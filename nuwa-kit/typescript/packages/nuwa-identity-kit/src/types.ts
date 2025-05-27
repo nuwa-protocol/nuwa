@@ -253,3 +253,106 @@ export interface SignerInterface {
    */
   canSign(keyId: string): Promise<boolean>;
 }
+
+/**
+ * CADOP (NIP-3) related types for Custodian-Assisted DID Onboarding Protocol
+ */
+
+/**
+ * Authentication methods enumeration for CADOP services
+ */
+export enum AuthMethod {
+  GoogleOAuth = 1,
+  TwitterOAuth = 2,
+  AppleSignIn = 3,
+  GitHubOAuth = 4,
+  EmailOTP = 5,
+  SMSOTP = 6,
+  WeChatQR = 7,
+  DiscordOAuth = 8,
+  // 10+ reserved for future versions
+}
+
+/**
+ * Sybil resistance levels for CADOP
+ */
+export enum SybilLevel {
+  None = 0,           // No specific verification
+  EmailBasic = 1,     // Email or basic Web2 OAuth
+  PhoneNumber = 2,    // Phone number verification
+  GovernmentID = 3    // Government ID or strong biometric
+}
+
+/**
+ * Metadata for CadopCustodianService
+ */
+export interface CadopCustodianServiceMetadata {
+  name?: string;
+  auth_methods?: AuthMethod[];
+  sybilLevel?: SybilLevel;
+  maxDailyMints?: number;
+}
+
+/**
+ * Metadata for CadopIdPService (Identity Provider)
+ */
+export interface CadopIdPServiceMetadata {
+  name?: string;
+  jwks_uri: string;  // REQUIRED
+  issuer_did?: string;
+  authorization_endpoint?: string;
+  token_endpoint?: string;
+}
+
+/**
+ * Metadata for Web2ProofServiceCADOP
+ */
+export interface Web2ProofServiceMetadata {
+  name?: string;
+  accepts?: string[];  // Types of Web2 proofs accepted
+  supportedClaims?: string[];  // Types of claims/VCs this service can issue
+}
+
+/**
+ * CADOP service types
+ */
+export const CADOP_SERVICE_TYPES = {
+  CUSTODIAN: 'CadopCustodianService',
+  IDENTITY_PROVIDER: 'CadopIdPService', 
+  WEB2_PROOF: 'Web2ProofServiceCADOP'
+} as const;
+
+/**
+ * OIDC ID Token claims required for CADOP
+ */
+export interface CadopIdTokenClaims {
+  iss: string;        // Issuer identifier
+  sub: string;        // Subject (user's DID, typically did:key)
+  aud: string;        // Audience (custodian DID)
+  exp: number;        // Expiration time
+  iat: number;        // Issued at time
+  jti: string;        // JWT ID (unique identifier)
+  nonce: string;      // Nonce from state parameter
+  pub_jwk: JsonWebKey; // Public key in JWK format
+  sybil_level: SybilLevel; // Sybil resistance level
+}
+
+/**
+ * CADOP onboarding request payload
+ */
+export interface CadopOnboardingRequest {
+  userDID: string;           // User's client-generated DID (e.g., did:key)
+  initialAgentKey_pub: JsonWebKey | Uint8Array; // Public key material
+  idToken: string;           // ID Token from CadopIdPService
+  web2ProofAttestations?: string[]; // Optional additional VCs from Web2ProofService
+}
+
+/**
+ * CADOP onboarding response
+ */
+export interface CadopOnboardingResponse {
+  success: boolean;
+  agentDID?: string;         // Final Agent DID (if newly created)
+  transactionHash?: string;  // On-chain transaction hash (if applicable)
+  error?: string;
+}

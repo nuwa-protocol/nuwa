@@ -7,3 +7,6 @@
 [submodule "nuwa-agent"]
 	path = nuwa-agent
 	url = https://github.com/nuwa-protocol/nuwa-agent.git
+[submodule "deps/rooch"]
+	path = deps/rooch
+	url = git@github.com:rooch-network/rooch.git
