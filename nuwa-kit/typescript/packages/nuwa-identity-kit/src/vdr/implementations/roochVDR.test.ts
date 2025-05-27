@@ -163,16 +163,29 @@ describe('RoochVDR', () => {
   describe('resolve', () => {
     it('should resolve a DID document', async () => {
       const mockMoveDoc = {
-        id: { identifier: '0x123' },
-        controller: [{ method: 'rooch', identifier: '0x123' }],
-        verification_methods: {},
-        authentication: ['account-key'],
-        assertion_method: ['account-key'],
-        capability_invocation: ['account-key'],
-        capability_delegation: ['account-key'],
-        key_agreement: [],
-        services: {},
-        also_known_as: [],
+        value: {
+          id: { 
+            value: { 
+              method: 'rooch', 
+              identifier: '0x123' 
+            } 
+          },
+          controller: { 
+            value: [['rooch', '0x123']] 
+          },
+          verification_methods: {
+            value: {
+              data: []
+            }
+          },
+          authentication: { value: [] },
+          assertion_method: { value: [] },
+          capability_invocation: { value: [] },
+          capability_delegation: { value: [] },
+          key_agreement: { value: [] },
+          services: { value: { data: [] } },
+          also_known_as: []
+        }
       };
 
       mockClient.executeViewFunction.mockResolvedValue({
@@ -198,6 +211,39 @@ describe('RoochVDR', () => {
 
   describe('addVerificationMethod', () => {
     it('should add verification method successfully', async () => {
+      // Mock resolve to return a valid DID document first
+      const mockMoveDoc = {
+        value: {
+          id: { 
+            value: { 
+              method: 'rooch', 
+              identifier: '0x123' 
+            } 
+          },
+          controller: { 
+            value: [['rooch', '0x123']] 
+          },
+          verification_methods: {
+            value: {
+              data: []
+            }
+          },
+          authentication: { value: [] },
+          assertion_method: { value: [] },
+          capability_invocation: { value: [] },
+          capability_delegation: { value: [] },
+          key_agreement: { value: [] },
+          services: { value: { data: [] } },
+          also_known_as: []
+        }
+      };
+
+      // First call is for resolve() in addVerificationMethod
+      mockClient.executeViewFunction.mockResolvedValue({
+        vm_status: 'Executed',
+        return_values: [{ decoded_value: mockMoveDoc }],
+      });
+
       const verificationMethod: VerificationMethod = {
         id: 'did:rooch:0x123#key-2',
         type: 'Ed25519VerificationKey2020',
@@ -222,6 +268,39 @@ describe('RoochVDR', () => {
 
   describe('addService', () => {
     it('should add service successfully', async () => {
+      // Mock resolve to return a valid DID document first
+      const mockMoveDoc = {
+        value: {
+          id: { 
+            value: { 
+              method: 'rooch', 
+              identifier: '0x123' 
+            } 
+          },
+          controller: { 
+            value: [['rooch', '0x123']] 
+          },
+          verification_methods: {
+            value: {
+              data: []
+            }
+          },
+          authentication: { value: [] },
+          assertion_method: { value: [] },
+          capability_invocation: { value: [] },
+          capability_delegation: { value: [] },
+          key_agreement: { value: [] },
+          services: { value: { data: [] } },
+          also_known_as: []
+        }
+      };
+
+      // First call is for resolve() in addService
+      mockClient.executeViewFunction.mockResolvedValue({
+        vm_status: 'Executed',
+        return_values: [{ decoded_value: mockMoveDoc }],
+      });
+
       mockClient.signAndExecuteTransaction.mockResolvedValue({
         execution_info: { status: { type: 'executed' } },
       });
