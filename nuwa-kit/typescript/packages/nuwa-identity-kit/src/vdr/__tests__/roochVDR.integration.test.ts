@@ -30,7 +30,7 @@ describe('RoochVDR Integration Tests', () => {
   let client: any;
   let keypair: any;
   let testAddress: string;
-  let actualDIDAddress: string;
+  let actualDID: string;
 
   beforeAll(async () => {
     // Skip integration tests if should not run
@@ -125,11 +125,11 @@ describe('RoochVDR Integration Tests', () => {
       expect(result.didDocument!.id).toBeTruthy();
 
       // Get the actual DID address from the create operation
-      actualDIDAddress = result.didDocument!.id;
-      expect(actualDIDAddress).toBeTruthy();
-      expect(actualDIDAddress).toMatch(/^did:rooch:rooch1[a-z0-9]+$/);
+      actualDID = result.didDocument!.id;
+      expect(actualDID).toBeTruthy();
+      expect(actualDID).toMatch(/^did:rooch:rooch1[a-z0-9]+$/);
       
-      console.log('✅ Actual DID created:', actualDIDAddress);
+      console.log('✅ Actual DID created:', actualDID);
       console.log('📝 Controller address:', testAddress);
       console.log('Note: External keypair is controller, DID contract creates new account for actual DID');
     }, TEST_TIMEOUT);
@@ -138,8 +138,8 @@ describe('RoochVDR Integration Tests', () => {
       if (!shouldRunIntegrationTests()) return;
 
       // Use the actual DID address that was created
-      expect(actualDIDAddress).toBeTruthy();
-      const exists = await roochVDR.exists(actualDIDAddress);
+      expect(actualDID).toBeTruthy();
+      const exists = await roochVDR.exists(actualDID);
       expect(exists).toBe(true);
     }, TEST_TIMEOUT);
 
@@ -147,10 +147,10 @@ describe('RoochVDR Integration Tests', () => {
       if (!shouldRunIntegrationTests()) return;
 
       // Use the actual DID address that was created
-      expect(actualDIDAddress).toBeTruthy();
-      const resolvedDoc = await roochVDR.resolve(actualDIDAddress);
+      expect(actualDID).toBeTruthy();
+      const resolvedDoc = await roochVDR.resolve(actualDID);
       expect(resolvedDoc).toBeTruthy();
-      expect(resolvedDoc?.id).toBe(actualDIDAddress);
+      expect(resolvedDoc?.id).toBe(actualDID);
       // The controller should be properly set (could be the DID itself or the creator address)
       expect(resolvedDoc?.controller).toBeTruthy();
       expect(Array.isArray(resolvedDoc?.controller)).toBe(true);
@@ -162,9 +162,9 @@ describe('RoochVDR Integration Tests', () => {
     it('should add a new verification method', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      expect(actualDIDAddress).toBeTruthy();
+      expect(actualDID).toBeTruthy();
       
-      console.log(`🔧 Adding verification method to DID: ${actualDIDAddress}`);
+      console.log(`🔧 Adding verification method to DID: ${actualDID}`);
       console.log(`🗝️ Using signer with address: ${testAddress}`);
       
       const newKeypair = Secp256k1Keypair.generate();
@@ -181,16 +181,16 @@ describe('RoochVDR Integration Tests', () => {
       console.log('- First few bytes:', Array.from(publicKeyBytes.slice(0, 5) as Uint8Array).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
       
       const verificationMethod: VerificationMethod = {
-        id: `${actualDIDAddress}#key-2`,
+        id: `${actualDID}#key-2`,
         type: 'EcdsaSecp256k1VerificationKey2019',
-        controller: actualDIDAddress,
+        controller: actualDID,
         publicKeyMultibase: publicKeyMultibase,
       };
 
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
 
       const success = await roochVDR.addVerificationMethod(
-        actualDIDAddress,
+        actualDID,
         verificationMethod,
         ['authentication', 'assertionMethod'],
         { signer: didAccount }
@@ -204,15 +204,15 @@ describe('RoochVDR Integration Tests', () => {
     it('should remove a verification method', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      expect(actualDIDAddress).toBeTruthy();
+      expect(actualDID).toBeTruthy();
       
-      console.log(`🗑️ Attempting to remove verification method from DID: ${actualDIDAddress}`);
+      console.log(`🗑️ Attempting to remove verification method from DID: ${actualDID}`);
       
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
       
       const success = await roochVDR.removeVerificationMethod(
-        actualDIDAddress,
-        `${actualDIDAddress}#key-2`,
+        actualDID,
+        `${actualDID}#key-2`,
         { signer: didAccount }
       );
 
@@ -226,17 +226,17 @@ describe('RoochVDR Integration Tests', () => {
     it('should add a service endpoint', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      expect(actualDIDAddress).toBeTruthy();
+      expect(actualDID).toBeTruthy();
       
-      console.log(`🔧 Adding service to DID: ${actualDIDAddress}`);
+      console.log(`🔧 Adding service to DID: ${actualDID}`);
       console.log(`🗝️ Using signer with address: ${testAddress}`);
       
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
       
       const success = await roochVDR.addService(
-        actualDIDAddress,
+        actualDID,
         {
-          id: `${actualDIDAddress}#service-1`,
+          id: `${actualDID}#service-1`,
           type: 'LinkedDomains',
           serviceEndpoint: 'https://example.com',
         },
@@ -251,16 +251,16 @@ describe('RoochVDR Integration Tests', () => {
     it('should add a service with properties', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      expect(actualDIDAddress).toBeTruthy();
+      expect(actualDID).toBeTruthy();
       
-      console.log(`🔧 Adding service with properties to DID: ${actualDIDAddress}`);
+      console.log(`🔧 Adding service with properties to DID: ${actualDID}`);
       
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
       
       const success = await roochVDR.addServiceWithProperties(
-        actualDIDAddress,
+        actualDID,
         {
-          id: `${actualDIDAddress}#llm-service`,
+          id: `${actualDID}#llm-service`,
           type: 'LLMGatewayNIP9',
           serviceEndpoint: 'https://api.example.com/llm',
           properties: {
@@ -279,15 +279,15 @@ describe('RoochVDR Integration Tests', () => {
     it('should remove a service', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      expect(actualDIDAddress).toBeTruthy();
+      expect(actualDID).toBeTruthy();
       
-      console.log(`🗑️ Attempting to remove service from DID: ${actualDIDAddress}`);
+      console.log(`🗑️ Attempting to remove service from DID: ${actualDID}`);
       
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
       
       const success = await roochVDR.removeService(
-        actualDIDAddress,
-        `${actualDIDAddress}#service-1`,
+        actualDID,
+        `${actualDID}#service-1`,
         { signer: didAccount }
       );
 
@@ -303,20 +303,20 @@ describe('RoochVDR Integration Tests', () => {
 
       console.log('🏗️ Testing CADOP DID creation...');
       console.log(`📝 Custodian address: ${testAddress}`);
-      console.log(`📝 Actual DID created earlier: ${actualDIDAddress}`);
+      console.log(`📝 Actual DID created earlier: ${actualDID}`);
       
       // First, try to add a CADOP service to the custodian's actual DID
       // Note: The custodian would need to have their own DID to provide CADOP services
       // For this test, we'll try to add the service to the actual DID created earlier
       
-      console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDIDAddress}`);
+      console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDID}`);
       
-      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      let didAccount = new DIDAccount(actualDID, keypair);
       
       const serviceAddResult = await roochVDR.addServiceWithProperties(
-        actualDIDAddress,
+        actualDID,
         {
-          id: `${actualDIDAddress}#cadop-service`,
+          id: `${actualDID}#cadop-service`,
           type: 'CadopCustodianService',
           serviceEndpoint: 'https://custodian.example.com/api/cadop',
           properties: {
