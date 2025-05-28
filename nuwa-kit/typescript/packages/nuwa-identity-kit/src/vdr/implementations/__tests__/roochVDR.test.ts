@@ -1,42 +1,86 @@
-import { RoochVDR } from './roochVDR';
-import { DIDDocument, VerificationMethod } from '../../types';
+import { RoochVDR } from '../roochVDR';
+import { DIDDocument, VerificationMethod } from '../../../types';
 
 // Mock the Rooch SDK
-jest.mock('@roochnetwork/rooch-sdk', () => ({
-  RoochClient: jest.fn().mockImplementation(() => ({
-    executeViewFunction: jest.fn(),
-    signAndExecuteTransaction: jest.fn(),
-    getStates: jest.fn(),
-  })),
-  Transaction: jest.fn().mockImplementation(() => ({
-    callFunction: jest.fn(),
-  })),
-  Args: {
-    string: jest.fn((val) => ({ value: val, type: 'string' })),
-    address: jest.fn((val) => ({ value: val, type: 'address' })),
-    u8: jest.fn((val) => ({ value: val, type: 'u8' })),
-    vec: jest.fn((type, val) => ({ value: val, type: `vec<${type}>` })),
-  },
-  getRoochNodeUrl: jest.fn((network) => {
-    const networkMap: { [key: string]: string } = {
-      'dev': 'localnet',
-      'test': 'testnet', 
-      'main': 'mainnet'
-    };
-    const roochNetwork = networkMap[network] || network;
-    return `https://${roochNetwork}-seed.rooch.network/`;
-  }),
-  bcs: {
-    struct: jest.fn(() => ({
-      parse: jest.fn(),
+jest.mock('@roochnetwork/rooch-sdk', () => {
+  class MockSigner {
+    getRoochAddress() { return new MockRoochAddress('0x123'); }
+    sign() { return Promise.resolve(new Uint8Array()); }
+    signTransaction() { return Promise.resolve({}); }
+    getKeyScheme() { return 'Ed25519'; }
+    getPublicKey() { return new MockPublicKey(); }
+    getBitcoinAddress() { throw new Error('Not implemented'); }
+  }
+
+  class MockRoochAddress {
+    private address: string;
+    constructor(address: string) {
+      this.address = address;
+    }
+    toBech32Address() { return 'rooch1...'; }
+    toHexAddress() { return this.address; }
+  }
+
+  class MockKeypair {
+    sign() { return Promise.resolve(new Uint8Array()); }
+    getKeyScheme() { return 'Ed25519'; }
+    getPublicKey() { return new MockPublicKey(); }
+  }
+
+  class MockPublicKey {
+    toBytes() { return new Uint8Array(); }
+  }
+
+  class MockAddress {
+    toBytes() { return new Uint8Array(); }
+  }
+
+  class MockBitcoinAddress {
+    toBytes() { return new Uint8Array(); }
+  }
+
+  return {
+    Signer: MockSigner,
+    RoochAddress: MockRoochAddress,
+    Keypair: MockKeypair,
+    PublicKey: MockPublicKey,
+    Address: MockAddress,
+    BitcoinAddress: MockBitcoinAddress,
+    RoochClient: jest.fn().mockImplementation(() => ({
+      executeViewFunction: jest.fn(),
+      signAndExecuteTransaction: jest.fn(),
+      getStates: jest.fn(),
     })),
-    string: jest.fn(),
-    vector: jest.fn(),
-    ObjectId: 'ObjectId',
-    Address: 'Address',
-  },
-  address: 'address',
-}));
+    Transaction: jest.fn().mockImplementation(() => ({
+      callFunction: jest.fn(),
+    })),
+    Args: {
+      string: jest.fn((val) => ({ value: val, type: 'string' })),
+      address: jest.fn((val) => ({ value: val, type: 'address' })),
+      u8: jest.fn((val) => ({ value: val, type: 'u8' })),
+      vec: jest.fn((type, val) => ({ value: val, type: `vec<${type}>` })),
+    },
+    getRoochNodeUrl: jest.fn((network) => {
+      const networkMap: { [key: string]: string } = {
+        'dev': 'localnet',
+        'test': 'testnet', 
+        'main': 'mainnet'
+      };
+      const roochNetwork = networkMap[network] || network;
+      return `https://${roochNetwork}-seed.rooch.network/`;
+    }),
+    bcs: {
+      struct: jest.fn(() => ({
+        parse: jest.fn(),
+      })),
+      string: jest.fn(),
+      vector: jest.fn(),
+      ObjectId: 'ObjectId',
+      Address: 'Address',
+    },
+    address: 'address',
+  };
+});
 
 describe('RoochVDR', () => {
   let roochVDR: RoochVDR;
@@ -51,7 +95,10 @@ describe('RoochVDR', () => {
     };
 
     mockSigner = {
-      getRoochAddress: jest.fn(() => ({ toHexAddress: () => '0x123' })),
+      getRoochAddress: jest.fn(() => ({
+        toBech32Address: () => 'rooch1test',
+        toHexAddress: () => '0x123'
+      })),
       signTransaction: jest.fn(),
     };
 
@@ -225,13 +272,18 @@ describe('RoochVDR', () => {
           },
           verification_methods: {
             value: {
-              data: []
+              data: [{
+                id: { value: 'key-1' },
+                type: { value: 'Ed25519VerificationKey2020' },
+                controller: { value: ['rooch', '0x123'] },
+                public_key: { value: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' }
+              }]
             }
           },
-          authentication: { value: [] },
-          assertion_method: { value: [] },
-          capability_invocation: { value: [] },
-          capability_delegation: { value: [] },
+          authentication: { value: ['key-1'] },
+          assertion_method: { value: ['key-1'] },
+          capability_invocation: { value: ['key-1'] },
+          capability_delegation: { value: ['key-1'] },
           key_agreement: { value: [] },
           services: { value: { data: [] } },
           also_known_as: []
@@ -282,13 +334,18 @@ describe('RoochVDR', () => {
           },
           verification_methods: {
             value: {
-              data: []
+              data: [{
+                id: { value: 'key-1' },
+                type: { value: 'Ed25519VerificationKey2020' },
+                controller: { value: ['rooch', '0x123'] },
+                public_key: { value: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' }
+              }]
             }
           },
-          authentication: { value: [] },
-          assertion_method: { value: [] },
-          capability_invocation: { value: [] },
-          capability_delegation: { value: [] },
+          authentication: { value: ['key-1'] },
+          assertion_method: { value: ['key-1'] },
+          capability_invocation: { value: ['key-1'] },
+          capability_delegation: { value: ['key-1'] },
           key_agreement: { value: [] },
           services: { value: { data: [] } },
           also_known_as: []

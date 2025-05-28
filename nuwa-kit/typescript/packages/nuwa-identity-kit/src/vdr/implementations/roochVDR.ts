@@ -3,7 +3,7 @@ import {
   RoochClient, 
   Transaction, 
   Args, 
-  getRoochNodeUrl, 
+  getRoochNodeUrl as sdkGetRoochNodeUrl, 
   bcs,
   Signer,
   RoochAddress,
@@ -14,9 +14,20 @@ import {
   Bytes,
   Authenticator,
   BitcoinAddress,
+  AnnotatedMoveStructView,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../../types';
 import { AbstractVDR } from '../abstractVDR';
+import {
+  DIDCreatedEventData,
+  parseDIDCreatedEvent,
+  getDIDAddressFromEvent,
+  convertMoveDIDDocumentToInterface,
+  DIDDocumentSchema,
+  MoveDIDDocument,
+  SimpleMap,
+  resolveDidObjectID,
+} from './roochVDRTypes';
 
 export interface RoochClientConfig {
   url: string;
@@ -92,36 +103,6 @@ export interface StoreResult {
   success: boolean;
   actualDIDAddress?: string;
 }
-
-/**
- * BCS type definitions for DID events
- */
-export interface DIDStruct {
-  method: string;
-  identifier: string;
-}
-
-export interface DIDCreatedEventData {
-  did: DIDStruct;
-  object_id: string;
-  controller: DIDStruct[];
-  creator_address: address;
-  creation_method: string;
-}
-
-// BCS schemas for deserializing DID events
-const DIDSchema = bcs.struct('DID', {
-  method: bcs.string(),
-  identifier: bcs.string(),
-});
-
-const DIDCreatedEventSchema = bcs.struct('DIDCreatedEvent', {
-  did: DIDSchema,
-  object_id: bcs.ObjectId, // ObjectID is 32 bytes
-  controller: bcs.vector(DIDSchema),
-  creator_address: bcs.Address, // Rooch address is 20 bytes  
-  creation_method: bcs.string(),
-});
 
 /**
  * Options for Rooch VDR operations
@@ -392,9 +373,9 @@ export class RoochVDR extends AbstractVDR {
   }
   
   /**
-   * Resolve a DID Document from the Rooch blockchain
+   * Resolve DID Document from Rooch blockchain
    * 
-   * @param did The DID to resolve
+   * @param did The DID to resolve (e.g., "did:rooch:0x123...")
    * @returns Promise resolving to the DID Document or null if not found
    */
   async resolve(did: string): Promise<DIDDocument | null> {
@@ -407,22 +388,31 @@ export class RoochVDR extends AbstractVDR {
         throw new Error('Invalid DID format. Expected did:rooch:address');
       }
       
-      const address = didParts[2];
+      const identifier = didParts[2];
       
-      // Call DID contract's get_did_document view function
+      // Calculate Object ID from identifier
+      const objectId = resolveDidObjectID(identifier);
+      
+      // Get Object from chain
       const result = await this.client.executeViewFunction({
         target: `${this.didContractAddress}::get_did_document`,
-        args: [Args.address(address)]
+        args: [Args.address(identifier)]
       });
       
       if (!result || result.vm_status !== 'Executed' || !result.return_values) {
         return null;
       }
-      
-      // Convert the Move DIDDocument struct to our DIDDocument interface
-      return this.convertMoveDIDDocumentToInterface(result.return_values[0]?.decoded_value);
+
+      // Convert Move value to MoveDIDDocument
+      const moveValue = result.return_values[0].decoded_value as AnnotatedMoveStructView;
+      if (!moveValue || !moveValue.value) {
+        return null;
+      }
+
+      // Convert to standard DID Document interface
+      return convertMoveDIDDocumentToInterface(moveValue);
     } catch (error) {
-      console.error(`Error resolving DID from Rooch blockchain:`, error);
+      this.errorLog(`Error resolving DID from Rooch blockchain:`, error);
       return null;
     }
   }
@@ -1060,40 +1050,7 @@ export class RoochVDR extends AbstractVDR {
     if (!moveDoc) return null;
     
     try {
-      // Extract DID information from the actual structure
-      const didId = moveDoc.value?.id?.value ? 
-        `did:${moveDoc.value.id.value.method}:${moveDoc.value.id.value.identifier}` : 
-        '';
-      
-      // Convert controller from the actual structure  
-      // Controller is stored as [["method", "identifier"]] format
-      const controller = moveDoc.value?.controller?.value?.[0] && Array.isArray(moveDoc.value.controller.value[0]) ? 
-        [`did:${moveDoc.value.controller.value[0][0]}:${moveDoc.value.controller.value[0][1]}`] : 
-        [];
-      
-      // Convert verification methods from SimpleMap structure
-      const verificationMethods = this.convertMoveVerificationMethods(moveDoc.value?.verification_methods);
-      
-      // Convert authentication/assertion/capability arrays from hex strings
-      const authentication = this.convertHexStringArray(moveDoc.value?.authentication);
-      const assertionMethod = this.convertHexStringArray(moveDoc.value?.assertion_method);
-      const capabilityInvocation = this.convertHexStringArray(moveDoc.value?.capability_invocation);
-      const capabilityDelegation = this.convertHexStringArray(moveDoc.value?.capability_delegation);
-      const keyAgreement = this.convertHexStringArray(moveDoc.value?.key_agreement);
-      
-      return {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: didId,
-        controller: controller,
-        verificationMethod: verificationMethods,
-        authentication: authentication,
-        assertionMethod: assertionMethod,
-        capabilityInvocation: capabilityInvocation,
-        capabilityDelegation: capabilityDelegation,
-        keyAgreement: keyAgreement,
-        service: this.convertMoveServices(moveDoc.value?.services),
-        alsoKnownAs: moveDoc.value?.also_known_as || []
-      };
+      return convertMoveDIDDocumentToInterface(moveDoc.value);
     } catch (error) {
       console.error('Error converting Move DIDDocument:', error);
       return null;
@@ -1101,194 +1058,15 @@ export class RoochVDR extends AbstractVDR {
   }
   
   /**
-   * Convert Move verification methods to our format
-   */
-  private convertMoveVerificationMethods(moveVMs: any): VerificationMethod[] {
-    if (!moveVMs?.value?.data) return [];
-    
-    try {
-      const vms: VerificationMethod[] = [];
-      const data = moveVMs.value.data;
-      
-      // Handle single element case vs array case
-      if (Array.isArray(data)) {
-        // Multiple verification methods
-        for (const element of data) {
-          const vm = this.convertSingleVerificationMethod(element);
-          if (vm) vms.push(vm);
-        }
-      } else if (data.value) {
-        // Single verification method
-        const vm = this.convertSingleVerificationMethod(data);
-        if (vm) vms.push(vm);
-      }
-      
-      return vms;
-    } catch (error) {
-      console.error('Error converting verification methods:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Convert a single verification method element
-   */
-  private convertSingleVerificationMethod(element: any): VerificationMethod | null {
-    try {
-      if (!element.value || element.value.length < 2) return null;
-      
-      const [key, valueData] = element.value;
-      const vmData = valueData.value;
-      
-      const vmId = vmData.id?.value;
-      const did = vmId?.did?.value;
-      const fragment = vmId?.fragment;
-      
-      if (!did || !fragment) return null;
-      
-      return {
-        id: `did:${did.method}:${did.identifier}#${fragment}`,
-        type: vmData.type,
-        controller: `did:${vmData.controller.value.method}:${vmData.controller.value.identifier}`,
-        publicKeyMultibase: vmData.public_key_multibase
-      };
-    } catch (error) {
-      console.error('Error converting single verification method:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Convert hex string array to string array
-   */
-  private convertHexStringArray(hexArray: any): string[] {
-    if (!hexArray?.value) return [];
-    
-    try {
-      // hexArray.value should be an array of hex strings
-      return hexArray.value.map((hexBytes: any) => {
-        if (Array.isArray(hexBytes) && hexBytes.length > 0 && hexBytes[0].startsWith('0x')) {
-          // Convert hex string to text
-          const hex = hexBytes[0].slice(2); // Remove '0x' prefix
-          return Buffer.from(hex, 'hex').toString('utf-8');
-        }
-        return '';
-      }).filter((str: string) => str.length > 0);
-    } catch (error) {
-      console.error('Error converting hex string array:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Convert Move services to our format
-   */
-  private convertMoveServices(moveServices: any): ServiceEndpoint[] {
-    if (!moveServices) return [];
-    
-    // Assuming moveServices is a SimpleMap structure
-    const services: ServiceEndpoint[] = [];
-    // Implementation depends on the actual Move SimpleMap structure
-    // This is a placeholder - adjust based on actual data structure
-    
-    return services;
-  }
-  
-  /**
-   * Get network-specific RPC URL
-   */
-  static getRoochNodeUrl(network: 'dev' | 'test' | 'main'): string {
-    // Map our network names to Rooch SDK network names
-    const networkMap: { [key: string]: string } = {
-      'dev': 'localnet',
-      'test': 'testnet', 
-      'main': 'mainnet'
-    };
-    
-    const roochNetwork = networkMap[network] || network;
-    return getRoochNodeUrl(roochNetwork as any);
-  }
-  
-  /**
-   * Parse DIDCreatedEvent using BCS schema
-   */
-  private parseDIDCreatedEvent(event: any): void {
-    const eventData = event.event_data;
-    const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
-    const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
-
-    this.debugLog('Event data bytes length:', bytes.length);
-    this.debugLog('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
-
-    try {
-      const decoded: DIDCreatedEventData = DIDCreatedEventSchema.parse(bytes);
-      this.debugLog('DID Created Event (BCS parsed):');
-      this.debugLog(`  New DID: did:${decoded.did.method}:${decoded.did.identifier}`);
-      this.debugLog(`  Object ID: ${decoded.object_id}`);
-      this.debugLog(`  Creator Address: ${decoded.creator_address}`);
-      this.debugLog(`  Creation Method: ${decoded.creation_method}`);
-      this.debugLog('  Controllers:');
-      decoded.controller.forEach((controller, index) => {
-        this.debugLog(`    [${index}] did:${controller.method}:${controller.identifier}`);
-      });
-    } catch (parseError) {
-      this.errorLog('BCS parsing failed:', parseError);
-      throw parseError;
-    }
-  }
-
-  /**
    * Parse DIDCreatedEvent using BCS schema and return the DID address
    */
   private parseDIDCreatedEventAndGetAddress(event: any): string | null {
-    const eventData = event.event_data;
-    const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
-    const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
-
-    this.debugLog('Event data bytes length:', bytes.length);
-    this.debugLog('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
-
     try {
-      const decoded: DIDCreatedEventData = DIDCreatedEventSchema.parse(bytes);
-      const newDIDAddress = `did:${decoded.did.method}:${decoded.did.identifier}`;
-      this.debugLog('DID Created Event (BCS parsed):');
-      this.debugLog(`  New DID: ${newDIDAddress}`);
-      this.debugLog(`  Object ID: ${decoded.object_id}`);
-      this.debugLog(`  Creator Address: ${decoded.creator_address}`);
-      this.debugLog(`  Creation Method: ${decoded.creation_method}`);
-      this.debugLog('  Controllers:');
-      decoded.controller.forEach((controller, index) => {
-        this.debugLog(`    [${index}] did:${controller.method}:${controller.identifier}`);
-      });
-      return newDIDAddress;
-    } catch (parseError) {
-      this.errorLog('BCS parsing failed:', parseError);
-      throw parseError;
-    }
-  }
-
-  /**
-   * Fallback method to parse DIDCreatedEvent using string matching
-   */
-  private parseDIDCreatedEventFallback(event: any): void {
-    const eventData = event.event_data;
-    const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
-    const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
-    
-    // Try to find DID strings in the data (look for "did:rooch:" patterns)
-    const dataStr = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-    console.log('Event data as string (fallback):', dataStr);
-    
-    // Look for rooch addresses (bech32 format starting with "rooch1")
-    const roochAddressMatches = dataStr.match(/rooch1[a-z0-9]{58}/g);
-    if (roochAddressMatches && roochAddressMatches.length > 0) {
-      console.log('Found Rooch addresses in event:', roochAddressMatches);
-      // The first address should be the new DID, the second should be the controller
-      if (roochAddressMatches.length >= 1) {
-        const newDIDAddress = roochAddressMatches[0];
-        console.log('🎉 New DID created (fallback):', `did:rooch:${newDIDAddress}`);
-        console.log('📝 Controller DID (fallback):', roochAddressMatches.length > 1 ? `did:rooch:${roochAddressMatches[1]}` : 'Not found');
-      }
+      const eventData = parseDIDCreatedEvent(event.event_data);
+      return getDIDAddressFromEvent(eventData);
+    } catch (error) {
+      this.errorLog('BCS parsing failed:', error);
+      throw error;
     }
   }
 
@@ -1337,6 +1115,22 @@ export class RoochVDR extends AbstractVDR {
       didContractAddress: '0x3::did'
     });
   }
+
+  /**
+   * Get network-specific RPC URL
+   */
+  private static getRoochNodeUrl(network: 'dev' | 'test' | 'main'): string {
+    // Map our network names to Rooch SDK network names
+    const networkMap: { [key: string]: string } = {
+      'dev': 'localnet',
+      'test': 'testnet', 
+      'main': 'mainnet'
+    };
+    
+    const roochNetwork = networkMap[network] || network;
+    return sdkGetRoochNodeUrl(roochNetwork as any);
+  }
+
 }
 
 /**
