@@ -2,7 +2,7 @@ import {
   RoochAddress,
 } from '@roochnetwork/rooch-sdk';
 import { resolveDidObjectID, convertMoveDIDDocumentToInterface } from '../roochVDRTypes';
-import { DIDDocument } from '../../../types';
+import { DIDDocument } from '../../types';
 
 describe('roochVDRTypes', () => {
   it('should resolve DIDDocument Object ID correctly', () => {

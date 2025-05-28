@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, afterAll } from '@jest/globals';
 import { DIDAccount, RoochVDR } from '../roochVDR';
-import { DIDDocument, VerificationMethod } from '../../../types';
+import { VerificationMethod } from '../../types';
 
 // Import Rooch SDK components for integration testing
 import { 

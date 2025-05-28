@@ -1,5 +1,5 @@
 import { RoochVDR } from '../roochVDR';
-import { DIDDocument, VerificationMethod } from '../../../types';
+import { VerificationMethod } from '../../types';
 import { 
   RoochClient, 
   Transaction, 

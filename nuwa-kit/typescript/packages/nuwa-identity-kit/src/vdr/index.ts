@@ -1,7 +1,6 @@
-import { DIDDocument, VDRInterface } from '../types';
+import { VDRInterface } from '../types';
 import { KeyVDR } from './keyVDR';
-import { AbstractVDR } from './abstractVDR';
-import { RoochVDR } from './implementations/roochVDR';
+import { RoochVDR } from './roochVDR';
 
 /**
  * Factory function to create a VDR instance based on the DID method
@@ -41,4 +40,4 @@ export function createDefaultVDRs(options?: {
 // Export VDR implementations
 export { KeyVDR } from './keyVDR';
 export { AbstractVDR } from './abstractVDR';
-export { RoochVDR } from './implementations/roochVDR';
+export { RoochVDR } from './roochVDR';

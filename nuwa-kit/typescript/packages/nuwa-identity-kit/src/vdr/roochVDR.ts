@@ -14,8 +14,8 @@ import {
   BitcoinAddress,
   ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../../types';
-import { AbstractVDR } from '../abstractVDR';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
+import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
   formatDIDString,

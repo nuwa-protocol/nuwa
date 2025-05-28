@@ -11,7 +11,7 @@ import {
   StructTag,
   ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
-import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../types';
 
 /**
  * BCS type definitions for DID related structs
