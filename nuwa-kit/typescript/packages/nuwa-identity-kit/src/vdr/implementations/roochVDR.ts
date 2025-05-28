@@ -15,6 +15,7 @@ import {
   Authenticator,
   BitcoinAddress,
   AnnotatedMoveStructView,
+  ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../../types';
 import { AbstractVDR } from '../abstractVDR';
@@ -392,25 +393,18 @@ export class RoochVDR extends AbstractVDR {
       
       // Calculate Object ID from identifier
       const objectId = resolveDidObjectID(identifier);
-      
-      // Get Object from chain
-      const result = await this.client.executeViewFunction({
-        target: `${this.didContractAddress}::get_did_document`,
-        args: [Args.address(identifier)]
+      const objectStates = await this.client.getObjectStates({
+        ids: [objectId],
       });
-      
-      if (!result || result.vm_status !== 'Executed' || !result.return_values) {
+      console.log('objectStates', JSON.stringify(objectStates, null, 2));
+
+      if (!objectStates || objectStates.length === 0) {
         return null;
       }
 
-      // Convert Move value to MoveDIDDocument
-      const moveValue = result.return_values[0].decoded_value as AnnotatedMoveStructView;
-      if (!moveValue || !moveValue.value) {
-        return null;
-      }
+      let didDocObject: ObjectStateView = objectStates[0];
 
-      // Convert to standard DID Document interface
-      return convertMoveDIDDocumentToInterface(moveValue);
+      return convertMoveDIDDocumentToInterface(didDocObject);
     } catch (error) {
       this.errorLog(`Error resolving DID from Rooch blockchain:`, error);
       return null;
@@ -1040,20 +1034,6 @@ export class RoochVDR extends AbstractVDR {
     } catch (error) {
       this.errorLog('Error checking permission:', error);
       return false;
-    }
-  }
-  
-  /**
-   * Convert Move DIDDocument struct to our DIDDocument interface
-   */
-  private convertMoveDIDDocumentToInterface(moveDoc: any): DIDDocument | null {
-    if (!moveDoc) return null;
-    
-    try {
-      return convertMoveDIDDocumentToInterface(moveDoc.value);
-    } catch (error) {
-      console.error('Error converting Move DIDDocument:', error);
-      return null;
     }
   }
   

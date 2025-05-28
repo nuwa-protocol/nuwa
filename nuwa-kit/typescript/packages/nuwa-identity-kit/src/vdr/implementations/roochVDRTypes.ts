@@ -9,6 +9,7 @@ import {
   stringToBytes,
   Serializer,
   StructTag,
+  ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../../types';
 
@@ -19,7 +20,10 @@ import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../../types';
 // SimpleMap schema generator
 export function simpleMapSchema<K, V>(keySchema: any, valueSchema: any) {
   return bcs.struct('SimpleMap', {
-    data: bcs.vector(bcs.tuple(keySchema, valueSchema)),
+    data: bcs.vector(bcs.struct('Entry', {
+      key: keySchema,
+      value: valueSchema
+    })),
   });
 }
 
@@ -140,18 +144,24 @@ export const DIDCreatedEventSchema = bcs.struct('DIDCreatedEvent', {
 
 // TypeScript interface for SimpleMap
 export interface SimpleMap<K, V> {
-  data: [K, V][];
+  data: Array<{
+    key: K;
+    value: V;
+  }>;
 }
 
 // Convert SimpleMap to standard Map
 export function simpleMapToMap<K, V>(simpleMap: SimpleMap<K, V>): Map<K, V> {
-  return new Map(simpleMap.data);
+  return new Map(simpleMap.data.map(entry => [entry.key, entry.value]));
 }
 
 // Convert standard Map to SimpleMap
 export function mapToSimpleMap<K, V>(map: Map<K, V>): SimpleMap<K, V> {
   return {
-    data: Array.from(map.entries())
+    data: Array.from(map.entries()).map(([key, value]) => ({
+      key,
+      value
+    }))
   };
 }
 
@@ -178,30 +188,24 @@ export function convertMoveValue<T>(moveValue: AnnotatedMoveValueView): T {
 /**
  * Convert Move DID Document to standard DID Document interface
  */
-export function convertMoveDIDDocumentToInterface(moveDoc: AnnotatedMoveStructView): DIDDocument {
-  // Convert Move value to MoveDIDDocument
-  const doc: MoveDIDDocument = {
-    id: convertMoveValue(moveDoc.value.id),
-    controller: convertMoveValue(moveDoc.value.controller),
-    verification_methods: convertMoveValue(moveDoc.value.verification_methods),
-    authentication: convertMoveValue(moveDoc.value.authentication),
-    assertion_method: convertMoveValue(moveDoc.value.assertion_method),
-    capability_invocation: convertMoveValue(moveDoc.value.capability_invocation),
-    capability_delegation: convertMoveValue(moveDoc.value.capability_delegation),
-    key_agreement: convertMoveValue(moveDoc.value.key_agreement),
-    services: convertMoveValue(moveDoc.value.services),
-    also_known_as: convertMoveValue(moveDoc.value.also_known_as),
-  };
+export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView): DIDDocument {
+  // Parse BCS hex string to bytes and deserialize
+  let bcsHex = didDocObject.value;
+  // Remove '0x' prefix if present
+  bcsHex = bcsHex.startsWith('0x') ? bcsHex.slice(2) : bcsHex;
+  let bcsBytes = new Uint8Array(bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
+  let didDoc = DIDDocumentSchema.parse(bcsBytes);
 
   // Create DID string
-  const didId = `did:${doc.id.method}:${doc.id.identifier}`;
+  const didId = `did:${didDoc.id.method}:${didDoc.id.identifier}`;
   
   // Convert controllers
-  const controllers = doc.controller.map(c => `did:${c.method}:${c.identifier}`);
+  const controllers = didDoc.controller.map(c => `did:${c.method}:${c.identifier}`);
   
   // Convert verification methods
   const verificationMethods: VerificationMethod[] = [];
-  doc.verification_methods.forEach((vm: MoveVerificationMethod) => {
+  const verificationMethodsMap = simpleMapToMap(didDoc.verification_methods) as Map<string, MoveVerificationMethod>;
+  verificationMethodsMap.forEach((vm) => {
     verificationMethods.push({
       id: `did:${vm.id.did.method}:${vm.id.did.identifier}#${vm.id.fragment}`,
       type: vm.type,
@@ -209,10 +213,14 @@ export function convertMoveDIDDocumentToInterface(moveDoc: AnnotatedMoveStructVi
       publicKeyMultibase: vm.public_key_multibase,
     });
   });
+
+  // Helper function to convert fragment to full DID URL
+  const convertFragmentToDIDURL = (fragment: string) => `${didId}#${fragment}`;
   
   // Convert services
   const services: ServiceEndpoint[] = [];
-  doc.services.forEach((service: MoveService) => {
+  const servicesMap = simpleMapToMap(didDoc.services) as Map<string, MoveService>;
+  servicesMap.forEach((service) => {
     const serviceEndpoint: ServiceEndpoint = {
       id: `did:${service.id.did.method}:${service.id.did.identifier}#${service.id.fragment}`,
       type: service.type,
@@ -225,7 +233,7 @@ export function convertMoveDIDDocumentToInterface(moveDoc: AnnotatedMoveStructVi
       service.properties.forEach((value, key) => {
         properties[key] = value;
       });
-      (serviceEndpoint as any).properties = properties;
+      Object.assign(serviceEndpoint, properties);
     }
     
     services.push(serviceEndpoint);
@@ -236,13 +244,13 @@ export function convertMoveDIDDocumentToInterface(moveDoc: AnnotatedMoveStructVi
     id: didId,
     controller: controllers,
     verificationMethod: verificationMethods,
-    authentication: doc.authentication,
-    assertionMethod: doc.assertion_method,
-    capabilityInvocation: doc.capability_invocation,
-    capabilityDelegation: doc.capability_delegation,
-    keyAgreement: doc.key_agreement,
+    authentication: didDoc.authentication.map(convertFragmentToDIDURL),
+    assertionMethod: didDoc.assertion_method.map(convertFragmentToDIDURL),
+    capabilityInvocation: didDoc.capability_invocation.map(convertFragmentToDIDURL),
+    capabilityDelegation: didDoc.capability_delegation.map(convertFragmentToDIDURL),
+    keyAgreement: didDoc.key_agreement.map(convertFragmentToDIDURL),
     service: services,
-    alsoKnownAs: doc.also_known_as,
+    alsoKnownAs: didDoc.also_known_as,
   };
 }
 
@@ -279,7 +287,7 @@ export function resolveDidObjectID(identifier: string): string {
 }
 
 export function customObjectID(id: string, structTag: StructTag): string {
-  const idBytes = stringToBytes('utf8', id);
+  const idBytes = bcs.String.serialize(id).toBytes();
   const typeBytes = stringToBytes('utf8', Serializer.structTagToCanonicalString(structTag));
   const bytes = new Uint8Array(idBytes.length + typeBytes.length);
   bytes.set(idBytes);
