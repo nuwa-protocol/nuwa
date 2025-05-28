@@ -1,23 +1,18 @@
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "moduleFileExtensions": ["ts", "js", "json"],
-  "roots": [
-    "<rootDir>/test",
-    "<rootDir>/src"
-  ],
-  "testMatch": [
-    "**/*.test.ts"
-  ],
+  "roots": ["<rootDir>/src", "<rootDir>/test"],
   "transform": {
     "^.+\\.tsx?$": ["ts-jest", {
-      "tsconfig": "tsconfig.test.json"
+      "tsconfig": "tsconfig.json"
     }]
   },
-  "verbose": true,
+  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "verbose": false,
   "collectCoverage": true,
   "coverageDirectory": "coverage",
-  "coverageReporters": ["text", "lcov"],
+  "coverageReporters": ["text-summary"],
   "collectCoverageFrom": [
     "src/**/*.ts",
     "!src/**/types.ts",
@@ -31,5 +26,14 @@
       "statements": 0
     }
   },
-  "setupFiles": ["<rootDir>/test/setup.js"]
+  "setupFiles": ["<rootDir>/test/setup.js"],
+  "reporters": [
+    ["default", {
+      "summaryThreshold": 1,
+      "verbose": false
+    }]
+  ],
+  "maxConcurrency": 1,
+  "maxWorkers": 1,
+  "silent": true
 }

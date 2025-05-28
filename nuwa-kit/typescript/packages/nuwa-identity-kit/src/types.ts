@@ -100,9 +100,63 @@ export type VerificationRelationship =
  */
 export interface MasterIdentity {
   did: string;
-  didDocument: DIDDocument;
   masterKeyId: string; // ID of the primary master key in verificationMethod
+  masterPublicKeyMultibase: string; // Multibase encoded public key
   masterPrivateKey: CryptoKey | Uint8Array; // The private key material for the master key
+}
+
+/**
+ * DID creation request information
+ */
+export interface DIDCreationRequest {
+  // Basic information
+  publicKeyMultibase: string;
+  keyType?: string; // Default inferred, e.g., 'EcdsaSecp256k1VerificationKey2019'
+  
+  // Optional preferred DID (some VDRs may support this)
+  preferredDID?: string;
+  
+  // Controller information
+  controller?: string | string[];
+  
+  // Initial verification relationships
+  initialRelationships?: VerificationRelationship[];
+  
+  // Initial service endpoints
+  initialServices?: ServiceEndpoint[];
+  
+  // Additional verification methods
+  additionalVerificationMethods?: VerificationMethod[];
+}
+
+/**
+ * DID creation result
+ */
+export interface DIDCreationResult {
+  success: boolean;
+  did: string; // Actual created DID (required field)
+  didDocument?: DIDDocument; // The created DID Document
+  transactionHash?: string;
+  blockHeight?: number;
+  error?: string;
+  
+  // Additional information for debugging
+  debug?: {
+    requestedDID?: string;
+    actualDID?: string;
+    events?: any[];
+    transactionResult?: any; // Transaction execution result for debugging
+  };
+}
+
+/**
+ * CADOP creation request
+ */
+export interface CADOPCreationRequest {
+  userDidKey: string;
+  custodianServicePublicKey: string;
+  custodianServiceVMType: string;
+  additionalClaims?: Record<string, any>;
 }
 
 /**
@@ -110,17 +164,6 @@ export interface MasterIdentity {
  * A VDR is responsible for storing and retrieving DID Documents
  */
 export interface VDRInterface {
-  /**
-   * Store a new DID Document in the registry
-   * This should be used ONLY for the initial creation of a DID document
-   * For updates, use the specific methods like addVerificationMethod, removeVerificationMethod, etc.
-   * 
-   * @param didDocument The DID Document to store
-   * @param options Optional storing options (e.g., signer, gas limit)
-   * @returns Promise resolving to true if successful
-   */
-  store(didDocument: DIDDocument, options?: any): Promise<boolean>;
-  
   /**
    * Resolve a DID to its DID Document
    * @param did The DID to resolve
@@ -140,6 +183,24 @@ export interface VDRInterface {
    * @returns The DID method (e.g., 'key', 'web', 'rooch')
    */
   getMethod(): string;
+  
+  /**
+   * Create a new DID
+   * 
+   * @param request DID creation request
+   * @param options Creation options
+   * @returns DID creation result, containing the actual created DID
+   */
+  create(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult>;
+  
+  /**
+   * Create a DID via CADOP
+   * 
+   * @param request CADOP creation request
+   * @param options Creation options
+   * @returns DID creation result
+   */
+  createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult>;
   
   /**
    * Add a new verification method to a DID document
@@ -356,3 +417,37 @@ export interface CadopOnboardingResponse {
   transactionHash?: string;  // On-chain transaction hash (if applicable)
   error?: string;
 }
+
+/**
+ * Key type constants for cryptographic operations
+ */
+export const KEY_TYPE = {
+  ED25519: 'Ed25519VerificationKey2020',
+  SECP256K1: 'EcdsaSecp256k1VerificationKey2019'
+} as const;
+
+export type KeyType = typeof KEY_TYPE[keyof typeof KEY_TYPE];
+
+/**
+ * Type guard to check if a string is a valid KeyType
+ */
+export function isKeyType(value: string): value is KeyType {
+  return Object.values(KEY_TYPE).includes(value as KeyType);
+}
+
+/**
+ * Convert a string to KeyType, with runtime validation
+ * @throws Error if the string is not a valid KeyType
+ */
+export function toKeyType(value: string): KeyType {
+  if (isKeyType(value)) {
+    return value;
+  }
+  throw new Error(`Invalid key type: ${value}`);
+}
+
+/**
+ * Type that represents either a KeyType or a string
+ * Useful for functions that need to accept both strict KeyType and general string values
+ */
+export type KeyTypeInput = KeyType | string;

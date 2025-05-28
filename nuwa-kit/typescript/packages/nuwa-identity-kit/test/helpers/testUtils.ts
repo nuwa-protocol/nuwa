@@ -1,177 +1,53 @@
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, SignerInterface } from '../../src/types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, SignerInterface, MasterIdentity, KEY_TYPE, KeyType } from '../../src/types';
+import { CryptoUtils } from '../../src/cryptoUtils';
 // For Node.js environments
 import { Buffer } from 'buffer';
 
 /**
- * Creates a basic test DID document with a master key
- * 
- * @param did The DID to use for the document
- * @returns A DID document with basic structure and a master key
+ * Creates a test DID document
+ * @param did The DID to use
+ * @returns A test DID document
  */
 export function createTestDIDDocument(did: string): DIDDocument {
-  const keyId = `${did}#master`;
   return {
-    '@context': ['https://www.w3.org/ns/did/v1'],
-    id: did,
-    verificationMethod: [
-      {
-        id: keyId,
-        type: 'Ed25519VerificationKey2020',
-        controller: did,
-        publicKeyMultibase: 'zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV'
-      }
+    '@context': [
+      'https://www.w3.org/ns/did/v1',
+      'https://w3id.org/security/suites/jws-2020/v1'
     ],
-    authentication: [keyId],
-    assertionMethod: [keyId],
-    capabilityInvocation: [keyId],
-    capabilityDelegation: [keyId]
+    id: did,
+    controller: did,
+    verificationMethod: [],
+    authentication: [],
+    assertionMethod: [],
+    capabilityInvocation: [],
+    capabilityDelegation: []
   };
-}
-
-/**
- * Creates a test DID document with multiple keys and specific capabilities
- * 
- * @param did The DID to use for the document
- * @param keyConfig Configuration of keys to add with specific permissions
- * @returns A DID document with multiple keys and specified permissions
- */
-export function createTestDIDDocumentWithMultipleKeys(did: string, keyConfig: {
-  withCapabilityDelegation?: string;
-  withoutCapabilityDelegation?: string;
-  withCapabilityInvocation?: string;
-  withoutCapabilityInvocation?: string;
-  withAuthentication?: string;
-  withoutAuthentication?: string;
-  withAssertionMethod?: string;
-  withoutAssertionMethod?: string;
-}): DIDDocument {
-  const doc = createTestDIDDocument(did);
-  
-  // Add keys based on configuration
-  if (keyConfig.withCapabilityDelegation) {
-    const keyId = keyConfig.withCapabilityDelegation;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z2DEF456AbCdEfG'
-    });
-    doc.capabilityDelegation!.push(keyId);
-  }
-  
-  if (keyConfig.withoutCapabilityDelegation) {
-    const keyId = keyConfig.withoutCapabilityDelegation;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z3HIJ789KlMnOp'
-    });
-    // Don't add to capabilityDelegation
-  }
-  
-  if (keyConfig.withCapabilityInvocation) {
-    const keyId = keyConfig.withCapabilityInvocation;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z4QRS012TuVwXy'
-    });
-    doc.capabilityInvocation!.push(keyId);
-  }
-  
-  if (keyConfig.withoutCapabilityInvocation) {
-    const keyId = keyConfig.withoutCapabilityInvocation;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z5ZAB345CdEfGh'
-    });
-    // Don't add to capabilityInvocation
-  }
-  
-  if (keyConfig.withAuthentication) {
-    const keyId = keyConfig.withAuthentication;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z6ZAB345CdEfGh'
-    });
-    doc.authentication!.push(keyId);
-  }
-  
-  if (keyConfig.withoutAuthentication) {
-    const keyId = keyConfig.withoutAuthentication;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z7ZAB345CdEfGh'
-    });
-    // Don't add to authentication
-  }
-  
-  if (keyConfig.withAssertionMethod) {
-    const keyId = keyConfig.withAssertionMethod;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z8ZAB345CdEfGh'
-    });
-    doc.assertionMethod!.push(keyId);
-  }
-  
-  if (keyConfig.withoutAssertionMethod) {
-    const keyId = keyConfig.withoutAssertionMethod;
-    doc.verificationMethod!.push({
-      id: keyId,
-      type: 'Ed25519VerificationKey2020',
-      controller: did,
-      publicKeyMultibase: 'z9ZAB345CdEfGh'
-    });
-    // Don't add to assertionMethod
-  }
-  
-  return doc;
 }
 
 /**
  * Creates a test verification method
- * 
- * @param id The ID for the verification method
- * @returns A verification method object
+ * @param id The ID of the verification method
+ * @returns A test verification method
  */
 export function createTestVerificationMethod(id: string): VerificationMethod {
-  const did = id.split('#')[0];
   return {
     id,
-    type: 'Ed25519VerificationKey2020',
-    controller: did,
-    publicKeyMultibase: 'zRandomMultibaseValue'
+    type: KEY_TYPE.ED25519,
+    controller: id.split('#')[0],
+    publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
   };
 }
 
 /**
- * Creates a test service endpoint
- * 
- * @param id The ID for the service
- * @param type Optional service type, defaults to 'TestService'
- * @param endpoint Optional service endpoint URL, defaults to 'https://example.com/service'
- * @returns A service endpoint object
+ * Creates a test service
+ * @param id The ID of the service
+ * @returns A test service
  */
-export function createTestService(
-  id: string, 
-  type: string = 'TestService',
-  endpoint: string = 'https://example.com/service'
-): ServiceEndpoint {
+export function createTestService(id: string): ServiceEndpoint {
   return {
     id,
-    type,
-    serviceEndpoint: endpoint
+    type: 'TestService',
+    serviceEndpoint: 'https://example.com/test'
   };
 }
 
@@ -182,10 +58,7 @@ export function createTestService(
  * @returns A mock private key as Uint8Array
  */
 export function createMockPrivateKey(): Uint8Array {
-  return new Uint8Array([
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
-  ]);
+  return new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 }
 
 /**
@@ -240,7 +113,6 @@ export class MockSigner implements SignerInterface {
     }
     
     // For testing, we'll create a simple base64-like string without actually encoding
-    // This avoids dependencies on Buffer or btoa which can be problematic in some environments
     return 'TEST_SIGNATURE_' + Array.from(signature)
       .map(byte => byte.toString(16).padStart(2, '0'))
       .join('');
@@ -266,5 +138,32 @@ export function createTestOptionsWithSigner(keyId: string, privateKey?: Uint8Arr
   return {
     keyId,
     signer: mockSigner
+  };
+}
+
+/**
+ * Creates a test master identity
+ * @param method The DID method to use
+ * @param keyType Optional key type to use (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
+ * @param masterKeyIdFragment Optional master key ID fragment
+ * @returns A test master identity
+ */
+export async function createTestMasterIdentity(
+  method: string,
+  keyType?: KeyType,
+  masterKeyIdFragment?: string
+): Promise<MasterIdentity> {
+  // Generate a test key pair
+  const actualKeyType = keyType || KEY_TYPE.ED25519;
+  const keyPair = await CryptoUtils.generateKeyPair(actualKeyType);
+  const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey as Uint8Array, actualKeyType);
+  const did = `did:${method}:${publicKeyMultibase}`;
+  const keyId = `${did}#${masterKeyIdFragment || publicKeyMultibase}`;
+  
+  return {
+    did,
+    masterKeyId: keyId,
+    masterPublicKeyMultibase: publicKeyMultibase,
+    masterPrivateKey: keyPair.privateKey
   };
 }

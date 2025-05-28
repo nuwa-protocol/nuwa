@@ -128,62 +128,6 @@ describe('RoochVDR', () => {
     });
   });
 
-  describe('store', () => {
-    it('should store a DID document successfully', async () => {
-      const didDocument: DIDDocument = {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: 'did:rooch:0x123',
-        controller: ['did:rooch:0x123'],
-        verificationMethod: [
-          {
-            id: 'did:rooch:0x123#account-key',
-            type: 'EcdsaSecp256k1VerificationKey2019',
-            controller: 'did:rooch:0x123',
-            publicKeyMultibase: 'z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic',
-          },
-        ],
-        authentication: ['did:rooch:0x123#account-key'],
-        assertionMethod: ['did:rooch:0x123#account-key'],
-        capabilityInvocation: ['did:rooch:0x123#account-key'],
-        capabilityDelegation: ['did:rooch:0x123#account-key'],
-      };
-
-      const mockExecutionInfo: ExecuteTransactionResponseView = {
-        execution_info: {
-          event_root: '0x123',
-          gas_used: '1000',
-          state_root: '0x456',
-          tx_hash: '0x789',
-          status: { type: 'executed' },
-        },
-        sequence_info: {
-          tx_order: '1',
-          tx_accumulator_root: '0x123',
-          tx_order_signature: '0x456',
-          tx_timestamp: '2024-01-01T00:00:00Z'
-        },
-      };
-
-      mockClient.signAndExecuteTransaction.mockResolvedValue(mockExecutionInfo);
-
-      const result = await roochVDR.store(didDocument);
-      expect(result).toBe(true);
-    });
-
-    it('should throw error when no verification method is provided', async () => {
-      const didDocument: DIDDocument = {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: 'did:rooch:0x123',
-        controller: ['did:rooch:0x123'],
-        verificationMethod: [],
-      };
-
-      await expect(roochVDR.store(didDocument)).rejects.toThrow(
-        'DID document must have at least one verification method'
-      );
-    });
-  });
-
   describe('addVerificationMethod', () => {
     it('should add verification method successfully', async () => {
       const mockObjectState: ObjectStateView = {

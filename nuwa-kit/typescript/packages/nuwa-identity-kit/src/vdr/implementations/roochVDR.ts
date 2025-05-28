@@ -17,7 +17,7 @@ import {
   AnnotatedMoveStructView,
   ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../../types';
 import { AbstractVDR } from '../abstractVDR';
 import {
   DIDCreatedEventData,
@@ -86,15 +86,6 @@ export interface RoochVDROptions {
    * Enable debug mode for detailed logging
    */
   debug?: boolean;
-}
-
-/**
- * Result of DID creation operation
- */
-export interface DIDCreationResult {
-  success: boolean;
-  newDIDAddress?: string;
-  transactionHash?: string;
 }
 
 /**
@@ -245,36 +236,23 @@ export class RoochVDR extends AbstractVDR {
   }
   
   /**
-   * Store a new DID Document on the Rooch blockchain
-   * This creates a DID for oneself using account key
-   * 
-   * @param didDocument The DID Document to store
-   * @param options Operation options including signer
-   * @returns Promise resolving to true if successful
+   * Override create method to support Rooch dynamic DID generation
    */
-  async store(didDocument: DIDDocument, options?: RoochVDROperationOptions): Promise<boolean> {
+  async create(request: DIDCreationRequest, options?: RoochVDROperationOptions): Promise<DIDCreationResult> {
     try {
-      this.validateDocument(didDocument);
-      
       const signer = options?.signer || this.options.signer;
       if (!signer) {
-        throw new Error('No signer provided for store operation');
+        throw new Error('No signer provided for create operation');
       }
       
-      // Extract the account public key from the first verification method
-      const firstVM = didDocument.verificationMethod?.[0];
-      if (!firstVM || !firstVM.publicKeyMultibase) {
-        throw new Error('DID document must have at least one verification method with publicKeyMultibase');
-      }
+      this.debugLog('Creating DID with request:', request);
       
-      // Create transaction to call DID contract's create_did_object_for_self_entry function
+      // Create transaction
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::create_did_object_for_self_entry`,
-        args: [
-          Args.string(firstVM.publicKeyMultibase)
-        ],
-        maxGas: options?.maxGas || 100000000 // 1 RGas default
+        args: [Args.string(request.publicKeyMultibase)],
+        maxGas: options?.maxGas || 100000000
       });
       
       // Execute transaction
@@ -284,77 +262,80 @@ export class RoochVDR extends AbstractVDR {
         option: { withOutput: true }
       });
       
-      // Check if transaction was successful
       const success = result.execution_info.status.type === 'executed';
       
-      if (success) {
-        this.debugLog(`DID Document ${didDocument.id} successfully stored on Rooch blockchain`);
-        
-        // Extract the actual DID address from transaction events
-        // Look for DIDCreatedEvent in the events
-        const didCreatedEvent = result.output?.events?.find((event: any) => 
-          event.event_type === '0x3::did::DIDCreatedEvent'
-        );
-        
-        if (didCreatedEvent) {
-          this.debugLog('DID creation event found:', didCreatedEvent);
-          
-          // Parse the actual DID address from the event data using BCS
-          try {
-            const actualDIDAddress = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent);
-            if (actualDIDAddress) {
-              this.lastCreatedDIDAddress = actualDIDAddress;
-            }
-          } catch (error) {
-            this.errorLog('Could not parse DID from event data using BCS:', error);
-            // Fallback to string parsing if BCS fails
-            const fallbackAddress = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent);
-            if (fallbackAddress) {
-              this.lastCreatedDIDAddress = fallbackAddress;
-            }
+      if (!success) {
+        // Return preferredDID or generate a failure placeholder on failure
+        return {
+          success: false,
+          did: request.preferredDID || `did:rooch:failed-${Date.now()}`,
+          error: 'Transaction execution failed',
+          debug: {
+            requestedDID: request.preferredDID,
+            transactionResult: result.execution_info
           }
-        }
-      } else {
-        this.errorLog(`Failed to store DID Document ${didDocument.id} on Rooch blockchain`);
-        this.errorLog('Transaction execution info:', result.execution_info);
+        };
       }
       
-      return success;
+      // Parse the actual created DID
+      let actualDID: string | undefined;
+      const didCreatedEvent = result.output?.events?.find((event: any) => 
+        event.event_type === '0x3::did::DIDCreatedEvent'
+      );
+      
+      if (didCreatedEvent) {
+        try {
+          actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
+        } catch (error) {
+          actualDID = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent) || undefined;
+        }
+      }
+      
+      if (actualDID) {
+        this.lastCreatedDIDAddress = actualDID;
+      }
+      
+      // Ensure we always return a valid DID
+      const finalDID = actualDID || request.preferredDID || `did:rooch:unknown-${Date.now()}`;
+      
+      return {
+        success: true,
+        did: finalDID,
+        transactionHash: (result as any).transaction_hash,
+        debug: {
+          requestedDID: request.preferredDID,
+          actualDID: actualDID,
+          events: result.output?.events
+        }
+      };
     } catch (error) {
-      this.errorLog(`Error storing DID document on Rooch blockchain:`, error);
-      throw error;
+      this.errorLog('Error creating DID:', error);
+      return {
+        success: false,
+        did: request.preferredDID || `did:rooch:error-${Date.now()}`,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
   
   /**
-   * Create a DID via CADOP (Custodian-Assisted DID Onboarding Protocol)
-   * 
-   * @param userDidKeyString User's did:key string
-   * @param custodianServicePkMultibase Custodian's service public key
-   * @param custodianServiceVmType Custodian service VM type
-   * @param options Operation options including custodian signer
-   * @returns Promise resolving to true if successful
+   * Override CADOP creation method
    */
-  async createViaCADOP(
-    userDidKeyString: string,
-    custodianServicePkMultibase: string,
-    custodianServiceVmType: string,
-    options?: RoochVDROperationOptions
-  ): Promise<boolean> {
+  async createViaCADOP(request: CADOPCreationRequest, options?: RoochVDROperationOptions): Promise<DIDCreationResult> {
     try {
       const signer = options?.signer || this.options.signer;
       if (!signer) {
         throw new Error('No custodian signer provided for CADOP operation');
       }
       
-      // Create transaction to call DID contract's create_did_object_via_cadop_with_did_key_entry function
+      // Create transaction
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::create_did_object_via_cadop_with_did_key_entry`,
         args: [
-          Args.string(userDidKeyString),
-          Args.string(custodianServicePkMultibase),
-          Args.string(custodianServiceVmType)
+          Args.string(request.userDidKey),
+          Args.string(request.custodianServicePublicKey),
+          Args.string(request.custodianServiceVMType)
         ],
         maxGas: options?.maxGas || 100000000
       });
@@ -366,11 +347,65 @@ export class RoochVDR extends AbstractVDR {
         option: { withOutput: true }
       });
       
-      return result.execution_info.status.type === 'executed';
+      const success = result.execution_info.status.type === 'executed';
+      
+      if (!success) {
+        return {
+          success: false,
+          did: `did:rooch:cadop-failed-${Date.now()}`,
+          error: 'CADOP transaction execution failed'
+        };
+      }
+      
+      // Parse the created DID
+      let actualDID: string | undefined;
+      const didCreatedEvent = result.output?.events?.find((event: any) => 
+        event.event_type === '0x3::did::DIDCreatedEvent'
+      );
+      
+      if (didCreatedEvent) {
+        try {
+          actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
+        } catch (error) {
+          actualDID = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent) || undefined;
+        }
+      }
+      
+      return {
+        success: true,
+        did: actualDID || `did:rooch:cadop-unknown-${Date.now()}`,
+        transactionHash: (result as any).transaction_hash
+      };
     } catch (error) {
-      console.error(`Error creating DID via CADOP:`, error);
-      throw error;
+      this.errorLog('Error creating DID via CADOP:', error);
+      return {
+        success: false,
+        did: `did:rooch:cadop-error-${Date.now()}`,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
+  } 
+
+  /**
+   * Extract verification relationships from DID Document for a specified verification method
+   */
+  private extractRelationshipsFromDocument(didDocument: DIDDocument, vmId: string): VerificationRelationship[] {
+    const relationships: VerificationRelationship[] = [];
+    const relationshipTypes: VerificationRelationship[] = [
+      'authentication', 'assertionMethod', 'keyAgreement', 
+      'capabilityInvocation', 'capabilityDelegation'
+    ];
+    
+    relationshipTypes.forEach(rel => {
+      const relationshipArray = didDocument[rel];
+      if (relationshipArray && relationshipArray.some(item => 
+        typeof item === 'string' ? item === vmId : item.id === vmId
+      )) {
+        relationships.push(rel);
+      }
+    });
+    
+    return relationships;
   }
   
   /**
@@ -396,7 +431,6 @@ export class RoochVDR extends AbstractVDR {
       const objectStates = await this.client.getObjectStates({
         ids: [objectId],
       });
-      console.log('objectStates', JSON.stringify(objectStates, null, 2));
 
       if (!objectStates || objectStates.length === 0) {
         return null;

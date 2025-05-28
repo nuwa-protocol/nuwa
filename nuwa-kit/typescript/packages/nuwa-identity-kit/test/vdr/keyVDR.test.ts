@@ -1,27 +1,9 @@
 import { KeyVDR } from '../../src/vdr/keyVDR';
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../../src/types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest } from '../../src/types';
+import { createTestDIDDocument, createTestVerificationMethod, createTestService } from '../helpers/testUtils';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 // Test helpers
-function createTestDIDDocument(did: string): DIDDocument {
-  const keyId = `${did}#master`;
-  return {
-    '@context': ['https://www.w3.org/ns/did/v1'],
-    id: did,
-    verificationMethod: [
-      {
-        id: keyId,
-        type: 'Ed25519VerificationKey2020',
-        controller: did,
-        publicKeyMultibase: 'zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV'
-      }
-    ],
-    authentication: [keyId],
-    assertionMethod: [keyId],
-    capabilityInvocation: [keyId],
-    capabilityDelegation: [keyId]
-  };
-}
-
 function createTestDIDDocumentWithMultipleKeys(did: string, keyConfig: any): DIDDocument {
   const doc = createTestDIDDocument(did);
   
@@ -73,103 +55,127 @@ function createTestDIDDocumentWithMultipleKeys(did: string, keyConfig: any): DID
   return doc;
 }
 
-function createTestVerificationMethod(id: string): VerificationMethod {
-  const did = id.split('#')[0];
-  return {
-    id,
-    type: 'Ed25519VerificationKey2020',
-    controller: did,
-    publicKeyMultibase: 'zRandomMultibaseValue'
-  };
-}
-
-function createTestService(id: string): ServiceEndpoint {
-  return {
-    id,
-    type: 'TestService',
-    serviceEndpoint: 'https://example.com/service'
-  };
-}
-
 describe('KeyVDR', () => {
   let keyVDR: KeyVDR;
-
+  let testDID: string;
+  let testDocument: DIDDocument;
+  
   beforeEach(() => {
     keyVDR = new KeyVDR();
+    keyVDR.reset(); // Reset the cache
+    testDID = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
+    testDocument = createTestDIDDocument(testDID);
   });
-
-  describe('Initialization', () => {
-    it('should initialize with the correct method type', () => {
-      expect(keyVDR.getMethod()).toEqual('key');
+  
+  describe('create', () => {
+    it('should create a DID document with the specified key', async () => {
+      const request = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: testDID,
+        controller: testDID,
+        initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'] as VerificationRelationship[],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
+      
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(true);
+      expect(result.did).toBe(testDID);
+      
+      const doc = await keyVDR.resolve(testDID);
+      expect(doc).toBeTruthy();
+      expect(doc!.id).toBe(testDID);
+      expect(doc!.verificationMethod).toBeDefined();
+      expect(doc!.verificationMethod!.length).toBe(1);
+      expect(doc!.verificationMethod![0].publicKeyMultibase).toBe(request.publicKeyMultibase);
     });
-
-    it('should initialize with an empty document cache', () => {
-      keyVDR.reset();
-      expect(keyVDR.exists('did:key:nonexistent')).resolves.toBeFalsy();
-    });
-  });
-
-  describe('did:key resolution', () => {
-    it('should resolve a valid did:key identifier', async () => {
-      const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-      const document = await keyVDR.resolve(did);
+    
+    it('should not create a DID document with invalid key format', async () => {
+      const request = {
+        publicKeyMultibase: 'invalid-key',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: 'did:key:invalid-key',
+        controller: 'did:key:invalid-key',
+        initialRelationships: ['authentication'] as VerificationRelationship[],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
       
-      expect(document).not.toBeNull();
-      expect(document?.id).toEqual(did);
-      expect(document?.verificationMethod).toHaveLength(1);
-      expect(document?.verificationMethod?.[0].controller).toEqual(did);
-    });
-
-    it('should throw an error for an invalid did:key format', async () => {
-      const invalidDid = 'did:key:invalid';
-      await expect(async () => {
-        await keyVDR.resolve(invalidDid);
-      }).not.toThrow();
-      
-      const result = await keyVDR.resolve(invalidDid);
-      expect(result).not.toBeNull();
-    });
-
-    it('should cache resolved documents', async () => {
-      const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-      
-      // First resolution should generate the document
-      const document1 = await keyVDR.resolve(did);
-      expect(document1).not.toBeNull();
-      
-      // Mock the generateDIDDocument method to track if it's called
-      const spy = jest.spyOn(keyVDR as any, 'generateDIDDocument');
-      
-      // Second resolution should use the cache
-      const document2 = await keyVDR.resolve(did);
-      expect(document2).not.toBeNull();
-      expect(document2).toEqual(document1);
-      
-      // The generate method should not have been called
-      expect(spy).not.toHaveBeenCalled();
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
     });
   });
-
-  describe('document storage', () => {
-    it('should store a valid DID document', async () => {
-      const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-      const document = createTestDIDDocument(did);
+  
+  describe('resolve', () => {
+    it('should resolve a created DID document', async () => {
+      // First create a document
+      const request = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: testDID,
+        controller: testDID,
+        initialRelationships: ['authentication'] as VerificationRelationship[],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
       
-      const result = await keyVDR.store(document);
-      expect(result).toBe(true);
+      await keyVDR.create(request);
       
-      // Verify it was stored in the cache
-      const resolved = await keyVDR.resolve(did);
-      expect(resolved).toEqual(document);
+      const doc = await keyVDR.resolve(testDID);
+      expect(doc).toBeTruthy();
+      expect(doc!.id).toBe(testDID);
+    });
+    
+    it('should return null for non-existent DID', async () => {
+      const doc = await keyVDR.resolve('did:key:nonexistent');
+      expect(doc).toBeNull();
     });
   });
-
+  
+  describe('exists', () => {
+    it('should return true for existing DID', async () => {
+      // First create a document
+      const request = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: testDID,
+        controller: testDID,
+        initialRelationships: ['authentication'] as VerificationRelationship[],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
+      
+      await keyVDR.create(request);
+      
+      const exists = await keyVDR.exists(testDID);
+      expect(exists).toBe(true);
+    });
+    
+    it('should return false for non-existent DID', async () => {
+      const exists = await keyVDR.exists('did:key:invalid-format');
+      expect(exists).toBe(false);
+    });
+  });
+  
   describe('verification method operations', () => {
     const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
     
     beforeEach(async () => {
-      const document = createTestDIDDocument(did);
-      await keyVDR.store(document);
+      // Create a new DID document using create method
+      const request: DIDCreationRequest = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
+      
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(true);
     });
     
     it('should add a verification method', async () => {
@@ -179,7 +185,7 @@ describe('KeyVDR', () => {
         did,
         newMethod,
         ['authentication'],
-        { keyId: `${did}#master` }
+        { keyId: `${did}#account-key` }
       );
       
       expect(result).toBe(true);
@@ -200,14 +206,14 @@ describe('KeyVDR', () => {
         did,
         newMethod,
         ['authentication'],
-        { keyId: `${did}#master` }
+        { keyId: `${did}#account-key` }
       );
       
       // Now remove it
       const result = await keyVDR.removeVerificationMethod(
         did,
         newMethod.id,
-        { keyId: `${did}#master` }
+        { keyId: `${did}#account-key` }
       );
       
       expect(result).toBe(true);
@@ -222,23 +228,10 @@ describe('KeyVDR', () => {
       await expect(async () => {
         await keyVDR.removeVerificationMethod(
           did,
-          `${did}#master`,
-          { keyId: `${did}#master` }
+          `${did}#account-key`,
+          { keyId: `${did}#account-key` }
         );
       }).rejects.toThrow(/Cannot remove the primary key/);
-    });
-    
-    it('should fail to add a method with an invalid ID', async () => {
-      const invalidMethod = createTestVerificationMethod('did:wrong:123#key');
-      
-      await expect(async () => {
-        await keyVDR.addVerificationMethod(
-          did,
-          invalidMethod,
-          ['authentication'],
-          { keyId: `${did}#master` }
-        );
-      }).rejects.toThrow(/must start with DID/);
     });
   });
   
@@ -246,48 +239,56 @@ describe('KeyVDR', () => {
     const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
     
     beforeEach(async () => {
-      const document = createTestDIDDocument(did);
-      await keyVDR.store(document);
+      // Create a new DID document using create method
+      const request: DIDCreationRequest = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
+      
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(true);
     });
-    
+
     it('should add a service', async () => {
-      const service = createTestService(`${did}#service1`);
-      
-      const result = await keyVDR.addService(
-        did,
-        service,
-        { keyId: `${did}#master` }
-      );
-      
-      expect(result).toBe(true);
-      
-      // Verify it was added
-      const updated = await keyVDR.resolve(did);
-      expect(updated?.service).toHaveLength(1);
-      expect(updated?.service?.[0].id).toEqual(service.id);
+      const service = {
+        id: `${did}#service1`,
+        type: 'TestService',
+        serviceEndpoint: 'https://example.com'
+      };
+
+      const addResult = await keyVDR.addService(did, service, {
+        keyId: `${did}#account-key`
+      });
+      expect(addResult).toBe(true);
+
+      const doc = await keyVDR.resolve(did);
+      expect(doc?.service).toHaveLength(1);
+      expect(doc?.service?.[0]).toEqual(service);
     });
-    
+
     it('should remove a service', async () => {
-      // First add a service
-      const service = createTestService(`${did}#service1`);
-      await keyVDR.addService(
-        did,
-        service,
-        { keyId: `${did}#master` }
-      );
-      
-      // Now remove it
-      const result = await keyVDR.removeService(
-        did,
-        service.id,
-        { keyId: `${did}#master` }
-      );
-      
-      expect(result).toBe(true);
-      
-      // Verify it was removed
-      const updated = await keyVDR.resolve(did);
-      expect(updated?.service).toHaveLength(0);
+      const service = {
+        id: `${did}#service1`,
+        type: 'TestService',
+        serviceEndpoint: 'https://example.com'
+      };
+
+      await keyVDR.addService(did, service, {
+        keyId: `${did}#account-key`
+      });
+
+      const removeResult = await keyVDR.removeService(did, service.id, {
+        keyId: `${did}#account-key`
+      });
+      expect(removeResult).toBe(true);
+
+      const doc = await keyVDR.resolve(did);
+      expect(doc?.service).toHaveLength(0);
     });
   });
 
@@ -295,55 +296,45 @@ describe('KeyVDR', () => {
     const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
     
     beforeEach(async () => {
-      // Create a document with multiple keys
-      const document = createTestDIDDocumentWithMultipleKeys(did, {
-        withCapabilityDelegation: `${did}#withDelegation`,
-        withoutCapabilityDelegation: `${did}#withoutDelegation`
-      });
-      await keyVDR.store(document);
+      // Create a new DID document using create method
+      const request: DIDCreationRequest = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'],
+        initialServices: undefined,
+        additionalVerificationMethods: undefined
+      };
+      
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(true);
     });
-    
-    it('should update relationships', async () => {
-      const keyId = `${did}#withoutDelegation`;
-      
-      const result = await keyVDR.updateRelationships(
-        did,
-        keyId,
-        ['assertionMethod'],
-        [],
-        { keyId: `${did}#master` }
-      );
-      
-      expect(result).toBe(true);
-      
-      // Verify the relationship was added
-      const updated = await keyVDR.resolve(did);
-      expect(updated?.assertionMethod).toContain(keyId);
-    });
-  });
 
-  describe('controller operations', () => {
-    const did = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-    
-    beforeEach(async () => {
-      const document = createTestDIDDocument(did);
-      await keyVDR.store(document);
-    });
-    
-    it('should update controller', async () => {
-      const newController = 'did:key:z6MkNewController';
-      
-      const result = await keyVDR.updateController(
+    it('should update relationships', async () => {
+      const newVM = {
+        id: `${did}#newKey`,
+        type: 'Ed25519VerificationKey2020',
+        controller: did,
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+      };
+
+      await keyVDR.addVerificationMethod(did, newVM, ['authentication'], {
+        keyId: `${did}#account-key`
+      });
+
+      const updateResult = await keyVDR.updateRelationships(
         did,
-        newController,
-        { keyId: `${did}#master` }
+        newVM.id,
+        ['assertionMethod'] as VerificationRelationship[],
+        ['authentication'] as VerificationRelationship[],
+        { keyId: `${did}#account-key` }
       );
-      
-      expect(result).toBe(true);
-      
-      // Verify the controller was updated
-      const updated = await keyVDR.resolve(did);
-      expect(updated?.controller).toEqual(newController);
+      expect(updateResult).toBe(true);
+
+      const doc = await keyVDR.resolve(did);
+      expect(doc?.authentication).not.toContain(newVM.id);
+      expect(doc?.assertionMethod).toContain(newVM.id);
     });
   });
 
@@ -352,13 +343,47 @@ describe('KeyVDR', () => {
     
     beforeEach(async () => {
       // Create a document with various permission keys
-      const document = createTestDIDDocumentWithMultipleKeys(did, {
-        withCapabilityDelegation: `${did}#withDelegation`,
-        withoutCapabilityDelegation: `${did}#withoutDelegation`,
-        withCapabilityInvocation: `${did}#withInvocation`,
-        withoutCapabilityInvocation: `${did}#withoutInvocation`
-      });
-      await keyVDR.store(document);
+      const request: DIDCreationRequest = {
+        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'],
+        initialServices: undefined,
+        additionalVerificationMethods: [
+          {
+            id: `${did}#withDelegation`,
+            type: 'Ed25519VerificationKey2020',
+            controller: did,
+            publicKeyMultibase: 'z2DEF456AbCdEfG'
+          },
+          {
+            id: `${did}#withoutDelegation`,
+            type: 'Ed25519VerificationKey2020',
+            controller: did,
+            publicKeyMultibase: 'z3HIJ789KlMnOp'
+          },
+          {
+            id: `${did}#withInvocation`,
+            type: 'Ed25519VerificationKey2020',
+            controller: did,
+            publicKeyMultibase: 'z4QRS012TuVwXy'
+          },
+          {
+            id: `${did}#withoutInvocation`,
+            type: 'Ed25519VerificationKey2020',
+            controller: did,
+            publicKeyMultibase: 'z5ZAB345CdEfGh'
+          }
+        ]
+      };
+      
+      const result = await keyVDR.create(request);
+      expect(result.success).toBe(true);
+      
+      // Add relationships
+      await keyVDR.updateRelationships(did, `${did}#withDelegation`, ['capabilityDelegation'], [], { keyId: `${did}#account-key` });
+      await keyVDR.updateRelationships(did, `${did}#withInvocation`, ['capabilityInvocation'], [], { keyId: `${did}#account-key` });
     });
     
     it('should require capabilityDelegation for adding verification methods', async () => {

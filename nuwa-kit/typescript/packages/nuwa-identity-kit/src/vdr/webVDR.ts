@@ -1,4 +1,4 @@
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
 import { AbstractVDR } from './abstractVDR';
 
 export interface WebVDROptions {
@@ -131,41 +131,6 @@ export class WebVDR extends AbstractVDR {
     }
   }
   
-  /**
-   * Stores a DID document for a did:web identifier
-   * 
-   * Note: This method should ONLY be used for the initial creation of the DID document.
-   * For updates, use the specific methods like addVerificationMethod, etc.
-   * 
-   * Requires the uploadHandler option to be set, as the WebVDR
-   * itself doesn't handle authentication for uploading documents.
-   * 
-   * @param didDocument The DID document to store
-   * @returns true if successful, throws otherwise
-   */
-  async store(didDocument: DIDDocument): Promise<boolean> {
-    try {
-      this.validateDocument(didDocument);
-      
-      const did = didDocument.id;
-      const { domain, path } = this.parseDIDWeb(did);
-      
-      // We need an upload handler to store the document
-      if (!this.options.uploadHandler) {
-        throw new Error(
-          'No uploadHandler configured for WebVDR. ' +
-          'Please provide an uploadHandler in the options to enable document publishing.'
-        );
-      }
-      
-      // Use the provided upload handler to store the document
-      return await this.options.uploadHandler(domain, path, didDocument);
-    } catch (error) {
-      console.error(`Error storing document for ${didDocument.id}:`, error);
-      throw error;
-    }
-  }
-
   /**
    * Adds a verification method to a DID Document for a did:web identifier
    * 
@@ -483,5 +448,67 @@ export class WebVDR extends AbstractVDR {
       console.error(`Error updating controller for ${did}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Override create method for did:web
+   * For did:web, we require a preferred DID since it must match a domain
+   */
+  async create(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult> {
+    try {
+      if (!request.preferredDID) {
+        throw new Error('did:web requires preferredDID to specify the domain');
+      }
+      
+      // Validate it's a proper did:web
+      this.validateDIDMethod(request.preferredDID);
+      
+      // Build DID document using parent implementation
+      const didDocument = this.buildDIDDocumentFromRequest(request);
+      
+      // We need an upload handler to store the document
+      if (!this.options.uploadHandler) {
+        throw new Error(
+          'No uploadHandler configured for WebVDR. ' +
+          'Please provide an uploadHandler in the options to enable document publishing.'
+        );
+      }
+      
+      // Parse DID to get domain and path
+      const { domain, path } = this.parseDIDWeb(request.preferredDID);
+      
+      // Use the provided upload handler to store the document
+      const success = await this.options.uploadHandler(domain, path, didDocument);
+      
+      if (!success) {
+        throw new Error('Failed to publish DID document');
+      }
+      
+      return {
+        success: true,
+        did: request.preferredDID,
+        debug: {
+          requestedDID: request.preferredDID,
+          actualDID: request.preferredDID
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        did: request.preferredDID || `did:web:failed-${Date.now()}`,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+  
+  /**
+   * did:web doesn't typically support CADOP
+   */
+  async createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult> {
+    return {
+      success: false,
+      did: `did:web:cadop-not-supported`,
+      error: 'CADOP is not typically supported for did:web method'
+    };
   }
 }

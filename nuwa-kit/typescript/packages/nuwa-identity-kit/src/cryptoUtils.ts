@@ -1,155 +1,94 @@
-import * as nacl from 'tweetnacl';
-import { encodeBase64, decodeBase64 } from 'tweetnacl-util';
+import { base58btc } from 'multiformats/bases/base58';
+import { base64url } from 'multiformats/bases/base64';
+import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from './types';
+import { defaultCryptoProviderFactory } from './crypto/factory';
 
 /**
  * CryptoUtils provides cross-platform cryptographic utilities for DID operations.
- * It abstracts the complexity of different key types (Ed25519, ECDSA), formats, and
- * crypto APIs (browser vs Node.js).
+ * It abstracts the complexity of different key types and formats.
  */
 export class CryptoUtils {
   /**
-   * Generates a key pair of the specified type.
-   * Currently supports Ed25519VerificationKey2020.
+   * Generates a key pair based on the specified curve
+   * @param type The key type to generate (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
+   * @returns A key pair containing public and private keys
    */
-  static async generateKeyPair(type: string): Promise<{ 
-    publicKey: Uint8Array | JsonWebKey, 
-    privateKey: Uint8Array | CryptoKey 
-  }> {
-    if (type === 'Ed25519VerificationKey2020') {
-      // Use TweetNaCl for Ed25519 keys
-      const keyPair = nacl.sign.keyPair();
-      return {
-        publicKey: keyPair.publicKey,
-        privateKey: keyPair.secretKey
-      };
-    } else if (type === 'EcdsaSecp256k1VerificationKey2019' || type === 'JsonWebKey2020') {
-      // Use Web Crypto API for ECDSA keys
-      // Note: The actual curve might depend on the specific verification key type
-      const algorithm = {
-        name: 'ECDSA',
-        namedCurve: 'P-256' // Use 'K-256' for secp256k1 if supported
-      };
-      
-      const keyPair = await crypto.subtle.generateKey(
-        algorithm,
-        true, // extractable
-        ['sign', 'verify']
-      );
-      
-      const jwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
-      return {
-        publicKey: jwk,
-        privateKey: keyPair.privateKey
-      };
-    }
+  static async generateKeyPair(type: KeyTypeInput = KEY_TYPE.ED25519): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
+    const keyType = typeof type === 'string' ? toKeyType(type) : type;
+    const provider = defaultCryptoProviderFactory.createProvider(keyType);
+    return provider.generateKeyPair();
+  }
+
+  /**
+   * Converts a public key to multibase format
+   * @param publicKey The public key to convert
+   * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
+   * @returns The multibase-encoded public key
+   */
+  static async publicKeyToMultibase(publicKey: Uint8Array, type: KeyTypeInput): Promise<string> {
+    const keyType = typeof type === 'string' ? toKeyType(type) : type;
     
-    throw new Error(`Unsupported key type: ${type}`);
-  }
-
-  /**
-   * Signs data using the specified private key and key type.
-   */
-  static async sign(
-    data: Uint8Array, 
-    privateKey: CryptoKey | Uint8Array, 
-    keyType: string
-  ): Promise<string> {
-    if (privateKey instanceof Uint8Array && keyType === 'Ed25519VerificationKey2020') {
-      // Use TweetNaCl for Ed25519 signatures
-      const signature = nacl.sign.detached(data, privateKey);
-      return encodeBase64(signature);
-    } else if (privateKey instanceof CryptoKey) {
-      // Use Web Crypto API for ECDSA signatures
-      const algorithm = {
-        name: 'ECDSA',
-        hash: { name: 'SHA-256' }
-      };
-      
-      const signatureBuffer = await crypto.subtle.sign(
-        algorithm,
-        privateKey,
-        data
-      );
-      
-      // Convert the signature to a base64 string
-      return encodeBase64(new Uint8Array(signatureBuffer));
-    }
+    // Add multicodec prefix based on key type
+    const prefix = keyType === KEY_TYPE.ED25519 ? new Uint8Array([0xed, 0x01]) : new Uint8Array([0xe7, 0x01]);
+    const prefixedKey = new Uint8Array(prefix.length + publicKey.length);
+    prefixedKey.set(prefix);
+    prefixedKey.set(publicKey, prefix.length);
     
-    throw new Error('Unsupported private key type for signing');
+    // Encode with base58btc
+    return base58btc.encode(prefixedKey);
   }
 
-  /**
-   * Verifies a signature using the specified public key and key type.
-   */
-  static async verify(
-    data: Uint8Array,
-    signature: string,
-    publicKey: JsonWebKey | Uint8Array,
-    keyType: string
-  ): Promise<boolean> {
-    try {
-      if (publicKey instanceof Uint8Array && keyType === 'Ed25519VerificationKey2020') {
-        // Use TweetNaCl for Ed25519 verification
-        const signatureBytes = decodeBase64(signature);
-        return nacl.sign.detached.verify(data, signatureBytes, publicKey);
-      } else if (typeof publicKey === 'object' && publicKey !== null && 'kty' in publicKey) {
-        // Use Web Crypto API for ECDSA verification
-        const algorithm = {
-          name: 'ECDSA',
-          hash: { name: 'SHA-256' }
-        };
-        
-        // If publicKey is a JsonWebKey (has kty property), we can safely import it
-        const jwk = publicKey as Record<string, any>;
-        const cryptoKey = await crypto.subtle.importKey(
-          'jwk',
-          jwk,
-          algorithm,
-          true,
-          ['verify']
-        );
-        
-        const signatureBuffer = decodeBase64(signature);
-        return await crypto.subtle.verify(
-          algorithm,
-          cryptoKey,
-          signatureBuffer,
-          data
-        );
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Signature verification error:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Converts a public key to a multibase encoded string.
-   * This is a simplified implementation that needs to be expanded based on actual requirements.
-   */
-  static publicKeyToMultibase(publicKey: Uint8Array, type: string): string {
-    // In a real implementation, you would use the multicodec and multibase libraries properly
-    // For now, this is a very simplified version
-    if (type === 'Ed25519VerificationKey2020') {
-      // For Ed25519, we would prefix with the multicodec code point
-      // and then encode with multibase (e.g., base58btc)
-      return `z${encodeBase64(publicKey)}`;
-    }
-    
-    // Fallback
-    return `z${encodeBase64(publicKey)}`;
-  }
-
-  /**
-   * Converts a JWK to a multibase encoded string.
-   */
   static async jwkToMultibase(jwk: JsonWebKey): Promise<string> {
-    // In a real implementation, you would handle this properly based on the JWK type
-    // For now, this is a very simplified placeholder
-    const jwkString = JSON.stringify(jwk);
-    const encoder = new TextEncoder();
-    return `z${encodeBase64(encoder.encode(jwkString))}`;
+    if (!jwk.x || !jwk.kty || !jwk.crv) {
+      throw new Error('Invalid JWK: missing required properties');
+    }
+
+    let keyType: KeyType;
+    // Determine key type based on JWK curve
+    switch (jwk.crv) {
+      case 'Ed25519':
+        keyType = KEY_TYPE.ED25519;
+        break;
+      case 'secp256k1':
+        keyType = KEY_TYPE.SECP256K1;
+        break;
+      default:
+        throw new Error(`Unsupported curve: ${jwk.crv}`);
+    }
+
+    // Convert base64url-encoded x coordinate to Uint8Array
+    const publicKeyBytes = base64url.decode(jwk.x);
+    
+    // Use existing publicKeyToMultibase method to handle the conversion
+    return CryptoUtils.publicKeyToMultibase(publicKeyBytes, keyType);
+  }
+
+  /**
+   * Signs data using the specified private key
+   * @param data The data to sign
+   * @param privateKey The private key to use for signing (can be Uint8Array or CryptoKey)
+   * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
+   * @returns The signature as a base64url-encoded string
+   */
+  static async sign(data: Uint8Array, privateKey: Uint8Array | CryptoKey, type: KeyTypeInput): Promise<string> {
+    const keyType = typeof type === 'string' ? toKeyType(type) : type;
+    const provider = defaultCryptoProviderFactory.createProvider(keyType);
+    const signature = await provider.sign(data, privateKey);
+    return base64url.encode(signature);
+  }
+
+  /**
+   * Verifies a signature using the specified public key
+   * @param data The original data
+   * @param signature The signature to verify (base64url-encoded)
+   * @param publicKey The public key to use for verification (can be Uint8Array or JsonWebKey)
+   * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
+   * @returns Whether the signature is valid
+   */
+  static async verify(data: Uint8Array, signature: string, publicKey: Uint8Array | JsonWebKey, type: KeyTypeInput): Promise<boolean> {
+    const keyType = typeof type === 'string' ? toKeyType(type) : type;
+    const provider = defaultCryptoProviderFactory.createProvider(keyType);
+    const signatureBytes = base64url.decode(signature);
+    return provider.verify(data, signatureBytes, publicKey);
   }
 }

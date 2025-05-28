@@ -1,88 +1,151 @@
+import { NuwaIdentityKit } from '../../src';
+import { DIDDocument, DIDCreationRequest, SignerInterface, KEY_TYPE } from '../../src/types';
+import { validateDIDDocument } from '../../src/validators/did-document-validator';
+import { CryptoUtils } from '../../src/cryptoUtils';
 import { KeyVDR } from '../../src/vdr/keyVDR';
-import { NuwaIdentityKit } from '../../src/index';
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { DIDValidator } from './did-validator';
+import { MockSigner, createMockPrivateKey } from '../helpers/testUtils';
 
 describe('DID Document Validator', () => {
+  let validDocument: DIDDocument;
   let keyVDR: KeyVDR;
-  let didDocument: any;
-
+  let mockSigner: MockSigner;
+  
   beforeEach(async () => {
+    // Initialize KeyVDR
     keyVDR = new KeyVDR();
     keyVDR.reset();
+
+    // Generate a key pair
+    const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    const did = `did:key:${publicKeyMultibase}`;
+    const keyId = `${did}#account-key`;
+
+    // Create mock signer
+    mockSigner = new MockSigner();
+    mockSigner.addKey(keyId, createMockPrivateKey());
+
+    // Create DID creation request
+    const creationRequest: DIDCreationRequest = {
+      publicKeyMultibase,
+      keyType: 'Ed25519VerificationKey2020',
+      preferredDID: did,
+      controller: did
+    };
+
+    // Create a new DID using NuwaIdentityKit
+    const kit = await NuwaIdentityKit.createNewDID(creationRequest, keyVDR, mockSigner);
+    validDocument = kit.getDIDDocument();
+  });
+  
+  it('should validate a well-formed DID document', () => {
+    const result = validateDIDDocument(validDocument);
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+  
+  it('should reject a document without an id', () => {
+    const invalidDoc = { ...validDocument };
+    delete (invalidDoc as any).id;
     
-    // Create a basic DID identity
-    const identity = await NuwaIdentityKit.createMasterIdentity({ method: 'key' });
-    didDocument = identity.didDocument;
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('DID document must have an id');
   });
-
-  it('should validate a well-formed DID document structure', async () => {
-    const result = DIDValidator.validateBasicStructure(didDocument);
-    expect(result.valid).toBe(true);
-    expect(result.errors.length).toBe(0);
-  });
-
-  it('should validate verification methods in the DID document', async () => {
-    const result = DIDValidator.validateVerificationMethods(didDocument);
-    expect(result.valid).toBe(true);
-    expect(result.errors.length).toBe(0);
-  });
-
-  it('should validate verification relationships in the DID document', async () => {
-    const result = DIDValidator.validateVerificationRelationships(didDocument);
-    expect(result.valid).toBe(true);
-    expect(result.errors.length).toBe(0);
-  });
-
-  it('should validate the DID document against W3C JSON-LD context', async () => {
-    const result = await DIDValidator.validateJsonLd(didDocument);
-    expect(result.valid).toBe(true);
-    expect(result.errors.length).toBe(0);
-  });
-
-  it('should perform complete validation of a DID document', async () => {
-    const result = await DIDValidator.validateDIDDocument(didDocument);
-    expect(result.valid).toBe(true);
-    expect(result.structureValid).toBe(true);
-    expect(result.methodsValid).toBe(true);
-    expect(result.relationshipsValid).toBe(true);
-    expect(result.jsonLdValid).toBe(true);
-    expect(result.errors.length).toBe(0);
-  });
-
-  it('should detect invalid DID document structure', async () => {
-    const invalidDoc = { ...didDocument };
-    delete invalidDoc.id;
+  
+  it('should reject a document with an invalid id format', () => {
+    const invalidDoc = { ...validDocument, id: 'not-a-did' };
     
-    const result = DIDValidator.validateBasicStructure(invalidDoc);
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toContain('id property');
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('DID document id must be a valid DID');
   });
-
-  it('should detect invalid verification methods', async () => {
-    const invalidDoc = { ...didDocument };
-    if (invalidDoc.verificationMethod && invalidDoc.verificationMethod.length > 0) {
-      const invalidMethod = { ...invalidDoc.verificationMethod[0] };
-      delete invalidMethod.type;
-      invalidDoc.verificationMethod = [invalidMethod];
-    }
+  
+  it('should reject a document without @context', () => {
+    const invalidDoc = { ...validDocument };
+    delete (invalidDoc as any)['@context'];
     
-    const result = DIDValidator.validateVerificationMethods(invalidDoc);
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toContain('type');
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('DID document must have a @context');
   });
-
-  it('should detect invalid verification relationships', async () => {
-    const invalidDoc = { ...didDocument };
-    if (invalidDoc.authentication && invalidDoc.authentication.length > 0) {
-      invalidDoc.authentication = ['did:key:non-existent-method'];
-    }
+  
+  it('should reject a document with invalid @context format', () => {
+    const invalidDoc = { ...validDocument, '@context': 'not-an-array' };
     
-    const result = DIDValidator.validateVerificationRelationships(invalidDoc);
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toContain('non-existent');
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('DID document @context must be an array');
+  });
+  
+  it('should reject a document with empty verification methods array', () => {
+    const invalidDoc = { ...validDocument, verificationMethod: [] };
+    
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('DID document must have at least one verification method');
+  });
+  
+  it('should reject a document with invalid verification method format', () => {
+    const invalidDoc = {
+      ...validDocument,
+      verificationMethod: [
+        {
+          // Missing required fields
+          id: 'did:example:123#key-1'
+        } as any
+      ]
+    };
+    
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('Verification method must have a type');
+    expect(result.errors).toContain('Verification method must have a controller');
+  });
+  
+  it('should reject a document with invalid service format', () => {
+    const invalidDoc = {
+      ...validDocument,
+      service: [
+        {
+          // Missing required fields
+          id: 'did:example:123#service-1'
+        } as any
+      ]
+    };
+    
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('Service must have a type');
+    expect(result.errors).toContain('Service must have a serviceEndpoint');
+  });
+  
+  it('should reject a document with invalid relationship references', () => {
+    const invalidDoc = {
+      ...validDocument,
+      authentication: ['did:example:123#non-existent-key']
+    };
+    
+    const result = validateDIDDocument(invalidDoc);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain('Authentication reference did:example:123#non-existent-key does not exist in verificationMethod');
+  });
+  
+  it('should validate a document with valid relationship references', () => {
+    // Get the first verification method ID
+    const vmId = validDocument.verificationMethod![0].id;
+    
+    const validDoc = {
+      ...validDocument,
+      authentication: [vmId],
+      assertionMethod: [vmId],
+      capabilityInvocation: [vmId],
+      capabilityDelegation: [vmId]
+    };
+    
+    const result = validateDIDDocument(validDoc);
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 }); 

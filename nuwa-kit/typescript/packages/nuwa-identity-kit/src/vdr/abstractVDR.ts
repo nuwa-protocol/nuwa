@@ -1,4 +1,4 @@
-import { DIDDocument, ServiceEndpoint, VDRInterface, VerificationMethod, VerificationRelationship } from '../types';
+import { DIDDocument, ServiceEndpoint, VDRInterface, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
 
 /**
  * Abstract base class for implementing Verifiable Data Registry functionality
@@ -102,19 +102,21 @@ export abstract class AbstractVDR implements VDRInterface {
     keyId: string,
     requiredRelationship: VerificationRelationship
   ): boolean {
-    // Check if key exists in verification methods
+    // 检查验证方法是否存在
     const keyExists = didDocument.verificationMethod?.some(vm => vm.id === keyId);
     if (!keyExists) {
       console.error(`Key ${keyId} not found in DID document`);
       return false;
     }
-    
-    // Check if key has the required relationship
-    const hasPermission = this.hasVerificationRelationship(
-      didDocument, 
-      keyId, 
-      requiredRelationship
-    );
+
+    // 检查是否是主密钥
+    const isPrimaryKey = didDocument.verificationMethod?.[0]?.id === keyId;
+    if (isPrimaryKey) {
+      return true;
+    }
+
+    // 检查是否有所需权限
+    const hasPermission = didDocument[requiredRelationship]?.includes(keyId);
     
     if (!hasPermission) {
       console.error(`Key ${keyId} does not have ${requiredRelationship} permission`);
@@ -125,10 +127,62 @@ export abstract class AbstractVDR implements VDRInterface {
   }
   
   /**
-   * Stores a DID document in the registry
-   * Implementations must provide this functionality
+   * Default create implementation - throws not implemented error for base class
+   * Subclasses must override this method to provide actual implementation
    */
-  abstract store(didDocument: DIDDocument, options?: any): Promise<boolean>;
+  async create(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult> {
+    throw new Error(`create method not implemented for ${this.method} VDR`);
+  }
+  
+  /**
+   * Default CADOP implementation - throws not implemented error
+   */
+  async createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult> {
+    throw new Error(`createViaCADOP not implemented for ${this.method} VDR`);
+  }
+  
+  /**
+   * Build DID Document from creation request
+   */
+  protected buildDIDDocumentFromRequest(request: DIDCreationRequest): DIDDocument {
+    const did = request.preferredDID!;
+    
+    // Extract the first controller for the verification method (which only accepts string)
+    const controllerForVM = Array.isArray(request.controller) 
+      ? request.controller[0] 
+      : (request.controller || did);
+    
+    const verificationMethod: VerificationMethod = {
+      id: `${did}#account-key`,
+      type: request.keyType || 'EcdsaSecp256k1VerificationKey2019',
+      controller: controllerForVM,
+      publicKeyMultibase: request.publicKeyMultibase
+    };
+    
+    const didDocument: DIDDocument = {
+      '@context': ['https://www.w3.org/ns/did/v1'],
+      id: did,
+      controller: request.controller ? 
+        (Array.isArray(request.controller) ? request.controller : [request.controller]) : 
+        [did],
+      verificationMethod: [verificationMethod, ...(request.additionalVerificationMethods || [])],
+      service: request.initialServices || []
+    };
+    
+    // Set initial relationships
+    const relationships = request.initialRelationships || 
+      ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'];
+    
+    const vmId = verificationMethod.id;
+    relationships.forEach(rel => {
+      if (!didDocument[rel]) {
+        didDocument[rel] = [];
+      }
+      (didDocument[rel] as string[]).push(vmId);
+    });
+    
+    return didDocument;
+  }
   
   /**
    * Resolves a DID to its corresponding DID document

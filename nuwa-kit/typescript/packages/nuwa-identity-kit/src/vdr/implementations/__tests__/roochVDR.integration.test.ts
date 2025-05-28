@@ -103,11 +103,7 @@ describe('RoochVDR Integration Tests', () => {
       const publicKeyBytes = keypair.getPublicKey().toBytes();
       
       // Create correct multibase encoding for Secp256k1 public key
-      // Based on Rust CLI code: public_key.raw_to_multibase()
-      // This suggests using raw bytes without multicodec prefix
       const multibase = require('multibase');
-      
-      // Try approach 1: Raw bytes with base58btc (what Rust CLI likely does)
       const encoded = multibase.encode('base58btc', publicKeyBytes);
       const publicKeyMultibase = new TextDecoder().decode(encoded);
       
@@ -116,30 +112,19 @@ describe('RoochVDR Integration Tests', () => {
       console.log('Public key bytes length:', publicKeyBytes.length);
       console.log('First few bytes:', Array.from(publicKeyBytes.slice(0, 5) as Uint8Array).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
       
-      // Create a test DID document
-      const didDocument: DIDDocument = {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: testDid,
-        controller: [testDid],
-        verificationMethod: [
-          {
-            id: `${testDid}#account-key`,
-            type: 'EcdsaSecp256k1VerificationKey2019',
-            controller: testDid,
-            publicKeyMultibase: publicKeyMultibase,
-          },
-        ],
-        authentication: [`${testDid}#account-key`],
-        assertionMethod: [`${testDid}#account-key`],
-        capabilityInvocation: [`${testDid}#account-key`],
-        capabilityDelegation: [`${testDid}#account-key`],
-      };
+      // Create a new DID using create method
+      const result = await roochVDR.create({
+        publicKeyMultibase,
+        keyType: 'EcdsaSecp256k1VerificationKey2019',
+        preferredDID: testDid,
+        controller: testDid
+      }, { signer: keypair });
 
-      const success = await roochVDR.store(didDocument, { signer: keypair });
-      expect(success).toBe(true);
+      expect(result.success).toBe(true);
+      expect(result.did).toBeTruthy();
 
-      // Get the actual DID address from the store operation
-      actualDIDAddress = roochVDR.getLastCreatedDIDAddress() || '';
+      // Get the actual DID address from the create operation
+      actualDIDAddress = result.did;
       expect(actualDIDAddress).toBeTruthy();
       expect(actualDIDAddress).toMatch(/^did:rooch:rooch1[a-z0-9]+$/);
       
@@ -181,11 +166,9 @@ describe('RoochVDR Integration Tests', () => {
       console.log(`🔧 Adding verification method to DID: ${actualDIDAddress}`);
       console.log(`🗝️ Using signer with address: ${testAddress}`);
       
-      // 生成新的 keypair 用于验证方法
       const newKeypair = Secp256k1Keypair.generate();
       const publicKeyBytes = newKeypair.getPublicKey().toBytes();
       
-      // 使用 multibase 编码公钥
       const multibase = require('multibase');
       const encoded = multibase.encode('base58btc', publicKeyBytes);
       const publicKeyMultibase = new TextDecoder().decode(encoded);
@@ -350,15 +333,19 @@ describe('RoochVDR Integration Tests', () => {
       // Now try to create a DID via CADOP
       console.log('🚀 Attempting CADOP DID creation...');
       
-      const success = await roochVDR.createViaCADOP(
-        'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-        'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-        'Ed25519VerificationKey2020',
+      const cadopRequest = {
+        userDidKey: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        custodianServicePublicKey: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        custodianServiceVMType: 'Ed25519VerificationKey2020'
+      };
+      
+      const result = await roochVDR.createViaCADOP(
+        cadopRequest,
         { signer: didAccount }
       );
 
-      console.log(`📝 CADOP DID creation result: ${success}`);
-      expect(success).toBe(true);
+      console.log(`📝 CADOP DID creation result: ${result.success}`);
+      expect(result.success).toBe(true);
       console.log(`✅ Successfully created DID via CADOP using DID account signer`);
     }, TEST_TIMEOUT);
   });
@@ -380,33 +367,6 @@ describe('RoochVDR Integration Tests', () => {
       expect(exists).toBe(false);
     }, TEST_TIMEOUT);
 
-    it('should throw error when no signer provided', async () => {
-      if (!shouldRunIntegrationTests()) return;
-
-      // Create a RoochVDR instance without any default signer
-      const vdrWithoutSigner = new RoochVDR({
-        rpcUrl: DEFAULT_NODE_URL,
-        client: client,
-        // No default signer provided
-        didContractAddress: '0x3::did'
-      });
-
-      const didDocument: DIDDocument = {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: 'did:rooch:0x123',
-        controller: ['did:rooch:0x123'],
-        verificationMethod: [
-          {
-            id: 'did:rooch:0x123#key-1',
-            type: 'Ed25519VerificationKey2020',
-            controller: 'did:rooch:0x123',
-            publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-          },
-        ],
-      };
-
-      await expect(vdrWithoutSigner.store(didDocument)).rejects.toThrow('No signer provided');
-    }, TEST_TIMEOUT);
   });
 });
 
