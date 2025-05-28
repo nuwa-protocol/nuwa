@@ -100,17 +100,11 @@ export class NuwaIdentityKit {
     signer: SignerInterface
   ): Promise<NuwaIdentityKit> {
     const result = await vdr.create(creationRequest);
-    if (!result.success || !result.did) {
+    if (!result.success || !result.didDocument) {
       throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
     }
 
-    // If VDR didn't return DID Document, try to resolve it
-    const didDocument = result.didDocument || await vdr.resolve(result.did);
-    if (!didDocument) {
-      throw new Error(`Failed to get DID Document for ${result.did}`);
-    }
-
-    return new NuwaIdentityKit(didDocument, {
+    return new NuwaIdentityKit(result.didDocument, {
       externalSigner: signer,
       vdrs: [vdr]
     });
@@ -146,7 +140,6 @@ export class NuwaIdentityKit {
         type: keyInfo.type,
         controller: keyInfo.controller || this.didDocument.id,
         publicKeyMultibase: await CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type),
-        expires: keyInfo.expires,
       };
     } else {
       verificationMethodEntry = {
@@ -154,7 +147,6 @@ export class NuwaIdentityKit {
         type: keyInfo.type,
         controller: keyInfo.controller || this.didDocument.id,
         publicKeyJwk: keyInfo.publicKeyMaterial as JsonWebKey,
-        expires: keyInfo.expires,
       };
     }
 

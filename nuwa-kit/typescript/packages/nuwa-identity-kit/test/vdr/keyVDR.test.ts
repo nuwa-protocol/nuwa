@@ -81,7 +81,8 @@ describe('KeyVDR', () => {
       
       const result = await keyVDR.create(request);
       expect(result.success).toBe(true);
-      expect(result.did).toBe(testDID);
+      expect(result.didDocument).toBeDefined();
+      expect(result.didDocument!.id).toBe(testDID);
       
       const doc = await keyVDR.resolve(testDID);
       expect(doc).toBeTruthy();

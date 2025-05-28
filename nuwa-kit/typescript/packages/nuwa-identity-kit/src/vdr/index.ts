@@ -1,7 +1,7 @@
 import { DIDDocument, VDRInterface } from '../types';
-import { WebVDR, WebVDROptions } from './webVDR';
 import { KeyVDR } from './keyVDR';
 import { AbstractVDR } from './abstractVDR';
+import { RoochVDR } from './implementations/roochVDR';
 
 /**
  * Factory function to create a VDR instance based on the DID method
@@ -12,10 +12,10 @@ import { AbstractVDR } from './abstractVDR';
  */
 export function createVDR(method: string, options?: any): VDRInterface | undefined {
   switch (method.toLowerCase()) {
-    case 'web':
-      return new WebVDR(options as WebVDROptions);
     case 'key':
       return new KeyVDR();
+    case 'rooch':
+      return new RoochVDR(options);
     // Add additional DID methods as needed
     default:
       console.warn(`No built-in VDR implementation available for method '${method}'`);
@@ -30,15 +30,15 @@ export function createVDR(method: string, options?: any): VDRInterface | undefin
  * @returns An array of VDR instances
  */
 export function createDefaultVDRs(options?: { 
-  web?: WebVDROptions 
+  rooch?: any 
 }): VDRInterface[] {
   return [
     new KeyVDR(),
-    new WebVDR(options?.web || {})
+    new RoochVDR(options?.rooch || {})
   ];
 }
 
 // Export VDR implementations
-export { WebVDR, WebVDROptions } from './webVDR';
 export { KeyVDR } from './keyVDR';
 export { AbstractVDR } from './abstractVDR';
+export { RoochVDR } from './implementations/roochVDR';

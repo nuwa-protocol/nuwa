@@ -58,7 +58,6 @@ export interface OperationalKeyInfo {
   type: string; // Cryptographic suite of the key, e.g., Ed25519VerificationKey2020
   publicKeyMaterial: Uint8Array | JsonWebKey; // The public key material
   controller?: string; // Defaults to the master DID if not provided
-  expires?: string; // Optional expiration timestamp
 }
 
 /**
@@ -132,7 +131,6 @@ export interface DIDCreationRequest {
  */
 export interface DIDCreationResult {
   success: boolean;
-  did: string; // Actual created DID (required field)
   didDocument?: DIDDocument; // The created DID Document
   transactionHash?: string;
   blockHeight?: number;

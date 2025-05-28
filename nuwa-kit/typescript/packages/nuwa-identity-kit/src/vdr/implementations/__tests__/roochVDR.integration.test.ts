@@ -121,10 +121,11 @@ describe('RoochVDR Integration Tests', () => {
       }, { signer: keypair });
 
       expect(result.success).toBe(true);
-      expect(result.did).toBeTruthy();
+      expect(result.didDocument).toBeDefined();
+      expect(result.didDocument!.id).toBeTruthy();
 
       // Get the actual DID address from the create operation
-      actualDIDAddress = result.did;
+      actualDIDAddress = result.didDocument!.id;
       expect(actualDIDAddress).toBeTruthy();
       expect(actualDIDAddress).toMatch(/^did:rooch:rooch1[a-z0-9]+$/);
       

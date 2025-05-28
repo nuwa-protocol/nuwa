@@ -33,6 +33,11 @@ export interface DIDStruct {
   identifier: string;
 }
 
+// Helper function to format DID string
+export function formatDIDString(did: DIDStruct): string {
+  return `did:${did.method}:${did.identifier}`;
+}
+
 // DID Document verification method
 export interface MoveVerificationMethod {
   id: {
@@ -197,19 +202,19 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
   let didDoc = DIDDocumentSchema.parse(bcsBytes);
 
   // Create DID string
-  const didId = `did:${didDoc.id.method}:${didDoc.id.identifier}`;
+  const didId = formatDIDString(didDoc.id);
   
   // Convert controllers
-  const controllers = didDoc.controller.map(c => `did:${c.method}:${c.identifier}`);
+  const controllers = didDoc.controller.map(c => formatDIDString(c));
   
   // Convert verification methods
   const verificationMethods: VerificationMethod[] = [];
   const verificationMethodsMap = simpleMapToMap(didDoc.verification_methods) as Map<string, MoveVerificationMethod>;
   verificationMethodsMap.forEach((vm) => {
     verificationMethods.push({
-      id: `did:${vm.id.did.method}:${vm.id.did.identifier}#${vm.id.fragment}`,
+      id: `${formatDIDString(vm.id.did)}#${vm.id.fragment}`,
       type: vm.type,
-      controller: `did:${vm.controller.method}:${vm.controller.identifier}`,
+      controller: formatDIDString(vm.controller),
       publicKeyMultibase: vm.public_key_multibase,
     });
   });
@@ -222,7 +227,7 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
   const servicesMap = simpleMapToMap(didDoc.services) as Map<string, MoveService>;
   servicesMap.forEach((service) => {
     const serviceEndpoint: ServiceEndpoint = {
-      id: `did:${service.id.did.method}:${service.id.did.identifier}#${service.id.fragment}`,
+      id: `${formatDIDString(service.id.did)}#${service.id.fragment}`,
       type: service.type,
       serviceEndpoint: service.service_endpoint,
     };
@@ -267,7 +272,7 @@ export function parseDIDCreatedEvent(eventData: string): DIDCreatedEventData {
  * Get DID address from DID Created Event data
  */
 export function getDIDAddressFromEvent(eventData: DIDCreatedEventData): string {
-  return `did:${eventData.did.method}:${eventData.did.identifier}`;
+  return formatDIDString(eventData.did);
 }
 
 // Define StructTag for DIDDocument

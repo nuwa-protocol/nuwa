@@ -18,6 +18,7 @@ import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelations
 import { AbstractVDR } from '../abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
+  formatDIDString,
   getDIDAddressFromEvent,
   parseDIDCreatedEvent,
   resolveDidObjectID,
@@ -261,8 +262,7 @@ export class RoochVDR extends AbstractVDR {
         // Return preferredDID or generate a failure placeholder on failure
         return {
           success: false,
-          did: request.preferredDID || `did:rooch:failed-${Date.now()}`,
-          error: 'Transaction execution failed',
+          error: 'Transaction execution failed, execution_info: ' + JSON.stringify(result.execution_info),
           debug: {
             requestedDID: request.preferredDID,
             transactionResult: result.execution_info
@@ -276,16 +276,16 @@ export class RoochVDR extends AbstractVDR {
       );
       let actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent); 
       
-      if (actualDID) {
-        this.lastCreatedDIDAddress = actualDID;
-      }
+      this.lastCreatedDIDAddress = actualDID;
       
-      // Ensure we always return a valid DID
-      const finalDID = actualDID || request.preferredDID || `did:rooch:unknown-${Date.now()}`;
+      let didDocument = await this.resolve(actualDID);
+      if (!didDocument) {
+        throw new Error('DID document not found with DID: ' + actualDID);
+      }
       
       return {
         success: true,
-        did: finalDID,
+        didDocument: didDocument,
         transactionHash: (result as any).transaction_hash,
         debug: {
           requestedDID: request.preferredDID,
@@ -297,7 +297,6 @@ export class RoochVDR extends AbstractVDR {
       this.errorLog('Error creating DID:', error);
       return {
         success: false,
-        did: request.preferredDID || `did:rooch:error-${Date.now()}`,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -337,31 +336,31 @@ export class RoochVDR extends AbstractVDR {
       if (!success) {
         return {
           success: false,
-          did: `did:rooch:cadop-failed-${Date.now()}`,
-          error: 'CADOP transaction execution failed'
+          error: 'CADOP transaction execution failed, execution_info: ' + JSON.stringify(result.execution_info)
         };
       }
       
       // Parse the created DID
-      let actualDID: string | undefined;
       const didCreatedEvent = result.output?.events?.find((event: any) => 
         event.event_type === '0x3::did::DIDCreatedEvent'
       );
-      
-      if (didCreatedEvent) {
-        actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
+      if (!didCreatedEvent) {
+        throw new Error('DIDCreatedEvent not found');
       }
-      
+      let actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent);
+      let didDocument = await this.resolve(actualDID);
+      if (!didDocument) {
+        throw new Error('DID document not found with DID: ' + actualDID);
+      }
       return {
         success: true,
-        did: actualDID || `did:rooch:cadop-unknown-${Date.now()}`,
+        didDocument: didDocument,
         transactionHash: (result as any).transaction_hash
       };
     } catch (error) {
       this.errorLog('Error creating DID via CADOP:', error);
       return {
         success: false,
-        did: `did:rooch:cadop-error-${Date.now()}`,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -1055,10 +1054,10 @@ export class RoochVDR extends AbstractVDR {
   /**
    * Parse DIDCreatedEvent using BCS schema and return the DID address
    */
-  private parseDIDCreatedEventAndGetAddress(event: any): string | null {
+  private parseDIDCreatedEventAndGetAddress(event: any): string {
     try {
       const eventData = parseDIDCreatedEvent(event.event_data);
-      return getDIDAddressFromEvent(eventData);
+      return formatDIDString(eventData.did);
     } catch (error) {
       this.errorLog('BCS parsing failed:', error);
       throw error;

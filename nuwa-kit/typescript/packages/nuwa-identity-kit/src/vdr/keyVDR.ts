@@ -298,7 +298,6 @@ export class KeyVDR extends AbstractVDR {
       if (!request.publicKeyMultibase || !request.publicKeyMultibase.startsWith('z')) {
         return {
           success: false,
-          did: request.preferredDID || `did:key:invalid-${Date.now()}`,
           error: 'Invalid key format: publicKeyMultibase must start with "z"'
         };
       }
@@ -306,7 +305,6 @@ export class KeyVDR extends AbstractVDR {
       if (!request.preferredDID || !request.controller) {
         return {
           success: false,
-          did: request.preferredDID || `did:key:missing-params-${Date.now()}`,
           error: 'Missing required parameters: preferredDID and controller'
         };
       }
@@ -319,14 +317,12 @@ export class KeyVDR extends AbstractVDR {
 
       return {
         success: true,
-        did: request.preferredDID,
         didDocument
       };
     } catch (error) {
       console.error(`Error creating DID document:`, error);
       return {
         success: false,
-        did: request.preferredDID || `did:key:error-${Date.now()}`,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
