@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, afterAll } from '@jest/globals';
-import { RoochVDR } from './roochVDR';
+import { DIDAccount, RoochVDR } from './roochVDR';
 import { DIDDocument, VerificationMethod } from '../../types';
 
 // Import Rooch SDK components for integration testing
@@ -8,7 +8,8 @@ import {
   Secp256k1Keypair, 
   Transaction, 
   Args, 
-  getRoochNodeUrl 
+  getRoochNodeUrl, 
+  RoochAddress
 } from '@roochnetwork/rooch-sdk';
 
 // Test configuration
@@ -180,31 +181,40 @@ describe('RoochVDR Integration Tests', () => {
       console.log(`🔧 Adding verification method to DID: ${actualDIDAddress}`);
       console.log(`🗝️ Using signer with address: ${testAddress}`);
       
+      // 生成新的 keypair 用于验证方法
+      const newKeypair = Secp256k1Keypair.generate();
+      const publicKeyBytes = newKeypair.getPublicKey().toBytes();
+      
+      // 使用 multibase 编码公钥
+      const multibase = require('multibase');
+      const encoded = multibase.encode('base58btc', publicKeyBytes);
+      const publicKeyMultibase = new TextDecoder().decode(encoded);
+      
+      console.log('Generated new verification method:');
+      console.log('- Public key multibase:', publicKeyMultibase);
+      console.log('- Should start with z (base58btc):', publicKeyMultibase.startsWith('z'));
+      console.log('- Public key bytes length:', publicKeyBytes.length);
+      console.log('- First few bytes:', Array.from(publicKeyBytes.slice(0, 5) as Uint8Array).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
+      
       const verificationMethod: VerificationMethod = {
         id: `${actualDIDAddress}#key-2`,
-        type: 'Ed25519VerificationKey2020',
+        type: 'EcdsaSecp256k1VerificationKey2019',
         controller: actualDIDAddress,
-        publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        publicKeyMultibase: publicKeyMultibase,
       };
+
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
 
       const success = await roochVDR.addVerificationMethod(
         actualDIDAddress,
         verificationMethod,
         ['authentication', 'assertionMethod'],
-        { signer: keypair }
+        { signer: didAccount }
       );
 
-      if (!success) {
-        console.log('❌ Add verification method failed, but this may be expected due to permission model');
-        console.log('💡 In Rooch DID system, operations may need to be performed by the DID account itself, not the controller');
-      }
-
-      // For now, we'll just log the result rather than fail the test
-      // since the permission model may require the DID account signer rather than controller
       console.log(`📝 Add verification method result: ${success}`);
-      
-      // We expect this to potentially fail due to current permission model
-      // where operations must be performed by the DID account itself
+      expect(success).toBe(true);
+      console.log(`✅ Test passed: Successfully added verification method using DID account signer`);
     }, TEST_TIMEOUT);
 
     it('should remove a verification method', async () => {
@@ -214,16 +224,17 @@ describe('RoochVDR Integration Tests', () => {
       
       console.log(`🗑️ Attempting to remove verification method from DID: ${actualDIDAddress}`);
       
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      
       const success = await roochVDR.removeVerificationMethod(
         actualDIDAddress,
         `${actualDIDAddress}#key-2`,
-        { signer: keypair }
+        { signer: didAccount }
       );
 
       console.log(`📝 Remove verification method result: ${success}`);
-      
-      // Similar to add, this may fail due to permission model
-      // Log the result but don't fail the test
+      expect(success).toBe(true);
+      console.log(`✅ Test passed: Successfully removed verification method using DID account signer`);
     }, TEST_TIMEOUT);
   });
 
@@ -236,6 +247,8 @@ describe('RoochVDR Integration Tests', () => {
       console.log(`🔧 Adding service to DID: ${actualDIDAddress}`);
       console.log(`🗝️ Using signer with address: ${testAddress}`);
       
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      
       const success = await roochVDR.addService(
         actualDIDAddress,
         {
@@ -243,16 +256,12 @@ describe('RoochVDR Integration Tests', () => {
           type: 'LinkedDomains',
           serviceEndpoint: 'https://example.com',
         },
-        { signer: keypair }
+        { signer: didAccount }
       );
 
       console.log(`📝 Add service result: ${success}`);
-      
-      if (!success) {
-        console.log('❌ Add service failed, may be due to permission model requiring DID account signer');
-      }
-      
-      // Don't fail the test, just log the result for debugging
+      expect(success).toBe(true);
+      console.log(`✅ Test passed: Successfully added service using DID account signer`);
     }, TEST_TIMEOUT);
 
     it('should add a service with properties', async () => {
@@ -261,6 +270,8 @@ describe('RoochVDR Integration Tests', () => {
       expect(actualDIDAddress).toBeTruthy();
       
       console.log(`🔧 Adding service with properties to DID: ${actualDIDAddress}`);
+      
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
       
       const success = await roochVDR.addServiceWithProperties(
         actualDIDAddress,
@@ -273,14 +284,12 @@ describe('RoochVDR Integration Tests', () => {
             'version': '1.0',
           }
         },
-        { signer: keypair }
+        { signer: didAccount }
       );
 
       console.log(`📝 Add service with properties result: ${success}`);
-      
-      if (!success) {
-        console.log('❌ Add service with properties failed, may be due to permission model');
-      }
+      expect(success).toBe(true);
+      console.log(`✅ Test passed: Successfully added service with properties using DID account signer`);
     }, TEST_TIMEOUT);
 
     it('should remove a service', async () => {
@@ -290,76 +299,67 @@ describe('RoochVDR Integration Tests', () => {
       
       console.log(`🗑️ Attempting to remove service from DID: ${actualDIDAddress}`);
       
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      
       const success = await roochVDR.removeService(
         actualDIDAddress,
         `${actualDIDAddress}#service-1`,
-        { signer: keypair }
+        { signer: didAccount }
       );
 
       console.log(`📝 Remove service result: ${success}`);
-      
-      if (!success) {
-        console.log('❌ Remove service failed, may be due to permission model');
-      }
+      expect(success).toBe(true);
+      console.log(`✅ Test passed: Successfully removed service using DID account signer`);
     }, TEST_TIMEOUT);
   });
 
   describe('CADOP Operations', () => {
-    it('should create DID via CADOP (if custodian has CADOP service)', async () => {
+    it('should create DID via CADOP', async () => {
       if (!shouldRunIntegrationTests()) return;
 
       console.log('🏗️ Testing CADOP DID creation...');
       console.log(`📝 Custodian address: ${testAddress}`);
       console.log(`📝 Actual DID created earlier: ${actualDIDAddress}`);
       
-      try {
-        // First, try to add a CADOP service to the custodian's actual DID
-        // Note: The custodian would need to have their own DID to provide CADOP services
-        // For this test, we'll try to add the service to the actual DID created earlier
-        
-        console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDIDAddress}`);
-        
-        const serviceAddResult = await roochVDR.addServiceWithProperties(
-          actualDIDAddress,
-          {
-            id: `${actualDIDAddress}#cadop-service`,
-            type: 'CadopCustodianService',
-            serviceEndpoint: 'https://custodian.example.com/api/cadop',
-            properties: {
-              'name': 'Test Custodian',
-              'maxDailyMints': '1000'
-            }
-          },
-          { signer: keypair }
-        );
-
-        console.log(`📝 CADOP service addition result: ${serviceAddResult}`);
-
-        if (serviceAddResult) {
-          // Now try to create a DID via CADOP
-          console.log('🚀 Attempting CADOP DID creation...');
-          
-          const success = await roochVDR.createViaCADOP(
-            'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-            'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-            'Ed25519VerificationKey2020',
-            { signer: keypair }
-          );
-
-          console.log(`📝 CADOP DID creation result: ${success}`);
-          
-          if (!success) {
-            console.log('❌ CADOP creation failed, but this is expected in current test setup');
+      // First, try to add a CADOP service to the custodian's actual DID
+      // Note: The custodian would need to have their own DID to provide CADOP services
+      // For this test, we'll try to add the service to the actual DID created earlier
+      
+      console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDIDAddress}`);
+      
+      let didAccount = new DIDAccount(actualDIDAddress, keypair);
+      
+      const serviceAddResult = await roochVDR.addServiceWithProperties(
+        actualDIDAddress,
+        {
+          id: `${actualDIDAddress}#cadop-service`,
+          type: 'CadopCustodianService',
+          serviceEndpoint: 'https://custodian.example.com/api/cadop',
+          properties: {
+            'name': 'Test Custodian',
+            'maxDailyMints': '1000'
           }
-        } else {
-          console.log('⚠️ CADOP service addition failed, skipping CADOP creation test');
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log('❌ CADOP test failed (expected due to permission/setup issues):', errorMessage);
-        // This test might fail due to various setup/permission issues
-        // We'll just log the error and continue rather than failing the test
-      }
+        },
+        { signer: didAccount }
+      );
+
+      console.log(`📝 CADOP service addition result: ${serviceAddResult}`);
+      expect(serviceAddResult).toBe(true);
+      console.log(`✅ Successfully added CADOP service using DID account signer`);
+
+      // Now try to create a DID via CADOP
+      console.log('🚀 Attempting CADOP DID creation...');
+      
+      const success = await roochVDR.createViaCADOP(
+        'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        'Ed25519VerificationKey2020',
+        { signer: didAccount }
+      );
+
+      console.log(`📝 CADOP DID creation result: ${success}`);
+      expect(success).toBe(true);
+      console.log(`✅ Successfully created DID via CADOP using DID account signer`);
     }, TEST_TIMEOUT);
   });
 

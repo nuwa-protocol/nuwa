@@ -2,6 +2,17 @@
 
 This directory contains specialized VDR implementations for various DID methods.
 
+## Solution for Rooch DIDAccount Signature Issue
+
+In the Rooch DID system, all on-chain operations (such as adding/removing verification methods or services) must be authorized by the DID's associated smart contract account. The controller(s) listed in the DID document do not have direct authority to perform these on-chain actions for the DID document itself. The solution and key points are as follows:
+
+- **Authorization by DID's Associated Account**: On-chain modifications to a DID Document (e.g., `addVerificationMethod`, `addService`) must be authorized by the DID's own associated smart contract account (identified by `did:rooch:<account_address>`). For a transaction to be authorized, it must be signed using a private key whose corresponding public key is registered as an `authentication` verification method in the DID Document. This key then acts as a `session_key` for that specific transaction.
+- **Permission Check**: The implementation's `hasPermissionForOperation` method effectively checks if the signer (authorized via the session_key mechanism) has the required capabilities (e.g., `capabilityDelegation` for key management) associated with the DID's account.
+- **Debugging Advice**: If you encounter permission errors, first verify that the transaction is signed with a key that is part of the DID's `authentication` relationship and has the necessary permissions (e.g. `capabilityDelegation`). It is recommended to enable debug mode (`debug: true` in the RoochVDR constructor) during development and debugging to output detailed logs.
+- **SessionKey Mechanism**: The authorization relies on Rooch's `session_key` system. An `authentication` verification method's public key is used to derive a `session_key` that grants temporary, scoped permissions for the DID's associated account to act.
+
+> Summary: In the Rooch DID system, the authority to perform on-chain modifications to a DID Document rests with its associated smart contract account. This authority is exercised when a transaction is signed by a key listed in the DID's `authentication` verification methods (which then acts as a `session_key`). Controllers, as defined in the DID Document, serve roles like off-chain governance or specific delegated capabilities but do not grant direct permissions to sign for on-chain DID Document mutations.
+
 ## Adding a New VDR Implementation
 
 To create a new VDR implementation:

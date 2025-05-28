@@ -4,7 +4,16 @@ import {
   Transaction, 
   Args, 
   getRoochNodeUrl, 
-  bcs 
+  bcs,
+  Signer,
+  RoochAddress,
+  SignatureScheme,
+  Keypair,
+  PublicKey,
+  Address,
+  Bytes,
+  Authenticator,
+  BitcoinAddress,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship } from '../../types';
 import { AbstractVDR } from '../abstractVDR';
@@ -60,6 +69,11 @@ export interface RoochVDROptions {
    * Network type (dev, test, main)
    */
   network?: 'dev' | 'test' | 'main';
+
+  /**
+   * Enable debug mode for detailed logging
+   */
+  debug?: boolean;
 }
 
 /**
@@ -86,10 +100,6 @@ export interface DIDStruct {
   method: string;
   identifier: string;
 }
-
-// export interface ObjectID {
-//   id: address[];
-// }
 
 export interface DIDCreatedEventData {
   did: DIDStruct;
@@ -134,6 +144,72 @@ export interface RoochVDROperationOptions {
 }
 
 /**
+ * Represents a signer for a Rooch DID's associated smart contract account.
+ *
+ * The `DIDAccount` class implements the Rooch `Signer` interface. It is initialized
+ * with a DID string (e.g., "did:rooch:0x...") and a `Keypair`. This `Keypair`
+ * corresponds to a specific verification method within the DID Document,
+ * typically one with an 'authentication' relationship.
+ *
+ * When this `DIDAccount` signs a transaction, the provided `Keypair` is used.
+ * In the context of the Rooch DID system, this signature, when validated against
+ * an `authentication` verification method, allows the transaction to be authorized
+ * by the DID's associated smart contract account (via the session key mechanism).
+ *
+ * The `didAddress` (a `RoochAddress`) derived from the input DID string represents
+ * the actual on-chain smart contract account associated with the DID.
+ */
+export class DIDAccount extends Signer {
+  private did: string;
+  private kp: Keypair;
+  private didAddress: RoochAddress;
+  constructor(did: string, kp: Keypair) {
+    super();
+    this.did = did;
+    this.kp = kp;
+    // parse the identifier from the did
+    const didParts = did.split(':');
+    if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
+      throw new Error('Invalid DID format. Expected did:rooch:address');
+    }
+    this.didAddress = new RoochAddress(didParts[2]);
+  }
+
+  getRoochAddress(): RoochAddress {
+    return this.didAddress
+  }
+
+  
+  sign(input: Bytes): Promise<Bytes>{
+    return this.kp.sign(input);
+  }
+  
+  signTransaction(input: Transaction): Promise<Authenticator>{
+    return Authenticator.rooch(input.hashData(), this);
+  }
+  
+  getKeyScheme(): SignatureScheme{
+    return this.kp.getKeyScheme();
+  }
+
+  getPublicKey(): PublicKey<Address>{
+    return this.kp.getPublicKey();
+  }
+
+  getBitcoinAddress(): BitcoinAddress{
+    throw new Error('Bitcoin address is not supported for DID account');
+  }
+
+  getDid(): string{
+    return this.did;
+  }
+
+  getDidAddress(): RoochAddress{
+    return this.didAddress;
+  }
+}
+
+/**
  * VDR implementation for did:rooch method
  * 
  * This implementation integrates with Rooch network's DID contract system
@@ -143,6 +219,7 @@ export class RoochVDR extends AbstractVDR {
   private readonly options: RoochVDROptions;
   private client: RoochClient;
   private readonly didContractAddress: string;
+  private readonly debug: boolean;
   
   // Cache for storing the last created DID address
   private lastCreatedDIDAddress?: string;
@@ -151,12 +228,37 @@ export class RoochVDR extends AbstractVDR {
     super('rooch');
     this.options = options;
     this.didContractAddress = options.didContractAddress || '0x3::did';
+    this.debug = options.debug || false;
     
     // Initialize Rooch client
     if (options.client) {
       this.client = options.client;
     } else {
       this.client = new RoochClient({ url: options.rpcUrl });
+    }
+  }
+  
+  /**
+   * Log message if debug mode is enabled
+   */
+  private debugLog(message: string, data?: any) {
+    if (this.debug) {
+      if (data) {
+        console.log(`[RoochVDR Debug] ${message}`, data);
+      } else {
+        console.log(`[RoochVDR Debug] ${message}`);
+      }
+    }
+  }
+
+  /**
+   * Log error message (always logged regardless of debug mode)
+   */
+  private errorLog(message: string, error?: any) {
+    if (error) {
+      console.error(`[RoochVDR Error] ${message}`, error);
+    } else {
+      console.error(`[RoochVDR Error] ${message}`);
     }
   }
   
@@ -204,7 +306,7 @@ export class RoochVDR extends AbstractVDR {
       const success = result.execution_info.status.type === 'executed';
       
       if (success) {
-        console.log(`DID Document ${didDocument.id} successfully stored on Rooch blockchain`);
+        this.debugLog(`DID Document ${didDocument.id} successfully stored on Rooch blockchain`);
         
         // Extract the actual DID address from transaction events
         // Look for DIDCreatedEvent in the events
@@ -213,7 +315,7 @@ export class RoochVDR extends AbstractVDR {
         );
         
         if (didCreatedEvent) {
-          console.log('DID creation event found:', didCreatedEvent);
+          this.debugLog('DID creation event found:', didCreatedEvent);
           
           // Parse the actual DID address from the event data using BCS
           try {
@@ -222,7 +324,7 @@ export class RoochVDR extends AbstractVDR {
               this.lastCreatedDIDAddress = actualDIDAddress;
             }
           } catch (error) {
-            console.warn('Could not parse DID from event data using BCS:', error);
+            this.errorLog('Could not parse DID from event data using BCS:', error);
             // Fallback to string parsing if BCS fails
             const fallbackAddress = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent);
             if (fallbackAddress) {
@@ -231,13 +333,13 @@ export class RoochVDR extends AbstractVDR {
           }
         }
       } else {
-        console.error(`Failed to store DID Document ${didDocument.id} on Rooch blockchain`);
-        console.error('Transaction execution info:', JSON.stringify(result.execution_info, null, 2));
+        this.errorLog(`Failed to store DID Document ${didDocument.id} on Rooch blockchain`);
+        this.errorLog('Transaction execution info:', result.execution_info);
       }
       
       return success;
     } catch (error) {
-      console.error(`Error storing DID document on Rooch blockchain:`, error);
+      this.errorLog(`Error storing DID document on Rooch blockchain:`, error);
       throw error;
     }
   }
@@ -379,10 +481,14 @@ export class RoochVDR extends AbstractVDR {
         throw new Error(`DID document ${did} not found`);
       }
       
+      this.debugLog(`Adding verification method to DID: ${did}`);
+      this.debugLog(`Using signer with address: ${signer.getRoochAddress().toBech32Address()}`);
+      
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
-        console.error(`Signer does not have capabilityDelegation permission for ${did}`);
+        this.errorLog(`Signer does not have capabilityDelegation permission for ${did}`);
+        this.debugLog(`Note: DID operations may require the DID account itself to sign, not the controller`);
         return false;
       }
       
@@ -407,6 +513,14 @@ export class RoochVDR extends AbstractVDR {
         maxGas: options?.maxGas || 100000000
       });
       
+      this.debugLog(`Executing transaction: add_verification_method_entry`);
+      this.debugLog(`Args:`, [
+        this.extractFragmentFromId(verificationMethod.id),
+        verificationMethod.type,
+        verificationMethod.publicKeyMultibase,
+        relationshipValues
+      ]);
+      
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -414,10 +528,26 @@ export class RoochVDR extends AbstractVDR {
         option: { withOutput: true }
       });
       
-      return result.execution_info.status.type === 'executed';
+      this.debugLog(`Transaction execution result:`, {
+        status: result.execution_info.status,
+        gas_used: result.execution_info.gas_used,
+        events_count: result.output?.events?.length || 0
+      });
+      
+      if (result.execution_info.status.type !== 'executed') {
+        this.errorLog(`Transaction failed:`, result.execution_info);
+        if (result.execution_info.status.type === 'moveabort') {
+          this.errorLog(`Move abort code:`, (result.execution_info.status as any).abort_code);
+          this.errorLog(`Move abort location:`, (result.execution_info.status as any).location);
+        }
+        return false;
+      }
+      
+      this.debugLog(`Verification method added successfully`);
+      return true;
     } catch (error) {
-      console.error(`Error adding verification method to ${did}:`, error);
-      return false; // Return false instead of throwing for permission errors
+      this.errorLog(`Error adding verification method to ${did}:`, error);
+      return false;
     }
   }
   
@@ -444,7 +574,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
         console.error(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
@@ -496,10 +626,14 @@ export class RoochVDR extends AbstractVDR {
         throw new Error(`DID document ${did} not found`);
       }
       
+      console.log(`🔧 Adding service to DID: ${did}`);
+      console.log(`🗝️ Using signer with address: ${signer.getRoochAddress().toBech32Address()}`);
+      
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
-        console.error(`Signer does not have capabilityInvocation permission for ${did}`);
+        console.error(`❌ Signer does not have capabilityInvocation permission for ${did}`);
+        console.log(`💡 Note: DID operations may require the DID account itself to sign, not the controller`);
         return false;
       }
       
@@ -515,6 +649,13 @@ export class RoochVDR extends AbstractVDR {
         maxGas: options?.maxGas || 100000000
       });
       
+      console.log(`📤 Executing transaction: add_service_entry`);
+      console.log(`📋 Args:`, [
+        this.extractFragmentFromId(service.id),
+        service.type,
+        service.serviceEndpoint
+      ]);
+      
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -522,9 +663,25 @@ export class RoochVDR extends AbstractVDR {
         option: { withOutput: true }
       });
       
-      return result.execution_info.status.type === 'executed';
+      console.log(`📊 Transaction execution result:`, {
+        status: result.execution_info.status,
+        gas_used: result.execution_info.gas_used,
+        events_count: result.output?.events?.length || 0
+      });
+      
+      if (result.execution_info.status.type !== 'executed') {
+        console.error(`❌ Transaction failed:`, result.execution_info);
+        if (result.execution_info.status.type === 'moveabort') {
+          console.error(`🔥 Move abort code:`, (result.execution_info.status as any).abort_code);
+          console.error(`🔥 Move abort location:`, (result.execution_info.status as any).location);
+        }
+        return false;
+      }
+      
+      console.log(`✅ Service added successfully`);
+      return true;
     } catch (error) {
-      console.error(`Error adding service to ${did}:`, error);
+      console.error(`❌ Error adding service to ${did}:`, error);
       return false;
     }
   }
@@ -552,7 +709,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
         console.error(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
@@ -613,7 +770,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
         console.error(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
@@ -668,7 +825,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toHexAddress() : null;
+      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
         console.error(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
@@ -785,23 +942,46 @@ export class RoochVDR extends AbstractVDR {
     requiredRelationship: VerificationRelationship
   ): boolean {
     try {
-      console.log(`🔍 Checking permission for signer ${signerAddress} on DID ${didDocument.id}`);
-      console.log(`📋 Required relationship: ${requiredRelationship}`);
-      console.log(`👑 DID controllers:`, didDocument.controller);
+      this.debugLog(`Checking permission for signer ${signerAddress} on DID ${didDocument.id}`);
+      this.debugLog(`Required relationship: ${requiredRelationship}`);
+      this.debugLog(`DID controllers:`, didDocument.controller);
       
       // Create possible DID formats for the signer
       const signerDIDHex = `did:rooch:${signerAddress}`;
-      console.log(`🔑 Signer DID (hex):`, signerDIDHex);
+      this.debugLog(`Signer DID (hex):`, signerDIDHex);
       
+      // Extract DID address from the DID document ID
+      const didMatch = didDocument.id.match(/did:rooch:(.+)$/);
+      const didAddress = didMatch ? didMatch[1] : null;
+      
+      this.debugLog(`DID account address:`, didAddress);
+      this.debugLog(`Signer address:`, signerAddress);
+      
+      // **CRITICAL**: In Rooch DID system, operations must be signed by the DID account itself
+      // The DID account is created by the contract and is different from the controller
+      if (didAddress && signerAddress.toLowerCase() === didAddress.toLowerCase()) {
+        this.debugLog(`Permission granted: Signer is the DID account itself`);
+        return true;
+      }
+      
+      // If signer is not the DID account, this will fail at contract level
+      this.errorLog(`Permission issue: Signer is not the DID account`);
+      this.debugLog(`In Rooch DID system:`);
+      this.debugLog(`   - DID account address: ${didAddress}`);
+      this.debugLog(`   - Signer address: ${signerAddress}`);
+      this.debugLog(`   - Operations must be signed by the DID account, not the controller`);
+      this.debugLog(`   - DID accounts can only sign via SessionKey or similar mechanism`);
+      
+      // Legacy permission check (will likely fail at contract level)
       // According to Rooch DID documentation, controllers should have management permissions
       // Check if the signer is in the controller list
       if (Array.isArray(didDocument.controller)) {
         for (const controller of didDocument.controller) {
-          console.log(`🔍 Checking controller:`, controller);
+          this.debugLog(`Checking controller:`, controller);
           
           // Direct match (hex format)
           if (controller === signerDIDHex) {
-            console.log(`✅ Permission granted: Signer is a direct controller (hex format)`);
+            this.debugLog(`Signer is a controller (hex format) but may fail at contract level`);
             return true;
           }
           
@@ -810,7 +990,7 @@ export class RoochVDR extends AbstractVDR {
             // For bech32 controllers, we need to convert addresses
             // For now, we'll be permissive for controllers since the Rooch DID system
             // should handle the actual authorization at the blockchain level
-            console.log(`✅ Permission granted: Signer appears to be a controller (bech32 format)`);
+            this.debugLog(`Signer appears to be a controller (bech32 format) but may fail at contract level`);
             return true;
           }
           
@@ -819,7 +999,7 @@ export class RoochVDR extends AbstractVDR {
           if (controllerMatch) {
             const controllerAddress = controllerMatch[1];
             if (controllerAddress === signerAddress || controllerAddress.toLowerCase() === signerAddress.toLowerCase()) {
-              console.log(`✅ Permission granted: Address match found`);
+              this.debugLog(`Address match found but may fail at contract level`);
               return true;
             }
           }
@@ -828,12 +1008,12 @@ export class RoochVDR extends AbstractVDR {
       
       // Check if signer controls any verification method with the required relationship
       if (!didDocument.verificationMethod) {
-        console.log(`❌ No verification methods found`);
+        this.debugLog(`No verification methods found`);
         return false;
       }
       
       for (const vm of didDocument.verificationMethod) {
-        console.log(`🔍 Checking verification method:`, vm.id, 'controller:', vm.controller);
+        this.debugLog(`Checking verification method: ${vm.id}, controller: ${vm.controller}`);
         
         // Check if this verification method is controlled by the signer
         const isControlledBySigner = vm.controller === signerDIDHex || 
@@ -841,12 +1021,12 @@ export class RoochVDR extends AbstractVDR {
           (Array.isArray(didDocument.controller) && didDocument.controller.includes(signerDIDHex));
         
         if (isControlledBySigner) {
-          console.log(`🔍 VM ${vm.id} is controlled by signer, checking relationships...`);
+          this.debugLog(`VM ${vm.id} is controlled by signer, checking relationships...`);
           
           // Check if this verification method has the required relationship
           const relationshipArray = didDocument[requiredRelationship] as (string | object)[];
           if (relationshipArray) {
-            console.log(`🔍 Relationship array for ${requiredRelationship}:`, relationshipArray);
+            this.debugLog(`Relationship array for ${requiredRelationship}:`, relationshipArray);
             
             const hasRelationship = relationshipArray.some(item => {
               if (typeof item === 'string') {
@@ -858,17 +1038,17 @@ export class RoochVDR extends AbstractVDR {
             });
             
             if (hasRelationship) {
-              console.log(`✅ Permission granted: VM has required relationship`);
+              this.debugLog(`VM has required relationship but signer may not be DID account`);
               return true;
             }
           }
         }
       }
       
-      console.log(`❌ Permission denied: No matching controller or VM relationship found`);
+      this.errorLog(`Permission denied: No matching controller or VM relationship found`);
       return false;
     } catch (error) {
-      console.error('Error checking permission:', error);
+      this.errorLog('Error checking permission:', error);
       return false;
     }
   }
@@ -1037,22 +1217,22 @@ export class RoochVDR extends AbstractVDR {
     const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
     const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
 
-    console.log('Event data bytes length:', bytes.length);
-    console.log('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
+    this.debugLog('Event data bytes length:', bytes.length);
+    this.debugLog('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
 
     try {
       const decoded: DIDCreatedEventData = DIDCreatedEventSchema.parse(bytes);
-      console.log('🎉 DID Created Event (BCS parsed):');
-      console.log('  New DID:', `did:${decoded.did.method}:${decoded.did.identifier}`);
-      console.log('  Object ID:', decoded.object_id);
-      console.log('  Creator Address:', decoded.creator_address);
-      console.log('  Creation Method:', decoded.creation_method);
-      console.log('  Controllers:');
+      this.debugLog('DID Created Event (BCS parsed):');
+      this.debugLog(`  New DID: did:${decoded.did.method}:${decoded.did.identifier}`);
+      this.debugLog(`  Object ID: ${decoded.object_id}`);
+      this.debugLog(`  Creator Address: ${decoded.creator_address}`);
+      this.debugLog(`  Creation Method: ${decoded.creation_method}`);
+      this.debugLog('  Controllers:');
       decoded.controller.forEach((controller, index) => {
-        console.log(`    [${index}] did:${controller.method}:${controller.identifier}`);
+        this.debugLog(`    [${index}] did:${controller.method}:${controller.identifier}`);
       });
     } catch (parseError) {
-      console.warn('BCS parsing failed:', parseError);
+      this.errorLog('BCS parsing failed:', parseError);
       throw parseError;
     }
   }
@@ -1065,24 +1245,24 @@ export class RoochVDR extends AbstractVDR {
     const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
     const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
 
-    console.log('Event data bytes length:', bytes.length);
-    console.log('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
+    this.debugLog('Event data bytes length:', bytes.length);
+    this.debugLog('First few bytes:', Array.from(bytes.slice(0, 10)).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
 
     try {
       const decoded: DIDCreatedEventData = DIDCreatedEventSchema.parse(bytes);
       const newDIDAddress = `did:${decoded.did.method}:${decoded.did.identifier}`;
-      console.log('🎉 DID Created Event (BCS parsed):');
-      console.log('  New DID:', newDIDAddress);
-      console.log('  Object ID:', decoded.object_id);
-      console.log('  Creator Address:', decoded.creator_address);
-      console.log('  Creation Method:', decoded.creation_method);
-      console.log('  Controllers:');
+      this.debugLog('DID Created Event (BCS parsed):');
+      this.debugLog(`  New DID: ${newDIDAddress}`);
+      this.debugLog(`  Object ID: ${decoded.object_id}`);
+      this.debugLog(`  Creator Address: ${decoded.creator_address}`);
+      this.debugLog(`  Creation Method: ${decoded.creation_method}`);
+      this.debugLog('  Controllers:');
       decoded.controller.forEach((controller, index) => {
-        console.log(`    [${index}] did:${controller.method}:${controller.identifier}`);
+        this.debugLog(`    [${index}] did:${controller.method}:${controller.identifier}`);
       });
       return newDIDAddress;
     } catch (parseError) {
-      console.warn('BCS parsing failed:', parseError);
+      this.errorLog('BCS parsing failed:', parseError);
       throw parseError;
     }
   }
