@@ -67,11 +67,6 @@ export interface RoochVDROptions {
   signer?: any; // SessionAccount or other Rooch signer
   
   /**
-   * DID contract address on Rooch (default: 0x3::did)
-   */
-  didContractAddress?: string;
-  
-  /**
    * Network type (dev, test, main)
    */
   network?: 'dev' | 'test' | 'main';
@@ -194,7 +189,7 @@ export class RoochVDR extends AbstractVDR {
   constructor(options: RoochVDROptions) {
     super('rooch');
     this.options = options;
-    this.didContractAddress = options.didContractAddress || '0x3::did';
+    this.didContractAddress = '0x3::did';
     this.debug = options.debug || false;
     
     // Initialize Rooch client
@@ -1078,7 +1073,6 @@ export class RoochVDR extends AbstractVDR {
     return new RoochVDR({
       rpcUrl: RoochVDR.getRoochNodeUrl(network),
       network,
-      didContractAddress: '0x3::did'
     });
   }
 
@@ -1111,7 +1105,6 @@ export class RoochVDR extends AbstractVDR {
  * const roochVDR = new RoochVDR({
  *   rpcUrl: 'https://test-seed.rooch.network/',
  *   client: client,
- *   didContractAddress: '0x3::did'
  * });
  * 
  * // 3. Store a DID document (self-creation)

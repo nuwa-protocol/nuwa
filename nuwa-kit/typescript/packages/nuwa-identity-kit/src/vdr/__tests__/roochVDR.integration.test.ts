@@ -52,7 +52,6 @@ describe('RoochVDR Integration Tests', () => {
         rpcUrl: DEFAULT_NODE_URL,
         client: client,
         signer: keypair,
-        didContractAddress: '0x3::did'
       });
 
       console.log(`Test address: ${testAddress}`);
