@@ -8,8 +8,6 @@ export interface VerificationMethod {
   controller: string; // DID of the controller
   publicKeyMultibase?: string; // Base64 URL encoded public key
   publicKeyJwk?: JsonWebKey; // JWK format public key
-  blockchainAccountId?: string; // For on-chain keys, e.g., an account ID or address
-  expires?: string; // ISO 8601 datetime string, e.g., 2025-12-31T23:59:59Z
 }
 
 export interface ServiceEndpoint {

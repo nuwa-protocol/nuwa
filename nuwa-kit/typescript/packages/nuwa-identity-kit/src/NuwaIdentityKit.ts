@@ -481,15 +481,6 @@ export class NuwaIdentityKit {
       return false;
     }
 
-    // Check key expiration
-    if (verificationMethod.expires) {
-      const expiryDate = new Date(verificationMethod.expires);
-      if (expiryDate.getTime() < Date.now()) {
-        console.warn(`Key ${signature.key_id} has expired.`);
-        return false;
-      }
-    }
-
     // Extract public key
     let publicKeyMaterial: JsonWebKey | Uint8Array | null = null;
     if (verificationMethod.publicKeyJwk) {

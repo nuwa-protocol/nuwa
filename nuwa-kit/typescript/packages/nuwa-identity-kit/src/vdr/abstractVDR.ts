@@ -343,8 +343,7 @@ export abstract class AbstractVDR implements VDRInterface {
     
     // Check that at least one key material format is present
     if (!verificationMethod.publicKeyMultibase && 
-        !verificationMethod.publicKeyJwk && 
-        !verificationMethod.blockchainAccountId) {
+        !verificationMethod.publicKeyJwk) {
       throw new Error('Verification method must have at least one form of public key material');
     }
   }
