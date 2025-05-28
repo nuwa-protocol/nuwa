@@ -1,10 +1,8 @@
 import { 
-  address,
   RoochClient, 
   Transaction, 
   Args, 
   getRoochNodeUrl as sdkGetRoochNodeUrl, 
-  bcs,
   Signer,
   RoochAddress,
   SignatureScheme,
@@ -14,19 +12,14 @@ import {
   Bytes,
   Authenticator,
   BitcoinAddress,
-  AnnotatedMoveStructView,
   ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../../types';
 import { AbstractVDR } from '../abstractVDR';
 import {
-  DIDCreatedEventData,
-  parseDIDCreatedEvent,
-  getDIDAddressFromEvent,
   convertMoveDIDDocumentToInterface,
-  DIDDocumentSchema,
-  MoveDIDDocument,
-  SimpleMap,
+  getDIDAddressFromEvent,
+  parseDIDCreatedEvent,
   resolveDidObjectID,
 } from './roochVDRTypes';
 
@@ -278,18 +271,10 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Parse the actual created DID
-      let actualDID: string | undefined;
       const didCreatedEvent = result.output?.events?.find((event: any) => 
         event.event_type === '0x3::did::DIDCreatedEvent'
       );
-      
-      if (didCreatedEvent) {
-        try {
-          actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
-        } catch (error) {
-          actualDID = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent) || undefined;
-        }
-      }
+      let actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent); 
       
       if (actualDID) {
         this.lastCreatedDIDAddress = actualDID;
@@ -304,7 +289,7 @@ export class RoochVDR extends AbstractVDR {
         transactionHash: (result as any).transaction_hash,
         debug: {
           requestedDID: request.preferredDID,
-          actualDID: actualDID,
+          actualDID: actualDID || undefined,
           events: result.output?.events
         }
       };
@@ -364,11 +349,7 @@ export class RoochVDR extends AbstractVDR {
       );
       
       if (didCreatedEvent) {
-        try {
-          actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
-        } catch (error) {
-          actualDID = this.parseDIDCreatedEventFallbackAndGetAddress(didCreatedEvent) || undefined;
-        }
+        actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent) || undefined;
       }
       
       return {
@@ -1082,34 +1063,6 @@ export class RoochVDR extends AbstractVDR {
       this.errorLog('BCS parsing failed:', error);
       throw error;
     }
-  }
-
-  /**
-   * Fallback method to parse DIDCreatedEvent using string matching and return the DID address
-   */
-  private parseDIDCreatedEventFallbackAndGetAddress(event: any): string | null {
-    const eventData = event.event_data;
-    const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
-    const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
-    
-    // Try to find DID strings in the data (look for "did:rooch:" patterns)
-    const dataStr = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-    console.log('Event data as string (fallback):', dataStr);
-    
-    // Look for rooch addresses (bech32 format starting with "rooch1")
-    const roochAddressMatches = dataStr.match(/rooch1[a-z0-9]{58}/g);
-    if (roochAddressMatches && roochAddressMatches.length > 0) {
-      console.log('Found Rooch addresses in event:', roochAddressMatches);
-      // The first address should be the new DID, the second should be the controller
-      if (roochAddressMatches.length >= 1) {
-        const newDIDAddress = roochAddressMatches[0];
-        const didAddress = `did:rooch:${newDIDAddress}`;
-        console.log('🎉 New DID created (fallback):', didAddress);
-        console.log('📝 Controller DID (fallback):', roochAddressMatches.length > 1 ? `did:rooch:${roochAddressMatches[1]}` : 'Not found');
-        return didAddress;
-      }
-    }
-    return null;
   }
 
   /**
