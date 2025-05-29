@@ -1,22 +1,9 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "Node16",
-    "moduleResolution": "node16",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "types": ["node", "jest"],
-    "allowJs": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": false,
-    "jsx": "react-jsx",
-    "baseUrl": ".",
-    "paths": {
-      "@cadop/*": ["packages/*/src"]
-    }
-  },
-  "exclude": ["node_modules", "dist"]
+  "extends": "./tsconfig.base.json",
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/cadop-api" },
+    { "path": "./packages/cadop-web" }
+  ],
+  "files": []
 } 
