@@ -5,7 +5,7 @@ import { cryptoService } from '../services/crypto';
 const router = Router();
 
 /**
- * OIDC 发现端点
+ * OIDC discovery endpoint
  * GET /.well-known/openid-configuration
  */
 router.get('/.well-known/openid-configuration', async (_req, res) => {
@@ -22,7 +22,7 @@ router.get('/.well-known/openid-configuration', async (_req, res) => {
 });
 
 /**
- * JWKS 端点
+ * JWKS endpoint
  * GET /.well-known/jwks.json
  */
 router.get('/.well-known/jwks.json', async (_req, res) => {
@@ -39,12 +39,12 @@ router.get('/.well-known/jwks.json', async (_req, res) => {
 });
 
 /**
- * DID Document 端点
+ * DID Document endpoint
  * GET /.well-known/did.json
  */
 router.get('/.well-known/did.json', async (req, res) => {
   try {
-    // 为 CADOP 服务生成 DID Document
+    // Generate DID Document for CADOP service
     const publicJWK = await cryptoService.getPublicJWK();
     const issuer = req.protocol + '://' + req.get('host');
     
@@ -89,7 +89,7 @@ router.get('/.well-known/did.json', async (req, res) => {
 });
 
 /**
- * 授权端点
+ * Authorization endpoint
  * GET /auth/authorize
  */
 router.get('/auth/authorize', async (req, res) => {
@@ -97,7 +97,7 @@ router.get('/auth/authorize', async (req, res) => {
 });
 
 /**
- * 令牌端点
+ * Token endpoint
  * POST /auth/token
  */
 router.post('/auth/token', async (req, res) => {
@@ -105,7 +105,7 @@ router.post('/auth/token', async (req, res) => {
 });
 
 /**
- * 用户信息端点
+ * User info endpoint
  * GET /auth/userinfo
  */
 router.get('/auth/userinfo', async (req, res) => {
@@ -113,13 +113,13 @@ router.get('/auth/userinfo', async (req, res) => {
 });
 
 /**
- * 客户端注册端点 (简化版)
+ * Client registration endpoint (simplified version)
  * POST /auth/register
  */
 router.post('/auth/register', async (req, res) => {
   try {
-    // 简化的客户端注册实现
-    // 在生产环境中，这应该有适当的验证和授权
+    // Simplified client registration implementation
+    // In production, this should have appropriate validation and authorization
     
     const {
       client_name,
@@ -130,7 +130,7 @@ router.post('/auth/register', async (req, res) => {
       client_secret
     } = req.body;
     
-    // 基本验证
+    // Basic validation
     if (!client_name || !redirect_uris || !Array.isArray(redirect_uris)) {
       return res.status(400).json({
         error: 'invalid_request',
@@ -138,11 +138,11 @@ router.post('/auth/register', async (req, res) => {
       });
     }
     
-    // 生成客户端 ID
+    // Generate client ID
     const client_id = `client_${cryptoService.generateSecureRandom(16)}`;
     
-    // TODO: 在实际实现中，应该将客户端信息存储到数据库
-    // 这里返回客户端信息用于测试
+    // TODO: In production, client information should be stored in the database
+    // Here we return client information for testing
     
     const clientInfo = {
       client_id,
@@ -168,39 +168,7 @@ router.post('/auth/register', async (req, res) => {
 });
 
 /**
- * 健康检查端点
- * GET /health
- */
-router.get('/health', async (_req, res) => {
-  try {
-    // 检查密钥系统
-    await cryptoService.getJWKS();
-    
-    // 验证 OIDC 配置
-    oidcService.getDiscoveryConfiguration();
-    
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      services: {
-        crypto: 'ok',
-        oidc: 'ok',
-        database: 'ok' // TODO: 添加数据库健康检查
-      }
-    });
-  } catch (error) {
-    console.error('Health check error:', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
- * 服务文档端点
+ * Service documentation endpoint
  * GET /.well-known/service_documentation
  */
 router.get('/.well-known/service_documentation', (_req, res) => {
@@ -233,7 +201,7 @@ router.get('/.well-known/service_documentation', (_req, res) => {
 });
 
 /**
- * 隐私政策端点
+ * Privacy policy endpoint
  * GET /.well-known/privacy_policy
  */
 router.get('/.well-known/privacy_policy', (_req, res) => {
@@ -255,7 +223,7 @@ router.get('/.well-known/privacy_policy', (_req, res) => {
 });
 
 /**
- * 服务条款端点
+ * Terms of service endpoint
  * GET /.well-known/terms_of_service
  */
 router.get('/.well-known/terms_of_service', (_req, res) => {

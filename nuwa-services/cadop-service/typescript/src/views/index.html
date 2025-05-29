@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CADOP Service</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .endpoints {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            margin: 10px 0;
+        }
+        .endpoint-name {
+            font-weight: bold;
+            color: #666;
+        }
+        .endpoint-url {
+            font-family: monospace;
+            background: #e9e9e9;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CADOP Service</h1>
+        <p>Welcome to the CADOP (Custodian-Assisted DID Onboarding Protocol Service) Service. This service provides OIDC-based authentication and DID operations.</p>
+        
+        <div class="endpoints">
+            <h2>Available Endpoints:</h2>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">OIDC Discovery</div>
+                <div class="endpoint-url">/.well-known/openid-configuration</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">JWKS</div>
+                <div class="endpoint-url">/.well-known/jwks.json</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">DID Document</div>
+                <div class="endpoint-url">/.well-known/did.json</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">Authorization Endpoint</div>
+                <div class="endpoint-url">/auth/authorize</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">Token Endpoint</div>
+                <div class="endpoint-url">/auth/token</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">UserInfo Endpoint</div>
+                <div class="endpoint-url">/auth/userinfo</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">WebAuthn API</div>
+                <div class="endpoint-url">/api/webauthn/*</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">Custodian API</div>
+                <div class="endpoint-url">/api/custodian/*</div>
+            </div>
+            
+            <div class="endpoint">
+                <div class="endpoint-name">Proof API</div>
+                <div class="endpoint-url">/api/proof/*</div>
+            </div>
+        </div>
+        
+        <p>For more information, please refer to the <a href="https://github.com/rooch-network/nuwa">documentation</a>.</p>
+    </div>
+</body>
+</html> 

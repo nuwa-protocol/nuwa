@@ -16,6 +16,14 @@ import { cryptoService } from './services/crypto';
 
 const app = express();
 
+// Set explicit MIME types for static files
+express.static.mime.define({
+  'text/css': ['css'],
+  'application/javascript': ['js'],
+  'application/json': ['json'],
+  'text/html': ['html']
+});
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -24,6 +32,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.github.com", "https://accounts.google.com"],
     },
   },
 }));
@@ -44,8 +53,37 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Static files serving
-app.use('/static', express.static(path.join(__dirname, 'public/static')));
+// Set up MIME types before static files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.css')) {
+    res.type('text/css');
+  } else if (req.path.endsWith('.js')) {
+    res.type('application/javascript');
+  }
+  next();
+});
+
+// Debug middleware to track static file requests
+app.use((req, res, next) => {
+  if (req.path.includes('.css') || req.path.includes('.js')) {
+    console.log(`[DEBUG] Static file request: ${req.method} ${req.path}`);
+  }
+  next();
+});
+
+// Static files serving - MUST be before all other routes
+const staticPath = path.join(__dirname, process.env.NODE_ENV === 'production' ? 'public' : '../dist/public');
+console.log(`[DEBUG] Static files path: ${staticPath}`);
+console.log(`[DEBUG] Static files exists: ${require('fs').existsSync(staticPath)}`);
+app.use(express.static(staticPath, {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Initialize crypto service and keys
 async function initializeServices() {
@@ -58,30 +96,33 @@ async function initializeServices() {
   }
 }
 
-// Routes
+// API Routes - order matters!
 app.use('/health', healthRoutes);
-
-// OIDC and well-known endpoints (注意：这些路由需要在其他路由之前)
-app.use('/', oidcRoutes);
-
-// API routes
 app.use('/auth', authRoutes);
 app.use('/api/custodian', custodianRoutes);
 app.use('/api/proof', proofRoutes);
-
-// WebAuthn routes
 app.use('/api/webauthn', webauthnRoutes);
+// OIDC routes last since they include root-level routes
+// app.use('/', oidcRoutes);
+
+// Serve React app for non-static routes only
+app.get('*', (req, res) => {
+  // Skip serving index.html for API routes
+  if (req.path.startsWith('/api/') || 
+      req.path.startsWith('/auth/') || 
+      req.path.startsWith('/health') ||
+      req.path.startsWith('/.well-known/')) {
+    // Let these routes be handled by their respective routers
+    return res.status(404).json({ error: 'Route not found' });
+  }
+  
+  const indexPath = path.join(staticPath, 'index.html');
+  console.log(`[DEBUG] Serving index.html from: ${indexPath} for route: ${req.path}`);
+  res.sendFile(indexPath);
+});
 
 // Error handling
 app.use(errorHandler);
-
-// 404 handler
-app.use('*', (_req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: 'The requested resource was not found'
-  });
-});
 
 const port = config.server.port;
 
