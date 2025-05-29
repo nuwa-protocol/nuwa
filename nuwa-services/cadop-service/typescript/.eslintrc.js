@@ -3,7 +3,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
-    project: './tsconfig.json',
+    project: ['./packages/*/tsconfig.json'],
   },
   plugins: ['@typescript-eslint'],
   extends: [
@@ -15,7 +15,13 @@ module.exports = {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js', 'dist/', 'node_modules/'],
+  ignorePatterns: [
+    '.eslintrc.js',
+    'dist/',
+    'node_modules/',
+    'packages/*/dist/',
+    'packages/*/node_modules/',
+  ],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',

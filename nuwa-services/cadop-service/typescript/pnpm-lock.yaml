@@ -70,13 +70,13 @@ importers:
         specifier: ^4.17.21
         version: 4.17.22
       '@types/jest':
-        specifier: ^29.5.12
+        specifier: ^29.5.14
         version: 29.5.14
       '@types/jsonwebtoken':
         specifier: ^9.0.5
         version: 9.0.9
       '@types/node':
-        specifier: ^20.11.19
+        specifier: ^20.17.52
         version: 20.17.52
       '@types/supertest':
         specifier: ^6.0.2
@@ -172,6 +172,12 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.17(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3)))
     devDependencies:
+      '@types/jest':
+        specifier: ^29.5.14
+        version: 29.5.14
+      '@types/node':
+        specifier: ^20.17.52
+        version: 20.17.52
       '@types/react':
         specifier: ^18.2.45
         version: 18.3.23
@@ -197,7 +203,7 @@ importers:
         specifier: ^5.3.3
         version: 5.8.3
       vite:
-        specifier: ^5.0.10
+        specifier: ^5.4.19
         version: 5.4.19(@types/node@20.17.52)
       vitest:
         specifier: ^1.1.0
@@ -222,7 +228,7 @@ importers:
         specifier: ^29.5.11
         version: 29.5.14
       '@types/node':
-        specifier: ^20.10.6
+        specifier: ^20.17.52
         version: 20.17.52
       jest:
         specifier: ^29.7.0
