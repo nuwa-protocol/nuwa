@@ -1,0 +1,59 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "didManagement": "DID Management",
+    "verification": "Identity Verification",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "welcome": "Welcome to Nuwa CADOP Service",
+    "createDID": "Create New DID",
+    "verifyIdentity": "Verify Identity",
+    "manageDID": "Manage DID",
+    "status": {
+      "title": "Status Overview",
+      "totalDIDs": "Total DIDs",
+      "verifiedIdentities": "Verified Identities",
+      "recentActivity": "Recent Activity"
+    }
+  },
+  "did": {
+    "creation": {
+      "title": "Create New DID",
+      "step1": "Choose Authentication Method",
+      "step2": "Identity Verification",
+      "step3": "Configure DID",
+      "step4": "Confirm Creation"
+    },
+    "management": {
+      "title": "DID Management",
+      "noDIDs": "No DIDs found",
+      "createFirst": "Create your first DID"
+    }
+  },
+  "verification": {
+    "title": "Identity Verification",
+    "methods": {
+      "title": "Available Methods",
+      "web2": "Web2 Authentication",
+      "web3": "Web3 Wallet"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications"
+  }
+} 

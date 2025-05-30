@@ -1,0 +1,21 @@
+{
+  "name": "CADOP Service",
+  "short_name": "CADOP",
+  "description": "Custodian-Assisted DID Onboarding Protocol Service - 创建和管理您的 DID，增强您的 Web3 身份",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+} 
