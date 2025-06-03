@@ -13,13 +13,9 @@ import type {
   AuthenticatorTransportFuture,
 } from '@simplewebauthn/types';
 
+import { apiClient } from '../api/client';
+
 export class PasskeyService {
-  private apiBaseUrl: string;
-
-  constructor() {
-    this.apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
-  }
-
   /**
    * Check if the browser supports WebAuthn/Passkey
    */
@@ -38,48 +34,31 @@ export class PasskeyService {
   ): Promise<PasskeyRegistrationResult> {
     try {
       // 1. Get registration options from server
-      const optionsResponse = await fetch(`${this.apiBaseUrl}/webauthn/registration/options`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          display_name: displayName,
-          friendly_name: friendlyName,
-        }),
-        credentials: 'include',
-      });
-
-      if (!optionsResponse.ok) {
-        throw new Error('Failed to get registration options');
+      const { data, error } = await apiClient.getRegistrationOptions(email, displayName, friendlyName);
+      
+      if (error || !data?.options) {
+        throw new Error(error?.message || 'Failed to get registration options');
       }
-
-      const { options } = await optionsResponse.json();
 
       // 2. Create credentials
       const credential = await navigator.credentials.create({
-        publicKey: this.preformatRegistrationOptions(options),
+        publicKey: this.preformatRegistrationOptions(data.options),
       }) as PublicKeyCredential;
 
       // 3. Verify registration with server
-      const verificationResponse = await fetch(`${this.apiBaseUrl}/webauthn/registration/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          response: this.formatRegistrationResponse(credential),
-          friendly_name: friendlyName,
-        }),
-        credentials: 'include',
-      });
+      const verificationResult = await apiClient.verifyRegistration(
+        this.formatRegistrationResponse(credential),
+        friendlyName
+      );
 
-      if (!verificationResponse.ok) {
-        throw new Error('Registration verification failed');
+      if (verificationResult.error) {
+        throw new Error(verificationResult.error.message);
       }
 
-      return await verificationResponse.json();
+      return {
+        ...verificationResult.data!,
+        user_id: data.user_id // Include the user_id from registration options
+      };
     } catch (error) {
       console.error('Passkey registration failed:', error);
       return {
@@ -97,43 +76,30 @@ export class PasskeyService {
   ): Promise<PasskeyAuthenticationResult> {
     try {
       // 1. Get authentication options from server
-      const optionsResponse = await fetch(`${this.apiBaseUrl}/webauthn/authentication/options`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userIdentifier ? { user_identifier: userIdentifier } : {}),
-        credentials: 'include',
-      });
-
-      if (!optionsResponse.ok) {
-        throw new Error('Failed to get authentication options');
+      const { data, error } = await apiClient.getAuthenticationOptions(userIdentifier);
+      
+      if (error || !data?.options) {
+        throw new Error(error?.message || 'Failed to get authentication options');
       }
-
-      const { options } = await optionsResponse.json();
 
       // 2. Get credentials
       const credential = await navigator.credentials.get({
-        publicKey: this.preformatAuthenticationOptions(options),
+        publicKey: this.preformatAuthenticationOptions(data.options),
       }) as PublicKeyCredential;
 
       // 3. Verify authentication with server
-      const verificationResponse = await fetch(`${this.apiBaseUrl}/webauthn/authentication/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          response: this.formatAuthenticationResponse(credential),
-        }),
-        credentials: 'include',
-      });
+      const verificationResult = await apiClient.verifyAuthentication(
+        this.formatAuthenticationResponse(credential)
+      );
 
-      if (!verificationResponse.ok) {
-        throw new Error('Authentication verification failed');
+      if (verificationResult.error) {
+        throw new Error(verificationResult.error.message);
       }
 
-      return await verificationResponse.json();
+      return verificationResult.data || {
+        success: false,
+        error: 'No data returned from server'
+      };
     } catch (error) {
       console.error('Passkey authentication failed:', error);
       return {
@@ -144,10 +110,15 @@ export class PasskeyService {
   }
 
   /**
-   * Helper: Convert base64 string to ArrayBuffer
+   * Helper: Convert base64url string to ArrayBuffer
    */
-  private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binaryString = window.atob(base64);
+  private base64urlToArrayBuffer(base64url: string): ArrayBuffer {
+    // Convert base64url to base64
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    // Add padding if needed
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    
+    const binaryString = window.atob(padded);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
@@ -156,11 +127,13 @@ export class PasskeyService {
   }
 
   /**
-   * Helper: Convert ArrayBuffer to base64 string
+   * Helper: Convert ArrayBuffer to base64url string
    */
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+  private arrayBufferToBase64url(buffer: ArrayBuffer): string {
     const binary = String.fromCharCode(...new Uint8Array(buffer));
-    return window.btoa(binary);
+    const base64 = window.btoa(binary);
+    // Convert base64 to base64url
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   /**
@@ -171,14 +144,14 @@ export class PasskeyService {
   ): PublicKeyCredentialCreationOptions {
     return {
       ...options,
-      challenge: this.base64ToArrayBuffer(options.challenge),
+      challenge: this.base64urlToArrayBuffer(options.challenge),
       user: {
         ...options.user,
-        id: this.base64ToArrayBuffer(options.user.id),
+        id: this.base64urlToArrayBuffer(options.user.id),
       },
       excludeCredentials: options.excludeCredentials?.map(credential => ({
         ...credential,
-        id: this.base64ToArrayBuffer(credential.id),
+        id: this.base64urlToArrayBuffer(credential.id),
         transports: credential.transports as AuthenticatorTransport[],
       })) as PublicKeyCredentialDescriptor[],
     };
@@ -192,10 +165,10 @@ export class PasskeyService {
   ): PublicKeyCredentialRequestOptions {
     return {
       ...options,
-      challenge: this.base64ToArrayBuffer(options.challenge),
+      challenge: this.base64urlToArrayBuffer(options.challenge),
       allowCredentials: options.allowCredentials?.map(credential => ({
         ...credential,
-        id: this.base64ToArrayBuffer(credential.id),
+        id: this.base64urlToArrayBuffer(credential.id),
         transports: credential.transports as AuthenticatorTransport[],
       })) as PublicKeyCredentialDescriptor[],
     };
@@ -209,10 +182,10 @@ export class PasskeyService {
     
     return {
       id: credential.id,
-      rawId: this.arrayBufferToBase64(credential.rawId),
+      rawId: this.arrayBufferToBase64url(credential.rawId),
       response: {
-        attestationObject: this.arrayBufferToBase64(response.attestationObject),
-        clientDataJSON: this.arrayBufferToBase64(response.clientDataJSON),
+        attestationObject: this.arrayBufferToBase64url(response.attestationObject),
+        clientDataJSON: this.arrayBufferToBase64url(response.clientDataJSON),
         transports: response.getTransports?.() as AuthenticatorTransportFuture[] | undefined,
       },
       type: 'public-key',
@@ -229,12 +202,12 @@ export class PasskeyService {
     
     return {
       id: credential.id,
-      rawId: this.arrayBufferToBase64(credential.rawId),
+      rawId: this.arrayBufferToBase64url(credential.rawId),
       response: {
-        authenticatorData: this.arrayBufferToBase64(response.authenticatorData),
-        clientDataJSON: this.arrayBufferToBase64(response.clientDataJSON),
-        signature: this.arrayBufferToBase64(response.signature),
-        userHandle: response.userHandle ? this.arrayBufferToBase64(response.userHandle) : undefined,
+        authenticatorData: this.arrayBufferToBase64url(response.authenticatorData),
+        clientDataJSON: this.arrayBufferToBase64url(response.clientDataJSON),
+        signature: this.arrayBufferToBase64url(response.signature),
+        userHandle: response.userHandle ? this.arrayBufferToBase64url(response.userHandle) : undefined,
       },
       type: 'public-key',
       clientExtensionResults: credential.getClientExtensionResults(),

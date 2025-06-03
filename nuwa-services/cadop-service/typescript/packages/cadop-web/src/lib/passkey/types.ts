@@ -73,6 +73,7 @@ export interface PasskeyRegistrationResult {
   success: boolean;
   device?: PasskeyDevice;
   error?: string;
+  user_id?: string;
 }
 
 export interface PasskeyAuthenticationResult {
@@ -80,4 +81,5 @@ export interface PasskeyAuthenticationResult {
   user_id?: string;
   device_id?: string;
   error?: string;
+  session?: any; // Supabase session type
 } 

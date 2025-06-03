@@ -60,7 +60,8 @@ export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: Passke
         'Default Device'
       );
 
-      if (registrationResult.success) {
+      if (registrationResult.success && registrationResult.user_id) {
+        // After successful registration, try to authenticate immediately
         const authResult = await passkeyService.authenticate(email);
         if (authResult.success && authResult.user_id) {
           const session = await supabaseAuthService.handlePasskeyResponse(
