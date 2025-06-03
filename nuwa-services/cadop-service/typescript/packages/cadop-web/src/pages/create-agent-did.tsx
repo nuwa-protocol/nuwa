@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Steps, Card, Button, Alert, Typography, Row, Col, Space, Spin } from 'antd';
 import { CheckCircleOutlined, LoadingOutlined, ClockCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth.js';
+import { useAuth } from '../lib/auth/AuthContext';
 import { useCustodianService } from '../hooks/useCustodianService.js';
 import { AgentDIDInstructions } from '../components/AgentDIDInstructions.js';
 import { AuthMethodSelector, AuthMethod } from '../components/AuthMethodSelector.js';
@@ -13,7 +13,8 @@ import type { CreateAgentDIDRequest, AgentDIDCreationStatus as DIDStatus } from 
 const { Title, Text } = Typography;
 
 export const CreateAgentDIDPage: React.FC = () => {
-  const { user, getIdToken } = useAuth();
+  const { session, isAuthenticated, isLoading: authLoading } = useAuth();
+  const user = session?.user;
   const { createAgentDID, getCreationStatus } = useCustodianService();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -23,6 +24,11 @@ export const CreateAgentDIDPage: React.FC = () => {
   const [didCreationStatus, setDidCreationStatus] = useState<DIDStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Helper function to get ID token (session token)
+  const getIdToken = async (): Promise<string | null> => {
+    return session?.session_token || null;
+  };
 
   // Auto-check status if recordId is in URL
   useEffect(() => {
@@ -152,7 +158,7 @@ export const CreateAgentDIDPage: React.FC = () => {
     }
   };
 
-  if (!user) {
+  if (!isAuthenticated || authLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <Spin size="large" />

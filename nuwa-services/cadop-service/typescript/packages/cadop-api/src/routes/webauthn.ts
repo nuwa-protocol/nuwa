@@ -340,6 +340,44 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { response } = req.body;
+      
+      logger.debug('🎯 Received authentication verification request', {
+        credentialId: response.id,
+        responseType: response.type,
+        authenticatorAttachment: response.authenticatorAttachment,
+        hasUserHandle: !!response.response.userHandle,
+        userAgent: req.headers['user-agent'],
+        origin: req.headers.origin,
+        referer: req.headers.referer
+      });
+
+      // 分析接收到的authenticatorData
+      try {
+        const authenticatorDataBase64 = response.response.authenticatorData;
+        const authenticatorDataBuffer = Buffer.from(authenticatorDataBase64, 'base64');
+        
+        logger.debug('📥 Received AuthenticatorData (API Layer):', {
+          credentialId: response.id,
+          authenticatorDataBase64Length: authenticatorDataBase64.length,
+          authenticatorDataBufferLength: authenticatorDataBuffer.length,
+          bufferHex: authenticatorDataBuffer.toString('hex'),
+          // 解析counter部分
+          counterBytes: authenticatorDataBuffer.length >= 37 ? 
+            Array.from(authenticatorDataBuffer.slice(33, 37)) : 'insufficient data',
+          extractedCounter: authenticatorDataBuffer.length >= 37 ? 
+            authenticatorDataBuffer.readUInt32BE(33) : 'insufficient data',
+          // 检查flags
+          flagsByte: authenticatorDataBuffer.length > 32 ? 
+            authenticatorDataBuffer[32] : 'no flags',
+          flagsBinary: authenticatorDataBuffer.length > 32 ? 
+            authenticatorDataBuffer[32].toString(2).padStart(8, '0') : 'no flags'
+        });
+      } catch (parseError) {
+        logger.warn('Failed to parse authenticatorData in API layer', { 
+          parseError: parseError instanceof Error ? parseError.message : parseError 
+        });
+      }
+
       const result = await webauthnService.verifyAuthenticationResponse(response);
 
       if (result.success && result.userId && result.authenticatorId) {
@@ -610,5 +648,75 @@ router.get('/test', (req: Request, res: Response) => {
     redirectTo: process.env['FRONTEND_URL'] || 'http://localhost:3000',
   });
 });
+
+// 开发环境专用路由
+if (process.env.NODE_ENV !== 'production') {
+  /**
+   * POST /api/webauthn/dev/reset-counter
+   * 重置指定认证器的counter（仅开发环境）
+   */
+  router.post('/dev/reset-counter', async (req: Request, res: Response) => {
+    try {
+      const { credentialId } = req.body;
+      
+      if (!credentialId) {
+        return res.status(400).json({
+          error: 'credentialId is required',
+          code: 'MISSING_CREDENTIAL_ID',
+        });
+      }
+
+      const result = await webauthnService.resetAuthenticatorCounter(credentialId);
+      
+      if (result) {
+        logger.info('Authenticator counter reset successfully', { credentialId });
+        res.json({ success: true, message: 'Counter reset successfully' });
+      } else {
+        res.status(500).json({
+          error: 'Failed to reset counter',
+          code: 'RESET_FAILED',
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to reset authenticator counter', { error });
+      res.status(500).json({
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+      });
+    }
+  });
+
+  /**
+   * POST /api/webauthn/dev/reset-user-counters
+   * 重置用户所有认证器的counter（仅开发环境）
+   */
+  router.post('/dev/reset-user-counters', async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({
+          error: 'userId is required',
+          code: 'MISSING_USER_ID',
+        });
+      }
+
+      const resetCount = await webauthnService.resetUserAuthenticatorCounters(userId);
+      
+      logger.info('User authenticator counters reset successfully', { userId, resetCount });
+      res.json({ 
+        success: true, 
+        message: `Reset ${resetCount} authenticator counters`,
+        resetCount 
+      });
+    } catch (error) {
+      logger.error('Failed to reset user authenticator counters', { error });
+      res.status(500).json({
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+      });
+    }
+  });
+}
 
 export default router; 

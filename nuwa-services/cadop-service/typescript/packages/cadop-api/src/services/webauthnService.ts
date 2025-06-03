@@ -68,7 +68,8 @@ export class WebAuthnService {
    * Get user's registered WebAuthn devices
    */
   async getUserDevices(userId: string): Promise<WebAuthnDeviceInfo[]> {
-    const authenticators = await this.getAuthenticators(userId);
+    const authenticators = await this.getAuthenticators({ userId });
+
     return authenticators.map(auth => ({
       id: auth.id,
       name: auth.friendlyName || 'Unknown Device',
@@ -93,12 +94,12 @@ export class WebAuthnService {
         config: this.config,
       });
 
-      // Get existing authenticators for this user to exclude them
-      const existingAuthenticators = await this.getAuthenticators(userId);
+      // Get existing authenticators for this user
+      const existingAuthenticators = await this.getAuthenticators({ userId });
       
       logger.debug('Found existing authenticators', {
         userId,
-        authenticatorsCount: existingAuthenticators.length,
+        authenticatorsCount: existingAuthenticators?.length || 0,
         authenticators: existingAuthenticators,
       });
 
@@ -111,11 +112,11 @@ export class WebAuthnService {
         timeout: this.config.timeout,
         attestationType: this.config.attestationType,
         supportedAlgorithmIDs: [-7, -257], // ES256, RS256
-        excludeCredentials: existingAuthenticators.map(auth => ({
+        excludeCredentials: existingAuthenticators?.map(auth => ({
           id: auth.credentialId,
           type: 'public-key' as const,
           transports: auth.transports,
-        })),
+        })) || [],
         authenticatorSelection: {
           residentKey: 'preferred' as ResidentKeyRequirement,
           userVerification: 'preferred' as UserVerificationRequirement,
@@ -206,59 +207,35 @@ export class WebAuthnService {
         );
       }
 
-      // After challenge verification, check if user exists
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('id', userId)
-        .single();
+      const { registrationInfo } = verification;
 
-      if (userError || !user) {
-        logger.warn('User not found, creating new user', { userId });
-        
-        // Create user if not exists
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert({
-            id: userId,
-            email: storedChallenge.email,
-            user_did: `did:rooch:${userId}`, // Generate DID for user
-          })
-          .select()
-          .single();
+      // 检查现有的凭证
+      const query = supabase
+        .from('authenticators')
+        .select('*')
+        .eq('credential_id', registrationInfo.credential.id);
 
-        if (createError) {
-          logger.error('Failed to create user', { error: createError });
-          throw new WebAuthnError('Failed to create user');
-        }
+      const { data: existingAuthenticator, error } = await query;
 
-        logger.info('Created new user', { userId, email: storedChallenge.email });
+      if (!error && existingAuthenticator && existingAuthenticator.length > 0) {
+        logger.warn('Authenticator already registered', {
+          userId,
+          credentialId: registrationInfo.credential.id,
+        });
+        return {
+          success: false,
+          error: 'Authenticator already registered',
+        };
       }
 
-      // Create new authenticator record
-      const { registrationInfo } = verification;
-      
-      logger.debug('Registration info details', {
-        credentialId: registrationInfo.credential.id,
-        publicKeyLength: registrationInfo.credential.publicKey.length,
-        publicKeyType: typeof registrationInfo.credential.publicKey,
-        publicKeyBuffer: Buffer.isBuffer(registrationInfo.credential.publicKey),
-        publicKeyContent: registrationInfo.credential.publicKey,
-      });
+      // 确保公钥是正确的格式
+      const publicKeyBuffer = Buffer.from(registrationInfo.credential.publicKey);
 
-      // 将类数组对象转换为真正的数组，然后创建 Buffer
-      const publicKeyArray = Array.from(registrationInfo.credential.publicKey);
-      const publicKeyBuffer = Buffer.from(publicKeyArray);
-
-      logger.debug('Converted public key', {
-        publicKeyArray: publicKeyArray,
-        publicKeyBufferHex: publicKeyBuffer.toString('hex'),
-      });
-
-      const authenticatorData: CreateAuthenticatorData = {
+      const authenticatorData = {
+        userId,
         credentialId: registrationInfo.credential.id,
         credentialPublicKey: publicKeyBuffer,
-        counter: 0,
+        counter: registrationInfo.credential.counter,
         credentialDeviceType: registrationInfo.credentialDeviceType || 'singleDevice',
         credentialBackedUp: registrationInfo.credentialBackedUp || false,
         transports: response.response.transports || [],
@@ -271,10 +248,7 @@ export class WebAuthnService {
         publicKeyHex: authenticatorData.credentialPublicKey.toString('hex'),
       });
 
-      const authenticator = await this.createAuthenticator({
-        userId,
-        ...authenticatorData,
-      });
+      const authenticator = await this.createAuthenticator(authenticatorData);
 
       logger.debug('Created new authenticator', { 
         id: authenticator.id,
@@ -315,13 +289,24 @@ export class WebAuthnService {
     userId?: string
   ): Promise<PublicKeyCredentialRequestOptionsJSON> {
     try {
-      const allowCredentials = userId
-        ? (await this.getAuthenticators(userId)).map(auth => ({
-            id: auth.credentialId,
+      let allowCredentials: { id: string; type: 'public-key'; transports?: AuthenticatorTransportFuture[]; }[] | undefined;
+
+      if (userId) {
+        const query = supabase
+          .from('authenticators')
+          .select('*')
+          .eq('user_id', userId);
+
+        const { data: authenticators, error } = await query;
+
+        if (!error && authenticators) {
+          allowCredentials = authenticators.map(auth => ({
+            id: auth.credential_id,
             type: 'public-key' as const,
             transports: auth.transports,
-          }))
-        : undefined;
+          }));
+        }
+      }
 
       const options = {
         timeout: this.config.timeout,
@@ -352,14 +337,55 @@ export class WebAuthnService {
     expectedChallenge?: string
   ): Promise<WebAuthnAuthenticationResult> {
     try {
-      const authenticator = await this.getAuthenticatorByCredentialId(response.id);
+      logger.debug('🚀 Starting authentication response verification', { 
+        credentialId: response.id,
+        responseType: response.type,
+        hasSignature: !!response.response.signature,
+        hasAuthenticatorData: !!response.response.authenticatorData,
+        authenticatorDataLength: response.response.authenticatorData?.length || 0
+      });
 
-      if (!authenticator) {
-        throw new WebAuthnError(
-          `Authenticator not found via credentialId(${response.id})`,
-          'AUTHENTICATOR_NOT_FOUND'
-        );
+      // 解析authenticatorData来获取counter信息
+      const authenticatorDataBase64 = response.response.authenticatorData;
+      const authenticatorDataBuffer = Buffer.from(authenticatorDataBase64, 'base64');
+      
+      logger.debug('🔍 Raw AuthenticatorData Analysis (Server):', {
+        credentialId: response.id,
+        authenticatorDataBase64,
+        authenticatorDataLength: authenticatorDataBuffer.length,
+        authenticatorDataHex: authenticatorDataBuffer.toString('hex'),
+        // 解析基本结构
+        rpIdHash: authenticatorDataBuffer.slice(0, 32).toString('hex'),
+        flags: authenticatorDataBuffer.length > 32 ? authenticatorDataBuffer[32].toString(2).padStart(8, '0') : 'N/A',
+        rawCounterBytes: authenticatorDataBuffer.length >= 37 ? 
+          Array.from(authenticatorDataBuffer.slice(33, 37)) : 'N/A',
+        extractedCounterValue: authenticatorDataBuffer.length >= 37 ? 
+          authenticatorDataBuffer.readUInt32BE(33) : 'N/A'
+      });
+
+      const query = supabase
+        .from('authenticators')
+        .select('*')
+        .eq('credential_id', response.id)
+        .single();
+
+      const { data: authenticator, error } = await query;
+
+      if (error || !authenticator) {
+        logger.error('Authenticator not found', { error, response });
+        return {
+          success: false,
+          error: `Authenticator not found via credentialId(${response.id})`,
+        };
       }
+
+      logger.debug('📊 Current Authenticator State:', { 
+        authenticatorId: authenticator.id,
+        storedCounter: authenticator.counter,
+        userId: authenticator.user_id,
+        credentialId: authenticator.credential_id,
+        lastUsedAt: authenticator.last_used_at
+      });
 
       let challengeStr: string;
       if (expectedChallenge) {
@@ -369,26 +395,53 @@ export class WebAuthnService {
         let challenge = await this.getAndConsumeChallenge(null, 'authentication');
         
         // 如果没找到匿名 challenge，再尝试使用用户特定的 challenge
-        if (!challenge && authenticator.userId) {
-          challenge = await this.getAndConsumeChallenge(authenticator.userId, 'authentication');
+        if (!challenge && authenticator.user_id) {
+          challenge = await this.getAndConsumeChallenge(authenticator.user_id, 'authentication');
         }
 
         if (!challenge) {
-          throw new WebAuthnError(
-            `Challenge not found or expired for authenticator(${response.id})`,
-            'CHALLENGE_NOT_FOUND'
-          );
+          return {
+            success: false,
+            error: `Challenge not found or expired for authenticator(${response.id})`,
+          };
         }
         challengeStr = challenge.challenge;
       }
 
-      // 确保 publicKey 是正确的格式：从十六进制字符串转换为 Uint8Array
-      const publicKeyHex = String(authenticator.credentialPublicKey);
-      const bytes: number[] = [];
-      for (let i = 0; i < publicKeyHex.length; i += 2) {
-        bytes.push(parseInt(publicKeyHex.slice(i, i + 2), 16));
+      // 处理公钥格式 - 确保正确转换
+      let publicKey: Buffer;
+      try {
+        const publicKeyData = authenticator.credential_public_key;
+        
+        // 检查是否是字符串（十六进制）
+        if (typeof publicKeyData === 'string') {
+          publicKey = Buffer.from(publicKeyData, 'hex');
+        } 
+        // 检查是否是 Buffer 对象的 JSON 表示
+        else if (publicKeyData && typeof publicKeyData === 'object' && 
+                 'type' in publicKeyData && publicKeyData.type === 'Buffer' &&
+                 'data' in publicKeyData && Array.isArray(publicKeyData.data)) {
+          publicKey = Buffer.from(publicKeyData.data as number[]);
+        }
+        // 检查是否已经是 Buffer
+        else if (Buffer.isBuffer(publicKeyData)) {
+          publicKey = publicKeyData;
+        }
+        // 尝试直接转换
+        else {
+          publicKey = Buffer.from(String(publicKeyData), 'hex');
+        }
+      } catch (error) {
+        logger.error('Failed to process public key', { 
+          error, 
+          publicKeyType: typeof authenticator.credential_public_key,
+          publicKeyData: authenticator.credential_public_key 
+        });
+        return {
+          success: false,
+          error: 'Invalid public key format',
+        };
       }
-      const publicKey = new Uint8Array(bytes);
 
       const opts = {
         response,
@@ -396,58 +449,104 @@ export class WebAuthnService {
         expectedOrigin: this.config.origin,
         expectedRPID: this.config.rpID,
         credential: {
-          id: authenticator.credentialId,
-          publicKey,
+          id: authenticator.credential_id,
+          publicKey: new Uint8Array(publicKey),
           counter: authenticator.counter,
         },
         requireUserVerification: false,
       };
 
-      logger.debug('Verifying authentication response with options', { 
-        credentialId: authenticator.credentialId,
-        publicKeyHex,
+      logger.debug('⚙️ Verification Options:', { 
+        credentialId: authenticator.credential_id,
+        expectedCounter: authenticator.counter,
+        extractedCounterFromAuthData: authenticatorDataBuffer.length >= 37 ? 
+          authenticatorDataBuffer.readUInt32BE(33) : 'N/A',
+        expectedOrigin: this.config.origin,
+        expectedRPID: this.config.rpID,
+        publicKeyLength: publicKey.length,
+        publicKeyHex: publicKey.toString('hex').substring(0, 32) + '...' // 只显示前32个字符
       });
 
       let verification: VerifiedAuthenticationResponse;
       try {
         verification = await verifyAuthenticationResponse(opts);
-        logger.debug('Verification result', { verification });
+        
+        logger.debug('✅ Verification Result Details:', { 
+          verified: verification.verified,
+          newCounter: verification.authenticationInfo?.newCounter,
+          previousCounter: authenticator.counter,
+          counterIncreased: verification.authenticationInfo?.newCounter > authenticator.counter,
+          credentialId: authenticator.credential_id
+        });
+        
         if (!verification.verified) {
-          logger.warn('WebAuthn authentication verification failed', {
-            userId: authenticator.userId,
+          logger.warn('❌ WebAuthn authentication verification failed', {
+            userId: authenticator.user_id,
             authenticatorId: authenticator.id,
+            verification,
+            storedCounter: authenticator.counter,
+            newCounter: verification.authenticationInfo?.newCounter
           });
-          throw new WebAuthnError(
-            'Authentication verification failed'
-          );
+          return {
+            success: false,
+            error: 'Authentication verification failed',
+          };
         }
       } catch (error) {
-        logger.error('Failed to verify authentication response', { 
+        logger.error('💥 Failed to verify authentication response', { 
           error, 
-          opts,
-          publicKeyType: typeof publicKey,
-          publicKeyIsBuffer: Buffer.isBuffer(publicKey),
-          publicKeyHex: publicKey.toString('hex'),
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          credentialId: authenticator.credential_id,
+          storedCounter: authenticator.counter,
+          extractedCounter: authenticatorDataBuffer.length >= 37 ? 
+            authenticatorDataBuffer.readUInt32BE(33) : 'N/A',
+          opts: {
+            ...opts,
+            response: {
+              ...opts.response,
+              response: {
+                ...opts.response.response,
+                signature: '[REDACTED]' // 不记录签名数据
+              }
+            }
+          }
         });
-        throw new WebAuthnError(
-          'Failed to verify authentication response'
-        );
+        return {
+          success: false,
+          error: 'Failed to verify authentication response',
+        };
       }      
 
       // Update authenticator counter and last used
-      await this.updateAuthenticator(authenticator.id, {
-        counter: verification.authenticationInfo.newCounter,
-        lastUsedAt: new Date(),
-      });
+      const { error: updateError } = await supabase
+        .from('authenticators')
+        .update({
+          counter: verification.authenticationInfo.newCounter,
+          last_used_at: new Date(),
+        })
+        .eq('id', authenticator.id);
 
-      logger.info('WebAuthn authentication successful', {
-        userId: authenticator.userId,
+      if (updateError) {
+        logger.error('Failed to update authenticator', {
+          error: updateError,
+          authenticatorId: authenticator.id,
+        });
+        return {
+          success: false,
+          error: 'Failed to update authenticator',
+        };
+      }
+
+      logger.info('🎉 WebAuthn authentication successful', {
+        userId: authenticator.user_id,
         authenticatorId: authenticator.id,
+        counterUpdated: `${authenticator.counter} → ${verification.authenticationInfo.newCounter}`
       });
 
       return {
         success: true,
-        userId: authenticator.userId,
+        userId: authenticator.user_id,
         authenticatorId: authenticator.id
       };
     } catch (error: unknown) {
@@ -455,16 +554,9 @@ export class WebAuthnService {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      if (error instanceof WebAuthnError) {
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
-
       return {
         success: false,
-        error: 'Authentication failed',
+        error: error instanceof Error ? error.message : 'Authentication failed',
       };
     }
   }
@@ -590,77 +682,74 @@ export class WebAuthnService {
     };
   }
 
-  private async getAuthenticators(userId: string): Promise<Authenticator[]> {
-    const { data, error } = await supabase
+  private async getAuthenticators(filter: { userId?: string; credentialId?: string; id?: string } = {}): Promise<Authenticator[]> {
+    let query = supabase
       .from('authenticators')
-      .select('*')
-      .eq('user_id', userId);
+      .select('*');
 
-    if (error) throw error;
+    if (filter.userId) {
+      query = query.eq('user_id', filter.userId);
+    }
+    if (filter.credentialId) {
+      query = query.eq('credential_id', filter.credentialId);
+    }
+    if (filter.id) {
+      query = query.eq('id', filter.id);
+    }
 
-    return data.map(auth => ({
-      id: auth.id,
-      userId: auth.user_id,
-      credentialId: auth.credential_id,
-      credentialPublicKey: Buffer.from(auth.credential_public_key),
-      counter: auth.counter,
-      credentialDeviceType: auth.credential_device_type,
-      credentialBackedUp: auth.credential_backed_up,
-      transports: auth.transports,
-      friendlyName: auth.friendly_name,
-      aaguid: auth.aaguid,
-      lastUsedAt: auth.last_used_at ? new Date(auth.last_used_at) : undefined,
-      createdAt: new Date(auth.created_at),
-      updatedAt: new Date(auth.updated_at),
-    }));
+    const { data, error } = await query;
+
+    if (error || !data) return [];
+
+    return data.map(item => {
+      // 处理从数据库读取的 credential_public_key
+      let publicKey: Buffer;
+      const publicKeyData = item.credential_public_key;
+      
+      // 检查是否是字符串（十六进制）
+      if (typeof publicKeyData === 'string') {
+        publicKey = Buffer.from(publicKeyData, 'hex');
+      } 
+      // 检查是否是 Buffer 对象的 JSON 表示
+      else if (publicKeyData && typeof publicKeyData === 'object' && 
+               'type' in publicKeyData && publicKeyData.type === 'Buffer' &&
+               'data' in publicKeyData && Array.isArray(publicKeyData.data)) {
+        publicKey = Buffer.from(publicKeyData.data as number[]);
+      }
+      // 检查是否已经是 Buffer
+      else if (Buffer.isBuffer(publicKeyData)) {
+        publicKey = publicKeyData;
+      }
+      // 尝试直接转换
+      else {
+        publicKey = Buffer.from(String(publicKeyData), 'hex');
+      }
+
+      return {
+        id: item.id,
+        userId: item.user_id,
+        credentialId: item.credential_id,
+        credentialPublicKey: publicKey,
+        counter: item.counter,
+        credentialDeviceType: item.credential_device_type,
+        credentialBackedUp: item.credential_backed_up,
+        transports: item.transports,
+        friendlyName: item.friendly_name,
+        aaguid: item.aaguid,
+        lastUsedAt: item.last_used_at ? new Date(item.last_used_at) : undefined,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+      };
+    });
+  }
+
+  private async getAuthenticatorByUserId(userId: string): Promise<Authenticator[]> {
+    return this.getAuthenticators({ userId });
   }
 
   private async getAuthenticatorByCredentialId(credentialId: string): Promise<Authenticator | null> {
-    const { data, error } = await supabase
-      .from('authenticators')
-      .select('*')
-      .eq('credential_id', credentialId)
-      .single();
-
-    if (error || !data) return null;
-
-    // 处理从数据库读取的 credential_public_key
-    let publicKey = data.credential_public_key;
-    
-    logger.debug('Raw public key from database', {
-      publicKeyType: typeof publicKey,
-      publicKeyLength: publicKey.length,
-      isHexString: typeof publicKey === 'string' && /^[0-9a-fA-F]*$/.test(publicKey),
-    });
-
-    // 从十六进制字符串转换为 Buffer
-    publicKey = Buffer.from(publicKey, 'hex');
-
-    logger.debug('Processed public key', {
-      credentialId,
-      publicKeyLength: publicKey.length,
-      publicKeyType: typeof publicKey,
-      publicKeyBuffer: Buffer.isBuffer(publicKey),
-      publicKeyHex: publicKey.toString('hex'),
-      service: 'cadop-service',
-      timestamp: new Date().toISOString(),
-    });
-
-    return {
-      id: data.id,
-      userId: data.user_id,
-      credentialId: data.credential_id,
-      credentialPublicKey: publicKey,
-      counter: data.counter,
-      credentialDeviceType: data.credential_device_type,
-      credentialBackedUp: data.credential_backed_up,
-      transports: data.transports,
-      friendlyName: data.friendly_name,
-      aaguid: data.aaguid,
-      lastUsedAt: data.last_used_at ? new Date(data.last_used_at) : undefined,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-    };
+    const authenticators = await this.getAuthenticators({ credentialId });
+    return authenticators[0] || null;
   }
 
   private async createAuthenticator(data: {
@@ -733,11 +822,12 @@ export class WebAuthnService {
     };
   }
 
-  private async updateAuthenticator(
-    id: string,
-    data: UpdateAuthenticatorData
-  ): Promise<void> {
-    logger.debug('Updating authenticator', { id, data });
+  private async updateAuthenticator(data: {
+    id: string;
+    counter: number;
+    lastUsedAt: Date;
+  }): Promise<void> {
+    logger.debug('Updating authenticator', { data });
     const dbData = {
       counter: data.counter,
       last_used_at: data.lastUsedAt,
@@ -745,7 +835,7 @@ export class WebAuthnService {
     const { error } = await supabase
       .from('authenticators')
       .update(dbData)
-      .eq('id', id);
+      .eq('id', data.id);
 
     if (error) throw error;
   }
@@ -826,18 +916,22 @@ export class WebAuthnService {
       return;
     }
 
-    // 从验证结果中获取 counter
-    const { data: authenticator } = await supabase
-      .from('authenticators')
-      .select('counter')
-      .eq('id', result.authenticatorId)
-      .single();
+    // 使用 getAuthenticators 获取认证器信息
+    const authenticators = await this.getAuthenticators({ id: result.authenticatorId });
+    const authenticator = authenticators[0];
+
+    if (!authenticator) {
+      logger.error('Authenticator not found', {
+        authenticatorId: result.authenticatorId
+      });
+      throw new Error('Authenticator not found');
+    }
 
     const { error } = await supabase
       .from('authenticators')
       .update({
         last_used_at: new Date(),
-        counter: (authenticator?.counter || 0) + 1
+        counter: authenticator.counter + 1
       })
       .eq('id', result.authenticatorId);
 
@@ -847,6 +941,65 @@ export class WebAuthnService {
         authenticatorId: result.authenticatorId
       });
       throw new Error('Failed to update authenticator usage');
+    }
+  }
+
+  /**
+   * 开发环境辅助方法：重置认证器的counter
+   * 用于解决Chrome DevTools虚拟认证器counter重置问题
+   */
+  async resetAuthenticatorCounter(credentialId: string): Promise<boolean> {
+    if (process.env.NODE_ENV === 'production') {
+      logger.warn('Counter reset not allowed in production environment');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('authenticators')
+        .update({ counter: 0 })
+        .eq('credential_id', credentialId);
+
+      if (error) {
+        logger.error('Failed to reset authenticator counter', { error, credentialId });
+        return false;
+      }
+
+      logger.info('Authenticator counter reset for development', { credentialId });
+      return true;
+    } catch (error) {
+      logger.error('Failed to reset authenticator counter', { error, credentialId });
+      return false;
+    }
+  }
+
+  /**
+   * 开发环境辅助方法：重置用户的所有认证器counter
+   */
+  async resetUserAuthenticatorCounters(userId: string): Promise<number> {
+    if (process.env.NODE_ENV === 'production') {
+      logger.warn('Counter reset not allowed in production environment');
+      return 0;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('authenticators')
+        .update({ counter: 0 })
+        .eq('user_id', userId)
+        .select('id');
+
+      if (error) {
+        logger.error('Failed to reset user authenticator counters', { error, userId });
+        return 0;
+      }
+
+      const resetCount = data?.length || 0;
+      logger.info('Reset all authenticator counters for user', { userId, resetCount });
+      return resetCount;
+    } catch (error) {
+      logger.error('Failed to reset user authenticator counters', { error, userId });
+      return 0;
     }
   }
 }
