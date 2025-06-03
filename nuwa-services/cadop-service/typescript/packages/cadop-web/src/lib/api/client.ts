@@ -228,8 +228,81 @@ class APIClient {
   public async verifyAuthentication(
     response: PasskeyAuthenticationResponse
   ): Promise<APIResponse<PasskeyAuthenticationResult>> {
-    console.debug('Verifying authentication:', { response });
-    return this.post('/api/webauthn/authentication/verify', { response });
+    console.debug('🔍 Verifying authentication (API Client):', { 
+      credentialId: response.id,
+      responseType: response.type,
+      hasSignature: !!response.response.signature,
+      authenticatorDataLength: response.response.authenticatorData?.length || 0,
+      clientDataJSONLength: response.response.clientDataJSON?.length || 0
+    });
+
+    try {
+      const result = await this.post<PasskeyAuthenticationResult>('/api/webauthn/authentication/verify', { response });
+      
+      console.debug('📬 Authentication verification API response:', {
+        credentialId: response.id,
+        hasData: !!result.data,
+        hasError: !!result.error,
+        dataSuccess: result.data?.success,
+        errorMessage: result.error?.message,
+        errorCode: result.error?.code,
+        sessionPresent: !!result.data?.session,
+        userIdPresent: !!result.data?.session?.user?.id
+      });
+
+      // 检查响应的完整性
+      if (result.data?.success && !result.data.session) {
+        console.warn('⚠️ Authentication marked as successful but no session data received', {
+          credentialId: response.id,
+          resultData: result.data
+        });
+      }
+
+      if (result.error) {
+        console.error('❌ Authentication verification API error:', {
+          credentialId: response.id,
+          error: result.error,
+          wasSuccessful: result.data?.success
+        });
+      }
+
+      return result;
+    } catch (exception) {
+      console.error('💥 Exception during authentication verification API call:', {
+        credentialId: response.id,
+        exception: exception instanceof Error ? exception.message : exception,
+        stack: exception instanceof Error ? exception.stack : undefined
+      });
+
+      return {
+        data: undefined,
+        error: {
+          message: exception instanceof Error ? exception.message : 'API call failed',
+          code: 'API_EXCEPTION',
+        },
+      };
+    }
+  }
+
+  // 开发环境专用方法
+  public async resetAuthenticatorCounter(
+    credentialId: string
+  ): Promise<APIResponse<{ success: boolean; message: string }>> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Counter reset not available in production');
+    }
+    console.debug('Resetting authenticator counter:', { credentialId });
+    return this.post('/api/webauthn/dev/reset-counter', { credentialId });
+  }
+
+  public async resetUserAuthenticatorCounters(
+    userId: string
+  ): Promise<APIResponse<{ success: boolean; message: string; resetCount: number }>> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Counter reset not available in production');
+    }
+    console.debug('Resetting user authenticator counters:', { userId });
+    return this.post('/api/webauthn/dev/reset-user-counters', { userId });
   }
 }
 

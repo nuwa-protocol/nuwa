@@ -5,6 +5,8 @@ export interface User {
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
+  primaryAgentDid?: string;
+  sybilLevel?: number;
 }
 
 export interface Session {

@@ -6,57 +6,162 @@ import type {
   AuthenticatorTransportFuture,
   AuthenticatorAttachment
 } from '@simplewebauthn/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../config/supabase.js';
+import jsonwebtoken from 'jsonwebtoken';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import * as crypto from 'crypto';
+import { encode } from 'cbor2';
+
+// 使用固定的种子生成密钥对
+const seed = Buffer.from('test-seed-for-consistent-key-generation');
+const credentialId = crypto.createHash('sha256').update(seed).digest().slice(0, 32);
+
+// 生成一个真实的 ECDSA key pair
+const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', {
+  namedCurve: 'P-256',
+  publicKeyEncoding: {
+    type: 'spki',
+    format: 'der'
+  },
+  privateKeyEncoding: {
+    type: 'pkcs8',
+    format: 'der'
+  }
+});
+
+// 从 DER 格式中提取原始公钥
+const asn1PublicKey = crypto.createPublicKey({
+  key: publicKey,
+  format: 'der',
+  type: 'spki'
+});
+const rawPublicKey = asn1PublicKey.export({
+  format: 'der',
+  type: 'spki'
+});
+
+// 提取 x 和 y 坐标
+const xCoord = rawPublicKey.slice(27, 59);
+const yCoord = rawPublicKey.slice(59, 91);
+
+// 创建 COSE 格式的公钥
+const cosePublicKey = new Map();
+cosePublicKey.set(1, 2); // kty: EC2
+cosePublicKey.set(3, -7); // alg: ES256
+cosePublicKey.set(-1, 1); // crv: P-256
+cosePublicKey.set(-2, xCoord); // x coordinate
+cosePublicKey.set(-3, yCoord); // y coordinate
+
+// 创建一个有效的 authenticator data（不包含 attestedCredentialData）
+const rpIdHash = crypto.createHash('sha256').update('localhost').digest();
+const flags = new Uint8Array([0b01000101]); // UP=1, UV=1, BE=1
+const signCount = new Uint8Array(4);
+
+// 简化的 authenticator data（用于认证）
+const simpleAuthenticatorData = new Uint8Array([
+  ...new Uint8Array(rpIdHash),     // 32 bytes
+  ...flags,                        // 1 byte
+  ...signCount,                    // 4 bytes
+]);
+// 总共 37 bytes
+
+// 完整的 authenticator data（用于注册，包含 attestedCredentialData）
+const aaguid = new Uint8Array(16);
+const credentialIdLength = new Uint8Array([0, 32]); // 32 bytes
+
+const authenticatorData = new Uint8Array([
+  ...new Uint8Array(rpIdHash),
+  ...flags,
+  ...signCount,
+  ...aaguid,
+  ...credentialIdLength,
+  ...new Uint8Array(credentialId),
+  ...new Uint8Array(encode(cosePublicKey))
+]);
 
 export const mockUser = {
-  id: 'test-user-123',
+  id: '4b371138-a604-4413-9359-bd862a12cfef',
   email: 'test@example.com',
   name: 'Test User',
 };
 
 export const mockAuthenticator = {
-  id: 'test-authenticator-123',
-  credential_id: Buffer.from('test-credential-id'),
-  credential_public_key: Buffer.from('test-public-key'),
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  user_id: mockUser.id,
+  credential_id: isoBase64URL.fromBuffer(credentialId),
+  credential_public_key: Buffer.from(encode(cosePublicKey)).toString('hex'),
   counter: 0,
   credential_device_type: 'singleDevice',
-  credential_backed_up: false,
-  transports: ['usb', 'internal'],
+  credential_backed_up: true,
+  transports: ['usb', 'internal'] as AuthenticatorTransportFuture[],
   friendly_name: 'Test Device',
-  aaguid: 'test-aaguid',
+  aaguid: '00000000-0000-0000-0000-000000000000',
   last_used_at: new Date(),
   created_at: new Date(),
   updated_at: new Date(),
 };
 
-export const mockWebAuthnRegistrationResponse: RegistrationResponseJSON = {
-  id: 'test-credential',
-  rawId: 'test-credential',
+export const createMockRegistrationResponse = (challenge: string): RegistrationResponseJSON => ({
+  id: mockAuthenticator.credential_id,
+  rawId: mockAuthenticator.credential_id,
   response: {
-    clientDataJSON: 'test-data',
-    attestationObject: 'test-attestation',
+    attestationObject: isoBase64URL.fromBuffer(encode({
+      fmt: 'none',
+      attStmt: {},
+      authData: authenticatorData
+    })),
+    clientDataJSON: isoBase64URL.fromBuffer(Buffer.from(JSON.stringify({
+      type: 'webauthn.create',
+      challenge: challenge,
+      origin: 'http://localhost:3000',
+    }))),
     transports: ['usb', 'internal'] as AuthenticatorTransportFuture[],
   },
   type: 'public-key',
   clientExtensionResults: {},
-  authenticatorAttachment: 'platform' as AuthenticatorAttachment,
-};
+  authenticatorAttachment: 'platform' as const,
+});
 
-export const mockWebAuthnAuthenticationResponse: AuthenticationResponseJSON = {
-  id: 'test-credential',
-  rawId: 'test-credential',
-  response: {
-    clientDataJSON: 'test-data',
-    authenticatorData: 'test-auth-data',
-    signature: 'test-signature',
-    userHandle: '',
-  },
-  type: 'public-key',
-  clientExtensionResults: {},
-  authenticatorAttachment: 'platform' as AuthenticatorAttachment,
+export const createMockAuthenticationResponse = (challenge: string): AuthenticationResponseJSON => {
+  // 创建签名数据
+  const clientDataJSON = {
+    type: 'webauthn.get',
+    challenge: challenge,
+    origin: 'http://localhost:3000',
+  };
+  const clientDataJSONBytes = Buffer.from(JSON.stringify(clientDataJSON));
+  const clientDataHash = crypto.createHash('sha256').update(clientDataJSONBytes).digest();
+  
+  // 使用简化的 authenticator data（认证时不包含 attestedCredentialData）
+  const signatureBase = Buffer.concat([simpleAuthenticatorData, clientDataHash]);
+  
+  // 使用 ES256 算法签名
+  const sign = crypto.createSign('SHA256');
+  sign.update(signatureBase);
+  const signature = sign.sign({
+    key: privateKey,
+    format: 'der',
+    type: 'pkcs8'
+  });
+
+  return {
+    id: mockAuthenticator.credential_id,
+    rawId: mockAuthenticator.credential_id,
+    response: {
+      authenticatorData: isoBase64URL.fromBuffer(simpleAuthenticatorData),
+      clientDataJSON: isoBase64URL.fromBuffer(clientDataJSONBytes),
+      signature: isoBase64URL.fromBuffer(signature),
+      userHandle: mockUser.id,
+    },
+    type: 'public-key',
+    clientExtensionResults: {},
+    authenticatorAttachment: 'platform' as const,
+  };
 };
 
 export const mockIDToken = {
-  sub: 'test-user-123',
+  sub: mockUser.id,
   aud: 'test-client',
   iss: 'https://test.localhost:3000',
   exp: Math.floor(Date.now() / 1000) + 3600,
@@ -67,75 +172,45 @@ export const mockIDToken = {
 };
 
 export function createTestIdToken(): string {
-  const jwt = require('jsonwebtoken');
-  return jwt.sign(mockIDToken, process.env['JWT_SECRET'], {
+  return jsonwebtoken.sign(mockIDToken, process.env['JWT_SECRET'] || 'test-secret', {
     algorithm: 'HS256',
   });
 }
 
 export function createExpiredIdToken(): string {
-  const jwt = require('jsonwebtoken');
   const expiredToken = {
     ...mockIDToken,
     exp: Math.floor(Date.now() / 1000) - 3600,
   };
-  return jwt.sign(expiredToken, process.env['JWT_SECRET'], {
+  return jsonwebtoken.sign(expiredToken, process.env['JWT_SECRET'] || 'test-secret', {
     algorithm: 'HS256',
   });
 }
 
-export function createMockSupabaseClient() {
-  return {
-    auth: {
-      admin: {
-        getUserById: jest.fn().mockResolvedValue({
-          data: { user: mockUser },
-          error: null,
-        }),
-        listUsers: jest.fn().mockResolvedValue({
-          data: { users: [mockUser] },
-          error: null,
-        }),
-        generateLink: jest.fn().mockResolvedValue({
-          data: {
-            properties: {
-              access_token: 'test-token',
-              refresh_token: 'test-refresh-token',
-            },
-          },
-          error: null,
-        }),
-      },
-      getUser: jest.fn().mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      }),
-    },
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    insert: jest.fn().mockResolvedValue({ data: [], error: null }),
-    update: jest.fn().mockResolvedValue({ data: [], error: null }),
-    delete: jest.fn().mockResolvedValue({ data: [], error: null }),
-    eq: jest.fn().mockReturnThis(),
-    gt: jest.fn().mockReturnThis(),
-    lt: jest.fn().mockReturnThis(),
-    lte: jest.fn().mockReturnThis(),
-    gte: jest.fn().mockReturnThis(),
-    in: jest.fn().mockReturnThis(),
-    is: jest.fn().mockReturnThis(),
-    not: jest.fn().mockReturnThis(),
-    like: jest.fn().mockReturnThis(),
-    ilike: jest.fn().mockReturnThis(),
-    match: jest.fn().mockReturnThis(),
-    matchRegex: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: null, error: null }),
-    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-  };
-}
+type MockSupabaseResponse<T> = {
+  data: T;
+  error: null;
+} | {
+  data: null;
+  error: Error;
+};
 
-export const mockLogger = {
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn(),
-}; 
+export function createMockSupabaseClient(): Partial<SupabaseClient<Database>> {
+  const mockInsert = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
+  const mockUpdate = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
+  const mockDelete = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
+  const mockSingle = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown>>({ data: null, error: null }));
+
+  return {
+    from: () => ({
+      insert: mockInsert,
+      update: mockUpdate,
+      delete: mockDelete,
+      select: () => ({
+        eq: () => ({
+          single: mockSingle,
+        }),
+      }),
+    }),
+  };
+} 
