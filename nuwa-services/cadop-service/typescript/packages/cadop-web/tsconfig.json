@@ -17,7 +17,7 @@
     }
   },
   "references": [
-    { "path": "../shared" }
+    { "path": "../cadop-shared" }
   ],
   "include": ["src/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
