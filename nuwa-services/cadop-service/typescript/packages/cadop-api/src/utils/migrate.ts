@@ -21,6 +21,7 @@ export class MigrationManager {
     for (const statement of statements) {
       if (statement.trim()) {
         const { error } = await supabase.rpc('exec_sql', { sql: statement });
+
         if (error) {
           throw new Error(`Failed to execute SQL: ${error.message}\nSQL: ${statement}`);
         }
@@ -43,23 +44,16 @@ export class MigrationManager {
       console.log('Creating migrations table manually...');
     }
 
-    // If table doesn't exist, we'll create it using a different approach
+    // If table doesn't exist, we'll create it by running the schema file
     if (!data || data.length === 0) {
-      // Try to create the table using a simple insert that will fail gracefully
-      const { error: createError } = await supabase
-        .from('schema_migrations')
-        .select('version')
-        .limit(1);
-      
-      if (createError && createError.message.includes('relation "schema_migrations" does not exist')) {
-        console.log('⚠️  Migrations table does not exist. Please create it manually in your database:');
-        console.log(`
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  version VARCHAR(255) PRIMARY KEY,
-  applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-        `);
-        throw new Error('Migrations table needs to be created manually');
+      console.log('⚠️  Database not initialized. Running schema file...');
+      const schemaPath = join(process.cwd(), 'database', 'seeds', '001_schema.sql');
+      try {
+        await this.executeSqlFile(schemaPath);
+        console.log('✅ Schema initialized successfully!');
+      } catch (error) {
+        console.error('❌ Failed to initialize schema:', error);
+        throw error;
       }
     }
   }
@@ -170,6 +164,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     console.log('🌱 Starting database seeding...');
     
     try {
+      // Ensure database is initialized
+      await this.createMigrationsTable();
+      
       const seedFiles = this.getSeedFiles();
       
       if (seedFiles.length === 0) {
@@ -266,7 +263,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 }
 
 // CLI interface when run directly
-if (require.main === module) {
+if (import.meta.url === new URL(process.argv[1], 'file://').href) {
   const command = process.argv[2];
   
   switch (command) {

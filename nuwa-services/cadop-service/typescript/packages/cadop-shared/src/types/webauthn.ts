@@ -17,18 +17,18 @@ import type {
 // Database types for authenticators
 export interface Authenticator {
   id: string;
-  user_id: string;
-  credential_id: Buffer;
-  credential_public_key: Buffer;
+  userId: string;
+  credentialId: string;  // base64url encoded string
+  credentialPublicKey: Buffer;
   counter: number;
-  credential_device_type: 'singleDevice' | 'multiDevice';
-  credential_backed_up: boolean;
+  credentialDeviceType: 'singleDevice' | 'multiDevice';
+  credentialBackedUp: boolean;
   transports: AuthenticatorTransportFuture[];
-  friendly_name?: string;
+  friendlyName?: string;
   aaguid?: string;
-  last_used_at?: Date;
-  created_at: Date;
-  updated_at: Date;
+  lastUsedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Database types for WebAuthn challenges
@@ -126,9 +126,9 @@ export interface WebAuthnRegistrationResult {
   success: boolean;
   authenticator?: {
     id: string;
-    friendly_name?: string | undefined;
-    credential_id: string;
-    created_at: Date;
+    friendlyName?: string | undefined;
+    credentialId: string;
+    createdAt: Date;
     transports: AuthenticatorTransportFuture[];
   };
   error?: string;
@@ -137,8 +137,8 @@ export interface WebAuthnRegistrationResult {
 
 export interface WebAuthnAuthenticationResult {
   success: boolean;
-  user_id?: string;
-  authenticator_id?: string;
+  userId?: string;
+  authenticatorId?: string;
   error?: string;
   details?: any;
 }
@@ -166,15 +166,17 @@ export class WebAuthnError extends Error {
 // Utility types
 export type AuthenticatorTransport = 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid';
 
+// Database input type for creating authenticator
 export interface CreateAuthenticatorData {
-  credentialId: string;
+  credentialId: string;  // base64url encoded string
   credentialPublicKey: Buffer;
   counter: number;
   credentialDeviceType: string;
   credentialBackedUp: boolean;
-  transports?: string[];
+  transports?: AuthenticatorTransportFuture[];
 }
 
+// Database input type for updating authenticator
 export interface UpdateAuthenticatorData {
   counter: number;
   lastUsedAt: Date;

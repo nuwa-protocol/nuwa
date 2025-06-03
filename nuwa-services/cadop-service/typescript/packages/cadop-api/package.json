@@ -12,7 +12,12 @@
     "dev": "tsx watch src/index.ts",
     "test": "jest",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "db:migrate": "supabase migration up",
+    "db:seed": "supabase db reset --include-seed",
+    "db:status": "supabase status",
+    "db:setup": "supabase db reset",
+    "db:new": "supabase migration new"
   },
   "dependencies": {
     "@cadop/shared": "workspace:*",
@@ -43,6 +48,7 @@
     "eslint": "^8.56.0",
     "jest": "^29.7.0",
     "nodemon": "^3.1.10",
+    "supabase": "^2.24.3",
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",

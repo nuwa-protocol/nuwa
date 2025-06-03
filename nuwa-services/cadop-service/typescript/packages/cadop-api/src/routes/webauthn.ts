@@ -5,55 +5,50 @@ import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
+import jwt from 'jsonwebtoken';
 
 const router: Router = Router();
 
 // Validation schemas
 const registrationOptionsSchema = z.object({
-  body: z.object({
-    friendly_name: z.string().min(1).max(100).optional(),
-  }),
+  email: z.string().email(),
+  display_name: z.string().optional(),
+  friendly_name: z.string().min(1).max(100).optional(),
 });
 
 const registrationResponseSchema = z.object({
-  body: z.object({
+  response: z.object({
+    id: z.string(),
+    rawId: z.string(),
     response: z.object({
-      id: z.string(),
-      rawId: z.string(),
-      response: z.object({
-        attestationObject: z.string(),
-        clientDataJSON: z.string(),
-        transports: z.array(z.string()).optional(),
-      }),
-      type: z.literal('public-key'),
-      clientExtensionResults: z.record(z.any()),
-      authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+      attestationObject: z.string(),
+      clientDataJSON: z.string(),
+      transports: z.array(z.string()).optional(),
     }),
-    friendly_name: z.string().min(1).max(100).optional(),
+    type: z.literal('public-key'),
+    clientExtensionResults: z.record(z.any()),
+    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
   }),
+  friendly_name: z.string().min(1).max(100).optional(),
 });
 
 const authenticationOptionsSchema = z.object({
-  body: z.object({
-    user_identifier: z.string().optional(), // email or user ID
-  }),
+  user_identifier: z.string().optional(), // email or user ID
 });
 
 const authenticationResponseSchema = z.object({
-  body: z.object({
+  response: z.object({
+    id: z.string(),
+    rawId: z.string(),
     response: z.object({
-      id: z.string(),
-      rawId: z.string(),
-      response: z.object({
-        authenticatorData: z.string(),
-        clientDataJSON: z.string(),
-        signature: z.string(),
-        userHandle: z.string().optional(),
-      }),
-      type: z.literal('public-key'),
-      clientExtensionResults: z.record(z.any()),
-      authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+      authenticatorData: z.string(),
+      clientDataJSON: z.string(),
+      signature: z.string(),
+      userHandle: z.string().optional(),
     }),
+    type: z.literal('public-key'),
+    clientExtensionResults: z.record(z.any()),
+    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
   }),
 });
 
@@ -63,46 +58,108 @@ const removeDeviceSchema = z.object({
   }),
 });
 
+// Add WebAuthn configuration endpoint
+router.get('/.well-known/webauthn', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    version: '1.0',
+    rp: {
+      id: process.env.WEBAUTHN_RP_ID || 'localhost',
+      name: process.env.WEBAUTHN_RP_NAME || 'CADOP Service',
+      icon: `${process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000'}/favicon.ico`
+    }
+  });
+});
+
 /**
  * POST /api/webauthn/registration/options
  * Generate WebAuthn registration options
  */
 router.post(
   '/registration/options',
-  requireAuth,
   validateRequest(registrationOptionsSchema),
   async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
-      const { friendly_name } = req.body;
+      logger.debug('Received registration options request', {
+        body: req.body,
+        headers: req.headers,
+      });
 
-      // Get user email from Supabase Auth
-      const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(userId);
-      if (authError || !authUser.user) {
-        return res.status(404).json({
-          error: 'User not found',
-          code: 'USER_NOT_FOUND',
+      const { email, display_name, friendly_name } = req.body;
+
+      // Check if user exists
+      const { data: { users }, error: userError } = await supabase.auth.admin.listUsers();
+      if (userError) {
+        logger.error('Failed to list users from Supabase', { error: userError });
+        throw userError;
+      }
+
+      logger.debug('Found existing users', { 
+        usersCount: users?.length,
+        emails: users?.map(u => u.email)
+      });
+
+      const existingUser = users?.find(u => u.email === email);
+      if (!existingUser) {
+        logger.debug('Creating new user', { email, display_name });
+        // Create a new user if not exists
+        const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: display_name
+          }
+        });
+
+        if (createError) {
+          logger.error('Failed to create new user', { error: createError });
+          throw createError;
+        }
+
+        logger.debug('New user created', { 
+          userId: newUser.user.id,
+          email: newUser.user.email,
+          metadata: newUser.user.user_metadata
+        });
+
+        const options = await webauthnService.generateRegistrationOptions(
+          newUser.user.id,
+          email,
+          display_name || email
+        );
+
+        logger.debug('Generated registration options for new user', {
+          userId: newUser.user.id,
+          email,
+          options,
+          challengeLength: options.challenge.length,
+          friendlyName: friendly_name,
+        });
+
+        return res.json({
+          success: true,
+          options,
+          user_id: newUser.user.id
         });
       }
 
-      const userEmail = authUser.user.email;
-      const userName = authUser.user.user_metadata?.['full_name'] || userEmail;
+      logger.debug('Found existing user', { 
+        userId: existingUser.id,
+        email: existingUser.email,
+        metadata: existingUser.user_metadata
+      });
 
-      if (!userEmail) {
-        return res.status(400).json({
-          error: 'User email is required for WebAuthn registration',
-          code: 'EMAIL_REQUIRED',
-        });
-      }
-
+      // Generate options for existing user
       const options = await webauthnService.generateRegistrationOptions(
-        userId,
-        userEmail,
-        userName
+        existingUser.id,
+        email,
+        display_name || email
       );
 
-      logger.info('WebAuthn registration options generated', {
-        userId,
+      logger.debug('Generated registration options for existing user', {
+        userId: existingUser.id,
+        email,
+        options,
         challengeLength: options.challenge.length,
         friendlyName: friendly_name,
       });
@@ -110,11 +167,13 @@ router.post(
       return res.json({
         success: true,
         options,
+        user_id: existingUser.id
       });
     } catch (error) {
       logger.error('Failed to generate WebAuthn registration options', {
         error,
-        userId: req.user?.id,
+        stack: error instanceof Error ? error.stack : undefined,
+        body: req.body,
       });
 
       return res.status(500).json({
@@ -132,12 +191,38 @@ router.post(
  */
 router.post(
   '/registration/verify',
-  requireAuth,
   validateRequest(registrationResponseSchema),
   async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
+      logger.debug('Received registration verification request', {
+        body: req.body,
+        headers: req.headers,
+      });
+
       const { response, friendly_name } = req.body;
+      
+      // Extract user ID from the clientDataJSON
+      const clientDataJSON = JSON.parse(
+        Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
+      );
+      
+      // Get user ID from the challenge data
+      const challenge = await webauthnService.getChallenge(clientDataJSON.challenge);
+      if (!challenge || !challenge.user_id) {
+        logger.warn('Invalid or expired challenge', { clientDataJSON });
+        return res.status(400).json({
+          error: 'Invalid or expired challenge',
+          code: 'INVALID_CHALLENGE',
+        });
+      }
+
+      const userId = challenge.user_id;
+      
+      logger.debug('Verifying registration response', {
+        userId,
+        response,
+        friendly_name,
+      });
 
       const result = await webauthnService.verifyRegistrationResponse(
         userId,
@@ -150,6 +235,7 @@ router.post(
           userId,
           authenticatorId: result.authenticator?.id,
           friendlyName: friendly_name,
+          result,
         });
 
         res.json({
@@ -161,6 +247,7 @@ router.post(
         logger.warn('WebAuthn registration failed', {
           userId,
           error: result.error,
+          details: result.details,
         });
 
         res.status(400).json({
@@ -173,7 +260,8 @@ router.post(
     } catch (error) {
       logger.error('WebAuthn registration verification error', {
         error,
-        userId: req.user?.id,
+        stack: error instanceof Error ? error.stack : undefined,
+        body: req.body,
       });
 
       res.status(500).json({
@@ -254,37 +342,62 @@ router.post(
 
       const result = await webauthnService.verifyAuthenticationResponse(response);
 
-      if (result.success && result.user_id) {
-        // Create or update session
-        const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
-          type: 'magiclink',
-          email: '', // This will be filled by the session creation
-          options: {
-            redirectTo: process.env.FRONTEND_URL || 'http://localhost:3000',
-          },
-        });
-
-        if (sessionError) {
-          logger.error('Failed to create session after WebAuthn authentication', {
-            error: sessionError,
-            userId: result.user_id,
+      if (result.success && result.userId) {
+        // Get user data
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(result.userId);
+        
+        if (userError || !userData.user) {
+          logger.error('Failed to get user data', {
+            error: userError,
+            userId: result.userId,
           });
+          throw new Error('Failed to get user data');
         }
 
+        // Create access token and refresh token
+        const accessToken = jwt.sign(
+          {
+            sub: result.userId,
+            email: userData.user.email,
+            role: 'authenticated',
+            aud: 'authenticated',
+            exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour
+          },
+          process.env.SUPABASE_JWT_SECRET || ''
+        );
+
+        const refreshToken = jwt.sign(
+          {
+            sub: result.userId,
+            email: userData.user.email,
+            role: 'authenticated',
+            aud: 'authenticated',
+            exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+            type: 'refresh',
+          },
+          process.env.SUPABASE_JWT_SECRET || ''
+        );
+
         logger.info('WebAuthn authentication successful', {
-          userId: result.user_id,
-          authenticatorId: result.authenticator_id,
+          userId: result.userId,
+          authenticatorId: result.authenticatorId,
         });
 
         res.json({
           success: true,
           message: 'Authentication successful',
-          user_id: result.user_id,
-          authenticator_id: result.authenticator_id,
-          session: sessionData?.properties,
+          user_id: result.userId,
+          authenticator_id: result.authenticatorId,
+          session: {
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_in: 3600, // 1 hour in seconds
+            refresh_token_expires_in: 2592000, // 30 days in seconds
+          },
         });
       } else {
-        logger.warn('WebAuthn authentication failed', {
+        logger.warn('WebAuthn authentication failed, result: ', {
+          result,
           error: result.error,
         });
 

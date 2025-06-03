@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import path from 'path';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/environment.js';
+import { webauthnService } from '../services/webauthnService.js';
 
 const router: Router = Router();
 
@@ -32,65 +32,134 @@ router.post('/token', asyncHandler(async (_req: Request, res: Response) => {
 }));
 
 // UserInfo endpoint
-router.get('/userinfo', asyncHandler(async (_req: Request, res: Response) => {
-  // TODO: Implement userinfo
-  res.json({ message: 'UserInfo - TODO' });
-}));
-
-// Login page
-router.get('/login', asyncHandler(async (_req: Request, res: Response) => {
-  // Serve the login HTML page
-  res.sendFile(path.join(__dirname, '../views/login.html'));
-}));
-
-// Login form submission
-router.post('/login', asyncHandler(async (req: Request, res: Response) => {
-  const { email, password, response_type, client_id, redirect_uri, scope, state, nonce } = req.body;
-  
+router.get('/userinfo', asyncHandler(async (req: Request, res: Response) => {
   try {
-    // TODO: Implement actual authentication logic
-    // For now, just accept any email/password for demonstration
-    if (!email || !password) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        error_description: 'Email and password are required'
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'unauthorized',
+        error_description: 'User not authenticated'
       });
     }
-    
-    // Create a simple session (in production, use proper session management)
-    const userId = `user_${Date.now()}`;
-    
-    // If this is part of an OAuth flow, redirect appropriately
-    if (response_type && client_id && redirect_uri) {
-      // Construct the authorization URL with the session info
-      const authUrl = `/auth/authorize?response_type=${response_type}&client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&scope=${scope || 'openid'}&state=${state || ''}&nonce=${nonce || ''}&user_id=${userId}`;
-      
-      return res.json({
-        success: true,
-        redirect_url: authUrl
+
+    const { data: user, error } = await supabase.auth.admin.getUserById(userId);
+    if (error || !user) {
+      return res.status(404).json({
+        error: 'not_found',
+        error_description: 'User not found'
       });
     }
-    
-    // If not part of OAuth flow, just return success
+
     return res.json({
-      success: true,
-      user_id: userId,
-      message: 'Login successful'
+      sub: userId,
+      email: user.user.email,
+      email_verified: user.user.email_confirmed_at ? true : false,
+      auth_time: user.user.last_sign_in_at,
+      updated_at: user.user.updated_at
     });
-    
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Error fetching user info:', error);
     return res.status(500).json({
       error: 'server_error',
-      error_description: 'Internal server error during login'
+      error_description: 'Internal server error'
+    });
+  }
+}));
+
+// WebAuthn login initialization
+router.post('/login/webauthn/begin', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    
+    // Find user by email
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (userError || !users) {
+      return res.status(404).json({
+        error: 'not_found',
+        error_description: 'User not found'
+      });
+    }
+    
+    // Generate authentication options with user ID
+    const options = await webauthnService.generateAuthenticationOptions(users.id);
+    
+    return res.json({
+      success: true,
+      options
+    });
+  } catch (error) {
+    logger.error('WebAuthn login initialization error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      error_description: 'Failed to initialize WebAuthn login'
+    });
+  }
+}));
+
+// WebAuthn login completion
+router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { response } = req.body;
+    
+    // Verify the authentication response
+    const result = await webauthnService.verifyAuthenticationResponse(response);
+    
+    if (!result.success) {
+      return res.status(401).json({
+        error: 'authentication_failed',
+        error_description: result.error || 'Authentication failed'
+      });
+    }
+
+    // Get user from database
+    const { data: user, error: userError } = await supabase.auth.admin.getUserById(result.user_id!);
+    if (userError || !user) {
+      throw new Error('User not found');
+    }
+
+    // Create session using Supabase auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: user.user.email!,
+      password: result.user_id! // Use user_id as a temporary password
+    });
+
+    if (authError) {
+      throw authError;
+    }
+
+    return res.json({
+      success: true,
+      session: authData.session
+    });
+  } catch (error) {
+    logger.error('WebAuthn login completion error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      error_description: 'Failed to complete WebAuthn login'
     });
   }
 }));
 
 // Logout endpoint
-router.post('/logout', asyncHandler(async (_req: Request, res: Response) => {
-  // TODO: Implement logout logic
-  res.json({ message: 'Logout successful' });
+router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (userId) {
+      await supabase.auth.admin.signOut(userId);
+    }
+    res.json({ success: true, message: 'Logout successful' });
+  } catch (error) {
+    logger.error('Logout error:', error);
+    res.status(500).json({
+      error: 'server_error',
+      error_description: 'Failed to logout'
+    });
+  }
 }));
 
 export { router as authRouter }; 
