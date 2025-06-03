@@ -1,7 +1,6 @@
-import * as jwt from 'jsonwebtoken';
-import { verify } from 'jsonwebtoken';
+import jsonwebtoken from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
-import { IDToken } from '@cadop/shared/types';
+import { IDToken } from '@cadop/shared';
 
 // 使用 IDToken 接口作为 IDTokenPayload
 export type IDTokenPayload = IDToken;
@@ -24,7 +23,7 @@ export async function validateIdToken(idToken: string): Promise<IDTokenPayload |
     }
 
     // Verify JWT Token
-    const payload = verify(idToken, jwtSecret, {
+    const payload = jsonwebtoken.verify(idToken, jwtSecret, {
       algorithms: ['HS256'],
       issuer: process.env['OIDC_ISSUER'] || 'https://localhost:3000',
       // Can add more verification options
@@ -86,7 +85,7 @@ export function createIdToken(payload: Partial<IDTokenPayload>): string {
     ...payload
   };
 
-  return jwt.sign(fullPayload, jwtSecret, { algorithm: 'HS256' });
+  return jsonwebtoken.sign(fullPayload, jwtSecret, { algorithm: 'HS256' });
 }
 
 /**
@@ -94,7 +93,7 @@ export function createIdToken(payload: Partial<IDTokenPayload>): string {
  */
 export function decodeIdToken(idToken: string): IDTokenPayload | null {
   try {
-    return jwt.decode(idToken) as IDTokenPayload;
+    return jsonwebtoken.decode(idToken) as IDTokenPayload;
   } catch (error) {
     logger.error('Failed to decode ID Token', { error });
     return null;
