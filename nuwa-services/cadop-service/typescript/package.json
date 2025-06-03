@@ -15,7 +15,11 @@
     "clean": "pnpm --recursive run clean"
   },
   "devDependencies": {
+    "@jest/expect": "30.0.0-beta.3",
+    "@jest/globals": "30.0.0-beta.3",
     "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.29",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "eslint": "^8.56.0",

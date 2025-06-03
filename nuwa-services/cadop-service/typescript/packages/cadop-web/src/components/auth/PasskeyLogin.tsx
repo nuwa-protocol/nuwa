@@ -4,11 +4,13 @@ import { SupabaseAuthService } from '../../lib/supabase/auth-service';
 import { useAuth } from '../../lib/auth/AuthContext';
 
 interface PasskeyLoginProps {
+  onSuccess: (userId: string) => void;
   onError: (error: string) => void;
+  email?: string;
 }
 
-export function PasskeyLogin({ onError }: PasskeyLoginProps) {
-  const [email, setEmail] = useState('');
+export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: PasskeyLoginProps) {
+  const [email, setEmail] = useState(initialEmail || '');
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,10 +28,11 @@ export function PasskeyLogin({ onError }: PasskeyLoginProps) {
         return;
       }
 
-      const authResult = await passkeyService.authenticate();
+      const authResult = await passkeyService.authenticate(email || undefined);
       if (authResult.success && authResult.user_id) {
         const session = await supabaseAuthService.handlePasskeyResponse(authResult.user_id);
         signIn(session);
+        onSuccess(authResult.user_id);
       } else {
         setIsRegistering(true);
       }
@@ -38,7 +41,7 @@ export function PasskeyLogin({ onError }: PasskeyLoginProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [onError, signIn]);
+  }, [onError, signIn, onSuccess, email]);
 
   const handlePasskeyRegistration = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +68,7 @@ export function PasskeyLogin({ onError }: PasskeyLoginProps) {
             email
           );
           signIn(session);
+          onSuccess(authResult.user_id);
         } else {
           onError('Registration successful but authentication failed');
         }
@@ -76,7 +80,7 @@ export function PasskeyLogin({ onError }: PasskeyLoginProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [email, onError, signIn]);
+  }, [email, onError, signIn, onSuccess]);
 
   if (isRegistering) {
     return (
