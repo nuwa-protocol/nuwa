@@ -1,4 +1,4 @@
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { validateIdToken, createIdToken, decodeIdToken, verifyIdToken } from '../oidc.js';
 import { createTestIdToken, createExpiredIdToken, mockIDToken } from '../../test/mocks.js';
 import { oidcService } from '../oidc.js';

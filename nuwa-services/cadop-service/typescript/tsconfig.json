@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "references": [
-    { "path": "./packages/shared" },
+    { "path": "./packages/cadop-shared" },
     { "path": "./packages/cadop-api" },
     { "path": "./packages/cadop-web" }
   ],
