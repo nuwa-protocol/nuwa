@@ -78,8 +78,14 @@ export interface PasskeyRegistrationResult {
 
 export interface PasskeyAuthenticationResult {
   success: boolean;
-  user_id?: string;
-  device_id?: string;
+  session?: {
+    session_token: string;
+    expires_at: string;
+    user: {
+      id: string;
+      email: string;
+      display_name: string | null;
+    };
+  };
   error?: string;
-  session?: any; // Supabase session type
 } 

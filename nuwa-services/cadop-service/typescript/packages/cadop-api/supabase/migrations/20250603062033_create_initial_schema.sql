@@ -33,49 +33,33 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+DO $$ BEGIN
+    CREATE TYPE authenticator_attachment AS ENUM ('platform', 'cross-platform');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 -- Create schema_migrations table for tracking migrations
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version VARCHAR(255) PRIMARY KEY,
   applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- User profiles table - extends Supabase auth.users
-CREATE TABLE IF NOT EXISTS user_profiles (
-    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-    user_did VARCHAR(255) NOT NULL,
-    primary_agent_did VARCHAR(255),
+-- Create users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_did VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) UNIQUE,
     display_name VARCHAR(255),
-    avatar_url TEXT,
     metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    CONSTRAINT user_profiles_user_did_unique UNIQUE (user_did),
-    CONSTRAINT user_profiles_primary_agent_did_unique UNIQUE (primary_agent_did)
-);
-
--- Auth methods table - OAuth/Web2 identities linked to users
-CREATE TABLE IF NOT EXISTS auth_methods (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    provider identity_provider NOT NULL,
-    provider_user_id VARCHAR(255) NOT NULL,
-    provider_data JSONB DEFAULT '{}',
-    sybil_contribution INTEGER DEFAULT 0 CHECK (sybil_contribution >= 0 AND sybil_contribution <= 100),
-    verified_at TIMESTAMP WITH TIME ZONE,
-    expires_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Ensure unique provider identity per user
-    UNIQUE(user_id, provider, provider_user_id),
-    -- Ensure unique provider identity globally
-    UNIQUE(provider, provider_user_id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- Agent DIDs table - Rooch Agent DIDs created for users
-CREATE TABLE IF NOT EXISTS agent_dids (
+CREATE TABLE agent_dids (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     agent_did VARCHAR(255) NOT NULL UNIQUE,
     controller_did VARCHAR(255) NOT NULL,
     rooch_address VARCHAR(255) NOT NULL UNIQUE,
@@ -99,9 +83,9 @@ CREATE TABLE IF NOT EXISTS agent_dids (
 );
 
 -- Transactions table - blockchain transaction tracking
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE transactions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     agent_did_id UUID REFERENCES agent_dids(id) ON DELETE SET NULL,
     tx_hash VARCHAR(255) NOT NULL UNIQUE,
     chain_id VARCHAR(50) NOT NULL DEFAULT 'rooch-testnet',
@@ -116,9 +100,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 -- Proof requests table - Web2 proof requests and VCs
-CREATE TABLE IF NOT EXISTS proof_requests (
+CREATE TABLE proof_requests (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     claim_type VARCHAR(100) NOT NULL,
     auth_method VARCHAR(50) NOT NULL,
     status proof_status DEFAULT 'pending',
@@ -134,7 +118,7 @@ CREATE TABLE IF NOT EXISTS proof_requests (
 );
 
 -- Verifiable credentials table - issued VCs
-CREATE TABLE IF NOT EXISTS verifiable_credentials (
+CREATE TABLE verifiable_credentials (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     issuer_did VARCHAR(255) NOT NULL,
     subject_did VARCHAR(255) NOT NULL,
@@ -157,42 +141,10 @@ CREATE TABLE IF NOT EXISTS verifiable_credentials (
     )
 );
 
--- OAuth clients table - OIDC client management
-CREATE TABLE IF NOT EXISTS oauth_clients (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    client_id VARCHAR(255) NOT NULL UNIQUE,
-    client_secret_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    redirect_uris JSONB NOT NULL DEFAULT '[]',
-    scopes JSONB NOT NULL DEFAULT '["openid"]',
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    CONSTRAINT oauth_clients_client_id_format CHECK (LENGTH(client_id) >= 8)
-);
-
--- Sessions table - user authentication sessions (extends Supabase auth)
-CREATE TABLE IF NOT EXISTS sessions (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    client_id UUID REFERENCES oauth_clients(id) ON DELETE CASCADE,
-    session_token_hash VARCHAR(255) NOT NULL UNIQUE,
-    access_token_hash VARCHAR(255),
-    refresh_token_hash VARCHAR(255),
-    session_data JSONB DEFAULT '{}',
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Ensure expiration is in the future
-    CONSTRAINT sessions_expires_at_future CHECK (expires_at > created_at)
-);
-
 -- Authenticators table - stores WebAuthn credential info
-CREATE TABLE IF NOT EXISTS authenticators (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+CREATE TABLE authenticators (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     credential_id VARCHAR(255) NOT NULL UNIQUE,
     credential_public_key VARCHAR(1024) NOT NULL,
     counter BIGINT NOT NULL DEFAULT 0,
@@ -202,23 +154,42 @@ CREATE TABLE IF NOT EXISTS authenticators (
     friendly_name VARCHAR(255),
     aaguid UUID,
     last_used_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
     -- Ensure credential_id uniqueness across the system
     CONSTRAINT authenticators_credential_id_unique UNIQUE (credential_id)
 );
 
+-- Create sessions table
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    passkey_credential_id VARCHAR(255) NOT NULL,
+    session_token TEXT NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    
+    -- Ensure expiration is in the future
+    CONSTRAINT sessions_expires_at_future CHECK (expires_at > created_at),
+    -- Reference to authenticators table
+    CONSTRAINT sessions_passkey_credential_id_fk FOREIGN KEY (passkey_credential_id) 
+        REFERENCES authenticators(credential_id) ON DELETE CASCADE
+);
+
 -- WebAuthn challenges table - temporary storage for registration/authentication challenges
-CREATE TABLE IF NOT EXISTS webauthn_challenges (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+CREATE TABLE webauthn_challenges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    -- user_id can be null for anonymous authentication attempts
+    user_id UUID,
     challenge VARCHAR(255) NOT NULL UNIQUE,
     operation_type VARCHAR(20) NOT NULL CHECK (operation_type IN ('registration', 'authentication')),
     client_data JSONB DEFAULT '{}',
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     used_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
     -- Ensure challenge expiration is in the future
     CONSTRAINT webauthn_challenges_expires_at_future CHECK (expires_at > created_at),
@@ -229,13 +200,8 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
 );
 
 -- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS user_profiles_user_did_idx ON user_profiles(user_did);
-CREATE INDEX IF NOT EXISTS user_profiles_primary_agent_did_idx ON user_profiles(primary_agent_did) WHERE primary_agent_did IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS auth_methods_user_id_idx ON auth_methods(user_id);
-CREATE INDEX IF NOT EXISTS auth_methods_provider_idx ON auth_methods(provider);
-CREATE INDEX IF NOT EXISTS auth_methods_provider_user_id_idx ON auth_methods(provider_user_id);
-CREATE INDEX IF NOT EXISTS auth_methods_verified_at_idx ON auth_methods(verified_at) WHERE verified_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS users_user_did_idx ON users(user_did);
+CREATE INDEX IF NOT EXISTS users_email_idx ON users(email) WHERE email IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS agent_dids_user_id_idx ON agent_dids(user_id);
 CREATE INDEX IF NOT EXISTS agent_dids_controller_did_idx ON agent_dids(controller_did);
@@ -261,11 +227,8 @@ CREATE INDEX IF NOT EXISTS verifiable_credentials_credential_type_idx ON verifia
 CREATE INDEX IF NOT EXISTS verifiable_credentials_status_idx ON verifiable_credentials(status);
 CREATE INDEX IF NOT EXISTS verifiable_credentials_proof_request_id_idx ON verifiable_credentials(proof_request_id) WHERE proof_request_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS oauth_clients_client_id_idx ON oauth_clients(client_id);
-
 CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS sessions_client_id_idx ON sessions(client_id) WHERE client_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS sessions_session_token_hash_idx ON sessions(session_token_hash);
+CREATE INDEX IF NOT EXISTS sessions_passkey_credential_id_idx ON sessions(passkey_credential_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 
 CREATE INDEX IF NOT EXISTS authenticators_user_id_idx ON authenticators(user_id);
@@ -279,129 +242,73 @@ CREATE INDEX IF NOT EXISTS webauthn_challenges_operation_type_idx ON webauthn_ch
 CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_at_idx ON webauthn_challenges(expires_at);
 
 -- Enable RLS on all tables
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth_methods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_dids ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE proof_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verifiable_credentials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE oauth_clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE authenticators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY;
 
+-- Create helper functions for RLS
+CREATE OR REPLACE FUNCTION current_user_id()
+RETURNS UUID AS $$
+BEGIN
+    RETURN current_setting('app.current_user_id', TRUE)::UUID;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION current_user_is_service()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN current_setting('app.is_service_role', TRUE)::BOOLEAN;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Create RLS policies
-CREATE POLICY "Users can view own profile" ON user_profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Service role can manage all profiles" ON user_profiles FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Users can view own data" ON users FOR SELECT USING (id = current_user_id());
+CREATE POLICY "Users can update own data" ON users FOR UPDATE USING (id = current_user_id());
+CREATE POLICY "Service role can manage all users" ON users FOR ALL USING (current_user_is_service());
 
-CREATE POLICY "Users can view own auth methods" ON auth_methods FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own auth methods" ON auth_methods FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own auth methods" ON auth_methods FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own auth methods" ON auth_methods FOR DELETE USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all auth methods" ON auth_methods FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-
-CREATE POLICY "Users can view own Agent DIDs" ON agent_dids FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own Agent DIDs" ON agent_dids FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own Agent DIDs" ON agent_dids FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all Agent DIDs" ON agent_dids FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Users can view own Agent DIDs" ON agent_dids FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Users can insert own Agent DIDs" ON agent_dids FOR INSERT WITH CHECK (user_id = current_user_id());
+CREATE POLICY "Users can update own Agent DIDs" ON agent_dids FOR UPDATE USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all Agent DIDs" ON agent_dids FOR ALL USING (current_user_is_service());
 CREATE POLICY "Public can read confirmed Agent DIDs" ON agent_dids FOR SELECT USING (status = 'confirmed');
 
-CREATE POLICY "Users can view own transactions" ON transactions FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all transactions" ON transactions FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Users can view own transactions" ON transactions FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all transactions" ON transactions FOR ALL USING (current_user_is_service());
 
-CREATE POLICY "Users can view own proof requests" ON proof_requests FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all proof requests" ON proof_requests FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Users can view own proof requests" ON proof_requests FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all proof requests" ON proof_requests FOR ALL USING (current_user_is_service());
 
 CREATE POLICY "Users can view credentials where they are the subject" ON verifiable_credentials FOR SELECT USING (
     EXISTS (
-        SELECT 1 FROM user_profiles 
-        WHERE user_profiles.id = auth.uid() 
-        AND (user_profiles.user_did = subject_did OR user_profiles.primary_agent_did = subject_did)
+        SELECT 1 FROM users 
+        WHERE users.id = current_user_id() 
+        AND (users.user_did = subject_did)
     )
 );
-CREATE POLICY "Service role can manage all credentials" ON verifiable_credentials FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Service role can manage all credentials" ON verifiable_credentials FOR ALL USING (current_user_is_service());
 CREATE POLICY "Public can read active credentials" ON verifiable_credentials FOR SELECT USING (status = 'active');
 
-CREATE POLICY "Service role can manage oauth clients" ON oauth_clients FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-CREATE POLICY "Public can read oauth client metadata" ON oauth_clients FOR SELECT USING (true);
+CREATE POLICY "Users can view own sessions" ON sessions FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Users can delete own sessions" ON sessions FOR DELETE USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all sessions" ON sessions FOR ALL USING (current_user_is_service());
 
-CREATE POLICY "Users can view own sessions" ON sessions FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own sessions" ON sessions FOR DELETE USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all sessions" ON sessions FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+CREATE POLICY "Users can view own authenticators" ON authenticators FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Users can manage own authenticators" ON authenticators FOR ALL USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all authenticators" ON authenticators FOR ALL USING (current_user_is_service());
 
-CREATE POLICY "Users can view own authenticators" ON authenticators FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can manage own authenticators" ON authenticators FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all authenticators" ON authenticators FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-
-CREATE POLICY "Users can view own challenges" ON webauthn_challenges FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Service role can manage all challenges" ON webauthn_challenges FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-
--- Create views for easier querying
-CREATE OR REPLACE VIEW user_complete_profile AS
-  SELECT 
-    up.id,
-    au.email,
-    up.user_did,
-    up.primary_agent_did,
-    up.display_name,
-    up.avatar_url,
-    up.metadata,
-    up.created_at,
-    up.updated_at,
-    au.created_at as auth_created_at,
-    au.last_sign_in_at,
-    COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'provider', am.provider,
-          'provider_user_id', am.provider_user_id,
-          'sybil_contribution', am.sybil_contribution,
-          'verified_at', am.verified_at
-        )
-      ) FILTER (WHERE am.id IS NOT NULL), 
-      '[]'::jsonb
-    ) as auth_methods,
-    COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'agent_did', ad.agent_did,
-          'controller_did', ad.controller_did,
-          'rooch_address', ad.rooch_address,
-          'status', ad.status,
-          'sybil_level', ad.sybil_level,
-          'created_at', ad.created_at,
-          'blockchain_confirmed', ad.blockchain_confirmed
-        )
-      ) FILTER (WHERE ad.id IS NOT NULL), 
-      '[]'::jsonb
-    ) as agent_dids
-  FROM user_profiles up
-  LEFT JOIN auth.users au ON up.id = au.id
-  LEFT JOIN auth_methods am ON up.id = am.user_id
-  LEFT JOIN agent_dids ad ON up.id = ad.user_id
-  GROUP BY up.id, up.user_did, up.primary_agent_did, up.display_name, up.avatar_url, 
-           up.metadata, up.created_at, up.updated_at, au.email, au.created_at, au.last_sign_in_at;
-
--- Enable RLS on the view
-ALTER VIEW user_complete_profile SET (security_barrier = true);
-
--- Create view for DID resolution (public access)
-CREATE OR REPLACE VIEW public_did_documents AS
-  SELECT 
-    agent_did as did,
-    did_document,
-    rooch_address,
-    object_id,
-    status,
-    blockchain_confirmed,
-    updated_at
-  FROM agent_dids 
-  WHERE status = 'confirmed' AND blockchain_confirmed = true;
-
--- Enable RLS on the view
-ALTER VIEW public_did_documents SET (security_barrier = true);
+CREATE POLICY "Users can view own challenges" ON webauthn_challenges FOR SELECT USING (user_id = current_user_id());
+CREATE POLICY "Service role can manage all challenges" ON webauthn_challenges FOR ALL USING (current_user_is_service());
 
 -- Create triggers for updated_at columns
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -412,16 +319,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_user_profiles_updated_at 
-    BEFORE UPDATE ON user_profiles 
+CREATE TRIGGER update_users_updated_at 
+    BEFORE UPDATE ON users 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_agent_dids_updated_at 
     BEFORE UPDATE ON agent_dids 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_oauth_clients_updated_at 
-    BEFORE UPDATE ON oauth_clients 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_sessions_updated_at 
@@ -474,42 +377,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION cleanup_old_webauthn_challenges()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM webauthn_challenges 
-    WHERE created_at < NOW() - INTERVAL '1 hour' AND used_at IS NULL;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create primary agent DID constraint check
-CREATE OR REPLACE FUNCTION check_primary_agent_did_constraint()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.primary_agent_did IS NOT NULL THEN
-        -- Check if the primary_agent_did exists in agent_dids table
-        IF NOT EXISTS (
-            SELECT 1 FROM agent_dids 
-            WHERE agent_did = NEW.primary_agent_did 
-            AND user_id = NEW.id
-            AND status = 'confirmed'
-        ) THEN
-            RAISE EXCEPTION 'Primary agent DID must be a confirmed DID owned by the user';
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER check_primary_agent_did_constraint_trigger
-    BEFORE INSERT OR UPDATE ON user_profiles
-    FOR EACH ROW EXECUTE FUNCTION check_primary_agent_did_constraint();
-
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
@@ -517,14 +384,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
 
--- Grant permissions on views
-GRANT SELECT ON user_complete_profile TO authenticated, service_role;
-GRANT SELECT ON public_did_documents TO anon, authenticated, service_role;
-
 -- Enable realtime for specific tables
-ALTER PUBLICATION supabase_realtime ADD TABLE user_profiles;
-ALTER PUBLICATION supabase_realtime ADD TABLE auth_methods;
+ALTER PUBLICATION supabase_realtime ADD TABLE users;
 ALTER PUBLICATION supabase_realtime ADD TABLE agent_dids;
 ALTER PUBLICATION supabase_realtime ADD TABLE transactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE proof_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE verifiable_credentials;
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE authenticators;
+ALTER PUBLICATION supabase_realtime ADD TABLE webauthn_challenges;

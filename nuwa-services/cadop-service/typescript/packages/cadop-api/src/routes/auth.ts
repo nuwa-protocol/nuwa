@@ -4,6 +4,9 @@ import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/environment.js';
 import { webauthnService } from '../services/webauthnService.js';
+import { z } from 'zod';
+import { validateRequest } from '../middleware/validation.js';
+import { SessionService } from '../services/sessionService.js';
 
 const router: Router = Router();
 
@@ -72,13 +75,13 @@ router.post('/login/webauthn/begin', asyncHandler(async (req: Request, res: Resp
     const { email } = req.body;
     
     // Find user by email
-    const { data: users, error: userError } = await supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
       .single();
 
-    if (userError || !users) {
+    if (userError || !user) {
       return res.status(404).json({
         error: 'not_found',
         error_description: 'User not found'
@@ -86,7 +89,7 @@ router.post('/login/webauthn/begin', asyncHandler(async (req: Request, res: Resp
     }
     
     // Generate authentication options with user ID
-    const options = await webauthnService.generateAuthenticationOptions(users.id);
+    const options = await webauthnService.generateAuthenticationOptions(user.id);
     
     return res.json({
       success: true,
@@ -109,7 +112,7 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
     // Verify the authentication response
     const result = await webauthnService.verifyAuthenticationResponse(response);
     
-    if (!result.success) {
+    if (!result.success || !result.userId || !result.authenticatorId) {
       return res.status(401).json({
         error: 'authentication_failed',
         error_description: result.error || 'Authentication failed'
@@ -117,24 +120,43 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
     }
 
     // Get user from database
-    const { data: user, error: userError } = await supabase.auth.admin.getUserById(result.user_id!);
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', result.userId)
+      .single();
+
     if (userError || !user) {
       throw new Error('User not found');
     }
 
-    // Create session using Supabase auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: user.user.email!,
-      password: result.user_id! // Use user_id as a temporary password
-    });
+    // Create new session
+    const sessionService = new SessionService();
+    const session = await sessionService.createSession(
+      result.userId,
+      result.authenticatorId,
+      {
+        email: user.email,
+        display_name: user.display_name
+      }
+    );
 
-    if (authError) {
-      throw authError;
-    }
+    // Update authenticator usage
+    await webauthnService.updateAuthenticatorUsage(result);
 
     return res.json({
       success: true,
-      session: authData.session
+      session: {
+        session_token: session.session_token,
+        expires_at: session.expires_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          display_name: user.display_name,
+          created_at: user.created_at,
+          updated_at: user.updated_at
+        }
+      }
     });
   } catch (error) {
     logger.error('WebAuthn login completion error:', error);
@@ -148,10 +170,13 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
 // Logout endpoint
 router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
   try {
+    const sessionService = new SessionService();
     const userId = req.user?.id;
+    
     if (userId) {
-      await supabase.auth.admin.signOut(userId);
+      await sessionService.invalidateAllUserSessions(userId);
     }
+    
     res.json({ success: true, message: 'Logout successful' });
   } catch (error) {
     logger.error('Logout error:', error);

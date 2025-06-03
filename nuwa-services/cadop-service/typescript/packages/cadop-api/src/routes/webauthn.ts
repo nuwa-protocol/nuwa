@@ -6,6 +6,7 @@ import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
+import { SessionService } from '../services/sessionService.js';
 
 const router: Router = Router();
 
@@ -339,14 +340,17 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { response } = req.body;
-
       const result = await webauthnService.verifyAuthenticationResponse(response);
 
-      if (result.success && result.userId) {
-        // Get user data
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(result.userId);
-        
-        if (userError || !userData.user) {
+      if (result.success && result.userId && result.authenticatorId) {
+        // 获取用户信息
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', result.userId)
+          .single();
+
+        if (userError || !userData) {
           logger.error('Failed to get user data', {
             error: userError,
             userId: result.userId,
@@ -354,68 +358,70 @@ router.post(
           throw new Error('Failed to get user data');
         }
 
-        // Create access token and refresh token
-        const accessToken = jwt.sign(
+        // 创建新会话
+        const sessionService = new SessionService();
+        const { data: authenticator } = await supabase
+          .from('authenticators')
+          .select('credential_id')
+          .eq('id', result.authenticatorId)
+          .single();
+
+        if (!authenticator) {
+          throw new Error('Failed to get authenticator data');
+        }
+
+        const session = await sessionService.createSession(
+          result.userId,
+          authenticator.credential_id,
           {
-            sub: result.userId,
-            email: userData.user.email,
-            role: 'authenticated',
-            aud: 'authenticated',
-            exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour
-          },
-          process.env.SUPABASE_JWT_SECRET || ''
+            email: userData.email,
+            display_name: userData.display_name
+          }
         );
 
-        const refreshToken = jwt.sign(
-          {
-            sub: result.userId,
-            email: userData.user.email,
-            role: 'authenticated',
-            aud: 'authenticated',
-            exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
-            type: 'refresh',
-          },
-          process.env.SUPABASE_JWT_SECRET || ''
-        );
+        // 更新认证器使用信息
+        await webauthnService.updateAuthenticatorUsage(result);
 
         logger.info('WebAuthn authentication successful', {
           userId: result.userId,
           authenticatorId: result.authenticatorId,
+          sessionId: session.id
         });
 
-        res.json({
+        return res.json({
           success: true,
-          message: 'Authentication successful',
-          user_id: result.userId,
-          authenticator_id: result.authenticatorId,
           session: {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            expires_in: 3600, // 1 hour in seconds
-            refresh_token_expires_in: 2592000, // 30 days in seconds
-          },
-        });
-      } else {
-        logger.warn('WebAuthn authentication failed, result: ', {
-          result,
-          error: result.error,
-        });
-
-        res.status(400).json({
-          success: false,
-          error: result.error || 'Authentication verification failed',
-          code: 'AUTHENTICATION_VERIFICATION_FAILED',
-          details: result.details,
+            session_token: session.session_token,
+            expires_at: session.expires_at,
+            user: {
+              id: userData.id,
+              email: userData.email,
+              display_name: userData.display_name
+            }
+          }
         });
       }
+
+      logger.warn('WebAuthn authentication failed', {
+        error: result.error,
+        details: result.details,
+      });
+
+      return res.status(401).json({
+        success: false,
+        error: result.error || 'Authentication failed',
+        code: 'AUTHENTICATION_FAILED',
+        details: result.details,
+      });
     } catch (error) {
       logger.error('WebAuthn authentication verification error', {
         error,
+        stack: error instanceof Error ? error.stack : undefined,
       });
 
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Authentication verification failed',
-        code: 'AUTHENTICATION_VERIFICATION_ERROR',
+        code: 'AUTHENTICATION_ERROR',
         details: process.env.NODE_ENV === 'development' ? error : undefined,
       });
     }

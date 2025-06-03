@@ -1,22 +1,27 @@
-export interface UserSession {
+export interface User {
   id: string;
   email?: string;
-  did?: string;
-  agent_did?: string;
-  sybil_level?: number;
+  display_name?: string;
+  metadata?: Record<string, any>;
   created_at: string;
-  last_sign_in_at: string;
+  updated_at: string;
+}
+
+export interface Session {
+  session_token: string;
+  expires_at: string;
+  user: User;
 }
 
 export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
-  session: UserSession | null;
+  session: Session | null;
   error: string | null;
 }
 
 export interface AuthContextType extends AuthState {
-  signIn: (session: UserSession) => void;
+  signIn: (session: Session) => void;
   signOut: () => void;
-  updateSession: (updates: Partial<UserSession>) => void;
+  updateSession: (updates: Partial<Session>) => void;
 } 

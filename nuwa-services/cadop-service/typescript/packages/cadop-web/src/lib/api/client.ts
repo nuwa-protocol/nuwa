@@ -106,7 +106,7 @@ class APIClient {
     return this.handleResponse<T>(response);
   }
 
-  private async post<T>(
+  public async post<T>(
     endpoint: string,
     data: any,
     options: { skipAuth?: boolean } = {}

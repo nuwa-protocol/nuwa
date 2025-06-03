@@ -10,7 +10,7 @@
     "postbuild": "cp package.json dist/",
     "start": "node --experimental-specifier-resolution=node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "test": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "db:migrate": "supabase migration up",

@@ -13,4 +13,8 @@ export default {
       },
     ],
   },
+  modulePathIgnorePatterns: ['<rootDir>/dist/'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(simplewebauthn|@simplewebauthn)/)',
+  ],
 }; 

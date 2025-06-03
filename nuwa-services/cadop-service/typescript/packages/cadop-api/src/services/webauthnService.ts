@@ -27,13 +27,11 @@ import {
   CreateAuthenticatorData,
   UpdateAuthenticatorData,
   WebAuthnDeviceInfo,
-  WebAuthnAuthenticationResult as SharedWebAuthnAuthenticationResult,
+  WebAuthnAuthenticationResult,
 } from '@cadop/shared';
 
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
-
-export type WebAuthnAuthenticationResult = SharedWebAuthnAuthenticationResult;
 
 // Base64URL 工具函数
 function base64URLToBuffer(base64url: string): Buffer {
@@ -183,6 +181,7 @@ export class WebAuthnService {
         storedChallenge: storedChallenge.challenge,
       });
 
+      // Verify the registration response first
       const opts = {
         response,
         expectedChallenge: storedChallenge.challenge,
@@ -205,6 +204,35 @@ export class WebAuthnService {
         throw new WebAuthnError(
           'Registration verification failed'
         );
+      }
+
+      // After challenge verification, check if user exists
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !user) {
+        logger.warn('User not found, creating new user', { userId });
+        
+        // Create user if not exists
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert({
+            id: userId,
+            email: storedChallenge.email,
+            user_did: `did:rooch:${userId}`, // Generate DID for user
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          logger.error('Failed to create user', { error: createError });
+          throw new WebAuthnError('Failed to create user');
+        }
+
+        logger.info('Created new user', { userId, email: storedChallenge.email });
       }
 
       // Create new authenticator record
@@ -354,6 +382,14 @@ export class WebAuthnService {
         challengeStr = challenge.challenge;
       }
 
+      // 确保 publicKey 是正确的格式：从十六进制字符串转换为 Uint8Array
+      const publicKeyHex = String(authenticator.credentialPublicKey);
+      const bytes: number[] = [];
+      for (let i = 0; i < publicKeyHex.length; i += 2) {
+        bytes.push(parseInt(publicKeyHex.slice(i, i + 2), 16));
+      }
+      const publicKey = new Uint8Array(bytes);
+
       const opts = {
         response,
         expectedChallenge: challengeStr,
@@ -361,21 +397,15 @@ export class WebAuthnService {
         expectedRPID: this.config.rpID,
         credential: {
           id: authenticator.credentialId,
-          publicKey: authenticator.credentialPublicKey,
+          publicKey,
           counter: authenticator.counter,
         },
         requireUserVerification: false,
       };
 
       logger.debug('Verifying authentication response with options', { 
-        response,
-        expectedChallenge: challengeStr,
-        expectedOrigin: this.config.origin,
-        expectedRPID: this.config.rpID,
         credentialId: authenticator.credentialId,
-        publicKeyLength: authenticator.credentialPublicKey.length,
-        publicKeyBuffer: Buffer.isBuffer(authenticator.credentialPublicKey),
-        publicKeyHex: Buffer.from(authenticator.credentialPublicKey).toString('hex'),
+        publicKeyHex,
       });
 
       let verification: VerifiedAuthenticationResponse;
@@ -392,7 +422,13 @@ export class WebAuthnService {
           );
         }
       } catch (error) {
-        logger.error('Failed to verify authentication response', { error, opts });
+        logger.error('Failed to verify authentication response', { 
+          error, 
+          opts,
+          publicKeyType: typeof publicKey,
+          publicKeyIsBuffer: Buffer.isBuffer(publicKey),
+          publicKeyHex: publicKey.toString('hex'),
+        });
         throw new WebAuthnError(
           'Failed to verify authentication response'
         );
@@ -404,38 +440,6 @@ export class WebAuthnService {
         lastUsedAt: new Date(),
       });
 
-      // 检查并创建用户 profile
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', authenticator.userId)
-        .single();
-
-      if (!profile && !profileError) {
-        // 生成用户的 DID
-        const userDid = `did:key:${authenticator.credentialId}`;
-        
-        logger.debug('Creating user profile', {
-          userId: authenticator.userId,
-          userDid,
-        });
-
-        const { error: createError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: authenticator.userId,
-            user_did: userDid,
-            display_name: 'Anonymous User',
-          });
-
-        if (createError) {
-          logger.error('Failed to create user profile', {
-            error: createError,
-            userId: authenticator.userId,
-          });
-        }
-      }
-
       logger.info('WebAuthn authentication successful', {
         userId: authenticator.userId,
         authenticatorId: authenticator.id,
@@ -444,7 +448,7 @@ export class WebAuthnService {
       return {
         success: true,
         userId: authenticator.userId,
-        authenticatorId: authenticator.id,
+        authenticatorId: authenticator.id
       };
     } catch (error: unknown) {
       logger.error('WebAuthn authentication failed', {
@@ -622,17 +626,22 @@ export class WebAuthnService {
 
     // 处理从数据库读取的 credential_public_key
     let publicKey = data.credential_public_key;
-    if (typeof publicKey === 'string') {
-      // 直接从十六进制字符串转换为 Buffer
-      publicKey = Buffer.from(publicKey, 'hex');
-    }
+    
+    logger.debug('Raw public key from database', {
+      publicKeyType: typeof publicKey,
+      publicKeyLength: publicKey.length,
+      isHexString: typeof publicKey === 'string' && /^[0-9a-fA-F]*$/.test(publicKey),
+    });
 
-    logger.debug('Found authenticator from database', {
+    // 从十六进制字符串转换为 Buffer
+    publicKey = Buffer.from(publicKey, 'hex');
+
+    logger.debug('Processed public key', {
       credentialId,
       publicKeyLength: publicKey.length,
       publicKeyType: typeof publicKey,
       publicKeyBuffer: Buffer.isBuffer(publicKey),
-      publicKeyHex: Buffer.isBuffer(publicKey) ? publicKey.toString('hex') : null,
+      publicKeyHex: publicKey.toString('hex'),
       service: 'cadop-service',
       timestamp: new Date().toISOString(),
     });
@@ -657,22 +666,24 @@ export class WebAuthnService {
   private async createAuthenticator(data: {
     userId: string;
     credentialId: string;
-    credentialPublicKey: Buffer;
+    credentialPublicKey: Buffer | Uint8Array;
     counter: number;
     credentialDeviceType: string;
     credentialBackedUp: boolean;
     transports?: AuthenticatorTransportFuture[];
   }): Promise<Authenticator> {
-    // 确保 credentialPublicKey 是 Buffer
-    if (!Buffer.isBuffer(data.credentialPublicKey)) {
-      throw new Error('credentialPublicKey must be a Buffer');
+    // 确保 credentialPublicKey 是 Buffer 或 Uint8Array
+    if (!Buffer.isBuffer(data.credentialPublicKey) && !(data.credentialPublicKey instanceof Uint8Array)) {
+      throw new Error('credentialPublicKey must be a Buffer or Uint8Array');
     }
+
+    // 转换为十六进制字符串存储
+    const publicKeyHex = Buffer.from(data.credentialPublicKey).toString('hex');
 
     const dbData = {
       user_id: data.userId,
       credential_id: data.credentialId,
-      // 直接存储为十六进制字符串，不使用 PostgreSQL 的 bytea 格式
-      credential_public_key: data.credentialPublicKey.toString('hex'),
+      credential_public_key: publicKeyHex,
       counter: data.counter,
       credential_device_type: data.credentialDeviceType,
       credential_backed_up: data.credentialBackedUp,
@@ -682,9 +693,9 @@ export class WebAuthnService {
     logger.debug('Creating authenticator in database', {
       userId: data.userId,
       credentialId: data.credentialId,
-      publicKeyLength: data.credentialPublicKey.length,
-      publicKeyBuffer: Buffer.isBuffer(data.credentialPublicKey),
-      publicKeyHex: data.credentialPublicKey.toString('hex'),
+      publicKeyLength: publicKeyHex.length / 2,
+      publicKeyType: 'hex',
+      publicKeyHex,
     });
 
     const { data: result, error } = await supabase
@@ -807,6 +818,35 @@ export class WebAuthnService {
     } catch (error) {
       logger.error('Failed to get challenge', { error, challenge });
       return null;
+    }
+  }
+
+  async updateAuthenticatorUsage(result: WebAuthnAuthenticationResult): Promise<void> {
+    if (!result.success || !result.authenticatorId) {
+      return;
+    }
+
+    // 从验证结果中获取 counter
+    const { data: authenticator } = await supabase
+      .from('authenticators')
+      .select('counter')
+      .eq('id', result.authenticatorId)
+      .single();
+
+    const { error } = await supabase
+      .from('authenticators')
+      .update({
+        last_used_at: new Date(),
+        counter: (authenticator?.counter || 0) + 1
+      })
+      .eq('id', result.authenticatorId);
+
+    if (error) {
+      logger.error('Failed to update authenticator usage', {
+        error,
+        authenticatorId: result.authenticatorId
+      });
+      throw new Error('Failed to update authenticator usage');
     }
   }
 }
