@@ -89,6 +89,7 @@ if (fs.existsSync(staticPath)) {
 // Initialize crypto service and keys
 async function initializeServices() {
   try {
+    logger.info('Initializing crypto service');
     await cryptoService.initializeKeys();
     logger.info('Crypto service initialized successfully');
   } catch (error) {

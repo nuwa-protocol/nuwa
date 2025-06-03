@@ -13,10 +13,10 @@ import type {
   OIDCConfiguration,
   OAuthClient
 } from '../types/oidc.js';
-import { verify } from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
 import { DatabaseService } from './database.js';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+const { verify } = jwt;
 
 // 扩展 Express Request 类型以支持 session
 declare module 'express' {
@@ -623,7 +623,7 @@ export class OIDCService {
       did: session.user_did,
       agent_did: session.agent_did,
       sybil_level: session.sybil_level,
-      auth_methods: session.auth_methods.map(method => ({
+      auth_methods: session.auth_methods.map((method: string) => ({
         provider: method,
         verified_at: Math.floor(Date.now() / 1000),
         sybil_contribution: 1
