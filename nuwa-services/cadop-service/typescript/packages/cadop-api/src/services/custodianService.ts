@@ -4,13 +4,17 @@ import {
   DIDCreationResult,
   VDRInterface,
 } from 'nuwa-identity-kit';
-import { RoochClient } from '@roochnetwork/rooch-sdk';
+import roochSdk from '@roochnetwork/rooch-sdk';
+//import type { RoochClient } from '@roochnetwork/rooch-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 import { validateIdToken } from './oidcService.js';
 import { calculateSybilLevel } from '../utils/sybilCalculator.js';
 import { z } from 'zod';
 import { supabase } from '../config/supabase.js';
+
+const { RoochClient } = roochSdk;
+type RoochClientInstance = InstanceType<typeof RoochClient>;
 
 // Local types for DID operations
 interface CADOPResult {
@@ -74,8 +78,9 @@ export interface DIDCreationStatus {
  * Implements NIP-3 CADOP protocol to help users create and manage Agent DIDs
  */
 export class CustodianService {
+  private static instance: CustodianService;
   private roochVDR: MockRoochVDR | null = null;
-  private roochClient: RoochClient;
+  private roochClient: RoochClientInstance;
   private supabase: any;
 
   constructor() {

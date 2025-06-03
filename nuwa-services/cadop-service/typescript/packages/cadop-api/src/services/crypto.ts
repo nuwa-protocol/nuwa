@@ -52,7 +52,9 @@ export class CryptoService {
       }
 
       // Generate new Ed25519 key pair
-      const { publicKey, privateKey } = await jose.generateKeyPair('EdDSA');
+      const { publicKey, privateKey } = await jose.generateKeyPair('EdDSA', {
+        extractable: true
+      });
       this.publicKey = publicKey as unknown as Uint8Array;
       this.privateKey = privateKey as unknown as Uint8Array;
 
