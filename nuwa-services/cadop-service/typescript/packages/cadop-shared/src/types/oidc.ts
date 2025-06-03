@@ -62,31 +62,34 @@ export interface TokenResponse {
 
 export interface UserInfoResponse {
   sub: string;
-  name?: string | undefined;
-  given_name?: string | undefined;
-  family_name?: string | undefined;
-  middle_name?: string | undefined;
-  nickname?: string | undefined;
-  preferred_username?: string | undefined;
-  profile?: string | undefined;
-  picture?: string | undefined;
-  website?: string | undefined;
-  email?: string | undefined;
-  email_verified?: boolean | undefined;
-  gender?: string | undefined;
-  birthdate?: string | undefined;
-  zoneinfo?: string | undefined;
-  locale?: string | undefined;
-  phone_number?: string | undefined;
-  phone_number_verified?: boolean | undefined;
-  address?: Address | undefined;
-  updated_at?: number | undefined;
-  // DID 相关扩展字段
-  did?: string | undefined;
-  agent_did?: string | undefined;
-  sybil_level?: number | undefined;
-  auth_methods?: string[] | undefined;
-}
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  nickname?: string;
+  preferred_username?: string;
+  profile?: string;
+  picture?: string;
+  website?: string;
+  email?: string;
+  email_verified?: boolean;
+  gender?: string;
+  birthdate?: string;
+  zoneinfo?: string;
+  locale?: string;
+  phone_number?: string;
+  phone_number_verified?: boolean;
+  address?: string;
+  updated_at?: number;
+  did?: string;
+  agent_did?: string;
+  sybil_level?: number;
+  auth_methods?: Array<{
+    provider: string;
+    verified_at?: number;
+    sybil_contribution: number;
+  }>;
+  metadata?: Record<string, any>;
+} 
 
 export interface Address {
   formatted?: string | undefined;
@@ -229,7 +232,13 @@ export interface IDToken {
   did?: string | undefined;
   agent_did?: string | undefined;
   sybil_level?: number | undefined;
-  auth_methods?: string[] | undefined;
+  auth_methods?: {
+    provider: string;
+    verified_at?: number;
+    sybil_contribution: number;
+  }[] | undefined;
+  email?: string | undefined;
+  email_verified?: boolean | undefined;
 }
 
 export interface SessionData {
