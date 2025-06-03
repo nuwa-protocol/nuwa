@@ -451,7 +451,9 @@ export class WebAuthnService {
         credential: {
           id: authenticator.credential_id,
           publicKey: new Uint8Array(publicKey),
-          counter: authenticator.counter,
+          //counter: authenticator.counter,
+          //TODO fixme 
+          counter: 0,
         },
         requireUserVerification: false,
       };
