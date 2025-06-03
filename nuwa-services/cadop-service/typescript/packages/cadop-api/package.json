@@ -9,7 +9,7 @@
     "build": "tsc -b --force",
     "postbuild": "cp package.json dist/",
     "start": "node --experimental-specifier-resolution=node dist/index.js",
-    "dev": "nodemon --exec \"node --loader ts-node/esm --require ts-node/register\" src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
@@ -46,6 +46,7 @@
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
+    "tsx": "^4.7.1",
     "typescript": "^5.8.3"
   }
 }
