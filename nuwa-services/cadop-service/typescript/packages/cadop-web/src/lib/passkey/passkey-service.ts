@@ -17,7 +17,7 @@ export class PasskeyService {
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+    this.apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
   }
 
   /**

@@ -1,4 +1,10 @@
+import { apiClient } from '../lib/api/client';
 import type { CreateAgentDIDRequest, AgentDIDCreationStatus } from '@cadop/shared/types';
+
+interface AgentDIDResponse {
+  recordId: string;
+  agentDid: string;
+}
 
 export interface CustodianService {
   createAgentDIDViaCADOP(request: CreateAgentDIDRequest): Promise<string>;
@@ -24,20 +30,13 @@ class CustodianServiceImpl implements CustodianService {
   }
 
   async createAgentDIDViaCADOP(request: CreateAgentDIDRequest): Promise<string> {
-    const response = await fetch(`${this.baseUrl}/agent-did`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to create agent DID');
+    const response = await apiClient.post<AgentDIDResponse>('/api/custodian/agent-did', request);
+    
+    if (response.error) {
+      throw new Error(`Failed to create agent DID: ${response.error.message}`);
     }
 
-    const data = await response.json();
-    return data.recordId;
+    return response.data!.recordId;
   }
 
   async getDIDCreationStatus(recordId: string): Promise<AgentDIDCreationStatus> {

@@ -9,26 +9,28 @@ export function LoginPage() {
   const location = useLocation();
   const { signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>('');
+  const [showEmailInput, setShowEmailInput] = useState<boolean>(false);
 
-  // 获取用户尝试访问的页面
+  // Get the page user was trying to access
   const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard';
 
   const handleLoginSuccess = (userId: string) => {
-    // 创建用户会话
+    // Create user session
     const session: UserSession = {
       id: userId,
       created_at: new Date().toISOString(),
       last_sign_in_at: new Date().toISOString(),
     };
 
-    // 存储会话并重定向
+    // Store session and redirect
     signIn(session);
     navigate(from, { replace: true });
   };
 
   const handleLoginError = (error: string) => {
     setError(error);
-    // 5秒后清除错误
+    // Clear error after 5 seconds
     setTimeout(() => setError(null), 5000);
   };
 
@@ -36,16 +38,16 @@ export function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h1 className="text-center text-3xl font-extrabold text-gray-900">
-          欢迎使用 CADOP
+          Welcome to CADOP
         </h1>
         <p className="mt-2 text-center text-sm text-gray-600">
-          登录或创建账户以继续
+          Sign in or create an account to continue
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* 错误提示 */}
+          {/* Error message */}
           {error && (
             <div className="mb-4 p-4 rounded-md bg-red-50">
               <div className="flex">
@@ -70,30 +72,72 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Passkey 登录 */}
+          {/* Passkey login */}
           <div className="space-y-6">
-            <PasskeyLogin
-              onSuccess={handleLoginSuccess}
-              onError={handleLoginError}
-            />
+            {showEmailInput ? (
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email address (optional)
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Enter your email"
+                  />
+                </div>
+                <div className="mt-2 flex justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailInput(false)}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Cancel
+                  </button>
+                  <PasskeyLogin
+                    onSuccess={handleLoginSuccess}
+                    onError={handleLoginError}
+                    email={email}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <PasskeyLogin
+                  onSuccess={handleLoginSuccess}
+                  onError={handleLoginError}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEmailInput(true)}
+                  className="text-sm text-indigo-600 hover:text-indigo-900"
+                >
+                  Use email to find your Passkey
+                </button>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">或继续使用</span>
+                <span className="px-2 bg-white text-gray-500">or continue with</span>
               </div>
             </div>
 
-            {/* 钱包登录（占位） */}
+            {/* Wallet login (placeholder) */}
             <div>
               <button
                 type="button"
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 disabled
               >
-                连接钱包（即将推出）
+                Connect Wallet (Coming Soon)
               </button>
             </div>
           </div>
