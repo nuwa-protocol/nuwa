@@ -1,17 +1,10 @@
+import * as jwt from 'jsonwebtoken';
 import { verify } from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
+import { IDToken } from '@cadop/shared/types';
 
-export interface IDTokenPayload {
-  iss: string; // Issuer
-  sub: string; // Subject (User ID)
-  aud: string; // Audience (Client ID)
-  exp: number; // Expiration time
-  iat: number; // Issued at
-  did?: string; // User DID (optional)
-  email?: string; // User email (optional)
-  sybil_level?: number; // Sybil level (optional)
-  [key: string]: any; // Other claims
-}
+// 使用 IDToken 接口作为 IDTokenPayload
+export type IDTokenPayload = IDToken;
 
 /**
  * Validate ID Token validity
@@ -82,7 +75,6 @@ export function createIdToken(payload: Partial<IDTokenPayload>): string {
     throw new Error('JWT_SECRET not configured');
   }
 
-  const jwt = require('jsonwebtoken');
   const now = Math.floor(Date.now() / 1000);
 
   const fullPayload: IDTokenPayload = {
@@ -102,7 +94,6 @@ export function createIdToken(payload: Partial<IDTokenPayload>): string {
  */
 export function decodeIdToken(idToken: string): IDTokenPayload | null {
   try {
-    const jwt = require('jsonwebtoken');
     return jwt.decode(idToken) as IDTokenPayload;
   } catch (error) {
     logger.error('Failed to decode ID Token', { error });

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config/environment.js';
 import { supabase } from './config/supabase.js';
 import { logger } from './utils/logger.js';
@@ -11,11 +12,14 @@ import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import custodianRouter from './routes/custodian.js';
 import { proofRouter } from './routes/proof.js';
-import oidcRouter from './routes/oidc.js';
+import { oidcRouter } from './routes/oidc.js';
 import webauthnRouter from './routes/webauthn.js';
 import { cryptoService } from './services/crypto.js';
+import fs from 'fs';
 
 const app: Express = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Set explicit MIME types for static files
 express.static.mime.define({
@@ -37,6 +41,7 @@ app.use(helmet({
     },
   },
 }));
+
 app.use(cors({
   origin: config.cors.origin,
   credentials: true
@@ -64,27 +69,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// Debug middleware to track static file requests
-app.use((req, res, next) => {
-  if (req.path.includes('.css') || req.path.includes('.js')) {
-    console.log(`[DEBUG] Static file request: ${req.method} ${req.path}`);
-  }
-  next();
-});
-
-// Static files serving - MUST be before all other routes
-const staticPath = path.join(__dirname, process.env.NODE_ENV === 'production' ? 'public' : '../dist/public');
-console.log(`[DEBUG] Static files path: ${staticPath}`);
-console.log(`[DEBUG] Static files exists: ${require('fs').existsSync(staticPath)}`);
-app.use(express.static(staticPath, {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    } else if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
+// Static files serving
+const staticPath = path.join(__dirname, process.env.NODE_ENV === 'production' ? '../public' : '../dist/public');
+if (fs.existsSync(staticPath)) {
+  logger.info(`Serving static files from: ${staticPath}`);
+  app.use(express.static(staticPath, {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      } else if (path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      }
     }
-  }
-}));
+  }));
+} else {
+  logger.warn(`Static files directory not found: ${staticPath}`);
+}
 
 // Initialize crypto service and keys
 async function initializeServices() {
@@ -93,39 +93,37 @@ async function initializeServices() {
     logger.info('Crypto service initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize crypto service', { error });
-    process.exit(1);
+    throw error;
   }
 }
 
-// API Routes - order matters!
+// API Routes
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
 app.use('/api/custodian', custodianRouter);
 app.use('/api/proof', proofRouter);
 app.use('/api/webauthn', webauthnRouter);
-// OIDC routes last since they include root-level routes
-// app.use('/', oidcRouter);
+app.use('/', oidcRouter);
 
-// Serve React app for non-static routes only
+// Serve React app for non-static routes
 app.get('*', (req, res) => {
-  // Skip serving index.html for API routes
   if (req.path.startsWith('/api/') || 
       req.path.startsWith('/auth/') || 
       req.path.startsWith('/health') ||
       req.path.startsWith('/.well-known/')) {
-    // Let these routes be handled by their respective routers
     return res.status(404).json({ error: 'Route not found' });
   }
   
   const indexPath = path.join(staticPath, 'index.html');
-  console.log(`[DEBUG] Serving index.html from: ${indexPath} for route: ${req.path}`);
-  res.sendFile(indexPath);
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Frontend not built' });
+  }
 });
 
 // Error handling
 app.use(errorHandler);
-
-const port = config.server.port;
 
 // Start server with service initialization
 async function startServer() {
@@ -134,8 +132,9 @@ async function startServer() {
     await initializeServices();
     
     // Start the HTTP server
+    const port = config.server.port || 8080;
     app.listen(port, () => {
-      logger.info(`CADOP Service started on port ${port}`, {
+      logger.info(`CADOP Service started successfully`, {
         environment: config.server.nodeEnv,
         port,
         oidc_issuer: config.oidc.issuer,
@@ -150,7 +149,10 @@ async function startServer() {
       });
     });
   } catch (error) {
-    logger.error('Failed to start server', { error });
+    logger.error('Failed to start server', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined 
+    });
     process.exit(1);
   }
 }
@@ -167,6 +169,12 @@ process.on('SIGINT', () => {
 });
 
 // Start the server
-startServer();
+startServer().catch(error => {
+  logger.error('Unhandled error during server startup', { 
+    error: error instanceof Error ? error.message : 'Unknown error',
+    stack: error instanceof Error ? error.stack : undefined 
+  });
+  process.exit(1);
+});
 
 export default app; 

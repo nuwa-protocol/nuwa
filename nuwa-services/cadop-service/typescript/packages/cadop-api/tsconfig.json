@@ -10,7 +10,7 @@
     "types": ["node", "jest"]
   },
   "references": [
-    { "path": "../shared" }
+    { "path": "../cadop-shared" }
   ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

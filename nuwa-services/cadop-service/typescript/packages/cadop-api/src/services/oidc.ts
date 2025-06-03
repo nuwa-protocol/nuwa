@@ -2,20 +2,21 @@ import { Request, Response } from 'express';
 import { config } from '../config/environment.js';
 import { supabase } from '../config/supabase.js';
 import { cryptoService } from './crypto.js';
-import { 
+import type { 
+  IDToken, 
   AuthorizeRequest, 
   AuthorizeResponse, 
   TokenRequest, 
   TokenResponse, 
   UserInfoResponse,
-  OIDCConfiguration,
-  IDToken,
   SessionData,
+  OIDCConfiguration,
   OAuthClient
 } from '../types/oidc.js';
-import { OIDCConfig } from '@cadop/shared/types';
 import { verify } from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
+import { DatabaseService } from './database.js';
+import * as jwt from 'jsonwebtoken';
 
 // 扩展 Express Request 类型以支持 session
 declare module 'express' {
@@ -292,6 +293,7 @@ export class OIDCService {
       // 从 Authorization header 获取访问令牌
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        logger.warn('UserInfo request without access token');
         res.status(401).json({
           error: 'invalid_token',
           error_description: 'Access token required'
@@ -304,19 +306,36 @@ export class OIDCService {
       // 验证访问令牌
       const tokenData = await this.validateAccessToken(accessToken);
       if (!tokenData) {
+        logger.warn('Invalid access token in UserInfo request', { accessToken });
         res.status(401).json({
           error: 'invalid_token',
-          error_description: 'Invalid access token'
+          error_description: 'Invalid or expired access token'
         });
         return;
       }
       
       // 获取用户信息
-      const userInfo = await this.getUserInfo(tokenData.user_id, tokenData.scope);
-      res.json(userInfo);
+      try {
+        const userInfo = await this.getUserInfo(tokenData.user_id, tokenData.scope);
+        logger.debug('UserInfo request successful', { 
+          user_id: tokenData.user_id,
+          scope: tokenData.scope
+        });
+        res.json(userInfo);
+      } catch (error) {
+        logger.error('Failed to get user info', { 
+          error,
+          user_id: tokenData.user_id,
+          scope: tokenData.scope
+        });
+        res.status(500).json({
+          error: 'server_error',
+          error_description: 'Failed to retrieve user information'
+        });
+      }
       
     } catch (error) {
-      console.error('UserInfo error:', error);
+      logger.error('UserInfo request error', { error });
       res.status(500).json({
         error: 'server_error',
         error_description: 'Internal server error'
@@ -593,24 +612,24 @@ export class OIDCService {
    * 生成 ID Token
    */
   private async generateIDToken(session: SessionData, authRequest: AuthorizeRequest): Promise<string> {
-    const now = Math.floor(Date.now() / 1000);
-    
     const claims: IDToken = {
       iss: config.oidc.issuer,
       sub: session.user_id,
       aud: authRequest.client_id,
-      exp: now + 3600, // 1 小时
-      iat: now,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iat: Math.floor(Date.now() / 1000),
       auth_time: session.auth_time,
-      // 只有当 nonce 存在时才设置
-      ...(authRequest.nonce && { nonce: authRequest.nonce }),
-      // DID 相关 claims
-      ...(session.user_did && { did: session.user_did }),
-      ...(session.agent_did && { agent_did: session.agent_did }),
-      ...(session.sybil_level !== undefined && { sybil_level: session.sybil_level }),
-      auth_methods: session.auth_methods
+      nonce: authRequest.nonce,
+      did: session.user_did,
+      agent_did: session.agent_did,
+      sybil_level: session.sybil_level,
+      auth_methods: session.auth_methods.map(method => ({
+        provider: method,
+        verified_at: Math.floor(Date.now() / 1000),
+        sybil_contribution: 1
+      }))
     };
-    
+
     return await cryptoService.signIDToken(claims);
   }
 
@@ -831,27 +850,69 @@ export class OIDCService {
    */
   private async validateAccessToken(token: string): Promise<{ user_id: string; scope: string } | null> {
     try {
+      // 首先检查令牌格式
+      if (!token || typeof token !== 'string' || token.length < 32) {
+        logger.warn('Invalid access token format');
+        return null;
+      }
+
+      // 从数据库获取令牌信息
       const { data, error } = await supabase
         .from('access_tokens')
-        .select('user_id, scope, expires_at')
-        .eq('token', token)
+        .select('user_id, scope, expires_at, client_id')
+        .eq('token_hash', cryptoService.createHash(token))
         .single();
         
-      if (error || !data) {
+      if (error) {
+        logger.warn('Failed to retrieve access token from database', { error });
+        return null;
+      }
+
+      if (!data) {
+        logger.warn('Access token not found in database');
         return null;
       }
       
       // 检查是否过期
-      if (new Date(data.expires_at) < new Date()) {
+      const expiresAt = new Date(data.expires_at);
+      const now = new Date();
+      
+      if (expiresAt < now) {
+        logger.warn('Access token has expired', {
+          token_hash: cryptoService.createHash(token),
+          expires_at: expiresAt,
+          now
+        });
+        return null;
+      }
+
+      // 检查令牌是否被撤销
+      const { data: revoked } = await supabase
+        .from('revoked_tokens')
+        .select('id')
+        .eq('token_hash', cryptoService.createHash(token))
+        .single();
+
+      if (revoked) {
+        logger.warn('Access token has been revoked', {
+          token_hash: cryptoService.createHash(token)
+        });
         return null;
       }
       
+      logger.debug('Access token validated successfully', {
+        user_id: data.user_id,
+        client_id: data.client_id,
+        scope: data.scope,
+        expires_at: expiresAt
+      });
+
       return {
         user_id: data.user_id,
         scope: data.scope
       };
     } catch (error) {
-      console.error('Access token validation error:', error);
+      logger.error('Access token validation error', { error });
       return null;
     }
   }
@@ -860,68 +921,29 @@ export class OIDCService {
    * 获取用户信息
    */
   private async getUserInfo(userId: string, scope: string): Promise<UserInfoResponse> {
-    try {
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (profileError || !profile) {
-        throw new Error('User not found');
-      }
-      
-      // 基础信息
-      const userInfo: UserInfoResponse = {
-        sub: userId
-      };
-      
-      // 根据 scope 添加不同的信息
-      const scopes = scope.split(' ');
-      
-      if (scopes.includes('profile')) {
-        userInfo.name = profile.display_name;
-        userInfo.nickname = profile.display_name;
-        userInfo.picture = profile.avatar_url;
-        userInfo.preferred_username = profile.display_name;
-        userInfo.updated_at = Math.floor(new Date(profile.updated_at).getTime() / 1000);
-      }
-      
-      if (scopes.includes('email')) {
-        // 从 auth.users 获取 email
-        const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-        if (authUser.user) {
-          userInfo.email = authUser.user.email;
-          userInfo.email_verified = authUser.user.email_confirmed_at !== null;
-        }
-      }
-      
-      if (scopes.includes('did')) {
-        userInfo.did = profile.user_did;
-      }
-      
-      if (scopes.includes('agent_did')) {
-        userInfo.agent_did = profile.primary_agent_did;
-      }
-      
-      if (scopes.includes('sybil_level')) {
-        // 获取 Sybil 等级
-        const { data: agentDid } = await supabase
-          .from('agent_dids')
-          .select('sybil_level')
-          .eq('agent_did', profile.primary_agent_did)
-          .single();
-          
-        if (agentDid) {
-          userInfo.sybil_level = agentDid.sybil_level;
-        }
-      }
-      
-      return userInfo;
-    } catch (error) {
-      console.error('Get user info error:', error);
-      throw error;
+    const user = await DatabaseService.getUserCompleteProfile(userId);
+    if (!user) {
+      throw new Error('User not found');
     }
+
+    const authMethods = await DatabaseService.getUserAuthMethods(userId);
+
+    const response: UserInfoResponse = {
+      sub: user.id,
+      name: user.display_name,
+      email: user.email,
+      email_verified: false, // 从数据库中获取或设置默认值
+      did: user.user_did,
+      agent_did: user.primary_agent_did,
+      sybil_level: user.metadata?.sybil_level || 0,
+      auth_methods: authMethods.map(method => ({
+        provider: method.provider,
+        verified_at: method.verified_at ? Math.floor(new Date(method.verified_at).getTime() / 1000) : undefined,
+        sybil_contribution: method.sybil_contribution
+      }))
+    };
+
+    return response;
   }
 
   /**
@@ -1083,7 +1105,94 @@ export class OIDCService {
     
     return { error: 'server_error', error_description: 'Internal server error' };
   }
+
+  public async verifyIdToken(token: string): Promise<IDToken | null> {
+    try {
+      if (!token) {
+        return null;
+      }
+
+      const decoded = this.decodeIdToken(token);
+      if (!decoded) {
+        return null;
+      }
+
+      // 验证必需的字段
+      if (!decoded.sub || !decoded.aud) {
+        return null;
+      }
+
+      // 验证过期时间
+      const now = Math.floor(Date.now() / 1000);
+      if (decoded.exp && decoded.exp < now) {
+        return null;
+      }
+
+      // 验证签名
+      const isValid = await cryptoService.verifyIDToken(token);
+      if (!isValid) {
+        return null;
+      }
+
+      return decoded;
+    } catch (error) {
+      logger.error('Failed to verify ID token', { error });
+      return null;
+    }
+  }
+
+  public async createIdToken(payload: Partial<IDToken>): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    const claims: IDToken = {
+      iss: config.oidc.issuer,
+      sub: payload.sub || 'test-user',
+      aud: payload.aud || 'default-client',
+      exp: now + 3600,
+      iat: now,
+      ...payload
+    };
+
+    return cryptoService.signIDToken(claims);
+  }
+
+  public decodeIdToken(token: string): IDToken | null {
+    try {
+      if (!token) {
+        return null;
+      }
+
+      const decoded = cryptoService.decodeIDToken(token);
+      return decoded as IDToken;
+    } catch (error) {
+      logger.error('Failed to decode ID token', { error });
+      return null;
+    }
+  }
 }
 
 // 导出单例实例
-export const oidcService = OIDCService.getInstance(); 
+export const oidcService = OIDCService.getInstance();
+
+export async function validateIdToken(token: string): Promise<IDToken | null> {
+  try {
+    return await oidcService.verifyIdToken(token);
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function createIdToken(payload: Partial<IDToken>): Promise<string> {
+  return await oidcService.createIdToken(payload);
+}
+
+export function decodeIdToken(token: string): IDToken | null {
+  try {
+    return jwt.decode(token) as IDToken;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function verifyIdToken(token: string): Promise<IDToken | null> {
+  return await oidcService.verifyIdToken(token);
+} 
