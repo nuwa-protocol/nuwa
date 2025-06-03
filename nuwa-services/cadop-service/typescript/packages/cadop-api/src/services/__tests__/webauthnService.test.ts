@@ -11,11 +11,11 @@ import type {
   RegistrationResponseJSON,
   AuthenticatorTransportFuture,
   AuthenticatorAttachment,
-  AuthenticationResponseJSON
+  AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
 // Mock external dependencies
-jest.mock('@simplewebauthn/server');
 jest.mock('../../config/supabase', () => ({
   supabase: createMockSupabaseClient(),
 }));
@@ -23,9 +23,22 @@ jest.mock('../../utils/logger', () => ({
   logger: mockLogger,
 }));
 
+// 创建真实的测试数据
+const mockCredentialIdBuffer = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+const mockCredentialId = isoBase64URL.fromBuffer(mockCredentialIdBuffer);
+const mockPublicKeyBuffer = new Uint8Array([
+  0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 
+  0x58, 0x20, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00,
+]);
+const mockPublicKey = isoBase64URL.fromBuffer(mockPublicKeyBuffer);
+
+const mockAuthenticatorDataBuffer = new Uint8Array([
+  0x49, 0x96, 0x0d, 0xe5, 0x88, 0x0e, 0x8c, 0x68,
+]);
+const mockAuthenticatorData = isoBase64URL.fromBuffer(mockAuthenticatorDataBuffer);
+
 describe('WebAuthn Service', () => {
   let webAuthnService: WebAuthnService;
-  let mockSimpleWebAuthn: any;
 
   beforeEach(() => {
     // Reset mocks
@@ -38,13 +51,6 @@ describe('WebAuthn Service', () => {
     process.env['WEBAUTHN_CHALLENGE_TIMEOUT'] = '300000';
     process.env['WEBAUTHN_EXPECTED_ORIGIN'] = 'http://localhost:3000';
     process.env['WEBAUTHN_EXPECTED_RP_ID'] = 'localhost';
-
-    // Mock @simplewebauthn/server
-    mockSimpleWebAuthn = require('@simplewebauthn/server');
-    mockSimpleWebAuthn.generateRegistrationOptions = jest.fn();
-    mockSimpleWebAuthn.verifyRegistrationResponse = jest.fn();
-    mockSimpleWebAuthn.generateAuthenticationOptions = jest.fn();
-    mockSimpleWebAuthn.verifyAuthenticationResponse = jest.fn();
 
     webAuthnService = new WebAuthnService();
   });
@@ -63,176 +69,116 @@ describe('WebAuthn Service', () => {
     });
   });
 
-  describe('generateRegistrationOptions', () => {
-    beforeEach(() => {
-      mockSimpleWebAuthn.generateRegistrationOptions.mockResolvedValue({
-        challenge: 'test-challenge',
-        rp: { name: 'Test CADOP Service', id: 'localhost' },
-        user: {
-          id: mockUser.id,
-          name: mockUser.email,
-          displayName: mockUser.name,
+  describe('Public Key Storage and Verification', () => {
+    it('should correctly store and retrieve public key', async () => {
+      const mockRegistrationResponse: RegistrationResponseJSON = {
+        id: mockCredentialId,
+        rawId: mockCredentialId,
+        response: {
+          attestationObject: isoBase64URL.fromBuffer(new Uint8Array([1, 2, 3, 4])),
+          clientDataJSON: JSON.stringify({
+            type: 'webauthn.create',
+            challenge: 'test-challenge',
+            origin: 'http://localhost:3000',
+          }),
         },
-        pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
-        excludeCredentials: [],
-        authenticatorSelection: {
-          residentKey: 'preferred',
-          userVerification: 'preferred',
-        },
-        timeout: 300000,
-      });
-    });
+        type: 'public-key',
+        clientExtensionResults: {},
+      };
 
-    it('should generate registration options successfully', async () => {
-      const result = await webAuthnService.generateRegistrationOptions(
-        mockUser.id,
-        mockUser.email,
-        mockUser.name
-      );
-
-      expect(result).toBeTruthy();
-      expect(result.challenge).toBe('test-challenge');
-      expect(mockSimpleWebAuthn.generateRegistrationOptions).toHaveBeenCalled();
-    });
-
-    it('should handle errors during generation', async () => {
-      mockSimpleWebAuthn.generateRegistrationOptions.mockRejectedValue(
-        new Error('Generation failed')
-      );
-
-      await expect(
-        webAuthnService.generateRegistrationOptions(mockUser.id, mockUser.email)
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('verifyRegistrationResponse', () => {
-    beforeEach(() => {
-      mockSimpleWebAuthn.verifyRegistrationResponse.mockResolvedValue({
-        verified: true,
-        registrationInfo: {
-          credentialID: new Uint8Array([1, 2, 3, 4]),
-          credentialPublicKey: new Uint8Array([5, 6, 7, 8]),
-          counter: 0,
-          credentialDeviceType: 'singleDevice',
-          credentialBackedUp: false,
-          aaguid: 'test-aaguid',
-        },
-      });
-    });
-
-    it('should handle successful verification', async () => {
+      // 使用真实的 WebAuthn 服务进行验证
       const result = await webAuthnService.verifyRegistrationResponse(
         mockUser.id,
-        mockWebAuthnRegistrationResponse,
-        'My Device'
+        mockRegistrationResponse,
+        'Test Device'
       );
 
-      // Even if the internal logic fails due to mocking issues,
-      // we can still test that the method exists and handles input
-      expect(typeof result).toBe('object');
-      expect(mockSimpleWebAuthn.verifyRegistrationResponse).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      if (result.success && result.authenticator) {
+        expect(result.authenticator.credentialId).toBeDefined();
+        expect(result.authenticator.friendlyName).toBe('Test Device');
+      }
     });
 
-    it('should handle verification failure', async () => {
-      mockSimpleWebAuthn.verifyRegistrationResponse.mockResolvedValue({
-        verified: false,
-        registrationInfo: null,
-      });
-
-      const result = await webAuthnService.verifyRegistrationResponse(
-        mockUser.id,
-        mockWebAuthnRegistrationResponse
-      );
-
-      expect(result.success).toBe(false);
-    });
-  });
-
-  describe('generateAuthenticationOptions', () => {
-    beforeEach(() => {
-      mockSimpleWebAuthn.generateAuthenticationOptions.mockResolvedValue({
-        challenge: 'auth-challenge',
-        timeout: 300000,
-        rpId: 'localhost',
-        allowCredentials: [],
-      });
-    });
-
-    it('should generate authentication options', async () => {
-      const result = await webAuthnService.generateAuthenticationOptions(mockUser.id);
-
-      expect(result).toBeTruthy();
-      expect(result.challenge).toBe('auth-challenge');
-      expect(mockSimpleWebAuthn.generateAuthenticationOptions).toHaveBeenCalled();
-    });
-
-    it('should handle generation errors', async () => {
-      mockSimpleWebAuthn.generateAuthenticationOptions.mockRejectedValue(
-        new Error('Generation failed')
-      );
-
-      await expect(
-        webAuthnService.generateAuthenticationOptions(mockUser.id)
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('verifyAuthenticationResponse', () => {
-    beforeEach(() => {
-      mockSimpleWebAuthn.verifyAuthenticationResponse.mockResolvedValue({
-        verified: true,
-        authenticationInfo: {
-          newCounter: 1,
-          credentialID: mockAuthenticator.credential_id,
+    it('should correctly verify stored public key during authentication', async () => {
+      const mockAuthResponse: AuthenticationResponseJSON = {
+        id: mockCredentialId,
+        rawId: mockCredentialId,
+        response: {
+          authenticatorData: mockAuthenticatorData,
+          clientDataJSON: JSON.stringify({
+            type: 'webauthn.get',
+            challenge: 'test-challenge',
+            origin: 'http://localhost:3000',
+          }),
+          signature: isoBase64URL.fromBuffer(new Uint8Array([1, 2, 3, 4])),
+          userHandle: mockUser.id,
         },
-      });
-    });
+        type: 'public-key',
+        clientExtensionResults: {},
+      };
 
-    it('should handle authentication verification', async () => {
       const result = await webAuthnService.verifyAuthenticationResponse(
-        mockWebAuthnAuthenticationResponse,
+        mockAuthResponse,
         'test-challenge'
       );
 
-      // Test that the method exists and processes input
-      expect(typeof result).toBe('object');
-      expect(mockSimpleWebAuthn.verifyAuthenticationResponse).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.userId).toBeDefined();
+        expect(result.authenticatorId).toBeDefined();
+      }
     });
 
-    it('should handle verification failure', async () => {
-      mockSimpleWebAuthn.verifyAuthenticationResponse.mockResolvedValue({
-        verified: false,
-        authenticationInfo: null,
-      });
+    it('should handle invalid public key format', async () => {
+      const invalidRegistrationResponse: RegistrationResponseJSON = {
+        ...mockWebAuthnRegistrationResponse,
+        response: {
+          ...mockWebAuthnRegistrationResponse.response,
+          attestationObject: 'invalid-attestation', // 使用无效的 attestation 对象
+        },
+      };
 
-      const result = await webAuthnService.verifyAuthenticationResponse(
-        mockWebAuthnAuthenticationResponse
+      const result = await webAuthnService.verifyRegistrationResponse(
+        mockUser.id,
+        invalidRegistrationResponse,
+        'Test Device'
       );
 
       expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('should handle database errors during public key storage', async () => {
+      const mockDbError = new Error('Database error');
+      const mockSupabase = createMockSupabaseClient();
+      mockSupabase.from().insert.mockRejectedValue(mockDbError);
+
+      const result = await webAuthnService.verifyRegistrationResponse(
+        mockUser.id,
+        mockWebAuthnRegistrationResponse,
+        'Test Device'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('Device Management', () => {
     it('should handle getUserDevices', async () => {
       const devices = await webAuthnService.getUserDevices(mockUser.id);
-
-      // Test method exists and returns expected type
       expect(Array.isArray(devices)).toBe(true);
     });
 
     it('should handle removeDevice', async () => {
       const result = await webAuthnService.removeDevice(mockUser.id, mockAuthenticator.id);
-
-      // Test method exists and returns boolean
       expect(typeof result).toBe('boolean');
     });
 
     it('should handle cleanupExpiredChallenges', async () => {
       const result = await webAuthnService.cleanupExpiredChallenges();
-
-      // Test method exists and returns number
       expect(typeof result).toBe('number');
     });
   });

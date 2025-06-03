@@ -29,10 +29,9 @@ export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: Passke
       }
 
       const authResult = await passkeyService.authenticate(email || undefined);
-      if (authResult.success && authResult.user_id) {
-        const session = await supabaseAuthService.handlePasskeyResponse(authResult.user_id);
-        signIn(session);
-        onSuccess(authResult.user_id);
+      if (authResult.success && authResult.session) {
+        signIn(authResult.session);
+        onSuccess(authResult.session.user.id);
       } else {
         setIsRegistering(true);
       }

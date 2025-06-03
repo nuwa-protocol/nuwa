@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { SessionService } from '../services/sessionService.js';
 
 // 定义自定义的 User 类型，包含我们需要的属性
 interface CustomUser {
@@ -11,7 +12,10 @@ interface CustomUser {
 declare global {
   namespace Express {
     interface Request {
-      user?: CustomUser;
+      user?: {
+        id: string;
+        metadata?: Record<string, any>;
+      };
     }
   }
 }
@@ -20,25 +24,62 @@ declare global {
  * Middleware to require user authentication
  * Assumes that user authentication has been handled by Supabase Auth
  */
-export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
-  if (!req.user) {
-    res.status(401).json({
-      error: 'Authentication required',
-      message: 'You must be logged in to access this resource',
-    });
-    return;
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  const token = authHeader.split(' ')[1];
+  const sessionService = new SessionService();
   
-  next();
-};
+  try {
+    const { valid, userId, metadata } = await sessionService.validateSession(token);
+    
+    if (!valid || !userId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // 添加用户信息到请求对象
+    req.user = { id: userId, metadata };
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
 
 /**
  * Optional auth middleware that doesn't fail if user is not authenticated
  */
-export const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
-  // User may or may not be present, but continue regardless
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  const sessionService = new SessionService();
+  
+  try {
+    const { valid, userId, metadata } = await sessionService.validateSession(token);
+    
+    if (valid && userId) {
+      req.user = { id: userId, metadata };
+    }
+  } catch (error) {
+    // Ignore errors in optional auth
+  }
+  
   next();
-};
+}
 
 /**
  * Middleware to extract user from Supabase session

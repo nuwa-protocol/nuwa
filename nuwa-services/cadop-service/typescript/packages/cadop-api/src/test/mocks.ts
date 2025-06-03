@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { AuthMethod } from '../utils/sybilCalculator.js';
 import type {
   RegistrationResponseJSON,
