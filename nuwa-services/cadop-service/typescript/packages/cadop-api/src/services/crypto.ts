@@ -1,15 +1,25 @@
 import * as jose from 'jose';
 import { createHash, randomBytes } from 'crypto';
-import { config } from '../config/environment.js';
-import { JWK } from '@cadop/shared/types';
-import { JWKS, IDToken } from '../types/oidc.js';
-import type { CryptoKey } from 'jose';
+import { logger } from '../utils/logger.js';
+import type { IDToken } from '../types/oidc.js';
+import * as jwt from 'jsonwebtoken';
+
+// Define our own JWK type that matches the shared type
+interface LocalJWK {
+  kty: string;
+  kid?: string;
+  use?: string;
+  alg?: string;
+  key_ops?: string[];
+  [key: string]: unknown;
+}
 
 export class CryptoService {
   private static instance: CryptoService;
-  private signingKey: CryptoKey | null = null;
-  private publicJWK: JWK | null = null;
-  private privateJWK: JWK | null = null;
+  private publicKey: Uint8Array | null = null;
+  private privateKey: Uint8Array | null = null;
+  private publicJWK: LocalJWK | null = null;
+  private privateJWK: LocalJWK | null = null;
   private keyId: string | null = null;
 
   private constructor() {}
@@ -22,344 +32,153 @@ export class CryptoService {
   }
 
   /**
-   * 初始化密钥对
+   * Generate a key ID from a JWK
+   */
+  private generateKeyId(jwk: LocalJWK): string {
+    const hash = createHash('sha256');
+    hash.update(JSON.stringify(jwk));
+    return hash.digest('hex').slice(0, 16);
+  }
+
+  /**
+   * Initialize cryptographic keys
    */
   public async initializeKeys(): Promise<void> {
     try {
-      // 检查是否已有密钥
-      if (this.signingKey) {
+      // Check if we already have keys
+      if (this.publicKey && this.privateKey) {
+        logger.info('Crypto keys already initialized');
         return;
       }
 
-      if (config.jwt.privateKey) {
-        // 从配置文件加载现有密钥
-        await this.loadKeysFromConfig();
-      } else {
-        // 生成新的密钥对
-        await this.generateNewKeyPair();
-      }
+      // Generate new Ed25519 key pair
+      const { publicKey, privateKey } = await jose.generateKeyPair('EdDSA');
+      this.publicKey = publicKey as unknown as Uint8Array;
+      this.privateKey = privateKey as unknown as Uint8Array;
 
-      if (!this.signingKey || !this.publicJWK || !this.privateJWK || !this.keyId) {
-        throw new Error('Failed to initialize keys properly');
-      }
+      // Export keys as JWK
+      const exportedPublicJWK = await jose.exportJWK(publicKey);
+      const exportedPrivateJWK = await jose.exportJWK(privateKey);
 
-      console.log('JWT signing keys initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize JWT keys:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 从配置加载密钥
-   */
-  private async loadKeysFromConfig(): Promise<void> {
-    try {
-      const privateKeyPem = config.jwt.privateKey;
-      if (!privateKeyPem) {
-        throw new Error('Private key not found in configuration');
-      }
-
-      // 导入私钥
-      const privateKey = await jose.importPKCS8(privateKeyPem, 'EdDSA');
-      if (!privateKey) {
-        throw new Error('Failed to import private key');
-      }
-      this.signingKey = privateKey;
-
-      // 生成公钥 JWK
-      const publicKey = await jose.exportSPKI(privateKey);
-      const publicKeyObject = await jose.importSPKI(publicKey, 'EdDSA');
-      const publicJWK = await jose.exportJWK(publicKeyObject) as jose.JWK;
-      const privateJWK = await jose.exportJWK(privateKey) as jose.JWK;
-
-      if (!publicJWK || !privateJWK) {
-        throw new Error('Failed to export keys to JWK format');
-      }
-
-      // 确保必需的字段存在
+      // Convert to our JWK type with required fields
       this.publicJWK = {
-        kty: publicJWK.kty || 'OKP',
-        ...publicJWK
-      };
+        kty: exportedPublicJWK.kty || 'OKP',
+        ...exportedPublicJWK
+      } as LocalJWK;
 
       this.privateJWK = {
-        kty: privateJWK.kty || 'OKP',
-        ...privateJWK
-      };
+        kty: exportedPrivateJWK.kty || 'OKP',
+        ...exportedPrivateJWK
+      } as LocalJWK;
 
-      // 生成密钥ID
+      // Generate key ID
       this.keyId = this.generateKeyId(this.publicJWK);
-      if (!this.keyId) {
-        throw new Error('Failed to generate key ID');
-      }
 
+      // Set key properties
       this.publicJWK.kid = this.keyId;
-      this.privateJWK.kid = this.keyId;
-
-      // 设置密钥用途
       this.publicJWK.use = 'sig';
       this.publicJWK.alg = 'EdDSA';
       this.publicJWK.key_ops = ['verify'];
 
+      this.privateJWK.kid = this.keyId;
       this.privateJWK.use = 'sig';
       this.privateJWK.alg = 'EdDSA';
       this.privateJWK.key_ops = ['sign'];
 
-    } catch (error) {
-      console.error('Failed to load keys from config:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 生成新的 Ed25519 密钥对
-   */
-  private async generateNewKeyPair(): Promise<void> {
-    try {
-      // 生成 Ed25519 密钥对
-      const { publicKey, privateKey } = await jose.generateKeyPair('EdDSA', {
-        crv: 'Ed25519'
+      logger.info('Crypto keys initialized successfully', {
+        keyId: this.keyId,
       });
-
-      this.signingKey = privateKey;
-
-      // 导出 JWK 格式
-      const publicJWK = await jose.exportJWK(publicKey) as jose.JWK;
-      const privateJWK = await jose.exportJWK(privateKey) as jose.JWK;
-
-      if (!publicJWK || !privateJWK) {
-        throw new Error('Failed to export keys to JWK format');
-      }
-
-      // 确保必需的字段存在
-      this.publicJWK = {
-        kty: publicJWK.kty || 'OKP',
-        ...publicJWK
-      };
-
-      this.privateJWK = {
-        kty: privateJWK.kty || 'OKP',
-        ...privateJWK
-      };
-
-      // 生成密钥ID
-      this.keyId = this.generateKeyId(this.publicJWK);
-      if (!this.keyId) {
-        throw new Error('Failed to generate key ID');
-      }
-
-      this.publicJWK.kid = this.keyId;
-      this.privateJWK.kid = this.keyId;
-
-      // 设置密钥用途
-      this.publicJWK.use = 'sig';
-      this.publicJWK.alg = 'EdDSA';
-      this.publicJWK.key_ops = ['verify'];
-
-      this.privateJWK.use = 'sig';
-      this.privateJWK.alg = 'EdDSA';
-      this.privateJWK.key_ops = ['sign'];
-
-      console.log('New Ed25519 key pair generated');
-      console.log('Public JWK:', JSON.stringify(this.publicJWK, null, 2));
-      
-      // 导出私钥用于保存
-      const exportedPrivateKey = await jose.exportPKCS8(privateKey);
-      console.warn('⚠️  Store this private key in your JWT_PRIVATE_KEY environment variable:');
-      console.warn(exportedPrivateKey);
-
     } catch (error) {
-      console.error('Failed to generate key pair:', error);
+      logger.error('Failed to initialize crypto keys', { error });
       throw error;
     }
   }
 
   /**
-   * 生成密钥ID (基于公钥的 thumbprint)
+   * Get the public key as JWK
    */
-  private generateKeyId(jwk: JWK): string {
-    const jwkCopy = { ...jwk };
-    // 移除非核心字段
-    delete jwkCopy.kid;
-    delete jwkCopy.use;
-    delete jwkCopy.key_ops;
-    delete jwkCopy.alg;
-
-    // 创建 thumbprint
-    const thumbprint = createHash('sha256')
-      .update(JSON.stringify(jwkCopy))
-      .digest('base64url');
-
-    return thumbprint.substring(0, 8);
-  }
-
-  /**
-   * 获取 JWKS (公钥集)
-   */
-  public async getJWKS(): Promise<JWKS> {
-    await this.initializeKeys();
-    
-    if (!this.publicJWK) {
-      throw new Error('Public key not available');
-    }
-
-    return {
-      keys: [this.publicJWK]
-    };
-  }
-
-  /**
-   * 获取公钥 JWK
-   */
-  public async getPublicJWK(): Promise<JWK> {
-    await this.initializeKeys();
-    
-    if (!this.publicJWK) {
-      throw new Error('Public key not available');
-    }
-
+  public getPublicJWK(): LocalJWK | null {
     return this.publicJWK;
   }
 
   /**
-   * 签发 JWT
+   * Get the key ID
    */
-  public async signJWT(payload: Record<string, any>, options: {
-    issuer: string;
-    audience: string | string[];
-    expiresIn?: string | number;
-    subject?: string;
-  }): Promise<string> {
-    await this.initializeKeys();
+  public getKeyId(): string | null {
+    return this.keyId;
+  }
 
-    if (!this.signingKey || !this.keyId) {
-      throw new Error('Signing key not available');
+  /**
+   * Sign data using the private key
+   */
+  public async sign(data: string): Promise<string> {
+    if (!this.privateKey || !this.keyId) {
+      throw new Error('Private key not initialized');
     }
 
-    const jwt = await new jose.SignJWT(payload)
-      .setProtectedHeader({ 
-        alg: 'EdDSA', 
-        kid: this.keyId,
-        typ: 'JWT'
-      })
-      .setIssuer(options.issuer)
-      .setAudience(options.audience)
+    const signature = await new jose.SignJWT({ data })
+      .setProtectedHeader({ alg: 'EdDSA', kid: this.keyId })
       .setIssuedAt()
-      .setExpirationTime(options.expiresIn || '1h');
+      .setExpirationTime('1h')
+      .sign(this.privateKey);
 
-    if (options.subject) {
-      jwt.setSubject(options.subject);
-    }
-
-    return await jwt.sign(this.signingKey);
+    return signature;
   }
 
   /**
-   * 签发 ID Token
+   * Verify a signature using the public key
    */
-  public async signIDToken(claims: IDToken): Promise<string> {
-    await this.initializeKeys();
-
-    if (!this.signingKey || !this.keyId) {
-      throw new Error('Signing key not available');
+  public async verify(signature: string): Promise<boolean> {
+    if (!this.publicKey) {
+      throw new Error('Public key not initialized');
     }
 
-    // 转换 IDToken 为 JWTPayload 格式
-    const payload: jose.JWTPayload = {
-      ...claims,
-      // 确保必要字段存在
-      iss: claims.iss,
-      sub: claims.sub,
-      aud: claims.aud,
-      exp: claims.exp,
-      iat: claims.iat
-    };
-
-    const jwt = await new jose.SignJWT(payload)
-      .setProtectedHeader({ 
-        alg: 'EdDSA', 
-        kid: this.keyId,
-        typ: 'JWT'
-      })
-      .setIssuer(claims.iss)
-      .setSubject(claims.sub)
-      .setAudience(claims.aud)
-      .setIssuedAt(claims.iat)
-      .setExpirationTime(claims.exp);
-
-    if (claims.auth_time) {
-      jwt.setNotBefore(claims.auth_time);
+    try {
+      const { payload } = await jose.jwtVerify(signature, this.publicKey);
+      return !!payload;
+    } catch (error) {
+      logger.error('Signature verification failed', { error });
+      return false;
     }
-
-    return await jwt.sign(this.signingKey);
   }
 
   /**
-   * 验证 JWT
-   */
-  public async verifyJWT(token: string, options: {
-    issuer?: string;
-    audience?: string | string[];
-  } = {}): Promise<jose.JWTPayload> {
-    await this.initializeKeys();
-
-    if (!this.signingKey) {
-      throw new Error('Verification key not available');
-    }
-
-    const verifyOptions: jose.JWTVerifyOptions = {};
-    
-    if (options.issuer) {
-      verifyOptions.issuer = options.issuer;
-    }
-    
-    if (options.audience) {
-      verifyOptions.audience = options.audience;
-    }
-
-    const { payload } = await jose.jwtVerify(token, this.signingKey, verifyOptions);
-
-    return payload;
-  }
-
-  /**
-   * 生成安全的随机字符串
+   * Generate secure random string
    */
   public generateSecureRandom(length: number = 32): string {
     return randomBytes(length).toString('base64url');
   }
 
   /**
-   * 生成授权码
+   * Generate authorization code
    */
   public generateAuthorizationCode(): string {
     return this.generateSecureRandom(32);
   }
 
   /**
-   * 生成访问令牌
+   * Generate access token
    */
   public generateAccessToken(): string {
     return this.generateSecureRandom(32);
   }
 
   /**
-   * 生成刷新令牌
+   * Generate refresh token
    */
   public generateRefreshToken(): string {
     return this.generateSecureRandom(32);
   }
 
   /**
-   * 创建安全的哈希
+   * Create hash
    */
   public createHash(input: string, algorithm: string = 'sha256'): string {
     return createHash(algorithm).update(input).digest('hex');
   }
 
   /**
-   * 验证哈希
+   * Verify hash
    */
   public verifyHash(input: string, hash: string, algorithm: string = 'sha256'): boolean {
     const computed = this.createHash(input, algorithm);
@@ -367,24 +186,44 @@ export class CryptoService {
   }
 
   /**
-   * 密钥轮换
+   * Sign ID Token
    */
-  public async rotateKeys(): Promise<void> {
-    console.log('Starting key rotation...');
-    
-    // 保存旧密钥ID用于日志
-    const oldKeyId = this.keyId;
-    
-    // 重置当前密钥
-    this.signingKey = null;
-    this.publicJWK = null;
-    this.privateJWK = null;
-    this.keyId = null;
-    
-    // 生成新密钥对
-    await this.generateNewKeyPair();
-    
-    console.log(`Key rotation completed. Old key ID: ${oldKeyId}, New key ID: ${this.keyId}`);
+  public signIDToken(claims: IDToken): string {
+    const secret = process.env['JWT_SECRET'];
+    if (!secret) {
+      throw new Error('JWT_SECRET not configured');
+    }
+
+    return jwt.sign(claims, secret, {
+      algorithm: 'HS256'
+    });
+  }
+
+  public async verifyIDToken(token: string): Promise<boolean> {
+    try {
+      const secret = process.env['JWT_SECRET'];
+      if (!secret) {
+        return false;
+      }
+
+      jwt.verify(token, secret, {
+        algorithms: ['HS256']
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to verify ID token', { error });
+      return false;
+    }
+  }
+
+  public decodeIDToken(token: string): IDToken | null {
+    try {
+      return jwt.decode(token) as IDToken;
+    } catch (error) {
+      logger.error('Failed to decode ID token', { error });
+      return null;
+    }
   }
 }
 

@@ -83,6 +83,24 @@ export const config = {
     issuer: env.OIDC_ISSUER,
     clientId: env.OIDC_CLIENT_ID,
     clientSecret: env.OIDC_CLIENT_SECRET,
+    authorization_endpoint: '/auth/authorize',
+    token_endpoint: '/auth/token',
+    userinfo_endpoint: '/auth/userinfo',
+    jwks_uri: '/.well-known/jwks.json',
+    scopes_supported: [
+      'openid',
+      'profile',
+      'email',
+      'did',
+      'agent_did',
+      'sybil_level',
+      'auth_methods'
+    ],
+    response_types_supported: ['code', 'token', 'id_token'],
+    grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
+    subject_types_supported: ['public'],
+    id_token_signing_alg_values_supported: ['HS256', 'EdDSA'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post']
   },
   oauth: {
     google: {

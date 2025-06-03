@@ -25,7 +25,7 @@ import {
   CreateAuthenticatorData,
   UpdateAuthenticatorData,
   WebAuthnDeviceInfo,
-} from '../../../shared/src/types/webauthn.js';
+} from '@cadop/shared';
 
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
