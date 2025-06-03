@@ -7,7 +7,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "module": "Node16",
+    "moduleResolution": "Node16"
   },
   "references": [
     { "path": "../cadop-shared" }
