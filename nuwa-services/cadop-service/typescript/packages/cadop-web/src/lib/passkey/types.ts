@@ -59,6 +59,11 @@ export interface PasskeyAuthenticationResponse {
   type: 'public-key';
   clientExtensionResults: Record<string, any>;
   authenticatorAttachment?: AuthenticatorAttachment;
+  authenticatorInfo?: {
+    userAgent: string;
+    platform: string;
+    isVirtualAuthenticator?: boolean;
+  };
 }
 
 export interface PasskeyDevice {

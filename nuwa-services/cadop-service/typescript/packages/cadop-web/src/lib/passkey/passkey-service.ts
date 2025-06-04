@@ -437,6 +437,10 @@ export class PasskeyService {
     const authDataAnalysis = this.analyzeAuthenticatorData(response.authenticatorData);
     const authenticatorDataBase64 = this.arrayBufferToBase64url(response.authenticatorData);
     
+    // 检测是否是虚拟认证器（仅开发环境）
+    const isVirtualAuthenticator = this.developmentMode && 
+      typeof (window as any).__WEBAUTHN_VIRTUAL_AUTHENTICATOR__ !== 'undefined';
+    
     console.debug('🔍 Detailed AuthenticatorData Analysis:', {
       credentialId: credential.id,
       analysis: authDataAnalysis,
@@ -458,10 +462,13 @@ export class PasskeyService {
     }
 
     if (authDataAnalysis.counter === 0) {
-      console.warn('🚨 Counter value is 0 - this may cause verification issues:', {
+      console.warn('ℹ️ Counter value is 0 - this is normal for macOS platform authenticator:', {
         credentialId: credential.id,
         counterValue: authDataAnalysis.counter,
-        flags: authDataAnalysis.flags
+        flags: authDataAnalysis.flags,
+        authenticatorAttachment: credential.authenticatorAttachment,
+        platform: navigator.platform,
+        userAgent: navigator.userAgent
       });
     }
     
@@ -477,6 +484,11 @@ export class PasskeyService {
       type: 'public-key',
       clientExtensionResults: credential.getClientExtensionResults(),
       authenticatorAttachment: (credential.authenticatorAttachment as AuthenticatorAttachment) || undefined,
+      authenticatorInfo: {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        isVirtualAuthenticator
+      }
     };
   }
 

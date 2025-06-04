@@ -141,9 +141,6 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
       }
     );
 
-    // Update authenticator usage
-    await webauthnService.updateAuthenticatorUsage(result);
-
     return res.json({
       success: true,
       session: {
