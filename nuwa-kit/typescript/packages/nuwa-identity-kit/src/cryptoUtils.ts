@@ -25,7 +25,7 @@ export class CryptoUtils {
    * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
    * @returns The multibase-encoded public key
    */
-  static async publicKeyToMultibase(publicKey: Uint8Array, type: KeyTypeInput): Promise<string> {
+  static publicKeyToMultibase(publicKey: Uint8Array, type: KeyTypeInput): string {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     
     // Add multicodec prefix based on key type
@@ -38,7 +38,7 @@ export class CryptoUtils {
     return base58btc.encode(prefixedKey);
   }
 
-  static async jwkToMultibase(jwk: JsonWebKey): Promise<string> {
+  static jwkToMultibase(jwk: JsonWebKey): string {
     if (!jwk.x || !jwk.kty || !jwk.crv) {
       throw new Error('Invalid JWK: missing required properties');
     }
