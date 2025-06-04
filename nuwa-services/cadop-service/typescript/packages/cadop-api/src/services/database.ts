@@ -2,9 +2,18 @@ import { supabase } from '../config/supabase.js';
 import { Database } from '../config/supabase.js';
 
 // Type aliases for easier use
-type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
-type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert'];
-type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update'];
+type User = {
+  id: string;
+  user_did: string;
+  email?: string;
+  display_name?: string;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type UserInsert = Omit<User, 'id' | 'created_at' | 'updated_at'>;
+type UserUpdate = Partial<UserInsert>;
 
 type AuthMethod = Database['public']['Tables']['auth_methods']['Row'];
 type AuthMethodInsert = Database['public']['Tables']['auth_methods']['Insert'];
@@ -33,77 +42,76 @@ type SessionInsert = Database['public']['Tables']['sessions']['Insert'];
 type SessionUpdate = Database['public']['Tables']['sessions']['Update'];
 
 // Views
-type UserCompleteProfile = Database['public']['Views']['user_complete_profile']['Row'];
 type PublicDIDDocument = Database['public']['Views']['public_did_documents']['Row'];
 
 export class DatabaseService {
-  // User profile operations (extends Supabase auth.users)
-  static async createUserProfile(profileData: UserProfileInsert): Promise<UserProfile> {
+  // User operations
+  static async createUser(userData: UserInsert): Promise<User> {
     const { data, error } = await supabase
-      .from('user_profiles')
-      .insert(profileData)
+      .from('users')
+      .insert(userData)
       .select()
       .single();
 
     if (error) {
-      throw new Error(`Failed to create user profile: ${error.message}`);
+      throw new Error(`Failed to create user: ${error.message}`);
     }
 
     return data;
   }
 
-  static async getUserProfileById(userId: string): Promise<UserProfile | null> {
+  static async getUserById(userId: string): Promise<User | null> {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get user profile: ${error.message}`);
+      throw new Error(`Failed to get user: ${error.message}`);
     }
 
     return data;
   }
 
-  static async getUserProfileByDID(userDid: string): Promise<UserProfile | null> {
+  static async getUserByEmail(email: string): Promise<User | null> {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(`Failed to get user by email: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async getUserByDID(userDid: string): Promise<User | null> {
+    const { data, error } = await supabase
+      .from('users')
       .select('*')
       .eq('user_did', userDid)
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get user profile by DID: ${error.message}`);
+      throw new Error(`Failed to get user by DID: ${error.message}`);
     }
 
     return data;
   }
 
-  static async updateUserProfile(userId: string, updates: UserProfileUpdate): Promise<UserProfile> {
+  static async updateUser(userId: string, updates: UserUpdate): Promise<User> {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('users')
       .update(updates)
       .eq('id', userId)
       .select()
       .single();
 
     if (error) {
-      throw new Error(`Failed to update user profile: ${error.message}`);
-    }
-
-    return data;
-  }
-
-  static async getUserCompleteProfile(userId: string): Promise<UserCompleteProfile | null> {
-    const { data, error } = await supabase
-      .from('user_complete_profile')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get complete user profile: ${error.message}`);
+      throw new Error(`Failed to update user: ${error.message}`);
     }
 
     return data;
@@ -161,12 +169,12 @@ export class DatabaseService {
   static async findUserByProviderIdentity(
     provider: string,
     providerUserId: string
-  ): Promise<UserProfile | null> {
+  ): Promise<User | null> {
     const { data, error } = await supabase
       .from('auth_methods')
       .select(`
         user_id,
-        user_profiles!inner(*)
+        users!inner(*)
       `)
       .eq('provider', provider)
       .eq('provider_user_id', providerUserId)
@@ -176,7 +184,7 @@ export class DatabaseService {
       throw new Error(`Failed to find user by provider identity: ${error.message}`);
     }
 
-    return (data?.user_profiles as unknown as UserProfile) || null;
+    return (data?.users as unknown as User) || null;
   }
 
   static async updateAuthMethod(authId: string, updates: AuthMethodUpdate): Promise<AuthMethod> {

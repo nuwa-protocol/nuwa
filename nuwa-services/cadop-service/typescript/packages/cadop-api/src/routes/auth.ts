@@ -74,22 +74,8 @@ router.post('/login/webauthn/begin', asyncHandler(async (req: Request, res: Resp
   try {
     const { email } = req.body;
     
-    // Find user by email
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({
-        error: 'not_found',
-        error_description: 'User not found'
-      });
-    }
-    
-    // Generate authentication options with user ID
-    const options = await webauthnService.generateAuthenticationOptions(user.id);
+    // 尝试获取认证选项，如果用户不存在会返回特定错误
+    const options = await webauthnService.generateAuthenticationOptions(email);
     
     return res.json({
       success: true,
@@ -109,7 +95,7 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
   try {
     const { response } = req.body;
     
-    // Verify the authentication response
+    // 验证认证响应
     const result = await webauthnService.verifyAuthenticationResponse(response);
     
     if (!result.success || !result.userId || !result.authenticatorId) {
@@ -119,7 +105,7 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
       });
     }
 
-    // Get user from database
+    // 获取用户信息
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
@@ -130,7 +116,7 @@ router.post('/login/webauthn/complete', asyncHandler(async (req: Request, res: R
       throw new Error('User not found');
     }
 
-    // Create new session
+    // 创建新会话
     const sessionService = new SessionService();
     const session = await sessionService.createSession(
       result.userId,
