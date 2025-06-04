@@ -204,26 +204,29 @@ class APIClient {
 
   public async verify(
     response: WebAuthnRegistrationResponse | WebAuthnAuthenticationResponse,
-    friendlyName?: string
+    friendlyName?: string,
+    didKey?: string
   ): Promise<APIResponse<WebAuthnAuthenticationResult>> {
     console.debug('Verifying WebAuthn response:', {
       response,
-      friendlyName
+      friendlyName,
+      didKey
     });
     return this.post('/api/webauthn/verify', {
       response,
       friendly_name: friendlyName,
+      did_key: didKey
     }, { skipAuth: true });
   }
 
-  public async getAuthenticationOptions(userIdentifier?: string): Promise<APIResponse<WebAuthnOptionsResponse>> {
+  public async getAuthenticationOptions(userDid?: string): Promise<APIResponse<WebAuthnOptionsResponse>> {
     try {
       const response = await fetch('/api/webauthn/authentication/options', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ user_identifier: userIdentifier }),
+        body: JSON.stringify({ user_did: userDid }),
       });
 
       if (!response.ok) {

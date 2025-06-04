@@ -9,11 +9,51 @@ import jwt from 'jsonwebtoken';
 import { SessionService } from '../services/sessionService.js';
 import { DatabaseService } from '../services/database.js';
 import crypto from 'crypto';
+import cbor from 'cbor';
+import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import {
   registrationOptionsSchema,
   verifySchema,
   authenticationOptionsSchema,
 } from '../schemas/webauthn.js';
+
+/**
+ * Base64URL 编码工具函数
+ */
+function base64urlEncode(buffer: Buffer): string {
+  const base64 = buffer.toString('base64');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// 辅助函数：解析认证器数据
+function parseAuthenticatorData(buffer: Buffer) {
+  let pos = 0;
+  const rpIdHash = buffer.slice(pos, pos + 32); pos += 32;
+  const flagsBuf = buffer.slice(pos, pos + 1); pos += 1;
+  const flags = flagsBuf[0];
+  const counterBuf = buffer.slice(pos, pos + 4); pos += 4;
+  const counter = counterBuf.readUInt32BE(0);
+  
+  let aaguid: Buffer | undefined;
+  let credentialId: Buffer | undefined;
+  let credentialPublicKey: Buffer | undefined;
+
+  if (flags & 0x40) { // Check if attestation data is included
+    aaguid = buffer.slice(pos, pos + 16); pos += 16;
+    const credentialIdLength = buffer.slice(pos, pos + 2).readUInt16BE(0); pos += 2;
+    credentialId = buffer.slice(pos, pos + credentialIdLength); pos += credentialIdLength;
+    credentialPublicKey = buffer.slice(pos);
+  }
+
+  return {
+    rpIdHash,
+    flags,
+    counter,
+    aaguid,
+    credentialId,
+    credentialPublicKey
+  };
+}
 
 const router: Router = Router();
 const webauthnService = new WebAuthnService();
@@ -37,208 +77,6 @@ router.get('/.well-known/webauthn', (req: Request, res: Response) => {
   });
 });
 
-// /**
-//  * POST /api/webauthn/registration/options
-//  * Generate WebAuthn registration options
-//  */
-// router.post(
-//   '/registration/options',
-//   validateRequest(registrationOptionsSchema),
-//   async (req: Request, res: Response) => {
-//     try {
-//       logger.debug('Received registration options request', {
-//         body: req.body,
-//         headers: req.headers,
-//       });
-
-//       const { email, display_name, friendly_name } = req.body;
-
-//       // Check if user exists
-//       const { data: { users }, error: userError } = await supabase.auth.admin.listUsers();
-//       if (userError) {
-//         logger.error('Failed to list users from Supabase', { error: userError });
-//         throw userError;
-//       }
-
-//       logger.debug('Found existing users', { 
-//         usersCount: users?.length,
-//         emails: users?.map(u => u.email)
-//       });
-
-//       const existingUser = users?.find(u => u.email === email);
-//       if (!existingUser) {
-//         logger.debug('Creating new user', { email, display_name });
-//         // Create a new user if not exists
-//         const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-//           email,
-//           email_confirm: true,
-//           user_metadata: {
-//             full_name: display_name
-//           }
-//         });
-
-//         if (createError) {
-//           logger.error('Failed to create new user', { error: createError });
-//           throw createError;
-//         }
-
-//         logger.debug('New user created', { 
-//           userId: newUser.user.id,
-//           email: newUser.user.email,
-//           metadata: newUser.user.user_metadata
-//         });
-
-//         const options = await webauthnService.generateRegistrationOptions(
-//           newUser.user.id,
-//           email,
-//           display_name || email
-//         );
-
-//         logger.debug('Generated registration options for new user', {
-//           userId: newUser.user.id,
-//           email,
-//           options,
-//           challengeLength: options.challenge.length,
-//           friendlyName: friendly_name,
-//         });
-
-//         return res.json({
-//           success: true,
-//           options,
-//           user_id: newUser.user.id
-//         });
-//       }
-
-//       logger.debug('Found existing user', { 
-//         userId: existingUser.id,
-//         email: existingUser.email,
-//         metadata: existingUser.user_metadata
-//       });
-
-//       // Generate options for existing user
-//       const options = await webauthnService.generateRegistrationOptions(
-//         existingUser.id,
-//         email,
-//         display_name || email
-//       );
-
-//       logger.debug('Generated registration options for existing user', {
-//         userId: existingUser.id,
-//         email,
-//         options,
-//         challengeLength: options.challenge.length,
-//         friendlyName: friendly_name,
-//       });
-
-//       return res.json({
-//         success: true,
-//         options,
-//         user_id: existingUser.id
-//       });
-//     } catch (error) {
-//       logger.error('Failed to generate WebAuthn registration options', {
-//         error,
-//         stack: error instanceof Error ? error.stack : undefined,
-//         body: req.body,
-//       });
-
-//       return res.status(500).json({
-//         error: 'Failed to generate registration options',
-//         code: 'REGISTRATION_OPTIONS_FAILED',
-//         details: process.env['NODE_ENV'] === 'development' ? error : undefined,
-//       });
-//     }
-//   }
-// );
-
-/**
- * POST /api/webauthn/registration/verify
- * Verify WebAuthn registration response
- */
-router.post(
-  '/registration/verify',
-  validateRequest(verifySchema),
-  async (req: Request, res: Response) => {
-    try {
-      logger.debug('Received registration verification request', {
-        body: req.body,
-        headers: req.headers,
-      });
-
-      const { response, friendly_name } = req.body;
-      
-      // Extract user ID from the clientDataJSON
-      const clientDataJSON = JSON.parse(
-        Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
-      );
-      
-      // Get user ID from the challenge data
-      const challenge = await webauthnService.getChallenge(clientDataJSON.challenge);
-      if (!challenge || !challenge.user_id) {
-        logger.warn('Invalid or expired challenge', { clientDataJSON });
-        return res.status(400).json({
-          error: 'Invalid or expired challenge',
-          code: 'INVALID_CHALLENGE',
-        });
-      }
-
-      const userId = challenge.user_id;
-      
-      logger.debug('Verifying registration response', {
-        userId,
-        response,
-        friendly_name,
-      });
-
-      const result = await webauthnService.verifyRegistrationResponse(
-        userId,
-        response,
-        friendly_name
-      );
-
-      if (result.success) {
-        logger.info('WebAuthn registration successful', {
-          userId,
-          authenticatorId: result.authenticator?.id,
-          friendlyName: friendly_name,
-          result,
-        });
-
-        res.json({
-          success: true,
-          message: 'WebAuthn device registered successfully',
-          authenticator: result.authenticator,
-        });
-      } else {
-        logger.warn('WebAuthn registration failed', {
-          userId,
-          error: result.error,
-          details: result.details,
-        });
-
-        res.status(400).json({
-          success: false,
-          error: result.error || 'Registration verification failed',
-          code: 'REGISTRATION_VERIFICATION_FAILED',
-          details: result.details,
-        });
-      }
-    } catch (error) {
-      logger.error('WebAuthn registration verification error', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-        body: req.body,
-      });
-
-      res.status(500).json({
-        error: 'Registration verification failed',
-        code: 'REGISTRATION_VERIFICATION_ERROR',
-        details: process.env.NODE_ENV === 'development' ? error : undefined,
-      });
-    }
-  }
-);
-
 /**
  * POST /api/webauthn/authentication/options
  * Generate WebAuthn authentication options
@@ -248,55 +86,74 @@ router.post(
   validateRequest(authenticationOptionsSchema),
   async (req: Request, res: Response) => {
     try {
-      const { user_identifier } = req.body;
+      const { user_did } = req.body;
       let userId: string | undefined;
       let isNewUser = false;
+      
       logger.debug('Received authentication options request', {
-        user_identifier,
+        user_did,
         headers: req.headers,
       });
-      // 如果提供了用户标识符，尝试查找或创建用户
-      if (user_identifier) {
-        if (user_identifier.includes('@')) {
-          // 通过邮箱查找用户
-          const user = await DatabaseService.getUserByEmail(user_identifier);
-          if (user) {
-            logger.debug('User found', { user });
-            userId = user.id;
-          } else {
-            logger.debug('User not found, creating new user', { user_identifier });
-
-            // 生成临时 DID
-            const tempDid = `did:key:${crypto.randomBytes(32).toString('hex')}`;
-            
-            // 创建新用户
-            const newUser = await DatabaseService.createUser({
-              user_did: tempDid,
-              email: user_identifier,
-              display_name: user_identifier,
-              metadata: {}
-            });
-
-            userId = newUser.id;
-            isNewUser = true;
-          }
+      
+      // 如果提供了用户 DID，尝试查找用户
+      if (user_did) {
+        // 通过 DID 查找用户
+        const user = await DatabaseService.getUserByDID(user_did);
+        if (user) {
+          logger.debug('User found', { user });
+          userId = user.id;
         } else {
-          // 假设是用户 ID
-          userId = user_identifier;
+          logger.debug('User not found, creating new user', { user_did });
+            
+          // 创建新用户
+          const newUser = await DatabaseService.createUser({
+            user_did,
+            display_name: user_did,
+            metadata: {}
+          });
+
+          userId = newUser.id;
+          isNewUser = true;
         }
+      } else {
+        // 如果没有提供 DID，说明是首次使用，创建临时用户
+        logger.debug('No DID provided, creating temporary user for registration');
+        
+        // 生成临时用户 ID 和临时 DID
+        const tempUserId = crypto.randomUUID();
+        const tempDid = `did:temp:${tempUserId}`;
+        
+        // 创建临时用户记录
+        const tempUser = await DatabaseService.createUser({
+          user_did: tempDid,
+          display_name: 'New User',
+          metadata: {
+            is_temporary: true,
+            created_at: new Date().toISOString()
+          }
+        });
+
+        userId = tempUser.id;
+        isNewUser = true;
+        
+        logger.debug('Created temporary user', { 
+          userId: tempUser.id,
+          displayName: tempUser.display_name,
+          did: tempDid
+        });
       }
 
       // 如果是新用户，生成注册选项
       if (isNewUser) {
         const options = await webauthnService.generateRegistrationOptions(
-          userId!,
-          user_identifier,
-          user_identifier
+          userId,
+          userId, // 使用 userId 作为临时标识符
+          'New User' // 临时显示名称
         );
 
         logger.info('Generated registration options for new user', {
           userId,
-          email: user_identifier,
+          did: user_did,
           challengeLength: options.challenge.length
         });
 
@@ -324,7 +181,7 @@ router.post(
     } catch (error) {
       logger.error('Failed to generate WebAuthn options', {
         error,
-        userIdentifier: req.body.user_identifier,
+        userDid: req.body.user_did,
       });
 
       res.status(500).json({
@@ -399,6 +256,34 @@ router.post(
         if (!userData) {
           logger.error('Failed to get user data', { userId });
           throw new Error('Failed to get user data');
+        }
+
+        // 如果是临时 DID，使用客户端生成的 did:key 更新用户记录
+        if (userData.user_did.startsWith('did:temp:')) {
+          const { did_key } = req.body;
+          
+          if (!did_key || !did_key.startsWith('did:key:')) {
+            logger.error('Invalid or missing did:key in registration request', { userId });
+            throw new Error('Invalid or missing did:key');
+          }
+
+          // 更新用户记录
+          await DatabaseService.updateUser(userId, {
+            user_did: did_key,
+            metadata: {
+              ...userData.metadata,
+              is_temporary: false,
+              did_updated_at: new Date().toISOString()
+            }
+          });
+
+          logger.info('Updated user DID', {
+            userId,
+            oldDid: userData.user_did,
+            newDid: did_key
+          });
+
+          userData.user_did = did_key;
         }
 
         // 创建新会话

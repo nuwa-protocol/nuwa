@@ -38,8 +38,9 @@ const authenticationResponseSchema = baseResponseSchema.extend({
 export const verifySchema = z.object({
   response: z.union([registrationResponseSchema, authenticationResponseSchema]),
   friendly_name: z.string().min(1).max(100).optional(),
+  did_key: z.string().regex(/^did:key:.+$/).optional(),
 });
 
 export const authenticationOptionsSchema = z.object({
-  user_identifier: z.string().optional()
+  user_did: z.string().optional()
 });

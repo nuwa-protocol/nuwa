@@ -15,9 +15,25 @@ import type {
 } from '@simplewebauthn/types';
 
 import { apiClient } from '../api/client';
+import { DIDKeyManager } from './did-key';
 
 export class PasskeyService {
   private developmentMode = import.meta.env.DEV;
+  private localStorageKey = 'passkey_did';
+
+  /**
+   * 从本地存储获取 DID
+   */
+  private getDIDFromStorage(): string | null {
+    return localStorage.getItem(this.localStorageKey);
+  }
+
+  /**
+   * 保存 DID 到本地存储
+   */
+  private saveDIDToStorage(did: string): void {
+    localStorage.setItem(this.localStorageKey, did);
+  }
 
   /**
    * Check if the browser supports WebAuthn/Passkey
@@ -59,14 +75,14 @@ export class PasskeyService {
    * Authenticate with Passkey
    * If user doesn't exist, server will handle registration automatically
    */
-  public async authenticate(
-    userIdentifier?: string
-  ): Promise<WebAuthnAuthenticationResult> {
+  public async authenticate(): Promise<WebAuthnAuthenticationResult> {
     try {
-      console.log('🚀 Starting Passkey authentication flow', { userIdentifier });
+      // 尝试从本地存储获取 DID
+      let userDid = this.getDIDFromStorage() || undefined;
+      console.log('🔑 Retrieved DID from storage:', { userDid });
 
       // 1. Get authentication options from server
-      const { data, error } = await apiClient.getAuthenticationOptions(userIdentifier);
+      const { data, error } = await apiClient.getAuthenticationOptions(userDid);
       
       if (error) {
         throw new Error(error.message || 'Failed to get authentication options');
@@ -115,10 +131,20 @@ export class PasskeyService {
           id: credential.id
         });
 
+        // 从认证器响应中获取公钥并生成 DID
+        const response = credential.response as AuthenticatorAttestationResponse;
+        const publicKey = response.getPublicKey();
+        if (publicKey) {
+          userDid = await DIDKeyManager.generateDIDFromPublicKey(publicKey);
+          this.saveDIDToStorage(userDid);
+          console.log('🔑 Generated and saved DID:', { userDid });
+        }
+
         // 调用统一的验证接口
         const verificationResult = await apiClient.verify(
           this.formatRegistrationResponse(credential),
-          'Default Device'
+          'Default Device',
+          userDid // 传递生成的 did:key
         );
 
         if (verificationResult.error) {
@@ -181,7 +207,7 @@ export class PasskeyService {
     } catch (error) {
       console.error('💥 Passkey authentication failed with exception', {
         error: error instanceof Error ? error.message : error,
-        userIdentifier
+        userDid: this.getDIDFromStorage()
       });
       
       return {
