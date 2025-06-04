@@ -119,6 +119,11 @@ export interface WebAuthnAuthenticationResponse {
   type: 'public-key';
   clientExtensionResults: Record<string, any>;
   authenticatorAttachment?: 'platform' | 'cross-platform';
+  authenticatorInfo?: {
+    userAgent: string;
+    platform: string;
+    isVirtualAuthenticator: boolean;
+  };
 }
 
 // Service response types
@@ -168,12 +173,14 @@ export type AuthenticatorTransport = 'usb' | 'nfc' | 'ble' | 'internal' | 'hybri
 
 // Database input type for creating authenticator
 export interface CreateAuthenticatorData {
-  credentialId: string;  // base64url encoded string
-  credentialPublicKey: Buffer;
+  userId: string;
+  credentialId: string;
+  credentialPublicKey: Buffer | Uint8Array;
   counter: number;
   credentialDeviceType: string;
   credentialBackedUp: boolean;
   transports?: AuthenticatorTransportFuture[];
+  friendlyName?: string;
 }
 
 // Database input type for updating authenticator
@@ -199,4 +206,11 @@ export type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
   PublicKeyCredentialDescriptorFuture,
-}; 
+};
+
+// API response types
+export interface WebAuthnOptionsResponse {
+  success: boolean;
+  options: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
+  isRegistration: boolean;
+} 

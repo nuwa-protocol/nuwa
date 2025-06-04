@@ -1,57 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { webauthnService } from '../services/webauthnService.js';
+import { WebAuthnService } from '../services/webauthnService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
 import { SessionService } from '../services/sessionService.js';
+import { DatabaseService } from '../services/database.js';
+import crypto from 'crypto';
+import {
+  registrationOptionsSchema,
+  registrationVerificationSchema,
+  registrationResponseSchema,
+  authenticationOptionsSchema,
+  authenticationResponseSchema,
+} from '../schemas/webauthn.js';
 
 const router: Router = Router();
-
-// Validation schemas
-const registrationOptionsSchema = z.object({
-  email: z.string().email(),
-  display_name: z.string().optional(),
-  friendly_name: z.string().min(1).max(100).optional(),
-});
-
-const registrationResponseSchema = z.object({
-  response: z.object({
-    id: z.string(),
-    rawId: z.string(),
-    response: z.object({
-      attestationObject: z.string(),
-      clientDataJSON: z.string(),
-      transports: z.array(z.string()).optional(),
-    }),
-    type: z.literal('public-key'),
-    clientExtensionResults: z.record(z.any()),
-    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
-  }),
-  friendly_name: z.string().min(1).max(100).optional(),
-});
-
-const authenticationOptionsSchema = z.object({
-  user_identifier: z.string().optional(), // email or user ID
-});
-
-const authenticationResponseSchema = z.object({
-  response: z.object({
-    id: z.string(),
-    rawId: z.string(),
-    response: z.object({
-      authenticatorData: z.string(),
-      clientDataJSON: z.string(),
-      signature: z.string(),
-      userHandle: z.string().optional(),
-    }),
-    type: z.literal('public-key'),
-    clientExtensionResults: z.record(z.any()),
-    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
-  }),
-});
+const webauthnService = new WebAuthnService();
 
 const removeDeviceSchema = z.object({
   params: z.object({
@@ -72,119 +39,119 @@ router.get('/.well-known/webauthn', (req: Request, res: Response) => {
   });
 });
 
-/**
- * POST /api/webauthn/registration/options
- * Generate WebAuthn registration options
- */
-router.post(
-  '/registration/options',
-  validateRequest(registrationOptionsSchema),
-  async (req: Request, res: Response) => {
-    try {
-      logger.debug('Received registration options request', {
-        body: req.body,
-        headers: req.headers,
-      });
+// /**
+//  * POST /api/webauthn/registration/options
+//  * Generate WebAuthn registration options
+//  */
+// router.post(
+//   '/registration/options',
+//   validateRequest(registrationOptionsSchema),
+//   async (req: Request, res: Response) => {
+//     try {
+//       logger.debug('Received registration options request', {
+//         body: req.body,
+//         headers: req.headers,
+//       });
 
-      const { email, display_name, friendly_name } = req.body;
+//       const { email, display_name, friendly_name } = req.body;
 
-      // Check if user exists
-      const { data: { users }, error: userError } = await supabase.auth.admin.listUsers();
-      if (userError) {
-        logger.error('Failed to list users from Supabase', { error: userError });
-        throw userError;
-      }
+//       // Check if user exists
+//       const { data: { users }, error: userError } = await supabase.auth.admin.listUsers();
+//       if (userError) {
+//         logger.error('Failed to list users from Supabase', { error: userError });
+//         throw userError;
+//       }
 
-      logger.debug('Found existing users', { 
-        usersCount: users?.length,
-        emails: users?.map(u => u.email)
-      });
+//       logger.debug('Found existing users', { 
+//         usersCount: users?.length,
+//         emails: users?.map(u => u.email)
+//       });
 
-      const existingUser = users?.find(u => u.email === email);
-      if (!existingUser) {
-        logger.debug('Creating new user', { email, display_name });
-        // Create a new user if not exists
-        const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-          email,
-          email_confirm: true,
-          user_metadata: {
-            full_name: display_name
-          }
-        });
+//       const existingUser = users?.find(u => u.email === email);
+//       if (!existingUser) {
+//         logger.debug('Creating new user', { email, display_name });
+//         // Create a new user if not exists
+//         const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+//           email,
+//           email_confirm: true,
+//           user_metadata: {
+//             full_name: display_name
+//           }
+//         });
 
-        if (createError) {
-          logger.error('Failed to create new user', { error: createError });
-          throw createError;
-        }
+//         if (createError) {
+//           logger.error('Failed to create new user', { error: createError });
+//           throw createError;
+//         }
 
-        logger.debug('New user created', { 
-          userId: newUser.user.id,
-          email: newUser.user.email,
-          metadata: newUser.user.user_metadata
-        });
+//         logger.debug('New user created', { 
+//           userId: newUser.user.id,
+//           email: newUser.user.email,
+//           metadata: newUser.user.user_metadata
+//         });
 
-        const options = await webauthnService.generateRegistrationOptions(
-          newUser.user.id,
-          email,
-          display_name || email
-        );
+//         const options = await webauthnService.generateRegistrationOptions(
+//           newUser.user.id,
+//           email,
+//           display_name || email
+//         );
 
-        logger.debug('Generated registration options for new user', {
-          userId: newUser.user.id,
-          email,
-          options,
-          challengeLength: options.challenge.length,
-          friendlyName: friendly_name,
-        });
+//         logger.debug('Generated registration options for new user', {
+//           userId: newUser.user.id,
+//           email,
+//           options,
+//           challengeLength: options.challenge.length,
+//           friendlyName: friendly_name,
+//         });
 
-        return res.json({
-          success: true,
-          options,
-          user_id: newUser.user.id
-        });
-      }
+//         return res.json({
+//           success: true,
+//           options,
+//           user_id: newUser.user.id
+//         });
+//       }
 
-      logger.debug('Found existing user', { 
-        userId: existingUser.id,
-        email: existingUser.email,
-        metadata: existingUser.user_metadata
-      });
+//       logger.debug('Found existing user', { 
+//         userId: existingUser.id,
+//         email: existingUser.email,
+//         metadata: existingUser.user_metadata
+//       });
 
-      // Generate options for existing user
-      const options = await webauthnService.generateRegistrationOptions(
-        existingUser.id,
-        email,
-        display_name || email
-      );
+//       // Generate options for existing user
+//       const options = await webauthnService.generateRegistrationOptions(
+//         existingUser.id,
+//         email,
+//         display_name || email
+//       );
 
-      logger.debug('Generated registration options for existing user', {
-        userId: existingUser.id,
-        email,
-        options,
-        challengeLength: options.challenge.length,
-        friendlyName: friendly_name,
-      });
+//       logger.debug('Generated registration options for existing user', {
+//         userId: existingUser.id,
+//         email,
+//         options,
+//         challengeLength: options.challenge.length,
+//         friendlyName: friendly_name,
+//       });
 
-      return res.json({
-        success: true,
-        options,
-        user_id: existingUser.id
-      });
-    } catch (error) {
-      logger.error('Failed to generate WebAuthn registration options', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-        body: req.body,
-      });
+//       return res.json({
+//         success: true,
+//         options,
+//         user_id: existingUser.id
+//       });
+//     } catch (error) {
+//       logger.error('Failed to generate WebAuthn registration options', {
+//         error,
+//         stack: error instanceof Error ? error.stack : undefined,
+//         body: req.body,
+//       });
 
-      return res.status(500).json({
-        error: 'Failed to generate registration options',
-        code: 'REGISTRATION_OPTIONS_FAILED',
-        details: process.env['NODE_ENV'] === 'development' ? error : undefined,
-      });
-    }
-  }
-);
+//       return res.status(500).json({
+//         error: 'Failed to generate registration options',
+//         code: 'REGISTRATION_OPTIONS_FAILED',
+//         details: process.env['NODE_ENV'] === 'development' ? error : undefined,
+//       });
+//     }
+//   }
+// );
 
 /**
  * POST /api/webauthn/registration/verify
@@ -285,27 +252,67 @@ router.post(
     try {
       const { user_identifier } = req.body;
       let userId: string | undefined;
-
-      // If user_identifier is provided, try to find the user
+      let isNewUser = false;
+      logger.debug('Received authentication options request', {
+        user_identifier,
+        headers: req.headers,
+      });
+      // 如果提供了用户标识符，尝试查找或创建用户
       if (user_identifier) {
         if (user_identifier.includes('@')) {
-          // Email-based lookup
-          const { data: authUser, error } = await supabase.auth.admin.listUsers();
-          if (!error && authUser.users) {
-            const user = authUser.users.find(u => u.email === user_identifier);
-            if (user) {
-              userId = user.id;
-            }
+          // 通过邮箱查找用户
+          const user = await DatabaseService.getUserByEmail(user_identifier);
+          if (user) {
+            logger.debug('User found', { user });
+            userId = user.id;
+          } else {
+            logger.debug('User not found, creating new user', { user_identifier });
+
+            // 生成临时 DID
+            const tempDid = `did:key:${crypto.randomBytes(32).toString('hex')}`;
+            
+            // 创建新用户
+            const newUser = await DatabaseService.createUser({
+              user_did: tempDid,
+              email: user_identifier,
+              display_name: user_identifier,
+              metadata: {}
+            });
+
+            userId = newUser.id;
+            isNewUser = true;
           }
         } else {
-          // Assume it's a user ID
+          // 假设是用户 ID
           userId = user_identifier;
         }
       }
 
+      // 如果是新用户，生成注册选项
+      if (isNewUser) {
+        const options = await webauthnService.generateRegistrationOptions(
+          userId!,
+          user_identifier,
+          user_identifier
+        );
+
+        logger.info('Generated registration options for new user', {
+          userId,
+          email: user_identifier,
+          challengeLength: options.challenge.length
+        });
+
+        return res.json({
+          success: true,
+          options,
+          isRegistration: true
+        });
+      }
+
+      // 否则生成认证选项
       const options = await webauthnService.generateAuthenticationOptions(userId);
 
-      logger.info('WebAuthn authentication options generated', {
+      logger.info('Generated authentication options', {
         userId: userId || 'anonymous',
         challengeLength: options.challenge.length,
         allowCredentialsCount: options.allowCredentials?.length || 0,
@@ -314,16 +321,17 @@ router.post(
       res.json({
         success: true,
         options,
+        isRegistration: false
       });
     } catch (error) {
-      logger.error('Failed to generate WebAuthn authentication options', {
+      logger.error('Failed to generate WebAuthn options', {
         error,
         userIdentifier: req.body.user_identifier,
       });
 
       res.status(500).json({
-        error: 'Failed to generate authentication options',
-        code: 'AUTHENTICATION_OPTIONS_FAILED',
+        error: 'Failed to generate options',
+        code: 'OPTIONS_FAILED',
         details: process.env.NODE_ENV === 'development' ? error : undefined,
       });
     }
@@ -332,7 +340,7 @@ router.post(
 
 /**
  * POST /api/webauthn/authentication/verify
- * Verify WebAuthn authentication response
+ * Verify WebAuthn authentication or registration response
  */
 router.post(
   '/authentication/verify',
@@ -341,57 +349,121 @@ router.post(
     try {
       const { response } = req.body;
       
-      logger.debug('🎯 Received authentication verification request', {
+      logger.debug('🎯 Received verification request', {
         credentialId: response.id,
         responseType: response.type,
         authenticatorAttachment: response.authenticatorAttachment,
-        hasUserHandle: !!response.response.userHandle,
-        userAgent: req.headers['user-agent'],
-        origin: req.headers.origin,
-        referer: req.headers.referer
+        hasUserHandle: !!response.response.userHandle
       });
 
-      // 分析接收到的authenticatorData
-      try {
-        const authenticatorDataBase64 = response.response.authenticatorData;
-        const authenticatorDataBuffer = Buffer.from(authenticatorDataBase64, 'base64');
-        
-        logger.debug('📥 Received AuthenticatorData (API Layer):', {
-          credentialId: response.id,
-          authenticatorDataBase64Length: authenticatorDataBase64.length,
-          authenticatorDataBufferLength: authenticatorDataBuffer.length,
-          bufferHex: authenticatorDataBuffer.toString('hex'),
-          // 解析counter部分
-          counterBytes: authenticatorDataBuffer.length >= 37 ? 
-            Array.from(authenticatorDataBuffer.slice(33, 37)) : 'insufficient data',
-          extractedCounter: authenticatorDataBuffer.length >= 37 ? 
-            authenticatorDataBuffer.readUInt32BE(33) : 'insufficient data',
-          // 检查flags
-          flagsByte: authenticatorDataBuffer.length > 32 ? 
-            authenticatorDataBuffer[32] : 'no flags',
-          flagsBinary: authenticatorDataBuffer.length > 32 ? 
-            authenticatorDataBuffer[32].toString(2).padStart(8, '0') : 'no flags'
-        });
-      } catch (parseError) {
-        logger.warn('Failed to parse authenticatorData in API layer', { 
-          parseError: parseError instanceof Error ? parseError.message : parseError 
+      // 从 clientDataJSON 中提取 challenge
+      const clientDataJSON = JSON.parse(
+        Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
+      );
+      
+      // 获取 challenge 数据
+      const challengeData = await webauthnService.getChallenge(clientDataJSON.challenge);
+      if (!challengeData) {
+        return res.status(400).json({
+          error: 'Invalid or expired challenge',
+          code: 'INVALID_CHALLENGE'
         });
       }
 
-      const result = await webauthnService.verifyAuthenticationResponse(response);
+      // 检查是否是注册流程
+      const isRegistration = challengeData.operation_type === 'registration';
+      
+      // 验证响应
+      let verificationResult;
+      if (isRegistration) {
+        // 处理注册响应
+        verificationResult = await webauthnService.verifyRegistrationResponse(
+          challengeData.user_id,
+          response as any, // 类型转换
+          'Default Device'
+        );
 
-      if (result.success && result.userId && result.authenticatorId) {
+        if (!verificationResult.success || !verificationResult.authenticator) {
+          return res.status(401).json({
+            success: false,
+            error: verificationResult.error || 'Registration failed',
+            code: 'REGISTRATION_FAILED',
+            details: verificationResult.details,
+          });
+        }
+
+        // 使用注册结果创建会话
+        const userId = challengeData.user_id;
+        const authenticatorId = verificationResult.authenticator.id;
+
         // 获取用户信息
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
-          .eq('id', result.userId)
+          .eq('id', userId)
           .single();
 
         if (userError || !userData) {
           logger.error('Failed to get user data', {
             error: userError,
-            userId: result.userId,
+            userId,
+          });
+          throw new Error('Failed to get user data');
+        }
+
+        // 创建新会话
+        const sessionService = new SessionService();
+        const session = await sessionService.createSession(
+          userId,
+          verificationResult.authenticator.credentialId,
+          {
+            email: userData.email,
+            display_name: userData.display_name
+          }
+        );
+
+        logger.info('WebAuthn registration successful', {
+          userId,
+          authenticatorId,
+          sessionId: session.id
+        });
+
+        return res.json({
+          success: true,
+          session: {
+            session_token: session.session_token,
+            expires_at: session.expires_at,
+            user: {
+              id: userData.id,
+              email: userData.email,
+              display_name: userData.display_name
+            }
+          }
+        });
+      } else {
+        // 处理认证响应
+        verificationResult = await webauthnService.verifyAuthenticationResponse(response);
+
+        if (!verificationResult.success || !verificationResult.userId || !verificationResult.authenticatorId) {
+          return res.status(401).json({
+            success: false,
+            error: verificationResult.error || 'Authentication failed',
+            code: 'AUTHENTICATION_FAILED',
+            details: verificationResult.details,
+          });
+        }
+
+        // 获取用户信息
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', verificationResult.userId)
+          .single();
+
+        if (userError || !userData) {
+          logger.error('Failed to get user data', {
+            error: userError,
+            userId: verificationResult.userId,
           });
           throw new Error('Failed to get user data');
         }
@@ -401,7 +473,7 @@ router.post(
         const { data: authenticator } = await supabase
           .from('authenticators')
           .select('credential_id')
-          .eq('id', result.authenticatorId)
+          .eq('id', verificationResult.authenticatorId)
           .single();
 
         if (!authenticator) {
@@ -409,7 +481,7 @@ router.post(
         }
 
         const session = await sessionService.createSession(
-          result.userId,
+          verificationResult.userId,
           authenticator.credential_id,
           {
             email: userData.email,
@@ -417,10 +489,9 @@ router.post(
           }
         );
 
-
         logger.info('WebAuthn authentication successful', {
-          userId: result.userId,
-          authenticatorId: result.authenticatorId,
+          userId: verificationResult.userId,
+          authenticatorId: verificationResult.authenticatorId,
           sessionId: session.id
         });
 
@@ -437,27 +508,15 @@ router.post(
           }
         });
       }
-
-      logger.warn('WebAuthn authentication failed', {
-        error: result.error,
-        details: result.details,
-      });
-
-      return res.status(401).json({
-        success: false,
-        error: result.error || 'Authentication failed',
-        code: 'AUTHENTICATION_FAILED',
-        details: result.details,
-      });
     } catch (error) {
-      logger.error('WebAuthn authentication verification error', {
+      logger.error('WebAuthn verification error', {
         error,
         stack: error instanceof Error ? error.stack : undefined,
       });
 
       return res.status(500).json({
-        error: 'Authentication verification failed',
-        code: 'AUTHENTICATION_ERROR',
+        error: 'Verification failed',
+        code: 'VERIFICATION_ERROR',
         details: process.env.NODE_ENV === 'development' ? error : undefined,
       });
     }

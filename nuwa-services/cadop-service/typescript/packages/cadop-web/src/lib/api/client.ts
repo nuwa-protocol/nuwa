@@ -9,14 +9,15 @@ import type {
   PasskeyRegistrationOptions,
   PasskeyAuthenticationOptions,
   PasskeyRegistrationResponse,
-  PasskeyAuthenticationResponse,
   PasskeyRegistrationResult,
-  PasskeyAuthenticationResult,
-} from '../passkey/types';
+  WebAuthnOptionsResponse,
+  WebAuthnAuthenticationResponse,
+  WebAuthnAuthenticationResult,
+} from '@cadop/shared';
 
 interface APIError {
-  code: string;
   message: string;
+  code?: string;
   details?: unknown;
 }
 
@@ -75,9 +76,8 @@ class APIClient {
     if (!response.ok) {
       return {
         error: {
-          code: response.status.toString(),
           message: responseData?.message || responseData?.error || `HTTP error ${response.status}`,
-          details: responseData
+          code: responseData?.code,
         }
       };
     }
@@ -218,67 +218,69 @@ class APIClient {
     }, { skipAuth: true });
   }
 
-  public async getAuthenticationOptions(
-    email?: string
-  ): Promise<APIResponse<{ options: PasskeyAuthenticationOptions }>> {
-    console.debug('Getting authentication options:', { email });
-    return this.post('/api/webauthn/authentication/options', { email });
+  public async getAuthenticationOptions(userIdentifier?: string): Promise<APIResponse<WebAuthnOptionsResponse>> {
+    try {
+      const response = await fetch('/api/webauthn/authentication/options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_identifier: userIdentifier }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return {
+          error: {
+            message: error.error_description || error.error || 'Failed to get authentication options',
+            code: error.code,
+            details: error,
+          },
+        };
+      }
+
+      const data: WebAuthnOptionsResponse = await response.json();
+      return { data };
+    } catch (error) {
+      return {
+        error: {
+          message: error instanceof Error ? error.message : 'Failed to get authentication options',
+          code: 'API_ERROR',
+          details: error,
+        },
+      };
+    }
   }
 
-  public async verifyAuthentication(
-    response: PasskeyAuthenticationResponse
-  ): Promise<APIResponse<PasskeyAuthenticationResult>> {
-    console.debug('🔍 Verifying authentication (API Client):', { 
-      credentialId: response.id,
-      responseType: response.type,
-      hasSignature: !!response.response.signature,
-      authenticatorDataLength: response.response.authenticatorData?.length || 0,
-      clientDataJSONLength: response.response.clientDataJSON?.length || 0
-    });
-
+  public async verifyAuthentication(response: WebAuthnAuthenticationResponse): Promise<APIResponse<WebAuthnAuthenticationResult>> {
     try {
-      const result = await this.post<PasskeyAuthenticationResult>('/api/webauthn/authentication/verify', { response });
-      
-      console.debug('📬 Authentication verification API response:', {
-        credentialId: response.id,
-        hasData: !!result.data,
-        hasError: !!result.error,
-        dataSuccess: result.data?.success,
-        errorMessage: result.error?.message,
-        errorCode: result.error?.code,
-        sessionPresent: !!result.data?.session,
-        userIdPresent: !!result.data?.session?.user?.id
+      const apiResponse = await fetch('/api/webauthn/authentication/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ response }),
       });
 
-      // 检查响应的完整性
-      if (result.data?.success && !result.data.session) {
-        console.warn('⚠️ Authentication marked as successful but no session data received', {
-          credentialId: response.id,
-          resultData: result.data
-        });
+      if (!apiResponse.ok) {
+        const error = await apiResponse.json();
+        return {
+          error: {
+            message: error.error_description || error.error || 'Failed to verify authentication',
+            code: error.code,
+            details: error,
+          },
+        };
       }
 
-      if (result.error) {
-        console.error('❌ Authentication verification API error:', {
-          credentialId: response.id,
-          error: result.error,
-          wasSuccessful: result.data?.success
-        });
-      }
-
-      return result;
-    } catch (exception) {
-      console.error('💥 Exception during authentication verification API call:', {
-        credentialId: response.id,
-        exception: exception instanceof Error ? exception.message : exception,
-        stack: exception instanceof Error ? exception.stack : undefined
-      });
-
+      const data: WebAuthnAuthenticationResult = await apiResponse.json();
+      return { data };
+    } catch (error) {
       return {
-        data: undefined,
         error: {
-          message: exception instanceof Error ? exception.message : 'API call failed',
-          code: 'API_EXCEPTION',
+          message: error instanceof Error ? error.message : 'Failed to verify authentication',
+          code: 'API_ERROR',
+          details: error,
         },
       };
     }
