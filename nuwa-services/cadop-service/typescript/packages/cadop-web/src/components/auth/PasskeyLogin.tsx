@@ -5,11 +5,9 @@ import { useAuth } from '../../lib/auth/AuthContext';
 interface PasskeyLoginProps {
   onSuccess: (userId: string) => void;
   onError: (error: string) => void;
-  email?: string;
 }
 
-export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: PasskeyLoginProps) {
-  const [email, setEmail] = useState(initialEmail || '');
+export function PasskeyLogin({ onSuccess, onError }: PasskeyLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [onePasswordWarning, setOnePasswordWarning] = useState<string | null>(null);
 
@@ -39,7 +37,7 @@ export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: Passke
       }
 
       // 尝试认证，服务端会自动处理注册流程
-      const authResult = await passkeyService.authenticate(email || undefined);
+      const authResult = await passkeyService.authenticate();
       if (authResult.success && authResult.session) {
         // Convert the session data to match AuthContext expectations
         const session = {
@@ -59,7 +57,7 @@ export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: Passke
     } finally {
       setIsLoading(false);
     }
-  }, [email, onError, signIn, onSuccess]);
+  }, [onError, signIn, onSuccess]);
 
   return (
     <div className="flex flex-col space-y-4">
@@ -70,22 +68,6 @@ export function PasskeyLogin({ onSuccess, onError, email: initialEmail }: Passke
           <strong>⚠️ 提示：</strong> {onePasswordWarning}
         </div>
       )}
-      
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Email
-        </label>
-        <input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          placeholder="Enter your email"
-          required
-          disabled={isLoading}
-        />
-      </div>
       
       <button
         onClick={handlePasskeyAuth}

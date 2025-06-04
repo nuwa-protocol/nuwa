@@ -146,6 +146,15 @@ export interface WebAuthnAuthenticationResult {
   authenticatorId?: string;
   error?: string;
   details?: any;
+  session?: {
+    session_token: string;
+    expires_at: string;
+    user: {
+      id: string;
+      email?: string;
+      display_name?: string;
+    }
+  }
 }
 
 // Configuration types
