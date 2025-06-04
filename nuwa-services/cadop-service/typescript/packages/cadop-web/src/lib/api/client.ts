@@ -6,13 +6,11 @@
 
 import { supabase } from '../supabase/config';
 import type {
-  PasskeyRegistrationOptions,
-  PasskeyAuthenticationOptions,
-  PasskeyRegistrationResponse,
-  PasskeyRegistrationResult,
   WebAuthnOptionsResponse,
   WebAuthnAuthenticationResponse,
   WebAuthnAuthenticationResult,
+  WebAuthnRegistrationResponse,
+  PublicKeyCredentialCreationOptionsJSON,
 } from '@cadop/shared';
 
 interface APIError {
@@ -191,7 +189,7 @@ class APIClient {
     email: string,
     displayName?: string,
     friendlyName?: string
-  ): Promise<APIResponse<{ options: PasskeyRegistrationOptions; user_id: string }>> {
+  ): Promise<APIResponse<{ options: PublicKeyCredentialCreationOptionsJSON; user_id: string }>> {
     console.debug('Getting registration options:', {
       email,
       displayName,
@@ -204,15 +202,15 @@ class APIClient {
     });
   }
 
-  public async verifyRegistration(
-    response: PasskeyRegistrationResponse,
+  public async verify(
+    response: WebAuthnRegistrationResponse | WebAuthnAuthenticationResponse,
     friendlyName?: string
-  ): Promise<APIResponse<PasskeyRegistrationResult>> {
-    console.debug('Verifying registration:', {
+  ): Promise<APIResponse<WebAuthnAuthenticationResult>> {
+    console.debug('Verifying WebAuthn response:', {
       response,
       friendlyName
     });
-    return this.post('/api/webauthn/registration/verify', {
+    return this.post('/api/webauthn/verify', {
       response,
       friendly_name: friendlyName,
     }, { skipAuth: true });
@@ -245,40 +243,6 @@ class APIClient {
       return {
         error: {
           message: error instanceof Error ? error.message : 'Failed to get authentication options',
-          code: 'API_ERROR',
-          details: error,
-        },
-      };
-    }
-  }
-
-  public async verifyAuthentication(response: WebAuthnAuthenticationResponse): Promise<APIResponse<WebAuthnAuthenticationResult>> {
-    try {
-      const apiResponse = await fetch('/api/webauthn/authentication/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ response }),
-      });
-
-      if (!apiResponse.ok) {
-        const error = await apiResponse.json();
-        return {
-          error: {
-            message: error.error_description || error.error || 'Failed to verify authentication',
-            code: error.code,
-            details: error,
-          },
-        };
-      }
-
-      const data: WebAuthnAuthenticationResult = await apiResponse.json();
-      return { data };
-    } catch (error) {
-      return {
-        error: {
-          message: error instanceof Error ? error.message : 'Failed to verify authentication',
           code: 'API_ERROR',
           details: error,
         },
