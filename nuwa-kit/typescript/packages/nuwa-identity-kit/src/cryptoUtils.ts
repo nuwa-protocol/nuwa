@@ -1,5 +1,5 @@
 import { base58btc } from 'multiformats/bases/base58';
-import { base64url } from 'multiformats/bases/base64';
+import { base64urlpad } from 'multiformats/bases/base64';
 import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from './types';
 import { defaultCryptoProviderFactory } from './crypto/factory';
 
@@ -57,7 +57,7 @@ export class CryptoUtils {
     }
 
     // Convert base64url-encoded x coordinate to Uint8Array
-    const publicKeyBytes = base64url.decode(jwk.x);
+    const publicKeyBytes = base64urlpad.decode(jwk.x);
     
     // Use existing publicKeyToMultibase method to handle the conversion
     return CryptoUtils.publicKeyToMultibase(publicKeyBytes, keyType);
@@ -74,7 +74,7 @@ export class CryptoUtils {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
     const signature = await provider.sign(data, privateKey);
-    return base64url.encode(signature);
+    return base64urlpad.encode(signature);
   }
 
   /**
@@ -88,7 +88,7 @@ export class CryptoUtils {
   static async verify(data: Uint8Array, signature: string, publicKey: Uint8Array | JsonWebKey, type: KeyTypeInput): Promise<boolean> {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
-    const signatureBytes = base64url.decode(signature);
+    const signatureBytes = base64urlpad.decode(signature);
     return provider.verify(data, signatureBytes, publicKey);
   }
 }
