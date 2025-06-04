@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase.js';
+import { logger } from '../utils/logger.js';
+import { Session as WebAuthnSession } from '@cadop/shared';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret';
 const ACCESS_TOKEN_EXPIRES_IN = '1h';
@@ -37,32 +39,91 @@ export class SessionService {
   }
 
   async createSession(
-    userId: string, 
-    passkeyCredentialId: string,
-    metadata: Record<string, any> = {}
-  ): Promise<Session> {
-    const { sessionToken, expiresIn } = this.generateSessionToken(userId, metadata);
-    
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + expiresIn);
-
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .insert({
-        user_id: userId,
-        passkey_credential_id: passkeyCredentialId,
-        session_token: sessionToken,
-        expires_at: expiresAt,
+    userId: string,
+    credentialId: string,
+    metadata: Record<string, any>
+  ): Promise<WebAuthnSession> {
+    try {
+      logger.debug('Creating session', {
+        userId,
+        credentialId,
         metadata
-      })
-      .select()
-      .single();
+      });
 
-    if (error) {
-      throw new Error(`Failed to create session: ${error.message}`);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
+      // 生成 session token
+      const { sessionToken } = this.generateSessionToken(userId, metadata);
+
+      logger.debug('Generated session token', {
+        userId,
+        expiresAt: expiresAt.toISOString()
+      });
+
+      const { data: user } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+
+      logger.debug('Found user for session', {
+        userId: user.id,
+        displayName: user.display_name
+      });
+
+      const { data: session, error } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: userId,
+          passkey_credential_id: credentialId,
+          session_token: sessionToken, // 添加生成的 session token
+          metadata,
+          expires_at: expiresAt.toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        logger.error('Failed to insert session into database', {
+          error: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId,
+          credentialId
+        });
+        throw error;
+      }
+
+      logger.debug('Session created successfully', {
+        sessionId: session.id,
+        userId,
+        expiresAt: session.expires_at
+      });
+
+      return {
+        id: session.id,
+        session_token: session.session_token,
+        expires_at: session.expires_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          display_name: user.display_name
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to create session', { 
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        credentialId
+      });
+      throw error;
     }
-
-    return session as Session;
   }
 
   async validateSession(sessionToken: string): Promise<{

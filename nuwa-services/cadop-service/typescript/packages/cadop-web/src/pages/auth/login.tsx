@@ -9,8 +9,6 @@ export function LoginPage() {
   const location = useLocation();
   const { signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState<string>('');
-  const [showEmailInput, setShowEmailInput] = useState<boolean>(false);
 
   // Get the page user was trying to access
   const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard';
@@ -74,52 +72,12 @@ export function LoginPage() {
 
           {/* Passkey login */}
           <div className="space-y-6">
-            {showEmailInput ? (
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email address (optional)
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    placeholder="Enter your email"
-                  />
-                </div>
-                <div className="mt-2 flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailInput(false)}
-                    className="text-sm text-gray-600 hover:text-gray-900"
-                  >
-                    Cancel
-                  </button>
-                  <PasskeyLogin
-                    onSuccess={handleLoginSuccess}
-                    onError={handleLoginError}
-                    email={email}
-                  />
-                </div>
-              </div>
-            ) : (
               <div className="space-y-4">
                 <PasskeyLogin
                   onSuccess={handleLoginSuccess}
                   onError={handleLoginError}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowEmailInput(true)}
-                  className="text-sm text-indigo-600 hover:text-indigo-900"
-                >
-                  Use email to find your Passkey
-                </button>
               </div>
-            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

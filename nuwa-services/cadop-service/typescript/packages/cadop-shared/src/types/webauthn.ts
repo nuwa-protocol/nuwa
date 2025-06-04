@@ -12,6 +12,9 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
   PublicKeyCredentialDescriptorFuture,
+  PublicKeyCredentialRequestOptions,
+  PublicKeyCredential,
+  PublicKeyCredentialDescriptorJSON,
 } from '@simplewebauthn/types';
 
 // Database types for authenticators
@@ -170,6 +173,7 @@ export interface WebAuthnConfig {
 export class WebAuthnError extends Error {
   constructor(
     message: string,
+    public code: WebAuthnErrorCode,
     public details?: any
   ) {
     super(message);
@@ -194,6 +198,7 @@ export interface CreateAuthenticatorData {
 
 // Database input type for updating authenticator
 export interface UpdateAuthenticatorData {
+  id: string;
   counter: number;
   lastUsedAt: Date;
 }
@@ -222,4 +227,85 @@ export interface WebAuthnOptionsResponse {
   success: boolean;
   options: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
   isRegistration: boolean;
+}
+
+// 统一认证选项
+export interface AuthenticationOptions {
+  publicKey: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
+  isNewUser?: boolean;
+  user?: {
+    did?: string;
+    name?: string;
+    displayName?: string;
+  }
+}
+
+// 统一认证结果
+export interface AuthenticationResult {
+  success: boolean;
+  credential?: PublicKeyCredentialDescriptorJSON;
+  session?: SessionInfo;
+  error?: WebAuthnError;
+  isNewUser?: boolean;
+}
+
+// 会话信息
+export interface SessionInfo {
+  session_token: string;
+  expires_at: string;
+  user: {
+    id: string;
+    email?: string;
+    display_name?: string;
+  }
+}
+
+// Session 类型
+export interface Session {
+  id: string;
+  session_token: string;
+  expires_at: string;
+  user: {
+    id: string;
+    email?: string;
+    display_name?: string;
+  }
+}
+
+// 错误码定义
+export enum WebAuthnErrorCode {
+  // 基础错误
+  NOT_SUPPORTED = 'NOT_SUPPORTED',
+  INVALID_STATE = 'INVALID_STATE',
+  
+  // 注册相关
+  REGISTRATION_FAILED = 'REGISTRATION_FAILED',
+  DUPLICATE_REGISTRATION = 'DUPLICATE_REGISTRATION',
+  
+  // 认证相关
+  AUTHENTICATION_FAILED = 'AUTHENTICATION_FAILED',
+  INVALID_CREDENTIAL = 'INVALID_CREDENTIAL',
+  
+  // 挑战相关
+  INVALID_CHALLENGE = 'INVALID_CHALLENGE',
+  CHALLENGE_EXPIRED = 'CHALLENGE_EXPIRED',
+  
+  // 用户相关
+  USER_NOT_FOUND = 'USER_NOT_FOUND',
+  USER_CANCELLED = 'USER_CANCELLED',
+  
+  // 系统错误
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  DATABASE_ERROR = 'DATABASE_ERROR',
+  REMOVE_DEVICE_FAILED = 'REMOVE_DEVICE_FAILED'
+}
+
+// 凭证信息
+export interface CredentialInfo {
+  id: string;
+  name: string;
+  type: string;
+  lastUsed: string;
+  credentialId: string;
+  transports: AuthenticatorTransportFuture[];
 } 

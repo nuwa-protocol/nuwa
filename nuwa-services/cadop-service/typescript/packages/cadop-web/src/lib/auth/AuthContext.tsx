@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { AuthContextType, Session } from './types';
+import type { AuthContextType } from './types';
+import type { Session } from '@cadop/shared';
 import { apiClient } from '../api/client';
 
 const SESSION_STORAGE_KEY = 'cadop_session';

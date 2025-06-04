@@ -12,7 +12,6 @@ import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import custodianRouter from './routes/custodian.js';
 import { proofRouter } from './routes/proof.js';
-import { oidcRouter } from './routes/oidc.js';
 import webauthnRouter from './routes/webauthn.js';
 import { cryptoService } from './services/crypto.js';
 import fs from 'fs';
@@ -104,7 +103,6 @@ app.use('/auth', authRouter);
 app.use('/api/custodian', custodianRouter);
 app.use('/api/proof', proofRouter);
 app.use('/api/webauthn', webauthnRouter);
-app.use('/', oidcRouter);
 
 // Serve React app for non-static routes
 app.get('*', (req, res) => {

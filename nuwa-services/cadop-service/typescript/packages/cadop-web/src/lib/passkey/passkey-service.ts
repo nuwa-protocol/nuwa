@@ -1,23 +1,30 @@
-import type {
-  WebAuthnOptionsResponse,
-  WebAuthnAuthenticationResponse,
-  WebAuthnAuthenticationResult,
-  WebAuthnRegistrationResponse,
+import {
+  AuthenticationOptions,
+  AuthenticationResult,
+  WebAuthnError,
+  WebAuthnErrorCode,
+  CredentialInfo,
+  DIDKeyManager
 } from '@cadop/shared';
 
 import type {
-  AuthenticatorTransport,
-  PublicKeyCredentialDescriptor,
   AuthenticatorTransportFuture,
+  PublicKeyCredentialDescriptor,
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+  AuthenticatorAttachment,
+  UserVerificationRequirement,
+  AuthenticatorSelectionCriteria,
   AttestationConveyancePreference,
+  PublicKeyCredentialParameters
 } from '@simplewebauthn/types';
 
 import { apiClient } from '../api/client';
-import { DIDKeyManager } from './did-key';
+import { decode } from 'cbor2';
 
-export class PasskeyService {
+export class WebAuthnService {
   private developmentMode = import.meta.env.DEV;
   private localStorageKey = 'passkey_did';
 
@@ -36,7 +43,7 @@ export class PasskeyService {
   }
 
   /**
-   * Check if the browser supports WebAuthn/Passkey
+   * 检查浏览器是否支持 WebAuthn
    */
   public async isSupported(): Promise<boolean> {
     return window.PublicKeyCredential !== undefined &&
@@ -44,272 +51,379 @@ export class PasskeyService {
   }
 
   /**
-   * Check if 1Password might be interfering with WebAuthn
+   * 统一的认证方法（包含注册和登录）
    */
-  public async check1PasswordInterference(): Promise<{
-    detected: boolean;
-    message?: string;
-    recommendation?: string;
-  }> {
-    try {
-      // 检查是否有 1Password 扩展
-      const has1PasswordExtension = !!(window as any).OnePasswordExtension || 
-                                   document.querySelector('[data-1p-ignore]') ||
-                                   document.querySelector('.onepassword-extension-element');
-
-      if (has1PasswordExtension) {
-        return {
-          detected: true,
-          message: '检测到 1Password 扩展可能会拦截 WebAuthn 请求',
-          recommendation: '建议在开发时暂时禁用 1Password 扩展或使用 Chrome DevTools 虚拟认证器'
-        };
-      }
-
-      return { detected: false };
-    } catch (error) {
-      return { detected: false };
-    }
-  }
-
-  /**
-   * Authenticate with Passkey
-   * If user doesn't exist, server will handle registration automatically
-   */
-  public async authenticate(): Promise<WebAuthnAuthenticationResult> {
+  public async authenticate(options?: {
+    name?: string;
+    displayName?: string;
+  }): Promise<AuthenticationResult> {
     try {
       // 尝试从本地存储获取 DID
-      let userDid = this.getDIDFromStorage() || undefined;
+      const userDid = this.getDIDFromStorage();
       console.log('🔑 Retrieved DID from storage:', { userDid });
 
-      // 1. Get authentication options from server
-      const { data, error } = await apiClient.getAuthenticationOptions(userDid);
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to get authentication options');
-      }
-
-      if (!data?.options) {
-        throw new Error('No authentication options returned from server');
-      }
-
-      const optionsResponse = data as WebAuthnOptionsResponse;
-
-      console.log('📋 Received options from server', { 
-        isRegistration: optionsResponse.isRegistration,
-        challengeLength: optionsResponse.options.challenge.length,
-        allowCredentialsCount: 'allowCredentials' in optionsResponse.options ? optionsResponse.options.allowCredentials?.length || 0 : 'N/A'
+      // 1. 获取认证选项
+      console.log('📡 Requesting authentication options from server...');
+      const { data, error } = await apiClient.post<AuthenticationOptions>('/api/webauthn/options', {
+        user_did: userDid,
+        name: options?.name,
+        display_name: options?.displayName
       });
 
-      let credential: PublicKeyCredential;
-      
-      // 2. 根据返回的选项类型调用不同的浏览器 API
-      if (optionsResponse.isRegistration) {
-        // 处理注册流程
-        const registrationOptions = optionsResponse.options as PublicKeyCredentialCreationOptionsJSON;
-        const credentialOptions = this.preformatRegistrationOptions(registrationOptions);
-        
-        // 配置认证器选项，启用 resident key
-        credentialOptions.authenticatorSelection = {
-          authenticatorAttachment: 'platform', // 使用平台认证器
-          requireResidentKey: true, // 要求使用 resident key
-          residentKey: 'required', // 明确要求 resident key
-          userVerification: 'preferred'
-        };
-        
-        // 在开发环境中添加额外的日志
-        if (this.developmentMode) {
-          console.log('🔧 Authenticator selection options:', {
-            authenticatorSelection: credentialOptions.authenticatorSelection
-          });
-        }
-
-        credential = await navigator.credentials.create({
-          publicKey: credentialOptions,
-        }) as PublicKeyCredential;
-
-        console.log('🆔 Authenticator used for registration:', {
-          authenticatorAttachment: credential.authenticatorAttachment,
-          id: credential.id
-        });
-
-        // 从认证器响应中获取公钥并生成 DID
-        const response = credential.response as AuthenticatorAttestationResponse;
-        const publicKey = response.getPublicKey();
-        if (publicKey) {
-          userDid = await DIDKeyManager.generateDIDFromPublicKey(publicKey);
-          this.saveDIDToStorage(userDid);
-          console.log('🔑 Generated and saved DID:', { userDid });
-        }
-
-        // 调用统一的验证接口
-        const verificationResult = await apiClient.verify(
-          this.formatRegistrationResponse(credential),
-          'Default Device',
-          userDid // 传递生成的 did:key
+      if (error) {
+        console.error('💥 Server error while getting options:', error);
+        throw new WebAuthnError(
+          error.message || 'Failed to get authentication options',
+          WebAuthnErrorCode.INTERNAL_ERROR
         );
+      }
 
-        if (verificationResult.error) {
-          throw new Error(verificationResult.error.message);
+      if (!data?.publicKey) {
+        console.error('💥 No publicKey in server response:', data);
+        throw new WebAuthnError(
+          'No authentication options returned from server',
+          WebAuthnErrorCode.INVALID_STATE
+        );
+      }
+
+      console.log('📋 Received options from server', {
+        isNewUser: data.isNewUser,
+        publicKey: data.publicKey,
+        rpId: ('rp' in data.publicKey ? data.publicKey.rp?.id : data.publicKey.rpId) || 'unknown',
+        challenge: data.publicKey.challenge
+      });
+
+      // 2. 调用浏览器 API
+      let credential: PublicKeyCredential;
+      let response: RegistrationResponseJSON | AuthenticationResponseJSON;
+
+      if (data.isNewUser) {
+        // 注册流程
+        console.log('🆕 Starting registration flow...');
+        const createOptions = this.preformatCreateOptions(data.publicKey as PublicKeyCredentialCreationOptionsJSON);
+        
+        console.log('🔧 Calling navigator.credentials.create()...');
+        try {
+          credential = await navigator.credentials.create({
+            publicKey: createOptions
+          }) as PublicKeyCredential;
+        } catch (webauthnError) {
+          console.error('💥 WebAuthn registration failed:', webauthnError);
+          
+          // 检查常见错误
+          if (webauthnError instanceof Error) {
+            if (webauthnError.name === 'NotAllowedError') {
+              throw new WebAuthnError(
+                'User denied the registration request or operation timed out',
+                WebAuthnErrorCode.USER_CANCELLED
+              );
+            } else if (webauthnError.name === 'NotSupportedError') {
+              throw new WebAuthnError(
+                'WebAuthn is not supported on this device',
+                WebAuthnErrorCode.NOT_SUPPORTED
+              );
+            }
+          }
+          throw webauthnError;
         }
 
-        return verificationResult.data || {
-          success: false,
-          error: 'No data returned from server'
-        };
-
-      } else {
-        // 处理认证流程
-        const authenticationOptions = optionsResponse.options as PublicKeyCredentialRequestOptionsJSON;
-        const authOptions = this.preformatAuthenticationOptions(authenticationOptions);
-        
-        // 配置认证选项
-        authOptions.mediation = 'conditional'; // 使用 conditional mediation
-        authOptions.userVerification = 'preferred';
-        
-        if (this.developmentMode) {
-          console.log('🔧 Authentication options:', {
-            mediation: authOptions.mediation,
-            userVerification: authOptions.userVerification,
-            allowCredentialsCount: authOptions.allowCredentials?.length || 0
-          });
-        }
-
-        credential = await navigator.credentials.get({
-          publicKey: authOptions,
-        }) as PublicKeyCredential;
-
-        console.log('🔐 Credential obtained from authenticator', {
-          credentialId: credential.id,
+        console.log('🆔 Created new credential:', {
+          id: credential.id,
           type: credential.type,
-          authenticatorAttachment: credential.authenticatorAttachment,
-          possibleAuthenticator: this.identifyAuthenticator(credential)
+          authenticatorAttachment: credential.authenticatorAttachment
         });
+
+        response = this.formatRegistrationResponse(credential);
+
+        // 生成 DID
+        const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+        const publicKey = attestationResponse.getPublicKey();
+        if (publicKey) {
+          const publicKeyArray = new Uint8Array(publicKey);
+          
+          // 打印完整的公钥数据以进行调试
+          console.log('🔑 Raw Public Key Data:', {
+            hex: Array.from(publicKeyArray).map(b => b.toString(16).padStart(2, '0')).join(''),
+            bytes: Array.from(publicKeyArray),
+            length: publicKeyArray.length
+          });
+          
+          // 解析 ASN.1 DER 编码的公钥
+          try {
+            // SPKI 格式中的 P-256 公钥：
+            // 前缀: 3059301306072A8648CE3D020106082A8648CE3D030107034200
+            // 0x04: 未压缩格式标记
+            // [32 bytes]: x 坐标
+            // [32 bytes]: y 坐标
+            
+            // 找到 0x04 标记（未压缩格式的 EC 公钥标记）
+            let i = 0;
+            while (i < publicKeyArray.length) {
+              if (publicKeyArray[i] === 0x04) {
+                break;
+              }
+              i++;
+            }
+            
+            if (i >= publicKeyArray.length) {
+              throw new Error('EC public key marker not found');
+            }
+            
+            // 提取 x 坐标（32字节）
+            const rawPublicKey = publicKeyArray.slice(i + 1, i + 33);
+            const rawPublicKeyHex = Array.from(rawPublicKey)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('');
+
+            console.log('🔑 Extracted Public Key (x coordinate):', {
+              hex: rawPublicKeyHex,
+              length: rawPublicKey.length,
+              expectedLength: 32,
+              startIndex: i + 1
+            });
+            
+            // 使用提取的公钥生成 DID
+            const rawPublicKeyBuffer = rawPublicKey.buffer.slice(
+              rawPublicKey.byteOffset,
+              rawPublicKey.byteOffset + rawPublicKey.length
+            );
+            
+            const did = await DIDKeyManager.generateDIDFromEd25519PublicKey(rawPublicKeyBuffer);
+            this.saveDIDToStorage(did);
+            console.log('🔑 Generated and saved DID:', { did });
+          } catch (error) {
+            console.error('Failed to process public key:', error);
+            throw new WebAuthnError(
+              'Failed to process public key',
+              WebAuthnErrorCode.INTERNAL_ERROR,
+              error
+            );
+          }
+        }
+      } else {
+        // 登录流程
+        console.log('🔐 Starting authentication flow...');
+        const getOptions = this.preformatRequestOptions(data.publicKey as PublicKeyCredentialRequestOptionsJSON);
+        
+        console.log('🔧 Calling navigator.credentials.get()...');
+        try {
+          credential = await navigator.credentials.get({
+            publicKey: getOptions
+          }) as PublicKeyCredential;
+        } catch (webauthnError) {
+          console.error('💥 WebAuthn authentication failed:', webauthnError);
+          
+          // 检查常见错误
+          if (webauthnError instanceof Error) {
+            if (webauthnError.name === 'NotAllowedError') {
+              throw new WebAuthnError(
+                'User denied the authentication request or operation timed out',
+                WebAuthnErrorCode.USER_CANCELLED
+              );
+            } else if (webauthnError.name === 'InvalidStateError') {
+              throw new WebAuthnError(
+                'No matching credentials found on this device',
+                WebAuthnErrorCode.INVALID_CREDENTIAL
+              );
+            }
+          }
+          throw webauthnError;
+        }
+
+        console.log('🔐 Retrieved credential:', {
+          id: credential.id,
+          type: credential.type,
+          authenticatorAttachment: credential.authenticatorAttachment
+        });
+
+        response = this.formatAuthenticationResponse(credential);
       }
 
       // 3. 验证响应
-      console.log('🔍 Sending verification request to server...');
-      const verificationResult = await apiClient.verify(
-        this.formatAuthenticationResponse(credential)
-      );
-
-      console.log('📬 Received verification result from server', {
-        success: !!verificationResult.data?.success,
-        hasError: !!verificationResult.error,
-        errorMessage: verificationResult.error?.message,
-        resultData: verificationResult.data
+      console.log('📤 Sending verification request to server...');
+      const verificationResult = await apiClient.post<AuthenticationResult>('/api/webauthn/verify', {
+        response
       });
 
       if (verificationResult.error) {
-        throw new Error(verificationResult.error.message);
+        console.error('💥 Server verification failed:', verificationResult.error);
+        throw new WebAuthnError(
+          verificationResult.error.message,
+          WebAuthnErrorCode.AUTHENTICATION_FAILED
+        );
       }
 
-      return verificationResult.data || {
+      const result = verificationResult.data || {
         success: false,
-        error: 'No data returned from server'
+        error: new WebAuthnError(
+          'No data returned from server',
+          WebAuthnErrorCode.INTERNAL_ERROR
+        )
       };
-    } catch (error) {
-      console.error('💥 Passkey authentication failed with exception', {
-        error: error instanceof Error ? error.message : error,
-        userDid: this.getDIDFromStorage()
+
+      console.log('✅ Authentication completed successfully:', {
+        success: result.success,
+        isNewUser: result.isNewUser,
+        hasSession: !!result.session
       });
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Authentication failed',
-      };
+
+      return result;
+    } catch (error) {
+      console.error('💥 Authentication failed:', error);
+      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+        error instanceof Error ? error.message : 'Authentication failed',
+        WebAuthnErrorCode.AUTHENTICATION_FAILED,
+        error
+      );
     }
   }
 
   /**
-   * Helper: Format registration options for the browser
+   * 获取用户的凭证列表
    */
-  private preformatRegistrationOptions(
-    options: PublicKeyCredentialCreationOptionsJSON
-  ): PublicKeyCredentialCreationOptions {
-    return {
-      ...options,
-      challenge: this.base64urlToArrayBuffer(options.challenge),
-      user: {
-        ...options.user,
-        id: this.base64urlToArrayBuffer(options.user.id),
-      },
-      excludeCredentials: options.excludeCredentials?.map(credential => ({
-        ...credential,
-        id: this.base64urlToArrayBuffer(credential.id),
-        transports: credential.transports as AuthenticatorTransport[],
-      })) as PublicKeyCredentialDescriptor[],
-      attestation: options.attestation as AttestationConveyancePreference,
-    };
+  public async getCredentials(): Promise<CredentialInfo[]> {
+    const { data, error } = await apiClient.get<{ credentials: CredentialInfo[] }>('/api/webauthn/credentials');
+    if (error) {
+      throw new WebAuthnError(
+        error.message || 'Failed to get credentials',
+        WebAuthnErrorCode.INTERNAL_ERROR
+      );
+    }
+    return data?.credentials || [];
   }
 
   /**
-   * Helper: Format authentication options for the browser
+   * 删除凭证
    */
-  private preformatAuthenticationOptions(
+  public async removeCredential(id: string): Promise<boolean> {
+    const { data, error } = await apiClient.delete<{ success: boolean }>(`/webauthn/credentials/${id}`);
+    if (error) {
+      throw new WebAuthnError(
+        error.message || 'Failed to remove credential',
+        WebAuthnErrorCode.INTERNAL_ERROR
+      );
+    }
+    return data?.success || false;
+  }
+
+  /**
+   * 格式化注册选项
+   */
+  private preformatCreateOptions(
+    options: PublicKeyCredentialCreationOptionsJSON
+  ): PublicKeyCredentialCreationOptions {
+    // 确保有 authenticatorSelection 配置
+    const authenticatorSelection: AuthenticatorSelectionCriteria = {
+      authenticatorAttachment: 'platform', // 强制使用平台认证器（Touch ID/Face ID）
+      requireResidentKey: true,
+      residentKey: 'required',
+      userVerification: 'preferred'
+    };
+
+    // 在开发环境中添加额外的日志
+    if (this.developmentMode) {
+      console.log('🔧 preformatCreateOptions:', {
+        options,
+        origin: window.location.origin,
+        userAgent: navigator.userAgent
+      });
+    }
+
+    // const pubKeyCredParams: PublicKeyCredentialParameters[] = [
+    //   {
+    //     alg: -8, // EdDSA (Ed25519)
+    //     type: 'public-key'
+    //   }
+    // ];
+
+    const createOptions = {
+      ...options,
+      challenge: this.base64URLToBuffer(options.challenge),
+      user: {
+        ...options.user,
+        id: this.base64URLToBuffer(options.user.id),
+      },
+      excludeCredentials: options.excludeCredentials?.map(credential => ({
+        ...credential,
+        id: this.base64URLToBuffer(credential.id),
+        transports: credential.transports as AuthenticatorTransport[],
+      })),
+      rp: options.rp,
+      timeout: 60000, // 设置足够长的超时时间
+      // attestation: options.attestation,
+      // authenticatorSelection: options.authenticatorSelection,
+    };
+
+    if (this.developmentMode) {
+      console.log('📋 Create options:', createOptions);
+      console.log('🔍 Expected behavior: Should show Touch ID/Face ID prompt, NOT QR code');
+    }
+
+    return createOptions;
+  }
+
+  /**
+   * 格式化认证选项
+   */
+  private preformatRequestOptions(
     options: PublicKeyCredentialRequestOptionsJSON
   ): PublicKeyCredentialRequestOptions {
     return {
       ...options,
-      challenge: this.base64urlToArrayBuffer(options.challenge),
+      challenge: this.base64URLToBuffer(options.challenge),
       allowCredentials: options.allowCredentials?.map(credential => ({
         ...credential,
-        id: this.base64urlToArrayBuffer(credential.id),
+        id: this.base64URLToBuffer(credential.id),
         transports: credential.transports as AuthenticatorTransport[],
-      })) as PublicKeyCredentialDescriptor[],
+      })),
+      rpId: options.rpId,
+      timeout: options.timeout,
+      userVerification: options.userVerification,
     };
   }
 
   /**
-   * Helper: Format authentication response for the server
+   * 格式化注册响应
    */
-  private formatAuthenticationResponse(credential: PublicKeyCredential): WebAuthnAuthenticationResponse {
-    const response = credential.response as AuthenticatorAssertionResponse;
-    
-    return {
-      id: credential.id,
-      rawId: this.arrayBufferToBase64url(credential.rawId),
-      response: {
-        authenticatorData: this.arrayBufferToBase64url(response.authenticatorData),
-        clientDataJSON: this.arrayBufferToBase64url(response.clientDataJSON),
-        signature: this.arrayBufferToBase64url(response.signature),
-        userHandle: response.userHandle ? this.arrayBufferToBase64url(response.userHandle) : undefined,
-      },
-      type: 'public-key',
-      clientExtensionResults: credential.getClientExtensionResults(),
-      authenticatorAttachment: credential.authenticatorAttachment as AuthenticatorAttachment,
-      authenticatorInfo: {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        isVirtualAuthenticator: this.developmentMode && 
-          typeof (window as any).__WEBAUTHN_VIRTUAL_AUTHENTICATOR__ !== 'undefined'
-      }
-    };
-  }
-
-  /**
-   * Helper: Format registration response for the server
-   */
-  private formatRegistrationResponse(credential: PublicKeyCredential): WebAuthnRegistrationResponse {
+  private formatRegistrationResponse(credential: PublicKeyCredential): RegistrationResponseJSON {
     const response = credential.response as AuthenticatorAttestationResponse;
-    
     return {
       id: credential.id,
-      rawId: this.arrayBufferToBase64url(credential.rawId),
-      response: {
-        attestationObject: this.arrayBufferToBase64url(response.attestationObject),
-        clientDataJSON: this.arrayBufferToBase64url(response.clientDataJSON),
-        transports: response.getTransports?.() as AuthenticatorTransportFuture[] | undefined,
-      },
+      rawId: this.arrayBufferToBase64URL(credential.rawId),
       type: 'public-key',
+      response: {
+        attestationObject: this.arrayBufferToBase64URL(response.attestationObject),
+        clientDataJSON: this.arrayBufferToBase64URL(response.clientDataJSON),
+        transports: (response.getTransports?.() || []) as AuthenticatorTransportFuture[],
+      },
       clientExtensionResults: credential.getClientExtensionResults(),
-      authenticatorAttachment: credential.authenticatorAttachment as AuthenticatorAttachment,
+      authenticatorAttachment: credential.authenticatorAttachment as AuthenticatorAttachment | undefined,
     };
   }
 
-  private base64urlToArrayBuffer(base64url: string): ArrayBuffer {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
-    const binaryString = window.atob(padded);
+  /**
+   * 格式化认证响应
+   */
+  private formatAuthenticationResponse(credential: PublicKeyCredential): AuthenticationResponseJSON {
+    const response = credential.response as AuthenticatorAssertionResponse;
+    return {
+      id: credential.id,
+      rawId: this.arrayBufferToBase64URL(credential.rawId),
+      type: 'public-key',
+      response: {
+        authenticatorData: this.arrayBufferToBase64URL(response.authenticatorData),
+        clientDataJSON: this.arrayBufferToBase64URL(response.clientDataJSON),
+        signature: this.arrayBufferToBase64URL(response.signature),
+        userHandle: response.userHandle ? this.arrayBufferToBase64URL(response.userHandle) : undefined,
+      },
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment as AuthenticatorAttachment | undefined,
+    };
+  }
+
+  private base64URLToBuffer(base64url: string): ArrayBuffer {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(base64url.length + ((4 - base64url.length % 4) % 4), '=');
+    const binaryString = window.atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
@@ -317,28 +431,9 @@ export class PasskeyService {
     return bytes.buffer;
   }
 
-  private arrayBufferToBase64url(buffer: ArrayBuffer): string {
+  private arrayBufferToBase64URL(buffer: ArrayBuffer): string {
     const binary = String.fromCharCode(...new Uint8Array(buffer));
     const base64 = window.btoa(binary);
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-  }
-
-  private identifyAuthenticator(credential: PublicKeyCredential): string {
-    const attachment = credential.authenticatorAttachment;
-    const id = credential.id;
-    
-    if (attachment === 'platform') {
-      return 'Platform Authenticator (TouchID/FaceID/Windows Hello)';
-    } else if (attachment === 'cross-platform') {
-      if (id.includes('1password') || id.includes('1pwd')) {
-        return '1Password (cross-platform)';
-      }
-      return 'Cross-platform Authenticator (Hardware Key/1Password/etc)';
-    } else {
-      if (id.includes('1password') || id.includes('1pwd')) {
-        return '1Password (unknown attachment)';
-      }
-      return 'Unknown Authenticator';
-    }
   }
 } 

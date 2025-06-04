@@ -1,3 +1,5 @@
+import type { Session } from '@cadop/shared';
+
 export interface User {
   id: string;
   email?: string;
@@ -7,12 +9,6 @@ export interface User {
   updated_at: string;
   primaryAgentDid?: string;
   sybilLevel?: number;
-}
-
-export interface Session {
-  session_token: string;
-  expires_at: string;
-  user: User;
 }
 
 export interface AuthState {
@@ -25,5 +21,6 @@ export interface AuthState {
 export interface AuthContextType extends AuthState {
   signIn: (session: Session) => void;
   signOut: () => void;
+  refreshSession: () => Promise<void>;
   updateSession: (updates: Partial<Session>) => void;
 } 

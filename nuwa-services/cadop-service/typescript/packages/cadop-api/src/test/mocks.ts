@@ -187,30 +187,3 @@ export function createExpiredIdToken(): string {
   });
 }
 
-type MockSupabaseResponse<T> = {
-  data: T;
-  error: null;
-} | {
-  data: null;
-  error: Error;
-};
-
-export function createMockSupabaseClient(): Partial<SupabaseClient<Database>> {
-  const mockInsert = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
-  const mockUpdate = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
-  const mockDelete = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown[]>>({ data: [], error: null }));
-  const mockSingle = jest.fn().mockImplementation(() => Promise.resolve<MockSupabaseResponse<unknown>>({ data: null, error: null }));
-
-  return {
-    from: () => ({
-      insert: mockInsert,
-      update: mockUpdate,
-      delete: mockDelete,
-      select: () => ({
-        eq: () => ({
-          single: mockSingle,
-        }),
-      }),
-    }),
-  };
-} 
