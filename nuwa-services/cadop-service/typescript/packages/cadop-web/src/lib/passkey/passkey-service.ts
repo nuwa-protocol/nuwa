@@ -108,16 +108,17 @@ export class PasskeyService {
         const registrationOptions = optionsResponse.options as PublicKeyCredentialCreationOptionsJSON;
         const credentialOptions = this.preformatRegistrationOptions(registrationOptions);
         
-        // 在开发环境中强制使用平台认证器，避免 1Password 拦截
+        // 配置认证器选项，启用 resident key
+        credentialOptions.authenticatorSelection = {
+          authenticatorAttachment: 'platform', // 使用平台认证器
+          requireResidentKey: true, // 要求使用 resident key
+          residentKey: 'required', // 明确要求 resident key
+          userVerification: 'preferred'
+        };
+        
+        // 在开发环境中添加额外的日志
         if (this.developmentMode) {
-          credentialOptions.authenticatorSelection = {
-            authenticatorAttachment: 'platform', // 强制使用平台认证器 
-            requireResidentKey: false,
-            residentKey: 'discouraged',
-            userVerification: 'preferred'
-          };
-          
-          console.log('🔧 Development mode: Forcing platform authenticator to avoid 1Password', {
+          console.log('🔧 Authenticator selection options:', {
             authenticatorSelection: credentialOptions.authenticatorSelection
           });
         }
@@ -161,11 +162,13 @@ export class PasskeyService {
         const authenticationOptions = optionsResponse.options as PublicKeyCredentialRequestOptionsJSON;
         const authOptions = this.preformatAuthenticationOptions(authenticationOptions);
         
-        // 在开发环境中添加用户验证偏好，可能有助于绕过 1Password
+        // 配置认证选项
+        authOptions.mediation = 'conditional'; // 使用 conditional mediation
+        authOptions.userVerification = 'preferred';
+        
         if (this.developmentMode) {
-          authOptions.userVerification = 'preferred';
-          
-          console.log('🔧 Development mode: Setting user verification preference', {
+          console.log('🔧 Authentication options:', {
+            mediation: authOptions.mediation,
             userVerification: authOptions.userVerification,
             allowCredentialsCount: authOptions.allowCredentials?.length || 0
           });
