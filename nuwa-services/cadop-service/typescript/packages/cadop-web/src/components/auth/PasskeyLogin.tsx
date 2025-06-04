@@ -1,81 +1,73 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PasskeyService } from '../../lib/passkey/passkey-service';
+import { WebAuthnService } from '../../lib/passkey/passkey-service';
 import { useAuth } from '../../lib/auth/AuthContext';
+import type { Session } from '@cadop/shared';
 
 interface PasskeyLoginProps {
   onSuccess: (userId: string) => void;
   onError: (error: string) => void;
+  email?: string;
 }
 
-export function PasskeyLogin({ onSuccess, onError }: PasskeyLoginProps) {
+export function PasskeyLogin({ onSuccess, onError, email }: PasskeyLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [onePasswordWarning, setOnePasswordWarning] = useState<string | null>(null);
-
+  const [isSupported, setIsSupported] = useState(false);
   const { signIn } = useAuth();
-  const passkeyService = new PasskeyService();
 
-  // 检查 1Password 干扰
+  const passkeyService = new WebAuthnService();
+
   useEffect(() => {
-    const check1Password = async () => {
-      const result = await passkeyService.check1PasswordInterference();
-      if (result.detected) {
-        setOnePasswordWarning(result.recommendation || '检测到 1Password 可能影响认证');
-      }
-    };
-    
-    check1Password();
+    passkeyService.isSupported().then(setIsSupported);
   }, []);
 
-  const handlePasskeyAuth = useCallback(async () => {
+  const handlePasskeyLogin = useCallback(async () => {
     try {
       setIsLoading(true);
+      const result = await passkeyService.authenticate({
+        name: email,
+        displayName: email
+      });
 
-      const isSupported = await passkeyService.isSupported();
-      if (!isSupported) {
-        onError('Your browser does not support Passkey authentication');
-        return;
-      }
-
-      // 尝试认证，服务端会自动处理注册流程
-      const authResult = await passkeyService.authenticate();
-      if (authResult.success && authResult.session) {
-        // Convert the session data to match AuthContext expectations
-        const session = {
-          ...authResult.session,
+      if (result.success && result.session) {
+        const session: Session = {
+          id: result.session.user.id,
+          session_token: result.session.session_token,
+          expires_at: result.session.expires_at,
           user: {
-            ...authResult.session.user,
-            display_name: authResult.session.user.display_name ?? undefined
+            id: result.session.user.id,
+            email: result.session.user.email,
+            display_name: result.session.user.display_name
           }
         };
         signIn(session);
-        onSuccess(authResult.session.user.id);
+        onSuccess(session.user.id);
       } else {
-        onError(authResult.error || 'Authentication failed');
+        onError(result.error?.message || 'Authentication failed');
       }
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Authentication failed');
     } finally {
       setIsLoading(false);
     }
-  }, [onError, signIn, onSuccess]);
+  }, [email, onSuccess, onError, signIn]);
+
+  if (!isSupported) {
+    return null;
+  }
 
   return (
-    <div className="flex flex-col space-y-4">
-      <h2 className="text-xl font-semibold">Sign in with Passkey</h2>
-      
-      {onePasswordWarning && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 text-sm">
-          <strong>⚠️ 提示：</strong> {onePasswordWarning}
-        </div>
-      )}
-      
-      <button
-        onClick={handlePasskeyAuth}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-        disabled={isLoading}
-      >
-        {isLoading ? 'Processing...' : 'Continue with Passkey'}
-      </button>
-    </div>
+    <button
+      onClick={handlePasskeyLogin}
+      disabled={isLoading}
+      className="w-full flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
+    >
+      <svg className="h-5 w-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M11.395 44.428C4.557 40.198 0 32.632 0 24 0 10.745 10.745 0 24 0a23.891 23.891 0 0113.997 4.502c-.2 17.907-11.097 33.245-26.602 39.926z" fill="#6875F5"/>
+        <path d="M14.134 45.885A23.914 23.914 0 0024 48c13.255 0 24-10.745 24-24 0-3.516-.756-6.856-2.115-9.866-4.659 15.143-16.608 27.092-31.75 31.751z" fill="#6875F5"/>
+      </svg>
+      <span className="text-sm font-semibold leading-6">
+        {isLoading ? '认证中...' : '使用 Passkey 继续'}
+      </span>
+    </button>
   );
 } 

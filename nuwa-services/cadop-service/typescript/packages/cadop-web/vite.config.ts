@@ -5,6 +5,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   publicDir: 'public',
+  base: '/',
   server: {
     port: 3000,
     proxy: {
@@ -15,11 +16,6 @@ export default defineConfig({
         headers: {
           'X-Client-Type': 'cadop-web'
         }
-      },
-      '/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false
       },
       '/.well-known': {
         target: 'http://localhost:8080',

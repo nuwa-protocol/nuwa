@@ -12,10 +12,12 @@ import crypto from 'crypto';
 import cbor from 'cbor';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import {
-  registrationOptionsSchema,
   verifySchema,
   authenticationOptionsSchema,
-} from '../schemas/webauthn.js';
+  credentialSchema,
+  WebAuthnError,
+  WebAuthnErrorCode,
+} from '@cadop/shared';
 
 /**
  * Base64URL 编码工具函数
@@ -78,117 +80,39 @@ router.get('/.well-known/webauthn', (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/webauthn/authentication/options
+ * POST /api/webauthn/options
  * Generate WebAuthn authentication options
  */
 router.post(
-  '/authentication/options',
+  '/options',
   validateRequest(authenticationOptionsSchema),
   async (req: Request, res: Response) => {
     try {
-      const { user_did } = req.body;
-      let userId: string | undefined;
-      let isNewUser = false;
-      
-      logger.debug('Received authentication options request', {
-        user_did,
-        headers: req.headers,
-      });
-      
-      // 如果提供了用户 DID，尝试查找用户
-      if (user_did) {
-        // 通过 DID 查找用户
-        const user = await DatabaseService.getUserByDID(user_did);
-        if (user) {
-          logger.debug('User found', { user });
-          userId = user.id;
-        } else {
-          logger.debug('User not found, creating new user', { user_did });
-            
-          // 创建新用户
-          const newUser = await DatabaseService.createUser({
-            user_did,
-            display_name: user_did,
-            metadata: {}
-          });
-
-          userId = newUser.id;
-          isNewUser = true;
-        }
-      } else {
-        // 如果没有提供 DID，说明是首次使用，创建临时用户
-        logger.debug('No DID provided, creating temporary user for registration');
-        
-        // 生成临时用户 ID 和临时 DID
-        const tempUserId = crypto.randomUUID();
-        const tempDid = `did:temp:${tempUserId}`;
-        
-        // 创建临时用户记录
-        const tempUser = await DatabaseService.createUser({
-          user_did: tempDid,
-          display_name: 'New User',
-          metadata: {
-            is_temporary: true,
-            created_at: new Date().toISOString()
-          }
-        });
-
-        userId = tempUser.id;
-        isNewUser = true;
-        
-        logger.debug('Created temporary user', { 
-          userId: tempUser.id,
-          displayName: tempUser.display_name,
-          did: tempDid
-        });
-      }
-
-      // 如果是新用户，生成注册选项
-      if (isNewUser) {
-        const options = await webauthnService.generateRegistrationOptions(
-          userId,
-          userId, // 使用 userId 作为临时标识符
-          'New User' // 临时显示名称
-        );
-
-        logger.info('Generated registration options for new user', {
-          userId,
-          did: user_did,
-          challengeLength: options.challenge.length
-        });
-
-        return res.json({
-          success: true,
-          options,
-          isRegistration: true
-        });
-      }
-
-      // 否则生成认证选项
-      const options = await webauthnService.generateAuthenticationOptions(userId);
-
-      logger.info('Generated authentication options', {
-        userId: userId || 'anonymous',
-        challengeLength: options.challenge.length,
-        allowCredentialsCount: options.allowCredentials?.length || 0,
+      const { user_did, name, display_name } = req.body;
+      const options = await webauthnService.generateAuthenticationOptions(user_did, {
+        name,
+        displayName: display_name
       });
 
       res.json({
         success: true,
-        options,
-        isRegistration: false
+        ...options
       });
     } catch (error) {
-      logger.error('Failed to generate WebAuthn options', {
-        error,
-        userDid: req.body.user_did,
-      });
-
-      res.status(500).json({
-        error: 'Failed to generate options',
-        code: 'OPTIONS_FAILED',
-        details: process.env.NODE_ENV === 'development' ? error : undefined,
-      });
+      logger.error('Failed to generate authentication options', { error });
+      if (error instanceof WebAuthnError) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+          code: error.code
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          code: WebAuthnErrorCode.INTERNAL_ERROR
+        });
+      }
     }
   }
 );
@@ -202,272 +126,73 @@ router.post(
   validateRequest(verifySchema),
   async (req: Request, res: Response) => {
     try {
-      const { response } = req.body;
-      
-      logger.debug('🎯 Received verification request', {
-        credentialId: response.id,
-        responseType: response.type,
-        authenticatorAttachment: response.authenticatorAttachment,
-        hasUserHandle: !!response.response.userHandle
-      });
-
-      // 从 clientDataJSON 中提取 challenge
-      const clientDataJSON = JSON.parse(
-        Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
-      );
-      
-      // 获取 challenge 数据
-      const challengeData = await webauthnService.getChallenge(clientDataJSON.challenge);
-      if (!challengeData) {
-        return res.status(400).json({
-          error: 'Invalid or expired challenge',
-          code: 'INVALID_CHALLENGE'
-        });
-      }
-
-      // 检查是否是注册流程
-      const isRegistration = challengeData.operation_type === 'registration';
-      
-      // 验证响应
-      let verificationResult;
-      if (isRegistration) {
-        // 处理注册响应
-        verificationResult = await webauthnService.verifyRegistrationResponse(
-          challengeData.user_id,
-          response as any, // 类型转换
-          'Default Device'
-        );
-
-        if (!verificationResult.success || !verificationResult.authenticator) {
-          return res.status(401).json({
-            success: false,
-            error: verificationResult.error || 'Registration failed',
-            code: 'REGISTRATION_FAILED',
-            details: verificationResult.details,
-          });
-        }
-
-        // 使用注册结果创建会话
-        const userId = challengeData.user_id;
-        const authenticatorId = verificationResult.authenticator.id;
-
-        // 获取用户信息
-        const userData = await DatabaseService.getUserById(userId);
-        if (!userData) {
-          logger.error('Failed to get user data', { userId });
-          throw new Error('Failed to get user data');
-        }
-
-        // 如果是临时 DID，使用客户端生成的 did:key 更新用户记录
-        if (userData.user_did.startsWith('did:temp:')) {
-          const { did_key } = req.body;
-          
-          if (!did_key || !did_key.startsWith('did:key:')) {
-            logger.error('Invalid or missing did:key in registration request', { userId });
-            throw new Error('Invalid or missing did:key');
-          }
-
-          // 更新用户记录
-          await DatabaseService.updateUser(userId, {
-            user_did: did_key,
-            metadata: {
-              ...userData.metadata,
-              is_temporary: false,
-              did_updated_at: new Date().toISOString()
-            }
-          });
-
-          logger.info('Updated user DID', {
-            userId,
-            oldDid: userData.user_did,
-            newDid: did_key
-          });
-
-          userData.user_did = did_key;
-        }
-
-        // 创建新会话
-        const sessionService = new SessionService();
-        const session = await sessionService.createSession(
-          userId,
-          verificationResult.authenticator.credentialId,
-          {
-            email: userData.email,
-            display_name: userData.display_name
-          }
-        );
-
-        logger.info('WebAuthn registration successful', {
-          userId,
-          authenticatorId,
-          sessionId: session.id
-        });
-
-        return res.json({
-          success: true,
-          session: {
-            session_token: session.session_token,
-            expires_at: session.expires_at,
-            user: {
-              id: userData.id,
-              email: userData.email,
-              display_name: userData.display_name
-            }
-          }
+      const result = await webauthnService.verifyAuthenticationResponse(req.body.response);
+      res.json(result);
+    } catch (error) {
+      logger.error('Failed to verify authentication response', { error });
+      if (error instanceof WebAuthnError) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+          code: error.code
         });
       } else {
-        // 处理认证响应
-        verificationResult = await webauthnService.verifyAuthenticationResponse(response);
-
-        if (!verificationResult.success || !verificationResult.userId || !verificationResult.authenticatorId) {
-          return res.status(401).json({
-            success: false,
-            error: verificationResult.error || 'Authentication failed',
-            code: 'AUTHENTICATION_FAILED',
-            details: verificationResult.details,
-          });
-        }
-
-        // 获取用户信息
-        const userData = await DatabaseService.getUserById(verificationResult.userId);
-        if (!userData) {
-          logger.error('Failed to get user data', {
-            userId: verificationResult.userId,
-          });
-          throw new Error('Failed to get user data');
-        }
-
-        // 创建新会话
-        const sessionService = new SessionService();
-        const { data: authenticator } = await supabase
-          .from('authenticators')
-          .select('credential_id')
-          .eq('id', verificationResult.authenticatorId)
-          .single();
-
-        if (!authenticator) {
-          throw new Error('Failed to get authenticator data');
-        }
-
-        const session = await sessionService.createSession(
-          verificationResult.userId,
-          authenticator.credential_id,
-          {
-            email: userData.email,
-            display_name: userData.display_name
-          }
-        );
-
-        logger.info('WebAuthn authentication successful', {
-          userId: verificationResult.userId,
-          authenticatorId: verificationResult.authenticatorId,
-          sessionId: session.id
-        });
-
-        return res.json({
-          success: true,
-          session: {
-            session_token: session.session_token,
-            expires_at: session.expires_at,
-            user: {
-              id: userData.id,
-              email: userData.email,
-              display_name: userData.display_name
-            }
-          }
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          code: WebAuthnErrorCode.INTERNAL_ERROR
         });
       }
-    } catch (error) {
-      logger.error('WebAuthn verification error', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+    }
+  }
+);
 
-      return res.status(500).json({
-        error: 'Verification failed',
-        code: 'VERIFICATION_ERROR',
-        details: process.env.NODE_ENV === 'development' ? error : undefined,
+/**
+ * GET /api/webauthn/credentials
+ * Get user's registered WebAuthn credentials
+ */
+router.get(
+  '/credentials',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const credentials = await webauthnService.getUserCredentials(req.user!.id);
+      res.json({
+        success: true,
+        credentials
+      });
+    } catch (error) {
+      logger.error('Failed to get user credentials', { error });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get credentials',
+        code: WebAuthnErrorCode.INTERNAL_ERROR
       });
     }
   }
 );
 
 /**
- * GET /api/webauthn/devices
- * Get user's registered WebAuthn devices
- */
-router.get('/devices', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const devices = await webauthnService.getUserDevices(userId);
-
-    res.json({
-      success: true,
-      devices,
-    });
-  } catch (error) {
-    logger.error('Failed to get user WebAuthn devices', {
-      error,
-      userId: req.user?.id,
-    });
-
-    res.status(500).json({
-      error: 'Failed to get devices',
-      code: 'GET_DEVICES_FAILED',
-      details: process.env.NODE_ENV === 'development' ? error : undefined,
-    });
-  }
-});
-
-/**
- * DELETE /api/webauthn/devices/:deviceId
- * Remove a WebAuthn device
+ * DELETE /api/webauthn/credentials/:id
+ * Remove a WebAuthn credential
  */
 router.delete(
-  '/devices/:deviceId',
+  '/credentials/:id',
   requireAuth,
-  validateRequest(removeDeviceSchema),
+  validateRequest(credentialSchema),
   async (req: Request, res: Response) => {
     try {
-      const userId = req.user!.id;
-      const deviceId = req.params['deviceId'];
-
-      if (!deviceId) {
-        return res.status(400).json({
-          error: 'Device ID is required',
-          code: 'DEVICE_ID_REQUIRED',
-        });
-      }
-
-      const success = await webauthnService.removeDevice(userId, deviceId);
-
-      if (success) {
-        logger.info('WebAuthn device removed', {
-          userId,
-          deviceId,
-        });
-
-        return res.json({
-          success: true,
-          message: 'Device removed successfully',
-        });
-      } else {
-        return res.status(404).json({
-          error: 'Device not found',
-          code: 'DEVICE_NOT_FOUND',
-        });
-      }
+      const success = await webauthnService.removeCredential(
+        req.user!.id,
+        req.params.id
+      );
+      res.json({ success });
     } catch (error) {
-      logger.error('Failed to remove WebAuthn device', {
-        error,
-        userId: req.user?.id,
-        deviceId: req.params['deviceId'],
-      });
-
-      return res.status(500).json({
-        error: 'Failed to remove device',
-        code: 'REMOVE_DEVICE_FAILED',
-        details: process.env['NODE_ENV'] === 'development' ? error : undefined,
+      logger.error('Failed to remove credential', { error });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to remove credential',
+        code: WebAuthnErrorCode.INTERNAL_ERROR
       });
     }
   }
@@ -479,83 +204,61 @@ router.delete(
  */
 router.post('/cleanup', async (req: Request, res: Response) => {
   try {
-    const cleanedCount = await webauthnService.cleanupExpiredChallenges();
-
+    const count = await webauthnService.cleanupExpiredChallenges();
     res.json({
       success: true,
-      message: `Cleaned up ${cleanedCount} expired challenges`,
-      count: cleanedCount,
+      count
     });
   } catch (error) {
-    logger.error('Failed to cleanup expired WebAuthn challenges', { error });
-
+    logger.error('Failed to cleanup challenges', { error });
     res.status(500).json({
-      error: 'Failed to cleanup expired challenges',
-      code: 'CLEANUP_FAILED',
-      details: process.env.NODE_ENV === 'development' ? error : undefined,
+      success: false,
+      error: 'Failed to cleanup challenges',
+      code: WebAuthnErrorCode.INTERNAL_ERROR
     });
   }
 });
 
-router.post('/register/begin', requireAuth, 
-  async (req: Request, res: Response) => {
-    try {
-      const userId = req.user!.id;
-      const authUser = await supabase.auth.getUser(req.headers.authorization?.split(' ')[1]);
-      
-      if (authUser.error) {
-        return res.status(401).json({ 
-          error: 'User not found',
-          details: process.env['NODE_ENV'] === 'development' ? authUser.error : undefined,
-        });
-      }
+// 废弃的接口
+/**
+ * @deprecated Use /webauthn/options instead
+ */
+router.post('/authentication/options', (req: Request, res: Response) => {
+  logger.warn('Using deprecated endpoint: /authentication/options');
+  res.redirect(307, '/webauthn/options');
+});
 
-      const userEmail = authUser.data.user.email;
-      const userName = authUser.data.user.user_metadata?.['full_name'] || userEmail;
+/**
+ * @deprecated Use /webauthn/options instead
+ */
+router.post('/register/begin', (req: Request, res: Response) => {
+  logger.warn('Using deprecated endpoint: /register/begin');
+  res.redirect(307, '/webauthn/options');
+});
 
-      if (!userEmail) {
-        return res.status(400).json({
-          error: 'User email is required',
-          code: 'EMAIL_REQUIRED',
-        });
-      }
+/**
+ * @deprecated Use /webauthn/options instead
+ */
+router.post('/authenticate/begin', (req: Request, res: Response) => {
+  logger.warn('Using deprecated endpoint: /authenticate/begin');
+  res.redirect(307, '/webauthn/options');
+});
 
-      const options = await webauthnService.generateRegistrationOptions(
-        userId,
-        userEmail,
-        userName
-      );
+/**
+ * @deprecated Use /webauthn/credentials instead
+ */
+router.get('/devices', requireAuth, (req: Request, res: Response) => {
+  logger.warn('Using deprecated endpoint: /devices');
+  res.redirect(307, '/webauthn/credentials');
+});
 
-      return res.json(options);
-    } catch (error) {
-      logger.error('Failed to generate registration options', { error });
-      return res.status(500).json({
-        error: 'Failed to generate registration options',
-        userId: req.user?.id,
-        details: process.env['NODE_ENV'] === 'development' ? error : undefined,
-      });
-    }
-  }
-);
-
-router.post('/authenticate/begin', requireAuth, 
-  async (req: Request, res: Response) => {
-    try {
-      const userId = req.user!.id;
-
-      const options = await webauthnService.generateAuthenticationOptions(userId);
-
-      return res.json(options);
-    } catch (error) {
-      logger.error('Failed to generate authentication options', { error });
-      return res.status(500).json({
-        error: 'Failed to generate authentication options',
-        userId: req.user?.id,
-        details: process.env['NODE_ENV'] === 'development' ? error : undefined,
-      });
-    }
-  }
-);
+/**
+ * @deprecated Use /webauthn/credentials/:id instead
+ */
+router.delete('/devices/:deviceId', requireAuth, (req: Request, res: Response) => {
+  logger.warn('Using deprecated endpoint: /devices/:deviceId');
+  res.redirect(307, `/webauthn/credentials/${req.params.deviceId}`);
+});
 
 router.get('/test', (req: Request, res: Response) => {
   const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';

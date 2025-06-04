@@ -8,7 +8,6 @@ import roochSdk from '@roochnetwork/rooch-sdk';
 //import type { RoochClient } from '@roochnetwork/rooch-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
-import { validateIdToken } from './oidcService.js';
 import { calculateSybilLevel } from '../utils/sybilCalculator.js';
 import { z } from 'zod';
 import { supabase } from '../config/supabase.js';
@@ -201,81 +200,83 @@ export class CustodianService {
    * Create Agent DID via CADOP protocol for user
    */
   async createAgentDIDViaCADOP(request: CADOPMintRequest): Promise<DIDCreationStatus> {
-    try {
-      // 1. Validate ID Token
-      const tokenPayload = await validateIdToken(request.idToken);
-      if (!tokenPayload) {
-        throw new Error('Invalid ID token');
-      }
+    // try {
+    //   // 1. Validate ID Token
+    //   const tokenPayload = await validateIdToken(request.idToken);
+    //   if (!tokenPayload) {
+    //     throw new Error('Invalid ID token');
+    //   }
 
-      logger.info('Starting CADOP DID creation', {
-        userId: tokenPayload.sub,
-        userDidKey: request.userDidKey
-      });
+    //   logger.info('Starting CADOP DID creation', {
+    //     userId: tokenPayload.sub,
+    //     userDidKey: request.userDidKey
+    //   });
 
-      // 2. Check Sybil level
-      const sybilLevel = await this.calculateUserSybilLevel(
-        tokenPayload.sub, 
-        request.additionalAuthMethods || []
-      );
+    //   // 2. Check Sybil level
+    //   const sybilLevel = await this.calculateUserSybilLevel(
+    //     tokenPayload.sub, 
+    //     request.additionalAuthMethods || []
+    //   );
 
-      if (sybilLevel < 1) {
-        throw new Error('Insufficient Sybil protection level');
-      }
+    //   if (sybilLevel < 1) {
+    //     throw new Error('Insufficient Sybil protection level');
+    //   }
 
-      // 3. Create database record (pending status)
-      const { data: didRecord, error: dbError } = await this.supabase
-        .from('agent_dids')
-        .insert({
-          user_id: tokenPayload.sub,
-          controller_did: request.userDidKey || tokenPayload.did,
-          sybil_level: sybilLevel,
-          status: 'pending'
-        })
-        .select()
-        .single();
+    //   // 3. Create database record (pending status)
+    //   const { data: didRecord, error: dbError } = await this.supabase
+    //     .from('agent_dids')
+    //     .insert({
+    //       user_id: tokenPayload.sub,
+    //       controller_did: request.userDidKey || tokenPayload.did,
+    //       sybil_level: sybilLevel,
+    //       status: 'pending'
+    //     })
+    //     .select()
+    //     .single();
 
-      if (dbError) {
-        logger.error('Failed to create DID record', { error: dbError });
-        throw new Error('Database error');
-      }
+    //   if (dbError) {
+    //     logger.error('Failed to create DID record', { error: dbError });
+    //     throw new Error('Database error');
+    //   }
 
-      // 4. Execute CADOP creation flow asynchronously
-      this.executeCADOPCreation(didRecord.id, request, tokenPayload)
-        .catch(error => {
-          logger.error('CADOP creation failed', { 
-            recordId: didRecord.id, 
-            error 
-          });
+    //   // 4. Execute CADOP creation flow asynchronously
+    //   this.executeCADOPCreation(didRecord.id, request, tokenPayload)
+    //     .catch(error => {
+    //       logger.error('CADOP creation failed', { 
+    //         recordId: didRecord.id, 
+    //         error 
+    //       });
           
-          // Update database status to failed
-          this.supabase
-            .from('agent_dids')
-            .update({ 
-              status: 'failed', 
-              error: error.message,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', didRecord.id)
-            .then(({ error: updateError }: { error: any }) => {
-              if (updateError) {
-                logger.error('Failed to update failed status', { updateError });
-              }
-            });
-        });
+    //       // Update database status to failed
+    //       this.supabase
+    //         .from('agent_dids')
+    //         .update({ 
+    //           status: 'failed', 
+    //           error: error.message,
+    //           updated_at: new Date().toISOString()
+    //         })
+    //         .eq('id', didRecord.id)
+    //         .then(({ error: updateError }: { error: any }) => {
+    //           if (updateError) {
+    //             logger.error('Failed to update failed status', { updateError });
+    //           }
+    //         });
+    //     });
 
-      return {
-        id: didRecord.id,
-        status: 'pending',
-        blockchainConfirmed: false,
-        createdAt: new Date(didRecord.created_at),
-        updatedAt: new Date(didRecord.updated_at)
-      };
+    //   return {
+    //     id: didRecord.id,
+    //     status: 'pending',
+    //     blockchainConfirmed: false,
+    //     createdAt: new Date(didRecord.created_at),
+    //     updatedAt: new Date(didRecord.updated_at)
+    //   };
 
-    } catch (error) {
-      logger.error('CADOP DID creation request failed', { error });
-      throw error;
-    }
+    // } catch (error) {
+    //   logger.error('CADOP DID creation request failed', { error });
+    //   throw error;
+    // }
+
+    throw new Error('Not implemented');
   }
 
   /**

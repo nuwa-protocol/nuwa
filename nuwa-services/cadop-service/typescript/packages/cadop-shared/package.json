@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "exports": {
     ".": {
@@ -23,12 +24,14 @@
     "@roochnetwork/rooch-sdk": "^0.3.4",
     "@simplewebauthn/server": "^12.0.0",
     "@simplewebauthn/types": "^12.0.0",
+    "nuwa-identity-kit": "file:../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.11",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.17.52",
     "jest": "^29.7.0",
+    "multiformats": "^13.3.6",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.3"
