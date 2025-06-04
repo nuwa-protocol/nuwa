@@ -11,10 +11,8 @@ import { DatabaseService } from '../services/database.js';
 import crypto from 'crypto';
 import {
   registrationOptionsSchema,
-  registrationVerificationSchema,
-  registrationResponseSchema,
+  verifySchema,
   authenticationOptionsSchema,
-  authenticationResponseSchema,
 } from '../schemas/webauthn.js';
 
 const router: Router = Router();
@@ -159,7 +157,7 @@ router.get('/.well-known/webauthn', (req: Request, res: Response) => {
  */
 router.post(
   '/registration/verify',
-  validateRequest(registrationResponseSchema),
+  validateRequest(verifySchema),
   async (req: Request, res: Response) => {
     try {
       logger.debug('Received registration verification request', {
@@ -339,12 +337,12 @@ router.post(
 );
 
 /**
- * POST /api/webauthn/authentication/verify
- * Verify WebAuthn authentication or registration response
+ * POST /api/webauthn/verify
+ * Verify WebAuthn registration or authentication response
  */
 router.post(
-  '/authentication/verify',
-  validateRequest(authenticationResponseSchema),
+  '/verify',
+  validateRequest(verifySchema),
   async (req: Request, res: Response) => {
     try {
       const { response } = req.body;
@@ -397,17 +395,9 @@ router.post(
         const authenticatorId = verificationResult.authenticator.id;
 
         // 获取用户信息
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (userError || !userData) {
-          logger.error('Failed to get user data', {
-            error: userError,
-            userId,
-          });
+        const userData = await DatabaseService.getUserById(userId);
+        if (!userData) {
+          logger.error('Failed to get user data', { userId });
           throw new Error('Failed to get user data');
         }
 
@@ -454,15 +444,9 @@ router.post(
         }
 
         // 获取用户信息
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', verificationResult.userId)
-          .single();
-
-        if (userError || !userData) {
+        const userData = await DatabaseService.getUserById(verificationResult.userId);
+        if (!userData) {
           logger.error('Failed to get user data', {
-            error: userError,
             userId: verificationResult.userId,
           });
           throw new Error('Failed to get user data');

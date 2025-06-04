@@ -115,29 +115,20 @@ export class PasskeyService {
           id: credential.id
         });
 
-        // 调用注册验证接口
-        const registrationResult = await apiClient.verifyRegistration(
+        // 调用统一的验证接口
+        const verificationResult = await apiClient.verify(
           this.formatRegistrationResponse(credential),
           'Default Device'
         );
 
-        if (registrationResult.error) {
-          throw new Error(registrationResult.error.message);
+        if (verificationResult.error) {
+          throw new Error(verificationResult.error.message);
         }
 
-        // 注册成功后，立即尝试认证
-        const authenticationOptions = await apiClient.getAuthenticationOptions(userIdentifier);
-        if (authenticationOptions.error || !authenticationOptions.data?.options) {
-          throw new Error(authenticationOptions.error?.message || 'Failed to get authentication options after registration');
-        }
-
-        const authOptions = this.preformatAuthenticationOptions(
-          authenticationOptions.data.options as PublicKeyCredentialRequestOptionsJSON
-        );
-
-        credential = await navigator.credentials.get({
-          publicKey: authOptions,
-        }) as PublicKeyCredential;
+        return verificationResult.data || {
+          success: false,
+          error: 'No data returned from server'
+        };
 
       } else {
         // 处理认证流程
@@ -168,7 +159,7 @@ export class PasskeyService {
 
       // 3. 验证响应
       console.log('🔍 Sending verification request to server...');
-      const verificationResult = await apiClient.verifyAuthentication(
+      const verificationResult = await apiClient.verify(
         this.formatAuthenticationResponse(credential)
       );
 
