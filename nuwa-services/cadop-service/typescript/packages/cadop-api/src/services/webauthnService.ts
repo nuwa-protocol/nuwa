@@ -451,9 +451,7 @@ export class WebAuthnService {
         credential: {
           id: authenticator.credential_id,
           publicKey: new Uint8Array(publicKey),
-          //counter: authenticator.counter,
-          //TODO fixme 
-          counter: 0,
+          counter: authenticator.counter,
         },
         requireUserVerification: false,
       };
@@ -520,25 +518,10 @@ export class WebAuthnService {
         };
       }      
 
-      // Update authenticator counter and last used
-      const { error: updateError } = await supabase
-        .from('authenticators')
-        .update({
-          counter: verification.authenticationInfo.newCounter,
-          last_used_at: new Date(),
-        })
-        .eq('id', authenticator.id);
-
-      if (updateError) {
-        logger.error('Failed to update authenticator', {
-          error: updateError,
-          authenticatorId: authenticator.id,
-        });
-        return {
-          success: false,
-          error: 'Failed to update authenticator',
-        };
-      }
+      // We don't need to increment the counter here
+      // because some platforms do not increment the counter https://stackoverflow.com/questions/78776653/passkey-counter-always-0-macos
+      // We just store the new counter in the database
+      await this.updateAuthenticator({id: authenticator.id, counter: verification.authenticationInfo.newCounter, lastUsedAt: new Date()});
 
       logger.info('🎉 WebAuthn authentication successful', {
         userId: authenticator.user_id,

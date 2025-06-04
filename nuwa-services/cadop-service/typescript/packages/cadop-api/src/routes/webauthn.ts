@@ -417,8 +417,6 @@ router.post(
           }
         );
 
-        // 更新认证器使用信息
-        await webauthnService.updateAuthenticatorUsage(result);
 
         logger.info('WebAuthn authentication successful', {
           userId: result.userId,
