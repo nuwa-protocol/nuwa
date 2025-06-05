@@ -1,6 +1,7 @@
 import { WebAuthnService } from '../webauthnService.js';
 import crypto from 'crypto';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
+import { generateRandomDid } from '../../test/mocks.js';
 
 describe('WebAuthnService Real Data Test', () => {
   let service: WebAuthnService;
@@ -18,9 +19,15 @@ describe('WebAuthnService Real Data Test', () => {
 
   it('should verify real registration response', async () => {
     const testUserId = crypto.randomUUID();
+    const testUserDid = generateRandomDid();
     // This challenge must match the one in mockRegistrationResponse
     const testChallenge = 'wXfuBHclXXuUT16qn-6wh-JttB2yXUnmkgbSnTJqRJc';
-
+    await service['userRepo'].create({
+      id: testUserId,
+      user_did: testUserDid,
+      email: `${testUserId}@example.com`,
+      display_name: 'Test User'
+    });
     // Create a test challenge in the database
     await service['challengesRepo'].create({
       user_id: testUserId,
@@ -49,14 +56,10 @@ describe('WebAuthnService Real Data Test', () => {
       },
       authenticatorAttachment: 'platform'
     };
-
-    const result = await service.verifyRegistrationResponse(testUserId, mockRegistrationResponse, 'Test Device');
+    const result = await service.verifyAuthenticationResponse(mockRegistrationResponse);
     
     expect(result).toBeDefined();
     expect(result.success).toBe(true);
-    if (result.authenticator) {
-      expect(result.authenticator.credentialId).toBe(mockRegistrationResponse.id);
-      expect(result.authenticator.friendlyName).toBe('Test Device');
-    }
+    expect(result.session?.user.id).toBe(testUserId);
   });
 }); 
