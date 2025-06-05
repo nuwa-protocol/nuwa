@@ -12,8 +12,6 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
   PublicKeyCredentialDescriptorFuture,
-  PublicKeyCredentialRequestOptions,
-  PublicKeyCredential,
   PublicKeyCredentialDescriptorJSON,
 } from '@simplewebauthn/types';
 
@@ -37,70 +35,6 @@ export interface Authenticator {
   updatedAt: Date;
 }
 
-export interface WebAuthnRegistrationResponse {
-  id: string;
-  rawId: string;
-  response: {
-    attestationObject: string;
-    clientDataJSON: string;
-    transports?: AuthenticatorTransportFuture[];
-  };
-  type: 'public-key';
-  clientExtensionResults: Record<string, any>;
-  authenticatorAttachment?: 'platform' | 'cross-platform';
-}
-
-
-export interface WebAuthnAuthenticationResponse {
-  id: string;
-  rawId: string;
-  response: {
-    authenticatorData: string;
-    clientDataJSON: string;
-    signature: string;
-    userHandle?: string;
-  };
-  type: 'public-key';
-  clientExtensionResults: Record<string, any>;
-  authenticatorAttachment?: 'platform' | 'cross-platform';
-  authenticatorInfo?: {
-    userAgent: string;
-    platform: string;
-    isVirtualAuthenticator: boolean;
-  };
-}
-
-// Service response types
-export interface WebAuthnRegistrationResult {
-  success: boolean;
-  authenticator?: {
-    id: string;
-    friendlyName?: string | undefined;
-    credentialId: string;
-    createdAt: Date;
-    transports: AuthenticatorTransportFuture[];
-  };
-  error?: string;
-  details?: any;
-}
-
-export interface WebAuthnAuthenticationResult {
-  success: boolean;
-  userId?: string;
-  authenticatorId?: string;
-  error?: string;
-  details?: any;
-  session?: {
-    session_token: string;
-    expires_at: string;
-    user: {
-      id: string;
-      email?: string;
-      display_name?: string;
-    }
-  }
-}
-
 // Configuration types
 export interface WebAuthnConfig {
   rpName: string;
@@ -109,8 +43,6 @@ export interface WebAuthnConfig {
   timeout: number;
   attestationType: 'none' | 'indirect' | 'direct';
 }
-
-
 
 export interface WebAuthnDeviceInfo {
   id: string;
@@ -131,12 +63,7 @@ export type {
   PublicKeyCredentialDescriptorFuture,
 };
 
-// API response types
-export interface WebAuthnOptionsResponse {
-  success: boolean;
-  options: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
-  isRegistration: boolean;
-}
+export type AuthenticatorResponse = RegistrationResponseJSON | AuthenticationResponseJSON;
 
 // Unify authentication options
 export interface AuthenticationOptions {

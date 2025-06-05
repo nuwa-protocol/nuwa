@@ -7,8 +7,6 @@ import {
 
 import type {
   AuthenticatorTransportFuture,
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
@@ -21,10 +19,8 @@ import {
   Authenticator,
   WebAuthnConfig,
   CredentialInfo,
-  Session,
   DIDKeyManager,
-  WebAuthnDeviceInfo,
-  WebAuthnRegistrationResult,
+  AuthenticatorResponse,
 } from '@cadop/shared';
 
 import { logger } from '../utils/logger.js';
@@ -35,7 +31,6 @@ import { mapToSession, SessionService } from './sessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
 
-type AuthenticatorResponse = RegistrationResponseJSON | AuthenticationResponseJSON;
 
 // Input type for creating authenticator
 interface CreateAuthenticatorData {
@@ -69,159 +64,7 @@ export class WebAuthnService {
     this.authenticatorRepo = new AuthenticatorRepository();
     this.userRepo = new UserRepository();
     logger.debug('WebAuthn service initialized with config', { config: this.config });
-  }
-
-  // /**
-  //  * Verify registration response and create new authenticator
-  //  */
-  // async verifyRegistrationResponse(
-  //   userId: string,
-  //   response: RegistrationResponseJSON,
-  //   friendlyName?: string
-  // ): Promise<WebAuthnRegistrationResult> {
-  //   try {
-  //     logger.debug('Verifying registration response', {
-  //       userId,
-  //       response,
-  //       friendlyName,
-  //     });
-
-  //     // Parse the client data to get the challenge
-  //     const clientDataJSON = JSON.parse(
-  //       Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
-  //     );
-
-  //     // Get and consume challenge
-  //     const storedChallenge = await this.getAndConsumeChallenge(userId, 'registration');
-  //     if (!storedChallenge) {
-  //       logger.warn('No valid registration challenge found', { userId });
-  //       throw new CadopError(
-  //         'No valid registration challenge found',
-  //         CadopErrorCode.INVALID_CHALLENGE
-  //       );
-  //     }
-
-  //     logger.debug('Challenge verification', {
-  //       receivedChallenge: clientDataJSON.challenge,
-  //       storedChallenge: storedChallenge.challenge,
-  //     });
-
-  //     // Verify the registration response first
-  //     const opts = {
-  //       response,
-  //       expectedChallenge: storedChallenge.challenge,
-  //       expectedOrigin: this.config.origin,
-  //       expectedRPID: this.config.rpID,
-  //     };
-
-  //     logger.debug('Calling verifyRegistrationResponse with options', { opts });
-
-  //     const verification = await verifyRegistrationResponse(opts);
-
-  //     logger.debug('Verification result', { verification });
-
-  //     if (!verification.verified || !verification.registrationInfo) {
-  //       logger.warn('WebAuthn registration verification failed', {
-  //         userId,
-  //         verified: verification.verified,
-  //         registrationInfo: verification.registrationInfo,
-  //       });
-  //       throw new CadopError(
-  //         'Registration verification failed',
-  //         CadopErrorCode.AUTHENTICATION_FAILED
-  //       );
-  //     }
-
-  //     const { registrationInfo } = verification;
-
-  //     // check if the credential is already registered
-  //     const existingAuthenticator = await this.getAuthenticatorByCredentialId(response.id);
-
-  //     if (existingAuthenticator) {
-  //       logger.warn('Authenticator already registered', {
-  //         userId,
-  //         credentialId: response.id,
-  //       });
-  //       return {
-  //         success: false,
-  //         error: 'Authenticator already registered',
-  //       };
-  //     }
-
-  //     // ensure the public key is in the correct format
-  //     const publicKeyBuffer = Buffer.from(registrationInfo.credential.publicKey);
-
-  //     const authenticatorData = {
-  //       userId,
-  //       credentialId: response.id,
-  //       credentialPublicKey: publicKeyBuffer,
-  //       counter: registrationInfo.credential.counter,
-  //       credentialDeviceType: registrationInfo.credentialDeviceType || 'singleDevice',
-  //       credentialBackedUp: registrationInfo.credentialBackedUp || false,
-  //       transports: response.response.transports || [],
-  //       friendlyName: friendlyName || 'Default Device'
-  //     };
-
-  //     logger.debug('Creating new authenticator', { 
-  //       credentialId: authenticatorData.credentialId,
-  //       publicKeyLength: authenticatorData.credentialPublicKey.length,
-  //       publicKeyBuffer: Buffer.isBuffer(authenticatorData.credentialPublicKey),
-  //       publicKeyHex: authenticatorData.credentialPublicKey.toString('hex'),
-  //       userId,
-  //       transports: authenticatorData.transports
-  //     });
-
-  //     const authenticator = await this.createAuthenticator(authenticatorData);
-
-  //     logger.debug('Created new authenticator', { 
-  //       id: authenticator.id,
-  //       credentialId: authenticator.credentialId,
-  //       createdAt: authenticator.createdAt,
-  //       transports: authenticator.transports,
-  //       userId: authenticator.userId
-  //     });
-
-  //     // verify if the authenticator is created correctly
-  //     const createdAuthenticator = await this.getAuthenticators({ id: authenticator.id });
-      
-  //     if (!createdAuthenticator) {
-  //       logger.error('Failed to verify created authenticator', {
-  //         authenticatorId: authenticator.id,
-  //         userId
-  //       });
-  //       throw new Error('Failed to verify created authenticator');
-  //     }
-
-  //     logger.info('Successfully verified created authenticator', {
-  //       authenticatorId: authenticator.id,
-  //       credentialId: authenticator.credentialId,
-  //       userId
-  //     });
-
-  //     return {
-  //       success: true,
-  //       authenticator: {
-  //         id: authenticator.id,
-  //         friendlyName: authenticator.friendlyName,
-  //         credentialId: authenticator.credentialId,
-  //         createdAt: authenticator.createdAt,
-  //         transports: authenticator.transports,
-  //       },
-  //     };
-  //   } catch (error) {
-  //     logger.error('Failed to verify registration response', {
-  //       error,
-  //       stack: error instanceof Error ? error.stack : undefined,
-  //       userId,
-  //       response,
-  //     });
-  //     return {
-  //       success: false,
-  //       error: error instanceof Error ? error.message : 'Registration verification failed',
-  //       details: error,
-  //     };
-  //   }
-  // }
+  } 
 
   /**
    * generate authentication options for a user
