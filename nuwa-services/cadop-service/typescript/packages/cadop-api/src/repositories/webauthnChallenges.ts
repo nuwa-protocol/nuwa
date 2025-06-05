@@ -45,17 +45,23 @@ export class WebAuthnChallengesRepository extends BaseRepository<WebAuthnChallen
     userId: string | null,
     operationType: 'registration' | 'authentication'
   ): Promise<WebAuthnChallengeRecord | null> {
-    const result = await this.customQuery<WebAuthnChallengeRecord>(query =>
-      query
+    const result = await this.customQuery<WebAuthnChallengeRecord>(query => {
+      let q = query
         .select()
         .eq('operation_type', operationType)
         .is('used_at', null)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
-        .limit(1)
-        .is('user_id', userId || null)
-        .single()
-    );
+        .limit(1);
+
+      if (userId) {
+        q = q.eq('user_id', userId);
+      } else {
+        q = q.is('user_id', null);
+      }
+
+      return q.single();
+    });
 
     return result ? this.mapToRecord(result) : null;
   }
