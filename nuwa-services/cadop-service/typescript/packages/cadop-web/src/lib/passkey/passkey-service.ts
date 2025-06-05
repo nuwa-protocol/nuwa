@@ -1,8 +1,8 @@
 import {
   AuthenticationOptions,
   AuthenticationResult,
-  WebAuthnError,
-  WebAuthnErrorCode,
+  CadopError,
+  CadopErrorCode,
   CredentialInfo,
   DIDKeyManager
 } from '@cadop/shared';
@@ -72,17 +72,17 @@ export class WebAuthnService {
 
       if (error) {
         console.error('💥 Server error while getting options:', error);
-        throw new WebAuthnError(
+        throw new CadopError(
           error.message || 'Failed to get authentication options',
-          WebAuthnErrorCode.INTERNAL_ERROR
+          CadopErrorCode.INTERNAL_ERROR
         );
       }
 
       if (!data?.publicKey) {
         console.error('💥 No publicKey in server response:', data);
-        throw new WebAuthnError(
+        throw new CadopError(
           'No authentication options returned from server',
-          WebAuthnErrorCode.INVALID_STATE
+          CadopErrorCode.INVALID_STATE
         );
       }
 
@@ -113,14 +113,14 @@ export class WebAuthnService {
           // 检查常见错误
           if (webauthnError instanceof Error) {
             if (webauthnError.name === 'NotAllowedError') {
-              throw new WebAuthnError(
+              throw new CadopError(
                 'User denied the registration request or operation timed out',
-                WebAuthnErrorCode.USER_CANCELLED
+                CadopErrorCode.USER_CANCELLED
               );
             } else if (webauthnError.name === 'NotSupportedError') {
-              throw new WebAuthnError(
+              throw new CadopError(
                 'WebAuthn is not supported on this device',
-                WebAuthnErrorCode.NOT_SUPPORTED
+                CadopErrorCode.NOT_SUPPORTED
               );
             }
           }
@@ -193,9 +193,9 @@ export class WebAuthnService {
             console.log('🔑 Generated and saved DID:', { did });
           } catch (error) {
             console.error('Failed to process public key:', error);
-            throw new WebAuthnError(
+            throw new CadopError(
               'Failed to process public key',
-              WebAuthnErrorCode.INTERNAL_ERROR,
+              CadopErrorCode.INTERNAL_ERROR,
               error
             );
           }
@@ -216,14 +216,14 @@ export class WebAuthnService {
           // 检查常见错误
           if (webauthnError instanceof Error) {
             if (webauthnError.name === 'NotAllowedError') {
-              throw new WebAuthnError(
+              throw new CadopError(
                 'User denied the authentication request or operation timed out',
-                WebAuthnErrorCode.USER_CANCELLED
+                CadopErrorCode.USER_CANCELLED
               );
             } else if (webauthnError.name === 'InvalidStateError') {
-              throw new WebAuthnError(
+              throw new CadopError(
                 'No matching credentials found on this device',
-                WebAuthnErrorCode.INVALID_CREDENTIAL
+                CadopErrorCode.INVALID_CREDENTIAL
               );
             }
           }
@@ -247,17 +247,17 @@ export class WebAuthnService {
 
       if (verificationResult.error) {
         console.error('💥 Server verification failed:', verificationResult.error);
-        throw new WebAuthnError(
+        throw new CadopError(
           verificationResult.error.message,
-          WebAuthnErrorCode.AUTHENTICATION_FAILED
+          CadopErrorCode.AUTHENTICATION_FAILED
         );
       }
 
       const result = verificationResult.data || {
         success: false,
-        error: new WebAuthnError(
+        error: new CadopError(
           'No data returned from server',
-          WebAuthnErrorCode.INTERNAL_ERROR
+          CadopErrorCode.INTERNAL_ERROR
         )
       };
 
@@ -270,9 +270,9 @@ export class WebAuthnService {
       return result;
     } catch (error) {
       console.error('💥 Authentication failed:', error);
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+      throw error instanceof CadopError ? error : new CadopError(
         error instanceof Error ? error.message : 'Authentication failed',
-        WebAuthnErrorCode.AUTHENTICATION_FAILED,
+        CadopErrorCode.AUTHENTICATION_FAILED,
         error
       );
     }
@@ -284,9 +284,9 @@ export class WebAuthnService {
   public async getCredentials(): Promise<CredentialInfo[]> {
     const { data, error } = await apiClient.get<{ credentials: CredentialInfo[] }>('/api/webauthn/credentials');
     if (error) {
-      throw new WebAuthnError(
+      throw new CadopError(
         error.message || 'Failed to get credentials',
-        WebAuthnErrorCode.INTERNAL_ERROR
+        CadopErrorCode.INTERNAL_ERROR
       );
     }
     return data?.credentials || [];
@@ -298,9 +298,9 @@ export class WebAuthnService {
   public async removeCredential(id: string): Promise<boolean> {
     const { data, error } = await apiClient.delete<{ success: boolean }>(`/webauthn/credentials/${id}`);
     if (error) {
-      throw new WebAuthnError(
+      throw new CadopError(
         error.message || 'Failed to remove credential',
-        WebAuthnErrorCode.INTERNAL_ERROR
+        CadopErrorCode.INTERNAL_ERROR
       );
     }
     return data?.success || false;
@@ -346,7 +346,7 @@ export class WebAuthnService {
       excludeCredentials: options.excludeCredentials?.map(credential => ({
         ...credential,
         id: this.base64URLToBuffer(credential.id),
-        transports: credential.transports as AuthenticatorTransport[],
+        transports: credential.transports,
       })),
       rp: options.rp,
       timeout: 60000, // 设置足够长的超时时间
@@ -374,7 +374,7 @@ export class WebAuthnService {
       allowCredentials: options.allowCredentials?.map(credential => ({
         ...credential,
         id: this.base64URLToBuffer(credential.id),
-        transports: credential.transports as AuthenticatorTransport[],
+        transports: credential.transports,
       })),
       rpId: options.rpId,
       timeout: options.timeout,
