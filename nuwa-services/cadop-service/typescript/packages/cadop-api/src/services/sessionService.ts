@@ -1,205 +1,219 @@
 import jwt from 'jsonwebtoken';
-import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
-import { Session as WebAuthnSession } from '@cadop/shared';
+import { WebAuthnError, WebAuthnErrorCode } from '@cadop/shared';
+import { SessionRecord, SessionRepository } from '../repositories/sessions.js';
+import { UserRecord, UserRepository } from '../repositories/users.js';
+import { config } from '../config/environment.js';
+import crypto from 'crypto';
+import { Session } from '@cadop/shared';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret';
-const ACCESS_TOKEN_EXPIRES_IN = '1h';
-const REFRESH_TOKEN_EXPIRES_IN = '7d';
+export interface SessionWithUser {
+  session: SessionRecord;
+  user: UserRecord;
+}
 
-export interface Session {
-  id: string;
-  user_id: string;
-  passkey_credential_id: string;
-  session_token: string;
-  expires_at: Date;
-  metadata: Record<string, any>;
-  created_at: Date;
-  updated_at: Date;
+export function mapToSession(session_with_user: SessionWithUser): Session {
+  return {
+    id: session_with_user.session.id,
+    accessToken: session_with_user.session.access_token,
+    refreshToken: session_with_user.session.refresh_token,
+    accessTokenExpiresAt: session_with_user.session.access_token_expires_at,
+    refreshTokenExpiresAt: session_with_user.session.refresh_token_expires_at,
+    metadata: session_with_user.session.metadata,
+    user: {
+      id: session_with_user.user.id,
+      userDid: session_with_user.user.user_did,
+      sybilLevel: session_with_user.user.sybil_level,
+      email: session_with_user.user.email,
+      displayName: session_with_user.user.display_name
+    }
+  }
 }
 
 export class SessionService {
-  private generateSessionToken(userId: string, metadata: Record<string, any> = {}) {
+  private readonly sessionRepo: SessionRepository;
+  private readonly userRepo: UserRepository;
+  private readonly accessTokenDuration: number = 24 * 60 * 60 * 1000;  // 24 hours
+  private readonly refreshTokenDuration: number = 7 * 24 * 60 * 60 * 1000; // 7 days
+  private readonly renewThreshold: number = 5 * 60 * 1000; // 5 minutes
+
+  constructor() {
+    this.sessionRepo = new SessionRepository();
+    this.userRepo = new UserRepository();
+  }
+
+  private generateTokens(userId: string, metadata: Record<string, any> = {}) {
     const now = Math.floor(Date.now() / 1000);
     
-    const sessionToken = jwt.sign(
+    // Generate access token
+    const accessToken = jwt.sign(
       {
         sub: userId,
+        type: 'access',
         metadata,
         iat: now,
-        exp: now + 7 * 24 * 3600 // 7 days
+        exp: now + this.accessTokenDuration / 1000
       },
-      JWT_SECRET
+      config.session.secret
+    );
+
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      {
+        sub: userId,
+        type: 'refresh',
+        jti: crypto.randomBytes(16).toString('hex'), // Unique token ID
+        iat: now,
+        exp: now + this.refreshTokenDuration / 1000
+      },
+      config.session.secret
     );
 
     return {
-      sessionToken,
-      expiresIn: 7 * 24 * 3600 // 7 days
+      accessToken,
+      refreshToken,
+      accessTokenExpiresAt: new Date(Date.now() + this.accessTokenDuration),
+      refreshTokenExpiresAt: new Date(Date.now() + this.refreshTokenDuration)
     };
   }
 
+  /**
+   * Create a new session
+   */
   async createSession(
     userId: string,
-    credentialId: string,
-    metadata: Record<string, any>
-  ): Promise<WebAuthnSession> {
-    try {
-      logger.debug('Creating session', {
+    authenticatorId: string,
+    metadata?: Record<string, any>
+  ): Promise<SessionWithUser> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new WebAuthnError("User not found", WebAuthnErrorCode.USER_NOT_FOUND, {
         userId,
-        credentialId,
+        authenticatorId,
         metadata
       });
-
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
-
-      const { sessionToken } = this.generateSessionToken(userId, metadata);
-
-      logger.debug('Generated session token', {
-        userId,
-        expiresAt: expiresAt.toISOString()
-      });
-
-      const { data: user } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (!user) {
-        throw new Error(`User not found: ${userId}`);
-      }
-
-      logger.debug('Found user for session', {
-        userId: user.id,
-        displayName: user.display_name
-      });
-
-      const { data: session, error } = await supabase
-        .from('sessions')
-        .insert({
-          user_id: userId,
-          passkey_credential_id: credentialId,
-          session_token: sessionToken,
-          metadata,
-          expires_at: expiresAt.toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) {
-        logger.error('Failed to insert session into database', {
-          error: error.message,
-          details: error.details,
-          hint: error.hint,
-          userId,
-          credentialId
-        });
-        throw error;
-      }
-
-      logger.debug('Session created successfully', {
-        sessionId: session.id,
-        userId,
-        expiresAt: session.expires_at
-      });
-
-      return {
-        id: session.id,
-        session_token: session.session_token,
-        expires_at: session.expires_at,
-        user: {
-          id: user.id,
-          user_did: user.user_did,
-          sybil_level: user.sybil_level,
-          email: user.email,
-          display_name: user.display_name
-        }
-      };
-    } catch (error) {
-      logger.error('Failed to create session', { 
-        error: error instanceof Error ? error.message : error,
-        stack: error instanceof Error ? error.stack : undefined,
-        userId,
-        credentialId
-      });
-      throw error;
     }
+
+    const {
+      accessToken,
+      refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt
+    } = this.generateTokens(userId, metadata);
+
+    const session = await this.sessionRepo.create({
+      user_id: userId,
+      authenticator_id: authenticatorId,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      access_token_expires_at: accessTokenExpiresAt,
+      refresh_token_expires_at: refreshTokenExpiresAt,
+      metadata: metadata || {}
+    });
+
+    return {
+      session,
+      user,
+    };
   }
 
-  async validateSession(sessionToken: string): Promise<{
+  /**
+   * Validate a session using access token
+   */
+  async validateSession(token: string): Promise<{
     valid: boolean;
-    userId?: string;
-    metadata?: Record<string, any>;
+    session?: SessionRecord;
+    user?: UserRecord;
   }> {
     try {
-      const payload = jwt.verify(sessionToken, JWT_SECRET) as jwt.JwtPayload;
-
-      const { data: session, error } = await supabase
-        .from('sessions')
-        .select()
-        .eq('session_token', sessionToken)
-        .single();
-
-      if (error || !session) {
+      // Verify JWT first
+      const payload = jwt.verify(token, config.session.secret) as jwt.JwtPayload;
+      if (payload.type !== 'access') {
         return { valid: false };
       }
 
-      return {
-        valid: true,
-        userId: payload.sub,
-        metadata: payload.metadata
-      };
+      const session = await this.sessionRepo.findByAccessToken(token);
+      if (!session) {
+        return { valid: false };
+      }
+
+      const user = await this.userRepo.findById(session.user_id);
+      if (!user) {
+        await this.sessionRepo.delete(session.id);
+        return { valid: false };
+      }
+
+      return { valid: true, session, user };
     } catch (error) {
+      logger.error('Session validation error:', error);
       return { valid: false };
     }
   }
 
+  /**
+   * Refresh access token using refresh token
+   */
+  async refreshAccessToken(refreshToken: string): Promise<SessionWithUser | null> {
+    try {
+      // Verify refresh token
+      const payload = jwt.verify(refreshToken, config.session.secret) as jwt.JwtPayload;
+      if (payload.type !== 'refresh') {
+        return null;
+      }
+
+      // Find session
+      const session = await this.sessionRepo.findByRefreshToken(refreshToken);
+      if (!session) {
+        return null;
+      }
+
+      // Get user
+      const user = await this.userRepo.findById(session.user_id);
+      if (!user) {
+        await this.sessionRepo.delete(session.id);
+        return null;
+      }
+
+      // Generate new access token
+      const {
+        accessToken,
+        accessTokenExpiresAt
+      } = this.generateTokens(user.id, session.metadata);
+
+      // Update session
+      const updatedSession = await this.sessionRepo.update(session.id, {
+        access_token: accessToken,
+        access_token_expires_at: accessTokenExpiresAt
+      });
+
+      return {
+        session: updatedSession,
+        user,
+      };
+    } catch (error) {
+      logger.error('Token refresh error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Invalidate a session
+   */
   async invalidateSession(sessionId: string): Promise<void> {
-    const { error } = await supabase
-      .from('sessions')
-      .delete()
-      .eq('id', sessionId);
-
-    if (error) {
-      throw new Error(`Failed to invalidate session: ${error.message}`);
-    }
+    await this.sessionRepo.delete(sessionId);
   }
 
+  /**
+   * Invalidate all sessions for a user
+   */
   async invalidateAllUserSessions(userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('sessions')
-      .delete()
-      .eq('user_id', userId);
-
-    if (error) {
-      throw new Error(`Failed to invalidate user sessions: ${error.message}`);
-    }
+    await this.sessionRepo.deleteByUserId(userId);
   }
 
-  async getUserInfo(userId: string): Promise<{
-    email?: string;
-    display_name?: string;
-    metadata?: Record<string, any>;
-    created_at: string;
-    updated_at: string;
-  }> {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to get user info: ${error.message}`);
-    }
-
-    return {
-      email: user.email,
-      display_name: user.display_name,
-      metadata: user.metadata,
-      created_at: user.created_at,
-      updated_at: user.updated_at
-    };
+  /**
+   * Clean up expired sessions
+   */
+  async cleanupExpiredSessions(): Promise<number> {
+    return this.sessionRepo.deleteExpired();
   }
 } 

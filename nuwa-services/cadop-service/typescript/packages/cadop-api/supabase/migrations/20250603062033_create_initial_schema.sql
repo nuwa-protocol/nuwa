@@ -147,37 +147,34 @@ CREATE TABLE authenticators (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     credential_id VARCHAR(255) NOT NULL UNIQUE,
-    credential_public_key VARCHAR(1024) NOT NULL,
+    credential_public_key TEXT NOT NULL,
     counter BIGINT NOT NULL DEFAULT 0,
-    credential_device_type VARCHAR(50) NOT NULL DEFAULT 'singleDevice',
+    credential_device_type authenticator_attachment NOT NULL DEFAULT 'cross-platform',
     credential_backed_up BOOLEAN NOT NULL DEFAULT false,
     transports authenticator_transport[] DEFAULT ARRAY[]::authenticator_transport[],
     friendly_name VARCHAR(255),
-    aaguid UUID,
+    aaguid VARCHAR(255),
     last_used_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    
-    -- Ensure credential_id uniqueness across the system
-    CONSTRAINT authenticators_credential_id_unique UNIQUE (credential_id)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- Create sessions table
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    passkey_credential_id VARCHAR(255) NOT NULL,
-    session_token TEXT NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    authenticator_id UUID NOT NULL REFERENCES authenticators(id) ON DELETE CASCADE,
+    access_token TEXT NOT NULL UNIQUE,
+    refresh_token TEXT NOT NULL UNIQUE,
+    access_token_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    refresh_token_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
-    -- Ensure expiration is in the future
-    CONSTRAINT sessions_expires_at_future CHECK (expires_at > created_at),
-    -- Reference to authenticators table
-    CONSTRAINT sessions_passkey_credential_id_fk FOREIGN KEY (passkey_credential_id) 
-        REFERENCES authenticators(credential_id) ON DELETE CASCADE
+    CONSTRAINT sessions_access_token_expires_future CHECK (access_token_expires_at > created_at),
+    CONSTRAINT sessions_refresh_token_expires_future CHECK (refresh_token_expires_at > created_at),
+    CONSTRAINT sessions_refresh_expires_after_access CHECK (refresh_token_expires_at > access_token_expires_at)
 );
 
 -- WebAuthn challenges table - temporary storage for registration/authentication challenges
@@ -229,8 +226,11 @@ CREATE INDEX IF NOT EXISTS verifiable_credentials_status_idx ON verifiable_crede
 CREATE INDEX IF NOT EXISTS verifiable_credentials_proof_request_id_idx ON verifiable_credentials(proof_request_id) WHERE proof_request_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS sessions_passkey_credential_id_idx ON sessions(passkey_credential_id);
-CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS sessions_authenticator_id_idx ON sessions(authenticator_id);
+CREATE INDEX IF NOT EXISTS sessions_access_token_idx ON sessions(access_token);
+CREATE INDEX IF NOT EXISTS sessions_refresh_token_idx ON sessions(refresh_token);
+CREATE INDEX IF NOT EXISTS sessions_access_expires_idx ON sessions(access_token_expires_at);
+CREATE INDEX IF NOT EXISTS sessions_refresh_expires_idx ON sessions(refresh_token_expires_at);
 
 CREATE INDEX IF NOT EXISTS authenticators_user_id_idx ON authenticators(user_id);
 CREATE INDEX IF NOT EXISTS authenticators_credential_id_idx ON authenticators(credential_id);

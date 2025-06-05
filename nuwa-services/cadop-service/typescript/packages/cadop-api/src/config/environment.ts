@@ -7,7 +7,7 @@ dotenv.config();
 // Environment validation schema with development defaults
 const envSchema = z.object({
   // Server
-  PORT: z.string().default('3000'),
+  PORT: z.string().default('8080'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   
   // Supabase (with development defaults)
@@ -22,9 +22,10 @@ const envSchema = z.object({
   JWT_AUDIENCE: z.string().default('cadop-service'),
   
   // OIDC (with development defaults)
-  OIDC_ISSUER: z.string().url().default('http://localhost:3000'),
+  OIDC_ISSUER: z.string().url().default('http://localhost:8080'),
   OIDC_CLIENT_ID: z.string().default('cadop-service'),
-  OIDC_CLIENT_SECRET: z.string().default('development-client-secret'),
+  OIDC_CLIENT_SECRET: z.string(),
+  OIDC_REDIRECT_URI: z.string().url().default('http://localhost:3000/callback'),
   
   // OAuth Providers (optional)
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -55,8 +56,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:3000'),
   
   // Session (with development defaults)
-  SESSION_SECRET: z.string().min(32).default('development-session-secret-minimum-32-characters-long-for-testing'),
-  SESSION_MAX_AGE: z.string().default('86400000'),
+  SESSION_SECRET: z.string(),
+  SESSION_DURATION: z.string().default('86400'), // 24 hours in seconds
 });
 
 // Validate environment variables
@@ -83,6 +84,7 @@ export const config = {
     issuer: env.OIDC_ISSUER,
     clientId: env.OIDC_CLIENT_ID,
     clientSecret: env.OIDC_CLIENT_SECRET,
+    redirectUri: env.OIDC_REDIRECT_URI,
     authorization_endpoint: '/auth/authorize',
     token_endpoint: '/auth/token',
     userinfo_endpoint: '/auth/userinfo',
@@ -138,6 +140,6 @@ export const config = {
   },
   session: {
     secret: env.SESSION_SECRET,
-    maxAge: parseInt(env.SESSION_MAX_AGE, 10),
+    duration: parseInt(env.SESSION_DURATION, 10),
   },
 } as const; 

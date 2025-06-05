@@ -1,96 +1,158 @@
 import { Request, Response, NextFunction } from 'express';
 import { SessionService } from '../services/sessionService.js';
+import { logger } from '../utils/logger.js';
+import rateLimit from 'express-rate-limit';
+import { config } from '../config/environment.js';
+import { SessionRecord } from '../repositories/sessions.js';
+import { UserRecord } from '../repositories/users.js';
 
-// 定义自定义的 User 类型，包含我们需要的属性
-interface CustomUser {
-  id: string;
-  email?: string;
-  user_metadata?: Record<string, any>;
+// 认证错误类
+class AuthError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public statusCode: number = 401
+  ) {
+    super(message);
+    this.name = 'AuthError';
+  }
 }
 
-// Extend Express Request type to include user property
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        metadata?: Record<string, any>;
-      };
+// Create an authentication limiter
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes window
+  max: 100, // 100 requests per IP
+  message: { error: 'Too many authentication attempts, please try again later' }
+});
+
+/**
+ * Extract and validate authentication token
+ */
+function extractToken(req: Request): string {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new AuthError('INVALID_TOKEN', 'No bearer token provided');
+  }
+  return authHeader.split(' ')[1];
+}
+
+/**
+ * Validate session and inject user information
+ */
+async function validateAndInjectSession(
+  req: Request,
+  token: string,
+  required: boolean = true
+): Promise<void> {
+  const sessionService = new SessionService();
+  
+  try {
+    const { valid, session, user } = await sessionService.validateSession(token);
+    
+    if (!valid || !user || !session) {
+      if (required) {
+        throw new AuthError('INVALID_SESSION', 'Invalid or expired session');
+      }
+      return;
     }
+
+    // Inject user information
+    req.user = user;
+    req.session = session;
+
+  } catch (error) {
+    if (error instanceof AuthError) {
+      throw error;
+    }
+    throw new AuthError('AUTH_ERROR', 'Authentication failed');
   }
 }
 
 /**
- * Middleware to require user authentication
- * Assumes that user authentication has been handled by Supabase Auth
+ * Required authentication middleware
  */
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  const sessionService = new SessionService();
-  
-  try {
-    const { valid, userId, metadata } = await sessionService.validateSession(token);
-    
-    if (!valid || !userId) {
-      return res.status(401).json({ error: 'Invalid token' });
+export const requireAuth = [
+  authLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const token = extractToken(req);
+      await validateAndInjectSession(req, token);
+      next();
+    } catch (error) {
+      if (error instanceof AuthError) {
+        res.status(error.statusCode).json({ 
+          error: error.code,
+          message: error.message 
+        });
+      } else {
+        logger.error('Authentication error', { error });
+        res.status(500).json({ 
+          error: 'INTERNAL_ERROR',
+          message: 'Internal server error' 
+        });
+      }
     }
-
-    // 添加用户信息到请求对象
-    req.user = { id: userId, metadata };
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
   }
-}
+];
 
 /**
- * Optional auth middleware that doesn't fail if user is not authenticated
+ * Optional authentication middleware
  */
-export async function optionalAuth(
+export const optionalAuth = async (
   req: Request,
   res: Response,
   next: NextFunction
-) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return next();
-  }
-
-  const token = authHeader.split(' ')[1];
-  const sessionService = new SessionService();
-  
+) => {
   try {
-    const { valid, userId, metadata } = await sessionService.validateSession(token);
-    
-    if (valid && userId) {
-      req.user = { id: userId, metadata };
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      await validateAndInjectSession(req, token, false);
     }
   } catch (error) {
-    // Ignore errors in optional auth
+    logger.warn('Optional auth failed', { error });
   }
-  
   next();
-}
+};
 
 /**
- * Middleware to extract user from Supabase session
- * This should be used before requireAuth
+ * Admin authentication middleware
  */
-export const extractUser = (req: Request, res: Response, next: NextFunction): void => {
-  // In a real implementation, this would extract the user from JWT token
-  // For now, we'll set a placeholder that can be populated by Supabase middleware
-  
-  // The actual user extraction should be handled by Supabase Auth middleware
-  // This is just a placeholder to satisfy TypeScript
-  
+export const requireAdmin = [
+  requireAuth,
+  (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user?.metadata?.isAdmin) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Admin privileges required'
+      });
+    }
+    next();
+  }
+];
+
+/**
+ * Session cleanup middleware
+ * Used to perform necessary cleanup work after a request
+ */
+export const sessionCleanup = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  res.on('finish', async () => {
+    if (req.session) {
+      try {
+        const sessionService = new SessionService();
+        // If the response status code indicates an invalid session, clean it up
+        if (res.statusCode === 401) {
+          await sessionService.invalidateSession(req.session.id);
+          logger.debug('Session invalidated', { sessionId: req.session.id });
+        }
+      } catch (error) {
+        logger.error('Session cleanup error', { error });
+      }
+    }
+  });
   next();
 }; 
