@@ -15,8 +15,8 @@ import {
   verifySchema,
   authenticationOptionsSchema,
   credentialSchema,
-  WebAuthnError,
-  WebAuthnErrorCode,
+  CadopError,
+  CadopErrorCode,
 } from '@cadop/shared';
 
 /**
@@ -100,7 +100,7 @@ router.post(
       });
     } catch (error) {
       logger.error('Failed to generate authentication options', { error });
-      if (error instanceof WebAuthnError) {
+      if (error instanceof CadopError) {
         res.status(400).json({
           success: false,
           error: error.message,
@@ -110,7 +110,7 @@ router.post(
         res.status(500).json({
           success: false,
           error: 'Internal server error',
-          code: WebAuthnErrorCode.INTERNAL_ERROR
+          code: CadopErrorCode.INTERNAL_ERROR
         });
       }
     }
@@ -130,7 +130,7 @@ router.post(
       res.json(result);
     } catch (error) {
       logger.error('Failed to verify authentication response', { error });
-      if (error instanceof WebAuthnError) {
+      if (error instanceof CadopError) {
         res.status(400).json({
           success: false,
           error: error.message,
@@ -140,7 +140,7 @@ router.post(
         res.status(500).json({
           success: false,
           error: 'Internal server error',
-          code: WebAuthnErrorCode.INTERNAL_ERROR
+          code: CadopErrorCode.INTERNAL_ERROR
         });
       }
     }
@@ -166,7 +166,7 @@ router.get(
       res.status(500).json({
         success: false,
         error: 'Failed to get credentials',
-        code: WebAuthnErrorCode.INTERNAL_ERROR
+        code: CadopErrorCode.INTERNAL_ERROR
       });
     }
   }
@@ -192,7 +192,7 @@ router.delete(
       res.status(500).json({
         success: false,
         error: 'Failed to remove credential',
-        code: WebAuthnErrorCode.INTERNAL_ERROR
+        code: CadopErrorCode.INTERNAL_ERROR
       });
     }
   }
@@ -223,7 +223,7 @@ router.post('/cleanup', requireAuth, async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to cleanup challenges',
-      code: WebAuthnErrorCode.INTERNAL_ERROR
+      code: CadopErrorCode.INTERNAL_ERROR
     });
   }
 });

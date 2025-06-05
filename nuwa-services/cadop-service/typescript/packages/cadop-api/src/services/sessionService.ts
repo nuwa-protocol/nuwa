@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
-import { WebAuthnError, WebAuthnErrorCode } from '@cadop/shared';
+import { CadopError, CadopErrorCode } from '@cadop/shared';
 import { SessionRecord, SessionRepository } from '../repositories/sessions.js';
 import { UserRecord, UserRepository } from '../repositories/users.js';
 import { config } from '../config/environment.js';
@@ -87,7 +87,7 @@ export class SessionService {
   ): Promise<SessionWithUser> {
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new WebAuthnError("User not found", WebAuthnErrorCode.USER_NOT_FOUND, {
+      throw new CadopError("User not found", CadopErrorCode.USER_NOT_FOUND, {
         userId,
         authenticatorId,
         metadata

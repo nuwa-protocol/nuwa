@@ -18,6 +18,7 @@ import type {
 } from '@simplewebauthn/types';
 
 import type { Session } from './session.js';
+import type { CadopError } from './errors.js';
 
 // Database types for authenticators
 export interface Authenticator {
@@ -171,26 +172,7 @@ export interface WebAuthnConfig {
   attestationType: 'none' | 'indirect' | 'direct';
 }
 
-// Error types
-export class WebAuthnError extends Error {
-  constructor(
-    message: string,
-    public code: WebAuthnErrorCode,
-    public details?: any
-  ) {
-    super(message);
-    this.name = 'WebAuthnError';
-  }
-}
 
-
-
-// Database input type for updating authenticator
-export interface UpdateAuthenticatorData {
-  id: string;
-  counter: number;
-  lastUsedAt: Date;
-}
 
 export interface WebAuthnDeviceInfo {
   id: string;
@@ -234,38 +216,11 @@ export interface AuthenticationResult {
   success: boolean;
   credential?: PublicKeyCredentialDescriptorJSON;
   session?: Session;
-  error?: WebAuthnError;
+  error?: CadopError;
   isNewUser?: boolean;
 }
 
 
-// Error code definition
-export enum WebAuthnErrorCode {
-  // Basic error
-  NOT_SUPPORTED = 'NOT_SUPPORTED',
-  INVALID_STATE = 'INVALID_STATE',
-  
-  // Registration related
-  REGISTRATION_FAILED = 'REGISTRATION_FAILED',
-  DUPLICATE_REGISTRATION = 'DUPLICATE_REGISTRATION',
-  
-  // Authentication related
-  AUTHENTICATION_FAILED = 'AUTHENTICATION_FAILED',
-  INVALID_CREDENTIAL = 'INVALID_CREDENTIAL',
-  
-  // Challenge related
-  INVALID_CHALLENGE = 'INVALID_CHALLENGE',
-  CHALLENGE_EXPIRED = 'CHALLENGE_EXPIRED',
-  
-  // User related
-  USER_NOT_FOUND = 'USER_NOT_FOUND',
-  USER_CANCELLED = 'USER_CANCELLED',
-  
-  // System error
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-  DATABASE_ERROR = 'DATABASE_ERROR',
-  REMOVE_DEVICE_FAILED = 'REMOVE_DEVICE_FAILED'
-}
 
 // Credential information
 export interface CredentialInfo {
