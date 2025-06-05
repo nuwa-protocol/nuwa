@@ -9,23 +9,49 @@ import {
   credentialSchema,
   CadopError,
   CadopErrorCode,
+  createErrorResponse,
+  createSuccessResponse,
+  createErrorResponseFromError
 } from '@cadop/shared';
 
 const router: Router = Router();
 const webauthnService = new WebAuthnService();
 
+// Helper function to handle errors
+const handleError = (error: unknown): { status: number; response: any } => {
+  logger.error('API Error:', { error });
+  
+  if (error instanceof CadopError) {
+    return {
+      status: 400,
+      response: createErrorResponse(error.message, error.code, error.details)
+    };
+  }
+  
+  if (error instanceof Error) {
+    return {
+      status: 500,
+      response: createErrorResponse(error.message, CadopErrorCode.INTERNAL_ERROR)
+    };
+  }
+  
+  return {
+    status: 500,
+    response: createErrorResponse('Unknown error occurred', CadopErrorCode.INTERNAL_ERROR)
+  };
+};
 
 // Add WebAuthn configuration endpoint
 router.get('/.well-known/webauthn', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/json');
-  res.json({
+  res.json(createSuccessResponse({
     version: '1.0',
     rp: {
       id: process.env.WEBAUTHN_RP_ID || 'localhost',
       name: process.env.WEBAUTHN_RP_NAME || 'CADOP Service',
       icon: `${process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000'}/favicon.ico`
     }
-  });
+  }));
 });
 
 /**
@@ -43,25 +69,10 @@ router.post(
         displayName: display_name
       });
 
-      res.json({
-        success: true,
-        ...options
-      });
+      res.json(createSuccessResponse(options));
     } catch (error) {
-      logger.error('Failed to generate authentication options', { error });
-      if (error instanceof CadopError) {
-        res.status(400).json({
-          success: false,
-          error: error.message,
-          code: error.code
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error',
-          code: CadopErrorCode.INTERNAL_ERROR
-        });
-      }
+      const { status, response } = handleError(error);
+      res.status(status).json(response);
     }
   }
 );
@@ -76,22 +87,10 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const result = await webauthnService.verifyAuthenticationResponse(req.body.response);
-      res.json(result);
+      res.json(createSuccessResponse(result));
     } catch (error) {
-      logger.error('Failed to verify authentication response', { error });
-      if (error instanceof CadopError) {
-        res.status(400).json({
-          success: false,
-          error: error.message,
-          code: error.code
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error',
-          code: CadopErrorCode.INTERNAL_ERROR
-        });
-      }
+      const { status, response } = handleError(error);
+      res.status(status).json(response);
     }
   }
 );
@@ -106,17 +105,10 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const credentials = await webauthnService.getUserCredentials(req.user!.id);
-      res.json({
-        success: true,
-        credentials
-      });
+      res.json(createSuccessResponse({ credentials }));
     } catch (error) {
-      logger.error('Failed to get user credentials', { error });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get credentials',
-        code: CadopErrorCode.INTERNAL_ERROR
-      });
+      const { status, response } = handleError(error);
+      res.status(status).json(response);
     }
   }
 );
@@ -135,14 +127,10 @@ router.delete(
         req.user!.id,
         req.params.id
       );
-      res.json({ success });
+      res.json(createSuccessResponse({ success }));
     } catch (error) {
-      logger.error('Failed to remove credential', { error });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to remove credential',
-        code: CadopErrorCode.INTERNAL_ERROR
-      });
+      const { status, response } = handleError(error);
+      res.status(status).json(response);
     }
   }
 );
@@ -155,26 +143,18 @@ router.post('/cleanup', requireAuth, async (req: Request, res: Response) => {
   try {
     // Check if user has admin privileges
     if (!req.user?.metadata?.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        error: 'Insufficient privileges',
-        code: 'UNAUTHORIZED'
-      });
+      return res.status(403).json(createErrorResponse(
+        'Insufficient privileges',
+        'UNAUTHORIZED'
+      ));
     }
 
     const count = await webauthnService.cleanupExpiredChallenges();
-    res.json({
-      success: true,
-      count
-    });
+    res.json(createSuccessResponse({ count }));
   } catch (error) {
-    logger.error('Failed to cleanup challenges', { error });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to cleanup challenges',
-      code: CadopErrorCode.INTERNAL_ERROR
-    });
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 
-export default router; 
+export default router;

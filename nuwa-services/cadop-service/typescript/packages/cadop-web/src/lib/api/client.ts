@@ -6,23 +6,13 @@
 
 import { supabase } from '../supabase/config';
 import type {
-  WebAuthnOptionsResponse,
-  WebAuthnAuthenticationResponse,
-  WebAuthnAuthenticationResult,
-  WebAuthnRegistrationResponse,
-  PublicKeyCredentialCreationOptionsJSON,
+  AuthenticatorResponse,
+  APIResponse,
+  CredentialInfo,
+  AuthenticationOptions,
+  AuthenticationResult
 } from '@cadop/shared';
-
-interface APIError {
-  message: string;
-  code?: string;
-  details?: unknown;
-}
-
-interface APIResponse<T> {
-  data?: T;
-  error?: APIError;
-}
+import { createErrorResponse } from '@cadop/shared';
 
 class APIClient {
   private static instance: APIClient;
@@ -72,12 +62,10 @@ class APIClient {
     console.debug('Response data:', responseData);
 
     if (!response.ok) {
-      return {
-        error: {
-          message: responseData?.message || responseData?.error || `HTTP error ${response.status}`,
-          code: responseData?.code,
-        }
-      };
+      return createErrorResponse(
+        responseData?.message || responseData?.error || `HTTP error ${response.status}`,
+        responseData?.code
+      );
     }
 
     return { data: responseData };
@@ -128,29 +116,20 @@ class APIClient {
       const responseData = await response.json();
 
       if (!response.ok) {
-        return {
-          data: undefined,
-          error: {
-            message: responseData.error || 'An error occurred',
-            code: responseData.code,
-            details: responseData.details,
-          },
-        };
+        return createErrorResponse(
+          responseData.error || 'An error occurred',
+          responseData.code,
+          responseData.details
+        );
       }
 
-      return {
-        data: responseData as T,
-        error: undefined,
-      };
+      return { data: responseData as T };
     } catch (error) {
       console.error('API request failed:', error);
-      return {
-        data: undefined,
-        error: {
-          message: error instanceof Error ? error.message : 'Request failed',
-          code: 'REQUEST_FAILED',
-        },
-      };
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Request failed',
+        'REQUEST_FAILED'
+      );
     }
   }
 
@@ -184,23 +163,40 @@ class APIClient {
     return this.handleResponse<T>(response);
   }
 
-  public async verify(
-    response: WebAuthnRegistrationResponse | WebAuthnAuthenticationResponse,
-    friendlyName?: string,
-    didKey?: string
-  ): Promise<APIResponse<WebAuthnAuthenticationResult>> {
-    console.debug('Verifying WebAuthn response:', {
-      response,
-      friendlyName,
-      didKey
-    });
-    return this.post('/api/webauthn/verify', {
-      response,
-      friendly_name: friendlyName,
-      did_key: didKey
-    }, { skipAuth: true });
-  }
- 
 }
 
-export const apiClient = APIClient.getInstance(); 
+/**
+ * WebAuthn specific API client
+ */
+export class WebAuthnAPIClient {
+  constructor(private apiClient: APIClient) {}
+
+  async getAuthenticationOptions(params: {
+    user_did?: string;
+    name?: string;
+    display_name?: string;
+  }): Promise<APIResponse<AuthenticationOptions>> {
+    return this.apiClient.post('/api/webauthn/options', params);
+  }
+
+  async verifyAuthenticationResponse(
+    response: AuthenticatorResponse
+  ): Promise<APIResponse<AuthenticationResult>> {
+    return this.apiClient.post('/api/webauthn/verify', { response });
+  }
+
+  async getCredentials(): Promise<APIResponse<CredentialInfo[]>> {
+    return this.apiClient.get('/api/webauthn/credentials');
+  }
+
+  async removeCredential(id: string): Promise<APIResponse<boolean>> {
+    return this.apiClient.delete(`/api/webauthn/credentials/${id}`);
+  }
+
+  async cleanupExpiredChallenges(): Promise<APIResponse<{ count: number }>> {
+    return this.apiClient.post('/api/webauthn/cleanup', {});
+  }
+}
+
+export const apiClient = APIClient.getInstance();
+export const webAuthnClient = new WebAuthnAPIClient(apiClient); 

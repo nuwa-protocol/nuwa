@@ -1,5 +1,4 @@
 import {
-  AuthenticationOptions,
   AuthenticationResult,
   CadopError,
   CadopErrorCode,
@@ -9,20 +8,14 @@ import {
 
 import type {
   AuthenticatorTransportFuture,
-  PublicKeyCredentialDescriptor,
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
   AuthenticatorAttachment,
-  UserVerificationRequirement,
-  AuthenticatorSelectionCriteria,
-  AttestationConveyancePreference,
-  PublicKeyCredentialParameters
 } from '@simplewebauthn/types';
 
-import { apiClient } from '../api/client';
-import { decode } from 'cbor2';
+import { webAuthnClient } from '../api/client';
 
 export class WebAuthnService {
   private developmentMode = import.meta.env.DEV;
@@ -64,22 +57,24 @@ export class WebAuthnService {
 
       // 1. 获取认证选项
       console.log('📡 Requesting authentication options from server...');
-      const { data, error } = await apiClient.post<AuthenticationOptions>('/api/webauthn/options', {
-        user_did: userDid,
+      let optionsResponse = await webAuthnClient.getAuthenticationOptions({
+        user_did: userDid || undefined,
         name: options?.name,
         display_name: options?.displayName
       });
 
-      if (error) {
-        console.error('💥 Server error while getting options:', error);
+      if (optionsResponse.error) {
+        console.error('💥 Server error while getting options:', optionsResponse.error);
         throw new CadopError(
-          error.message || 'Failed to get authentication options',
+          optionsResponse.error.message || 'Failed to get authentication options',
           CadopErrorCode.INTERNAL_ERROR
         );
       }
 
-      if (!data?.publicKey) {
-        console.error('💥 No publicKey in server response:', data);
+      const authOptions = optionsResponse.data;
+
+      if (!authOptions?.publicKey) {
+        console.error('💥 No publicKey in server response:', authOptions);
         throw new CadopError(
           'No authentication options returned from server',
           CadopErrorCode.INVALID_STATE
@@ -87,20 +82,20 @@ export class WebAuthnService {
       }
 
       console.log('📋 Received options from server', {
-        isNewUser: data.isNewUser,
-        publicKey: data.publicKey,
-        rpId: ('rp' in data.publicKey ? data.publicKey.rp?.id : data.publicKey.rpId) || 'unknown',
-        challenge: data.publicKey.challenge
+        isNewUser: authOptions.isNewUser,
+        publicKey: authOptions.publicKey,
+        rpId: ('rp' in authOptions.publicKey ? authOptions.publicKey.rp?.id : authOptions.publicKey.rpId) || 'unknown',
+        challenge: authOptions.publicKey.challenge
       });
 
       // 2. 调用浏览器 API
       let credential: PublicKeyCredential;
       let response: RegistrationResponseJSON | AuthenticationResponseJSON;
 
-      if (data.isNewUser) {
+      if (authOptions.isNewUser) {
         // 注册流程
         console.log('🆕 Starting registration flow...');
-        const createOptions = this.preformatCreateOptions(data.publicKey as PublicKeyCredentialCreationOptionsJSON);
+        const createOptions = this.preformatCreateOptions(authOptions.publicKey as PublicKeyCredentialCreationOptionsJSON);
         
         console.log('🔧 Calling navigator.credentials.create()...');
         try {
@@ -203,7 +198,7 @@ export class WebAuthnService {
       } else {
         // 登录流程
         console.log('🔐 Starting authentication flow...');
-        const getOptions = this.preformatRequestOptions(data.publicKey as PublicKeyCredentialRequestOptionsJSON);
+        const getOptions = this.preformatRequestOptions(authOptions.publicKey as PublicKeyCredentialRequestOptionsJSON);
         
         console.log('🔧 Calling navigator.credentials.get()...');
         try {
@@ -241,9 +236,7 @@ export class WebAuthnService {
 
       // 3. 验证响应
       console.log('📤 Sending verification request to server...');
-      const verificationResult = await apiClient.post<AuthenticationResult>('/api/webauthn/verify', {
-        response
-      });
+      const verificationResult = await webAuthnClient.verifyAuthenticationResponse(response);
 
       if (verificationResult.error) {
         console.error('💥 Server verification failed:', verificationResult.error);
@@ -282,28 +275,28 @@ export class WebAuthnService {
    * 获取用户的凭证列表
    */
   public async getCredentials(): Promise<CredentialInfo[]> {
-    const { data, error } = await apiClient.get<{ credentials: CredentialInfo[] }>('/api/webauthn/credentials');
-    if (error) {
+    const response = await webAuthnClient.getCredentials();
+    if (response.error) {
       throw new CadopError(
-        error.message || 'Failed to get credentials',
+        response.error.message || 'Failed to get credentials',
         CadopErrorCode.INTERNAL_ERROR
       );
     }
-    return data?.credentials || [];
+    return response.data || [];
   }
 
   /**
    * 删除凭证
    */
   public async removeCredential(id: string): Promise<boolean> {
-    const { data, error } = await apiClient.delete<{ success: boolean }>(`/webauthn/credentials/${id}`);
-    if (error) {
+    const response = await webAuthnClient.removeCredential(id);
+    if (response.error) {
       throw new CadopError(
-        error.message || 'Failed to remove credential',
+        response.error.message || 'Failed to remove credential',
         CadopErrorCode.INTERNAL_ERROR
       );
     }
-    return data?.success || false;
+    return response.data || false;
   }
 
   /**
@@ -313,12 +306,12 @@ export class WebAuthnService {
     options: PublicKeyCredentialCreationOptionsJSON
   ): PublicKeyCredentialCreationOptions {
     // 确保有 authenticatorSelection 配置
-    const authenticatorSelection: AuthenticatorSelectionCriteria = {
-      authenticatorAttachment: 'platform', // 强制使用平台认证器（Touch ID/Face ID）
-      requireResidentKey: true,
-      residentKey: 'required',
-      userVerification: 'preferred'
-    };
+    // const authenticatorSelection: AuthenticatorSelectionCriteria = {
+    //   authenticatorAttachment: 'platform', // 强制使用平台认证器（Touch ID/Face ID）
+    //   requireResidentKey: true,
+    //   residentKey: 'required',
+    //   userVerification: 'preferred'
+    // };
 
     // 在开发环境中添加额外的日志
     if (this.developmentMode) {
@@ -346,7 +339,7 @@ export class WebAuthnService {
       excludeCredentials: options.excludeCredentials?.map(credential => ({
         ...credential,
         id: this.base64URLToBuffer(credential.id),
-        transports: credential.transports,
+        transports: credential.transports as AuthenticatorTransport[],
       })),
       rp: options.rp,
       timeout: 60000, // 设置足够长的超时时间
@@ -374,7 +367,7 @@ export class WebAuthnService {
       allowCredentials: options.allowCredentials?.map(credential => ({
         ...credential,
         id: this.base64URLToBuffer(credential.id),
-        transports: credential.transports,
+        transports: credential.transports as AuthenticatorTransport[],
       })),
       rpId: options.rpId,
       timeout: options.timeout,
