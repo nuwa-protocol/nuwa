@@ -60,7 +60,7 @@ CREATE TABLE users (
 -- Agent DIDs table - Rooch Agent DIDs created for users
 CREATE TABLE agent_dids (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     agent_did VARCHAR(255) NOT NULL UNIQUE,
     controller_did VARCHAR(255) NOT NULL,
     rooch_address VARCHAR(255) NOT NULL UNIQUE,
@@ -86,8 +86,8 @@ CREATE TABLE agent_dids (
 -- Transactions table - blockchain transaction tracking
 CREATE TABLE transactions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    agent_did_id UUID REFERENCES agent_dids(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL,
+    agent_did_id UUID,
     tx_hash VARCHAR(255) NOT NULL UNIQUE,
     chain_id VARCHAR(50) NOT NULL DEFAULT 'rooch-testnet',
     operation_type VARCHAR(100) NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE transactions (
 -- Proof requests table - Web2 proof requests and VCs
 CREATE TABLE proof_requests (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     claim_type VARCHAR(100) NOT NULL,
     auth_method VARCHAR(50) NOT NULL,
     status proof_status DEFAULT 'pending',
@@ -129,7 +129,7 @@ CREATE TABLE verifiable_credentials (
     issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expires_at TIMESTAMP WITH TIME ZONE,
     status VARCHAR(50) DEFAULT 'active',
-    proof_request_id UUID REFERENCES proof_requests(id) ON DELETE SET NULL,
+    proof_request_id UUID,
     
     CONSTRAINT vc_issuer_did_format CHECK (
         issuer_did LIKE 'did:rooch:%' OR 
@@ -145,7 +145,7 @@ CREATE TABLE verifiable_credentials (
 -- Authenticators table - stores WebAuthn credential info
 CREATE TABLE authenticators (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     credential_id VARCHAR(255) NOT NULL UNIQUE,
     credential_public_key TEXT NOT NULL,
     counter BIGINT NOT NULL DEFAULT 0,
@@ -162,8 +162,8 @@ CREATE TABLE authenticators (
 -- Create sessions table
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    authenticator_id UUID NOT NULL REFERENCES authenticators(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    authenticator_id UUID NOT NULL,
     access_token TEXT NOT NULL UNIQUE,
     refresh_token TEXT NOT NULL UNIQUE,
     access_token_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -188,6 +188,7 @@ CREATE TABLE webauthn_challenges (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     used_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     
     -- Ensure challenge expiration is in the future
     CONSTRAINT webauthn_challenges_expires_at_future CHECK (expires_at > created_at),
@@ -336,6 +337,10 @@ CREATE TRIGGER update_authenticators_updated_at
     BEFORE UPDATE ON authenticators 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_webauthn_challenges_updated_at 
+    BEFORE UPDATE ON webauthn_challenges 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Create cleanup functions
 CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
 RETURNS INTEGER AS $$
@@ -343,7 +348,7 @@ DECLARE
     deleted_count INTEGER;
 BEGIN
     DELETE FROM sessions 
-    WHERE expires_at < NOW();
+    WHERE refresh_token_expires_at < NOW();
     
     GET DIAGNOSTICS deleted_count = ROW_COUNT;
     RETURN deleted_count;
@@ -394,3 +399,27 @@ ALTER PUBLICATION supabase_realtime ADD TABLE verifiable_credentials;
 ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE authenticators;
 ALTER PUBLICATION supabase_realtime ADD TABLE webauthn_challenges;
+
+
+-- Create test table for repository testing
+CREATE TABLE test_table (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS test_table_name_idx ON test_table(name);
+
+-- Enable RLS
+ALTER TABLE test_table ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Service role can manage all test data" ON test_table FOR ALL USING (current_user_is_service());
+
+-- Create trigger for updated_at
+CREATE TRIGGER update_test_table_updated_at 
+    BEFORE UPDATE ON test_table 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
