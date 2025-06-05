@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PasskeyLogin } from '../../components/auth/PasskeyLogin';
+import { WebAuthnLogin } from '../../components/auth/WebAuthnLogin';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ export function LoginPage() {
           {/* Passkey login */}
           <div className="space-y-6">
               <div className="space-y-4">
-                <PasskeyLogin
+                <WebAuthnLogin
                   onSuccess={handleLoginSuccess}
                   onError={handleLoginError}
                 />

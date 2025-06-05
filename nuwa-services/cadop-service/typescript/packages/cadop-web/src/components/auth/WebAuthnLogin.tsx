@@ -1,28 +1,28 @@
 import { useState, useCallback, useEffect } from 'react';
-import { WebAuthnService } from '../../lib/passkey/passkey-service';
+import { WebAuthnService } from '../../lib/webauthn/WebAuthnService';
 import { useAuth } from '../../lib/auth/AuthContext';
 
-interface PasskeyLoginProps {
+interface WebAuthnLoginProps {
   onSuccess: (userId: string) => void;
   onError: (error: string) => void;
   email?: string;
 }
 
-export function PasskeyLogin({ onSuccess, onError, email }: PasskeyLoginProps) {
+export function WebAuthnLogin({ onSuccess, onError, email }: WebAuthnLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const { signIn } = useAuth();
 
-  const passkeyService = new WebAuthnService();
+  const webAuthnService = new WebAuthnService();
 
   useEffect(() => {
-    passkeyService.isSupported().then(setIsSupported);
+    webAuthnService.isSupported().then(setIsSupported);
   }, []);
 
-  const handlePasskeyLogin = useCallback(async () => {
+  const handleWebAuthnLogin = useCallback(async () => {
     try {
       setIsLoading(true);
-      const result = await passkeyService.authenticate({
+      const result = await webAuthnService.authenticate({
         name: email,
         displayName: email
       });
@@ -46,7 +46,7 @@ export function PasskeyLogin({ onSuccess, onError, email }: PasskeyLoginProps) {
 
   return (
     <button
-      onClick={handlePasskeyLogin}
+      onClick={handleWebAuthnLogin}
       disabled={isLoading}
       className="w-full flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
     >
