@@ -28,12 +28,6 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE authenticator_transport AS ENUM ('usb', 'nfc', 'ble', 'internal', 'hybrid');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
     CREATE TYPE authenticator_attachment AS ENUM ('platform', 'cross-platform');
 EXCEPTION
     WHEN duplicate_object THEN null;

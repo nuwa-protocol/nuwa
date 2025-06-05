@@ -41,6 +41,25 @@ export class WebAuthnChallengesRepository extends BaseRepository<WebAuthnChallen
     return result ? this.mapToRecord(result) : null;
   }
 
+  async getLatestActiveChallenge(
+    userId: string | null,
+    operationType: 'registration' | 'authentication'
+  ): Promise<WebAuthnChallengeRecord | null> {
+    const result = await this.customQuery<WebAuthnChallengeRecord>(query =>
+      query
+        .select()
+        .eq('operation_type', operationType)
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .is('user_id', userId || null)
+        .single()
+    );
+
+    return result ? this.mapToRecord(result) : null;
+  }
+
   async markAsUsed(id: string): Promise<WebAuthnChallengeRecord> {
     return this.update(id, {
       used_at: new Date()
