@@ -76,7 +76,6 @@ export interface Database {
           user_did: string;
           email?: string;
           display_name?: string;
-          sybil_level: number;
           metadata?: any;
           created_at: string;
           updated_at: string;
@@ -86,7 +85,6 @@ export interface Database {
           user_did: string;
           email?: string;
           display_name?: string;
-          sybil_level: number;
           metadata?: any;
           created_at?: string;
           updated_at?: string;

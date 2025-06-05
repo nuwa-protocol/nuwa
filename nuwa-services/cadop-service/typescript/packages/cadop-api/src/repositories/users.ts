@@ -6,7 +6,6 @@ export interface UserRecord extends BaseRecord {
   user_did: string;
   email?: string;
   display_name?: string;
-  sybil_level: number;
   metadata: Record<string, any>;
 }
 
@@ -26,7 +25,6 @@ export class UserRepository extends BaseRepository<UserRecord> {
       user_did: data.user_did,
       email: data.email,
       display_name: data.display_name,
-      sybil_level: data.sybil_level,
       metadata: data.metadata || {},
       created_at: this.deserializeDate(data.created_at),
       updated_at: this.deserializeDate(data.updated_at)
@@ -65,19 +63,4 @@ export class UserRepository extends BaseRepository<UserRecord> {
     return result ? this.mapToRecord(result) : null;
   }
 
-  /**
-   * Find users by sybil level
-   * @param level - The sybil level to search for
-   * @returns Array of users
-   */
-  async findBySybilLevel(level: number): Promise<UserRecord[]> {
-    const result = await this.customQuery<UserRecord[]>(query =>
-      query
-        .select()
-        .eq('sybil_level', level)
-        .order('created_at', { ascending: false })
-    );
-
-    return result ? result.map(r => this.mapToRecord(r)) : [];
-  }
 } 

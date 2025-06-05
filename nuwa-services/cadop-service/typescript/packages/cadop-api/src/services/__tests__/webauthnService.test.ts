@@ -32,7 +32,6 @@ describe('WebAuthnService', () => {
       user_did: testUserDid,
       email: testEmail,
       display_name: 'Test User',
-      sybil_level: 0,
       metadata: {}
     });
   });
