@@ -183,20 +183,7 @@ export class WebAuthnError extends Error {
   }
 }
 
-// Utility types
-export type AuthenticatorTransport = 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid';
 
-// Database input type for creating authenticator
-export interface CreateAuthenticatorData {
-  userId: string;
-  credentialId: string;
-  credentialPublicKey: Buffer | Uint8Array;
-  counter: number;
-  credentialDeviceType: string;
-  credentialBackedUp: boolean;
-  transports?: AuthenticatorTransportFuture[];
-  friendlyName?: string;
-}
 
 // Database input type for updating authenticator
 export interface UpdateAuthenticatorData {

@@ -20,7 +20,6 @@ import {
   AuthenticationResult,
   Authenticator,
   WebAuthnConfig,
-  CreateAuthenticatorData,
   UpdateAuthenticatorData,
   CredentialInfo,
   Session,
@@ -35,31 +34,28 @@ import { DatabaseService } from './database.js';
 import { mapToSession, SessionService } from './sessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
+import { WebAuthnChallengesRepository, WebAuthnChallengeRecord } from '../repositories/webauthnChallenges.js';
+import { AuthenticatorRepository, AuthenticatorRecord } from '../repositories/authenticators.js';
 
-// Challenge 数据类型定义
-interface ChallengeData {
-  user_id: string | null;
-  challenge: string;
-  operation_type: 'registration' | 'authentication';
-  client_data: Record<string, any>;
-}
-
-// Base64URL 工具函数
-function base64URLToBuffer(base64url: string): Buffer {
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(base64url.length + ((4 - base64url.length % 4) % 4), '=');
-  return Buffer.from(base64, 'base64');
-}
-
-function bufferToBase64URL(buffer: Buffer): string {
-  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-// 认证器响应类型
 type AuthenticatorResponse = RegistrationResponseJSON | AuthenticationResponseJSON;
+
+// Input type for creating authenticator
+interface CreateAuthenticatorData {
+  userId: string;
+  credentialId: string;
+  credentialPublicKey: Buffer | Uint8Array;
+  counter: number;
+  credentialDeviceType: string;
+  credentialBackedUp: boolean;
+  transports?: AuthenticatorTransportFuture[];
+  friendlyName?: string;
+}
 
 export class WebAuthnService {
   private config: WebAuthnConfig;
   private sessionService: SessionService;
+  private challengesRepo: WebAuthnChallengesRepository;
+  private authenticatorRepo: AuthenticatorRepository;
 
   constructor() {
     this.config = {
@@ -70,94 +66,9 @@ export class WebAuthnService {
       attestationType: 'none',
     };
     this.sessionService = new SessionService();
+    this.challengesRepo = new WebAuthnChallengesRepository();
+    this.authenticatorRepo = new AuthenticatorRepository();
     logger.debug('WebAuthn service initialized with config', { config: this.config });
-  }
-
-  /**
-   * Get user's registered WebAuthn devices
-   */
-  async getUserDevices(userId: string): Promise<WebAuthnDeviceInfo[]> {
-    const authenticators = await this.getAuthenticators({ userId });
-
-    return authenticators.map(auth => ({
-      id: auth.id,
-      name: auth.friendlyName || 'Unknown Device',
-      type: auth.credentialDeviceType,
-      lastUsed: auth.lastUsedAt?.toISOString() || 'Never',
-    }));
-  }
-
-  /**
-   * Generate registration options for a new WebAuthn credential
-   */
-  async generateRegistrationOptions(
-    userId: string,
-    userEmail: string,
-    userName?: string
-  ): Promise<PublicKeyCredentialCreationOptionsJSON> {
-    try {
-      logger.debug('Generating registration options', {
-        userId,
-        userEmail,
-        userName,
-        config: this.config,
-      });
-
-      // Get existing authenticators for this user
-      const existingAuthenticators = await this.getAuthenticators({ userId });
-      
-      logger.debug('Found existing authenticators', {
-        userId,
-        authenticatorsCount: existingAuthenticators?.length || 0,
-        authenticators: existingAuthenticators,
-      });
-
-      const options = await generateRegistrationOptions({
-        rpName: this.config.rpName,
-        rpID: this.config.rpID,
-        userID: Buffer.from(userId),  // 需要转换为 Buffer
-        userName: userEmail,
-        userDisplayName: userName || userEmail,
-        timeout: this.config.timeout,
-        attestationType: this.config.attestationType,
-        supportedAlgorithmIDs: [-8], // EdDSA (Ed25519)
-        excludeCredentials: existingAuthenticators?.map(auth => ({
-          id: auth.credentialId,
-          type: 'public-key' as const,
-          transports: auth.transports,
-        })) || [],
-        authenticatorSelection: {
-          residentKey: 'required',
-          userVerification: 'preferred',
-        },
-      });
-
-      logger.debug('Generated registration options', { 
-        options,
-        challenge: options.challenge,
-        userId,
-      });
-
-      // Store challenge in database
-      await this.storeChallenge(userId, options.challenge, 'registration', {
-        email: userEmail,
-        user_name: userName,
-      });
-
-      return options;
-    } catch (error) {
-      logger.error('Failed to generate registration options', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-        userId,
-        userEmail,
-      });
-      throw new WebAuthnError(
-        'Failed to generate registration options',
-        WebAuthnErrorCode.INTERNAL_ERROR,
-        error
-      );
-    }
   }
 
   /**
@@ -223,7 +134,7 @@ export class WebAuthnService {
 
       const { registrationInfo } = verification;
 
-      // 检查现有的凭证
+      // check if the credential is already registered
       const existingAuthenticator = await this.getAuthenticatorByCredentialId(response.id);
 
       if (existingAuthenticator) {
@@ -237,7 +148,7 @@ export class WebAuthnService {
         };
       }
 
-      // 确保公钥是正确的格式
+      // ensure the public key is in the correct format
       const publicKeyBuffer = Buffer.from(registrationInfo.credential.publicKey);
 
       const authenticatorData = {
@@ -270,7 +181,7 @@ export class WebAuthnService {
         userId: authenticator.userId
       });
 
-      // 验证认证器是否正确创建
+      // verify if the authenticator is created correctly
       const createdAuthenticator = await this.getAuthenticators({ id: authenticator.id });
       
       if (!createdAuthenticator) {
@@ -313,7 +224,7 @@ export class WebAuthnService {
   }
 
   /**
-   * 统一的认证选项生成方法
+   * generate authentication options for a user
    */
   async generateAuthenticationOptions(
     userDid?: string,
@@ -331,7 +242,7 @@ export class WebAuthnService {
 
       if (userDid) {
         logger.debug('User DID provided, looking up existing user', { userDid });
-        // 查找或创建用户
+        // lookup or create user
         const user = await DatabaseService.getUserByDID(userDid);
         if (user) {
           userId = user.id;
@@ -349,14 +260,14 @@ export class WebAuthnService {
           logger.debug('Created new user', { userId, userDid, displayName: newUser.display_name });
         }
       } else {
-        // 如果没有提供 DID，说明是首次使用，创建临时用户
+        // if no DID is provided, create a temporary user
         logger.debug('No DID provided, creating temporary user for registration');
         
-        // 生成临时用户 ID 和临时 DID
+        // generate a temporary user ID and DID
         const tempUserId = crypto.randomUUID();
         const tempDid = `did:temp:${tempUserId}`;
         
-        // 创建临时用户记录
+        // create a temporary user record
         const tempUser = await DatabaseService.createUser({
           user_did: tempDid,
           display_name: userInfo?.displayName || 'New User',
@@ -388,7 +299,7 @@ export class WebAuthnService {
           userVerification: 'preferred'
         };
 
-        // 生成注册选项
+        // generate registration options
         const options = await generateRegistrationOptions({
           rpName: this.config.rpName,
           rpID: this.config.rpID,
@@ -403,7 +314,7 @@ export class WebAuthnService {
 
         logger.debug('Generated registration options', options);
 
-        // 存储 challenge 到数据库
+        // store challenge to database
         await this.storeChallenge(
           userId || 'anonymous',
           options.challenge,
@@ -412,7 +323,6 @@ export class WebAuthnService {
             name: userInfo?.name,
             display_name: userInfo?.displayName,
             user_did: userDid,
-            email: userInfo?.name // 如果 name 是 email 的话
           }
         );
 
@@ -430,7 +340,7 @@ export class WebAuthnService {
 
       logger.debug('Generating authentication options for existing user', { userId });
 
-      // 生成认证选项
+      // generate authentication options
       const authenticators = await this.getAuthenticators({ userId });
       logger.debug('Found existing authenticators', {
         userId,
@@ -460,7 +370,7 @@ export class WebAuthnService {
         allowCredentialsCount: options.allowCredentials?.length || 0
       });
 
-      // 存储 challenge 到数据库
+      // store challenge to database
       await this.storeChallenge(
         userId,
         options.challenge,
@@ -498,7 +408,7 @@ export class WebAuthnService {
   }
 
   /**
-   * 统一的验证响应方法
+   * verify authentication response
    */
   async verifyAuthenticationResponse(
     response: AuthenticatorResponse
@@ -509,7 +419,7 @@ export class WebAuthnService {
         credentialId: response.id
       });
 
-      // 从 clientDataJSON 中提取 challenge
+      // extract challenge from clientDataJSON
       const clientDataJSON = JSON.parse(
         Buffer.from('response' in response ? response.response.clientDataJSON : '', 'base64').toString('utf-8')
       );
@@ -521,7 +431,7 @@ export class WebAuthnService {
         type: clientDataJSON.type
       });
       
-      // 获取 challenge 数据
+      // get challenge data
       const challengeData = await this.getChallenge(clientDataJSON.challenge);
       if (!challengeData) {
         logger.error('Challenge not found or expired', {
@@ -570,40 +480,6 @@ export class WebAuthnService {
     }
   }
 
-  /**
-   * Remove a user's authenticator
-   */
-  async removeDevice(userId: string, authenticatorId: string): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('authenticators')
-        .delete()
-        .eq('id', authenticatorId)
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
-      // Also remove from auth_methods if it exists
-      await supabase
-        .from('auth_methods')
-        .delete()
-        .eq('user_id', userId)
-        .eq('provider', 'webauthn')
-        .eq('provider_user_id', authenticatorId);
-
-      logger.info('WebAuthn device removed', { userId, authenticatorId });
-      return true;
-    } catch (error) {
-      logger.error('Failed to remove device', { error, userId, authenticatorId });
-      throw new WebAuthnError(
-        'Failed to remove device',
-        WebAuthnErrorCode.REMOVE_DEVICE_FAILED,
-        error
-      );
-    }
-  }
-
-  // Private helper methods
   private async storeChallenge(
     userId: string,
     challenge: string,
@@ -618,42 +494,23 @@ export class WebAuthnService {
       operationType,
       clientData,
       expiresAt,
-      isAnonymous: userId === 'anonymous'
+      isAnonymous: !userId || userId === 'anonymous'
     });
 
-    // 直接存储 base64url 字符串
-    const { error } = await supabase
-      .from('webauthn_challenges')
-      .insert({
-        user_id: userId === 'anonymous' ? null : userId,  // 如果是匿名用户，存储 null
-        challenge: challenge,
-        operation_type: operationType,
-        client_data: clientData,
-        expires_at: expiresAt,
-      });
-
-    if (error) {
-      logger.error('Failed to store challenge', { 
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        userId, 
-        challenge,
-        operationType
-      });
-      throw new WebAuthnError(
-        'Failed to store challenge',
-        WebAuthnErrorCode.INTERNAL_ERROR,
-        error
-      );
-    }
+    await this.challengesRepo.create({
+      user_id: !userId || userId === 'anonymous' ? undefined : userId,
+      challenge: challenge,
+      operation_type: operationType,
+      client_data: clientData,
+      expires_at: expiresAt
+    });
 
     logger.debug('Challenge stored successfully', {
       userId,
       challenge,
       operationType,
       expiresAt,
-      isAnonymous: userId === 'anonymous'
+      isAnonymous: !userId || userId === 'anonymous'
     });
   }
 
@@ -661,87 +518,55 @@ export class WebAuthnService {
     userId: string | null,
     operationType: 'registration' | 'authentication'
   ): Promise<{ user_id: string | null; email: string; challenge: string } | null> {
-    // 构建基本查询
-    let query = supabase
-      .from('webauthn_challenges')
-      .select('*')
-      .eq('operation_type', operationType)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1);
+    // get the latest active challenge
+    const challenge = await this.challengesRepo.getLatestActiveChallenge(userId, operationType);
 
-    // 如果提供了 userId 且不是 anonymous，添加 user_id 条件
-    if (userId && userId !== 'anonymous') {
-      query = query.eq('user_id', userId);
-    } else {
-      // 对于匿名用户，查找 user_id 为 null 的记录
-      query = query.is('user_id', null);
-    }
-
-    const { data, error } = await query.single();
-
-    if (error || !data) {
+    if (!challenge) {
       logger.warn('Challenge not found', { 
         userId,
-        operationType,
-        error 
+        operationType
       });
       return null;
     }
 
-    // Mark challenge as used
-    await supabase
-      .from('webauthn_challenges')
-      .update({ used_at: new Date() })
-      .eq('id', data.id);
+    // mark the challenge as used
+    await this.challengesRepo.markAsUsed(challenge.id);
 
     return {
-      user_id: data.user_id,
-      email: data.client_data.email,
-      challenge: data.challenge,
+      user_id: challenge.user_id || null,
+      email: challenge.client_data.email,
+      challenge: challenge.challenge,
     };
   }
 
+
   private async getAuthenticators(filter: { userId?: string; credentialId?: string; id?: string } = {}): Promise<Authenticator[]> {
     try {
-      let query = supabase
-        .from('authenticators')
-        .select('*');
+      let authenticators: AuthenticatorRecord[] = [];
 
       if (filter.userId) {
-        query = query.eq('user_id', filter.userId);
-      }
-      if (filter.credentialId) {
-        query = query.eq('credential_id', filter.credentialId);
-      }
-      if (filter.id) {
-        query = query.eq('id', filter.id);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new WebAuthnError(
-          'Failed to get authenticators',
-          WebAuthnErrorCode.DATABASE_ERROR,
-          error
-        );
+        authenticators = await this.authenticatorRepo.findByUserId(filter.userId);
+      } else if (filter.credentialId) {
+        const authenticator = await this.authenticatorRepo.findByCredentialId(filter.credentialId);
+        authenticators = authenticator ? [authenticator] : [];
+      } else if (filter.id) {
+        const authenticator = await this.authenticatorRepo.findById(filter.id);
+        authenticators = authenticator ? [authenticator] : [];
       }
 
-      return (data || []).map(auth => ({
+      return authenticators.map(auth => ({
         id: auth.id,
         userId: auth.user_id,
         credentialId: auth.credential_id,
         credentialPublicKey: Buffer.from(auth.credential_public_key, 'hex'),
         counter: auth.counter,
-        credentialDeviceType: auth.credential_device_type,
+        credentialDeviceType: auth.credential_device_type === 'platform' ? 'singleDevice' : 'multiDevice',
         credentialBackedUp: auth.credential_backed_up,
         transports: auth.transports,
         friendlyName: auth.friendly_name,
-        lastUsedAt: auth.last_used_at ? new Date(auth.last_used_at) : undefined,
-        createdAt: new Date(auth.created_at),
-        updatedAt: new Date(auth.updated_at)
+        lastUsedAt: auth.last_used_at,
+        createdAt: auth.created_at,
+        updatedAt: auth.updated_at
       }));
     } catch (error) {
       logger.error('Failed to get authenticators', { error, filter });
@@ -753,10 +578,6 @@ export class WebAuthnService {
     }
   }
 
-  private async getAuthenticatorByUserId(userId: string): Promise<Authenticator[]> {
-    return this.getAuthenticators({ userId });
-  }
-
   private async getAuthenticatorByCredentialId(credentialId: string): Promise<Authenticator | null> {
     const authenticators = await this.getAuthenticators({ credentialId });
     return authenticators[0] || null;
@@ -764,42 +585,30 @@ export class WebAuthnService {
 
   private async createAuthenticator(data: CreateAuthenticatorData): Promise<Authenticator> {
     try {
-      const { data: authenticator, error } = await supabase
-        .from('authenticators')
-        .insert({
-          user_id: data.userId,
-          credential_id: data.credentialId,
-          credential_public_key: data.credentialPublicKey.toString('hex'),
-          counter: data.counter,
-          credential_device_type: data.credentialDeviceType,
-          credential_backed_up: data.credentialBackedUp,
-          transports: data.transports,
-          friendly_name: data.friendlyName
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw new WebAuthnError(
-          'Failed to create authenticator',
-          WebAuthnErrorCode.DATABASE_ERROR,
-          error
-        );
-      }
+      const authenticator = await this.authenticatorRepo.create({
+        user_id: data.userId,
+        credential_id: data.credentialId,
+        credential_public_key: data.credentialPublicKey.toString('hex'),
+        counter: data.counter,
+        credential_device_type: data.credentialDeviceType === 'singleDevice' ? 'platform' : 'cross-platform',
+        credential_backed_up: data.credentialBackedUp,
+        transports: data.transports || [],
+        friendly_name: data.friendlyName
+      });
 
       return {
         id: authenticator.id,
         userId: authenticator.user_id,
         credentialId: authenticator.credential_id,
-        credentialPublicKey: authenticator.credential_public_key,
+        credentialPublicKey: Buffer.from(authenticator.credential_public_key, 'hex'),
         counter: authenticator.counter,
-        credentialDeviceType: authenticator.credential_device_type,
+        credentialDeviceType: authenticator.credential_device_type === 'platform' ? 'singleDevice' : 'multiDevice',
         credentialBackedUp: authenticator.credential_backed_up,
-        transports: authenticator.transports,
-        friendlyName: authenticator.friendly_name,
-        lastUsedAt: authenticator.last_used_at ? new Date(authenticator.last_used_at) : undefined,
-        createdAt: new Date(authenticator.created_at),
-        updatedAt: new Date(authenticator.updated_at)
+        transports: data.transports || [],
+        friendlyName: data.friendlyName,
+        lastUsedAt: authenticator.last_used_at,
+        createdAt: authenticator.created_at,
+        updatedAt: authenticator.updated_at
       };
     } catch (error) {
       logger.error('Failed to create authenticator', { error });
@@ -811,67 +620,12 @@ export class WebAuthnService {
     }
   }
 
-  private async updateAuthenticator(data: UpdateAuthenticatorData): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('authenticators')
-        .update({
-          counter: data.counter,
-          last_used_at: data.lastUsedAt
-        })
-        .eq('id', data.id);
-
-      if (error) {
-        throw new WebAuthnError(
-          'Failed to update authenticator',
-          WebAuthnErrorCode.DATABASE_ERROR,
-          error
-        );
-      }
-    } catch (error) {
-      logger.error('Failed to update authenticator', { error });
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
-        'Failed to update authenticator',
-        WebAuthnErrorCode.DATABASE_ERROR,
-        error
-      );
-    }
-  }
-
-  private async updateAuthMethod(
-    userId: string,
-    data: {
-      provider: string;
-      provider_user_id: string;
-      provider_data: Record<string, any>;
-      sybil_contribution: number;
-      verified_at: Date;
-    }
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('auth_methods')
-      .upsert({
-        user_id: userId,
-        ...data,
-      });
-
-    if (error) throw error;
-  }
-
   /**
-   * 清理过期的挑战
+   * cleanup expired challenges
    */
   async cleanupExpiredChallenges(): Promise<number> {
     try {
-      const { data, error } = await supabase.rpc('cleanup_expired_webauthn_challenges');
-      if (error) {
-        throw new WebAuthnError(
-          'Failed to cleanup challenges',
-          WebAuthnErrorCode.DATABASE_ERROR,
-          error
-        );
-      }
-      return data || 0;
+      return await this.challengesRepo.cleanupExpired();
     } catch (error) {
       logger.error('Failed to cleanup challenges', { error });
       throw new WebAuthnError(
@@ -885,38 +639,23 @@ export class WebAuthnService {
   /**
    * Get challenge by challenge string
    */
-  async getChallenge(challenge: string): Promise<ChallengeData | null> {
+  async getChallenge(challenge: string): Promise<WebAuthnChallengeRecord | null> {
     try {
       logger.debug('Looking up challenge', { 
         challenge,
         timestamp: new Date().toISOString()
       });
 
-      const { data, error } = await supabase
-        .from('webauthn_challenges')
-        .select('*')
-        .eq('challenge', challenge)
-        .single();
-
-      if (error) {
-        logger.debug('Challenge lookup error', {
-          error: error.message,
-          details: error.details,
-          hint: error.hint,
-          challenge
-        });
-        return null;
-      }
+      const data = await this.challengesRepo.getByChallenge(challenge);
 
       if (!data) {
         logger.debug('Challenge not found in database', { challenge });
         return null;
       }
 
-      // 检查是否过期
+      // check if the challenge is expired
       const now = new Date();
-      const expiresAt = new Date(data.expires_at);
-      const isExpired = now > expiresAt;
+      const isExpired = now > data.expires_at;
       const isUsed = !!data.used_at;
 
       logger.debug('Challenge found', {
@@ -928,7 +667,7 @@ export class WebAuthnService {
         usedAt: data.used_at,
         isExpired,
         isUsed,
-        timeUntilExpiry: isExpired ? 'expired' : `${Math.round((expiresAt.getTime() - now.getTime()) / 1000)}s`
+        timeUntilExpiry: isExpired ? 'expired' : `${Math.round((data.expires_at.getTime() - now.getTime()) / 1000)}s`
       });
 
       if (isExpired) {
@@ -948,12 +687,7 @@ export class WebAuthnService {
         return null;
       }
 
-      return {
-        user_id: data.user_id,
-        challenge: data.challenge,
-        operation_type: data.operation_type,
-        client_data: data.client_data || {}
-      };
+      return data;
     } catch (error) {
       logger.error('Failed to get challenge', { 
         error: error instanceof Error ? error.message : error,
@@ -964,69 +698,9 @@ export class WebAuthnService {
     }
   }
 
-
-  /**
-   * 开发环境辅助方法：重置认证器的counter
-   * 用于解决Chrome DevTools虚拟认证器counter重置问题
-   */
-  async resetAuthenticatorCounter(credentialId: string): Promise<boolean> {
-    if (process.env.NODE_ENV === 'production') {
-      logger.warn('Counter reset not allowed in production environment');
-      return false;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('authenticators')
-        .update({ counter: 0 })
-        .eq('credential_id', credentialId);
-
-      if (error) {
-        logger.error('Failed to reset authenticator counter', { error, credentialId });
-        return false;
-      }
-
-      logger.info('Authenticator counter reset for development', { credentialId });
-      return true;
-    } catch (error) {
-      logger.error('Failed to reset authenticator counter', { error, credentialId });
-      return false;
-    }
-  }
-
-  /**
-   * 开发环境辅助方法：重置用户的所有认证器counter
-   */
-  async resetUserAuthenticatorCounters(userId: string): Promise<number> {
-    if (process.env.NODE_ENV === 'production') {
-      logger.warn('Counter reset not allowed in production environment');
-      return 0;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('authenticators')
-        .update({ counter: 0 })
-        .eq('user_id', userId)
-        .select('id');
-
-      if (error) {
-        logger.error('Failed to reset user authenticator counters', { error, userId });
-        return 0;
-      }
-
-      const resetCount = data?.length || 0;
-      logger.info('Reset all authenticator counters for user', { userId, resetCount });
-      return resetCount;
-    } catch (error) {
-      logger.error('Failed to reset user authenticator counters', { error, userId });
-      return 0;
-    }
-  }
-
   private async handleRegistrationResponse(
     response: RegistrationResponseJSON,
-    challengeData: ChallengeData
+    challengeData: WebAuthnChallengeRecord
   ): Promise<AuthenticationResult> {
     try {
       if (!challengeData.user_id) {
@@ -1041,7 +715,7 @@ export class WebAuthnService {
         credentialId: response.id
       });
 
-      // 验证注册响应
+      // verify the registration response
       const verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: challengeData.challenge,
@@ -1065,7 +739,7 @@ export class WebAuthnService {
         credentialBackedUp: registrationInfo.credentialBackedUp
       });
 
-      // 检查是否已存在相同的凭证
+      // check if the credential is already registered
       const existingAuthenticator = await this.getAuthenticators({ credentialId: response.id });
       if (existingAuthenticator.length > 0) {
         throw new WebAuthnError(
@@ -1074,7 +748,7 @@ export class WebAuthnService {
         );
       }
 
-      // 获取用户信息以检查是否是临时用户
+      // get user information to check if the user is a temporary user
       const user = await DatabaseService.getUserById(challengeData.user_id);
       if (!user) {
         throw new WebAuthnError(
@@ -1089,8 +763,7 @@ export class WebAuthnService {
         isTemporary: user.user_did?.startsWith('did:temp:')
       });
 
-      // 检查是否是临时用户，如果是则需要更新 DID
-      const finalUserId = challengeData.user_id;
+      // check if the user is a temporary user, if so, update the DID
       if (user.user_did?.startsWith('did:temp:')) {
         logger.debug('Updating temporary user DID', {
           userId: user.id,
@@ -1098,7 +771,7 @@ export class WebAuthnService {
         });
 
         try {
-          // 从公钥生成真实的 DID
+          // generate the real DID from the public key
           const publicKey = Buffer.from(registrationInfo.credential.publicKey);
           const realDid = this.generateDIDFromPublicKey(publicKey);
 
@@ -1108,7 +781,7 @@ export class WebAuthnService {
             newDid: realDid
           });
 
-          // 更新用户的 DID 和移除临时标记
+          // update the user's DID and remove the temporary flag
           const { error: updateError } = await supabase
             .from('users')
             .update({
@@ -1144,12 +817,12 @@ export class WebAuthnService {
             userId: user.id,
             oldDid: user.user_did
           });
-          // 不抛出错误，允许注册继续进行
-          // 临时用户仍然可以使用，只是 DID 没有更新
+          // do not throw an error, allow the registration to continue
+          // the temporary user can still be used, but the DID is not updated
         }
       }
 
-      // 创建新的认证器
+      // create a new authenticator
       const authenticator = await this.createAuthenticator({
         userId: challengeData.user_id,
         credentialId: response.id,
@@ -1204,11 +877,11 @@ export class WebAuthnService {
   }
 
   /**
-   * 从公钥生成 DID
+   * generate a DID from a public key
    */
   private generateDIDFromPublicKey(publicKeyBuffer: ArrayBuffer): string {
     try {
-      // 解析 COSE key
+      // parse the COSE key
       const publicKeyBytes = Buffer.from(publicKeyBuffer);
       const coseKey = decode(publicKeyBytes) as Map<number, any>;
       
@@ -1218,8 +891,8 @@ export class WebAuthnService {
         algorithm: coseKey.get(3), // alg
       });
 
-      // 提取实际的公钥
-      // 对于 Ed25519，公钥在 -2 字段
+      // extract the actual public key
+      // for Ed25519, the public key is in the -2 field
       const rawPublicKey = coseKey.get(-2);
       
       if (!rawPublicKey) {
@@ -1231,7 +904,7 @@ export class WebAuthnService {
         length: rawPublicKey.length
       });
       
-      // 将原始公钥转换为 ArrayBuffer
+      // convert the raw public key to an ArrayBuffer
       const rawPublicKeyBuffer = rawPublicKey.buffer.slice(
         rawPublicKey.byteOffset,
         rawPublicKey.byteOffset + rawPublicKey.length
@@ -1256,10 +929,10 @@ export class WebAuthnService {
 
   private async handleAuthenticationResponse(
     response: AuthenticationResponseJSON,
-    challengeData: ChallengeData
+    challengeData: WebAuthnChallengeRecord
   ): Promise<AuthenticationResult> {
     try {
-      // 获取认证器
+      // get the authenticator
       const authenticators = await this.getAuthenticators({ credentialId: response.id });
       if (authenticators.length === 0) {
         throw new WebAuthnError(
@@ -1270,7 +943,7 @@ export class WebAuthnService {
 
       const authenticator = authenticators[0];
 
-      // 验证认证响应
+      // verify the authentication response
       const verification = await verifyAuthenticationResponse({
         response,
         expectedChallenge: challengeData.challenge,
@@ -1291,14 +964,10 @@ export class WebAuthnService {
         );
       }
 
-      // 更新认证器计数器
-      await this.updateAuthenticator({
-        id: authenticator.id,
-        counter: verification.authenticationInfo.newCounter,
-        lastUsedAt: new Date()
-      });
+      // update the counter of the authenticator
+      this.authenticatorRepo.updateCounter(authenticator.id, verification.authenticationInfo.newCounter);
 
-      // 创建会话
+      // create a session
       const session_with_user = await this.sessionService.createSession(
         authenticator.userId,
         authenticator.id,
@@ -1326,7 +995,7 @@ export class WebAuthnService {
   }
 
   /**
-   * 获取用户的凭证列表
+   * get user's registered WebAuthn credentials
    */
   async getUserCredentials(userId: string): Promise<CredentialInfo[]> {
     try {
@@ -1350,24 +1019,11 @@ export class WebAuthnService {
   }
 
   /**
-   * 删除凭证
+   * remove a credential
    */
   async removeCredential(userId: string, credentialId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('authenticators')
-        .delete()
-        .eq('user_id', userId)
-        .eq('id', credentialId);
-
-      if (error) {
-        throw new WebAuthnError(
-          'Failed to remove credential',
-          WebAuthnErrorCode.DATABASE_ERROR,
-          error
-        );
-      }
-
+      await this.authenticatorRepo.delete(credentialId);
       return true;
     } catch (error) {
       logger.error('Failed to remove credential', { error, userId, credentialId });

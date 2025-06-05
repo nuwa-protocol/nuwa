@@ -1,7 +1,7 @@
 import { BaseRepository, BaseRecord } from './base.js';
 import { Database } from '../config/supabase.js';
+import { AuthenticatorTransportFuture } from '@simplewebauthn/types';
 
-type AuthenticatorTransport = Database['public']['Enums']['authenticator_transport'];
 type AuthenticatorAttachment = Database['public']['Enums']['authenticator_attachment'];
 
 export interface AuthenticatorRecord extends BaseRecord {
@@ -11,7 +11,7 @@ export interface AuthenticatorRecord extends BaseRecord {
   counter: number;
   credential_device_type: string;
   credential_backed_up: boolean;
-  transports: AuthenticatorTransport[];
+  transports: AuthenticatorTransportFuture[];
   friendly_name?: string;
   aaguid?: string;
   last_used_at?: Date;
@@ -144,7 +144,7 @@ export class AuthenticatorRepository extends BaseRepository<AuthenticatorRecord>
    * @param transport - The transport to find authenticators for
    * @returns Array of authenticators
    */
-  async findByTransport(transport: AuthenticatorTransport): Promise<AuthenticatorRecord[]> {
+  async findByTransport(transport: AuthenticatorTransportFuture): Promise<AuthenticatorRecord[]> {
     const result = await this.customQuery<AuthenticatorRecord[]>(query =>
       query
         .select()
