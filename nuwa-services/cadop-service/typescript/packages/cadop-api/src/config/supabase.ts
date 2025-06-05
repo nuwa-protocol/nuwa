@@ -338,6 +338,64 @@ export interface Database {
           updated_at?: string;
         };
       };
+      webauthn_challenges: {
+        Row: {
+          id: string;
+          user_id?: string;
+          challenge: string;
+          operation_type: 'registration' | 'authentication';
+          client_data: Record<string, any>;
+          expires_at: string;
+          used_at?: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          challenge: string;
+          operation_type: 'registration' | 'authentication';
+          client_data?: Record<string, any>;
+          expires_at: string;
+          used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          challenge?: string;
+          operation_type?: 'registration' | 'authentication';
+          client_data?: Record<string, any>;
+          expires_at?: string;
+          used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      test_table: {
+        Row: {
+          id: string;
+          name: string;
+          value: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          value: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          value?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     public_did_documents: {
         Row: {
