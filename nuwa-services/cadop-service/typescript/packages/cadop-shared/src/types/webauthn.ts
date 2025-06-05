@@ -229,7 +229,7 @@ export interface WebAuthnOptionsResponse {
   isRegistration: boolean;
 }
 
-// 统一认证选项
+// Unify authentication options
 export interface AuthenticationOptions {
   publicKey: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
   isNewUser?: boolean;
@@ -240,67 +240,58 @@ export interface AuthenticationOptions {
   }
 }
 
-// 统一认证结果
+// Authentication result
 export interface AuthenticationResult {
   success: boolean;
   credential?: PublicKeyCredentialDescriptorJSON;
-  session?: SessionInfo;
+  session?: Session;
   error?: WebAuthnError;
   isNewUser?: boolean;
 }
 
-// 会话信息
-export interface SessionInfo {
-  session_token: string;
-  expires_at: string;
-  user: {
-    id: string;
-    email?: string;
-    display_name?: string;
-  }
-}
-
-// Session 类型
+// Session type
 export interface Session {
   id: string;
   session_token: string;
   expires_at: string;
   user: {
     id: string;
+    user_did: string;
+    sybil_level: number;
     email?: string;
     display_name?: string;
   }
 }
 
-// 错误码定义
+// Error code definition
 export enum WebAuthnErrorCode {
-  // 基础错误
+  // Basic error
   NOT_SUPPORTED = 'NOT_SUPPORTED',
   INVALID_STATE = 'INVALID_STATE',
   
-  // 注册相关
+  // Registration related
   REGISTRATION_FAILED = 'REGISTRATION_FAILED',
   DUPLICATE_REGISTRATION = 'DUPLICATE_REGISTRATION',
   
-  // 认证相关
+  // Authentication related
   AUTHENTICATION_FAILED = 'AUTHENTICATION_FAILED',
   INVALID_CREDENTIAL = 'INVALID_CREDENTIAL',
   
-  // 挑战相关
+  // Challenge related
   INVALID_CHALLENGE = 'INVALID_CHALLENGE',
   CHALLENGE_EXPIRED = 'CHALLENGE_EXPIRED',
   
-  // 用户相关
+  // User related
   USER_NOT_FOUND = 'USER_NOT_FOUND',
   USER_CANCELLED = 'USER_CANCELLED',
   
-  // 系统错误
+  // System error
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
   REMOVE_DEVICE_FAILED = 'REMOVE_DEVICE_FAILED'
 }
 
-// 凭证信息
+// Credential information
 export interface CredentialInfo {
   id: string;
   name: string;

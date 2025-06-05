@@ -7,6 +7,7 @@ type User = {
   user_did: string;
   email?: string;
   display_name?: string;
+  sybil_level: number;
   metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
@@ -33,9 +34,6 @@ type ProofRequestUpdate = Database['public']['Tables']['proof_requests']['Update
 
 type VerifiableCredential = Database['public']['Tables']['verifiable_credentials']['Row'];
 type VerifiableCredentialInsert = Database['public']['Tables']['verifiable_credentials']['Insert'];
-
-type OAuthClient = Database['public']['Tables']['oauth_clients']['Row'];
-type OAuthClientInsert = Database['public']['Tables']['oauth_clients']['Insert'];
 
 type Session = Database['public']['Tables']['sessions']['Row'];
 type SessionInsert = Database['public']['Tables']['sessions']['Insert'];
@@ -455,34 +453,6 @@ export class DatabaseService {
     return data || [];
   }
 
-  // OAuth client operations
-  static async getOAuthClientById(clientId: string): Promise<OAuthClient | null> {
-    const { data, error } = await supabase
-      .from('oauth_clients')
-      .select('*')
-      .eq('client_id', clientId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get OAuth client: ${error.message}`);
-    }
-
-    return data;
-  }
-
-  static async createOAuthClient(clientData: OAuthClientInsert): Promise<OAuthClient> {
-    const { data, error } = await supabase
-      .from('oauth_clients')
-      .insert(clientData)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create OAuth client: ${error.message}`);
-    }
-
-    return data;
-  }
 
   // Session operations
   static async createSession(sessionData: SessionInsert): Promise<Session> {
