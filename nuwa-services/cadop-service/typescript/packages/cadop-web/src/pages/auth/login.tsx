@@ -1,28 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { PasskeyLogin } from '../../components/auth/PasskeyLogin';
-import { useAuth } from '../../lib/auth/AuthContext';
-import type { UserSession } from '../../lib/auth/types';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   // Get the page user was trying to access
   const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard';
 
-  const handleLoginSuccess = (userId: string) => {
-    // Create user session
-    const session: UserSession = {
-      id: userId,
-      created_at: new Date().toISOString(),
-      last_sign_in_at: new Date().toISOString(),
-    };
-
-    // Store session and redirect
-    signIn(session);
+  const handleLoginSuccess = (_userId: string) => {
     navigate(from, { replace: true });
   };
 

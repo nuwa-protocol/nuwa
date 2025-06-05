@@ -58,59 +58,23 @@ export function DashboardPage() {
               <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
                   <dt className="text-sm font-medium text-gray-500">用户 ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{session?.id}</dd>
+                  <dd className="mt-1 text-sm text-gray-900">{session?.user?.id}</dd>
                 </div>
-                {session?.email && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">邮箱</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.email}</dd>
-                  </div>
-                )}
-                {session?.did && (
+                
+                {session?.user?.user_did && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">DID</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.did}</dd>
+                    <dd className="mt-1 text-sm text-gray-900">{session.user.user_did}</dd>
                   </div>
                 )}
-                {session?.agent_did && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Agent DID</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.agent_did}</dd>
-                  </div>
-                )}
-                {session?.sybil_level !== undefined && (
+                
+                {session?.user?.sybil_level !== undefined && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Sybil 等级</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.sybil_level}</dd>
+                    <dd className="mt-1 text-sm text-gray-900">{session.user.sybil_level}</dd>
                   </div>
                 )}
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">注册时间</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(session?.created_at || '').toLocaleString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">最后登录</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(session?.last_sign_in_at || '').toLocaleString()}
-                  </dd>
-                </div>
               </dl>
-            </div>
-          </div>
-
-          {/* 预留钱包连接部分 */}
-          <div className="mt-6 bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900">钱包连接</h2>
-            <div className="mt-4">
-              <button
-                type="button"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                disabled
-              >
-                连接钱包（即将推出）
-              </button>
             </div>
           </div>
         </div>

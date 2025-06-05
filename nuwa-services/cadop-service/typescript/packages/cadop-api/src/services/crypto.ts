@@ -1,7 +1,6 @@
 import * as jose from 'jose';
 import { createHash, randomBytes } from 'crypto';
 import { logger } from '../utils/logger.js';
-import type { IDToken } from '../types/oidc.js';
 import * as jwt from 'jsonwebtoken';
 
 // Define our own JWK type that matches the shared type
@@ -187,46 +186,6 @@ export class CryptoService {
     return computed === hash;
   }
 
-  /**
-   * Sign ID Token
-   */
-  public signIDToken(claims: IDToken): string {
-    const secret = process.env['JWT_SECRET'];
-    if (!secret) {
-      throw new Error('JWT_SECRET not configured');
-    }
-
-    return jwt.sign(claims, secret, {
-      algorithm: 'HS256'
-    });
-  }
-
-  public async verifyIDToken(token: string): Promise<boolean> {
-    try {
-      const secret = process.env['JWT_SECRET'];
-      if (!secret) {
-        return false;
-      }
-
-      jwt.verify(token, secret, {
-        algorithms: ['HS256']
-      });
-
-      return true;
-    } catch (error) {
-      logger.error('Failed to verify ID token', { error });
-      return false;
-    }
-  }
-
-  public decodeIDToken(token: string): IDToken | null {
-    try {
-      return jwt.decode(token) as IDToken;
-    } catch (error) {
-      logger.error('Failed to decode ID token', { error });
-      return null;
-    }
-  }
 }
 
 // 导出单例实例

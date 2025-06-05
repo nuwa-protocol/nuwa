@@ -53,7 +53,6 @@ export class SessionService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
 
-      // 生成 session token
       const { sessionToken } = this.generateSessionToken(userId, metadata);
 
       logger.debug('Generated session token', {
@@ -81,7 +80,7 @@ export class SessionService {
         .insert({
           user_id: userId,
           passkey_credential_id: credentialId,
-          session_token: sessionToken, // 添加生成的 session token
+          session_token: sessionToken,
           metadata,
           expires_at: expiresAt.toISOString()
         })
@@ -111,6 +110,8 @@ export class SessionService {
         expires_at: session.expires_at,
         user: {
           id: user.id,
+          user_did: user.user_did,
+          sybil_level: user.sybil_level,
           email: user.email,
           display_name: user.display_name
         }

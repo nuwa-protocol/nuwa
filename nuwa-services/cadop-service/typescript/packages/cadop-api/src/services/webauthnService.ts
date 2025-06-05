@@ -23,7 +23,7 @@ import {
   CreateAuthenticatorData,
   UpdateAuthenticatorData,
   CredentialInfo,
-  SessionInfo,
+  Session,
   DIDKeyManager,
   WebAuthnDeviceInfo,
   WebAuthnRegistrationResult,
@@ -340,6 +340,7 @@ export class WebAuthnService {
           const newUser = await DatabaseService.createUser({
             user_did: userDid,
             display_name: userInfo?.displayName || userDid,
+            sybil_level: 0,
             metadata: {}
           });
           userId = newUser.id;
@@ -358,6 +359,7 @@ export class WebAuthnService {
         const tempUser = await DatabaseService.createUser({
           user_did: tempDid,
           display_name: userInfo?.displayName || 'New User',
+          sybil_level: 0,
           metadata: {
             is_temporary: true,
             created_at: new Date().toISOString()
@@ -1184,11 +1186,7 @@ export class WebAuthnService {
           type: 'public-key',
           transports: authenticator.transports
         },
-        session: {
-          session_token: session.session_token,
-          expires_at: session.expires_at,
-          user: session.user
-        },
+        session,
         isNewUser: true
       };
     } catch (error) {
@@ -1323,11 +1321,7 @@ export class WebAuthnService {
           type: 'public-key',
           transports: authenticator.transports
         },
-        session: {
-          session_token: session.session_token,
-          expires_at: session.expires_at,
-          user: session.user
-        },
+        session,
         isNewUser: false
       };
     } catch (error) {

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { WebAuthnService } from '../../lib/passkey/passkey-service';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { Session } from '@cadop/shared';
 
 interface PasskeyLoginProps {
   onSuccess: (userId: string) => void;
@@ -29,18 +28,8 @@ export function PasskeyLogin({ onSuccess, onError, email }: PasskeyLoginProps) {
       });
 
       if (result.success && result.session) {
-        const session: Session = {
-          id: result.session.user.id,
-          session_token: result.session.session_token,
-          expires_at: result.session.expires_at,
-          user: {
-            id: result.session.user.id,
-            email: result.session.user.email,
-            display_name: result.session.user.display_name
-          }
-        };
-        signIn(session);
-        onSuccess(session.user.id);
+        signIn(result.session);
+        onSuccess(result.session.user.id);
       } else {
         onError(result.error?.message || 'Authentication failed');
       }
