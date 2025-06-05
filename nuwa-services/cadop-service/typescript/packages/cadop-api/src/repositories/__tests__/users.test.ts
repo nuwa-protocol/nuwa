@@ -18,7 +18,6 @@ describe('UserRepository', () => {
       user_did: testUserDid,
       email: `test-${testUserId}@example.com`,
       display_name: 'Test User',
-      sybil_level: 0
     });
 
     expect(user.id).toBe(testUserId);

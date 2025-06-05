@@ -23,7 +23,6 @@ export function mapToSession(session_with_user: SessionWithUser): Session {
     user: {
       id: session_with_user.user.id,
       userDid: session_with_user.user.user_did,
-      sybilLevel: session_with_user.user.sybil_level,
       email: session_with_user.user.email,
       displayName: session_with_user.user.display_name
     }

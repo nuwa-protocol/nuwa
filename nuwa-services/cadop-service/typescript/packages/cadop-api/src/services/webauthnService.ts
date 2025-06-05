@@ -251,7 +251,6 @@ export class WebAuthnService {
           const newUser = await DatabaseService.createUser({
             user_did: userDid,
             display_name: userInfo?.displayName || userDid,
-            sybil_level: 0,
             metadata: {}
           });
           userId = newUser.id;
@@ -270,7 +269,6 @@ export class WebAuthnService {
         const tempUser = await DatabaseService.createUser({
           user_did: tempDid,
           display_name: userInfo?.displayName || 'New User',
-          sybil_level: 0,
           metadata: {
             is_temporary: true,
             created_at: new Date().toISOString()

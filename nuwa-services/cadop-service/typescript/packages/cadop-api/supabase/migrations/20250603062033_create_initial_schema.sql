@@ -45,7 +45,6 @@ CREATE TABLE users (
     user_did VARCHAR(255) NOT NULL UNIQUE,
     email VARCHAR(255) UNIQUE,
     display_name VARCHAR(255),
-    sybil_level INTEGER DEFAULT 0 CHECK (sybil_level >= 0),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()

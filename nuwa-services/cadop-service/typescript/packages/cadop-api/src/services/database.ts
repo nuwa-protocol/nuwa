@@ -7,7 +7,6 @@ type User = {
   user_did: string;
   email?: string;
   display_name?: string;
-  sybil_level: number;
   metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
@@ -510,17 +509,4 @@ export class DatabaseService {
     return 0;
   }
 
-  static async updateUserSybilLevel(userId: string): Promise<number> {
-    const sybilLevel = await this.calculateSybilLevel(userId);
-    
-    // Update all user's agent DIDs with new sybil level
-    await supabase
-      .from('agent_dids')
-      .update({ sybil_level: sybilLevel })
-      .eq('user_id', userId);
-    
-    return sybilLevel;
-  }
-
-  
 } 

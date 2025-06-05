@@ -10,7 +10,6 @@ export interface Session {
     user: {
       id: string;
       userDid: string;
-      sybilLevel: number;
       email?: string;
       displayName?: string;
     }
