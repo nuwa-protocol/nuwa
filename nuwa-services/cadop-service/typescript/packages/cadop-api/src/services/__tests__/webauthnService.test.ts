@@ -1,15 +1,11 @@
 import { WebAuthnService } from '../webauthnService.js';
-import { DatabaseService } from '../database.js';
-import { supabase } from '../../config/supabase.js';
-import type { Database } from '../../config/supabase.js';
 import crypto from 'crypto';
-import type { AuthenticationOptions } from '@cadop/shared';
 import type { 
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON 
 } from '@simplewebauthn/types';
+import { generateRandomDid } from '../../test/mocks.js';
 
-type UserInsert = Database['public']['Tables']['users']['Insert'];
 
 describe('WebAuthnService', () => {
   let service: WebAuthnService;
@@ -20,7 +16,6 @@ describe('WebAuthnService', () => {
 
   describe('generateAuthenticationOptions', () => {
     it('should generate registration options for new user', async () => {
-      const userId = crypto.randomUUID();
       const userInfo = {
         name: 'Test User',
         displayName: 'Test User Display'
@@ -41,22 +36,21 @@ describe('WebAuthnService', () => {
 
     it('should generate authentication options for existing user', async () => {
       const userId = crypto.randomUUID();
-      const userDid = `did:key:${crypto.randomBytes(32).toString('hex')}`;
+      const userDid = generateRandomDid();
       const userInfo = {
         name: 'Test User',
         displayName: 'Test User Display'
       };
 
-      // First create a user record
-      await DatabaseService.createUser({
-        id: userId,
+      //First create a user record
+      const user = await service['userRepo'].create({
         user_did: userDid,
         display_name: userInfo.displayName
-      } as UserInsert);
+      });
 
       // Create a mock authenticator
       await service['authenticatorRepo'].create({
-        user_id: userId,
+        user_id: user.id,
         credential_id: crypto.randomBytes(32).toString('base64url'),
         credential_public_key: crypto.randomBytes(32).toString('base64'),
         counter: 0,
@@ -67,7 +61,7 @@ describe('WebAuthnService', () => {
       });
 
       const options = await service.generateAuthenticationOptions(userDid, userInfo);
-
+      
       expect(options).toBeDefined();
       expect(options.isNewUser).toBe(false);
       expect(options.publicKey).toBeDefined();
@@ -75,10 +69,12 @@ describe('WebAuthnService', () => {
       expect(authOptions.allowCredentials).toBeDefined();
       expect(authOptions.allowCredentials?.length).toBe(1);
       expect(authOptions.userVerification).toBe('preferred');
-
+      expect(options.user).toBeDefined();
+      expect(options.user.id).toBe(user.id);
+      expect(options.user.userDid).toBe(userDid);
       // Cleanup
-      await service['authenticatorRepo'].deleteByUserId(userId);
-      await supabase.from('users').delete().eq('user_did', userDid);
+      await service['authenticatorRepo'].deleteByUserId(user.id);
+      await service['userRepo'].delete(user.id);
     });
   });
 

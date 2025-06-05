@@ -1,16 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import { WebAuthnService } from '../services/webauthnService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
-import { supabase } from '../config/supabase.js';
-import jwt from 'jsonwebtoken';
-import { SessionService } from '../services/sessionService.js';
-import { DatabaseService } from '../services/database.js';
-import crypto from 'crypto';
-import cbor from 'cbor';
-import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import {
   verifySchema,
   authenticationOptionsSchema,
@@ -19,52 +11,9 @@ import {
   CadopErrorCode,
 } from '@cadop/shared';
 
-/**
- * Base64URL 编码工具函数
- */
-function base64urlEncode(buffer: Buffer): string {
-  const base64 = buffer.toString('base64');
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-// 辅助函数：解析认证器数据
-function parseAuthenticatorData(buffer: Buffer) {
-  let pos = 0;
-  const rpIdHash = buffer.slice(pos, pos + 32); pos += 32;
-  const flagsBuf = buffer.slice(pos, pos + 1); pos += 1;
-  const flags = flagsBuf[0];
-  const counterBuf = buffer.slice(pos, pos + 4); pos += 4;
-  const counter = counterBuf.readUInt32BE(0);
-  
-  let aaguid: Buffer | undefined;
-  let credentialId: Buffer | undefined;
-  let credentialPublicKey: Buffer | undefined;
-
-  if (flags & 0x40) { // Check if attestation data is included
-    aaguid = buffer.slice(pos, pos + 16); pos += 16;
-    const credentialIdLength = buffer.slice(pos, pos + 2).readUInt16BE(0); pos += 2;
-    credentialId = buffer.slice(pos, pos + credentialIdLength); pos += credentialIdLength;
-    credentialPublicKey = buffer.slice(pos);
-  }
-
-  return {
-    rpIdHash,
-    flags,
-    counter,
-    aaguid,
-    credentialId,
-    credentialPublicKey
-  };
-}
-
 const router: Router = Router();
 const webauthnService = new WebAuthnService();
 
-const removeDeviceSchema = z.object({
-  params: z.object({
-    deviceId: z.string().uuid(),
-  }),
-});
 
 // Add WebAuthn configuration endpoint
 router.get('/.well-known/webauthn', (req: Request, res: Response) => {

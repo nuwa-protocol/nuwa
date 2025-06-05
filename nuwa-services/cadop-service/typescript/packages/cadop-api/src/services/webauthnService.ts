@@ -27,14 +27,13 @@ import {
   WebAuthnRegistrationResult,
 } from '@cadop/shared';
 
-import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
-import { DatabaseService } from './database.js';
+import { WebAuthnChallengesRepository, WebAuthnChallengeRecord } from '../repositories/webauthnChallenges.js';
+import { AuthenticatorRepository, AuthenticatorRecord } from '../repositories/authenticators.js';
+import { UserRepository, UserRecord } from '../repositories/users.js';
 import { mapToSession, SessionService } from './sessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
-import { WebAuthnChallengesRepository, WebAuthnChallengeRecord } from '../repositories/webauthnChallenges.js';
-import { AuthenticatorRepository, AuthenticatorRecord } from '../repositories/authenticators.js';
 
 type AuthenticatorResponse = RegistrationResponseJSON | AuthenticationResponseJSON;
 
@@ -55,6 +54,7 @@ export class WebAuthnService {
   private sessionService: SessionService;
   private challengesRepo: WebAuthnChallengesRepository;
   private authenticatorRepo: AuthenticatorRepository;
+  private userRepo: UserRepository;
 
   constructor() {
     this.config = {
@@ -67,160 +67,161 @@ export class WebAuthnService {
     this.sessionService = new SessionService();
     this.challengesRepo = new WebAuthnChallengesRepository();
     this.authenticatorRepo = new AuthenticatorRepository();
+    this.userRepo = new UserRepository();
     logger.debug('WebAuthn service initialized with config', { config: this.config });
   }
 
-  /**
-   * Verify registration response and create new authenticator
-   */
-  async verifyRegistrationResponse(
-    userId: string,
-    response: RegistrationResponseJSON,
-    friendlyName?: string
-  ): Promise<WebAuthnRegistrationResult> {
-    try {
-      logger.debug('Verifying registration response', {
-        userId,
-        response,
-        friendlyName,
-      });
+  // /**
+  //  * Verify registration response and create new authenticator
+  //  */
+  // async verifyRegistrationResponse(
+  //   userId: string,
+  //   response: RegistrationResponseJSON,
+  //   friendlyName?: string
+  // ): Promise<WebAuthnRegistrationResult> {
+  //   try {
+  //     logger.debug('Verifying registration response', {
+  //       userId,
+  //       response,
+  //       friendlyName,
+  //     });
 
-      // Parse the client data to get the challenge
-      const clientDataJSON = JSON.parse(
-        Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
-      );
+  //     // Parse the client data to get the challenge
+  //     const clientDataJSON = JSON.parse(
+  //       Buffer.from(response.response.clientDataJSON, 'base64').toString('utf-8')
+  //     );
 
-      // Get and consume challenge
-      const storedChallenge = await this.getAndConsumeChallenge(userId, 'registration');
-      if (!storedChallenge) {
-        logger.warn('No valid registration challenge found', { userId });
-        throw new CadopError(
-          'No valid registration challenge found',
-          CadopErrorCode.INVALID_CHALLENGE
-        );
-      }
+  //     // Get and consume challenge
+  //     const storedChallenge = await this.getAndConsumeChallenge(userId, 'registration');
+  //     if (!storedChallenge) {
+  //       logger.warn('No valid registration challenge found', { userId });
+  //       throw new CadopError(
+  //         'No valid registration challenge found',
+  //         CadopErrorCode.INVALID_CHALLENGE
+  //       );
+  //     }
 
-      logger.debug('Challenge verification', {
-        receivedChallenge: clientDataJSON.challenge,
-        storedChallenge: storedChallenge.challenge,
-      });
+  //     logger.debug('Challenge verification', {
+  //       receivedChallenge: clientDataJSON.challenge,
+  //       storedChallenge: storedChallenge.challenge,
+  //     });
 
-      // Verify the registration response first
-      const opts = {
-        response,
-        expectedChallenge: storedChallenge.challenge,
-        expectedOrigin: this.config.origin,
-        expectedRPID: this.config.rpID,
-      };
+  //     // Verify the registration response first
+  //     const opts = {
+  //       response,
+  //       expectedChallenge: storedChallenge.challenge,
+  //       expectedOrigin: this.config.origin,
+  //       expectedRPID: this.config.rpID,
+  //     };
 
-      logger.debug('Calling verifyRegistrationResponse with options', { opts });
+  //     logger.debug('Calling verifyRegistrationResponse with options', { opts });
 
-      const verification = await verifyRegistrationResponse(opts);
+  //     const verification = await verifyRegistrationResponse(opts);
 
-      logger.debug('Verification result', { verification });
+  //     logger.debug('Verification result', { verification });
 
-      if (!verification.verified || !verification.registrationInfo) {
-        logger.warn('WebAuthn registration verification failed', {
-          userId,
-          verified: verification.verified,
-          registrationInfo: verification.registrationInfo,
-        });
-        throw new CadopError(
-          'Registration verification failed',
-          CadopErrorCode.AUTHENTICATION_FAILED
-        );
-      }
+  //     if (!verification.verified || !verification.registrationInfo) {
+  //       logger.warn('WebAuthn registration verification failed', {
+  //         userId,
+  //         verified: verification.verified,
+  //         registrationInfo: verification.registrationInfo,
+  //       });
+  //       throw new CadopError(
+  //         'Registration verification failed',
+  //         CadopErrorCode.AUTHENTICATION_FAILED
+  //       );
+  //     }
 
-      const { registrationInfo } = verification;
+  //     const { registrationInfo } = verification;
 
-      // check if the credential is already registered
-      const existingAuthenticator = await this.getAuthenticatorByCredentialId(response.id);
+  //     // check if the credential is already registered
+  //     const existingAuthenticator = await this.getAuthenticatorByCredentialId(response.id);
 
-      if (existingAuthenticator) {
-        logger.warn('Authenticator already registered', {
-          userId,
-          credentialId: response.id,
-        });
-        return {
-          success: false,
-          error: 'Authenticator already registered',
-        };
-      }
+  //     if (existingAuthenticator) {
+  //       logger.warn('Authenticator already registered', {
+  //         userId,
+  //         credentialId: response.id,
+  //       });
+  //       return {
+  //         success: false,
+  //         error: 'Authenticator already registered',
+  //       };
+  //     }
 
-      // ensure the public key is in the correct format
-      const publicKeyBuffer = Buffer.from(registrationInfo.credential.publicKey);
+  //     // ensure the public key is in the correct format
+  //     const publicKeyBuffer = Buffer.from(registrationInfo.credential.publicKey);
 
-      const authenticatorData = {
-        userId,
-        credentialId: response.id,
-        credentialPublicKey: publicKeyBuffer,
-        counter: registrationInfo.credential.counter,
-        credentialDeviceType: registrationInfo.credentialDeviceType || 'singleDevice',
-        credentialBackedUp: registrationInfo.credentialBackedUp || false,
-        transports: response.response.transports || [],
-        friendlyName: friendlyName || 'Default Device'
-      };
+  //     const authenticatorData = {
+  //       userId,
+  //       credentialId: response.id,
+  //       credentialPublicKey: publicKeyBuffer,
+  //       counter: registrationInfo.credential.counter,
+  //       credentialDeviceType: registrationInfo.credentialDeviceType || 'singleDevice',
+  //       credentialBackedUp: registrationInfo.credentialBackedUp || false,
+  //       transports: response.response.transports || [],
+  //       friendlyName: friendlyName || 'Default Device'
+  //     };
 
-      logger.debug('Creating new authenticator', { 
-        credentialId: authenticatorData.credentialId,
-        publicKeyLength: authenticatorData.credentialPublicKey.length,
-        publicKeyBuffer: Buffer.isBuffer(authenticatorData.credentialPublicKey),
-        publicKeyHex: authenticatorData.credentialPublicKey.toString('hex'),
-        userId,
-        transports: authenticatorData.transports
-      });
+  //     logger.debug('Creating new authenticator', { 
+  //       credentialId: authenticatorData.credentialId,
+  //       publicKeyLength: authenticatorData.credentialPublicKey.length,
+  //       publicKeyBuffer: Buffer.isBuffer(authenticatorData.credentialPublicKey),
+  //       publicKeyHex: authenticatorData.credentialPublicKey.toString('hex'),
+  //       userId,
+  //       transports: authenticatorData.transports
+  //     });
 
-      const authenticator = await this.createAuthenticator(authenticatorData);
+  //     const authenticator = await this.createAuthenticator(authenticatorData);
 
-      logger.debug('Created new authenticator', { 
-        id: authenticator.id,
-        credentialId: authenticator.credentialId,
-        createdAt: authenticator.createdAt,
-        transports: authenticator.transports,
-        userId: authenticator.userId
-      });
+  //     logger.debug('Created new authenticator', { 
+  //       id: authenticator.id,
+  //       credentialId: authenticator.credentialId,
+  //       createdAt: authenticator.createdAt,
+  //       transports: authenticator.transports,
+  //       userId: authenticator.userId
+  //     });
 
-      // verify if the authenticator is created correctly
-      const createdAuthenticator = await this.getAuthenticators({ id: authenticator.id });
+  //     // verify if the authenticator is created correctly
+  //     const createdAuthenticator = await this.getAuthenticators({ id: authenticator.id });
       
-      if (!createdAuthenticator) {
-        logger.error('Failed to verify created authenticator', {
-          authenticatorId: authenticator.id,
-          userId
-        });
-        throw new Error('Failed to verify created authenticator');
-      }
+  //     if (!createdAuthenticator) {
+  //       logger.error('Failed to verify created authenticator', {
+  //         authenticatorId: authenticator.id,
+  //         userId
+  //       });
+  //       throw new Error('Failed to verify created authenticator');
+  //     }
 
-      logger.info('Successfully verified created authenticator', {
-        authenticatorId: authenticator.id,
-        credentialId: authenticator.credentialId,
-        userId
-      });
+  //     logger.info('Successfully verified created authenticator', {
+  //       authenticatorId: authenticator.id,
+  //       credentialId: authenticator.credentialId,
+  //       userId
+  //     });
 
-      return {
-        success: true,
-        authenticator: {
-          id: authenticator.id,
-          friendlyName: authenticator.friendlyName,
-          credentialId: authenticator.credentialId,
-          createdAt: authenticator.createdAt,
-          transports: authenticator.transports,
-        },
-      };
-    } catch (error) {
-      logger.error('Failed to verify registration response', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined,
-        userId,
-        response,
-      });
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Registration verification failed',
-        details: error,
-      };
-    }
-  }
+  //     return {
+  //       success: true,
+  //       authenticator: {
+  //         id: authenticator.id,
+  //         friendlyName: authenticator.friendlyName,
+  //         credentialId: authenticator.credentialId,
+  //         createdAt: authenticator.createdAt,
+  //         transports: authenticator.transports,
+  //       },
+  //     };
+  //   } catch (error) {
+  //     logger.error('Failed to verify registration response', {
+  //       error,
+  //       stack: error instanceof Error ? error.stack : undefined,
+  //       userId,
+  //       response,
+  //     });
+  //     return {
+  //       success: false,
+  //       error: error instanceof Error ? error.message : 'Registration verification failed',
+  //       details: error,
+  //     };
+  //   }
+  // }
 
   /**
    * generate authentication options for a user
@@ -236,26 +237,25 @@ export class WebAuthnService {
         config: this.config
       });
 
-      let userId: string;
+  
       let isNewUser = false;
-
+      let user: UserRecord | null = null;
       if (userDid) {
         logger.debug('User DID provided, looking up existing user', { userDid });
         // lookup or create user
-        const user = await DatabaseService.getUserByDID(userDid);
+        user = await this.userRepo.findByDID(userDid);
         if (user) {
-          userId = user.id;
-          logger.debug('Found existing user', { userId, userDid });
+          logger.debug('Found existing user', { userId: user.id, userDid });
         } else {
           logger.debug('User not found, creating new user', { userDid });
-          const newUser = await DatabaseService.createUser({
+          const newUser = await this.userRepo.create({
             user_did: userDid,
             display_name: userInfo?.displayName || userDid,
             metadata: {}
           });
-          userId = newUser.id;
           isNewUser = true;
-          logger.debug('Created new user', { userId, userDid, displayName: newUser.display_name });
+          logger.debug('Created new user', { userId: newUser.id, userDid, displayName: newUser.display_name });
+          user = newUser;
         }
       } else {
         // if no DID is provided, create a temporary user
@@ -266,27 +266,33 @@ export class WebAuthnService {
         const tempDid = `did:temp:${tempUserId}`;
         
         // create a temporary user record
-        const tempUser = await DatabaseService.createUser({
+        const tempUser = await this.userRepo.create({
           user_did: tempDid,
-          display_name: userInfo?.displayName || 'New User',
+          display_name: userInfo?.displayName || undefined,
           metadata: {
             is_temporary: true,
             created_at: new Date().toISOString()
           }
         });
 
-        userId = tempUser.id;
         isNewUser = true;
         
         logger.debug('Created temporary user', { 
           userId: tempUser.id,
-          displayName: tempUser.display_name,
           did: tempDid
         });
+        user = tempUser;
+      }
+
+      if (!user) {
+        throw new CadopError(
+          'Failed to find or create user',
+          CadopErrorCode.INTERNAL_ERROR
+        );
       }
 
       if (isNewUser) {
-        logger.debug('Generating registration options for new user', { userId, isNewUser });
+        logger.debug('Generating registration options for new user', { userId: user.id, isNewUser });
         
         const authenticatorSelection: AuthenticatorSelectionCriteria = {
           // prefer platform authenticator(Touch ID/Face ID)
@@ -300,9 +306,9 @@ export class WebAuthnService {
         const options = await generateRegistrationOptions({
           rpName: this.config.rpName,
           rpID: this.config.rpID,
-          userID: Buffer.from(userId),
-          userName: userInfo?.name || userDid || userId,
-          userDisplayName: userInfo?.displayName || userInfo?.name || userDid || userId,
+          userID: Buffer.from(user.id),
+          userName: userInfo?.name || user.user_did,
+          userDisplayName: userInfo?.displayName || userInfo?.name || user.user_did,
           attestationType: this.config.attestationType,
           authenticatorSelection: authenticatorSelection,
           // only support EdDSA (Ed25519) and ES256 (ECDSA)
@@ -313,7 +319,7 @@ export class WebAuthnService {
 
         // store challenge to database
         await this.storeChallenge(
-          userId || 'anonymous',
+          user.id,
           options.challenge,
           'registration',
           {
@@ -324,23 +330,27 @@ export class WebAuthnService {
         );
 
         logger.debug('Stored registration challenge successfully', {
-          userId,
+          userId: user.id,
           challenge: options.challenge,
           operationType: 'registration'
         });
 
         return {
           publicKey: options,
-          isNewUser: true
+          isNewUser: true,
+          user: {
+            id: user.id,
+            userDid: user.user_did
+          }
         };
       }
 
-      logger.debug('Generating authentication options for existing user', { userId });
+      logger.debug('Generating authentication options for existing user', { userId: user.id });
 
       // generate authentication options
-      const authenticators = await this.getAuthenticators({ userId });
+      const authenticators = await this.getAuthenticators({ userId: user.id });
       logger.debug('Found existing authenticators', {
-        userId,
+        userId: user.id,
         authenticatorCount: authenticators.length,
         authenticators: authenticators.map(auth => ({
           id: auth.id,
@@ -362,14 +372,14 @@ export class WebAuthnService {
 
       logger.debug('Generated authentication options', {
         challenge: options.challenge,
-        userId,
+        userId: user.id,
         rpID: options.rpId,
         allowCredentialsCount: options.allowCredentials?.length || 0
       });
 
       // store challenge to database
       await this.storeChallenge(
-        userId,
+        user.id,
         options.challenge,
         'authentication',
         {
@@ -380,14 +390,18 @@ export class WebAuthnService {
       );
 
       logger.debug('Stored authentication challenge successfully', {
-        userId,
+        userId: user.id,
         challenge: options.challenge,
         operationType: 'authentication'
       });
 
       return {
         publicKey: options,
-        isNewUser: false
+        isNewUser: false,
+        user: {
+          id: user.id,
+          userDid: user.user_did
+        }
       };
     } catch (error) {
       logger.error('Failed to generate authentication options', { 
@@ -746,7 +760,7 @@ export class WebAuthnService {
       }
 
       // get user information to check if the user is a temporary user
-      const user = await DatabaseService.getUserById(challengeData.user_id);
+      const user = await this.userRepo.findById(challengeData.user_id);
       if (!user) {
         throw new CadopError(
           'User not found',
@@ -779,28 +793,15 @@ export class WebAuthnService {
           });
 
           // update the user's DID and remove the temporary flag
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({
-              user_did: realDid,
-              metadata: {
-                ...user.metadata,
-                is_temporary: false,
-                temporary_did_updated_at: new Date().toISOString(),
-                original_temp_did: user.user_did
-              }
-            })
-            .eq('id', user.id);
-
-          if (updateError) {
-            logger.error('Failed to update user DID', {
-              error: updateError,
-              userId: user.id,
-              oldDid: user.user_did,
-              newDid: realDid
-            });
-            throw updateError;
-          }
+          await this.userRepo.update(user.id, {
+            user_did: realDid,
+            metadata: {
+              ...user.metadata,
+              is_temporary: false,
+              temporary_did_updated_at: new Date().toISOString(),
+              original_temp_did: user.user_did
+            }
+          });
 
           logger.info('Successfully updated temporary user DID', {
             userId: user.id,

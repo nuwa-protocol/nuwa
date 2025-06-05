@@ -37,65 +37,6 @@ export interface Authenticator {
   updatedAt: Date;
 }
 
-// Database types for WebAuthn challenges
-export interface WebAuthnChallenge {
-  id: string;
-  user_id?: string;
-  challenge: Buffer;
-  operation_type: 'registration' | 'authentication';
-  client_data: Record<string, any>;
-  expires_at: Date;
-  used_at?: Date;
-  created_at: Date;
-}
-
-// API request/response types
-export interface WebAuthnRegistrationOptions {
-  challenge: string;
-  rp: {
-    name: string;
-    id: string;
-  };
-  user: {
-    id: string;
-    name: string;
-    displayName: string;
-  };
-  pubKeyCredParams: Array<{
-    alg: number;
-    type: 'public-key';
-  }>;
-  authenticatorSelection?: {
-    authenticatorAttachment?: 'platform' | 'cross-platform';
-    userVerification?: 'required' | 'preferred' | 'discouraged';
-    residentKey?: 'discouraged' | 'preferred' | 'required';
-  };
-  attestation?: 'none' | 'indirect' | 'direct' | 'enterprise';
-  excludeCredentials?: Array<{
-    id: string;
-    type: 'public-key';
-    transports?: AuthenticatorTransportFuture[];
-  }>;
-  timeout?: number;
-}
-
-export interface WebAuthnAuthenticationOptions {
-  challenge: string;
-  timeout?: number;
-  rpId?: string;
-  allowCredentials?: Array<{
-    id: string;
-    type: 'public-key';
-    transports?: AuthenticatorTransportFuture[];
-  }>;
-  userVerification?: 'required' | 'preferred' | 'discouraged';
-}
-
-export interface WebAuthnRegistrationRequest {
-  options: WebAuthnRegistrationOptions;
-  friendly_name?: string;
-}
-
 export interface WebAuthnRegistrationResponse {
   id: string;
   rawId: string;
@@ -109,9 +50,6 @@ export interface WebAuthnRegistrationResponse {
   authenticatorAttachment?: 'platform' | 'cross-platform';
 }
 
-export interface WebAuthnAuthenticationRequest {
-  options: WebAuthnAuthenticationOptions;
-}
 
 export interface WebAuthnAuthenticationResponse {
   id: string;
@@ -204,10 +142,9 @@ export interface WebAuthnOptionsResponse {
 export interface AuthenticationOptions {
   publicKey: PublicKeyCredentialCreationOptionsJSON | PublicKeyCredentialRequestOptionsJSON;
   isNewUser?: boolean;
-  user?: {
-    did?: string;
-    name?: string;
-    displayName?: string;
+  user: {
+    id: string;
+    userDid: string;
   }
 }
 
