@@ -154,4 +154,16 @@ export class AuthenticatorRepository extends BaseRepository<AuthenticatorRecord>
 
     return result ? result.map(r => this.mapToRecord(r)) : [];
   }
+
+  /**
+   * Delete an authenticator by its credential ID
+   * @param credentialId - The credential ID to delete
+   */
+  async deleteByCredentialId(credentialId: string): Promise<void> {
+    await this.customQuery(query =>
+      query
+        .delete()
+        .eq('credential_id', credentialId)
+    );
+  }
 } 

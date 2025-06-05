@@ -94,4 +94,16 @@ export class WebAuthnChallengesRepository extends BaseRepository<WebAuthnChallen
 
     return result ? result.map(r => this.mapToRecord(r)) : [];
   }
+
+  /**
+   * Delete a challenge by its challenge string
+   * @param challenge - The challenge string to delete
+   */
+  async deleteByChallenge(challenge: string): Promise<void> {
+    await this.customQuery(query =>
+      query
+        .delete()
+        .eq('challenge', challenge)
+    );
+  }
 } 

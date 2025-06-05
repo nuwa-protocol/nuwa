@@ -144,7 +144,7 @@ CREATE TABLE authenticators (
     counter BIGINT NOT NULL DEFAULT 0,
     credential_device_type authenticator_attachment NOT NULL DEFAULT 'cross-platform',
     credential_backed_up BOOLEAN NOT NULL DEFAULT false,
-    transports authenticator_transport[] DEFAULT ARRAY[]::authenticator_transport[],
+    transports VARCHAR(255)[] DEFAULT ARRAY[]::VARCHAR(255)[],
     friendly_name VARCHAR(255),
     aaguid VARCHAR(255),
     last_used_at TIMESTAMP WITH TIME ZONE,
