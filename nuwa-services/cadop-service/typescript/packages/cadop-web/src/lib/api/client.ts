@@ -184,24 +184,6 @@ class APIClient {
     return this.handleResponse<T>(response);
   }
 
-  // WebAuthn/Passkey API methods
-  public async getRegistrationOptions(
-    email: string,
-    displayName?: string,
-    friendlyName?: string
-  ): Promise<APIResponse<{ options: PublicKeyCredentialCreationOptionsJSON; user_id: string }>> {
-    console.debug('Getting registration options:', {
-      email,
-      displayName,
-      friendlyName
-    });
-    return this.post('/api/webauthn/registration/options', {
-      email,
-      display_name: displayName,
-      friendly_name: friendlyName,
-    });
-  }
-
   public async verify(
     response: WebAuthnRegistrationResponse | WebAuthnAuthenticationResponse,
     friendlyName?: string,
@@ -218,61 +200,7 @@ class APIClient {
       did_key: didKey
     }, { skipAuth: true });
   }
-
-  public async getAuthenticationOptions(userDid?: string): Promise<APIResponse<WebAuthnOptionsResponse>> {
-    try {
-      const response = await fetch('/api/webauthn/authentication/options', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_did: userDid }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        return {
-          error: {
-            message: error.error_description || error.error || 'Failed to get authentication options',
-            code: error.code,
-            details: error,
-          },
-        };
-      }
-
-      const data: WebAuthnOptionsResponse = await response.json();
-      return { data };
-    } catch (error) {
-      return {
-        error: {
-          message: error instanceof Error ? error.message : 'Failed to get authentication options',
-          code: 'API_ERROR',
-          details: error,
-        },
-      };
-    }
-  }
-
-  // 开发环境专用方法
-  public async resetAuthenticatorCounter(
-    credentialId: string
-  ): Promise<APIResponse<{ success: boolean; message: string }>> {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Counter reset not available in production');
-    }
-    console.debug('Resetting authenticator counter:', { credentialId });
-    return this.post('/api/webauthn/dev/reset-counter', { credentialId });
-  }
-
-  public async resetUserAuthenticatorCounters(
-    userId: string
-  ): Promise<APIResponse<{ success: boolean; message: string; resetCount: number }>> {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Counter reset not available in production');
-    }
-    console.debug('Resetting user authenticator counters:', { userId });
-    return this.post('/api/webauthn/dev/reset-user-counters', { userId });
-  }
+ 
 }
 
 export const apiClient = APIClient.getInstance(); 
