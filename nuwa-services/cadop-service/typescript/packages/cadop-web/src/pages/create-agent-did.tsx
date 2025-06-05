@@ -5,7 +5,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useCustodianService } from '../hooks/useCustodianService.js';
 import { AgentDIDInstructions } from '../components/AgentDIDInstructions.js';
-import { AuthMethodSelector, AuthMethod } from '../components/AuthMethodSelector.js';
 import { DIDCreationStatus } from '../components/DIDCreationStatus.js';
 import { DIDDisplayCard } from '../components/DIDDisplayCard.js';
 import type { CreateAgentDIDRequest, AgentDIDCreationStatus as DIDStatus } from '@cadop/shared/types';
@@ -20,7 +19,6 @@ export const CreateAgentDIDPage: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [selectedAuthMethods, setSelectedAuthMethods] = useState<AuthMethod[]>([]);
   const [didCreationStatus, setDidCreationStatus] = useState<DIDStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -112,16 +110,6 @@ export const CreateAgentDIDPage: React.FC = () => {
         );
 
       case 1:
-        return (
-          <AuthMethodSelector
-            selectedMethods={selectedAuthMethods}
-            onMethodsChange={setSelectedAuthMethods}
-            onContinue={handleStartCreation}
-            user={user}
-          />
-        );
-
-      case 2:
         return (
           <DIDCreationStatus
             status={didCreationStatus}

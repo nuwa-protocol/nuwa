@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { DIDDisplay } from '@/components/did/DIDDisplay';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -61,19 +62,15 @@ export function DashboardPage() {
                   <dd className="mt-1 text-sm text-gray-900">{session?.user?.id}</dd>
                 </div>
                 
-                {session?.user?.user_did && (
+                {session?.user?.userDid && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">DID</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.user.user_did}</dd>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      <DIDDisplay did={session.user.userDid} />
+                    </dd>
                   </div>
                 )}
                 
-                {session?.user?.sybil_level !== undefined && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Sybil 等级</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{session.user.sybil_level}</dd>
-                  </div>
-                )}
               </dl>
             </div>
           </div>
