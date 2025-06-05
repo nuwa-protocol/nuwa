@@ -202,8 +202,17 @@ router.delete(
  * POST /api/webauthn/cleanup
  * Cleanup expired challenges (admin endpoint)
  */
-router.post('/cleanup', async (req: Request, res: Response) => {
+router.post('/cleanup', requireAuth, async (req: Request, res: Response) => {
   try {
+    // Check if user has admin privileges
+    if (!req.user?.metadata?.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient privileges',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
     const count = await webauthnService.cleanupExpiredChallenges();
     res.json({
       success: true,
@@ -218,134 +227,5 @@ router.post('/cleanup', async (req: Request, res: Response) => {
     });
   }
 });
-
-// 废弃的接口
-/**
- * @deprecated Use /webauthn/options instead
- */
-router.post('/authentication/options', (req: Request, res: Response) => {
-  logger.warn('Using deprecated endpoint: /authentication/options');
-  res.redirect(307, '/webauthn/options');
-});
-
-/**
- * @deprecated Use /webauthn/options instead
- */
-router.post('/register/begin', (req: Request, res: Response) => {
-  logger.warn('Using deprecated endpoint: /register/begin');
-  res.redirect(307, '/webauthn/options');
-});
-
-/**
- * @deprecated Use /webauthn/options instead
- */
-router.post('/authenticate/begin', (req: Request, res: Response) => {
-  logger.warn('Using deprecated endpoint: /authenticate/begin');
-  res.redirect(307, '/webauthn/options');
-});
-
-/**
- * @deprecated Use /webauthn/credentials instead
- */
-router.get('/devices', requireAuth, (req: Request, res: Response) => {
-  logger.warn('Using deprecated endpoint: /devices');
-  res.redirect(307, '/webauthn/credentials');
-});
-
-/**
- * @deprecated Use /webauthn/credentials/:id instead
- */
-router.delete('/devices/:deviceId', requireAuth, (req: Request, res: Response) => {
-  logger.warn('Using deprecated endpoint: /devices/:deviceId');
-  res.redirect(307, `/webauthn/credentials/${req.params.deviceId}`);
-});
-
-router.get('/test', (req: Request, res: Response) => {
-  const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
-  const rpID = req.hostname;
-  
-  return res.json({
-    isWebAuthnSupported: true,
-    isSecureContext: isSecure,
-    rpID,
-    origin: `${req.protocol}://${req.get('host')}`,
-    userAgent: req.headers['user-agent'],
-    features: {
-      publicKeyCredential: 'Available in browser',
-      conditionalMediation: 'Check browser support'
-    },
-    redirectTo: process.env['FRONTEND_URL'] || 'http://localhost:3000',
-  });
-});
-
-// 开发环境专用路由
-if (process.env.NODE_ENV !== 'production') {
-  /**
-   * POST /api/webauthn/dev/reset-counter
-   * 重置指定认证器的counter（仅开发环境）
-   */
-  router.post('/dev/reset-counter', async (req: Request, res: Response) => {
-    try {
-      const { credentialId } = req.body;
-      
-      if (!credentialId) {
-        return res.status(400).json({
-          error: 'credentialId is required',
-          code: 'MISSING_CREDENTIAL_ID',
-        });
-      }
-
-      const result = await webauthnService.resetAuthenticatorCounter(credentialId);
-      
-      if (result) {
-        logger.info('Authenticator counter reset successfully', { credentialId });
-        res.json({ success: true, message: 'Counter reset successfully' });
-      } else {
-        res.status(500).json({
-          error: 'Failed to reset counter',
-          code: 'RESET_FAILED',
-        });
-      }
-    } catch (error) {
-      logger.error('Failed to reset authenticator counter', { error });
-      res.status(500).json({
-        error: 'Internal server error',
-        code: 'INTERNAL_ERROR',
-      });
-    }
-  });
-
-  /**
-   * POST /api/webauthn/dev/reset-user-counters
-   * 重置用户所有认证器的counter（仅开发环境）
-   */
-  router.post('/dev/reset-user-counters', async (req: Request, res: Response) => {
-    try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({
-          error: 'userId is required',
-          code: 'MISSING_USER_ID',
-        });
-      }
-
-      const resetCount = await webauthnService.resetUserAuthenticatorCounters(userId);
-      
-      logger.info('User authenticator counters reset successfully', { userId, resetCount });
-      res.json({ 
-        success: true, 
-        message: `Reset ${resetCount} authenticator counters`,
-        resetCount 
-      });
-    } catch (error) {
-      logger.error('Failed to reset user authenticator counters', { error });
-      res.status(500).json({
-        error: 'Internal server error',
-        code: 'INTERNAL_ERROR',
-      });
-    }
-  });
-}
 
 export default router; 

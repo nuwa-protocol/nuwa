@@ -23,23 +23,70 @@ export const supabaseClient = createClient(
 export interface Database {
   public: {
     Tables: {
-      user_profiles: {
+      authenticators: {
+        Row: {
+          id: string;
+          user_id: string;
+          credential_id: string;
+          credential_public_key: string;
+          counter: number;
+          credential_device_type: string;
+          credential_backed_up: boolean;
+          transports: string[];
+          friendly_name?: string;
+          aaguid?: string;
+          last_used_at?: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          credential_id: string;
+          credential_public_key: string;
+          counter?: number;
+          credential_device_type?: string;
+          credential_backed_up?: boolean;
+          transports?: string[];
+          friendly_name?: string;
+          aaguid?: string;
+          last_used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          credential_id?: string;
+          credential_public_key?: string;
+          counter?: number;
+          credential_device_type?: string;
+          credential_backed_up?: boolean;
+          transports?: string[];
+          friendly_name?: string;
+          aaguid?: string;
+          last_used_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      users: {
         Row: {
           id: string;
           user_did: string;
-          primary_agent_did?: string;
+          email?: string;
           display_name?: string;
-          avatar_url?: string;
-          metadata: any;
+          sybil_level: number;
+          metadata?: any;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id: string;
           user_did: string;
-          primary_agent_did?: string;
+          email?: string;
           display_name?: string;
-          avatar_url?: string;
+          sybil_level: number;
           metadata?: any;
           created_at?: string;
           updated_at?: string;
@@ -47,9 +94,8 @@ export interface Database {
         Update: {
           id?: string;
           user_did?: string;
-          primary_agent_did?: string;
+          email?: string;
           display_name?: string;
-          avatar_url?: string;
           metadata?: any;
           created_at?: string;
           updated_at?: string;
@@ -260,99 +306,40 @@ export interface Database {
           proof_request_id?: string;
         };
       };
-      oauth_clients: {
-        Row: {
-          id: string;
-          client_id: string;
-          client_secret_hash: string;
-          name: string;
-          redirect_uris: any;
-          scopes: any;
-          metadata: any;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          client_id: string;
-          client_secret_hash: string;
-          name: string;
-          redirect_uris?: any;
-          scopes?: any;
-          metadata?: any;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          client_id?: string;
-          client_secret_hash?: string;
-          name?: string;
-          redirect_uris?: any;
-          scopes?: any;
-          metadata?: any;
-          created_at?: string;
-          updated_at?: string;
-        };
-      };
       sessions: {
         Row: {
           id: string;
           user_id: string;
-          client_id?: string;
-          session_token_hash: string;
-          access_token_hash?: string;
-          refresh_token_hash?: string;
-          session_data: any;
+          authenticator_id: string;
+          session_token: string;
           expires_at: string;
+          metadata: Record<string, any>;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          client_id?: string;
-          session_token_hash: string;
-          access_token_hash?: string;
-          refresh_token_hash?: string;
-          session_data?: any;
+          authenticator_id: string;
+          session_token: string;
           expires_at: string;
+          metadata?: Record<string, any>;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          client_id?: string;
-          session_token_hash?: string;
-          access_token_hash?: string;
-          refresh_token_hash?: string;
-          session_data?: any;
+          authenticator_id?: string;
+          session_token?: string;
           expires_at?: string;
+          metadata?: Record<string, any>;
           created_at?: string;
           updated_at?: string;
         };
       };
     };
-    Views: {
-      user_complete_profile: {
-        Row: {
-          id: string;
-          email?: string;
-          user_did: string;
-          primary_agent_did?: string;
-          display_name?: string;
-          avatar_url?: string;
-          metadata: any;
-          created_at: string;
-          updated_at: string;
-          auth_created_at: string;
-          last_sign_in_at?: string;
-          auth_methods: any;
-          agent_dids: any;
-        };
-      };
-      public_did_documents: {
+    public_did_documents: {
         Row: {
           did: string;
           did_document: any;
@@ -362,15 +349,14 @@ export interface Database {
           blockchain_confirmed: boolean;
           updated_at: string;
         };
-      };
     };
     Functions: {
       cleanup_expired_sessions: {
-        Args: {};
+        Args: Record<string, never>;
         Returns: number;
       };
       cleanup_expired_proof_requests: {
-        Args: {};
+        Args: Record<string, never>;
         Returns: number;
       };
     };
@@ -379,6 +365,8 @@ export interface Database {
       did_status: 'pending' | 'creating' | 'confirmed' | 'failed';
       proof_status: 'pending' | 'processing' | 'completed' | 'failed' | 'expired';
       identity_provider: 'email' | 'google' | 'github' | 'twitter' | 'apple' | 'webauthn';
+      authenticator_transport: 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid';
+      authenticator_attachment: 'platform' | 'cross-platform';
     };
   };
 } 

@@ -17,6 +17,8 @@ import type {
   PublicKeyCredentialDescriptorJSON,
 } from '@simplewebauthn/types';
 
+import type { Session } from './session.js';
+
 // Database types for authenticators
 export interface Authenticator {
   id: string;
@@ -249,19 +251,6 @@ export interface AuthenticationResult {
   isNewUser?: boolean;
 }
 
-// Session type
-export interface Session {
-  id: string;
-  session_token: string;
-  expires_at: string;
-  user: {
-    id: string;
-    user_did: string;
-    sybil_level: number;
-    email?: string;
-    display_name?: string;
-  }
-}
 
 // Error code definition
 export enum WebAuthnErrorCode {

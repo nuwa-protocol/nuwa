@@ -39,8 +39,7 @@ type Session = Database['public']['Tables']['sessions']['Row'];
 type SessionInsert = Database['public']['Tables']['sessions']['Insert'];
 type SessionUpdate = Database['public']['Tables']['sessions']['Update'];
 
-// Views
-type PublicDIDDocument = Database['public']['Views']['public_did_documents']['Row'];
+
 
 export class DatabaseService {
   // User operations
@@ -276,20 +275,6 @@ export class DatabaseService {
     return data;
   }
 
-  static async getPublicDIDDocument(did: string): Promise<PublicDIDDocument | null> {
-    const { data, error } = await supabase
-      .from('public_did_documents')
-      .select('*')
-      .eq('did', did)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new Error(`Failed to get public DID document: ${error.message}`);
-    }
-
-    return data;
-  }
-
   // Transaction operations
   static async createTransaction(txData: TransactionInsert): Promise<Transaction> {
     const { data, error } = await supabase
@@ -453,22 +438,6 @@ export class DatabaseService {
     return data || [];
   }
 
-
-  // Session operations
-  static async createSession(sessionData: SessionInsert): Promise<Session> {
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert(sessionData)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create session: ${error.message}`);
-    }
-
-    return data;
-  }
-
   static async getSessionByTokenHash(tokenHash: string): Promise<Session | null> {
     const { data, error } = await supabase
       .from('sessions')
@@ -553,9 +522,5 @@ export class DatabaseService {
     return sybilLevel;
   }
 
-  // DID resolution helper
-  static async resolveDID(did: string): Promise<any | null> {
-    const publicDoc = await this.getPublicDIDDocument(did);
-    return publicDoc?.did_document || null;
-  }
+  
 } 

@@ -32,7 +32,7 @@ import {
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { DatabaseService } from './database.js';
-import { SessionService } from './sessionService.js';
+import { mapToSession, SessionService } from './sessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
 
@@ -59,6 +59,7 @@ type AuthenticatorResponse = RegistrationResponseJSON | AuthenticationResponseJS
 
 export class WebAuthnService {
   private config: WebAuthnConfig;
+  private sessionService: SessionService;
 
   constructor() {
     this.config = {
@@ -68,7 +69,7 @@ export class WebAuthnService {
       timeout: parseInt(process.env['WEBAUTHN_CHALLENGE_TIMEOUT'] || '300000'),
       attestationType: 'none',
     };
-
+    this.sessionService = new SessionService();
     logger.debug('WebAuthn service initialized with config', { config: this.config });
   }
 
@@ -1089,7 +1090,7 @@ export class WebAuthnService {
       });
 
       // 检查是否是临时用户，如果是则需要更新 DID
-      let finalUserId = challengeData.user_id;
+      const finalUserId = challengeData.user_id;
       if (user.user_did?.startsWith('did:temp:')) {
         logger.debug('Updating temporary user DID', {
           userId: user.id,
@@ -1166,16 +1167,14 @@ export class WebAuthnService {
         credentialId: authenticator.credentialId
       });
 
-      // 创建会话
-      const sessionService = new SessionService();
-      const session = await sessionService.createSession(
+      const session_with_user = await this.sessionService.createSession(
         challengeData.user_id,
-        authenticator.credentialId,
+        authenticator.id,
         challengeData.client_data
       );
 
       logger.debug('Created session successfully', {
-        sessionId: session.id,
+        sessionId: session_with_user.session.id,
         userId: challengeData.user_id
       });
 
@@ -1186,7 +1185,7 @@ export class WebAuthnService {
           type: 'public-key',
           transports: authenticator.transports
         },
-        session,
+        session: mapToSession(session_with_user),
         isNewUser: true
       };
     } catch (error) {
@@ -1209,16 +1208,9 @@ export class WebAuthnService {
    */
   private generateDIDFromPublicKey(publicKeyBuffer: ArrayBuffer): string {
     try {
-      // logger.debug('Generating DID from public key', { 
-      //   publicKeyBuffer: Buffer.from(publicKeyBuffer).toString('hex'),
-      //   isArrayBuffer: publicKeyBuffer instanceof ArrayBuffer,
-      //   type: publicKeyBuffer.constructor.name,
-      //   byteLength: publicKeyBuffer.byteLength
-      // });
-      
       // 解析 COSE key
       const publicKeyBytes = Buffer.from(publicKeyBuffer);
-      const coseKey = decode(publicKeyBytes);
+      const coseKey = decode(publicKeyBytes) as Map<number, any>;
       
       logger.debug('Decoded COSE key', {
         coseKey: Object.fromEntries(coseKey.entries()),
@@ -1307,10 +1299,9 @@ export class WebAuthnService {
       });
 
       // 创建会话
-      const sessionService = new SessionService();
-      const session = await sessionService.createSession(
+      const session_with_user = await this.sessionService.createSession(
         authenticator.userId,
-        authenticator.credentialId,
+        authenticator.id,
         challengeData.client_data
       );
 
@@ -1321,7 +1312,7 @@ export class WebAuthnService {
           type: 'public-key',
           transports: authenticator.transports
         },
-        session,
+        session: mapToSession(session_with_user),
         isNewUser: false
       };
     } catch (error) {
