@@ -14,13 +14,12 @@ import type {
 } from '@simplewebauthn/types';
 
 import {
-  WebAuthnError,
-  WebAuthnErrorCode,
+  CadopError,
+  CadopErrorCode,
   AuthenticationOptions,
   AuthenticationResult,
   Authenticator,
   WebAuthnConfig,
-  UpdateAuthenticatorData,
   CredentialInfo,
   Session,
   DIDKeyManager,
@@ -95,9 +94,9 @@ export class WebAuthnService {
       const storedChallenge = await this.getAndConsumeChallenge(userId, 'registration');
       if (!storedChallenge) {
         logger.warn('No valid registration challenge found', { userId });
-        throw new WebAuthnError(
+        throw new CadopError(
           'No valid registration challenge found',
-          WebAuthnErrorCode.INVALID_CHALLENGE
+          CadopErrorCode.INVALID_CHALLENGE
         );
       }
 
@@ -126,9 +125,9 @@ export class WebAuthnService {
           verified: verification.verified,
           registrationInfo: verification.registrationInfo,
         });
-        throw new WebAuthnError(
+        throw new CadopError(
           'Registration verification failed',
-          WebAuthnErrorCode.AUTHENTICATION_FAILED
+          CadopErrorCode.AUTHENTICATION_FAILED
         );
       }
 
@@ -399,9 +398,9 @@ export class WebAuthnService {
         userDid,
         userInfo
       });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to generate authentication options',
-        WebAuthnErrorCode.INTERNAL_ERROR,
+        CadopErrorCode.INTERNAL_ERROR,
         error
       );
     }
@@ -438,9 +437,9 @@ export class WebAuthnService {
           challenge: clientDataJSON.challenge,
           clientOrigin: clientDataJSON.origin
         });
-        throw new WebAuthnError(
+        throw new CadopError(
           'Invalid or expired challenge',
-          WebAuthnErrorCode.INVALID_CHALLENGE
+          CadopErrorCode.INVALID_CHALLENGE
         );
       }
 
@@ -472,9 +471,9 @@ export class WebAuthnService {
         credentialId: response?.id,
         responseType: 'response' in response ? 'registration' : 'authentication'
       });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to verify authentication response',
-        WebAuthnErrorCode.AUTHENTICATION_FAILED,
+        CadopErrorCode.AUTHENTICATION_FAILED,
         error
       );
     }
@@ -570,9 +569,9 @@ export class WebAuthnService {
       }));
     } catch (error) {
       logger.error('Failed to get authenticators', { error, filter });
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+      throw error instanceof CadopError ? error : new CadopError(
         'Failed to get authenticators',
-        WebAuthnErrorCode.DATABASE_ERROR,
+        CadopErrorCode.DATABASE_ERROR,
         error
       );
     }
@@ -612,9 +611,9 @@ export class WebAuthnService {
       };
     } catch (error) {
       logger.error('Failed to create authenticator', { error });
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+      throw error instanceof CadopError ? error : new CadopError(
         'Failed to create authenticator',
-        WebAuthnErrorCode.DATABASE_ERROR,
+        CadopErrorCode.DATABASE_ERROR,
         error
       );
     }
@@ -628,9 +627,9 @@ export class WebAuthnService {
       return await this.challengesRepo.cleanupExpired();
     } catch (error) {
       logger.error('Failed to cleanup challenges', { error });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to cleanup challenges',
-        WebAuthnErrorCode.DATABASE_ERROR,
+        CadopErrorCode.DATABASE_ERROR,
         error
       );
     }
@@ -704,9 +703,9 @@ export class WebAuthnService {
   ): Promise<AuthenticationResult> {
     try {
       if (!challengeData.user_id) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'User ID is required for registration',
-          WebAuthnErrorCode.INVALID_STATE
+          CadopErrorCode.INVALID_STATE
         );
       }
 
@@ -724,9 +723,9 @@ export class WebAuthnService {
       });
 
       if (!verification.verified || !verification.registrationInfo) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'Registration verification failed',
-          WebAuthnErrorCode.REGISTRATION_FAILED
+          CadopErrorCode.REGISTRATION_FAILED
         );
       }
 
@@ -742,18 +741,18 @@ export class WebAuthnService {
       // check if the credential is already registered
       const existingAuthenticator = await this.getAuthenticators({ credentialId: response.id });
       if (existingAuthenticator.length > 0) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'Authenticator already registered',
-          WebAuthnErrorCode.DUPLICATE_REGISTRATION
+          CadopErrorCode.DUPLICATE_REGISTRATION
         );
       }
 
       // get user information to check if the user is a temporary user
       const user = await DatabaseService.getUserById(challengeData.user_id);
       if (!user) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'User not found',
-          WebAuthnErrorCode.USER_NOT_FOUND
+          CadopErrorCode.USER_NOT_FOUND
         );
       }
 
@@ -868,9 +867,9 @@ export class WebAuthnService {
         userId: challengeData.user_id,
         credentialId: response.id
       });
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+      throw error instanceof CadopError ? error : new CadopError(
         'Registration failed',
-        WebAuthnErrorCode.REGISTRATION_FAILED,
+        CadopErrorCode.REGISTRATION_FAILED,
         error
       );
     }
@@ -919,9 +918,9 @@ export class WebAuthnService {
         isArrayBuffer: publicKeyBuffer instanceof ArrayBuffer,
         isBuffer: Buffer.isBuffer(publicKeyBuffer)
       });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to generate DID from public key',
-        WebAuthnErrorCode.INTERNAL_ERROR,
+        CadopErrorCode.INTERNAL_ERROR,
         error
       );
     }
@@ -935,9 +934,9 @@ export class WebAuthnService {
       // get the authenticator
       const authenticators = await this.getAuthenticators({ credentialId: response.id });
       if (authenticators.length === 0) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'Authenticator not found',
-          WebAuthnErrorCode.INVALID_CREDENTIAL
+          CadopErrorCode.INVALID_CREDENTIAL
         );
       }
 
@@ -958,9 +957,9 @@ export class WebAuthnService {
       });
 
       if (!verification.verified) {
-        throw new WebAuthnError(
+        throw new CadopError(
           'Authentication verification failed',
-          WebAuthnErrorCode.AUTHENTICATION_FAILED
+          CadopErrorCode.AUTHENTICATION_FAILED
         );
       }
 
@@ -986,9 +985,9 @@ export class WebAuthnService {
       };
     } catch (error) {
       logger.error('Authentication failed', { error });
-      throw error instanceof WebAuthnError ? error : new WebAuthnError(
+      throw error instanceof CadopError ? error : new CadopError(
         'Authentication failed',
-        WebAuthnErrorCode.AUTHENTICATION_FAILED,
+        CadopErrorCode.AUTHENTICATION_FAILED,
         error
       );
     }
@@ -1010,9 +1009,9 @@ export class WebAuthnService {
       }));
     } catch (error) {
       logger.error('Failed to get user credentials', { error, userId });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to get user credentials',
-        WebAuthnErrorCode.DATABASE_ERROR,
+        CadopErrorCode.DATABASE_ERROR,
         error
       );
     }
@@ -1027,9 +1026,9 @@ export class WebAuthnService {
       return true;
     } catch (error) {
       logger.error('Failed to remove credential', { error, userId, credentialId });
-      throw new WebAuthnError(
+      throw new CadopError(
         'Failed to remove credential',
-        WebAuthnErrorCode.REMOVE_DEVICE_FAILED,
+        CadopErrorCode.REMOVE_DEVICE_FAILED,
         error
       );
     }
