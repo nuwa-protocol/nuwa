@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { WebAuthnService } from '../services/webauthnService.js';
+import { WebAuthnService } from '../services/WebAuthnService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';

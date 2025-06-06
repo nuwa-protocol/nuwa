@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { WebAuthnService } from '../../lib/webauthn/WebAuthnService';
+import { WebAuthnClientService } from '../../lib/webauthn/WebAuthnClientService';
 import { useAuth } from '../../lib/auth/AuthContext';
 
 interface WebAuthnLoginProps {
@@ -13,7 +13,7 @@ export function WebAuthnLogin({ onSuccess, onError, email }: WebAuthnLoginProps)
   const [isSupported, setIsSupported] = useState(false);
   const { signIn } = useAuth();
 
-  const webAuthnService = new WebAuthnService();
+  const webAuthnService = new WebAuthnClientService();
 
   useEffect(() => {
     webAuthnService.isSupported().then(setIsSupported);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { custodianService } from '../services/custodianService.js';
+import { custodianService } from '../services/CustodianService.js';
 import { logger } from '../utils/logger.js';
 
 const router: Router = Router();

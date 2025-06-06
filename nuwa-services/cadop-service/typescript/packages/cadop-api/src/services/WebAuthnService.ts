@@ -27,7 +27,7 @@ import { logger } from '../utils/logger.js';
 import { WebAuthnChallengesRepository, WebAuthnChallengeRecord } from '../repositories/webauthnChallenges.js';
 import { AuthenticatorRepository, AuthenticatorRecord } from '../repositories/authenticators.js';
 import { UserRepository, UserRecord } from '../repositories/users.js';
-import { mapToSession, SessionService } from './sessionService.js';
+import { mapToSession, SessionService } from './SessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
 
