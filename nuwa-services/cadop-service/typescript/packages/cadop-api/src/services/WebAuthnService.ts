@@ -30,6 +30,7 @@ import { UserRepository, UserRecord } from '../repositories/users.js';
 import { mapToSession, SessionService } from './SessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
+import jwt from 'jsonwebtoken';
 
 
 // Input type for creating authenticator
@@ -44,12 +45,31 @@ interface CreateAuthenticatorData {
   friendlyName?: string;
 }
 
+interface IDTokenPayload {
+  iss: string;      // Issuer (IdP's DID)
+  sub: string;      // Subject (user's DID)
+  aud: string;      // Audience (Custodian's DID)
+  exp: number;      // Expiration time
+  iat: number;      // Issued at time
+  jti: string;      // JWT ID
+  nonce: string;    // Prevent replay
+  pub_jwk: JsonWebKey;  // User's public key
+  sybil_level: number;  // Sybil resistance level
+}
+
+// Add INVALID_TOKEN to CadopErrorCode if not exists
+enum ExtendedCadopErrorCode {
+  INVALID_TOKEN = 'INVALID_TOKEN',
+  // ... include all existing codes from CadopErrorCode
+}
+
 export class WebAuthnService {
   private config: WebAuthnConfig;
   private sessionService: SessionService;
   private challengesRepo: WebAuthnChallengesRepository;
   private authenticatorRepo: AuthenticatorRepository;
   private userRepo: UserRepository;
+  private signingKey: string; // Key for signing ID Tokens
 
   constructor() {
     this.config = {
@@ -64,6 +84,9 @@ export class WebAuthnService {
     this.authenticatorRepo = new AuthenticatorRepository();
     this.userRepo = new UserRepository();
     logger.debug('WebAuthn service initialized with config', { config: this.config });
+    
+    // Initialize signing key (should be fetched from secure config in production)
+    this.signingKey = process.env.JWT_SIGNING_KEY || 'test-signing-key';
   } 
 
   /**
@@ -871,6 +894,274 @@ export class WebAuthnService {
       throw new CadopError(
         'Failed to remove credential',
         CadopErrorCode.REMOVE_DEVICE_FAILED,
+        error
+      );
+    }
+  }
+
+  /**
+   * Get ID Token for a user
+   * @param userId The user's ID
+   * @returns Promise<string> The ID Token
+   */
+  async getIdToken(userId: string): Promise<string> {
+    try {
+      logger.debug('Getting ID token for user', { userId });
+
+      // 1. Get user's authenticator
+      const authenticators = await this.getAuthenticators({ userId });
+      if (authenticators.length === 0) {
+        logger.error('No authenticator found for user', { userId });
+        throw new CadopError(
+          'No authenticator found',
+          CadopErrorCode.INVALID_CREDENTIAL
+        );
+      }
+
+      // 2. Get user information
+      const user = await this.userRepo.findById(userId);
+      if (!user) {
+        logger.error('User not found', { userId });
+        throw new CadopError(
+          'User not found',
+          CadopErrorCode.USER_NOT_FOUND
+        );
+      }
+
+      logger.debug('Found user and authenticator', {
+        userId,
+        authenticatorId: authenticators[0].id,
+        userDid: user.user_did
+      });
+
+      // 3. Extract JWK from authenticator's public key
+      const publicKeyBuffer = Buffer.from(authenticators[0].credentialPublicKey);
+      const publicKeyJwk = await this.extractPublicKeyJwk(publicKeyBuffer);
+
+      // 4. Generate ID Token
+      const idToken = jwt.sign({
+        iss: this.config.rpID,          // Issuer (current service)
+        sub: user.user_did,             // Subject (user's DID)
+        aud: this.config.rpID,          // Audience (currently self, could be other Custodians)
+        exp: Math.floor(Date.now() / 1000) + 300,  // Expires in 5 minutes
+        iat: Math.floor(Date.now() / 1000),        // Issued at
+        jti: crypto.randomUUID(),                  // JWT ID
+        nonce: crypto.randomUUID(),                // Prevent replay attacks
+        pub_jwk: publicKeyJwk,                     // User's public key
+        sybil_level: 1                             // Fixed value for MVP
+      }, this.signingKey);
+
+      logger.debug('Generated ID token', {
+        userId,
+        tokenId: (jwt.decode(idToken) as { jti: string })?.jti
+      });
+
+      return idToken;
+
+    } catch (error) {
+      logger.error('Failed to get ID token', { 
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        userId 
+      });
+      throw error instanceof CadopError ? error : new CadopError(
+        'Failed to get ID token',
+        CadopErrorCode.INTERNAL_ERROR,
+        error
+      );
+    }
+  }
+
+  /**
+   * Extract JWK from authenticator's public key
+   * @param publicKeyBuffer Raw public key buffer
+   * @returns Promise<JsonWebKey>
+   */
+  private async extractPublicKeyJwk(publicKeyBuffer: Buffer): Promise<JsonWebKey> {
+    try {
+      // The stored public key is already in raw format
+      return {
+        kty: 'OKP',
+        crv: 'Ed25519',
+        x: publicKeyBuffer.toString('base64url'),
+        alg: 'EdDSA',
+        use: 'sig'
+      };
+    } catch (error) {
+      logger.error('Failed to extract JWK from public key', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new CadopError(
+        'Failed to extract JWK from public key',
+        CadopErrorCode.INTERNAL_ERROR,
+        error
+      );
+    }
+  }
+
+  /**
+   * Verify ID Token issued by this service
+   * @param token The ID token to verify
+   * @param expectedAudience Expected audience (custodian DID)
+   * @returns Promise<IDTokenPayload> The verified token payload
+   */
+  async verifyIdToken(token: string, expectedAudience?: string): Promise<IDTokenPayload> {
+    try {
+      logger.debug('Verifying ID token');
+
+      // 1. Verify token signature and decode
+      let decoded: IDTokenPayload;
+      try {
+        decoded = jwt.verify(token, this.signingKey, {
+          algorithms: ['HS256']  // Since we're using a symmetric key for MVP
+        }) as IDTokenPayload;
+      } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+          throw new CadopError(
+            'Token has expired',
+            CadopErrorCode.TOKEN_EXPIRED
+          );
+        }
+        throw new CadopError(
+          'Invalid token signature',
+          CadopErrorCode.TOKEN_INVALID_SIGNATURE
+        );
+      }
+
+      logger.debug('Token signature verified', {
+        issuer: decoded.iss,
+        subject: decoded.sub
+      });
+
+      // 2. Verify issuer
+      if (decoded.iss !== this.config.rpID) {
+        logger.error('Invalid token issuer', {
+          expected: this.config.rpID,
+          received: decoded.iss
+        });
+        throw new CadopError(
+          'Invalid token issuer',
+          CadopErrorCode.TOKEN_INVALID_ISSUER
+        );
+      }
+
+      // 3. Verify audience if provided
+      if (expectedAudience && decoded.aud !== expectedAudience) {
+        logger.error('Invalid token audience', {
+          expected: expectedAudience,
+          received: decoded.aud
+        });
+        throw new CadopError(
+          'Invalid token audience',
+          CadopErrorCode.TOKEN_INVALID_AUDIENCE
+        );
+      }
+
+      // 4. Verify required claims
+      if (!decoded.sub || !decoded.pub_jwk) {
+        logger.error('Missing required claims', {
+          hasSub: !!decoded.sub,
+          hasPublicKey: !!decoded.pub_jwk
+        });
+        throw new CadopError(
+          'Missing required claims',
+          CadopErrorCode.TOKEN_INVALID_CLAIMS
+        );
+      }
+
+      // 5. Verify public key format
+      if (decoded.pub_jwk.kty !== 'OKP' || 
+          decoded.pub_jwk.crv !== 'Ed25519' ||
+          !decoded.pub_jwk.x) {
+        logger.error('Invalid public key format', {
+          keyType: decoded.pub_jwk.kty,
+          curve: decoded.pub_jwk.crv
+        });
+        throw new CadopError(
+          'Invalid public key format',
+          CadopErrorCode.TOKEN_INVALID_CLAIMS
+        );
+      }
+
+      // 6. Verify timestamps
+      const now = Math.floor(Date.now() / 1000);
+      if (decoded.exp <= now) {
+        logger.error('Token expired', {
+          expiry: new Date(decoded.exp * 1000).toISOString(),
+          now: new Date(now * 1000).toISOString()
+        });
+        throw new CadopError(
+          'Token has expired',
+          CadopErrorCode.TOKEN_EXPIRED
+        );
+      }
+
+      if (decoded.iat > now) {
+        logger.error('Token issued in future', {
+          issuedAt: new Date(decoded.iat * 1000).toISOString(),
+          now: new Date(now * 1000).toISOString()
+        });
+        throw new CadopError(
+          'Token issued in future',
+          CadopErrorCode.TOKEN_INVALID_CLAIMS
+        );
+      }
+
+      // 7. Verify the user exists and has the authenticator
+      const user = await this.userRepo.findByDID(decoded.sub);
+      if (!user) {
+        logger.error('User not found', { subject: decoded.sub });
+        throw new CadopError(
+          'User not found',
+          CadopErrorCode.USER_NOT_FOUND
+        );
+      }
+
+      const authenticators = await this.getAuthenticators({ userId: user.id });
+      if (authenticators.length === 0) {
+        logger.error('No authenticator found for user', { userId: user.id });
+        throw new CadopError(
+          'No authenticator found',
+          CadopErrorCode.INVALID_CREDENTIAL
+        );
+      }
+
+      // 8. Verify the public key matches
+      const storedPublicKey = Buffer.from(authenticators[0].credentialPublicKey);
+      const tokenPublicKey = Buffer.from(decoded.pub_jwk.x, 'base64url');
+      
+      if (!storedPublicKey.equals(tokenPublicKey)) {
+        logger.error('Public key mismatch', {
+          stored: storedPublicKey.toString('hex'),
+          token: tokenPublicKey.toString('hex')
+        });
+        throw new CadopError(
+          'Public key mismatch',
+          CadopErrorCode.TOKEN_PUBLIC_KEY_MISMATCH
+        );
+      }
+
+      logger.debug('ID token verified successfully', {
+        subject: decoded.sub,
+        sybilLevel: decoded.sybil_level
+      });
+
+      return decoded;
+
+    } catch (error) {
+      logger.error('ID token verification failed', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      if (error instanceof CadopError) {
+        throw error;
+      }
+      
+      throw new CadopError(
+        'Token verification failed',
+        CadopErrorCode.TOKEN_INVALID_SIGNATURE,
         error
       );
     }
