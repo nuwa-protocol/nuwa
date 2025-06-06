@@ -1,5 +1,5 @@
 import { WebAuthnService } from '../WebAuthnService.js';
-import { CadopError, CadopErrorCode } from '@cadop/shared';
+import { CadopError, CadopErrorCode, IDToken } from '@cadop/shared';
 import crypto from 'crypto';
 import type { 
   PublicKeyCredentialCreationOptionsJSON,
@@ -149,7 +149,7 @@ describe('WebAuthnService', () => {
     let user: any;
     let mockPublicKey: Buffer;
     let authenticator: any;
-    let validToken: string;
+    let validToken: IDToken;
 
     beforeEach(async () => {
       // Setup: Create test user and authenticator
@@ -224,7 +224,7 @@ describe('WebAuthnService', () => {
       }, service['signingKey']);
 
       // Should fail with wrong audience
-      await expect(service.verifyIdToken(token, 'did:rooch:wrong-custodian'))
+      await expect(service.verifyIdToken({ id_token: token }, 'did:rooch:wrong-custodian'))
         .rejects
         .toThrow(expect.objectContaining({
           code: CadopErrorCode.TOKEN_INVALID_AUDIENCE,
@@ -232,7 +232,7 @@ describe('WebAuthnService', () => {
         }));
 
       // Should succeed with correct audience
-      const verified = await service.verifyIdToken(token, customAudience);
+      const verified = await service.verifyIdToken({ id_token: token }, customAudience);
       expect(verified.aud).toBe(customAudience);
     });
 
@@ -255,7 +255,7 @@ describe('WebAuthnService', () => {
         sybil_level: 1
       }, service['signingKey']);
 
-      await expect(service.verifyIdToken(expiredToken))
+      await expect(service.verifyIdToken({ id_token: expiredToken }))
         .rejects
         .toThrow(expect.objectContaining({
           code: CadopErrorCode.TOKEN_EXPIRED,
@@ -282,7 +282,7 @@ describe('WebAuthnService', () => {
         sybil_level: 1
       }, 'wrong-signing-key');
 
-      await expect(service.verifyIdToken(invalidToken))
+      await expect(service.verifyIdToken({ id_token: invalidToken }))
         .rejects
         .toThrow(expect.objectContaining({
           code: CadopErrorCode.TOKEN_INVALID_SIGNATURE,
@@ -310,7 +310,7 @@ describe('WebAuthnService', () => {
         sybil_level: 1
       }, service['signingKey']);
 
-      await expect(service.verifyIdToken(tokenWithDifferentKey))
+      await expect(service.verifyIdToken({ id_token: tokenWithDifferentKey }))
         .rejects
         .toThrow(expect.objectContaining({
           code: CadopErrorCode.TOKEN_PUBLIC_KEY_MISMATCH,
@@ -338,7 +338,7 @@ describe('WebAuthnService', () => {
         sybil_level: 1
       }, service['signingKey']);
 
-      await expect(service.verifyIdToken(tokenWithNonExistentUser))
+      await expect(service.verifyIdToken({ id_token: tokenWithNonExistentUser }))
         .rejects
         .toThrow('User not found');
     });
@@ -363,7 +363,7 @@ describe('WebAuthnService', () => {
         sybil_level: 1
       }, service['signingKey']);
 
-      await expect(service.verifyIdToken(token, 'did:rooch:wrong-custodian'))
+      await expect(service.verifyIdToken({ id_token: token }, 'did:rooch:wrong-custodian'))
         .rejects
         .toThrow(expect.objectContaining({
           code: CadopErrorCode.TOKEN_INVALID_AUDIENCE,
