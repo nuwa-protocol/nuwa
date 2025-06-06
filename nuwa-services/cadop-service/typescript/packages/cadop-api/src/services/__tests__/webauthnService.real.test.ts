@@ -1,4 +1,4 @@
-import { WebAuthnService } from '../WebAuthnService.js';
+import { webauthnService, WebAuthnService } from '../WebAuthnService.js';
 import crypto from 'crypto';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import { generateRandomDid } from '../../test/mocks.js';
@@ -8,7 +8,7 @@ describe('WebAuthnService Real Data Test', () => {
   const testCredentialId = 'zL7EOz5Vd-iSGG0-z8yR0k2MKvdVRUdHT8T0-tnuPP438szQNVEvpNRjn_0';
 
   beforeAll(async () => {
-    service = new WebAuthnService();
+    service = webauthnService;
   });
 
   beforeEach(async () => {

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@roochnetwork/rooch-sdk':
+        specifier: ^0.3.4
+        version: 0.3.4(typescript@5.8.3)
       cbor-x:
         specifier: ^1.6.0
         version: 1.6.0
