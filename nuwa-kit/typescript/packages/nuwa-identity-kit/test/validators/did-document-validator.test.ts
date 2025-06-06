@@ -1,4 +1,4 @@
-import { NuwaIdentityKit } from '../../src';
+import { NuwaIdentityKit, VDRRegistry } from '../../src';
 import { DIDDocument, DIDCreationRequest, SignerInterface, KEY_TYPE } from '../../src/types';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
 import { CryptoUtils } from '../../src/cryptoUtils';
@@ -15,7 +15,7 @@ describe('DID Document Validator', () => {
     // Initialize KeyVDR
     keyVDR = new KeyVDR();
     keyVDR.reset();
-
+    VDRRegistry.getInstance().registerVDR(keyVDR);
     // Generate a key pair
     const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
     const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
@@ -35,7 +35,10 @@ describe('DID Document Validator', () => {
     };
 
     // Create a new DID using NuwaIdentityKit
-    const kit = await NuwaIdentityKit.createNewDID(creationRequest, keyVDR, mockSigner);
+    const kit = await NuwaIdentityKit.createNewDID("key", creationRequest, {
+      externalSigner: mockSigner
+    });
+    console.log(kit.getDIDDocument());
     validDocument = kit.getDIDDocument();
   });
   

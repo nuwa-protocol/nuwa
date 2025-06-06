@@ -1,6 +1,9 @@
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
 import { AbstractVDR } from './abstractVDR';
 import { CryptoUtils } from '../cryptoUtils';
+import { CadopUtils } from '../cadopUtils';
+import { KeyMultibaseCodec } from '../multibase/key';
+import { BaseMultibaseCodec } from '../multibase';
 
 /**
  * KeyVDR handles did:key DIDs
@@ -46,53 +49,6 @@ export class KeyVDR extends AbstractVDR {
     }
     
     return parts[2];
-  }
-  
-  /**
-   * Generates a DID document for a did:key identifier
-   * 
-   * @param did The did:key identifier
-   * @returns A generated DID document based on the encoded key
-   */
-  private async generateDIDDocument(did: string): Promise<DIDDocument> {
-    const multibaseKey = this.extractMultibaseKey(did);
-    
-    // Determine key type based on multibase prefix
-    // This is a simplified implementation - a full implementation would
-    // support more key types and proper multibase decoding
-    let keyType = 'Ed25519VerificationKey2020';
-    if (multibaseKey.startsWith('zQ3')) {
-      keyType = 'EcdsaSecp256k1VerificationKey2019';
-    }
-    
-    // The verification method ID is usually the DID with a fragment
-    // that references the key
-    const verificationMethodId = `${did}#${multibaseKey}`;
-    
-    // Create a basic DID Document
-    const didDocument: DIDDocument = {
-      '@context': [
-        'https://www.w3.org/ns/did/v1',
-        keyType === 'Ed25519VerificationKey2020' 
-          ? 'https://w3id.org/security/suites/ed25519-2020/v1'
-          : 'https://w3id.org/security/suites/secp256k1-2019/v1'
-      ],
-      id: did,
-      verificationMethod: [
-        {
-          id: verificationMethodId,
-          type: keyType,
-          controller: did,
-          publicKeyMultibase: multibaseKey
-        }
-      ],
-      authentication: [verificationMethodId],
-      assertionMethod: [verificationMethodId],
-      capabilityInvocation: [verificationMethodId],
-      capabilityDelegation: [verificationMethodId]
-    };
-    
-    return didDocument;
   }
   
   /**
@@ -321,6 +277,33 @@ export class KeyVDR extends AbstractVDR {
       };
     } catch (error) {
       console.error(`Error creating DID document:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  async createViaCADOP(request: CADOPCreationRequest, _options?: any): Promise<DIDCreationResult> {
+
+    let { keyType, bytes: publicKey } = KeyMultibaseCodec.decodeWithType(request.userDidKey);
+    try {
+      const didCreationRequest: DIDCreationRequest = {
+        publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(publicKey),
+        preferredDID: request.userDidKey,
+        keyType: keyType,
+        controller: request.userDidKey,
+        initialRelationships: ['authentication', 'capabilityDelegation']
+      };
+      
+      const didDocument = this.buildDIDDocumentFromRequest(didCreationRequest);
+      KeyVDR.documentCache.set(didDocument.id!, didDocument);
+      return {
+        success: true,
+        didDocument
+      };
+    } catch (error) {
+      console.error(`Error creating DID document via CADOP:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

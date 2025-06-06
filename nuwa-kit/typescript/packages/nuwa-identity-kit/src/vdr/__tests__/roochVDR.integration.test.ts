@@ -11,6 +11,8 @@ import {
   getRoochNodeUrl, 
   RoochAddress
 } from '@roochnetwork/rooch-sdk';
+import { KeyMultibaseCodec } from '../../multibase/key';
+import { BaseMultibaseCodec } from '../../multibase';
 
 // Test configuration
 const DEFAULT_NODE_URL = process.env.ROOCH_NODE_URL || 'http://localhost:6767';
@@ -101,10 +103,7 @@ describe('RoochVDR Integration Tests', () => {
       // Get the actual public key from the keypair (Secp256k1)
       const publicKeyBytes = keypair.getPublicKey().toBytes();
       
-      // Create correct multibase encoding for Secp256k1 public key
-      const multibase = require('multibase');
-      const encoded = multibase.encode('base58btc', publicKeyBytes);
-      const publicKeyMultibase = new TextDecoder().decode(encoded);
+      const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
       
       console.log('Using public key multibase (raw):', publicKeyMultibase);
       console.log('Should start with z (base58btc):', publicKeyMultibase.startsWith('z'));
