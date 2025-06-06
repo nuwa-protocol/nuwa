@@ -1,4 +1,4 @@
-import { WebAuthnService } from '../webauthnService.js';
+import { WebAuthnService } from '../WebAuthnService.js';
 import crypto from 'crypto';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import { generateRandomDid } from '../../test/mocks.js';

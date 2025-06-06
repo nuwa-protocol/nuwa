@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { SessionService } from '../services/sessionService.js';
+import { SessionService } from '../services/SessionService.js';
 import { logger } from '../utils/logger.js';
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/environment.js';

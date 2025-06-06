@@ -17,7 +17,7 @@ import type {
 
 import { webAuthnClient } from '../api/client';
 
-export class WebAuthnService {
+export class WebAuthnClientService {
   private developmentMode = import.meta.env.DEV;
   private localStorageKey = 'passkey_did';
 
