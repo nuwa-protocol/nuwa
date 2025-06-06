@@ -13,6 +13,7 @@ import {
   createSuccessResponse,
   createErrorResponseFromError
 } from '@cadop/shared';
+import jwt from 'jsonwebtoken';
 
 const router: Router = Router();
 const webauthnService = new WebAuthnService();
@@ -156,5 +157,27 @@ router.post('/cleanup', requireAuth, async (req: Request, res: Response) => {
     res.status(status).json(response);
   }
 });
+
+/**
+ * GET /api/webauthn/id-token
+ * Get ID Token for the authenticated user
+ */
+router.get(
+  '/id-token',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      logger.debug('Getting ID token for user', { 
+        userId: req.user!.id
+      });
+
+      const idToken = await webauthnService.getIdToken(req.user!.id);
+      res.json(createSuccessResponse(idToken));
+    } catch (error) {
+      const { status, response } = handleError(error);
+      res.status(status).json(response);
+    }
+  }
+);
 
 export default router;

@@ -94,4 +94,4 @@ export interface CredentialInfo {
   lastUsed: string;
   credentialId: string;
   transports: AuthenticatorTransportFuture[];
-} 
+}

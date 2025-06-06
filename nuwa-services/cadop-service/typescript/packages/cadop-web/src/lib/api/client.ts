@@ -10,7 +10,8 @@ import type {
   APIResponse,
   CredentialInfo,
   AuthenticationOptions,
-  AuthenticationResult
+  AuthenticationResult,
+  IDToken
 } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
 
@@ -165,6 +166,7 @@ class APIClient {
 
 }
 
+
 /**
  * WebAuthn specific API client
  */
@@ -183,6 +185,14 @@ export class WebAuthnAPIClient {
     response: AuthenticatorResponse
   ): Promise<APIResponse<AuthenticationResult>> {
     return this.apiClient.post('/api/webauthn/verify', { response });
+  }
+
+  /**
+   * Get ID Token for the authenticated user
+   * @returns Promise<APIResponse<IDToken>>
+   */
+  async getIdToken(): Promise<APIResponse<IDToken>> {
+    return this.apiClient.get('/api/webauthn/id-token');
   }
 
   async getCredentials(): Promise<APIResponse<CredentialInfo[]>> {

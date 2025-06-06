@@ -21,6 +21,8 @@ import {
   CredentialInfo,
   DIDKeyManager,
   AuthenticatorResponse,
+  IDTokenPayload,
+  IDToken,
 } from '@cadop/shared';
 
 import { logger } from '../utils/logger.js';
@@ -43,24 +45,6 @@ interface CreateAuthenticatorData {
   credentialBackedUp: boolean;
   transports?: AuthenticatorTransportFuture[];
   friendlyName?: string;
-}
-
-interface IDTokenPayload {
-  iss: string;      // Issuer (IdP's DID)
-  sub: string;      // Subject (user's DID)
-  aud: string;      // Audience (Custodian's DID)
-  exp: number;      // Expiration time
-  iat: number;      // Issued at time
-  jti: string;      // JWT ID
-  nonce: string;    // Prevent replay
-  pub_jwk: JsonWebKey;  // User's public key
-  sybil_level: number;  // Sybil resistance level
-}
-
-// Add INVALID_TOKEN to CadopErrorCode if not exists
-enum ExtendedCadopErrorCode {
-  INVALID_TOKEN = 'INVALID_TOKEN',
-  // ... include all existing codes from CadopErrorCode
 }
 
 export class WebAuthnService {
@@ -910,9 +894,9 @@ export class WebAuthnService {
   /**
    * Get ID Token for a user
    * @param userId The user's ID
-   * @returns Promise<string> The ID Token
+   * @returns Promise<IDToken> The ID Token
    */
-  async getIdToken(userId: string): Promise<string> {
+  async getIdToken(userId: string): Promise<IDToken> {
     try {
       logger.debug('Getting ID token for user', { userId });
 
@@ -965,7 +949,7 @@ export class WebAuthnService {
         issuer: this.serviceDid
       });
 
-      return idToken;
+      return { id_token: idToken };
 
     } catch (error) {
       logger.error('Failed to get ID token', { 
@@ -1015,14 +999,14 @@ export class WebAuthnService {
    * @param expectedAudience Expected audience (custodian DID)
    * @returns Promise<IDTokenPayload> The verified token payload
    */
-  async verifyIdToken(token: string, expectedAudience?: string): Promise<IDTokenPayload> {
+  async verifyIdToken(token: IDToken, expectedAudience?: string): Promise<IDTokenPayload> {
     try {
       logger.debug('Verifying ID token');
 
       // 1. Verify token signature and decode
       let decoded: IDTokenPayload;
       try {
-        decoded = jwt.verify(token, this.signingKey, {
+        decoded = jwt.verify(token.id_token, this.signingKey, {
           algorithms: ['HS256']  // Since we're using a symmetric key for MVP
         }) as IDTokenPayload;
       } catch (error) {
