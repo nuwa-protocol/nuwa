@@ -70,6 +70,7 @@ export class WebAuthnService {
   private authenticatorRepo: AuthenticatorRepository;
   private userRepo: UserRepository;
   private signingKey: string; // Key for signing ID Tokens
+  private serviceDid: string; // DID of this service
 
   constructor() {
     this.config = {
@@ -83,10 +84,17 @@ export class WebAuthnService {
     this.challengesRepo = new WebAuthnChallengesRepository();
     this.authenticatorRepo = new AuthenticatorRepository();
     this.userRepo = new UserRepository();
-    logger.debug('WebAuthn service initialized with config', { config: this.config });
     
     // Initialize signing key (should be fetched from secure config in production)
     this.signingKey = process.env.JWT_SIGNING_KEY || 'test-signing-key';
+    
+    // Initialize service DID (should be fetched from secure config in production)
+    this.serviceDid = process.env.SERVICE_DID || 'did:rooch:test-service';
+    
+    logger.debug('WebAuthn service initialized', { 
+      config: this.config,
+      serviceDid: this.serviceDid
+    });
   } 
 
   /**
@@ -940,9 +948,9 @@ export class WebAuthnService {
 
       // 4. Generate ID Token
       const idToken = jwt.sign({
-        iss: this.config.rpID,          // Issuer (current service)
-        sub: user.user_did,             // Subject (user's DID)
-        aud: this.config.rpID,          // Audience (currently self, could be other Custodians)
+        iss: this.serviceDid,        // Service's DID (IdP)
+        sub: user.user_did,          // User's DID
+        aud: this.serviceDid,        // For MVP, audience is self (can be other Custodian's DID)
         exp: Math.floor(Date.now() / 1000) + 300,  // Expires in 5 minutes
         iat: Math.floor(Date.now() / 1000),        // Issued at
         jti: crypto.randomUUID(),                  // JWT ID
@@ -953,7 +961,8 @@ export class WebAuthnService {
 
       logger.debug('Generated ID token', {
         userId,
-        tokenId: (jwt.decode(idToken) as { jti: string })?.jti
+        tokenId: (jwt.decode(idToken) as { jti: string })?.jti,
+        issuer: this.serviceDid
       });
 
       return idToken;
@@ -1035,9 +1044,9 @@ export class WebAuthnService {
       });
 
       // 2. Verify issuer
-      if (decoded.iss !== this.config.rpID) {
+      if (decoded.iss !== this.serviceDid) {
         logger.error('Invalid token issuer', {
-          expected: this.config.rpID,
+          expected: this.serviceDid,
           received: decoded.iss
         });
         throw new CadopError(
@@ -1047,9 +1056,10 @@ export class WebAuthnService {
       }
 
       // 3. Verify audience if provided
-      if (expectedAudience && decoded.aud !== expectedAudience) {
+      const expectedAud = expectedAudience || this.serviceDid;
+      if (decoded.aud !== expectedAud) {
         logger.error('Invalid token audience', {
-          expected: expectedAudience,
+          expected: expectedAud,
           received: decoded.aud
         });
         throw new CadopError(

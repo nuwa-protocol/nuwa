@@ -1,10 +1,12 @@
 import { WebAuthnService } from '../WebAuthnService.js';
+import { CadopError, CadopErrorCode } from '@cadop/shared';
 import crypto from 'crypto';
 import type { 
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON 
 } from '@simplewebauthn/types';
 import { generateRandomDid } from '../../test/mocks.js';
+import jwt from 'jsonwebtoken';
 
 
 describe('WebAuthnService', () => {
@@ -140,6 +142,233 @@ describe('WebAuthnService', () => {
 
       const retrievedChallenge = await service['getChallenge'](challenge);
       expect(retrievedChallenge).toBeNull();
+    });
+  });
+
+  describe('getIdToken and verifyIdToken', () => {
+    let user: any;
+    let mockPublicKey: Buffer;
+    let authenticator: any;
+    let validToken: string;
+
+    beforeEach(async () => {
+      // Setup: Create test user and authenticator
+      const userDid = generateRandomDid();
+      user = await service['userRepo'].create({
+        user_did: userDid,
+        display_name: 'Test User'
+      });
+
+      // Create mock authenticator
+      mockPublicKey = crypto.randomBytes(32);
+      authenticator = await service['authenticatorRepo'].create({
+        user_id: user.id,
+        credential_id: crypto.randomBytes(32).toString('base64url'),
+        credential_public_key: mockPublicKey.toString('hex'),
+        counter: 0,
+        credential_device_type: 'platform',
+        credential_backed_up: true,
+        transports: ['internal'],
+        friendly_name: 'Test Device'
+      });
+
+      // Get a valid token for tests
+      validToken = await service.getIdToken(user.id);
+    });
+
+    afterEach(async () => {
+      // Cleanup
+      await service['authenticatorRepo'].deleteByUserId(user.id);
+      await service['userRepo'].delete(user.id);
+    });
+
+    it('should generate and verify valid ID token', async () => {
+      // Verify the token
+      const verified = await service.verifyIdToken(validToken);
+      
+      // Check verified token claims
+      expect(verified).toMatchObject({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: service['serviceDid'],
+        sybil_level: 1
+      });
+
+      // Verify public key
+      expect(verified.pub_jwk).toBeDefined();
+      expect(verified.pub_jwk.kty).toBe('OKP');
+      expect(verified.pub_jwk.crv).toBe('Ed25519');
+      expect(verified.pub_jwk.x).toBe(mockPublicKey.toString('base64url'));
+    });
+
+    it('should verify token with specific audience', async () => {
+      const customAudience = 'did:rooch:custodian';
+      
+      // Generate token with custom audience
+      const token = jwt.sign({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: customAudience,
+        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: Math.floor(Date.now() / 1000),
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: mockPublicKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, service['signingKey']);
+
+      // Should fail with wrong audience
+      await expect(service.verifyIdToken(token, 'did:rooch:wrong-custodian'))
+        .rejects
+        .toThrow(expect.objectContaining({
+          code: CadopErrorCode.TOKEN_INVALID_AUDIENCE,
+          message: 'Invalid token audience'
+        }));
+
+      // Should succeed with correct audience
+      const verified = await service.verifyIdToken(token, customAudience);
+      expect(verified.aud).toBe(customAudience);
+    });
+
+    it('should reject expired token', async () => {
+      const expiredToken = jwt.sign({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: service['serviceDid'],
+        exp: Math.floor(Date.now() / 1000) - 60, // Expired 1 minute ago
+        iat: Math.floor(Date.now() / 1000) - 300,
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: mockPublicKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, service['signingKey']);
+
+      await expect(service.verifyIdToken(expiredToken))
+        .rejects
+        .toThrow(expect.objectContaining({
+          code: CadopErrorCode.TOKEN_EXPIRED,
+          message: 'Token has expired'
+        }));
+    });
+
+    it('should reject token with invalid signature', async () => {
+      const invalidToken = jwt.sign({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: service['serviceDid'],
+        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: Math.floor(Date.now() / 1000),
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: mockPublicKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, 'wrong-signing-key');
+
+      await expect(service.verifyIdToken(invalidToken))
+        .rejects
+        .toThrow(expect.objectContaining({
+          code: CadopErrorCode.TOKEN_INVALID_SIGNATURE,
+          message: 'Invalid token signature'
+        }));
+    });
+
+    it('should reject token with mismatched public key', async () => {
+      const differentKey = crypto.randomBytes(32);
+      const tokenWithDifferentKey = jwt.sign({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: service['serviceDid'],
+        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: Math.floor(Date.now() / 1000),
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: differentKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, service['signingKey']);
+
+      await expect(service.verifyIdToken(tokenWithDifferentKey))
+        .rejects
+        .toThrow(expect.objectContaining({
+          code: CadopErrorCode.TOKEN_PUBLIC_KEY_MISMATCH,
+          message: 'Public key mismatch'
+        }));
+    });
+
+    it('should reject token for non-existent user', async () => {
+      // Generate token with non-existent user DID
+      const tokenWithNonExistentUser = jwt.sign({
+        iss: service['serviceDid'],
+        sub: 'did:example:nonexistent',
+        aud: service['serviceDid'],
+        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: Math.floor(Date.now() / 1000),
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: mockPublicKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, service['signingKey']);
+
+      await expect(service.verifyIdToken(tokenWithNonExistentUser))
+        .rejects
+        .toThrow('User not found');
+    });
+
+    it('should reject token with invalid audience', async () => {
+      const customAudience = 'did:rooch:custodian';
+      const token = jwt.sign({
+        iss: service['serviceDid'],
+        sub: user.user_did,
+        aud: customAudience,
+        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: Math.floor(Date.now() / 1000),
+        jti: crypto.randomUUID(),
+        nonce: crypto.randomUUID(),
+        pub_jwk: {
+          kty: 'OKP',
+          crv: 'Ed25519',
+          x: mockPublicKey.toString('base64url'),
+          alg: 'EdDSA',
+          use: 'sig'
+        },
+        sybil_level: 1
+      }, service['signingKey']);
+
+      await expect(service.verifyIdToken(token, 'did:rooch:wrong-custodian'))
+        .rejects
+        .toThrow(expect.objectContaining({
+          code: CadopErrorCode.TOKEN_INVALID_AUDIENCE,
+          message: 'Invalid token audience'
+        }));
     });
   });
 }); 
