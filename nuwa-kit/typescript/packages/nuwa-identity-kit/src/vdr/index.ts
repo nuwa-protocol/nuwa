@@ -7,9 +7,9 @@ import { RoochVDR } from './roochVDR';
  * 
  * @param method DID method to create a VDR for
  * @param options Optional configuration for the VDR
- * @returns A VDR instance for the specified method or undefined if not supported
+ * @returns A VDR instance for the specified method
  */
-export function createVDR(method: string, options?: any): VDRInterface | undefined {
+export function createVDR(method: string, options?: any): VDRInterface {
   switch (method.toLowerCase()) {
     case 'key':
       return new KeyVDR();
@@ -17,8 +17,7 @@ export function createVDR(method: string, options?: any): VDRInterface | undefin
       return new RoochVDR(options);
     // Add additional DID methods as needed
     default:
-      console.warn(`No built-in VDR implementation available for method '${method}'`);
-      return undefined;
+      throw new Error(`No built-in VDR implementation available for method '${method}'`);
   }
 }
 
@@ -38,6 +37,6 @@ export function createDefaultVDRs(options?: {
 }
 
 // Export VDR implementations
-export { KeyVDR } from './keyVDR';
-export { AbstractVDR } from './abstractVDR';
-export { RoochVDR } from './roochVDR';
+export * from './keyVDR';
+export * from './abstractVDR';
+export * from './roochVDR';

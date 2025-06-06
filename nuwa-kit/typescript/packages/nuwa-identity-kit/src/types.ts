@@ -42,7 +42,7 @@ export interface SignedData {
 export interface NIP1Signature {
   signer_did: string;
   key_id: string; // The id of the verificationMethod used for signing
-  value: string; // The signature value, typically hex or base64 encoded
+  value: Uint8Array; // The signature value
 }
 
 export interface NIP1SignedObject {
@@ -127,7 +127,7 @@ export interface DIDCreationRequest {
 }
 
 /**
- * DID creation result
+ * Result of DID creation operation
  */
 export interface DIDCreationResult {
   success: boolean;
@@ -152,7 +152,6 @@ export interface CADOPCreationRequest {
   userDidKey: string;
   custodianServicePublicKey: string;
   custodianServiceVMType: string;
-  additionalClaims?: Record<string, any>;
 }
 
 /**
@@ -301,14 +300,14 @@ export interface SignerInterface {
    * @param keyId The ID of the key to use for signing
    * @returns A promise that resolves to the signature
    */
-  sign(data: Uint8Array, keyId: string): Promise<string>;
+  signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array>;
   
   /**
    * Checks if the signer can sign with a specific key
    * @param keyId The ID of the key to check
    * @returns A promise that resolves to true if the signer can sign with the key
    */
-  canSign(keyId: string): Promise<boolean>;
+  canSignWithKeyId(keyId: string): Promise<boolean>;
 }
 
 /**

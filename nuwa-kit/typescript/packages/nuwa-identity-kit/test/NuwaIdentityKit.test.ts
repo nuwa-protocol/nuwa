@@ -8,7 +8,8 @@ import {
   ServiceInfo,
   VerificationRelationship,
   SignedData,
-  KEY_TYPE
+  KEY_TYPE,
+  VDRRegistry
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
@@ -53,6 +54,9 @@ describe('NuwaIdentityKit', () => {
     // Reset cache
     keyVDR.reset();
 
+    // Register VDR
+    VDRRegistry.getInstance().registerVDR(keyVDR);
+
     // Initialize MockSigner
     mockSigner = new MockSigner();
     mockSigner.addKey(keyId, createMockPrivateKey());
@@ -68,7 +72,7 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      const kit = await NuwaIdentityKit.fromExistingDID(testDID, [keyVDR]);
+      const kit = await NuwaIdentityKit.fromExistingDID(testDID);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
@@ -91,7 +95,9 @@ describe('NuwaIdentityKit', () => {
         controller: did
       };
 
-      const kit = await NuwaIdentityKit.createNewDID(creationRequest, keyVDR, mockSigner);
+      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, {
+        externalSigner: mockSigner
+      });
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument().id).toMatch(/^did:key:/);
     });
@@ -109,8 +115,7 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID);
     });
 
     it('should add service', async () => {
@@ -147,7 +152,6 @@ describe('NuwaIdentityKit', () => {
       kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, {
         operationalPrivateKeys: mockOperationalKeys
       });
-      kit.registerVDR(keyVDR);
 
       // Create DID first
       await keyVDR.create({
@@ -215,32 +219,29 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID);
     });
 
     it('should resolve DID', async () => {
-      const resolved = await kit.resolveDID(testDID);
+      const resolved = await VDRRegistry.getInstance().resolveDID(testDID);
       expect(resolved).toEqual(mockDIDDocument);
     });
 
     it('should check if DID exists', async () => {
-      const exists = await kit.didExists(testDID);
+      const exists = await VDRRegistry.getInstance().exists(testDID);
       expect(exists).toBe(true);
     });
 
     it('should return null when DID resolution fails', async () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
-      const resolved = await kit.resolveDID('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
+      const resolved = await VDRRegistry.getInstance().resolveDID('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
       expect(resolved).toBeNull();
     });
   });
 
   describe('Error Handling', () => {
     it('should throw error when no VDR available for DID method', async () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      await expect(kit.resolveDID(testDID)).rejects.toThrow();
+      VDRRegistry.getInstance().registerVDR(keyVDR);
+      await expect(VDRRegistry.getInstance().resolveDID('did:example:123')).rejects.toThrow();
     });
   });
 });

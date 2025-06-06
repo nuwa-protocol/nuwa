@@ -14,7 +14,7 @@ import {
   BitcoinAddress,
   ObjectStateView,
 } from '@roochnetwork/rooch-sdk';
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, SignerInterface } from '../types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
@@ -121,26 +121,27 @@ export interface RoochVDROperationOptions {
  * The `didAddress` (a `RoochAddress`) derived from the input DID string represents
  * the actual on-chain smart contract account associated with the DID.
  */
-export class DIDAccount extends Signer {
+export class DIDAccount extends Signer implements SignerInterface {
   private did: string;
   private kp: Keypair;
   private didAddress: RoochAddress;
+  private keyId: string;
   constructor(did: string, kp: Keypair) {
     super();
-    this.did = did;
-    this.kp = kp;
     // parse the identifier from the did
     const didParts = did.split(':');
     if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
       throw new Error('Invalid DID format. Expected did:rooch:address');
     }
+    this.did = did;
+    this.kp = kp;
+    this.keyId = `${did}#account-key`;
     this.didAddress = new RoochAddress(didParts[2]);
   }
 
   getRoochAddress(): RoochAddress {
     return this.didAddress
   }
-
   
   sign(input: Bytes): Promise<Bytes>{
     return this.kp.sign(input);
@@ -168,6 +169,17 @@ export class DIDAccount extends Signer {
 
   getDidAddress(): RoochAddress{
     return this.didAddress;
+  }
+
+  signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
+    if (keyId !== this.keyId) {
+      throw new Error(`Key ID mismatch. Expected ${this.keyId}, got ${keyId}`);
+    }
+    return this.sign(data);
+  }
+
+  canSignWithKeyId(keyId: string): Promise<boolean> {
+    return Promise.resolve(keyId === this.keyId);
   }
 }
 
@@ -243,6 +255,8 @@ export class RoochVDR extends AbstractVDR {
         args: [Args.string(request.publicKeyMultibase)],
         maxGas: options?.maxGas || 100000000
       });
+
+      this.debugLog('Creating DID Transaction:', transaction)
       
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
@@ -318,6 +332,8 @@ export class RoochVDR extends AbstractVDR {
         ],
         maxGas: options?.maxGas || 100000000
       });
+
+      this.debugLog('Creating DID via CADOP Transaction:', transaction)
       
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
@@ -325,6 +341,8 @@ export class RoochVDR extends AbstractVDR {
         signer,
         option: { withOutput: true }
       });
+
+      this.debugLog('Creating DID via CADOP Transaction Result:', result)
       
       const success = result.execution_info.status.type === 'executed';
       
@@ -403,6 +421,7 @@ export class RoochVDR extends AbstractVDR {
       
       // Calculate Object ID from identifier
       const objectId = resolveDidObjectID(identifier);
+      this.debugLog(`Resolved DID object ID: ${objectId}`);
       const objectStates = await this.client.getObjectStates({
         ids: [objectId],
       });
@@ -412,16 +431,20 @@ export class RoochVDR extends AbstractVDR {
       }
 
       let didDocObject: ObjectStateView = objectStates[0];
-
+      if (!didDocObject) {
+        this.debugLog(`Resolved DID document by ${did} is null`);
+        return null;
+      }
+      this.debugLog(`Resolved DID document Move Object:`, JSON.stringify(didDocObject, null, 2));
       return convertMoveDIDDocumentToInterface(didDocObject);
     } catch (error) {
-      this.errorLog(`Error resolving DID from Rooch blockchain:`, error);
+      this.errorLog(`Error resolving DID from Rooch network:`, error);
       return null;
     }
   }
   
   /**
-   * Check if a DID exists on the Rooch blockchain
+   * Check if a DID exists on the Rooch network
    * 
    * @param did The DID to check
    * @returns Promise resolving to true if the DID exists
@@ -438,7 +461,7 @@ export class RoochVDR extends AbstractVDR {
       
       const address = didParts[2];
       
-      // Call DID contract's exists_did_for_address view function
+      // Call DID contract's exists_did_for_address view function on Rooch network
       const result = await this.client.executeViewFunction({
         target: `${this.didContractAddress}::exists_did_for_address`,
         args: [Args.address(address)]
@@ -446,7 +469,7 @@ export class RoochVDR extends AbstractVDR {
       
       return result?.vm_status === 'Executed' && result.return_values?.[0]?.decoded_value === true;
     } catch (error) {
-      console.error(`Error checking DID existence on Rooch blockchain:`, error);
+      console.error(`Error checking DID existence on Rooch network:`, error);
       return false;
     }
   }
@@ -629,15 +652,32 @@ export class RoochVDR extends AbstractVDR {
         console.log(`💡 Note: DID operations may require the DID account itself to sign, not the controller`);
         return false;
       }
+
+      const standardKeys = ['id', 'type', 'serviceEndpoint'];
+      const additionalProperties = Object.entries(service).reduce((acc, [key, value]) => {
+        if (!standardKeys.includes(key)) {
+          acc[key] = value ? value.toString() : '';
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
+      const propertyKeys = Object.keys(additionalProperties);
+      const propertyValues = Object.values(additionalProperties).map(value => value ? value.toString() : '');
+      console.log('service', JSON.stringify(service, null, 2))
+      console.log('additionalProperties', JSON.stringify(additionalProperties, null, 2))
+      console.log('propertyKeys', JSON.stringify(propertyKeys, null, 2))
+      console.log('propertyValues', JSON.stringify(propertyValues, null, 2))
       
       // Create transaction for simple service (without properties)
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.didContractAddress}::add_service_entry`,
+        target: `${this.didContractAddress}::add_service_with_properties_entry`,
         args: [
           Args.string(this.extractFragmentFromId(service.id)),
           Args.string(service.type),
-          Args.string(service.serviceEndpoint)
+          Args.string(service.serviceEndpoint),
+          Args.vec('string', propertyKeys),
+          Args.vec('string', propertyValues)
         ],
         maxGas: options?.maxGas || 100000000
       });

@@ -102,20 +102,18 @@ export abstract class AbstractVDR implements VDRInterface {
     keyId: string,
     requiredRelationship: VerificationRelationship
   ): boolean {
-    // 检查验证方法是否存在
+    
     const keyExists = didDocument.verificationMethod?.some(vm => vm.id === keyId);
     if (!keyExists) {
       console.error(`Key ${keyId} not found in DID document`);
       return false;
     }
 
-    // 检查是否是主密钥
     const isPrimaryKey = didDocument.verificationMethod?.[0]?.id === keyId;
     if (isPrimaryKey) {
       return true;
     }
 
-    // 检查是否有所需权限
     const hasPermission = didDocument[requiredRelationship]?.includes(keyId);
     
     if (!hasPermission) {
