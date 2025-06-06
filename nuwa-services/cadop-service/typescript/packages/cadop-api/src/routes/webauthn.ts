@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { WebAuthnService } from '../services/WebAuthnService.js';
+import { webauthnService } from '../services/WebAuthnService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
@@ -16,7 +16,6 @@ import {
 import jwt from 'jsonwebtoken';
 
 const router: Router = Router();
-const webauthnService = new WebAuthnService();
 
 // Helper function to handle errors
 const handleError = (error: unknown): { status: number; response: any } => {

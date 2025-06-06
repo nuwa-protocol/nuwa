@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { custodianService } from '../services/CustodianService.js';
+import { CustodianService } from '../services/CustodianService.js';
 import { logger } from '../utils/logger.js';
 
 const router: Router = Router();
@@ -8,15 +8,7 @@ const router: Router = Router();
 // Validation schemas
 const CADOPMintRequestSchema = z.object({
   idToken: z.string().min(1, 'ID token is required'),
-  userDidKey: z.string().optional(),
-  custodianServicePublicKeyMultibase: z.string().min(1, 'Custodian public key is required'),
-  custodianServiceVMType: z.string().min(1, 'Verification method type is required'),
-  additionalAuthMethods: z.array(z.object({
-    provider: z.string(),
-    providerId: z.string(),
-    verifiedAt: z.date(),
-    metadata: z.record(z.any()).optional()
-  })).optional()
+  userDid: z.string().min(1, 'User DID is required'),
 });
 
 const DIDRecordIdSchema = z.object({
@@ -42,17 +34,15 @@ router.post('/mint', async (req: Request, res: Response) => {
     
     logger.info('Received CADOP mint request', {
       hasIdToken: !!validatedData.idToken,
-      userDidKey: validatedData.userDidKey,
-      additionalAuthCount: validatedData.additionalAuthMethods?.length || 0
+      userDid: validatedData.userDid
     });
+
+    const custodianService = await CustodianService.getInstance();
 
     // Create Agent DID via CADOP
     const result = await custodianService.createAgentDIDViaCADOP({
       idToken: validatedData.idToken,
-      userDidKey: validatedData.userDidKey,
-      custodianServicePublicKeyMultibase: validatedData.custodianServicePublicKeyMultibase,
-      custodianServiceVMType: validatedData.custodianServiceVMType,
-      additionalAuthMethods: validatedData.additionalAuthMethods
+      userDid: validatedData.userDid,
     });
     
     logger.info('CADOP mint request processed', {
@@ -94,6 +84,7 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
     // Validate path parameter
     const { recordId } = DIDRecordIdSchema.parse({ recordId: req.params['recordId'] });
     
+    const custodianService = await getCustodianService();
     const status = await custodianService.getDIDCreationStatus(recordId);
     
     if (!status) {
@@ -138,6 +129,7 @@ router.get('/user/:userId/dids', async (req: Request, res: Response) => {
     // Validate path parameter
     const { userId } = UserIdSchema.parse({ userId: req.params['userId'] });
     
+    const custodianService = await getCustodianService();
     const dids = await custodianService.getUserAgentDIDs(userId);
     
     res.json({
@@ -174,6 +166,7 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
+    const custodianService = await getCustodianService();
     const didDocument = await custodianService.resolveAgentDID(agentDid);
     
     if (!didDocument) {
@@ -218,6 +211,7 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
+    const custodianService = await getCustodianService();
     const exists = await custodianService.agentDIDExists(agentDid);
     
     res.json({

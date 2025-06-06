@@ -1,4 +1,4 @@
-import { WebAuthnService } from '../WebAuthnService.js';
+import { webauthnService, WebAuthnService } from '../WebAuthnService.js';
 import { CadopError, CadopErrorCode, IDToken } from '@cadop/shared';
 import crypto from 'crypto';
 import type { 
@@ -13,7 +13,7 @@ describe('WebAuthnService', () => {
   let service: WebAuthnService;
 
   beforeAll(async () => {
-    service = new WebAuthnService();
+    service = webauthnService;
   });
 
   describe('generateAuthenticationOptions', () => {
