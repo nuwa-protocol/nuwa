@@ -37,7 +37,7 @@ This repository is a monorepo containing various components of the Nuwa Protocol
 *   **`contracts/`**: Contains information and potentially ABIs related to Nuwa smart contracts.
 *   **`nuwa-agent/`**: The Nuwa client agent implementation.
 *   **`nuwa-kit/`**: [Development Kits](./nuwa-kit/README.md) for building applications and services on Nuwa. This includes client SDKs and service development frameworks for various languages (e.g., TypeScript, Python).
-*   **`nuwa-services/`**: Reference implementations of key [Nuwa Services](./nuwa-services/README.md) (e.g., Custodian Service, LLM Proxy Service).
+*   **`nuwa-services/`**: Reference implementations of key [Nuwa Services](https://github.com/nuwa-protocol/nuwa/blob/main/README.md) (e.g., Custodian Service, LLM Proxy Service).
 *   **`nuwa-script/`**: (Experimental) A purpose-built scripting language for AI agents.
 
 Please refer to the `README.md` file within each directory for more specific details.
