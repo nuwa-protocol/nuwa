@@ -67,11 +67,9 @@ export class CadopIdentityKit {
   };
 
   private nuwaKit: NuwaIdentityKit;
-  private cadopSigner: SignerInterface;
 
-  private constructor(nuwaKit: NuwaIdentityKit, cadopSigner: SignerInterface) {
+  private constructor(nuwaKit: NuwaIdentityKit) {
     this.nuwaKit = nuwaKit;
-    this.cadopSigner = cadopSigner;
   }
 
   private extractCustodianInfo() : {custodianPublicKey?: string, custodianServiceVMType?: string} {
@@ -96,13 +94,10 @@ export class CadopIdentityKit {
    */
   static async fromServiceDID(
     serviceDid: string,
-    cadopSigner: SignerInterface,
-    options?: {
-      operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
-    }
+    signer: SignerInterface,
   ): Promise<CadopIdentityKit> {
-    const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, options);
-    return new CadopIdentityKit(nuwaKit, cadopSigner);
+    const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, signer);
+    return new CadopIdentityKit(nuwaKit);
   }
 
   /**
@@ -125,7 +120,7 @@ export class CadopIdentityKit {
     };
 
     return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {
-      signer: this.cadopSigner,
+      signer: this.nuwaKit.getSigner(),
       ...options
     });
   }
@@ -147,7 +142,7 @@ export class CadopIdentityKit {
     if (!CadopIdentityKit.validateService(serviceEndpoint, service.type as CadopServiceType)) {
       throw new Error(`Invalid CADOP service configuration for type: ${service.type}`);
     }
-    const result = await this.nuwaKit.addService(service, {signer: this.cadopSigner});
+    const result = await this.nuwaKit.addService(service);
     return result;
   }
 

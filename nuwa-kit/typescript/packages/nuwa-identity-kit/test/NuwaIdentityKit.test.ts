@@ -2,7 +2,6 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { 
   NuwaIdentityKit,
   DIDDocument,
-  SignerInterface,
   DIDCreationRequest,
   OperationalKeyInfo,
   ServiceInfo,
@@ -13,21 +12,32 @@ import {
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
-import { MockSigner} from './helpers/testUtils';
+import { LocalSigner } from '../src/signers/LocalSigner';
 
 describe('NuwaIdentityKit', () => {
   let keyVDR: KeyVDR;
   let testDID: string;
   let mockDIDDocument: DIDDocument;
-  let mockSigner: MockSigner;
+  let signer: LocalSigner;
   let keyId: string;
 
   beforeEach(async () => {
-    // Generate a new key pair
-    const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    // Initialize KeyVDR
+    keyVDR = new KeyVDR();
+    keyVDR.reset();
+    VDRRegistry.getInstance().registerVDR(keyVDR);
+
+    // Generate a key pair for the DID
+    const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ED25519);
     testDID = `did:key:${publicKeyMultibase}`;
-    keyId = `${testDID}#account-key`;
+
+    // Create a signer with the correct DID
+    const { signer: newSigner } = await LocalSigner.createWithNewKey(testDID);
+    signer = newSigner;
+
+    // Import the DID's key pair to the signer
+    keyId = await signer.importKeyPair('account-key', keyPair, KEY_TYPE.ED25519);
 
     // Create DID Document
     mockDIDDocument = {
@@ -49,17 +59,14 @@ describe('NuwaIdentityKit', () => {
       service: []
     };
 
-    // Initialize KeyVDR
-    keyVDR = new KeyVDR();
-    // Reset cache
-    keyVDR.reset();
-
-    // Register VDR
-    VDRRegistry.getInstance().registerVDR(keyVDR);
-
-    // Initialize MockSigner
-    mockSigner = new MockSigner();
-    mockSigner.generateKey(keyId);
+    // Create DID in VDR
+    await keyVDR.create({
+      publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
+      keyType: 'Ed25519VerificationKey2020',
+      preferredDID: testDID,
+      controller: testDID,
+      initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation']
+    });
   });
 
   describe('Initialization', () => {
@@ -72,13 +79,13 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      const kit = await NuwaIdentityKit.fromExistingDID(testDID);
+      const kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
 
     it('should create instance from DID Document', () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
+      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
@@ -95,7 +102,7 @@ describe('NuwaIdentityKit', () => {
         controller: did
       };
 
-      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest);
+      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument().id).toMatch(/^did:key:/);
     });
@@ -105,18 +112,14 @@ describe('NuwaIdentityKit', () => {
     let kit: NuwaIdentityKit;
 
     beforeEach(async () => {
-      // Create DID first
-      await keyVDR.create({
-        publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
-        keyType: 'Ed25519VerificationKey2020',
-        preferredDID: testDID,
-        controller: testDID
-      });
-
-      kit = await NuwaIdentityKit.fromExistingDID(testDID);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
     });
 
-    it('should add service', async () => {
+    it('should add and remove service', async () => {
+      // Debug: Log available keys and their relationships
+      const availableKeys = await kit.getAvailableKeyIds();
+      console.log('Available keys before adding service:', availableKeys);
+
       const serviceInfo: ServiceInfo = {
         type: 'MessagingService',
         serviceEndpoint: 'https://example.com/messaging',
@@ -124,19 +127,24 @@ describe('NuwaIdentityKit', () => {
         additionalProperties: {}
       };
 
-      const serviceId = await kit.addService(serviceInfo, {
-        signer: mockSigner
-      });
-
+      // Add service
+      const serviceId = await kit.addService(serviceInfo);
       expect(serviceId).toBe(`${testDID}#messaging`);
-    });
 
-    it('should remove service', async () => {
-      const result = await kit.removeService(`${testDID}#messaging`, {
-        signer: mockSigner
-      });
+      // Verify service was added
+      const docAfterAdd = kit.getDIDDocument();
+      expect(docAfterAdd.service).toBeDefined();
+      expect(docAfterAdd.service!.length).toBe(1);
+      expect(docAfterAdd.service![0].id).toBe(serviceId);
 
-      expect(result).toBe(true);
+      // Remove service
+      const removed = await kit.removeService(serviceId);
+      expect(removed).toBe(true);
+
+      // Verify service was removed
+      const docAfterRemove = kit.getDIDDocument();
+      expect(docAfterRemove.service).toBeDefined();
+      expect(docAfterRemove.service!.length).toBe(0);
     });
   });
 
@@ -152,7 +160,7 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      kit = await NuwaIdentityKit.fromExistingDID(testDID);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
     });
 
     it('should resolve DID', async () => {
@@ -175,6 +183,49 @@ describe('NuwaIdentityKit', () => {
     it('should throw error when no VDR available for DID method', async () => {
       VDRRegistry.getInstance().registerVDR(keyVDR);
       await expect(VDRRegistry.getInstance().resolveDID('did:example:123')).rejects.toThrow();
+    });
+  });
+
+  describe('Key Management', () => {
+    let kit: NuwaIdentityKit;
+
+    beforeEach(async () => {
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
+
+      // Debug: Log available keys in signer
+      const signerKeys = await signer.listKeyIds();
+      console.log('Signer keys:', signerKeys);
+
+      // Debug: Log DID Document
+      console.log('DID Document:', JSON.stringify(kit.getDIDDocument(), null, 2));
+
+      // Debug: Log available keys by relationship
+      const availableKeys = await kit.getAvailableKeyIds();
+      console.log('Available keys by relationship:', availableKeys);
+    });
+
+    it('should find key with specific relationship', async () => {
+      const availableKeys = await kit.getAvailableKeyIds();
+      expect(availableKeys).toBeDefined();
+      expect(availableKeys.authentication).toBeDefined();
+      expect(availableKeys.authentication!.length).toBeGreaterThan(0);
+      expect(availableKeys.authentication).toContain(keyId);
+    });
+
+    it('should find key with capabilityInvocation for service management', async () => {
+      const availableKeys = await kit.getAvailableKeyIds();
+      expect(availableKeys.capabilityInvocation).toBeDefined();
+      expect(availableKeys.capabilityInvocation).toContain(keyId);
+
+      const serviceInfo: ServiceInfo = {
+        type: 'MessagingService',
+        serviceEndpoint: 'https://example.com/messaging',
+        idFragment: 'messaging',
+        additionalProperties: {}
+      };
+
+      const serviceId = await kit.addService(serviceInfo);
+      expect(serviceId).toBe(`${testDID}#messaging`);
     });
   });
 });

@@ -3,7 +3,7 @@ import { AbstractVDR } from './abstractVDR';
 import { CryptoUtils } from '../cryptoUtils';
 import { CadopUtils } from '../cadopUtils';
 import { KeyMultibaseCodec } from '../multibase/key';
-import { BaseMultibaseCodec } from '../multibase';
+import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
 
 /**
  * KeyVDR handles did:key DIDs
@@ -286,7 +286,7 @@ export class KeyVDR extends AbstractVDR {
 
   async createViaCADOP(request: CADOPCreationRequest, _options?: any): Promise<DIDCreationResult> {
 
-    let { keyType, bytes: publicKey } = KeyMultibaseCodec.decodeWithType(request.userDidKey);
+    let { keyType, publicKey } = DidKeyCodec.parseDidKey(request.userDidKey);
     try {
       const didCreationRequest: DIDCreationRequest = {
         publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(publicKey),

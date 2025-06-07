@@ -44,7 +44,7 @@ export class BaseMultibaseCodec {
     try {
       return base58btc.decode(encoded);
     } catch (error) {
-      throw new Error('Invalid multibase format');
+      throw new Error(`Invalid multibase format ${encoded}, error: ${error}`);
     }
   }
 

@@ -4,27 +4,25 @@ import { validateDIDDocument } from '../../src/validators/did-document-validator
 import { CryptoUtils } from '../../src/cryptoUtils';
 import { KeyVDR } from '../../src/vdr/keyVDR';
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { MockSigner } from '../helpers/testUtils';
+import { LocalSigner } from '../../src/signers/LocalSigner';
 
 describe('DID Document Validator', () => {
   let validDocument: DIDDocument;
   let keyVDR: KeyVDR;
-  let mockSigner: MockSigner;
+  let mockSigner: LocalSigner;
   
   beforeEach(async () => {
     // Initialize KeyVDR
     keyVDR = new KeyVDR();
     keyVDR.reset();
     VDRRegistry.getInstance().registerVDR(keyVDR);
-    // Generate a key pair
-    const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
-    const did = `did:key:${publicKeyMultibase}`;
-    const keyId = `${did}#account-key`;
 
     // Create mock signer
-    mockSigner = new MockSigner();
-    mockSigner.generateKey(keyId);
+    const { signer: mockSigner, keyId } = await LocalSigner.createWithDidKey();
+    const did = mockSigner.getDid();
+
+    const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
 
     // Create DID creation request
     const creationRequest: DIDCreationRequest = {
@@ -35,7 +33,7 @@ describe('DID Document Validator', () => {
     };
 
     // Create a new DID using NuwaIdentityKit
-    const kit = await NuwaIdentityKit.createNewDID("key", creationRequest);
+    const kit = await NuwaIdentityKit.createNewDID("key", creationRequest, mockSigner);
     console.log(kit.getDIDDocument());
     validDocument = kit.getDIDDocument();
   });
