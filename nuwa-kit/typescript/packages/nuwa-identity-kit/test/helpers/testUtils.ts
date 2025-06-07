@@ -51,41 +51,6 @@ export function createTestService(id: string): ServiceEndpoint {
   };
 }
 
-
-/**
- * A simple mock implementation of a signer interface for testing
- * This implements the SignerInterface from the source code
- */
-export class MockSigner implements SignerInterface {
-  private keys: Map<string, Uint8Array> = new Map();
-  
-  constructor(keyMap?: Map<string, Uint8Array>) {
-    if (keyMap) {
-      this.keys = keyMap;
-    }
-  }
-
-  async generateKey(keyId: string){
-    const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    this.keys.set(keyId, keyPair.privateKey);
-    return keyPair.privateKey;
-  }
-
-
-  async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
-    const key = this.keys.get(keyId);
-    if (!key) {
-      throw new Error(`Key ${keyId} not found`);
-    }
-    return await CryptoUtils.sign(data, key, KEY_TYPE.ED25519);
-  }
-
-  async canSignWithKeyId(keyId: string): Promise<boolean> {
-    return this.keys.has(keyId);
-  }
-}
-
-
 /**
  * Creates a test master identity
  * @param method The DID method to use

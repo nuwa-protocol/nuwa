@@ -13,8 +13,10 @@ import {
   Authenticator,
   BitcoinAddress,
   ObjectStateView,
+  Ed25519PublicKey,
+  Secp256k1PublicKey,
 } from '@roochnetwork/rooch-sdk';
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, SignerInterface } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, SignerInterface, KeyType, KEY_TYPE } from '../types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
@@ -82,7 +84,12 @@ export interface RoochVDROperationOptions {
   /**
    * Signer to use for this operation
    */
-  signer?: any; // SessionAccount or other Rooch signer
+  signer?: SignerInterface | Signer;
+
+  /**
+   * Key ID to use for this operation
+   */
+  keyId?: string;
   
   /**
    * Maximum gas limit for the transaction
@@ -96,80 +103,124 @@ export interface RoochVDROperationOptions {
 }
 
 /**
- * Represents a signer for a Rooch DID's associated smart contract account.
- *
- * The `DIDAccount` class implements the Rooch `Signer` interface. It is initialized
- * with a DID string (e.g., "did:rooch:0x...") and a `Keypair`. This `Keypair`
- * corresponds to a specific verification method within the DID Document,
- * typically one with an 'authentication' relationship.
- *
- * When this `DIDAccount` signs a transaction, the provided `Keypair` is used.
- * In the context of the Rooch DID system, this signature, when validated against
- * an `authentication` verification method, allows the transaction to be authorized
- * by the DID's associated smart contract account (via the session key mechanism).
- *
- * The `didAddress` (a `RoochAddress`) derived from the input DID string represents
- * the actual on-chain smart contract account associated with the DID.
+ * A Rooch Signer implementation that wraps a SignerInterface.
+ * This class implements the Rooch Signer interface while delegating
+ * actual signing operations to the wrapped SignerInterface.
  */
-export class DIDAccount extends Signer implements SignerInterface {
+export class DidAccountSigner extends Signer implements SignerInterface {
   private did: string;
-  private kp: Keypair;
-  private didAddress: RoochAddress;
   private keyId: string;
-  constructor(did: string, kp: Keypair) {
+  private didAddress: RoochAddress;
+  private keyType: KeyType;
+  private publicKey: Uint8Array;
+
+  private constructor(
+    private wrappedSigner: SignerInterface,
+    keyId: string,
+    keyType: KeyType,
+    publicKey: Uint8Array
+  ) {
     super();
-    // parse the identifier from the did
-    const didParts = did.split(':');
-    if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
-      throw new Error('Invalid DID format. Expected did:rooch:address');
+    this.keyId = keyId;
+    this.did = wrappedSigner.getDid();
+    if (!this.did.startsWith('did:rooch:')) {
+      throw new Error('Signer DID must be a did:rooch DID');
     }
-    this.did = did;
-    this.kp = kp;
-    this.keyId = `${did}#account-key`;
+    const didParts = this.did.split(':');
     this.didAddress = new RoochAddress(didParts[2]);
+    this.keyType = keyType;
+    this.publicKey = publicKey;
   }
 
+  /**
+   * Create a DidAccountSigner instance from a SignerInterface
+   * @param signer The signer to wrap
+   * @param keyId Optional specific keyId to use
+   * @returns A new DidAccountSigner instance
+   */
+  static async create(signer: SignerInterface, keyId?: string): Promise<DidAccountSigner> {
+    // If already a DidAccountSigner, return as is
+    if (signer instanceof DidAccountSigner) {
+      return signer;
+    }
+
+    // Get keyId if not provided
+    const actualKeyId = keyId || (await signer.listKeyIds())[0];
+    if (!actualKeyId) {
+      throw new Error('No available keys in signer');
+    }
+
+    // Get key info
+    const keyInfo = await signer.getKeyInfo(actualKeyId);
+    if (!keyInfo) {
+      throw new Error(`Key info not found for keyId: ${actualKeyId}`);
+    }
+
+    return new DidAccountSigner(
+      signer,
+      actualKeyId,
+      keyInfo.type,
+      keyInfo.publicKey
+    );
+  }
+
+  // Implement Rooch Signer interface
   getRoochAddress(): RoochAddress {
-    return this.didAddress
-  }
-  
-  sign(input: Bytes): Promise<Bytes>{
-    return this.kp.sign(input);
-  }
-  
-  signTransaction(input: Transaction): Promise<Authenticator>{
-    return Authenticator.rooch(input.hashData(), this);
-  }
-  
-  getKeyScheme(): SignatureScheme{
-    return this.kp.getKeyScheme();
-  }
-
-  getPublicKey(): PublicKey<Address>{
-    return this.kp.getPublicKey();
-  }
-
-  getBitcoinAddress(): BitcoinAddress{
-    throw new Error('Bitcoin address is not supported for DID account');
-  }
-
-  getDid(): string{
-    return this.did;
-  }
-
-  getDidAddress(): RoochAddress{
     return this.didAddress;
   }
 
-  signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
+  async sign(input: Bytes): Promise<Bytes> {
+    return this.wrappedSigner.signWithKeyId(input, this.keyId);
+  }
+
+  async signTransaction(input: Transaction): Promise<Authenticator> {
+    return Authenticator.rooch(input.hashData(), this);
+  }
+
+  getKeyScheme(): SignatureScheme {
+    return this.keyType === KEY_TYPE.SECP256K1 ? 'Secp256k1' : 'ED25519';
+  }
+
+  getPublicKey(): PublicKey<Address> {
+    if (this.keyType === KEY_TYPE.SECP256K1) {
+      return new Secp256k1PublicKey(this.publicKey);
+    } else {
+      return new Ed25519PublicKey(this.publicKey);
+    }
+  }
+
+  getBitcoinAddress(): BitcoinAddress {
+    throw new Error('Bitcoin address is not supported for DID account');
+  }
+
+  // Implement SignerInterface
+  async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
     if (keyId !== this.keyId) {
       throw new Error(`Key ID mismatch. Expected ${this.keyId}, got ${keyId}`);
     }
     return this.sign(data);
   }
 
-  canSignWithKeyId(keyId: string): Promise<boolean> {
-    return Promise.resolve(keyId === this.keyId);
+  async canSignWithKeyId(keyId: string): Promise<boolean> {
+    return keyId === this.keyId;
+  }
+
+  async listKeyIds(): Promise<string[]> {
+    return [this.keyId];
+  }
+
+  getDid(): string {
+    return this.did;
+  }
+
+  async getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined> {
+    if (keyId !== this.keyId) {
+      return undefined;
+    }
+    return {
+      type: this.keyType,
+      publicKey: this.publicKey
+    };
   }
 }
 
@@ -221,6 +272,13 @@ export class RoochVDR extends AbstractVDR {
       console.error(`[RoochVDR Error] ${message}`);
     }
   }
+
+  private async convertSigner(signer: SignerInterface | Signer, keyId?: string): Promise<Signer> {
+    if (signer instanceof Signer) {
+      return signer;
+    }
+    return DidAccountSigner.create(signer, keyId);
+  }
   
   /**
    * Override create method to support Rooch dynamic DID generation
@@ -233,6 +291,8 @@ export class RoochVDR extends AbstractVDR {
       }
       
       this.debugLog('Creating DID with request:', request);
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Create transaction
       const transaction = this.createTransaction();
@@ -247,7 +307,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -306,7 +366,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No custodian signer provided for CADOP operation');
       }
-      
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       // Create transaction
       const transaction = this.createTransaction();
       transaction.callFunction({
@@ -324,7 +385,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
 
@@ -476,6 +537,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for addVerificationMethod operation');
       }
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
@@ -484,10 +547,10 @@ export class RoochVDR extends AbstractVDR {
       }
       
       this.debugLog(`Adding verification method to DID: ${did}`);
-      this.debugLog(`Using signer with address: ${signer.getRoochAddress().toBech32Address()}`);
+      this.debugLog(`Using signer with address: ${didAccountSigner.getRoochAddress().toBech32Address()}`);
       
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress ? didAccountSigner.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
         this.errorLog(`Signer does not have capabilityDelegation permission for ${did}`);
         this.debugLog(`Note: DID operations may require the DID account itself to sign, not the controller`);
@@ -526,7 +589,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -568,6 +631,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for removeVerificationMethod operation');
       }
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
@@ -576,7 +641,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress ? didAccountSigner.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
         console.error(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
@@ -595,7 +660,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -621,7 +686,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for addService operation');
       }
-      
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
@@ -629,10 +695,10 @@ export class RoochVDR extends AbstractVDR {
       }
       
       console.log(`🔧 Adding service to DID: ${did}`);
-      console.log(`🗝️ Using signer with address: ${signer.getRoochAddress().toBech32Address()}`);
+      console.log(`🗝️ Using signer with address: ${didAccountSigner.getRoochAddress().toBech32Address()}`);
       
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress ? didAccountSigner.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
         console.error(`❌ Signer does not have capabilityInvocation permission for ${did}`);
         console.log(`💡 Note: DID operations may require the DID account itself to sign, not the controller`);
@@ -678,7 +744,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -720,6 +786,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for addServiceWithProperties operation');
       }
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
@@ -728,7 +796,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress ? didAccountSigner.getRoochAddress().toBech32Address() : null;
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
         console.error(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
@@ -755,7 +823,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -781,6 +849,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for removeService operation');
       }
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
@@ -789,7 +859,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityInvocation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress().toBech32Address();
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')) {
         console.error(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
@@ -808,7 +878,7 @@ export class RoochVDR extends AbstractVDR {
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
-        signer,
+        signer: didAccountSigner,
         option: { withOutput: true }
       });
       
@@ -836,6 +906,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No signer provided for updateRelationships operation');
       }
+
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
@@ -844,7 +916,7 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Check if signer has capabilityDelegation permission
-      const signerAddress = signer.getRoochAddress ? signer.getRoochAddress().toBech32Address() : null;
+      const signerAddress = didAccountSigner.getRoochAddress().toBech32Address();
       if (signerAddress && !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')) {
         console.error(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
@@ -867,7 +939,7 @@ export class RoochVDR extends AbstractVDR {
         
         const result = await this.client.signAndExecuteTransaction({
           transaction,
-          signer,
+          signer: didAccountSigner,
           option: { withOutput: true }
         });
         
@@ -891,7 +963,7 @@ export class RoochVDR extends AbstractVDR {
         
         const result = await this.client.signAndExecuteTransaction({
           transaction,
-          signer,
+          signer: didAccountSigner,
           option: { withOutput: true }
         });
         

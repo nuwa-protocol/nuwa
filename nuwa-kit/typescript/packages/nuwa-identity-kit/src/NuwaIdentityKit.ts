@@ -21,17 +21,20 @@ export class NuwaIdentityKit {
   private didDocument: DIDDocument;
   private operationalPrivateKeys: Map<string, CryptoKey | Uint8Array> = new Map();
   private vdr: VDRInterface;
+  private signer: SignerInterface;
 
   // Private constructor, force use of factory methods
   private constructor(
     didDocument: DIDDocument,
     vdr: VDRInterface,
+    signer: SignerInterface,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
     }
   ) {
     this.didDocument = didDocument;
     this.vdr = vdr;
+    this.signer = signer;
     
     if (options?.operationalPrivateKeys) {
       this.operationalPrivateKeys = options.operationalPrivateKeys;
@@ -44,6 +47,7 @@ export class NuwaIdentityKit {
    */
   static async fromExistingDID(
     did: string,
+    signer: SignerInterface,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
     }
@@ -61,7 +65,7 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to resolve DID ${did}`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, options);
+    return new NuwaIdentityKit(didDocument, vdr, signer, options);
   }
 
   /**
@@ -69,6 +73,7 @@ export class NuwaIdentityKit {
    */
   static fromDIDDocument(
     didDocument: DIDDocument,
+    signer: SignerInterface,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
     }
@@ -79,7 +84,7 @@ export class NuwaIdentityKit {
       throw new Error(`No VDR available for DID method '${method}'`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, options);
+    return new NuwaIdentityKit(didDocument, vdr, signer, options);
   }
 
   /**
@@ -88,6 +93,7 @@ export class NuwaIdentityKit {
   static async createNewDID(
     method: string,
     creationRequest: DIDCreationRequest,
+    signer: SignerInterface,
     options?: Record<string, any>
   ): Promise<NuwaIdentityKit> {
     const registry = VDRRegistry.getInstance();
@@ -101,43 +107,100 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
     }
 
-    return new NuwaIdentityKit(result.didDocument, vdr, options);
+    return new NuwaIdentityKit(result.didDocument, vdr, signer, options);
   }
 
   // Verification Method Management
+  /**
+   * Find a key that has the specified verification relationship and is available for signing
+   * @param relationship The required verification relationship
+   * @returns The key ID if found, undefined otherwise
+   */
+  private async findKeyWithRelationship(
+    relationship: VerificationRelationship
+  ): Promise<string | undefined> {
+    // Get all available keys from the signer
+    const availableKeyIds = await this.signer.listKeyIds();
+    if (!availableKeyIds.length) {
+      return undefined;
+    }
+
+    // Get keys with the specified relationship from DID Document
+    const relationships = this.didDocument[relationship] as (string | { id: string })[];
+    if (!relationships?.length) {
+      return undefined;
+    }
+
+    // Find the first key that exists in both the DID Document and signer
+    for (const item of relationships) {
+      const keyId = typeof item === 'string' ? item : item.id;
+      if (availableKeyIds.includes(keyId)) {
+        return keyId;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Find all keys that have the specified verification relationship and are available for signing
+   * @param relationship The required verification relationship
+   * @returns Array of key IDs that match the criteria
+   */
+  private async findKeysWithRelationship(
+    relationship: VerificationRelationship
+  ): Promise<string[]> {
+    const availableKeyIds = await this.signer.listKeyIds();
+    if (!availableKeyIds.length) {
+      return [];
+    }
+
+    const relationships = this.didDocument[relationship] as (string | { id: string })[];
+    if (!relationships?.length) {
+      return [];
+    }
+
+    return relationships
+      .map(item => typeof item === 'string' ? item : item.id)
+      .filter(keyId => availableKeyIds.includes(keyId));
+  }
+
   async addVerificationMethod(
     keyInfo: OperationalKeyInfo,
     relationships: VerificationRelationship[],
-    options: {
-      signer?: SignerInterface;
+    options?: {
+      keyId?: string;
     }
   ): Promise<string> {
-    const keyIdFragment = keyInfo.idFragment || `key-${Date.now()}`;
-    const keyId = `${this.didDocument.id}#${keyIdFragment}`;
-
-    let verificationMethodEntry: any;
-    if (keyInfo.publicKeyMaterial instanceof Uint8Array) {
-      verificationMethodEntry = {
-        id: keyId,
-        type: keyInfo.type,
-        controller: keyInfo.controller || this.didDocument.id,
-        publicKeyMultibase: await CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type),
-      };
-    } else {
-      verificationMethodEntry = {
-        id: keyId,
-        type: keyInfo.type,
-        controller: keyInfo.controller || this.didDocument.id,
-        publicKeyJwk: keyInfo.publicKeyMaterial as JsonWebKey,
-      };
+    // 1. Get signing key
+    const signingKeyId = options?.keyId || await this.findKeyWithRelationship('capabilityDelegation');
+    if (!signingKeyId) {
+      throw new Error('No key with capabilityDelegation permission available');
     }
 
+    // 2. Create verification method entry
+    const keyIdFragment = keyInfo.idFragment || `key-${Date.now()}`;
+    const keyId = `${this.didDocument.id}#${keyIdFragment}`;
+    const verificationMethodEntry = {
+      id: keyId,
+      type: keyInfo.type,
+      controller: keyInfo.controller || this.didDocument.id,
+      publicKeyMultibase: keyInfo.publicKeyMaterial instanceof Uint8Array 
+        ? await CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type)
+        : undefined,
+      publicKeyJwk: !(keyInfo.publicKeyMaterial instanceof Uint8Array)
+        ? keyInfo.publicKeyMaterial
+        : undefined
+    };
+
+    // 3. Call VDR interface
     const published = await this.vdr.addVerificationMethod(
       this.didDocument.id,
       verificationMethodEntry,
       relationships,
       {
-        signer: options.signer
+        signer: this.signer,
+        keyId: signingKeyId
       }
     );
 
@@ -145,37 +208,28 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to publish verification method ${keyId}`);
     }
 
-    // Update local state
-    if (!this.didDocument.verificationMethod) {
-      this.didDocument.verificationMethod = [];
-    }
-    // Remove any existing verification method with the same ID
-    this.didDocument.verificationMethod = this.didDocument.verificationMethod.filter(vm => vm.id !== verificationMethodEntry.id);
-    this.didDocument.verificationMethod.push(verificationMethodEntry);
-
-    relationships.forEach(rel => {
-      if (!this.didDocument[rel]) {
-        this.didDocument[rel] = [];
-      }
-      // Remove any existing relationship with the same ID
-      this.didDocument[rel] = (this.didDocument[rel] as string[]).filter(id => id !== keyId);
-      (this.didDocument[rel] as string[]).push(keyId);
-    });
-
+    // 4. Update local state
+    await this.updateLocalDIDDocument();
+    
     return keyId;
   }
 
   async removeVerificationMethod(
     keyId: string,
-    options: {
-      signer?: SignerInterface;
+    options?: {
+      keyId?: string;
     }
   ): Promise<boolean> {
+    const signingKeyId = options?.keyId || await this.findKeyWithRelationship('capabilityDelegation');
+    if (!signingKeyId) {
+      throw new Error('No key with capabilityDelegation permission available');
+    }
+
     const published = await this.vdr.removeVerificationMethod(
       this.didDocument.id,
       keyId,
       {
-        signer: options.signer
+        signer: this.signer
       }
     );
 
@@ -261,10 +315,15 @@ export class NuwaIdentityKit {
   // Service Management
   async addService(
     serviceInfo: ServiceInfo,
-    options: {
-      signer?: SignerInterface;
+    options?: {
+      keyId?: string;
     }
   ): Promise<string> {
+    const signingKeyId = options?.keyId || await this.findKeyWithRelationship('capabilityInvocation');
+    if (!signingKeyId) {
+      throw new Error('No key with capabilityInvocation permission available');
+    }
+
     const serviceId = `${this.didDocument.id}#${serviceInfo.idFragment}`;
     const serviceEntry = {
       id: serviceId,
@@ -277,7 +336,8 @@ export class NuwaIdentityKit {
       this.didDocument.id,
       serviceEntry,
       {
-        signer: options.signer
+        signer: this.signer,
+        keyId: signingKeyId
       }
     );
 
@@ -292,15 +352,21 @@ export class NuwaIdentityKit {
 
   async removeService(
     serviceId: string,
-    options: {
-      signer?: SignerInterface;
+    options?: {
+      keyId?: string;
     }
   ): Promise<boolean> {
+    const signingKeyId = options?.keyId || await this.findKeyWithRelationship('capabilityInvocation');
+    if (!signingKeyId) {
+      throw new Error('No key with capabilityInvocation permission available');
+    }
+
     const published = await this.vdr.removeService(
       this.didDocument.id,
       serviceId,
       {
-        signer: options.signer
+        signer: this.signer,
+        keyId: signingKeyId
       }
     );
 
@@ -483,5 +549,39 @@ export class NuwaIdentityKit {
 
   private getOperationalPrivateKey(keyId: string): CryptoKey | Uint8Array | undefined {
     return this.operationalPrivateKeys.get(keyId);
+  }
+
+  /**
+   * Get all available keys grouped by their verification relationships
+   * @returns Object mapping verification relationships to arrays of key IDs
+   */
+  async getAvailableKeyIds(): Promise<{[key in VerificationRelationship]?: string[]}> {
+    const relationships: VerificationRelationship[] = [
+      'authentication',
+      'assertionMethod',
+      'keyAgreement',
+      'capabilityInvocation',
+      'capabilityDelegation'
+    ];
+
+    const result: {[key in VerificationRelationship]?: string[]} = {};
+    
+    for (const relationship of relationships) {
+      const keys = await this.findKeysWithRelationship(relationship);
+      if (keys.length > 0) {
+        result[relationship] = keys;
+      }
+    }
+
+    return result;
+  }
+
+  private async updateLocalDIDDocument(): Promise<void> {
+    this.didDocument = await this.vdr.resolve(this.didDocument.id) as DIDDocument;
+    console.log('After updateLocalDIDDocument', JSON.stringify(this.didDocument, null, 2))
+  }
+
+  getSigner(): SignerInterface {
+    return this.signer;
   }
 } 
