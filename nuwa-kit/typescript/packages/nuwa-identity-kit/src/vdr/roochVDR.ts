@@ -57,16 +57,6 @@ export interface RoochVDROptions {
   rpcUrl: string;
   
   /**
-   * Rooch client instance (optional, will create one if not provided)
-   */
-  client?: RoochClient;
-  
-  /**
-   * Default signer for transactions (optional)
-   */
-  signer?: any; // SessionAccount or other Rooch signer
-  
-  /**
    * Network type (dev, test, main)
    */
   network?: 'dev' | 'test' | 'main';
@@ -205,11 +195,7 @@ export class RoochVDR extends AbstractVDR {
     this.debug = options.debug || false;
     
     // Initialize Rooch client
-    if (options.client) {
-      this.client = options.client;
-    } else {
-      this.client = new RoochClient({ url: options.rpcUrl });
-    }
+    this.client = new RoochClient({ url: options.rpcUrl });
   }
   
   /**
@@ -241,7 +227,7 @@ export class RoochVDR extends AbstractVDR {
    */
   async create(request: DIDCreationRequest, options?: RoochVDROperationOptions): Promise<DIDCreationResult> {
     try {
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for create operation');
       }
@@ -316,7 +302,7 @@ export class RoochVDR extends AbstractVDR {
    */
   async createViaCADOP(request: CADOPCreationRequest, options?: RoochVDROperationOptions): Promise<DIDCreationResult> {
     try {
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No custodian signer provided for CADOP operation');
       }
@@ -486,7 +472,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for addVerificationMethod operation');
       }
@@ -578,7 +564,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for removeVerificationMethod operation');
       }
@@ -631,7 +617,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for addService operation');
       }
@@ -730,7 +716,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for addServiceWithProperties operation');
       }
@@ -791,7 +777,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for removeService operation');
       }
@@ -846,7 +832,7 @@ export class RoochVDR extends AbstractVDR {
     try {
       this.validateDIDMethod(did);
       
-      const signer = options?.signer || this.options.signer;
+      const signer = options?.signer;
       if (!signer) {
         throw new Error('No signer provided for updateRelationships operation');
       }

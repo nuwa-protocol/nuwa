@@ -67,9 +67,11 @@ export class CadopIdentityKit {
   };
 
   private nuwaKit: NuwaIdentityKit;
+  private cadopSigner: SignerInterface;
 
-  private constructor(nuwaKit: NuwaIdentityKit) {
+  private constructor(nuwaKit: NuwaIdentityKit, cadopSigner: SignerInterface) {
     this.nuwaKit = nuwaKit;
+    this.cadopSigner = cadopSigner;
   }
 
   private extractCustodianInfo() : {custodianPublicKey?: string, custodianServiceVMType?: string} {
@@ -94,13 +96,13 @@ export class CadopIdentityKit {
    */
   static async fromServiceDID(
     serviceDid: string,
+    cadopSigner: SignerInterface,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
-      externalSigner?: SignerInterface
     }
   ): Promise<CadopIdentityKit> {
     const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, options);
-    return new CadopIdentityKit(nuwaKit);
+    return new CadopIdentityKit(nuwaKit, cadopSigner);
   }
 
   /**
@@ -122,7 +124,10 @@ export class CadopIdentityKit {
       custodianServiceVMType: custodianInfo.custodianServiceVMType,
     };
 
-    return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, options);
+    return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {
+      signer: this.cadopSigner,
+      ...options
+    });
   }
 
   /**
@@ -130,10 +135,6 @@ export class CadopIdentityKit {
    */
   async addService(
     service: ServiceInfo,
-    options: {
-      keyId: string;
-      signer?: SignerInterface;
-    }
   ): Promise<string> {
     // Convert ServiceInfo to ServiceEndpoint format for validation
     const serviceEndpoint: ServiceEndpoint = {
@@ -146,7 +147,7 @@ export class CadopIdentityKit {
     if (!CadopIdentityKit.validateService(serviceEndpoint, service.type as CadopServiceType)) {
       throw new Error(`Invalid CADOP service configuration for type: ${service.type}`);
     }
-    const result = await this.nuwaKit.addService(service, options);
+    const result = await this.nuwaKit.addService(service, {signer: this.cadopSigner});
     return result;
   }
 

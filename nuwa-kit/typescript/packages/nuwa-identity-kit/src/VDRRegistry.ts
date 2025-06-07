@@ -41,7 +41,8 @@ export class VDRRegistry {
 
   async createDID(
     method: string,
-    creationRequest: DIDCreationRequest
+    creationRequest: DIDCreationRequest,
+    options?: Record<string, any>
   ): Promise<DIDCreationResult> {
     const vdr = this.vdrs.get(method);
     if (!vdr) {

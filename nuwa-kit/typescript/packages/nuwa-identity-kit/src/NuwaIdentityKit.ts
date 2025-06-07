@@ -20,7 +20,6 @@ import { VDRRegistry } from './VDRRegistry';
 export class NuwaIdentityKit {
   private didDocument: DIDDocument;
   private operationalPrivateKeys: Map<string, CryptoKey | Uint8Array> = new Map();
-  private externalSigner?: SignerInterface;
   private vdr: VDRInterface;
 
   // Private constructor, force use of factory methods
@@ -29,7 +28,6 @@ export class NuwaIdentityKit {
     vdr: VDRInterface,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
-      externalSigner?: SignerInterface
     }
   ) {
     this.didDocument = didDocument;
@@ -38,7 +36,6 @@ export class NuwaIdentityKit {
     if (options?.operationalPrivateKeys) {
       this.operationalPrivateKeys = options.operationalPrivateKeys;
     }
-    this.externalSigner = options?.externalSigner;
   }
 
   // Factory methods
@@ -49,7 +46,6 @@ export class NuwaIdentityKit {
     did: string,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
-      externalSigner?: SignerInterface
     }
   ): Promise<NuwaIdentityKit> {
     const registry = VDRRegistry.getInstance();
@@ -75,7 +71,6 @@ export class NuwaIdentityKit {
     didDocument: DIDDocument,
     options?: {
       operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>,
-      externalSigner?: SignerInterface
     }
   ): NuwaIdentityKit {
     const method = didDocument.id.split(':')[1];
@@ -93,9 +88,7 @@ export class NuwaIdentityKit {
   static async createNewDID(
     method: string,
     creationRequest: DIDCreationRequest,
-    options?: {
-      externalSigner?: SignerInterface
-    }
+    options?: Record<string, any>
   ): Promise<NuwaIdentityKit> {
     const registry = VDRRegistry.getInstance();
     const vdr = registry.getVDR(method);
@@ -103,7 +96,7 @@ export class NuwaIdentityKit {
       throw new Error(`No VDR available for DID method '${method}'`);
     }
 
-    const result = await registry.createDID(method, creationRequest);
+    const result = await registry.createDID(method, creationRequest, options);
     if (!result.success || !result.didDocument) {
       throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
     }
@@ -116,7 +109,6 @@ export class NuwaIdentityKit {
     keyInfo: OperationalKeyInfo,
     relationships: VerificationRelationship[],
     options: {
-      keyId: string;
       signer?: SignerInterface;
     }
   ): Promise<string> {
@@ -145,8 +137,7 @@ export class NuwaIdentityKit {
       verificationMethodEntry,
       relationships,
       {
-        keyId: options.keyId,
-        signer: options.signer || this.externalSigner
+        signer: options.signer
       }
     );
 
@@ -177,7 +168,6 @@ export class NuwaIdentityKit {
   async removeVerificationMethod(
     keyId: string,
     options: {
-      keyId: string;
       signer?: SignerInterface;
     }
   ): Promise<boolean> {
@@ -185,8 +175,7 @@ export class NuwaIdentityKit {
       this.didDocument.id,
       keyId,
       {
-        keyId: options.keyId,
-        signer: options.signer || this.externalSigner
+        signer: options.signer
       }
     );
 
@@ -226,7 +215,6 @@ export class NuwaIdentityKit {
     addRelationships: VerificationRelationship[],
     removeRelationships: VerificationRelationship[],
     options: {
-      keyId: string;
       signer?: SignerInterface;
     }
   ): Promise<boolean> {
@@ -236,8 +224,7 @@ export class NuwaIdentityKit {
       addRelationships,
       removeRelationships,
       {
-        keyId: options.keyId,
-        signer: options.signer || this.externalSigner
+        signer: options.signer
       }
     );
 
@@ -275,7 +262,6 @@ export class NuwaIdentityKit {
   async addService(
     serviceInfo: ServiceInfo,
     options: {
-      keyId: string;
       signer?: SignerInterface;
     }
   ): Promise<string> {
@@ -291,8 +277,7 @@ export class NuwaIdentityKit {
       this.didDocument.id,
       serviceEntry,
       {
-        keyId: options.keyId,
-        signer: options.signer || this.externalSigner
+        signer: options.signer
       }
     );
 
@@ -308,7 +293,6 @@ export class NuwaIdentityKit {
   async removeService(
     serviceId: string,
     options: {
-      keyId: string;
       signer?: SignerInterface;
     }
   ): Promise<boolean> {
@@ -316,8 +300,7 @@ export class NuwaIdentityKit {
       this.didDocument.id,
       serviceId,
       {
-        keyId: options.keyId,
-        signer: options.signer || this.externalSigner
+        signer: options.signer
       }
     );
 
@@ -352,22 +335,11 @@ export class NuwaIdentityKit {
     const canonicalData = JSON.stringify(signedData, Object.keys(signedData).sort());
     const dataToSign = new TextEncoder().encode(canonicalData);
 
-    const isMasterKey = verificationMethod.controller === this.didDocument.id;
-    let signatureValue: Uint8Array;
-
-    if (isMasterKey && this.externalSigner) {
-      const canSign = await this.externalSigner.canSignWithKeyId(keyId);
-      if (!canSign) {
-        throw new Error(`External signer cannot sign with master key ${keyId}`);
-      }
-      signatureValue = await this.externalSigner.signWithKeyId(dataToSign, keyId);
-    } else {
-      const privateKey = this.operationalPrivateKeys.get(keyId);
-      if (!privateKey) {
-        throw new Error(`Private key for keyId ${keyId} not found and no suitable external signer is available.`);
-      }
-      signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
+    const privateKey = this.operationalPrivateKeys.get(keyId);
+    if (!privateKey) {
+      throw new Error(`Private key for keyId ${keyId} not found and no suitable external signer is available.`);
     }
+    const signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
 
     return {
       signed_data: signedData,
@@ -496,24 +468,12 @@ export class NuwaIdentityKit {
   }
 
   // State Checks
-  getExternalSigner(): SignerInterface | undefined {
-    return this.externalSigner;
-  }
-
   async canSignWithKey(keyId: string): Promise<boolean> {
     if (this.operationalPrivateKeys.has(keyId)) {
       return true;
     }
     
-    if (this.externalSigner) {
-      return await this.externalSigner.canSignWithKeyId(keyId);
-    }
-    
     return false;
-  }
-
-  isDelegatedMode(): boolean {
-    return this.externalSigner === undefined;
   }
 
   // Private Key Management Methods
