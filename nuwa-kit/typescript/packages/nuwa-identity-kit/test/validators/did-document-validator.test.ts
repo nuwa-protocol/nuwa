@@ -4,7 +4,7 @@ import { validateDIDDocument } from '../../src/validators/did-document-validator
 import { CryptoUtils } from '../../src/cryptoUtils';
 import { KeyVDR } from '../../src/vdr/keyVDR';
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { MockSigner, createMockPrivateKey } from '../helpers/testUtils';
+import { MockSigner } from '../helpers/testUtils';
 
 describe('DID Document Validator', () => {
   let validDocument: DIDDocument;
@@ -24,7 +24,7 @@ describe('DID Document Validator', () => {
 
     // Create mock signer
     mockSigner = new MockSigner();
-    mockSigner.addKey(keyId, createMockPrivateKey());
+    mockSigner.generateKey(keyId);
 
     // Create DID creation request
     const creationRequest: DIDCreationRequest = {
@@ -35,9 +35,7 @@ describe('DID Document Validator', () => {
     };
 
     // Create a new DID using NuwaIdentityKit
-    const kit = await NuwaIdentityKit.createNewDID("key", creationRequest, {
-      externalSigner: mockSigner
-    });
+    const kit = await NuwaIdentityKit.createNewDID("key", creationRequest);
     console.log(kit.getDIDDocument());
     validDocument = kit.getDIDDocument();
   });

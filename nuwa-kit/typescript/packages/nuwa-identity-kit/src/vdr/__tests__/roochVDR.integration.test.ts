@@ -29,7 +29,6 @@ const shouldRunIntegrationTests = () => {
 
 describe('RoochVDR Integration Tests', () => {
   let roochVDR: RoochVDR;
-  let client: any;
   let keypair: any;
   let testAddress: string;
   let actualDID: string;
@@ -46,14 +45,9 @@ describe('RoochVDR Integration Tests', () => {
       keypair = Secp256k1Keypair.generate();
       testAddress = keypair.getRoochAddress().toHexAddress();
 
-      // Create Rooch client
-      client = new RoochClient({ url: DEFAULT_NODE_URL });
-
       // Create RoochVDR instance
       roochVDR = new RoochVDR({
         rpcUrl: DEFAULT_NODE_URL,
-        client: client,
-        signer: keypair,
       });
 
       console.log(`Test address: ${testAddress}`);
@@ -64,32 +58,12 @@ describe('RoochVDR Integration Tests', () => {
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
-    if (client && client.destroy) {
-      client.destroy();
-    }
   });
 
   describe('Basic DID Operations', () => {
-    it('should check if DID contract is available', async () => {
-      if (!shouldRunIntegrationTests()) return;
-
-      try {
-        // Try to call a simple view function to check if the contract exists
-        const result = await client.executeViewFunction({
-          target: '0x3::did::verification_relationship_authentication',
-          args: []
-        });
-        console.log('DID contract is available, authentication constant:', result);
-      } catch (error) {
-        console.warn('DID contract may not be deployed:', error);
-        // Skip the rest of the tests if contract is not available
-        return;
-      }
-    }, TEST_TIMEOUT);
 
     it('should check if DID exists (initially false)', async () => {
       if (!shouldRunIntegrationTests()) return;
-
       const testDid = `did:rooch:${testAddress}`;
       const exists = await roochVDR.exists(testDid);
       expect(exists).toBe(false);

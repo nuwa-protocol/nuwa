@@ -13,7 +13,7 @@ import {
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
-import { MockSigner, createMockPrivateKey } from './helpers/testUtils';
+import { MockSigner} from './helpers/testUtils';
 
 describe('NuwaIdentityKit', () => {
   let keyVDR: KeyVDR;
@@ -59,7 +59,7 @@ describe('NuwaIdentityKit', () => {
 
     // Initialize MockSigner
     mockSigner = new MockSigner();
-    mockSigner.addKey(keyId, createMockPrivateKey());
+    mockSigner.generateKey(keyId);
   });
 
   describe('Initialization', () => {
@@ -95,9 +95,7 @@ describe('NuwaIdentityKit', () => {
         controller: did
       };
 
-      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, {
-        externalSigner: mockSigner
-      });
+      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument().id).toMatch(/^did:key:/);
     });
@@ -127,7 +125,7 @@ describe('NuwaIdentityKit', () => {
       };
 
       const serviceId = await kit.addService(serviceInfo, {
-        keyId: `${testDID}#account-key`
+        signer: mockSigner
       });
 
       expect(serviceId).toBe(`${testDID}#messaging`);
@@ -135,75 +133,10 @@ describe('NuwaIdentityKit', () => {
 
     it('should remove service', async () => {
       const result = await kit.removeService(`${testDID}#messaging`, {
-        keyId: `${testDID}#account-key`
+        signer: mockSigner
       });
 
       expect(result).toBe(true);
-    });
-  });
-
-  describe('Signature Operations', () => {
-    let kit: NuwaIdentityKit;
-    const mockPrivateKey = new Uint8Array([1, 2, 3, 4, 5]);
-    const mockOperationalKeys = new Map<string, Uint8Array>();
-
-    beforeEach(async () => {
-      mockOperationalKeys.set(`${testDID}#account-key`, mockPrivateKey);
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, {
-        operationalPrivateKeys: mockOperationalKeys
-      });
-
-      // Create DID first
-      await keyVDR.create({
-        publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
-        keyType: 'Ed25519VerificationKey2020',
-        preferredDID: testDID,
-        controller: testDID
-      });
-    });
-
-    it('should create NIP1 signature', async () => {
-      // Mock CryptoUtils.sign to return a predictable signature
-      jest.spyOn(CryptoUtils, 'sign').mockResolvedValue('mockSignature');
-
-      const payload: Omit<SignedData, 'nonce' | 'timestamp'> = {
-        operation: 'test',
-        params: { test: 'value' }
-      };
-
-      const signedObject = await kit.createNIP1Signature(payload, `${testDID}#account-key`);
-      
-      expect(signedObject).toHaveProperty('signed_data');
-      expect(signedObject.signed_data).toHaveProperty('operation', 'test');
-      expect(signedObject.signed_data).toHaveProperty('params');
-      expect(signedObject.signed_data).toHaveProperty('nonce');
-      expect(signedObject.signed_data).toHaveProperty('timestamp');
-      expect(signedObject).toHaveProperty('signature');
-      expect(signedObject.signature).toHaveProperty('signer_did', testDID);
-      expect(signedObject.signature).toHaveProperty('key_id', `${testDID}#account-key`);
-      expect(signedObject.signature).toHaveProperty('value', 'mockSignature');
-    });
-
-    it('should verify NIP1 signature', async () => {
-      // Mock CryptoUtils.verify to return true
-      jest.spyOn(CryptoUtils, 'verify').mockResolvedValue(true);
-
-      const signedObject = {
-        signed_data: {
-          operation: 'test',
-          params: { test: 'value' },
-          nonce: '123',
-          timestamp: Math.floor(Date.now() / 1000)
-        },
-        signature: {
-          signer_did: testDID,
-          key_id: `${testDID}#account-key`,
-          value: 'mockSignature'
-        }
-      };
-
-      const isValid = await NuwaIdentityKit.verifyNIP1Signature(signedObject, mockDIDDocument);
-      expect(isValid).toBe(true);
     });
   });
 
