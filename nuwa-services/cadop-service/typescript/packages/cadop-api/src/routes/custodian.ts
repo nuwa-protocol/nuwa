@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { CustodianService } from '../services/CustodianService.js';
+import { ServiceContainer } from '../services/ServiceContainer.js';
 import { logger } from '../utils/logger.js';
 
 const router: Router = Router();
@@ -37,7 +37,8 @@ router.post('/mint', async (req: Request, res: Response) => {
       userDid: validatedData.userDid
     });
 
-    const custodianService = await CustodianService.getInstance();
+    const container = ServiceContainer.getInstance();
+    const custodianService = await container.getCustodianService();
 
     // Create Agent DID via CADOP
     const result = await custodianService.createAgentDIDViaCADOP({
@@ -84,7 +85,8 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
     // Validate path parameter
     const { recordId } = DIDRecordIdSchema.parse({ recordId: req.params['recordId'] });
     
-    const custodianService = await getCustodianService();
+    const container = ServiceContainer.getInstance();
+    const custodianService = await container.getCustodianService();
     const status = await custodianService.getDIDCreationStatus(recordId);
     
     if (!status) {
@@ -129,7 +131,8 @@ router.get('/user/:userId/dids', async (req: Request, res: Response) => {
     // Validate path parameter
     const { userId } = UserIdSchema.parse({ userId: req.params['userId'] });
     
-    const custodianService = await getCustodianService();
+    const container = ServiceContainer.getInstance();
+    const custodianService = await container.getCustodianService();
     const dids = await custodianService.getUserAgentDIDs(userId);
     
     res.json({
@@ -166,7 +169,8 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
-    const custodianService = await getCustodianService();
+    const container = ServiceContainer.getInstance();
+    const custodianService = await container.getCustodianService();
     const didDocument = await custodianService.resolveAgentDID(agentDid);
     
     if (!didDocument) {
@@ -211,7 +215,8 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
-    const custodianService = await getCustodianService();
+    const container = ServiceContainer.getInstance();
+    const custodianService = await container.getCustodianService();
     const exists = await custodianService.agentDIDExists(agentDid);
     
     res.json({

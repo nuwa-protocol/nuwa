@@ -19,7 +19,7 @@ const { Secp256k1Keypair } = roochSdk;
 
 import { WebAuthnService } from './WebAuthnService.js';
 
-interface CustodianServiceConfig {
+export interface CustodianServiceConfig {
   custodianDid: string;
   maxDailyMints: number;
   rpcUrl?: string;
@@ -33,6 +33,7 @@ export class CustodianService {
   private lastMintReset: Date;
   private config: CustodianServiceConfig;
   private webauthnService: WebAuthnService;
+  private initialized: boolean = false;
 
   constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService) {
     this.config = {
@@ -51,6 +52,10 @@ export class CustodianService {
    * Initialize the service with required dependencies
    */
   public async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
     logger.info('Initializing CustodianService', { config: this.config });
     const vdr = createVDR('rooch', {
       rpcUrl: this.config.rpcUrl,
@@ -59,6 +64,7 @@ export class CustodianService {
     });
     VDRRegistry.getInstance().registerVDR(vdr);
     this.cadopKit = await CadopIdentityKit.fromServiceDID(this.config.custodianDid);
+    this.initialized = true;
     logger.info('CustodianService initialized', { custodianDid: this.config.custodianDid });
   }
 
