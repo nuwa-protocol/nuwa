@@ -253,7 +253,6 @@ async function createDIDForUserViaCADOP(
   //   userDidKey: userGeneratedDidKey,
   //   custodianServicePublicKey: custodianServiceKeyMultibase, // Public key of the custodian service endpoint VM
   //   custodianServiceVMType: custodianServiceKeyType,      // Type of the custodian service VM
-  //   // additionalClaims: { /* ... any other claims ... */ } // Optional
   // };
 
   // // 1. Get the appropriate VDR from NuwaIdentityKit

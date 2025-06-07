@@ -5,30 +5,21 @@ import {
   ServiceEndpoint,
   CadopIdentityKit,
   CadopServiceType,
-  SybilLevel
+  VDRRegistry
 } from '../src';
 import { KeyVDR } from '../src/vdr/keyVDR';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KEY_TYPE } from '../src/types';
+import { LocalSigner } from '../src/signers/LocalSigner';
+import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 
 describe('CadopIdentityKit', () => {
   let keyVDR: KeyVDR;
   let testDID: string;
   let mockDIDDocument: DIDDocument;
   let cadopKit: CadopIdentityKit;
-  let baseKit: NuwaIdentityKit;
-
-  const mockCustodianService: ServiceEndpoint = {
-    id: 'did:example:123#custodian-1',
-    type: CadopServiceType.CUSTODIAN,
-    serviceEndpoint: 'https://custodian.example.com',
-    custodianPublicKey: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-    description: 'Test Custodian Service',
-    fees: {
-      registration: 0,
-      monthly: 0
-    }
-  };
+  let signer: LocalSigner;
+  let mockCustodianService: ServiceEndpoint;
 
   const mockIdPService: ServiceEndpoint = {
     id: 'did:example:123#idp-1',
@@ -54,11 +45,36 @@ describe('CadopIdentityKit', () => {
   };
 
   beforeEach(async () => {
-    // Generate a new key pair
-    const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    
+    // Generate custodian key pair
+    const custodianKeyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const custodianPublicKeyMultibase = await CryptoUtils.publicKeyToMultibase(custodianKeyPair.publicKey, KEY_TYPE.ED25519);
+
+    // Create mock services with real keys
+    mockCustodianService = {
+      id: 'did:example:123#custodian-1',
+      type: CadopServiceType.CUSTODIAN,
+      serviceEndpoint: 'https://custodian.example.com',
+      custodianPublicKey: custodianPublicKeyMultibase,
+      custodianServiceVMType: 'Ed25519VerificationKey2020',
+      description: 'Test Custodian Service',
+      fees: {
+        registration: 0,
+        monthly: 0
+      }
+    };
+
+    // Generate a key pair for the DID
+    const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ED25519);
     testDID = `did:key:${publicKeyMultibase}`;
-    const keyId = `${testDID}#account-key`;
+
+    // Create signer with the real DID
+    const { signer: newSigner } = await LocalSigner.createWithNewKey(testDID);
+    signer = newSigner;
+
+    // Import the key pair to signer and get full keyId
+    const fullKeyId = await signer.importKeyPair('account-key', keyPair, KEY_TYPE.ED25519);
 
     // Create DID Document with CADOP services
     mockDIDDocument = {
@@ -66,12 +82,15 @@ describe('CadopIdentityKit', () => {
       id: testDID,
       controller: [testDID],
       verificationMethod: [{
-        id: keyId,
+        id: fullKeyId,
         type: 'Ed25519VerificationKey2020',
         controller: testDID,
         publicKeyMultibase
       }],
-      authentication: [keyId],
+      authentication: [fullKeyId],
+      assertionMethod: [fullKeyId],
+      capabilityInvocation: [fullKeyId],
+      capabilityDelegation: [fullKeyId],
       service: [
         mockCustodianService,
         mockIdPService,
@@ -83,18 +102,123 @@ describe('CadopIdentityKit', () => {
     keyVDR = new KeyVDR();
     keyVDR.reset();
 
-    // Create DID
+    // Register VDR
+    VDRRegistry.getInstance().registerVDR(keyVDR);
+
+    // Create DID with services
     await keyVDR.create({
       publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
       keyType: 'Ed25519VerificationKey2020',
       preferredDID: testDID,
-      controller: testDID
+      controller: testDID,
+      initialServices: mockDIDDocument.service,
+      initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation']
     });
 
-    // Initialize base kit and cadop kit
-    baseKit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-    baseKit.registerVDR(keyVDR);
-    cadopKit = new CadopIdentityKit(baseKit);
+    // Initialize cadop kit
+    cadopKit = await CadopIdentityKit.fromServiceDID(testDID, signer);
+  });
+
+  describe('Initialization', () => {
+    it('should initialize from service DID', async () => {
+      const kit = await CadopIdentityKit.fromServiceDID(testDID, signer);
+      expect(kit).toBeInstanceOf(CadopIdentityKit);
+      expect(kit.getNuwaIdentityKit().getDIDDocument()).toEqual(mockDIDDocument);
+    });
+
+    it('should fail to initialize with invalid service DID', async () => {
+      await expect(CadopIdentityKit.fromServiceDID(
+        'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        signer
+      )).rejects.toThrow();
+    });
+  });
+
+  describe('Service Management', () => {
+    it('should add CADOP service', async () => {
+      const serviceInfo = {
+        idFragment: 'custodian-2',
+        type: CadopServiceType.CUSTODIAN,
+        serviceEndpoint: 'https://custodian2.example.com',
+        additionalProperties: {
+          custodianPublicKey: 'test-key',
+          custodianServiceVMType: 'Ed25519VerificationKey2020',
+          description: 'Another custodian service'
+        }
+      };
+
+      const serviceId = await cadopKit.addService(serviceInfo);
+
+      expect(serviceId).toBe(`${testDID}#custodian-2`);
+      
+      // Verify the service was added
+      const doc = await keyVDR.resolve(testDID);
+      expect(doc).not.toBeNull();
+      expect(doc!.service).toHaveLength(4); // Original 3 + new one
+      expect(doc!.service?.find(s => s.id === serviceId)).toBeTruthy();
+    });
+
+    it('should fail to add invalid CADOP service', async () => {
+      const serviceInfo = {
+        idFragment: 'custodian-2',
+        type: CadopServiceType.CUSTODIAN,
+        serviceEndpoint: 'https://custodian2.example.com',
+        additionalProperties: {
+          // Missing required custodianPublicKey and custodianServiceVMType
+          description: 'Invalid custodian service'
+        }
+      };
+
+      await expect(cadopKit.addService(serviceInfo))
+        .rejects.toThrow('Invalid CADOP service configuration');
+    });
+  });
+
+  describe('DID Creation', () => {
+    it('should create DID via CADOP', async () => {
+      // Generate a key pair for the user DID
+      const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+      const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ED25519);
+      const userDid = `did:key:${publicKeyMultibase}`;
+
+      // Import the key pair to signer and get full keyId
+      const fullKeyId = await signer.importKeyPair('user-key', keyPair, KEY_TYPE.ED25519);
+
+      const result = await cadopKit.createDID(
+        'key',
+        userDid,  
+        { description: 'Test DID' }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.didDocument).toBeDefined();
+      const doc = result.didDocument!;
+      expect(doc.id).toBeDefined();
+      expect(doc.controller).toEqual([userDid]);
+      expect(doc.authentication).toBeDefined();
+      expect(doc.authentication!.length).toBeGreaterThan(0);
+      expect(doc.capabilityDelegation).toBeDefined();
+      expect(doc.capabilityDelegation!.length).toBeGreaterThan(0);
+    });
+
+    it('should fail to create DID without custodian service', async () => {
+      // Create a new DID without services
+      const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+      const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+      const didWithoutServices = `did:key:${publicKeyMultibase}`;
+
+      await keyVDR.create({
+        publicKeyMultibase,
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: didWithoutServices,
+        controller: didWithoutServices
+      });
+
+      const kitWithoutCustodian = await CadopIdentityKit.fromServiceDID(didWithoutServices, signer);
+
+      await expect(kitWithoutCustodian.createDID('key', 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'))
+        .rejects.toThrow('Custodian service configuration not found');
+    });
   });
 
   describe('Service Discovery', () => {
@@ -114,61 +238,6 @@ describe('CadopIdentityKit', () => {
       const services = cadopKit.findWeb2ProofServices();
       expect(services).toHaveLength(1);
       expect(services[0]).toEqual(mockWeb2ProofService);
-    });
-
-    it('should discover custodian services from remote DID', async () => {
-      // Mock resolveDID to return a DID document with a custodian service
-      jest.spyOn(baseKit, 'resolveDID').mockResolvedValue({
-        ...mockDIDDocument,
-        id: 'did:example:custodian',
-        service: [mockCustodianService]
-      });
-
-      const services = await cadopKit.discoverCustodianServices('did:example:custodian');
-      expect(services).toHaveLength(1);
-      expect(services[0]).toEqual(mockCustodianService);
-    });
-
-    it('should return empty array when DID resolution fails', async () => {
-      jest.spyOn(baseKit, 'resolveDID').mockRejectedValue(new Error('Resolution failed'));
-      const services = await cadopKit.discoverCustodianServices('did:example:invalid');
-      expect(services).toEqual([]);
-    });
-  });
-
-  describe('Service Validation', () => {
-    it('should validate valid custodian service', () => {
-      expect(CadopIdentityKit.validateCustodianService(mockCustodianService)).toBe(true);
-    });
-
-    it('should validate valid IdP service', () => {
-      expect(CadopIdentityKit.validateIdPService(mockIdPService)).toBe(true);
-    });
-
-    it('should validate valid Web2 proof service', () => {
-      expect(CadopIdentityKit.validateWeb2ProofService(mockWeb2ProofService)).toBe(true);
-    });
-
-    it('should reject custodian service without required properties', () => {
-      const invalidService = { ...mockCustodianService };
-      delete (invalidService as any).custodianPublicKey;
-      expect(CadopIdentityKit.validateCustodianService(invalidService)).toBe(false);
-    });
-
-    it('should reject IdP service with invalid supportedCredentials', () => {
-      const invalidService = {
-        ...mockIdPService,
-        supportedCredentials: 'not-an-array'
-      };
-      expect(CadopIdentityKit.validateIdPService(invalidService)).toBe(false);
-    });
-
-    it('should reject service with unknown properties', () => {
-      const invalidService = {
-        ...mockWeb2ProofService,
-        unknownProperty: 'value'
-      };
-      expect(CadopIdentityKit.validateWeb2ProofService(invalidService)).toBe(false);
     });
   });
 }); 

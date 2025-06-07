@@ -2,31 +2,42 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { 
   NuwaIdentityKit,
   DIDDocument,
-  SignerInterface,
   DIDCreationRequest,
   OperationalKeyInfo,
   ServiceInfo,
   VerificationRelationship,
   SignedData,
-  KEY_TYPE
+  KEY_TYPE,
+  VDRRegistry
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
-import { MockSigner, createMockPrivateKey } from './helpers/testUtils';
+import { LocalSigner } from '../src/signers/LocalSigner';
 
 describe('NuwaIdentityKit', () => {
   let keyVDR: KeyVDR;
   let testDID: string;
   let mockDIDDocument: DIDDocument;
-  let mockSigner: MockSigner;
+  let signer: LocalSigner;
   let keyId: string;
 
   beforeEach(async () => {
-    // Generate a new key pair
-    const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    // Initialize KeyVDR
+    keyVDR = new KeyVDR();
+    keyVDR.reset();
+    VDRRegistry.getInstance().registerVDR(keyVDR);
+
+    // Generate a key pair for the DID
+    const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ED25519);
     testDID = `did:key:${publicKeyMultibase}`;
-    keyId = `${testDID}#account-key`;
+
+    // Create a signer with the correct DID
+    const { signer: newSigner } = await LocalSigner.createWithNewKey(testDID);
+    signer = newSigner;
+
+    // Import the DID's key pair to the signer
+    keyId = await signer.importKeyPair('account-key', keyPair, KEY_TYPE.ED25519);
 
     // Create DID Document
     mockDIDDocument = {
@@ -48,14 +59,14 @@ describe('NuwaIdentityKit', () => {
       service: []
     };
 
-    // Initialize KeyVDR
-    keyVDR = new KeyVDR();
-    // Reset cache
-    keyVDR.reset();
-
-    // Initialize MockSigner
-    mockSigner = new MockSigner();
-    mockSigner.addKey(keyId, createMockPrivateKey());
+    // Create DID in VDR
+    await keyVDR.create({
+      publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
+      keyType: 'Ed25519VerificationKey2020',
+      preferredDID: testDID,
+      controller: testDID,
+      initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation']
+    });
   });
 
   describe('Initialization', () => {
@@ -68,13 +79,13 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      const kit = await NuwaIdentityKit.fromExistingDID(testDID, [keyVDR]);
+      const kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
 
     it('should create instance from DID Document', () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
+      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
@@ -91,7 +102,7 @@ describe('NuwaIdentityKit', () => {
         controller: did
       };
 
-      const kit = await NuwaIdentityKit.createNewDID(creationRequest, keyVDR, mockSigner);
+      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, signer);
       expect(kit).toBeInstanceOf(NuwaIdentityKit);
       expect(kit.getDIDDocument().id).toMatch(/^did:key:/);
     });
@@ -101,19 +112,14 @@ describe('NuwaIdentityKit', () => {
     let kit: NuwaIdentityKit;
 
     beforeEach(async () => {
-      // Create DID first
-      await keyVDR.create({
-        publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
-        keyType: 'Ed25519VerificationKey2020',
-        preferredDID: testDID,
-        controller: testDID
-      });
-
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
     });
 
-    it('should add service', async () => {
+    it('should add and remove service', async () => {
+      // Debug: Log available keys and their relationships
+      const availableKeys = await kit.getAvailableKeyIds();
+      console.log('Available keys before adding service:', availableKeys);
+
       const serviceInfo: ServiceInfo = {
         type: 'MessagingService',
         serviceEndpoint: 'https://example.com/messaging',
@@ -121,85 +127,24 @@ describe('NuwaIdentityKit', () => {
         additionalProperties: {}
       };
 
-      const serviceId = await kit.addService(serviceInfo, {
-        keyId: `${testDID}#account-key`
-      });
-
+      // Add service
+      const serviceId = await kit.addService(serviceInfo);
       expect(serviceId).toBe(`${testDID}#messaging`);
-    });
 
-    it('should remove service', async () => {
-      const result = await kit.removeService(`${testDID}#messaging`, {
-        keyId: `${testDID}#account-key`
-      });
+      // Verify service was added
+      const docAfterAdd = kit.getDIDDocument();
+      expect(docAfterAdd.service).toBeDefined();
+      expect(docAfterAdd.service!.length).toBe(1);
+      expect(docAfterAdd.service![0].id).toBe(serviceId);
 
-      expect(result).toBe(true);
-    });
-  });
+      // Remove service
+      const removed = await kit.removeService(serviceId);
+      expect(removed).toBe(true);
 
-  describe('Signature Operations', () => {
-    let kit: NuwaIdentityKit;
-    const mockPrivateKey = new Uint8Array([1, 2, 3, 4, 5]);
-    const mockOperationalKeys = new Map<string, Uint8Array>();
-
-    beforeEach(async () => {
-      mockOperationalKeys.set(`${testDID}#account-key`, mockPrivateKey);
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, {
-        operationalPrivateKeys: mockOperationalKeys
-      });
-      kit.registerVDR(keyVDR);
-
-      // Create DID first
-      await keyVDR.create({
-        publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
-        keyType: 'Ed25519VerificationKey2020',
-        preferredDID: testDID,
-        controller: testDID
-      });
-    });
-
-    it('should create NIP1 signature', async () => {
-      // Mock CryptoUtils.sign to return a predictable signature
-      jest.spyOn(CryptoUtils, 'sign').mockResolvedValue('mockSignature');
-
-      const payload: Omit<SignedData, 'nonce' | 'timestamp'> = {
-        operation: 'test',
-        params: { test: 'value' }
-      };
-
-      const signedObject = await kit.createNIP1Signature(payload, `${testDID}#account-key`);
-      
-      expect(signedObject).toHaveProperty('signed_data');
-      expect(signedObject.signed_data).toHaveProperty('operation', 'test');
-      expect(signedObject.signed_data).toHaveProperty('params');
-      expect(signedObject.signed_data).toHaveProperty('nonce');
-      expect(signedObject.signed_data).toHaveProperty('timestamp');
-      expect(signedObject).toHaveProperty('signature');
-      expect(signedObject.signature).toHaveProperty('signer_did', testDID);
-      expect(signedObject.signature).toHaveProperty('key_id', `${testDID}#account-key`);
-      expect(signedObject.signature).toHaveProperty('value', 'mockSignature');
-    });
-
-    it('should verify NIP1 signature', async () => {
-      // Mock CryptoUtils.verify to return true
-      jest.spyOn(CryptoUtils, 'verify').mockResolvedValue(true);
-
-      const signedObject = {
-        signed_data: {
-          operation: 'test',
-          params: { test: 'value' },
-          nonce: '123',
-          timestamp: Math.floor(Date.now() / 1000)
-        },
-        signature: {
-          signer_did: testDID,
-          key_id: `${testDID}#account-key`,
-          value: 'mockSignature'
-        }
-      };
-
-      const isValid = await NuwaIdentityKit.verifyNIP1Signature(signedObject, mockDIDDocument);
-      expect(isValid).toBe(true);
+      // Verify service was removed
+      const docAfterRemove = kit.getDIDDocument();
+      expect(docAfterRemove.service).toBeDefined();
+      expect(docAfterRemove.service!.length).toBe(0);
     });
   });
 
@@ -215,32 +160,72 @@ describe('NuwaIdentityKit', () => {
         controller: testDID
       });
 
-      kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
     });
 
     it('should resolve DID', async () => {
-      const resolved = await kit.resolveDID(testDID);
+      const resolved = await VDRRegistry.getInstance().resolveDID(testDID);
       expect(resolved).toEqual(mockDIDDocument);
     });
 
     it('should check if DID exists', async () => {
-      const exists = await kit.didExists(testDID);
+      const exists = await VDRRegistry.getInstance().exists(testDID);
       expect(exists).toBe(true);
     });
 
     it('should return null when DID resolution fails', async () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      kit.registerVDR(keyVDR);
-      const resolved = await kit.resolveDID('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
+      const resolved = await VDRRegistry.getInstance().resolveDID('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
       expect(resolved).toBeNull();
     });
   });
 
   describe('Error Handling', () => {
     it('should throw error when no VDR available for DID method', async () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument);
-      await expect(kit.resolveDID(testDID)).rejects.toThrow();
+      VDRRegistry.getInstance().registerVDR(keyVDR);
+      await expect(VDRRegistry.getInstance().resolveDID('did:example:123')).rejects.toThrow();
+    });
+  });
+
+  describe('Key Management', () => {
+    let kit: NuwaIdentityKit;
+
+    beforeEach(async () => {
+      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
+
+      // Debug: Log available keys in signer
+      const signerKeys = await signer.listKeyIds();
+      console.log('Signer keys:', signerKeys);
+
+      // Debug: Log DID Document
+      console.log('DID Document:', JSON.stringify(kit.getDIDDocument(), null, 2));
+
+      // Debug: Log available keys by relationship
+      const availableKeys = await kit.getAvailableKeyIds();
+      console.log('Available keys by relationship:', availableKeys);
+    });
+
+    it('should find key with specific relationship', async () => {
+      const availableKeys = await kit.getAvailableKeyIds();
+      expect(availableKeys).toBeDefined();
+      expect(availableKeys.authentication).toBeDefined();
+      expect(availableKeys.authentication!.length).toBeGreaterThan(0);
+      expect(availableKeys.authentication).toContain(keyId);
+    });
+
+    it('should find key with capabilityInvocation for service management', async () => {
+      const availableKeys = await kit.getAvailableKeyIds();
+      expect(availableKeys.capabilityInvocation).toBeDefined();
+      expect(availableKeys.capabilityInvocation).toContain(keyId);
+
+      const serviceInfo: ServiceInfo = {
+        type: 'MessagingService',
+        serviceEndpoint: 'https://example.com/messaging',
+        idFragment: 'messaging',
+        additionalProperties: {}
+      };
+
+      const serviceId = await kit.addService(serviceInfo);
+      expect(serviceId).toBe(`${testDID}#messaging`);
     });
   });
 });

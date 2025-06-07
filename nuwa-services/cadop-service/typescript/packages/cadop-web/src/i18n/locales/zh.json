@@ -1,0 +1,59 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "back": "返回"
+  },
+  "navigation": {
+    "dashboard": "仪表盘",
+    "didManagement": "DID 管理",
+    "verification": "身份验证",
+    "settings": "设置"
+  },
+  "dashboard": {
+    "welcome": "欢迎使用 Nuwa CADOP 服务",
+    "createDID": "创建新 DID",
+    "verifyIdentity": "验证身份",
+    "manageDID": "管理 DID",
+    "status": {
+      "title": "状态概览",
+      "totalDIDs": "DID 总数",
+      "verifiedIdentities": "已验证身份",
+      "recentActivity": "最近活动"
+    }
+  },
+  "did": {
+    "creation": {
+      "title": "创建新 DID",
+      "step1": "选择认证方式",
+      "step2": "身份验证",
+      "step3": "配置 DID",
+      "step4": "确认创建"
+    },
+    "management": {
+      "title": "DID 管理",
+      "noDIDs": "未找到 DID",
+      "createFirst": "创建你的第一个 DID"
+    }
+  },
+  "verification": {
+    "title": "身份验证",
+    "methods": {
+      "title": "可用方式",
+      "web2": "Web2 认证",
+      "web3": "Web3 钱包"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知"
+  }
+} 
