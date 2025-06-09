@@ -1,6 +1,7 @@
 import { createVDR, NuwaIdentityKit, VDRRegistry } from 'nuwa-identity-kit';
 import type { OperationalKeyInfo, VerificationRelationship, SignerInterface, VDRInterface } from 'nuwa-identity-kit';
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
+import { Session } from '@cadop/shared';
 
 export class DIDService {
   private identityKit: NuwaIdentityKit;
@@ -9,7 +10,7 @@ export class DIDService {
     this.identityKit = identityKit;
   }
 
-  static async initialize(did: string): Promise<DIDService> {
+  static async initialize(did: string, session: Session): Promise<DIDService> {
     try {
         const roochVDR = createVDR('rooch', {
             rpcUrl: 'http://localhost:6767',
@@ -23,7 +24,8 @@ export class DIDService {
         const signer = new WebAuthnSigner(did, {
             didDocument: didDocument,
             rpId: window.location.hostname,
-            rpName: 'CADOP'
+            rpName: 'CADOP',
+            credentialId: session.credentialId
         });
 
         const identityKit = await NuwaIdentityKit.fromDIDDocument(
