@@ -184,13 +184,13 @@ export function AgentDetailPage() {
               </CardHeader>
               <CardContent>
                 <Space direction="vertical" style={{ width: '100%' }}>
+                  <Button className="w-full" variant="outline" onClick={() => navigate(`/agent/${did}/add-auth-method`)}>
+                    <KeyOutlined className="mr-2" />
+                    Add Authentication Method
+                  </Button>
                   <Button className="w-full" variant="outline">
                     <SettingOutlined className="mr-2" />
                     Manage Settings
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    <KeyOutlined className="mr-2" />
-                    Manage Keys
                   </Button>
                   <Button className="w-full" variant="outline">
                     <HistoryOutlined className="mr-2" />

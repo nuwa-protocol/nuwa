@@ -6,6 +6,7 @@ import { LoginPage } from './pages/auth/login';
 import { DashboardPage } from './pages/dashboard';
 import { CreateAgentDIDPage } from './pages/create-agent-did';
 import { AgentDetailPage } from './pages/agent-detail';
+import { AddAuthMethodPage } from './pages/add-auth-method';
 
 const App: React.FC = () => {
   return (
@@ -29,6 +30,15 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <AgentDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
+          path="/agent/:did/add-auth-method"
+          element={
+            <ProtectedRoute>
+              <AddAuthMethodPage />
             </ProtectedRoute>
           }
         />
