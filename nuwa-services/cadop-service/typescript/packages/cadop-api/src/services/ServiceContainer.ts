@@ -1,6 +1,8 @@
 import { CustodianService, type CustodianServiceConfig } from './CustodianService.js';
 import { WebAuthnService } from './WebAuthnService.js';
 import { logger } from '../utils/logger.js';
+import { CadopIdentityKit, createVDR, LocalSigner, VDRRegistry } from 'nuwa-identity-kit';
+import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 
 export class ServiceContainer {
   private static instance: ServiceContainer | null = null;
@@ -26,8 +28,18 @@ export class ServiceContainer {
   async getCustodianService(): Promise<CustodianService> {
     if (!this.custodianService) {
       logger.info('Creating new CustodianService instance');
-      this.custodianService = new CustodianService(this.config, this.webauthnService);
-      await this.custodianService.initialize();
+      //TODO load keypair from env
+      const keypair = Secp256k1Keypair.generate();
+      const vdr = createVDR('rooch', {
+        rpcUrl: this.config.rpcUrl || process.env.ROOCH_RPC_URL || 'https://test-seed.rooch.network/',
+        signer: keypair,
+        debug: true
+      });
+      VDRRegistry.getInstance().registerVDR(vdr);
+      const signer = await LocalSigner.createEmpty(this.config.custodianDid);
+      signer.importRoochKeyPair('account-key', keypair);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(this.config.custodianDid, signer);
+      this.custodianService = new CustodianService(this.config, this.webauthnService, cadopKit);
     }
     return this.custodianService;
   }

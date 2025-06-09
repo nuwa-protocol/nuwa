@@ -10,7 +10,8 @@ import {
   DIDDocument,
   ServiceEndpoint,
   VDRInterface,
-  createVDR
+  createVDR,
+  LocalSigner
 } from 'nuwa-identity-kit';
 import { logger } from '../utils/logger.js';
 import roochSdk from '@roochnetwork/rooch-sdk';
@@ -33,9 +34,8 @@ export class CustodianService {
   private lastMintReset: Date;
   private config: CustodianServiceConfig;
   private webauthnService: WebAuthnService;
-  private initialized: boolean = false;
 
-  constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService) {
+  constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService, cadopKit: CadopIdentityKit) {
     this.config = {
       ...config,
       rpcUrl: config.rpcUrl || process.env.ROOCH_RPC_URL || 'https://test-seed.rooch.network/'
@@ -46,26 +46,7 @@ export class CustodianService {
     this.dailyMintCount = new Map();
     this.lastMintReset = new Date();
     this.webauthnService = webauthnService;
-  }
-
-  /**
-   * Initialize the service with required dependencies
-   */
-  public async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
-    logger.info('Initializing CustodianService', { config: this.config });
-    const vdr = createVDR('rooch', {
-      rpcUrl: this.config.rpcUrl,
-      signer: Secp256k1Keypair.generate(),
-      debug: true
-    });
-    VDRRegistry.getInstance().registerVDR(vdr);
-    this.cadopKit = await CadopIdentityKit.fromServiceDID(this.config.custodianDid);
-    this.initialized = true;
-    logger.info('CustodianService initialized', { custodianDid: this.config.custodianDid });
+    this.cadopKit = cadopKit;
   }
 
   /**
@@ -162,9 +143,3 @@ export class CustodianService {
   }
 }
 
-// Factory function for creating and initializing service
-export async function createCustodianService(config: CustodianServiceConfig, webauthnService: WebAuthnService): Promise<CustodianService> {
-  const service = new CustodianService(config, webauthnService);
-  await service.initialize();
-  return service;
-}
