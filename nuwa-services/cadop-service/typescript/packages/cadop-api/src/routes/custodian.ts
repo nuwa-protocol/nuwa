@@ -126,11 +126,11 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
 router.get('/user/:userDid/dids', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { userDid } = DIDSchema.parse({ userDid: req.params['userDid'] });
+    const { did } = DIDSchema.parse({ did: req.params['userDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
-    const dids = await custodianService.getUserAgentDIDs(userDid);
+    const dids = await custodianService.getUserAgentDIDs(did);
     
     res.json(createSuccessResponse({ dids }));
 
@@ -152,11 +152,11 @@ router.get('/user/:userDid/dids', async (req: Request, res: Response) => {
 router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { agentDid } = DIDSchema.parse({ agentDid: req.params['agentDid'] });
+    const { did } = DIDSchema.parse({ did: req.params['agentDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
-    const didDocument = await custodianService.resolveAgentDID(agentDid);
+    const didDocument = await custodianService.resolveAgentDID(did);
     
     if (!didDocument) {
       return res.status(404).json(createErrorResponse(
@@ -185,11 +185,11 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
 router.get('/exists/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { agentDid } = DIDSchema.parse({ agentDid: req.params['agentDid'] });
+    const { did } = DIDSchema.parse({ did: req.params['agentDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
-    const exists = await custodianService.agentDIDExists(agentDid);
+    const exists = await custodianService.agentDIDExists(did);
     
     res.json(createSuccessResponse({ exists }));
 

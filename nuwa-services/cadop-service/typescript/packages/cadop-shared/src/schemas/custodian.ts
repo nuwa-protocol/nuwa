@@ -14,5 +14,5 @@ export const UserIdSchema = z.object({
   });
   
 export const DIDSchema = z.object({
-    agentDid: z.string().regex(/^did:/, 'Invalid Agent DID format')
+    did: z.string().regex(/^did:/, 'Invalid Agent DID format')
 });

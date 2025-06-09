@@ -102,7 +102,6 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Agent DID 列表卡片 */}
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
