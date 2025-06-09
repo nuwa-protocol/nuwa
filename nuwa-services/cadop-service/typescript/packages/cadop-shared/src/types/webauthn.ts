@@ -89,9 +89,6 @@ export interface AuthenticationResult {
 // Credential information
 export interface CredentialInfo {
   id: string;
-  name: string;
   type: string;
-  lastUsed: string;
-  credentialId: string;
-  transports: AuthenticatorTransportFuture[];
+  transports?: AuthenticatorTransportFuture[];
 }

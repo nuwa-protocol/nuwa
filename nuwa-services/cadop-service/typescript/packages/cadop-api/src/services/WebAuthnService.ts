@@ -85,7 +85,15 @@ export class WebAuthnService {
    */
   async generateAuthenticationOptions(
     userDid?: string,
-    userInfo?: { name?: string; displayName?: string }
+    userInfo?: { 
+      name?: string; 
+      displayName?: string;
+      existing_credential?: {
+        id: string;
+        type: string;
+        transports?: string[];
+      };
+    }
   ): Promise<AuthenticationOptions> {
     try {
       logger.debug('Generating authentication options', {
@@ -94,19 +102,32 @@ export class WebAuthnService {
         config: this.config
       });
 
-  
       let isNewUser = false;
       let user: UserRecord | null = null;
-      if (userDid) {
-        logger.debug('User DID provided, looking up existing user', { userDid });
-        // lookup or create user
-        user = await this.userRepo.findByDID(userDid);
-        if (user) {
-          logger.debug('Found existing user', { userId: user.id, userDid });
-        } else {
+
+      // if user provided DID or existing credential, try to find existing user
+      if (userDid || userInfo?.existing_credential) {
+        logger.debug('User DID provided or existing credential detected, looking up existing user', { 
+          userDid,
+          hasExistingCredential: !!userInfo?.existing_credential,
+          credentialId: userInfo?.existing_credential?.id
+        });
+        
+        // if user provided DID, use DID to find user
+        if (userDid) {
+          user = await this.userRepo.findByDID(userDid);
+        } else if (userInfo?.existing_credential) {
+          const authenticator = await this.authenticatorRepo.findByCredentialId(userInfo.existing_credential.id);
+          if (authenticator) {
+            user = await this.userRepo.findById(authenticator.user_id);
+          }
+        }
+        
+        // if user not found create a new user
+        if (!user) {
           logger.debug('User not found, creating new user', { userDid });
           const newUser = await this.userRepo.create({
-            user_did: userDid,
+            user_did: userDid || `did:temp:${crypto.randomUUID()}`,
             display_name: userInfo?.displayName || userDid,
             metadata: {}
           });
@@ -115,14 +136,14 @@ export class WebAuthnService {
           user = newUser;
         }
       } else {
-        // if no DID is provided, create a temporary user
-        logger.debug('No DID provided, creating temporary user for registration');
+        // if no DID provided and no existing credential, create a temporary user
+        logger.debug('No DID provided and no existing credential, creating temporary user for registration');
         
-        // generate a temporary user ID and DID
+        // generate a temporary user ID and DID for registration
         const tempUserId = crypto.randomUUID();
         const tempDid = `did:temp:${tempUserId}`;
         
-        // create a temporary user record
+        // create a temporary user record for registration
         const tempUser = await this.userRepo.create({
           user_did: tempDid,
           display_name: userInfo?.displayName || undefined,
@@ -152,14 +173,14 @@ export class WebAuthnService {
         logger.debug('Generating registration options for new user', { userId: user.id, isNewUser });
         
         const authenticatorSelection: AuthenticatorSelectionCriteria = {
-          // prefer platform authenticator(Touch ID/Face ID)
+          // prefer platform authenticator(Touch ID/Face ID) for registration
           authenticatorAttachment: 'platform',
           requireResidentKey: true,
           residentKey: 'required',
           userVerification: 'preferred'
         };
 
-        // generate registration options
+        // generate registration options for registration
         const options = await generateRegistrationOptions({
           rpName: this.config.rpName,
           rpID: this.config.rpID,
@@ -174,7 +195,7 @@ export class WebAuthnService {
 
         logger.debug('Generated registration options', options);
 
-        // store challenge to database
+        // store challenge to database for registration
         await this.storeChallenge(
           user.id,
           options.challenge,
@@ -204,7 +225,7 @@ export class WebAuthnService {
 
       logger.debug('Generating authentication options for existing user', { userId: user.id });
 
-      // generate authentication options
+      // generate authentication options for authentication
       const authenticators = await this.getAuthenticators({ userId: user.id });
       logger.debug('Found existing authenticators', {
         userId: user.id,
@@ -234,7 +255,7 @@ export class WebAuthnService {
         allowCredentialsCount: options.allowCredentials?.length || 0
       });
 
-      // store challenge to database
+      // store challenge to database for authentication
       await this.storeChallenge(
         user.id,
         options.challenge,
@@ -844,47 +865,6 @@ export class WebAuthnService {
       throw error instanceof CadopError ? error : new CadopError(
         'Authentication failed',
         CadopErrorCode.AUTHENTICATION_FAILED,
-        error
-      );
-    }
-  }
-
-  /**
-   * get user's registered WebAuthn credentials
-   */
-  async getUserCredentials(userId: string): Promise<CredentialInfo[]> {
-    try {
-      const authenticators = await this.getAuthenticators({ userId });
-      return authenticators.map(auth => ({
-        id: auth.id,
-        name: auth.friendlyName || 'Unknown Device',
-        type: auth.credentialDeviceType,
-        lastUsed: auth.lastUsedAt?.toISOString() || 'Never',
-        credentialId: auth.credentialId,
-        transports: auth.transports
-      }));
-    } catch (error) {
-      logger.error('Failed to get user credentials', { error, userId });
-      throw new CadopError(
-        'Failed to get user credentials',
-        CadopErrorCode.DATABASE_ERROR,
-        error
-      );
-    }
-  }
-
-  /**
-   * remove a credential
-   */
-  async removeCredential(userId: string, credentialId: string): Promise<boolean> {
-    try {
-      await this.authenticatorRepo.delete(credentialId);
-      return true;
-    } catch (error) {
-      logger.error('Failed to remove credential', { error, userId, credentialId });
-      throw new CadopError(
-        'Failed to remove credential',
-        CadopErrorCode.REMOVE_DEVICE_FAILED,
         error
       );
     }

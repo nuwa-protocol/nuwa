@@ -14,6 +14,7 @@ import {
   createErrorResponseFromError
 } from '@cadop/shared';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 
 const router: Router = Router();
 
@@ -67,19 +68,18 @@ router.post(
   validateRequest(authenticationOptionsSchema),
   async (req: Request, res: Response) => {
     try {
-      const { user_did, name, display_name } = req.body;
+      const { user_did, name, display_name, existing_credential } = req.body;
       const container = await ServiceContainer.getInstance();
       const webauthnService = container.getWebAuthnService();
       const options = await webauthnService.generateAuthenticationOptions(user_did, {
         name,
-        displayName: display_name
+        displayName: display_name,
+        existing_credential
       });
-      const response = createSuccessResponse(options);
-      logger.debug('WebAuthn options generated', { response });
-      res.json(response);
+      res.json(createSuccessResponse(options));
     } catch (error) {
-      const { status, response } = handleError(error);
-      res.status(status).json(response);
+      logger.error('Error generating authentication options', { error });
+      res.status(500).json({ error: 'Failed to generate authentication options' });
     }
   }
 );
@@ -97,50 +97,6 @@ router.post(
       const webauthnService = container.getWebAuthnService();
       const result = await webauthnService.verifyAuthenticationResponse(req.body.response);
       res.json(createSuccessResponse(result));
-    } catch (error) {
-      const { status, response } = handleError(error);
-      res.status(status).json(response);
-    }
-  }
-);
-
-/**
- * GET /api/webauthn/credentials
- * Get user's registered WebAuthn credentials
- */
-router.get(
-  '/credentials',
-  requireAuth,
-  async (req: Request, res: Response) => {
-    try {
-      const container = await ServiceContainer.getInstance();
-      const webauthnService = container.getWebAuthnService();
-      const credentials = await webauthnService.getUserCredentials(req.user!.id);
-      res.json(createSuccessResponse({ credentials }));
-    } catch (error) {
-      const { status, response } = handleError(error);
-      res.status(status).json(response);
-    }
-  }
-);
-
-/**
- * DELETE /api/webauthn/credentials/:id
- * Remove a WebAuthn credential
- */
-router.delete(
-  '/credentials/:id',
-  requireAuth,
-  validateRequest(credentialSchema),
-  async (req: Request, res: Response) => {
-    try {
-      const container = await ServiceContainer.getInstance();
-      const webauthnService = container.getWebAuthnService();
-      const success = await webauthnService.removeCredential(
-        req.user!.id,
-        req.params.id
-      );
-      res.json(createSuccessResponse({ success }));
     } catch (error) {
       const { status, response } = handleError(error);
       res.status(status).json(response);

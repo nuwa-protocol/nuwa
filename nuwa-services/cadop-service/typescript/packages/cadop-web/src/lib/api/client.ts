@@ -177,6 +177,11 @@ export class WebAuthnAPIClient {
     user_did?: string;
     name?: string;
     display_name?: string;
+    existing_credential?: {
+      id: string;
+      type: string;
+      transports?: string[];
+    };
   }): Promise<APIResponse<AuthenticationOptions>> {
     return this.apiClient.post('/api/webauthn/options', params);
   }
@@ -193,15 +198,7 @@ export class WebAuthnAPIClient {
    */
   async getIdToken(): Promise<APIResponse<IDToken>> {
     return this.apiClient.get('/api/webauthn/id-token');
-  }
-
-  async getCredentials(): Promise<APIResponse<CredentialInfo[]>> {
-    return this.apiClient.get('/api/webauthn/credentials');
-  }
-
-  async removeCredential(id: string): Promise<APIResponse<boolean>> {
-    return this.apiClient.delete(`/api/webauthn/credentials/${id}`);
-  }
+  } 
 
   async cleanupExpiredChallenges(): Promise<APIResponse<{ count: number }>> {
     return this.apiClient.post('/api/webauthn/cleanup', {});
@@ -272,4 +269,4 @@ export class CustodianAPIClient {
 
 export const apiClient = APIClient.getInstance();
 export const webAuthnClient = new WebAuthnAPIClient(apiClient);
-export const custodianClient = new CustodianAPIClient(apiClient); 
+export const custodianClient = new CustodianAPIClient(apiClient);
