@@ -36,7 +36,7 @@ export function AddAuthMethodPage() {
       loadDIDService();
       loadAvailableAuthenticators();
     }
-  }, [did]);
+  }, [did, session]);
 
   const loadAvailableAuthenticators = async () => {
     const authenticators = await WebAuthnSigner.getAvailableAuthenticators();
@@ -47,10 +47,10 @@ export function AddAuthMethodPage() {
   };
 
   const loadDIDService = async () => {
-    if (!did) return;
+    if (!did || !session) return;
     
     try {
-      const service = await DIDService.initialize(did);
+      const service = await DIDService.initialize(did, session);
       setDidService(service);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');

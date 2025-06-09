@@ -142,7 +142,6 @@ describe('CustodianService Integration Tests', () => {
         {
           cadopDid: serviceDID,
           maxDailyMints: 10,
-          rpcUrl: DEFAULT_NODE_URL
         },
         webauthnService,
         cadopKit
