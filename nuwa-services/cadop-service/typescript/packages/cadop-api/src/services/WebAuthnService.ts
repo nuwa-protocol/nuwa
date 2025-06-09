@@ -79,6 +79,10 @@ export class WebAuthnService {
     });
   }
 
+  getConfig(): WebAuthnServiceConfig {
+    return this.config;
+  }
+
   /**
    * Get the singleton instance of WebAuthnService
    */

@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from '@jest/globals';
 import { CustodianService } from '../CustodianService.js';
-import { ServiceContainer } from '../ServiceContainer.js';
 import roochSdk from '@roochnetwork/rooch-sdk';
 import type { RoochClient as RoochClientType, Secp256k1Keypair as Secp256k1KeypairType, Ed25519Keypair as Ed25519KeypairType } from '@roochnetwork/rooch-sdk';
 const { RoochClient, Secp256k1Keypair, Ed25519Keypair } = roochSdk;
@@ -14,7 +13,7 @@ import {
   SignerInterface,
   BaseMultibaseCodec,
   DidKeyCodec,
-  DIDAccount
+  LocalSigner
 } from 'nuwa-identity-kit';
 import { WebAuthnService } from '../WebAuthnService.js';
 import crypto from 'crypto';
@@ -42,6 +41,7 @@ describe('CustodianService Integration Tests', () => {
   let userId: string;
   let userDID: string;
   let mockPublicKey: Buffer;
+  let custodianService: CustodianService;
 
   beforeAll(async () => {
     if (!shouldRunIntegrationTests()) {
@@ -54,14 +54,10 @@ describe('CustodianService Integration Tests', () => {
       serviceKeypair = Secp256k1Keypair.generate();
       const serviceAddress = serviceKeypair.getRoochAddress().toBech32Address();
 
-      // Create Rooch client
-      roochClient = new RoochClient({ url: DEFAULT_NODE_URL });
       
       // Create and register RoochVDR
       const roochVDR = new RoochVDR({
         rpcUrl: DEFAULT_NODE_URL,
-        client: roochClient,
-        signer: serviceKeypair,
         debug: true
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
@@ -72,6 +68,8 @@ describe('CustodianService Integration Tests', () => {
       const createResult = await roochVDR.create({
         publicKeyMultibase,
         keyType: 'EcdsaSecp256k1VerificationKey2019',
+      }, {
+        signer: serviceKeypair
       });
 
       console.log('createResult', JSON.stringify(createResult, null, 2))
@@ -80,12 +78,12 @@ describe('CustodianService Integration Tests', () => {
       serviceDID = createResult.didDocument!.id;
 
       // Create signer adapter
-      serviceSigner = new DIDAccount(serviceDID, serviceKeypair);
-
+      const localSigner = await LocalSigner.createEmpty(serviceDID);
+      localSigner.importRoochKeyPair('account-key', serviceKeypair);
+      serviceSigner = localSigner;
       // Initialize CadopIdentityKit
-      const cadopKit = await CadopIdentityKit.fromServiceDID(serviceDID, {
-        externalSigner: serviceSigner
-      });
+      const cadopKit = await CadopIdentityKit.fromServiceDID(serviceDID, localSigner);
+      
 
       // Add CADOP service
       const serviceId = await cadopKit.addService({
@@ -97,8 +95,6 @@ describe('CustodianService Integration Tests', () => {
           custodianServiceVMType: 'EcdsaSecp256k1VerificationKey2019',
           description: 'Test Custodian Service'
         }
-      }, {
-        keyId: `${serviceDID}#account-key`
       });
 
       expect(serviceId).toBeDefined();
@@ -117,15 +113,6 @@ describe('CustodianService Integration Tests', () => {
         signingKey: 'test-signing-key'
       });
 
-      // Reset ServiceContainer for tests
-      ServiceContainer.resetInstance();
-      
-      // Initialize ServiceContainer with test configuration
-      ServiceContainer.getInstance({
-        custodianDid: serviceDID,
-        maxDailyMints: 100,
-        rpcUrl: DEFAULT_NODE_URL,
-      }, webauthnService);
 
       // Create a test user and authenticator using WebAuthnService
       const userKeypair = Ed25519Keypair.generate();
@@ -150,6 +137,12 @@ describe('CustodianService Integration Tests', () => {
         friendly_name: 'Test Device'
       });
 
+      custodianService = new CustodianService({
+        custodianDid: serviceDID,
+        maxDailyMints: 100,
+        rpcUrl: DEFAULT_NODE_URL,
+      }, webauthnService, cadopKit);
+
       console.log('Test setup complete:');
       console.log(`- Service address: ${serviceAddress}`);
       console.log(`- Service DID: ${serviceDID}`);
@@ -163,12 +156,7 @@ describe('CustodianService Integration Tests', () => {
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
-    // Reset ServiceContainer after tests
-    ServiceContainer.resetInstance();
 
-    if (roochClient && roochClient.destroy) {
-      roochClient.destroy();
-    }
     // Cleanup test user and authenticator
     if (userId) {
       await webauthnService['authenticatorRepo'].deleteByUserId(userId);
@@ -182,9 +170,6 @@ describe('CustodianService Integration Tests', () => {
 
       // Get a valid token
       const { id_token } = await webauthnService.getIdToken(userId);
-
-      const container = ServiceContainer.getInstance();
-      const custodianService = await container.getCustodianService();
 
       // Create agent DID
       const result = await custodianService.createAgentDIDViaCADOP({
@@ -217,9 +202,6 @@ describe('CustodianService Integration Tests', () => {
   describe('DID Management', () => {
     it('should list agent DIDs for a user', async () => {
       if (!shouldRunIntegrationTests()) return;
-
-      const container = ServiceContainer.getInstance();
-      const custodianService = await container.getCustodianService();
 
       // Get a valid token
       const { id_token } = await webauthnService.getIdToken(userId);
