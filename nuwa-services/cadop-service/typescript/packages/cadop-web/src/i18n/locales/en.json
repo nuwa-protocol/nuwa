@@ -26,7 +26,22 @@
       "totalDIDs": "Total DIDs",
       "verifiedIdentities": "Verified Identities",
       "recentActivity": "Recent Activity"
-    }
+    },
+    "identity": {
+      "title": "Identity Information",
+      "userId": "User ID",
+      "userDid": "User DID",
+      "userDidTooltip": "This is your main identity identifier",
+      "agentDidTooltip": "User DID is your main identity identifier, Agent DID is the AI agent identity you created"
+    },
+    "agent": {
+      "title": "AI Agent DIDs",
+      "createNew": "Create New Agent",
+      "manage": "Manage",
+      "noAgents": "You haven't created any Agent DIDs yet",
+      "createFirst": "Create Your First Agent"
+    },
+    "signOut": "Sign Out"
   },
   "did": {
     "creation": {

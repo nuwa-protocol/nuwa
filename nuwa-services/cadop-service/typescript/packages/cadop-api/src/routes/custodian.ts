@@ -10,8 +10,7 @@ import {
   createErrorResponseFromError,
   CADOPMintRequestSchema,
   DIDRecordIdSchema,
-  UserIdSchema,
-  AgentDIDSchema
+  DIDSchema
 } from '@cadop/shared';
 
 const router: Router = Router();
@@ -121,17 +120,17 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/custodian/user/:userId/dids
+ * GET /api/custodian/user/:userDid/dids
  * Get all Agent DIDs for a user
  */
-router.get('/user/:userId/dids', async (req: Request, res: Response) => {
+router.get('/user/:userDid/dids', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { userId } = UserIdSchema.parse({ userId: req.params['userId'] });
+    const { userDid } = DIDSchema.parse({ userDid: req.params['userDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
-    const dids = await custodianService.getUserAgentDIDs(userId);
+    const dids = await custodianService.getUserAgentDIDs(userDid);
     
     res.json(createSuccessResponse({ dids }));
 
@@ -153,7 +152,7 @@ router.get('/user/:userId/dids', async (req: Request, res: Response) => {
 router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
+    const { agentDid } = DIDSchema.parse({ agentDid: req.params['agentDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
@@ -186,7 +185,7 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
 router.get('/exists/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
-    const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
+    const { agentDid } = DIDSchema.parse({ agentDid: req.params['agentDid'] });
     
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();

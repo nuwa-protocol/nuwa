@@ -125,8 +125,8 @@ export class CustodianService {
     return this.didCreationRecords.get(recordId) || null;
   }
 
-  async getUserAgentDIDs(userId: string): Promise<string[]> {
-    return this.userDids.get(userId) || [];
+  async getUserAgentDIDs(userDid: string): Promise<string[]> {
+    return this.userDids.get(userDid) || [];
   }
 
   async resolveAgentDID(agentDid: string): Promise<DIDDocument | null> {
