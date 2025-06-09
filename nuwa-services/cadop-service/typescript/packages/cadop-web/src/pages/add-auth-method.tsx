@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '../lib/auth/AuthContext';
 import { custodianClient } from '../lib/api/client';
-import { Spin, Alert, Form, Space, Typography, Select } from 'antd';
+import { DIDService } from '../lib/did/DIDService';
+import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
+import { Spin, Alert, Form, Space, Typography, Select, Radio } from 'antd';
 import { ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
+import { BaseMultibaseCodec, type OperationalKeyInfo, type VerificationRelationship } from 'nuwa-identity-kit';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -20,16 +23,61 @@ export function AddAuthMethodPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form] = Form.useForm();
+  const [didService, setDidService] = useState<DIDService | null>(null);
+  const [availableAuthenticators, setAvailableAuthenticators] = useState<Array<{
+    id: string;
+    type: 'platform' | 'cross-platform';
+    name: string;
+  }>>([]);
+  const [selectedAuthenticator, setSelectedAuthenticator] = useState<string>('platform');
+
+  useEffect(() => {
+    if (did) {
+      loadDIDService();
+      loadAvailableAuthenticators();
+    }
+  }, [did]);
+
+  const loadAvailableAuthenticators = async () => {
+    const authenticators = await WebAuthnSigner.getAvailableAuthenticators();
+    setAvailableAuthenticators(authenticators);
+    if (authenticators.length > 0) {
+      setSelectedAuthenticator(authenticators[0].id);
+    }
+  };
+
+  const loadDIDService = async () => {
+    if (!did) return;
+    
+    try {
+      const service = await DIDService.initialize(did);
+      setDidService(service);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('common.error');
+      setError(message);
+    }
+  };
 
   const handleSubmit = async (values: any) => {
-    if (!did) return;
+    if (!did || !didService) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      // TODO: Implement the API call to add authentication method
-      console.log('Adding auth method:', values);
+      const keyInfo: OperationalKeyInfo = {
+        type: values.type,
+        publicKeyMaterial: BaseMultibaseCodec.decodeBase58btc(values.publicKey),
+        idFragment: `key-${Date.now()}`,
+        controller: did
+      };
+
+      const keyId = await didService.addVerificationMethod(
+        keyInfo,
+        values.capabilities as VerificationRelationship[]
+      );
+
+      console.log('Added verification method:', keyId);
       navigate(`/agent/${did}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
@@ -109,6 +157,24 @@ export function AddAuthMethodPage() {
                   <Option value="capabilityDelegation">Capability Delegation</Option>
                 </Select>
               </Form.Item>
+
+              {availableAuthenticators.length > 0 && (
+                <Form.Item
+                  label="Authenticator"
+                  help="Select your preferred authenticator for signing"
+                >
+                  <Radio.Group
+                    value={selectedAuthenticator}
+                    onChange={(e) => setSelectedAuthenticator(e.target.value)}
+                  >
+                    {availableAuthenticators.map((auth) => (
+                      <Radio key={auth.id} value={auth.id}>
+                        {auth.name}
+                      </Radio>
+                    ))}
+                  </Radio.Group>
+                </Form.Item>
+              )}
 
               <div className="flex justify-end space-x-4">
                 <Button

@@ -51,7 +51,6 @@ export class ServiceContainer {
       const keypair = cryptoService.getRoochKeypair();
       const roochVDR = createVDR('rooch', {
         rpcUrl: this.serviceConfig.rooch.networkUrl,
-        signer: keypair,
         debug: true
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);

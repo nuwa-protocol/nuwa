@@ -1,13 +1,16 @@
 import { z } from 'zod'
 
-// 认证选项请求 Schema
 export const authenticationOptionsSchema = z.object({
   user_did: z.string().optional().nullable(),
   name: z.string().optional(),
-  display_name: z.string().optional()
+  display_name: z.string().optional(),
+  existing_credential: z.object({
+    id: z.string(),
+    type: z.literal('public-key'),
+    transports: z.array(z.string()).optional()
+  }).optional()
 })
 
-// 验证响应 Schema
 export const verifySchema = z.object({
   response: z.object({
     id: z.string(),
@@ -26,7 +29,6 @@ export const verifySchema = z.object({
   })
 })
 
-// 凭证管理 Schema
 export const credentialSchema = z.object({
   id: z.string().uuid(),
   name: z.string().optional()

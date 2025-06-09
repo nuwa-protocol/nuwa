@@ -6,15 +6,18 @@ import { UserRecord, UserRepository } from '../repositories/users.js';
 import { cryptoService } from './crypto.js';
 import crypto from 'crypto';
 import { Session } from '@cadop/shared';
+import { AuthenticatorRecord, AuthenticatorRepository } from '../repositories/authenticators.js';
 
 export interface SessionWithUser {
   session: SessionRecord;
   user: UserRecord;
+  authenticator: AuthenticatorRecord;
 }
 
 export function mapToSession(session_with_user: SessionWithUser): Session {
   return {
     id: session_with_user.session.id,
+    credentialId: session_with_user.authenticator.credential_id,
     accessToken: session_with_user.session.access_token,
     refreshToken: session_with_user.session.refresh_token,
     accessTokenExpiresAt: session_with_user.session.access_token_expires_at,
@@ -32,6 +35,7 @@ export function mapToSession(session_with_user: SessionWithUser): Session {
 export class SessionService {
   private readonly sessionRepo: SessionRepository;
   private readonly userRepo: UserRepository;
+  private readonly authenticatorRepo: AuthenticatorRepository;
   private readonly accessTokenDuration: number = 24 * 60 * 60 * 1000;  // 24 hours
   private readonly refreshTokenDuration: number = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly renewThreshold: number = 5 * 60 * 1000; // 5 minutes
@@ -39,6 +43,7 @@ export class SessionService {
   constructor() {
     this.sessionRepo = new SessionRepository();
     this.userRepo = new UserRepository();
+    this.authenticatorRepo = new AuthenticatorRepository();
   }
 
   private generateTokens(userId: string, metadata: Record<string, any> = {}) {
@@ -93,6 +98,15 @@ export class SessionService {
       });
     }
 
+    const authenticator = await this.authenticatorRepo.findById(authenticatorId);
+    if (!authenticator) {
+      throw new CadopError("Authenticator not found", CadopErrorCode.AUTHENTICATOR_NOT_FOUND, {
+        userId,
+        authenticatorId,
+        metadata
+      });
+    }
+
     const {
       accessToken,
       refreshToken,
@@ -113,6 +127,7 @@ export class SessionService {
     return {
       session,
       user,
+      authenticator
     };
   }
 
@@ -142,7 +157,13 @@ export class SessionService {
         return { valid: false };
       }
 
-      return { valid: true, session, user };
+      const authenticator = await this.authenticatorRepo.findById(session.authenticator_id);
+      if (!authenticator) {
+        await this.sessionRepo.delete(session.id);
+        return { valid: false };
+      }
+
+      return { valid: true, session, user};
     } catch (error) {
       logger.error('Session validation error:', error);
       return { valid: false };
@@ -173,6 +194,12 @@ export class SessionService {
         return null;
       }
 
+      const authenticator = await this.authenticatorRepo.findById(session.authenticator_id);
+      if (!authenticator) {
+        await this.sessionRepo.delete(session.id);
+        return null;
+      }
+
       // Generate new access token
       const {
         accessToken,
@@ -188,6 +215,7 @@ export class SessionService {
       return {
         session: updatedSession,
         user,
+        authenticator
       };
     } catch (error) {
       logger.error('Token refresh error:', error);

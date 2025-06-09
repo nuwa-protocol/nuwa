@@ -2,6 +2,7 @@
 // Session type
 export interface Session {
     id: string;
+    credentialId: string;
     accessToken: string;
     refreshToken: string;
     accessTokenExpiresAt: Date;

@@ -2,8 +2,8 @@ import {
   AuthenticationResult,
   CadopError,
   CadopErrorCode,
-  CredentialInfo,
-  DIDKeyManager
+  DIDKeyManager,
+  CredentialInfo
 } from '@cadop/shared';
 
 import type {
@@ -16,6 +16,7 @@ import type {
 } from '@simplewebauthn/types';
 
 import { webAuthnClient } from '../api/client';
+import { Base64 } from 'js-base64';
 
 export class WebAuthnClientService {
   private developmentMode = import.meta.env.DEV;
@@ -55,13 +56,27 @@ export class WebAuthnClientService {
       const userDid = this.getDIDFromStorage();
       console.log('🔑 Retrieved DID from storage:', { userDid });
 
+      // 检查当前网站下是否存在 credential
+      const existingCredential = await this.checkExistingCredentials();
+      console.log('🔍 Checked for existing credentials:', { 
+        hasCredential: !!existingCredential,
+        credentialId: existingCredential?.id
+      });
+
       // 1. 获取认证选项
       console.log('📡 Requesting authentication options from server...');
       let optionsResponse = await webAuthnClient.getAuthenticationOptions({
         user_did: userDid || undefined,
         name: options?.name,
-        display_name: options?.displayName
+        display_name: options?.displayName,
+        existing_credential: existingCredential ? {
+          id: existingCredential.id,
+          type: existingCredential.type,
+          transports: existingCredential.transports
+        } : undefined
       });
+
+      console.log('🔍 Received options from server:', optionsResponse);
 
       if (optionsResponse.error) {
         console.error('💥 Server error while getting options:', optionsResponse.error);
@@ -132,7 +147,10 @@ export class WebAuthnClientService {
 
         // 生成 DID
         const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+        
         const publicKey = attestationResponse.getPublicKey();
+        const publicKeyAlgorithm = attestationResponse.getPublicKeyAlgorithm();
+        console.log('🔑 Public Key Algorithm:', publicKeyAlgorithm);
         if (publicKey) {
           const publicKeyArray = new Uint8Array(publicKey);
           
@@ -272,34 +290,6 @@ export class WebAuthnClientService {
   }
 
   /**
-   * 获取用户的凭证列表
-   */
-  public async getCredentials(): Promise<CredentialInfo[]> {
-    const response = await webAuthnClient.getCredentials();
-    if (response.error) {
-      throw new CadopError(
-        response.error.message || 'Failed to get credentials',
-        CadopErrorCode.INTERNAL_ERROR
-      );
-    }
-    return response.data || [];
-  }
-
-  /**
-   * 删除凭证
-   */
-  public async removeCredential(id: string): Promise<boolean> {
-    const response = await webAuthnClient.removeCredential(id);
-    if (response.error) {
-      throw new CadopError(
-        response.error.message || 'Failed to remove credential',
-        CadopErrorCode.INTERNAL_ERROR
-      );
-    }
-    return response.data || false;
-  }
-
-  /**
    * 格式化注册选项
    */
   private preformatCreateOptions(
@@ -415,18 +405,46 @@ export class WebAuthnClientService {
   }
 
   private base64URLToBuffer(base64url: string): ArrayBuffer {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(base64url.length + ((4 - base64url.length % 4) % 4), '=');
-    const binaryString = window.atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+    const bytes = Base64.toUint8Array(base64url);
     return bytes.buffer;
   }
 
   private arrayBufferToBase64URL(buffer: ArrayBuffer): string {
-    const binary = String.fromCharCode(...new Uint8Array(buffer));
-    const base64 = window.btoa(binary);
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    const bytes = new Uint8Array(buffer);
+    return Base64.fromUint8Array(bytes, true);
+  }
+
+  /**
+   * 检查当前网站下是否存在 credential
+   * @returns 如果存在 credential，返回 credential 信息，否则返回 null
+   */
+  private async checkExistingCredentials(): Promise<CredentialInfo | null> {
+    try {
+      // Create an empty authentication options object
+      const options: PublicKeyCredentialRequestOptions = {
+        challenge: new Uint8Array(32),
+        rpId: window.location.hostname,
+        allowCredentials: [],
+        userVerification: 'preferred',
+      };
+
+      // Try to get credentials
+      const credential = await navigator.credentials.get({
+        publicKey: options,
+        mediation: 'silent'
+      }) as PublicKeyCredential | null;
+
+      if (credential) {
+        return {
+          id: credential.id,
+          type: credential.type,
+          transports: (credential as any).transports
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error checking existing credentials:', error);
+      return null;
+    }
   }
 } 
