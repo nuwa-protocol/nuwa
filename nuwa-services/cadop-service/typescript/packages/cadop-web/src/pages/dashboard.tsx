@@ -36,34 +36,13 @@ export function DashboardPage() {
         setAgentDids(response.data.dids);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : '加载 Agent DID 失败';
+      const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
     } finally {
       console.log('Agent DIDs:', agentDids);
       setLoading(false);
     }
   };
-
-  const quickActions = [
-    {
-      title: t('dashboard.createDID'),
-      icon: <PlusCircleOutlined />,
-      onClick: () => navigate('/create-agent-did'),
-      description: '创建新的 AI Agent DID'
-    },
-    {
-      title: t('dashboard.verifyIdentity'),
-      icon: '✅',
-      onClick: () => navigate('/verification'),
-      description: '验证身份信息'
-    },
-    {
-      title: t('dashboard.manageDID'),
-      icon: '⚙️',
-      onClick: () => navigate('/did-management'),
-      description: '管理 DID 和身份'
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -80,7 +59,7 @@ export function DashboardPage() {
                 onClick={signOut}
                 className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                退出登录
+                {t('dashboard.signOut')}
               </button>
             </div>
           </div>
@@ -92,8 +71,8 @@ export function DashboardPage() {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">身份信息</h2>
-              <Tooltip title="用户 DID 是您的主要身份标识，Agent DID 是您创建的 AI 代理身份">
+              <h2 className="text-lg font-medium text-gray-900">{t('dashboard.identity.title')}</h2>
+              <Tooltip title={t('dashboard.identity.agentDidTooltip')}>
                 <InfoCircleOutlined className="text-gray-400" />
               </Tooltip>
             </div>
@@ -101,15 +80,15 @@ export function DashboardPage() {
             <div className="mt-4 border-t border-gray-200 pt-4">
               <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">用户 ID</dt>
+                  <dt className="text-sm font-medium text-gray-500">{t('dashboard.identity.userId')}</dt>
                   <dd className="mt-1 text-sm text-gray-900">{session?.user?.id}</dd>
                 </div>
                 
                 {session?.user?.userDid && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
-                      用户 DID
-                      <Tooltip title="这是您的主要身份标识">
+                      {t('dashboard.identity.userDid')}
+                      <Tooltip title={t('dashboard.identity.userDidTooltip')}>
                         <InfoCircleOutlined className="ml-1 text-gray-400" />
                       </Tooltip>
                     </dt>
@@ -127,19 +106,19 @@ export function DashboardPage() {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">AI Agent DIDs</h2>
+              <h2 className="text-lg font-medium text-gray-900">{t('dashboard.agent.title')}</h2>
               <AntButton
                 onClick={() => navigate('/create-agent-did')}
                 icon={<PlusCircleOutlined />}
                 type="primary"
               >
-                创建新 Agent
+                {t('dashboard.agent.createNew')}
               </AntButton>
             </div>
 
             {error && (
               <Alert
-                message="错误"
+                message={t('common.error')}
                 description={error}
                 type="error"
                 closable
@@ -167,7 +146,7 @@ export function DashboardPage() {
                         onClick={() => navigate(`/agent/${did}`)}
                         size="small"
                       >
-                        管理
+                        {t('dashboard.agent.manage')}
                       </AntButton>
                     </div>
                   </div>
@@ -175,40 +154,16 @@ export function DashboardPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <p>您还没有创建任何 Agent DID</p>
+                <p>{t('dashboard.agent.noAgents')}</p>
                 <AntButton
                   onClick={() => navigate('/create-agent-did')}
                   type="primary"
                   className="mt-4"
                 >
-                  创建第一个 Agent
+                  {t('dashboard.agent.createFirst')}
                 </AntButton>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* 快速操作卡片 */}
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">快速操作</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {quickActions.map((action) => (
-                <button
-                  key={action.title}
-                  onClick={action.onClick}
-                  className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 text-left"
-                >
-                  <div className="flex items-center">
-                    <span className="text-2xl mr-3">{action.icon}</span>
-                    <div>
-                      <div className="font-medium">{action.title}</div>
-                      <div className="text-sm text-gray-500">{action.description}</div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </main>

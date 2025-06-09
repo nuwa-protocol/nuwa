@@ -56,11 +56,13 @@ export class ServiceContainer {
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
+      let generatedCadopDid: string | undefined;
       const isDevelopment = this.serviceConfig.isDevelopment;
       if (isDevelopment){
         //Auto create a new service DID if the did is placeholder
         if (this.serviceConfig.cadopDid === 'did:rooch:placeholder'){
-          this.serviceConfig.cadopDid = await this.createServiceDID(roochVDR);
+          generatedCadopDid = await this.createServiceDID(roochVDR);
+          this.serviceConfig.cadopDid = generatedCadopDid;
         }
       }
       
@@ -98,6 +100,13 @@ export class ServiceContainer {
       logger.info('Custodian service initialized');
 
       logger.info('All services initialized successfully');
+      if (generatedCadopDid) {
+        console.log(`==============================================`);
+        console.log(`Please update the cadopDid in the environment variables`);
+        console.log(`CADOP_DID=${generatedCadopDid}`);
+        console.log(`ROOCH_PRIVATE_KEY=${cryptoService.getRoochKeypair().getSecretKey()}`);
+        console.log(`==============================================`);
+      }
     } catch (error) {
       logger.error('Failed to initialize services', { error });
       throw error;

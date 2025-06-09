@@ -13,6 +13,6 @@ export const UserIdSchema = z.object({
     userId: z.string().min(1, 'User ID is required')
   });
   
-export const AgentDIDSchema = z.object({
+export const DIDSchema = z.object({
     agentDid: z.string().regex(/^did:/, 'Invalid Agent DID format')
 });
