@@ -1,7 +1,9 @@
-
-export * from './NuwaIdentityKit';
 export * from './types';
-export { CryptoUtils } from './cryptoUtils';
+export * from './NuwaIdentityKit';
+export * from './CadopIdentityKit';
+export * from './VDRRegistry';
+export * from './cryptoUtils';
 export * from './vdr';
-export { CadopIdentityKit, CadopServiceType } from './CadopIdentityKit';
+export * from './multibase';
+export * from './signers/LocalSigner';
 export { CadopUtils } from './cadopUtils';

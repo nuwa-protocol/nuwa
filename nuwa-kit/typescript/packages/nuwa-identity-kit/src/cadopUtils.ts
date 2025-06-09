@@ -1,5 +1,6 @@
 import { DIDDocument, VerificationRelationship, CadopIdTokenClaims, CadopOnboardingRequest, KeyType } from './types';
 import { CryptoUtils } from './cryptoUtils';
+import { DidKeyCodec } from './multibase';
 
 /**
  * CADOP (NIP-3) Utility Functions
@@ -23,8 +24,11 @@ export class CadopUtils {
      * @returns The generated did:key string
      */
     static generateDidKeyFromBytes(publicKeyBytes: Uint8Array, keyType: KeyType): string {
-      const multibasePk = CryptoUtils.publicKeyToMultibase(publicKeyBytes, keyType);
-      return `did:key:${multibasePk}`;
+      return DidKeyCodec.generateDidKey(publicKeyBytes, keyType);
+    }
+
+    static parsePublicKeyFromDidKey(didKey: string): { keyType: KeyType; publicKey: Uint8Array } {
+      return DidKeyCodec.parseDidKey(didKey);
     }
     
     /**
