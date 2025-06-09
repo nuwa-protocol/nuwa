@@ -29,7 +29,7 @@ const App: React.FC = () => {
         {/* 404 page redirect to dashboard */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
         
-        <Route path="/create-did" element={<CreateAgentDIDPage />} />
+        <Route path="/create-agent-did" element={<CreateAgentDIDPage />} />
         {/* Add more routes as they are implemented */}
       </Routes>
     </AuthProvider>

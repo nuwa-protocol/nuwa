@@ -43,7 +43,6 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(did);
-      // TODO: 添加复制成功提示
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -91,17 +90,6 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
                 <span className="sr-only">Show QR Code</span>
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              asChild
-            >
-              <a href={`https://explorer.rooch.network/did/${did}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                <span className="sr-only">View on Explorer</span>
-              </a>
-            </Button>
           </div>
         </div>
       </CardContent>

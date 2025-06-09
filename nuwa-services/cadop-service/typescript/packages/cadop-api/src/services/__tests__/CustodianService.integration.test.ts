@@ -109,7 +109,7 @@ describe('CustodianService Integration Tests', () => {
         origin: 'http://localhost:3000',
         timeout: 30000,
         attestationType: 'none',
-        serviceDid: serviceDID,
+        cadopDid: serviceDID,
         signingKey: 'test-signing-key'
       });
 
@@ -118,6 +118,7 @@ describe('CustodianService Integration Tests', () => {
       const userKeypair = Ed25519Keypair.generate();
       const userPublicKeyBytes = userKeypair.getPublicKey().toBytes();
       userDID = DidKeyCodec.generateDidKey(userPublicKeyBytes, KEY_TYPE.ED25519);
+      
       const user = await webauthnService['userRepo'].create({
         user_did: userDID,
         display_name: 'Test User'
@@ -137,11 +138,15 @@ describe('CustodianService Integration Tests', () => {
         friendly_name: 'Test Device'
       });
 
-      custodianService = new CustodianService({
-        custodianDid: serviceDID,
-        maxDailyMints: 100,
-        rpcUrl: DEFAULT_NODE_URL,
-      }, webauthnService, cadopKit);
+      custodianService = new CustodianService(
+        {
+          cadopDid: serviceDID,
+          maxDailyMints: 10,
+          rpcUrl: DEFAULT_NODE_URL
+        },
+        webauthnService,
+        cadopKit
+      );
 
       console.log('Test setup complete:');
       console.log(`- Service address: ${serviceAddress}`);

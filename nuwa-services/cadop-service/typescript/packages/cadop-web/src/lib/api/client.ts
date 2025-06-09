@@ -11,9 +11,12 @@ import type {
   CredentialInfo,
   AuthenticationOptions,
   AuthenticationResult,
-  IDToken
+  IDToken,
+  AgentDIDCreationStatus,
+  DIDDocument
 } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
+import { useAuth } from '../auth/AuthContext';
 
 class APIClient {
   private static instance: APIClient;
@@ -32,10 +35,19 @@ class APIClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const session = await supabase.auth.getSession();
+    const storedSession = sessionStorage.getItem('cadop_session');
+    let session = null;
+    if (storedSession) {
+      try {
+        session = JSON.parse(storedSession);
+      } catch (error) {
+        console.error('Failed to parse session:', error);
+      }
+    }
+
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': session.data.session ? `Bearer ${session.data.session.access_token}` : '',
+      'Authorization': session?.accessToken ? `Bearer ${session.accessToken}` : '',
       'X-Client-Type': 'cadop-web'
     };
     console.debug('Request headers:', headers);
@@ -69,7 +81,7 @@ class APIClient {
       );
     }
 
-    return { data: responseData };
+    return { data: responseData.data };
   }
 
   public async get<T>(endpoint: string, params?: Record<string, string>): Promise<APIResponse<T>> {
@@ -114,17 +126,7 @@ class APIClient {
         body: JSON.stringify(data),
       });
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        return createErrorResponse(
-          responseData.error || 'An error occurred',
-          responseData.code,
-          responseData.details
-        );
-      }
-
-      return { data: responseData as T };
+      return this.handleResponse<T>(response);
     } catch (error) {
       console.error('API request failed:', error);
       return createErrorResponse(
@@ -163,9 +165,7 @@ class APIClient {
 
     return this.handleResponse<T>(response);
   }
-
 }
-
 
 /**
  * WebAuthn specific API client
@@ -208,5 +208,51 @@ export class WebAuthnAPIClient {
   }
 }
 
+/**
+ * Custodian specific API client
+ */
+export class CustodianAPIClient {
+  constructor(private apiClient: APIClient) {}
+
+  /**
+   * Create a new Agent DID via CADOP protocol
+   */
+  async mint(params: {
+    idToken: string;
+    userDid: string;
+  }): Promise<APIResponse<AgentDIDCreationStatus>> {
+    return this.apiClient.post('/api/custodian/mint', params);
+  }
+
+  /**
+   * Get DID creation status by record ID
+   */
+  async getStatus(recordId: string): Promise<APIResponse<AgentDIDCreationStatus>> {
+    return this.apiClient.get(`/api/custodian/status/${recordId}`);
+  }
+
+  /**
+   * Get all Agent DIDs for a user
+   */
+  async getUserAgentDIDs(userDid: string): Promise<APIResponse<{dids: string[]}>> {
+    return this.apiClient.get(`/api/custodian/user/${userDid}/dids`);
+  }
+
+  /**
+   * Resolve Agent DID document
+   */
+  async resolveAgentDID(agentDid: string): Promise<APIResponse<DIDDocument>> {
+    return this.apiClient.get(`/api/custodian/resolve/${agentDid}`);
+  }
+
+  /**
+   * Check if Agent DID exists
+   */
+  async agentDIDExists(agentDid: string): Promise<APIResponse<{ exists: boolean }>> {
+    return this.apiClient.get(`/api/custodian/exists/${agentDid}`);
+  }
+}
+
 export const apiClient = APIClient.getInstance();
-export const webAuthnClient = new WebAuthnAPIClient(apiClient); 
+export const webAuthnClient = new WebAuthnAPIClient(apiClient);
+export const custodianClient = new CustodianAPIClient(apiClient); 

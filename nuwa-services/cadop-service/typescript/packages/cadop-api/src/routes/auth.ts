@@ -2,10 +2,6 @@ import { Router, Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
-import { config } from '../config/environment.js';
-import { webauthnService } from '../services/WebAuthnService.js';
-import { z } from 'zod';
-import { validateRequest } from '../middleware/validation.js';
 import { SessionService } from '../services/SessionService.js';
 
 const router: Router = Router();

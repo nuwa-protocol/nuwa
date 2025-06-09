@@ -1,25 +1,29 @@
-import * as jose from 'jose';
 import { createHash, randomBytes } from 'crypto';
+import * as jose from 'jose';
 import { logger } from '../utils/logger.js';
-import * as jwt from 'jsonwebtoken';
+import { config } from '../config/environment.js';
+import roochSdk from '@roochnetwork/rooch-sdk';
+import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
+const { Secp256k1Keypair, decodeRoochSercetKey } = roochSdk;
 
-// Define our own JWK type that matches the shared type
-interface LocalJWK {
-  kty: string;
+export interface LocalJWK extends jose.JWK {
   kid?: string;
   use?: string;
-  alg?: string;
   key_ops?: string[];
-  [key: string]: unknown;
+}
+
+export interface CryptoKeys {
+  // WebAuthn ID Token signing key
+  webauthnSigningKey: string;
+  // Session JWT signing key
+  sessionSecret: string;
+  // Rooch keypair for custodian
+  roochKeypair: Secp256k1KeypairType;
 }
 
 export class CryptoService {
   private static instance: CryptoService;
-  private publicKey: Uint8Array | null = null;
-  private privateKey: Uint8Array | null = null;
-  private publicJWK: LocalJWK | null = null;
-  private privateJWK: LocalJWK | null = null;
-  private keyId: string | null = null;
+  private keys: CryptoKeys | null = null;
 
   private constructor() {}
 
@@ -31,63 +35,72 @@ export class CryptoService {
   }
 
   /**
-   * Generate a key ID from a JWK
-   */
-  private generateKeyId(jwk: LocalJWK): string {
-    const hash = createHash('sha256');
-    hash.update(JSON.stringify(jwk));
-    return hash.digest('hex').slice(0, 16);
-  }
-
-  /**
-   * Initialize cryptographic keys
+   * Initialize all cryptographic keys
    */
   public async initializeKeys(): Promise<void> {
     try {
       // Check if we already have keys
-      if (this.publicKey && this.privateKey) {
+      if (this.keys) {
         logger.info('Crypto keys already initialized');
         return;
       }
 
-      // Generate new Ed25519 key pair
-      const { publicKey, privateKey } = await jose.generateKeyPair('EdDSA', {
-        extractable: true
-      });
-      this.publicKey = publicKey as unknown as Uint8Array;
-      this.privateKey = privateKey as unknown as Uint8Array;
+      const isDevelopment = config.server.nodeEnv === 'development';
+      logger.info('Initializing crypto keys', { environment: config.server.nodeEnv });
 
-      // Export keys as JWK
-      const exportedPublicJWK = await jose.exportJWK(publicKey);
-      const exportedPrivateJWK = await jose.exportJWK(privateKey);
+      // Initialize WebAuthn signing key
+      const webauthnSigningKey = isDevelopment 
+        ? randomBytes(32).toString('hex')
+        : process.env.WEBAUTHN_SIGNING_KEY;
 
-      // Convert to our JWK type with required fields
-      this.publicJWK = {
-        kty: exportedPublicJWK.kty || 'OKP',
-        ...exportedPublicJWK
-      } as LocalJWK;
+      if (!webauthnSigningKey) {
+        throw new Error('WebAuthn signing key is required');
+      }
 
-      this.privateJWK = {
-        kty: exportedPrivateJWK.kty || 'OKP',
-        ...exportedPrivateJWK
-      } as LocalJWK;
+      // Initialize session secret
+      const sessionSecret = config.session.secret;
 
-      // Generate key ID
-      this.keyId = this.generateKeyId(this.publicJWK);
+      if (!sessionSecret || sessionSecret === 'dev-session-secret-key-for-testing-only') {
+        throw new Error('Session secret is required');
+      }
 
-      // Set key properties
-      this.publicJWK.kid = this.keyId;
-      this.publicJWK.use = 'sig';
-      this.publicJWK.alg = 'EdDSA';
-      this.publicJWK.key_ops = ['verify'];
+      // Initialize Rooch keypair
+      let roochKeypair;
+      if (isDevelopment && !process.env.ROOCH_PRIVATE_KEY) {
+        // In development, generate a new keypair
+        roochKeypair = Secp256k1Keypair.generate();
+        logger.info('Generated new Rooch keypair', {
+          publicKey: roochKeypair.getPublicKey().toString(),
+          privateKey: roochKeypair.getSecretKey()
+        });
+      } else {
+        // In production, load from environment
+        const roochPrivateKey = process.env.ROOCH_PRIVATE_KEY;
+        if (!roochPrivateKey) {
+          throw new Error('Rooch private key is required in production');
+        }
+        
+        const { secretKey, schema } = decodeRoochSercetKey(roochPrivateKey);
+        if (schema !== 'Secp256k1') {
+          throw new Error('Rooch private key is not a Secp256k1 key');
+        }
+        roochKeypair = Secp256k1Keypair.fromSecretKey(secretKey);
+        logger.info('Loaded Rooch keypair from environment', {
+          publicKey: roochKeypair.getPublicKey().toString,
+        });
+      }
 
-      this.privateJWK.kid = this.keyId;
-      this.privateJWK.use = 'sig';
-      this.privateJWK.alg = 'EdDSA';
-      this.privateJWK.key_ops = ['sign'];
+      this.keys = {
+        webauthnSigningKey,
+        sessionSecret,
+        roochKeypair
+      };
 
       logger.info('Crypto keys initialized successfully', {
-        keyId: this.keyId,
+        environment: config.server.nodeEnv,
+        hasWebAuthnKey: !!webauthnSigningKey,
+        hasSessionSecret: !!sessionSecret,
+        hasRoochKeypair: !!roochKeypair
       });
     } catch (error) {
       logger.error('Failed to initialize crypto keys', { error });
@@ -96,51 +109,33 @@ export class CryptoService {
   }
 
   /**
-   * Get the public key as JWK
+   * Get WebAuthn signing key
    */
-  public getPublicJWK(): LocalJWK | null {
-    return this.publicJWK;
+  public getWebAuthnSigningKey(): string {
+    if (!this.keys?.webauthnSigningKey) {
+      throw new Error('WebAuthn signing key not initialized');
+    }
+    return this.keys.webauthnSigningKey;
   }
 
   /**
-   * Get the key ID
+   * Get session secret
    */
-  public getKeyId(): string | null {
-    return this.keyId;
+  public getSessionSecret(): string {
+    if (!this.keys?.sessionSecret) {
+      throw new Error('Session secret not initialized');
+    }
+    return this.keys.sessionSecret;
   }
 
   /**
-   * Sign data using the private key
+   * Get Rooch keypair
    */
-  public async sign(data: string): Promise<string> {
-    if (!this.privateKey || !this.keyId) {
-      throw new Error('Private key not initialized');
+  public getRoochKeypair(): Secp256k1KeypairType {
+    if (!this.keys?.roochKeypair) {
+      throw new Error('Rooch keypair not initialized');
     }
-
-    const signature = await new jose.SignJWT({ data })
-      .setProtectedHeader({ alg: 'EdDSA', kid: this.keyId })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .sign(this.privateKey);
-
-    return signature;
-  }
-
-  /**
-   * Verify a signature using the public key
-   */
-  public async verify(signature: string): Promise<boolean> {
-    if (!this.publicKey) {
-      throw new Error('Public key not initialized');
-    }
-
-    try {
-      const { payload } = await jose.jwtVerify(signature, this.publicKey);
-      return !!payload;
-    } catch (error) {
-      logger.error('Signature verification failed', { error });
-      return false;
-    }
+    return this.keys.roochKeypair;
   }
 
   /**
@@ -148,27 +143,6 @@ export class CryptoService {
    */
   public generateSecureRandom(length: number = 32): string {
     return randomBytes(length).toString('base64url');
-  }
-
-  /**
-   * Generate authorization code
-   */
-  public generateAuthorizationCode(): string {
-    return this.generateSecureRandom(32);
-  }
-
-  /**
-   * Generate access token
-   */
-  public generateAccessToken(): string {
-    return this.generateSecureRandom(32);
-  }
-
-  /**
-   * Generate refresh token
-   */
-  public generateRefreshToken(): string {
-    return this.generateSecureRandom(32);
   }
 
   /**
@@ -185,8 +159,6 @@ export class CryptoService {
     const computed = this.createHash(input, algorithm);
     return computed === hash;
   }
-
 }
 
-// 导出单例实例
 export const cryptoService = CryptoService.getInstance(); 

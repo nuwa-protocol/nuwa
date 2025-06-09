@@ -53,20 +53,17 @@ export interface WebAuthnServiceConfig {
   origin: string;
   timeout: number;
   attestationType: 'none' | 'indirect' | 'direct';
-  serviceDid: string;
+  cadopDid: string;
   signingKey: string;
 }
 
 export class WebAuthnService {
-  private static instance: WebAuthnService | null = null;
-
   private config: WebAuthnServiceConfig;
   private sessionService: SessionService;
   private challengesRepo: WebAuthnChallengesRepository;
   private authenticatorRepo: AuthenticatorRepository;
   private userRepo: UserRepository;
   
-  // Make constructor private to enforce singleton pattern
   constructor(config: WebAuthnServiceConfig) {
     this.config = config;
     this.sessionService = new SessionService();
@@ -81,25 +78,6 @@ export class WebAuthnService {
 
   getConfig(): WebAuthnServiceConfig {
     return this.config;
-  }
-
-  /**
-   * Get the singleton instance of WebAuthnService
-   */
-  public static getInstance(): WebAuthnService {
-    if (!WebAuthnService.instance) {
-      const config = {
-        rpName: process.env['WEBAUTHN_RP_NAME'] || 'CADOP Service',
-        rpID: process.env['WEBAUTHN_RP_ID'] || 'localhost',
-        origin: process.env['WEBAUTHN_ORIGIN'] || 'http://localhost:3000',
-        timeout: parseInt(process.env['WEBAUTHN_CHALLENGE_TIMEOUT'] || '300000'),
-        attestationType: process.env['WEBAUTHN_ATTESTATION_TYPE'] as 'none' | 'indirect' | 'direct' || 'none',
-        serviceDid: process.env['SERVICE_DID'] || 'did:rooch:cadop-service',
-        signingKey: process.env['JWT_SIGNING_KEY'] || 'test-signing-key',
-      };
-      WebAuthnService.instance = new WebAuthnService(config);
-    }
-    return WebAuthnService.instance;
   }
 
   /**
@@ -953,9 +931,9 @@ export class WebAuthnService {
 
       // 4. Generate ID Token
       const idToken = jwt.sign({
-        iss: this.config.serviceDid,        // Service's DID (IdP)
+        iss: this.config.cadopDid,        // Service's DID (IdP)
         sub: user.user_did,          // User's DID
-        aud: this.config.serviceDid,        // For MVP, audience is self (can be other Custodian's DID)
+        aud: this.config.cadopDid,        // For MVP, audience is self (can be other Custodian's DID)
         exp: Math.floor(Date.now() / 1000) + 300,  // Expires in 5 minutes
         iat: Math.floor(Date.now() / 1000),        // Issued at
         jti: crypto.randomUUID(),                  // JWT ID
@@ -967,7 +945,7 @@ export class WebAuthnService {
       logger.debug('Generated ID token', {
         userId,
         tokenId: (jwt.decode(idToken) as { jti: string })?.jti,
-        issuer: this.config.serviceDid
+        issuer: this.config.cadopDid
       });
 
       return { id_token: idToken };
@@ -1049,9 +1027,9 @@ export class WebAuthnService {
       });
 
       // 2. Verify issuer
-      if (decoded.iss !== this.config.serviceDid) {
+      if (decoded.iss !== this.config.cadopDid) {
         logger.error('Invalid token issuer', {
-          expected: this.config.serviceDid,
+          expected: this.config.cadopDid,
           received: decoded.iss
         });
         throw new CadopError(
@@ -1061,7 +1039,7 @@ export class WebAuthnService {
       }
 
       // 3. Verify audience if provided
-      const expectedAud = expectedAudience || this.config.serviceDid;
+      const expectedAud = expectedAudience || this.config.cadopDid;
       if (decoded.aud !== expectedAud) {
         logger.error('Invalid token audience', {
           expected: expectedAud,
@@ -1181,7 +1159,4 @@ export class WebAuthnService {
       );
     }
   }
-}
-
-// Export singleton instance
-export const webauthnService = WebAuthnService.getInstance(); 
+} 

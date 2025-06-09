@@ -1,4 +1,4 @@
-import { webauthnService, WebAuthnService, WebAuthnServiceConfig } from '../WebAuthnService.js';
+import { WebAuthnService, WebAuthnServiceConfig } from '../WebAuthnService.js';
 import { CadopError, CadopErrorCode, IDToken } from '@cadop/shared';
 import crypto from 'crypto';
 import type { 
@@ -8,14 +8,21 @@ import type {
 import { generateRandomDid } from '../../test/mocks.js';
 import jwt from 'jsonwebtoken';
 
-
 describe('WebAuthnService', () => {
   let service: WebAuthnService;
   let webauthnServiceConfig: WebAuthnServiceConfig;
 
   beforeAll(async () => {
-    service = webauthnService;
-    webauthnServiceConfig = webauthnService.getConfig();
+    service = new WebAuthnService({
+      rpName: 'CADOP Service',
+      rpID: 'localhost',
+      origin: 'http://localhost:3000',
+      timeout: 30000,
+      attestationType: 'none',
+      cadopDid: 'did:rooch:test-service',
+      signingKey: 'test-signing-key'
+    });
+    webauthnServiceConfig = service.getConfig();
   });
 
   describe('generateAuthenticationOptions', () => {
@@ -190,9 +197,9 @@ describe('WebAuthnService', () => {
       
       // Check verified token claims
       expect(verified).toMatchObject({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
-        aud: webauthnServiceConfig.serviceDid,
+        aud: webauthnServiceConfig.cadopDid,
         sybil_level: 1
       });
 
@@ -208,7 +215,7 @@ describe('WebAuthnService', () => {
       
       // Generate token with custom audience
       const token = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
         aud: customAudience,
         exp: Math.floor(Date.now() / 1000) + 300,
@@ -240,9 +247,9 @@ describe('WebAuthnService', () => {
 
     it('should reject expired token', async () => {
       const expiredToken = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
-        aud: webauthnServiceConfig.serviceDid,
+        aud: webauthnServiceConfig.cadopDid,
         exp: Math.floor(Date.now() / 1000) - 60, // Expired 1 minute ago
         iat: Math.floor(Date.now() / 1000) - 300,
         jti: crypto.randomUUID(),
@@ -267,9 +274,9 @@ describe('WebAuthnService', () => {
 
     it('should reject token with invalid signature', async () => {
       const invalidToken = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
-        aud: webauthnServiceConfig.serviceDid,
+        aud: webauthnServiceConfig.cadopDid,
         exp: Math.floor(Date.now() / 1000) + 300,
         iat: Math.floor(Date.now() / 1000),
         jti: crypto.randomUUID(),
@@ -295,9 +302,9 @@ describe('WebAuthnService', () => {
     it('should reject token with mismatched public key', async () => {
       const differentKey = crypto.randomBytes(32);
       const tokenWithDifferentKey = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
-        aud: webauthnServiceConfig.serviceDid,
+        aud: webauthnServiceConfig.cadopDid,
         exp: Math.floor(Date.now() / 1000) + 300,
         iat: Math.floor(Date.now() / 1000),
         jti: crypto.randomUUID(),
@@ -323,9 +330,9 @@ describe('WebAuthnService', () => {
     it('should reject token for non-existent user', async () => {
       // Generate token with non-existent user DID
       const tokenWithNonExistentUser = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: 'did:example:nonexistent',
-        aud: webauthnServiceConfig.serviceDid,
+        aud: webauthnServiceConfig.cadopDid,
         exp: Math.floor(Date.now() / 1000) + 300,
         iat: Math.floor(Date.now() / 1000),
         jti: crypto.randomUUID(),
@@ -348,7 +355,7 @@ describe('WebAuthnService', () => {
     it('should reject token with invalid audience', async () => {
       const customAudience = 'did:rooch:custodian';
       const token = jwt.sign({
-        iss: webauthnServiceConfig.serviceDid,
+        iss: webauthnServiceConfig.cadopDid,
         sub: user.user_did,
         aud: customAudience,
         exp: Math.floor(Date.now() / 1000) + 300,
