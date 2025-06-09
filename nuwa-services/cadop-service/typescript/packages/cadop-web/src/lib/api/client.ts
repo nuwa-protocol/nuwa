@@ -251,6 +251,23 @@ export class CustodianAPIClient {
   async agentDIDExists(agentDid: string): Promise<APIResponse<{ exists: boolean }>> {
     return this.apiClient.get(`/api/custodian/exists/${agentDid}`);
   }
+
+  /**
+   * Get detailed information about an Agent DID
+   */
+  async getAgentInfo(agentDid: string): Promise<APIResponse<{
+    did: string;
+    sybilLevel: number;
+    verificationMethods: string[];
+    createdAt: string;
+    status: 'active' | 'pending' | 'inactive';
+    capabilities: {
+      canCreateSubAgents: boolean;
+      canManageCredentials: boolean;
+    };
+  }>> {
+    return this.apiClient.get(`/api/custodian/agent/${agentDid}`);
+  }
 }
 
 export const apiClient = APIClient.getInstance();
