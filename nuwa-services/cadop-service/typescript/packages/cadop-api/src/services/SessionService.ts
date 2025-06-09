@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 import { CadopError, CadopErrorCode } from '@cadop/shared';
 import { SessionRecord, SessionRepository } from '../repositories/sessions.js';
 import { UserRecord, UserRepository } from '../repositories/users.js';
-import { config } from '../config/environment.js';
+import { cryptoService } from './crypto.js';
 import crypto from 'crypto';
 import { Session } from '@cadop/shared';
 
@@ -53,7 +53,7 @@ export class SessionService {
         iat: now,
         exp: now + this.accessTokenDuration / 1000
       },
-      config.session.secret
+      cryptoService.getSessionSecret()
     );
 
     // Generate refresh token
@@ -65,7 +65,7 @@ export class SessionService {
         iat: now,
         exp: now + this.refreshTokenDuration / 1000
       },
-      config.session.secret
+      cryptoService.getSessionSecret()
     );
 
     return {
@@ -126,7 +126,7 @@ export class SessionService {
   }> {
     try {
       // Verify JWT first
-      const payload = jwt.verify(token, config.session.secret) as jwt.JwtPayload;
+      const payload = jwt.verify(token, cryptoService.getSessionSecret()) as jwt.JwtPayload;
       if (payload.type !== 'access') {
         return { valid: false };
       }
@@ -155,7 +155,7 @@ export class SessionService {
   async refreshAccessToken(refreshToken: string): Promise<SessionWithUser | null> {
     try {
       // Verify refresh token
-      const payload = jwt.verify(refreshToken, config.session.secret) as jwt.JwtPayload;
+      const payload = jwt.verify(refreshToken, cryptoService.getSessionSecret()) as jwt.JwtPayload;
       if (payload.type !== 'refresh') {
         return null;
       }

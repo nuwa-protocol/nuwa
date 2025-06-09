@@ -1,4 +1,4 @@
-import { webauthnService, WebAuthnService } from '../WebAuthnService.js';
+import { WebAuthnService } from '../WebAuthnService.js';
 import crypto from 'crypto';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import { generateRandomDid } from '../../test/mocks.js';
@@ -8,7 +8,15 @@ describe('WebAuthnService Real Data Test', () => {
   const testCredentialId = 'zL7EOz5Vd-iSGG0-z8yR0k2MKvdVRUdHT8T0-tnuPP438szQNVEvpNRjn_0';
 
   beforeAll(async () => {
-    service = webauthnService;
+    service = new WebAuthnService({
+      rpName: 'CADOP Service',
+      rpID: 'localhost',
+      origin: 'http://localhost:3000',
+      timeout: 30000,
+      attestationType: 'none',
+      cadopDid: 'did:rooch:test-service',
+      signingKey: 'test-signing-key'
+    });
   });
 
   beforeEach(async () => {

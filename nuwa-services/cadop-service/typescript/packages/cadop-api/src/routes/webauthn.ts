@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { webauthnService } from '../services/WebAuthnService.js';
+import { ServiceContainer } from '../services/ServiceContainer.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validation.js';
 import { logger } from '../utils/logger.js';
@@ -42,14 +42,18 @@ const handleError = (error: unknown): { status: number; response: any } => {
 };
 
 // Add WebAuthn configuration endpoint
-router.get('/.well-known/webauthn', (req: Request, res: Response) => {
+router.get('/.well-known/webauthn', async (req: Request, res: Response) => {
+  const container = await ServiceContainer.getInstance();
+  const webauthnService = container.getWebAuthnService();
+  const config = webauthnService.getConfig();
+  
   res.setHeader('Content-Type', 'application/json');
   res.json(createSuccessResponse({
     version: '1.0',
     rp: {
-      id: process.env.WEBAUTHN_RP_ID || 'localhost',
-      name: process.env.WEBAUTHN_RP_NAME || 'CADOP Service',
-      icon: `${process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000'}/favicon.ico`
+      id: config.rpID,
+      name: config.rpName,
+      icon: `${config.origin}/favicon.ico`
     }
   }));
 });
@@ -64,12 +68,15 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { user_did, name, display_name } = req.body;
+      const container = await ServiceContainer.getInstance();
+      const webauthnService = container.getWebAuthnService();
       const options = await webauthnService.generateAuthenticationOptions(user_did, {
         name,
         displayName: display_name
       });
-
-      res.json(createSuccessResponse(options));
+      const response = createSuccessResponse(options);
+      logger.debug('WebAuthn options generated', { response });
+      res.json(response);
     } catch (error) {
       const { status, response } = handleError(error);
       res.status(status).json(response);
@@ -86,6 +93,8 @@ router.post(
   validateRequest(verifySchema),
   async (req: Request, res: Response) => {
     try {
+      const container = await ServiceContainer.getInstance();
+      const webauthnService = container.getWebAuthnService();
       const result = await webauthnService.verifyAuthenticationResponse(req.body.response);
       res.json(createSuccessResponse(result));
     } catch (error) {
@@ -104,6 +113,8 @@ router.get(
   requireAuth,
   async (req: Request, res: Response) => {
     try {
+      const container = await ServiceContainer.getInstance();
+      const webauthnService = container.getWebAuthnService();
       const credentials = await webauthnService.getUserCredentials(req.user!.id);
       res.json(createSuccessResponse({ credentials }));
     } catch (error) {
@@ -123,6 +134,8 @@ router.delete(
   validateRequest(credentialSchema),
   async (req: Request, res: Response) => {
     try {
+      const container = await ServiceContainer.getInstance();
+      const webauthnService = container.getWebAuthnService();
       const success = await webauthnService.removeCredential(
         req.user!.id,
         req.params.id
@@ -149,6 +162,8 @@ router.post('/cleanup', requireAuth, async (req: Request, res: Response) => {
       ));
     }
 
+    const container = await ServiceContainer.getInstance();
+    const webauthnService = container.getWebAuthnService();
     const count = await webauthnService.cleanupExpiredChallenges();
     res.json(createSuccessResponse({ count }));
   } catch (error) {
@@ -170,6 +185,8 @@ router.get(
         userId: req.user!.id
       });
 
+      const container = await ServiceContainer.getInstance();
+      const webauthnService = container.getWebAuthnService();
       const idToken = await webauthnService.getIdToken(req.user!.id);
       res.json(createSuccessResponse(idToken));
     } catch (error) {

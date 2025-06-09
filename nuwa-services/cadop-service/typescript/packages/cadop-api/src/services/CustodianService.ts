@@ -21,9 +21,8 @@ const { Secp256k1Keypair } = roochSdk;
 import { WebAuthnService } from './WebAuthnService.js';
 
 export interface CustodianServiceConfig {
-  custodianDid: string;
+  cadopDid: string;
   maxDailyMints: number;
-  rpcUrl?: string;
 }
 
 export class CustodianService {
@@ -36,11 +35,7 @@ export class CustodianService {
   private webauthnService: WebAuthnService;
 
   constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService, cadopKit: CadopIdentityKit) {
-    this.config = {
-      ...config,
-      rpcUrl: config.rpcUrl || process.env.ROOCH_RPC_URL || 'https://test-seed.rooch.network/'
-    };
-    
+    this.config = config;
     this.didCreationRecords = new Map();
     this.userDids = new Map();
     this.dailyMintCount = new Map();
@@ -57,7 +52,7 @@ export class CustodianService {
       // 1. Validate ID Token using the singleton instance
       const tokenPayload = await this.webauthnService.verifyIdToken(
         { id_token: request.idToken },
-        this.config.custodianDid  // Verify we are the intended audience
+        this.config.cadopDid  // Verify we are the intended audience
       );
 
       // 2. Check daily mint quota

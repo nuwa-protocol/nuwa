@@ -2,26 +2,50 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { ServiceContainer } from '../services/ServiceContainer.js';
 import { logger } from '../utils/logger.js';
+import {
+  CadopError,
+  CadopErrorCode,
+  createErrorResponse,
+  createSuccessResponse,
+  createErrorResponseFromError,
+  CADOPMintRequestSchema,
+  DIDRecordIdSchema,
+  UserIdSchema,
+  AgentDIDSchema
+} from '@cadop/shared';
 
 const router: Router = Router();
 
-// Validation schemas
-const CADOPMintRequestSchema = z.object({
-  idToken: z.string().min(1, 'ID token is required'),
-  userDid: z.string().min(1, 'User DID is required'),
-});
-
-const DIDRecordIdSchema = z.object({
-  recordId: z.string().uuid('Invalid record ID format')
-});
-
-const UserIdSchema = z.object({
-  userId: z.string().min(1, 'User ID is required')
-});
-
-const AgentDIDSchema = z.object({
-  agentDid: z.string().regex(/^did:rooch:/, 'Invalid Agent DID format')
-});
+// Helper function to handle errors
+const handleError = (error: unknown): { status: number; response: any } => {
+  logger.error('API Error:', { error });
+  
+  if (error instanceof CadopError) {
+    return {
+      status: 400,
+      response: createErrorResponse(error.message, error.code, error.details)
+    };
+  }
+  
+  if (error instanceof z.ZodError) {
+    return {
+      status: 400,
+      response: createErrorResponse('Validation error', CadopErrorCode.VALIDATION_ERROR, error.errors)
+    };
+  }
+  
+  if (error instanceof Error) {
+    return {
+      status: 500,
+      response: createErrorResponse(error.message, CadopErrorCode.INTERNAL_ERROR)
+    };
+  }
+  
+  return {
+    status: 500,
+    response: createErrorResponse('Unknown error occurred', CadopErrorCode.INTERNAL_ERROR)
+  };
+};
 
 /**
  * POST /api/custodian/mint
@@ -37,8 +61,8 @@ router.post('/mint', async (req: Request, res: Response) => {
       userDid: validatedData.userDid
     });
 
-    const container = ServiceContainer.getInstance();
-    const custodianService = await container.getCustodianService();
+    const container = await ServiceContainer.getInstance();
+    const custodianService = container.getCustodianService();
 
     // Create Agent DID via CADOP
     const result = await custodianService.createAgentDIDViaCADOP({
@@ -51,28 +75,15 @@ router.post('/mint', async (req: Request, res: Response) => {
       status: result.status
     });
 
-    res.status(201).json({
-      success: true,
-      data: result
-    });
+    res.status(201).json(createSuccessResponse(result));
 
   } catch (error) {
     logger.error('CADOP mint request failed', { 
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        success: false,
-        error: 'Validation error',
-        details: error.errors
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Internal server error'
-      });
-    }
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 
@@ -85,22 +96,18 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
     // Validate path parameter
     const { recordId } = DIDRecordIdSchema.parse({ recordId: req.params['recordId'] });
     
-    const container = ServiceContainer.getInstance();
-    const custodianService = await container.getCustodianService();
+    const container = await ServiceContainer.getInstance();
+    const custodianService = container.getCustodianService();
     const status = await custodianService.getDIDCreationStatus(recordId);
     
     if (!status) {
-      res.status(404).json({
-        success: false,
-        error: 'DID creation record not found'
-      });
-      return;
+      return res.status(404).json(createErrorResponse(
+        'DID creation record not found',
+        CadopErrorCode.NOT_FOUND
+      ));
     }
 
-    res.json({
-      success: true,
-      data: status
-    });
+    res.json(createSuccessResponse(status));
 
   } catch (error) {
     logger.error('Failed to get DID creation status', { 
@@ -108,17 +115,8 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid record ID format'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 
@@ -131,14 +129,11 @@ router.get('/user/:userId/dids', async (req: Request, res: Response) => {
     // Validate path parameter
     const { userId } = UserIdSchema.parse({ userId: req.params['userId'] });
     
-    const container = ServiceContainer.getInstance();
-    const custodianService = await container.getCustodianService();
+    const container = await ServiceContainer.getInstance();
+    const custodianService = container.getCustodianService();
     const dids = await custodianService.getUserAgentDIDs(userId);
     
-    res.json({
-      success: true,
-      data: dids
-    });
+    res.json(createSuccessResponse({ dids }));
 
   } catch (error) {
     logger.error('Failed to get user Agent DIDs', { 
@@ -146,17 +141,8 @@ router.get('/user/:userId/dids', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid user ID format'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 
@@ -169,22 +155,18 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
-    const container = ServiceContainer.getInstance();
-    const custodianService = await container.getCustodianService();
+    const container = await ServiceContainer.getInstance();
+    const custodianService = container.getCustodianService();
     const didDocument = await custodianService.resolveAgentDID(agentDid);
     
     if (!didDocument) {
-      res.status(404).json({
-        success: false,
-        error: 'Agent DID not found'
-      });
-      return;
+      return res.status(404).json(createErrorResponse(
+        'Agent DID not found',
+        CadopErrorCode.NOT_FOUND
+      ));
     }
 
-    res.json({
-      success: true,
-      data: didDocument
-    });
+    res.json(createSuccessResponse(didDocument));
 
   } catch (error) {
     logger.error('Failed to resolve Agent DID', { 
@@ -192,17 +174,8 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid Agent DID format'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 
@@ -215,14 +188,11 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
     // Validate path parameter
     const { agentDid } = AgentDIDSchema.parse({ agentDid: req.params['agentDid'] });
     
-    const container = ServiceContainer.getInstance();
-    const custodianService = await container.getCustodianService();
+    const container = await ServiceContainer.getInstance();
+    const custodianService = container.getCustodianService();
     const exists = await custodianService.agentDIDExists(agentDid);
     
-    res.json({
-      success: true,
-      data: { exists }
-    });
+    res.json(createSuccessResponse({ exists }));
 
   } catch (error) {
     logger.error('Failed to check Agent DID existence', { 
@@ -230,41 +200,8 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid Agent DID format'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
-});
-
-/**
- * GET /api/custodian/health
- * Health check endpoint
- */
-router.get('/health', async (req: Request, res: Response) => {
-  try {
-    // Basic health check - could be extended to check Rooch network connectivity
-    res.json({
-      success: true,
-      data: {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'custodian-service'
-      }
-    });
-  } catch (error) {
-    logger.error('Health check failed', { error });
-    res.status(500).json({
-      success: false,
-      error: 'Service unhealthy'
-    });
+    const { status, response } = handleError(error);
+    res.status(status).json(response);
   }
 });
 

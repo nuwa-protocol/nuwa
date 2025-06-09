@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Steps, Card, Button, Alert, Typography, Row, Col, Space, Spin } from 'antd';
-import { CheckCircleOutlined, LoadingOutlined, ClockCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, LoadingOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth/AuthContext';
-import { useCustodianService } from '../hooks/useCustodianService.js';
-import { AgentDIDInstructions } from '../components/AgentDIDInstructions.js';
 import { DIDCreationStatus } from '../components/DIDCreationStatus.js';
 import { DIDDisplayCard } from '../components/DIDDisplayCard.js';
-import type { CreateAgentDIDRequest, AgentDIDCreationStatus as DIDStatus } from '@cadop/shared/types';
+import { webAuthnClient, custodianClient } from '../lib/api/client';
+import type { AgentDIDCreationStatus as DIDStatus } from '@cadop/shared';
 
 const { Title, Text } = Typography;
 
 export const CreateAgentDIDPage: React.FC = () => {
   const { session, isAuthenticated, isLoading: authLoading } = useAuth();
   const user = session?.user;
-  const { createAgentDID, getCreationStatus } = useCustodianService();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -23,23 +21,26 @@ export const CreateAgentDIDPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Helper function to get ID token (session token)
-  const getIdToken = async (): Promise<string | null> => {
-    return session?.session_token || null;
-  };
-
   // Auto-check status if recordId is in URL
   useEffect(() => {
     const recordId = searchParams.get('recordId');
     if (recordId) {
-      getCreationStatus(recordId).then((status: DIDStatus | null) => {
-        if (status) {
-          setDidCreationStatus(status);
-          setCurrentStep(2);
-        }
-      });
+      checkCreationStatus(recordId);
     }
-  }, [searchParams, getCreationStatus]);
+  }, [searchParams]);
+
+  const checkCreationStatus = async (recordId: string) => {
+    try {
+      const response = await custodianClient.getStatus(recordId);
+      if (response.data) {
+        setDidCreationStatus(response.data);
+        setCurrentStep(1);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to check DID creation status';
+      setError(message);
+    }
+  };
 
   const handleStartCreation = async () => {
     if (!user) {
@@ -51,22 +52,22 @@ export const CreateAgentDIDPage: React.FC = () => {
     setError(null);
 
     try {
-      const idToken = await getIdToken();
-      if (!idToken) {
+      const idTokenResponse = await webAuthnClient.getIdToken();
+      if (!idTokenResponse.data) {
         throw new Error('Unable to get authentication token');
       }
 
-      const request: CreateAgentDIDRequest = {
-        idToken,
-        ...(user.primaryAgentDid && { userDidKey: user.primaryAgentDid }),
-        custodianServicePublicKeyMultibase: 'z' + (process.env['REACT_APP_CUSTODIAN_PUBLIC_KEY'] || 'default-key'),
-        custodianServiceVMType: 'Ed25519VerificationKey2020',
-        ...(selectedAuthMethods && selectedAuthMethods.length > 0 && { additionalAuthMethods: selectedAuthMethods }),
-      };
+      const response = await custodianClient.mint({
+        idToken: idTokenResponse.data.id_token,
+        userDid: user.userDid
+      });
 
-      const result = await createAgentDID(request);
-      setDidCreationStatus(result);
-      setCurrentStep(2);
+      if (response.data) {
+        setDidCreationStatus(response.data);
+        setCurrentStep(1);
+      } else {
+        throw new Error('Failed to create Agent DID');
+      }
 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -78,24 +79,14 @@ export const CreateAgentDIDPage: React.FC = () => {
 
   const steps = [
     {
-      title: 'Introduction',
-      description: 'Learn about Agent DIDs',
-      icon: <ExclamationCircleOutlined />
-    },
-    {
-      title: 'Authentication',
-      description: 'Select authentication methods',
-      icon: loading ? <LoadingOutlined /> : <CheckCircleOutlined />
-    },
-    {
       title: 'Creation',
       description: 'Creating your Agent DID',
-      icon: didCreationStatus?.status === 'processing' ? <LoadingOutlined /> : <ClockCircleOutlined />
+      icon: loading ? <LoadingOutlined /> : <CheckCircleOutlined />
     },
     {
       title: 'Complete',
       description: 'Agent DID created successfully',
-      icon: <CheckCircleOutlined />
+      icon: didCreationStatus?.status === 'processing' ? <LoadingOutlined /> : <ClockCircleOutlined />
     }
   ];
 
@@ -103,41 +94,48 @@ export const CreateAgentDIDPage: React.FC = () => {
     switch (currentStep) {
       case 0:
         return (
-          <AgentDIDInstructions
-            onContinue={() => setCurrentStep(1)}
-            userSybilLevel={user?.sybilLevel || 0}
-          />
+          <Card>
+            <Title level={4}>Create Agent DID</Title>
+            <Text>Click the button below to create your Agent DID.</Text>
+            <Button
+              type="primary"
+              onClick={handleStartCreation}
+              loading={loading}
+              style={{ marginTop: 16 }}
+            >
+              Create Agent DID
+            </Button>
+          </Card>
         );
 
       case 1:
         return (
-          <DIDCreationStatus
-            status={didCreationStatus}
-            onRetry={() => setCurrentStep(1)}
-          />
-        );
-
-      case 3:
-        return (
-          <div style={{ textAlign: 'center' }}>
-            <DIDDisplayCard
-              {...(didCreationStatus?.agentDid && { agentDid: didCreationStatus.agentDid })}
-              {...(didCreationStatus?.transactionHash && { transactionHash: didCreationStatus.transactionHash })}
-              {...(didCreationStatus?.createdAt && { createdAt: didCreationStatus.createdAt })}
+          <div>
+            <DIDCreationStatus
+              status={didCreationStatus}
+              onRetry={handleStartCreation}
             />
-            <Space style={{ marginTop: 24 }}>
-              <Button type="default" onClick={() => navigate('/dashboard')}>
-                Go to Dashboard
-              </Button>
-              <Button type="primary" onClick={() => {
-                setCurrentStep(0);
-                setSelectedAuthMethods([]);
-                setDidCreationStatus(null);
-                setError(null);
-              }}>
-                Create Another DID
-              </Button>
-            </Space>
+            {didCreationStatus?.status === 'completed' && (
+              <div style={{ textAlign: 'center', marginTop: 24 }}>
+                <DIDDisplayCard
+                  {...(didCreationStatus?.agentDid && { agentDid: didCreationStatus.agentDid })}
+                  {...(didCreationStatus?.transactionHash && { transactionHash: didCreationStatus.transactionHash })}
+                  {...(didCreationStatus?.createdAt && { createdAt: didCreationStatus.createdAt })}
+                />
+                <Space style={{ marginTop: 24 }}>
+                  <Button type="default" onClick={() => navigate('/dashboard')}>
+                    Go to Dashboard
+                  </Button>
+                  <Button type="primary" onClick={() => {
+                    setCurrentStep(0);
+                    setDidCreationStatus(null);
+                    setError(null);
+                  }}>
+                    Create Another DID
+                  </Button>
+                </Space>
+              </div>
+            )}
           </div>
         );
 

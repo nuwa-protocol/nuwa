@@ -6,7 +6,6 @@ import { config } from '../config/environment.js';
 import { SessionRecord } from '../repositories/sessions.js';
 import { UserRecord } from '../repositories/users.js';
 
-// 认证错误类
 class AuthError extends Error {
   constructor(
     public code: string,

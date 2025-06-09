@@ -1,45 +1,130 @@
-import { CustodianService, type CustodianServiceConfig } from './CustodianService.js';
+import { CustodianService } from './CustodianService.js';
 import { WebAuthnService } from './WebAuthnService.js';
 import { logger } from '../utils/logger.js';
-import { CadopIdentityKit, createVDR, LocalSigner, VDRRegistry } from 'nuwa-identity-kit';
-import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
+import { BaseMultibaseCodec, CadopIdentityKit, createVDR, VDRInterface, VDRRegistry, LocalSigner, CadopServiceType } from 'nuwa-identity-kit';
+import roochSdk from '@roochnetwork/rooch-sdk';
+import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
+import { cryptoService } from './crypto.js';
+const { Secp256k1Keypair } = roochSdk;
+
+export interface ServiceConfig {
+  cadopDid: string;
+  webauthn: {
+    rpName: string;
+    rpID: string;
+    origin: string;
+    timeout: number;
+    attestationType: 'none' | 'indirect' | 'direct';
+  };
+  custodian: {
+    maxDailyMints: number;
+  };
+  rooch: {
+    networkUrl: string;
+    networkId: string;
+  };
+  isDevelopment: boolean;
+}
 
 export class ServiceContainer {
   private static instance: ServiceContainer | null = null;
-  private custodianService: CustodianService | null = null;
-  private config: CustodianServiceConfig;
-  private webauthnService: WebAuthnService;
+  private webauthnService!: WebAuthnService;
+  private custodianService!: CustodianService;
+  private serviceConfig: ServiceConfig;
 
-  private constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService) {
-    this.config = config;
-    this.webauthnService = webauthnService;
+  private constructor(config: ServiceConfig) {
+    this.serviceConfig = config;
   }
 
-  static getInstance(config?: CustodianServiceConfig, webauthnService?: WebAuthnService): ServiceContainer {
+  private async initialize() {
+    try {
+      logger.info('Initializing services');
+      logger.info('Service config', this.serviceConfig);
+
+      logger.info('Initializing crypto service');
+      await cryptoService.initializeKeys();
+      logger.info('Crypto service initialized successfully');
+
+
+      // Initialize VDR and signer for Custodian service
+      logger.info('Initializing VDR and signer...');
+      const keypair = cryptoService.getRoochKeypair();
+      const roochVDR = createVDR('rooch', {
+        rpcUrl: this.serviceConfig.rooch.networkUrl,
+        signer: keypair,
+        debug: true
+      });
+      VDRRegistry.getInstance().registerVDR(roochVDR);
+
+      const isDevelopment = this.serviceConfig.isDevelopment;
+      if (isDevelopment){
+        //Auto create a new service DID if the did is placeholder
+        if (this.serviceConfig.cadopDid === 'did:rooch:placeholder'){
+          this.serviceConfig.cadopDid = await this.createServiceDID(roochVDR);
+        }
+      }
+      
+      // Initialize WebAuthn service
+      logger.info('Initializing WebAuthn service...');
+
+      this.webauthnService = new WebAuthnService({
+        ...this.serviceConfig.webauthn,
+        cadopDid: this.serviceConfig.cadopDid,
+        signingKey: cryptoService.getWebAuthnSigningKey()
+      });
+      logger.info('WebAuthn service initialized');
+
+      
+
+      // Initialize CadopKit
+      logger.info('Initializing CadopKit...');
+      const signer = await LocalSigner.createEmpty(this.serviceConfig.cadopDid);
+      signer.importRoochKeyPair('account-key', keypair);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(
+        this.serviceConfig.cadopDid, 
+        signer
+      );
+
+      // Initialize Custodian service
+      logger.info('Initializing Custodian service...');
+      this.custodianService = new CustodianService(
+        {
+          cadopDid: this.serviceConfig.cadopDid,
+          maxDailyMints: this.serviceConfig.custodian.maxDailyMints,
+        },
+        this.webauthnService,
+        cadopKit
+      );
+      logger.info('Custodian service initialized');
+
+      logger.info('All services initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize services', { error });
+      throw error;
+    }
+  }
+
+  static async getInstance(config?: ServiceConfig): Promise<ServiceContainer> {
     if (!ServiceContainer.instance) {
-      if (!config || !webauthnService) {
+      if (!config) {
         throw new Error('Configuration required for first initialization');
       }
-      ServiceContainer.instance = new ServiceContainer(config, webauthnService);
+      ServiceContainer.instance = new ServiceContainer(config);
+      await ServiceContainer.instance.initialize();
     }
     return ServiceContainer.instance;
   }
 
-  async getCustodianService(): Promise<CustodianService> {
+  getWebAuthnService(): WebAuthnService {
+    if (!this.webauthnService) {
+      throw new Error('WebAuthn service not initialized');
+    }
+    return this.webauthnService;
+  }
+
+  getCustodianService(): CustodianService {
     if (!this.custodianService) {
-      logger.info('Creating new CustodianService instance');
-      //TODO load keypair from env
-      const keypair = Secp256k1Keypair.generate();
-      const vdr = createVDR('rooch', {
-        rpcUrl: this.config.rpcUrl || process.env.ROOCH_RPC_URL || 'https://test-seed.rooch.network/',
-        signer: keypair,
-        debug: true
-      });
-      VDRRegistry.getInstance().registerVDR(vdr);
-      const signer = await LocalSigner.createEmpty(this.config.custodianDid);
-      signer.importRoochKeyPair('account-key', keypair);
-      const cadopKit = await CadopIdentityKit.fromServiceDID(this.config.custodianDid, signer);
-      this.custodianService = new CustodianService(this.config, this.webauthnService, cadopKit);
+      throw new Error('Custodian service not initialized');
     }
     return this.custodianService;
   }
@@ -47,5 +132,45 @@ export class ServiceContainer {
   // For testing purposes only
   static resetInstance(): void {
     ServiceContainer.instance = null;
+  }
+
+  private async createServiceDID(roochVDR: VDRInterface): Promise<string> {
+    const serviceKeypair = cryptoService.getRoochKeypair();
+
+    const publicKeyBytes = serviceKeypair.getPublicKey().toBytes();
+    const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+    
+    const createResult = await roochVDR.create({
+      publicKeyMultibase,
+      keyType: 'EcdsaSecp256k1VerificationKey2019',
+    }, {
+      signer: serviceKeypair
+    });
+    if (!createResult.success) {
+      throw new Error(`Failed to create service DID, error: ${JSON.stringify(createResult, null, 2)}`);
+    }
+
+    const cadopDid = createResult.didDocument!.id;
+    logger.debug("Created service DID Result", createResult);
+
+    const localSigner = await LocalSigner.createEmpty(cadopDid);
+    localSigner.importRoochKeyPair('account-key', serviceKeypair);
+    const cadopKit = await CadopIdentityKit.fromServiceDID(cadopDid, localSigner);
+    
+    // Add CADOP service
+    const serviceId = await cadopKit.addService({
+      idFragment: 'custodian',
+      type: CadopServiceType.CUSTODIAN,
+      serviceEndpoint: 'http://localhost:8080',
+      additionalProperties: {
+        custodianPublicKey: publicKeyMultibase,
+        custodianServiceVMType: 'EcdsaSecp256k1VerificationKey2019',
+        description: 'Test Custodian Service'
+      }
+    });
+
+    logger.info("Please update the cadopDid in the environment variables");
+    logger.info(`CADOP DID: ${cadopDid}`);
+    return cadopDid;
   }
 } 
