@@ -19,7 +19,7 @@ export function AddAuthMethodPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { userDid } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form] = Form.useForm();
@@ -29,14 +29,14 @@ export function AddAuthMethodPage() {
     if (did) {
       loadDIDService();
     }
-  }, [did, session]);
+  }, [did, userDid]);
 
 
   const loadDIDService = async () => {
-    if (!did || !session) return;
+    if (!did || !userDid) return;
     
     try {
-      const service = await DIDService.initialize(did, session);
+      const service = await DIDService.initialize(did);
       setDidService(service);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');

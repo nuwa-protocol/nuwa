@@ -18,6 +18,7 @@ import roochSdk from '@roochnetwork/rooch-sdk';
 import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
 const { Secp256k1Keypair } = roochSdk;
 
+import jwt from 'jsonwebtoken';
 import { WebAuthnService } from './WebAuthnService.js';
 
 export interface CustodianServiceConfig {
@@ -49,11 +50,21 @@ export class CustodianService {
    */
   async createAgentDIDViaCADOP(request: CreateAgentDIDRequest): Promise<AgentDIDCreationStatus> {
     try {
-      // 1. Validate ID Token using the singleton instance
-      const tokenPayload = await this.webauthnService.verifyIdToken(
-        { id_token: request.idToken },
-        this.config.cadopDid  // Verify we are the intended audience
-      );
+      // 1. Simplified ID Token validation: just decode & check audience
+      let tokenPayload: any;
+      try {
+        tokenPayload = jwt.decode(request.idToken) as any;
+      } catch {
+        throw new Error('Invalid idToken');
+      }
+
+      if (!tokenPayload || tokenPayload.aud !== this.config.cadopDid) {
+        throw new Error('Invalid token audience');
+      }
+
+      if (!tokenPayload.sub) {
+        throw new Error('Token missing subject');
+      }
 
       // 2. Check daily mint quota
       await this.checkAndUpdateDailyMintQuota(tokenPayload.sub);

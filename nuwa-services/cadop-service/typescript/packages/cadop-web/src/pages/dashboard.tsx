@@ -8,41 +8,22 @@ import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { custodianClient } from '../lib/api/client';
 import { Spin, Alert, Tooltip, Button as AntButton } from 'antd';
 import { InfoCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
+import { AgentService } from '../lib/agent/AgentService';
 
 export function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { session, signOut } = useAuth();
+  const { userDid, signOut } = useAuth();
+  const agentService = new AgentService();
   const [agentDids, setAgentDids] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (session?.user?.id) {
-      loadAgentDids();
+    if (userDid) {
+      setAgentDids(agentService.getCachedAgentDIDs(userDid));
     }
-  }, [session?.user?.id]);
-
-  const loadAgentDids = async () => {
-    if (!session?.user?.id) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await custodianClient.getUserAgentDIDs(session.user.userDid);
-      console.log('Agent DIDs response:', response);
-      if (response.data) {
-        setAgentDids(response.data.dids);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
-      setError(message);
-    } finally {
-      console.log('Agent DIDs:', agentDids);
-      setLoading(false);
-    }
-  };
+  }, [userDid]);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -79,12 +60,8 @@ export function DashboardPage() {
             
             <div className="mt-4 border-t border-gray-200 pt-4">
               <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">{t('dashboard.identity.userId')}</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{session?.user?.id}</dd>
-                </div>
                 
-                {session?.user?.userDid && (
+                {userDid && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
                       {t('dashboard.identity.userDid')}
@@ -93,7 +70,7 @@ export function DashboardPage() {
                       </Tooltip>
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      <DIDDisplay did={session.user.userDid} />
+                      <DIDDisplay did={userDid} />
                     </dd>
                   </div>
                 )}

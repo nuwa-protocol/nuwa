@@ -11,6 +11,7 @@ import { healthRouter } from './routes/health.js';
 import custodianRouter from './routes/custodian.js';
 import { proofRouter } from './routes/proof.js';
 import webauthnRouter from './routes/webauthn.js';
+import idpRouter from './routes/idp.js';
 
 async function initializeServices() {
   try {
@@ -82,6 +83,7 @@ async function startApp(): Promise<Application> {
     app.use('/api/custodian', custodianRouter);
     app.use('/api/proof', proofRouter);
     app.use('/api/webauthn', webauthnRouter);
+    app.use('/api/idp', idpRouter);
 
     // 404 handler for undefined routes
     app.use((req, res) => {

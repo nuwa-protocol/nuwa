@@ -10,7 +10,7 @@ export class DIDService {
     this.identityKit = identityKit;
   }
 
-  static async initialize(did: string, session: Session): Promise<DIDService> {
+  static async initialize(did: string, credentialId?: string): Promise<DIDService> {
     try {
         const roochVDR = createVDR('rooch', {
             rpcUrl: import.meta.env.VITE_ROOCH_RPC_URL,
@@ -25,7 +25,7 @@ export class DIDService {
             didDocument: didDocument,
             rpId: window.location.hostname,
             rpName: 'CADOP',
-            credentialId: session.credentialId
+            credentialId: credentialId || undefined
         });
 
         const identityKit = await NuwaIdentityKit.fromDIDDocument(

@@ -5,14 +5,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth/AuthContext';
 import { DIDCreationStatus } from '../components/DIDCreationStatus.js';
 import { DIDDisplayCard } from '../components/DIDDisplayCard.js';
-import { webAuthnClient, custodianClient } from '../lib/api/client';
+import { custodianClient } from '../lib/api/client';
+import { AgentService } from '../lib/agent/AgentService';
 import type { AgentDIDCreationStatus as DIDStatus } from '@cadop/shared';
 
 const { Title, Text } = Typography;
 
 export const CreateAgentDIDPage: React.FC = () => {
-  const { session, isAuthenticated, isLoading: authLoading } = useAuth();
-  const user = session?.user;
+  const { userDid, isAuthenticated, isLoading: authLoading } = useAuth();
+  const agentService = new AgentService();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -43,7 +44,7 @@ export const CreateAgentDIDPage: React.FC = () => {
   };
 
   const handleStartCreation = async () => {
-    if (!user) {
+    if (!userDid) {
       setError('Please sign in first');
       return;
     }
@@ -52,23 +53,9 @@ export const CreateAgentDIDPage: React.FC = () => {
     setError(null);
 
     try {
-      const idTokenResponse = await webAuthnClient.getIdToken();
-      if (!idTokenResponse.data) {
-        throw new Error('Unable to get authentication token');
-      }
-
-      const response = await custodianClient.mint({
-        idToken: idTokenResponse.data.id_token,
-        userDid: user.userDid
-      });
-
-      if (response.data) {
-        setDidCreationStatus(response.data);
-        setCurrentStep(1);
-      } else {
-        throw new Error('Failed to create Agent DID');
-      }
-
+      const status = await agentService.createAgent();
+      setDidCreationStatus(status);
+      setCurrentStep(1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(message);
