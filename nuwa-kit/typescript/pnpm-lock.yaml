@@ -26,6 +26,9 @@ importers:
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.4
         version: 0.3.4(typescript@5.8.3)
+      '@simplewebauthn/types':
+        specifier: ^12.0.0
+        version: 12.0.0
       did-resolver:
         specifier: ^4.1.0
         version: 4.1.0
@@ -44,12 +47,6 @@ importers:
       multiformats:
         specifier: ^9.9.0
         version: 9.9.0
-      tweetnacl:
-        specifier: ^1.0.3
-        version: 1.0.3
-      tweetnacl-util:
-        specifier: ^0.15.1
-        version: 0.15.1
     devDependencies:
       '@types/jest':
         specifier: ^29.5.14
@@ -385,6 +382,9 @@ packages:
 
   '@scure/bip39@1.6.0':
     resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
+
+  '@simplewebauthn/types@12.0.0':
+    resolution: {integrity: sha512-q6y8MkoV8V8jB4zzp18Uyj2I7oFp2/ONL8c3j8uT06AOWu3cIChc1au71QYHrP2b+xDapkGTiv+9lX7xkTlAsA==}
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -1400,9 +1400,6 @@ packages:
       esbuild:
         optional: true
 
-  tweetnacl-util@0.15.1:
-    resolution: {integrity: sha512-RKJBIj8lySrShN4w6i/BonWp2Z/uxwC3h4y7xsRrpP59ZboCd0GpEVsOnMDYLMmKBpYhb5TgHzZXy7wTfYFBRw==}
-
   tweetnacl@1.0.3:
     resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
 
@@ -1973,6 +1970,8 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.5
+
+  '@simplewebauthn/types@12.0.0': {}
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -3119,8 +3118,6 @@ snapshots:
       '@jest/transform': 29.7.0
       '@jest/types': 29.6.3
       babel-jest: 29.7.0(@babel/core@7.27.1)
-
-  tweetnacl-util@0.15.1: {}
 
   tweetnacl@1.0.3: {}
 
