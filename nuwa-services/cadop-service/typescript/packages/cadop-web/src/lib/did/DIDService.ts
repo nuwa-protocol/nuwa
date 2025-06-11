@@ -13,7 +13,7 @@ export class DIDService {
   static async initialize(did: string, session: Session): Promise<DIDService> {
     try {
         const roochVDR = createVDR('rooch', {
-            rpcUrl: 'http://localhost:6767',
+            rpcUrl: import.meta.env.VITE_ROOCH_RPC_URL,
             debug: true
         });
         VDRRegistry.getInstance().registerVDR(roochVDR);

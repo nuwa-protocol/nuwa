@@ -33,6 +33,7 @@ import { mapToSession, SessionService } from './SessionService.js';
 import crypto from 'crypto';
 import { decode } from 'cbor2';
 import jwt from 'jsonwebtoken';
+import { DidKeyCodec, algorithmToKeyType, getSupportedAlgorithms } from 'nuwa-identity-kit';
 
 
 // Input type for creating authenticator
@@ -190,7 +191,7 @@ export class WebAuthnService {
           attestationType: this.config.attestationType,
           authenticatorSelection: authenticatorSelection,
           // only support EdDSA (Ed25519) and ES256 (ECDSA)
-          supportedAlgorithmIDs: [-8, -7],
+          supportedAlgorithmIDs: getSupportedAlgorithms(),
         });
 
         logger.debug('Generated registration options', options);
@@ -662,7 +663,11 @@ export class WebAuthnService {
         try {
           // generate the real DID from the public key
           const publicKey = Buffer.from(registrationInfo.credential.publicKey);
-          const realDid = this.generateDIDFromPublicKey(publicKey);
+          const publicKeyAlgorithm = response.response.publicKeyAlgorithm;
+          if (!publicKeyAlgorithm) {
+            throw new Error('Public key algorithm not found');
+          }
+          const realDid = this.generateDIDFromPublicKey(publicKey, publicKeyAlgorithm);
 
           logger.debug('Generated real DID from public key', {
             userId: user.id,
@@ -755,7 +760,7 @@ export class WebAuthnService {
   /**
    * generate a DID from a public key
    */
-  private generateDIDFromPublicKey(publicKeyBuffer: ArrayBuffer): string {
+  private generateDIDFromPublicKey(publicKeyBuffer: ArrayBuffer, algorithm: number): string {
     try {
       // parse the COSE key
       const publicKeyBytes = Buffer.from(publicKeyBuffer);
@@ -785,8 +790,13 @@ export class WebAuthnService {
         rawPublicKey.byteOffset,
         rawPublicKey.byteOffset + rawPublicKey.length
       );
-      
-      return DIDKeyManager.generateDIDFromEd25519PublicKey(rawPublicKeyBuffer);
+
+      const keyType = algorithmToKeyType(algorithm);
+      if (!keyType) {
+        throw new Error('Unsupported algorithm');
+      }
+
+      return DidKeyCodec.generateDidKey(rawPublicKeyBuffer, keyType);
     } catch (error) {
       logger.error('Failed to generate DID from public key', {
         error,
