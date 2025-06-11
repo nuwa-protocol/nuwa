@@ -51,6 +51,9 @@ export class CryptoUtils {
       case 'secp256k1':
         keyType = KEY_TYPE.SECP256K1;
         break;
+      case 'P-256':
+        keyType = KEY_TYPE.ECDSAR1;
+        break;
       default:
         throw new Error(`Unsupported curve: ${jwk.crv}`);
     }
