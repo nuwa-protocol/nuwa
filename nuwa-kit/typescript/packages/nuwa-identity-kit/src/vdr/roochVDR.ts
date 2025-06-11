@@ -366,7 +366,8 @@ export class RoochVDR extends AbstractVDR {
       if (!signer) {
         throw new Error('No custodian signer provided for CADOP operation');
       }
-
+      
+      this.debugLog('Creating DID via CADOP with request:', request);
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       // Create transaction
       const transaction = this.createTransaction();

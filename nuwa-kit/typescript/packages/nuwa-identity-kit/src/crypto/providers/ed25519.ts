@@ -1,10 +1,24 @@
-import { webcrypto } from 'crypto';
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
 
+// Get crypto object based on environment
+function getCrypto() {
+  if (typeof window !== 'undefined') {
+    return window.crypto;
+  }
+  // In Node.js environment, we need to use dynamic import
+  return require('crypto').webcrypto;
+}
+
 export class Ed25519Provider implements CryptoProvider {
+  private crypto: Crypto;
+
+  constructor() {
+    this.crypto = getCrypto();
+  }
+
   async generateKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
-    const { publicKey, privateKey } = await webcrypto.subtle.generateKey(
+    const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
       {
         name: 'Ed25519',
         namedCurve: 'Ed25519'
@@ -13,8 +27,8 @@ export class Ed25519Provider implements CryptoProvider {
       ['sign', 'verify']
     );
 
-    const exportedPublic = new Uint8Array(await webcrypto.subtle.exportKey('raw', publicKey));
-    const exportedPrivate = new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', privateKey));
+    const exportedPublic = new Uint8Array(await this.crypto.subtle.exportKey('raw', publicKey));
+    const exportedPrivate = new Uint8Array(await this.crypto.subtle.exportKey('pkcs8', privateKey));
 
     return {
       publicKey: exportedPublic,
@@ -25,7 +39,7 @@ export class Ed25519Provider implements CryptoProvider {
   async sign(data: Uint8Array, privateKey: Uint8Array | CryptoKey): Promise<Uint8Array> {
     let key: CryptoKey;
     if (privateKey instanceof Uint8Array) {
-      key = await webcrypto.subtle.importKey(
+      key = await this.crypto.subtle.importKey(
         'pkcs8',
         privateKey,
         {
@@ -39,7 +53,7 @@ export class Ed25519Provider implements CryptoProvider {
       key = privateKey;
     }
 
-    const signature = await webcrypto.subtle.sign(
+    const signature = await this.crypto.subtle.sign(
       'Ed25519',
       key,
       data
@@ -51,7 +65,7 @@ export class Ed25519Provider implements CryptoProvider {
   async verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey): Promise<boolean> {
     let key: CryptoKey;
     if (publicKey instanceof Uint8Array) {
-      key = await webcrypto.subtle.importKey(
+      key = await this.crypto.subtle.importKey(
         'raw',
         publicKey,
         {
@@ -62,7 +76,7 @@ export class Ed25519Provider implements CryptoProvider {
         ['verify']
       );
     } else {
-      key = await webcrypto.subtle.importKey(
+      key = await this.crypto.subtle.importKey(
         'jwk',
         publicKey,
         {
@@ -74,7 +88,7 @@ export class Ed25519Provider implements CryptoProvider {
       );
     }
 
-    return await webcrypto.subtle.verify(
+    return await this.crypto.subtle.verify(
       'Ed25519',
       key,
       signature,

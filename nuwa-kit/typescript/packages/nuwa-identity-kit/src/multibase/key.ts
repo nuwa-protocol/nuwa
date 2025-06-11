@@ -8,8 +8,10 @@ import { BaseMultibaseCodec } from './base';
 export class KeyMultibaseCodec {
   private static readonly ED25519_PREFIX = new Uint8Array([0xed, 0x01]);
   private static readonly SECP256K1_PREFIX = new Uint8Array([0xe7, 0x01]);
+  private static readonly ECDSA_R1_PREFIX = new Uint8Array([0x12, 0x00]);
   private static readonly ED25519_KEY_LENGTH = 32;
   private static readonly SECP256K1_KEY_LENGTH = 33;
+  private static readonly ECDSA_R1_KEY_LENGTH = 33;
 
   /**
    * Encode public key with multicodec prefix
@@ -65,6 +67,8 @@ export class KeyMultibaseCodec {
         return this.ED25519_PREFIX;
       case KEY_TYPE.SECP256K1:
         return this.SECP256K1_PREFIX;
+      case KEY_TYPE.ECDSAR1:
+        return this.ECDSA_R1_PREFIX;
       default:
         throw new Error(`Unsupported key type: ${keyType}`);
     }
@@ -82,6 +86,8 @@ export class KeyMultibaseCodec {
       return KEY_TYPE.ED25519;
     } else if (prefixedBytes[0] === 0xe7 && prefixedBytes[1] === 0x01) {
       return KEY_TYPE.SECP256K1;
+    } else if (prefixedBytes[0] === 0x12 && prefixedBytes[1] === 0x00) {
+      return KEY_TYPE.ECDSAR1;
     }
     throw new Error('Unknown key type prefix');
   }
@@ -96,6 +102,8 @@ export class KeyMultibaseCodec {
         return this.ED25519_KEY_LENGTH;
       case KEY_TYPE.SECP256K1:
         return this.SECP256K1_KEY_LENGTH;
+      case KEY_TYPE.ECDSAR1:
+        return this.ECDSA_R1_KEY_LENGTH;
       default:
         throw new Error(`Unsupported key type: ${keyType}`);
     }

@@ -437,7 +437,8 @@ export interface CadopOnboardingResponse {
  */
 export const KEY_TYPE = {
   ED25519: 'Ed25519VerificationKey2020',
-  SECP256K1: 'EcdsaSecp256k1VerificationKey2019'
+  SECP256K1: 'EcdsaSecp256k1VerificationKey2019',
+  ECDSAR1: 'EcdsaSecp256r1VerificationKey2019'
 } as const;
 
 export type KeyType = typeof KEY_TYPE[keyof typeof KEY_TYPE];
@@ -458,6 +459,38 @@ export function toKeyType(value: string): KeyType {
     return value;
   }
   throw new Error(`Invalid key type: ${value}`);
+}
+
+/**
+ * https://www.w3.org/TR/webauthn-2/#typedefdef-cosealgorithmidentifier
+ * Convert a WebAuthn public key algorithm to KeyType, with runtime validation
+ * @throws Error if the string is not a valid KeyType
+ */
+export function algorithmToKeyType(algorithm: number): KeyType|undefined {
+  switch (algorithm) {
+    case -8:
+      return KEY_TYPE.ED25519;
+    case -7:
+      return KEY_TYPE.ECDSAR1;
+    default:
+      return undefined;
+  }
+}
+
+export function keyTypeToAlgorithm(keyType: KeyType): number|undefined {
+  switch (keyType) {
+    case KEY_TYPE.ED25519:
+      return -8;
+    case KEY_TYPE.ECDSAR1:
+      return -7;
+    default:
+      return undefined;
+  }
+}
+
+
+export function getSupportedAlgorithms(): number[] {
+  return [-8, -7];
 }
 
 /**

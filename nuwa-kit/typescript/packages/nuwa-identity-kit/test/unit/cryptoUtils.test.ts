@@ -24,6 +24,12 @@ describe('CryptoUtils', () => {
       expect(keyPair.privateKey).toBeDefined();
     });
 
+    it('should generate ECDSAR1 key pair', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ECDSAR1);
+      expect(keyPair.publicKey).toBeDefined();
+      expect(keyPair.privateKey).toBeDefined();
+    });
+
     it('should throw error for invalid key type', async () => {
       await expect(CryptoUtils.generateKeyPair('invalid-type' as any))
         .rejects
@@ -41,6 +47,12 @@ describe('CryptoUtils', () => {
     it('should convert Secp256k1 public key to multibase', async () => {
       const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.SECP256K1);
       const multibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.SECP256K1);
+      expect(multibase).toMatch(/^z[1-9A-Za-z]+$/); // Base58btc encoded string
+    });
+
+    it('should convert ECDSAR1 public key to multibase', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ECDSAR1);
+      const multibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ECDSAR1);
       expect(multibase).toMatch(/^z[1-9A-Za-z]+$/); // Base58btc encoded string
     });
   });
@@ -65,6 +77,17 @@ describe('CryptoUtils', () => {
       expect(signature).toBeDefined();
       
       const isValid = await CryptoUtils.verify(data, signature, keyPair.publicKey, KEY_TYPE.SECP256K1);
+      expect(isValid).toBe(true);
+    });
+
+    it('should sign and verify with ECDSAR1', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ECDSAR1);
+      const data = new TextEncoder().encode('test message');
+      
+      const signature = await CryptoUtils.sign(data, keyPair.privateKey, KEY_TYPE.ECDSAR1);
+      expect(signature).toBeDefined();
+      
+      const isValid = await CryptoUtils.verify(data, signature, keyPair.publicKey, KEY_TYPE.ECDSAR1);
       expect(isValid).toBe(true);
     });
 
