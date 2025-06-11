@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/dashboard';
 import { CreateAgentDIDPage } from './pages/create-agent-did';
 import { AgentDetailPage } from './pages/agent-detail';
 import { AddAuthMethodPage } from './pages/add-auth-method';
+import { WebAuthnDebugPage } from './pages/webauthn-debug';
 
 const App: React.FC = () => {
   return (
@@ -14,6 +15,7 @@ const App: React.FC = () => {
       <Routes>
         {/* Public routes */}
         <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/debug/webauthn" element={<WebAuthnDebugPage />} />
         
         {/* Protected routes */}
         <Route

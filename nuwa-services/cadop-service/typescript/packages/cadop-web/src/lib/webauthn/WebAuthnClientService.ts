@@ -3,7 +3,7 @@ import {
   CadopError,
   CadopErrorCode,
   DIDKeyManager,
-  CredentialInfo
+  CredentialInfo,
 } from '@cadop/shared';
 
 import type {
@@ -17,6 +17,48 @@ import type {
 
 import { webAuthnClient } from '../api/client';
 import { Base64 } from 'js-base64';
+
+import { DidKeyCodec, KEY_TYPE, KeyType } from 'nuwa-identity-kit';
+
+// 部分环境下 nuwa-identity-kit 版本尚未导出 algorithmToKeyType，这里做本地回退
+const algorithmToKeyType = (alg: number): KeyType | undefined => {
+  switch (alg) {
+    case -8:
+      return KEY_TYPE.ED25519;
+    case -7:
+      return KEY_TYPE.ECDSAR1;
+    default:
+      return undefined;
+  }
+};
+
+// 根据算法从 SPKI(SubjectPublicKeyInfo) 中提取原始公钥 (compressed for P-256, raw for Ed25519)
+function extractRawPublicKey(spkiInput: ArrayBuffer | Uint8Array, alg: number): Uint8Array {
+  const spki = spkiInput instanceof Uint8Array ? spkiInput : new Uint8Array(spkiInput);
+
+  if (alg === -8) {
+    // Ed25519: SPKI 末尾 32 字节即为公钥
+    return spki.slice(spki.length - 32);
+  }
+
+  if (alg === -7) {
+    // P-256: 查找 0x04 (uncompressed marker)，后跟 64B (X||Y)
+    const idx = spki.indexOf(0x04);
+    if (idx === -1 || idx + 65 > spki.length) {
+      throw new Error('Invalid P-256 SPKI format');
+    }
+    const x = spki.slice(idx + 1, idx + 33);
+    const y = spki.slice(idx + 33, idx + 65);
+    // 压缩格式：0x02 / 0x03 + X
+    const prefix = (y[y.length - 1] & 1) === 0 ? 0x02 : 0x03;
+    const compressed = new Uint8Array(33);
+    compressed[0] = prefix;
+    compressed.set(x, 1);
+    return compressed;
+  }
+
+  throw new Error(`Unsupported algorithm ${alg}`);
+}
 
 export class WebAuthnClientService {
   private developmentMode = import.meta.env.DEV;
@@ -152,66 +194,23 @@ export class WebAuthnClientService {
         const publicKeyAlgorithm = attestationResponse.getPublicKeyAlgorithm();
         console.log('🔑 Public Key Algorithm:', publicKeyAlgorithm);
         if (publicKey) {
-          const publicKeyArray = new Uint8Array(publicKey);
+          const rawPublicKey = extractRawPublicKey(publicKey, publicKeyAlgorithm);
           
           // 打印完整的公钥数据以进行调试
           console.log('🔑 Raw Public Key Data:', {
-            hex: Array.from(publicKeyArray).map(b => b.toString(16).padStart(2, '0')).join(''),
-            bytes: Array.from(publicKeyArray),
-            length: publicKeyArray.length
+            hex: Array.from(rawPublicKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+            bytes: Array.from(rawPublicKey),
+            length: rawPublicKey.length
           });
           
-          // 解析 ASN.1 DER 编码的公钥
-          try {
-            // SPKI 格式中的 P-256 公钥：
-            // 前缀: 3059301306072A8648CE3D020106082A8648CE3D030107034200
-            // 0x04: 未压缩格式标记
-            // [32 bytes]: x 坐标
-            // [32 bytes]: y 坐标
-            
-            // 找到 0x04 标记（未压缩格式的 EC 公钥标记）
-            let i = 0;
-            while (i < publicKeyArray.length) {
-              if (publicKeyArray[i] === 0x04) {
-                break;
-              }
-              i++;
-            }
-            
-            if (i >= publicKeyArray.length) {
-              throw new Error('EC public key marker not found');
-            }
-            
-            // 提取 x 坐标（32字节）
-            const rawPublicKey = publicKeyArray.slice(i + 1, i + 33);
-            const rawPublicKeyHex = Array.from(rawPublicKey)
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('');
-
-            console.log('🔑 Extracted Public Key (x coordinate):', {
-              hex: rawPublicKeyHex,
-              length: rawPublicKey.length,
-              expectedLength: 32,
-              startIndex: i + 1
-            });
-            
-            // 使用提取的公钥生成 DID
-            const rawPublicKeyBuffer = rawPublicKey.buffer.slice(
-              rawPublicKey.byteOffset,
-              rawPublicKey.byteOffset + rawPublicKey.length
-            );
-            
-            const did = await DIDKeyManager.generateDIDFromEd25519PublicKey(rawPublicKeyBuffer);
-            this.saveDIDToStorage(did);
-            console.log('🔑 Generated and saved DID:', { did });
-          } catch (error) {
-            console.error('Failed to process public key:', error);
-            throw new CadopError(
-              'Failed to process public key',
-              CadopErrorCode.INTERNAL_ERROR,
-              error
-            );
+          // 使用提取的公钥生成 DID
+          const keyType = algorithmToKeyType(publicKeyAlgorithm);
+          if (!keyType) {
+            throw new Error('Unsupported algorithm');
           }
+          const did = DidKeyCodec.generateDidKey(rawPublicKey, keyType);
+          this.saveDIDToStorage(did);
+          console.log('🔑 Generated and saved DID:', { did });
         }
       } else {
         // 登录流程

@@ -24,27 +24,13 @@ export function AddAuthMethodPage() {
   const [error, setError] = useState<string | null>(null);
   const [form] = Form.useForm();
   const [didService, setDidService] = useState<DIDService | null>(null);
-  const [availableAuthenticators, setAvailableAuthenticators] = useState<Array<{
-    id: string;
-    type: 'platform' | 'cross-platform';
-    name: string;
-  }>>([]);
-  const [selectedAuthenticator, setSelectedAuthenticator] = useState<string>('platform');
 
   useEffect(() => {
     if (did) {
       loadDIDService();
-      loadAvailableAuthenticators();
     }
   }, [did, session]);
 
-  const loadAvailableAuthenticators = async () => {
-    const authenticators = await WebAuthnSigner.getAvailableAuthenticators();
-    setAvailableAuthenticators(authenticators);
-    if (authenticators.length > 0) {
-      setSelectedAuthenticator(authenticators[0].id);
-    }
-  };
 
   const loadDIDService = async () => {
     if (!did || !session) return;
@@ -157,24 +143,6 @@ export function AddAuthMethodPage() {
                   <Option value="capabilityDelegation">Capability Delegation</Option>
                 </Select>
               </Form.Item>
-
-              {availableAuthenticators.length > 0 && (
-                <Form.Item
-                  label="Authenticator"
-                  help="Select your preferred authenticator for signing"
-                >
-                  <Radio.Group
-                    value={selectedAuthenticator}
-                    onChange={(e) => setSelectedAuthenticator(e.target.value)}
-                  >
-                    {availableAuthenticators.map((auth) => (
-                      <Radio key={auth.id} value={auth.id}>
-                        {auth.name}
-                      </Radio>
-                    ))}
-                  </Radio.Group>
-                </Form.Item>
-              )}
 
               <div className="flex justify-end space-x-4">
                 <Button
