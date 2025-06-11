@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { WebAuthnClientService } from '../../lib/webauthn/WebAuthnClientService';
+import { PasskeyService } from '../../lib/passkey/PasskeyService';
 import { useAuth } from '../../lib/auth/AuthContext';
 
 interface WebAuthnLoginProps {
@@ -11,34 +11,26 @@ interface WebAuthnLoginProps {
 export function WebAuthnLogin({ onSuccess, onError, email }: WebAuthnLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const { signIn } = useAuth();
+  const { signInWithDid } = useAuth();
 
-  const webAuthnService = new WebAuthnClientService();
+  const passkeyService = new PasskeyService();
 
   useEffect(() => {
-    webAuthnService.isSupported().then(setIsSupported);
+    passkeyService.isSupported().then(setIsSupported);
   }, []);
 
   const handleWebAuthnLogin = useCallback(async () => {
     try {
       setIsLoading(true);
-      const result = await webAuthnService.authenticate({
-        name: email,
-        displayName: email
-      });
-
-      if (result.success && result.session) {
-        signIn(result.session);
-        onSuccess(result.session.user.id);
-      } else {
-        onError(result.error?.message || 'Authentication failed');
-      }
+      const userDid = await passkeyService.ensureUser();
+      signInWithDid(userDid);
+      onSuccess(userDid);
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Authentication failed');
     } finally {
       setIsLoading(false);
     }
-  }, [email, onSuccess, onError, signIn]);
+  }, [email, onSuccess, onError, signInWithDid]);
 
   if (!isSupported) {
     return null;

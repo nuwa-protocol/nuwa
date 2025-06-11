@@ -341,11 +341,9 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     if (!this.passkeyAuthMethod.publicKeyMultibase) {
       throw new Error('Public key not found');
     }
-
-    let keyType = toKeyType(this.passkeyAuthMethod.type);
-
+    let canonicalKeyType = toKeyType(this.passkeyAuthMethod.type);
     return {
-      type: keyType,
+      type: canonicalKeyType,
       publicKey: BaseMultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase)
     };
   }
