@@ -241,7 +241,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       const response = assertion.response as AuthenticatorAssertionResponse;
       console.log('signWithWebAuthn', {data, keyId, response});
       
-      const signature = new Uint8Array(response.signature);
+      let signature = new Uint8Array(response.signature);
       const authenticatorData = new Uint8Array(response.authenticatorData);
       const clientDataJSON = new Uint8Array(response.clientDataJSON);
       const clientDataHash = await crypto.subtle.digest('SHA-256', response.clientDataJSON);
@@ -272,11 +272,12 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       if (!isSupported) {
         throw new Error('Unsupported key type');
       } 
-
+      let sigForVerify = signature;
       try {
+        
         isValid = await CryptoUtils.verify(
           dataToVerify,
-          signature,
+          sigForVerify,
           publicKeyBytes,
           keyInfo.type,
         );
@@ -289,6 +290,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
         clientDataJSON,
         authenticatorData: Base64.fromUint8Array(authenticatorData),
         signature: Base64.fromUint8Array(signature),
+        sigForVerify: Base64.fromUint8Array(sigForVerify),
         dataToVerify: Base64.fromUint8Array(dataToVerify),
         publicKey: Base64.fromUint8Array(publicKeyBytes),
         keyType: keyInfo.type,
@@ -435,4 +437,42 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.didAddress;
   }
   
+  private derToRaw(der: Uint8Array): Uint8Array {
+    // Expect DER sequence: 0x30 len 0x02 lenR R 0x02 lenS S
+    let offset = 0;
+    if (der[offset++] !== 0x30) throw new Error('Invalid DER');
+    const seqLen = der[offset++];
+    if (seqLen + 2 !== der.length) {
+      // length byte could be multi-byte but for 70-72 len it's fine
+    }
+    if (der[offset++] !== 0x02) throw new Error('Invalid DER');
+    const rLen = der[offset++];
+    let r = der.slice(offset, offset + rLen);
+    offset += rLen;
+    if (der[offset++] !== 0x02) throw new Error('Invalid DER');
+    const sLen = der[offset++];
+    let s = der.slice(offset, offset + sLen);
+
+    // Strip leading zero padding
+    if (r.length === 33 && r[0] === 0x00) {
+      r = r.slice(1);
+    }
+    if (s.length === 33 && s[0] === 0x00) {
+      s = s.slice(1);
+    }
+    if (r.length > 32 || s.length > 32) {
+      throw new Error('Invalid signature length');
+    }
+
+    // Pad to 32 bytes
+    const rPad = new Uint8Array(32);
+    rPad.set(r, 32 - r.length);
+    const sPad = new Uint8Array(32);
+    sPad.set(s, 32 - s.length);
+
+    const raw = new Uint8Array(64);
+    raw.set(rPad, 0);
+    raw.set(sPad, 32);
+    return raw;
+  }
 } 

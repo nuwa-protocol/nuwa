@@ -94,7 +94,15 @@ export class PasskeyService {
     };
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] create options', options);
+      console.log('[PasskeyService] Registration options:', {
+        challenge: options.challenge,
+        rpId: options.rp.id,
+        rpName: options.rp.name,
+        userUuid,
+        userName,
+        currentHostname: window.location.hostname,
+        currentOrigin: window.location.origin
+      });
     }
 
     const publicKeyOptions: PublicKeyCredentialCreationOptions = {
@@ -108,24 +116,98 @@ export class PasskeyService {
 
     const cred = await navigator.credentials.create({ publicKey: publicKeyOptions }) as PublicKeyCredential;
 
+    if (this.developmentMode) {
+      console.log('[PasskeyService] Credential created:', {
+        credentialId: cred.id,
+        credentialIdLength: cred.id.length,
+        credentialType: cred.type,
+        rawIdLength: cred.rawId?.byteLength
+      });
+    }
+
     const attRes = cred.response as AuthenticatorAttestationResponse;
     const publicKey = attRes.getPublicKey();
     const alg = attRes.getPublicKeyAlgorithm();
+    
+    if (this.developmentMode) {
+      console.log('[PasskeyService] Attestation response details:', {
+        hasPublicKey: !!publicKey,
+        publicKeyLength: publicKey?.byteLength,
+        algorithm: alg,
+        attestationObjectLength: attRes.attestationObject?.byteLength,
+        clientDataJSONLength: attRes.clientDataJSON?.byteLength
+      });
+    }
+
     if (!publicKey) throw new Error('No publicKey from attestation');
+    
+    // 详细记录 SPKI 格式的公钥
+    const spkiBytes = new Uint8Array(publicKey);
+    if (this.developmentMode) {
+      console.log('[PasskeyService] SPKI public key details:', {
+        algorithm: alg,
+        spkiLength: spkiBytes.length,
+        spkiHex: Array.from(spkiBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+        first20Bytes: Array.from(spkiBytes.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '),
+        last20Bytes: Array.from(spkiBytes.slice(-20)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      });
+    }
+
     const rawPubKey = extractRawPublicKey(publicKey, alg);
+    
+    if (this.developmentMode) {
+      console.log('[PasskeyService] Raw public key extracted:', {
+        rawLength: rawPubKey.length,
+        rawHex: Array.from(rawPubKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+        isCompressed: rawPubKey.length === 33 && (rawPubKey[0] === 0x02 || rawPubKey[0] === 0x03),
+        compressionFlag: rawPubKey[0]?.toString(16).padStart(2, '0'),
+        first8Bytes: Array.from(rawPubKey.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      });
+    }
+
     const keyType = algo2key(alg);
     if (this.developmentMode) {
-      console.log('[PasskeyService] PublicKey details', {
+      console.log('[PasskeyService] Key type resolution:', {
         algorithm: alg,
         resolvedKeyType: keyType,
-        rawPublicKeyHex: Array.from(rawPubKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+        isEd25519: keyType === KEY_TYPE.ED25519,
+        isEcdsaR1: keyType === KEY_TYPE.ECDSAR1
       });
     }
 
     if (!keyType) {
       throw new Error(`Unsupported key algorithm: ${alg}`);
     }
+    
     const userDid = DidKeyCodec.generateDidKey(rawPubKey, keyType);
+
+    if (this.developmentMode) {
+      console.log('[PasskeyService] DID generation:', {
+        userDid,
+        didLength: userDid.length,
+        didPrefix: userDid.substring(0, 20) + '...',
+        keyType,
+        publicKeyLength: rawPubKey.length
+      });
+
+      // 验证 DID 的往返转换
+      try {
+        const { keyType: parsedKeyType, publicKey: parsedPublicKey } = DidKeyCodec.parseDidKey(userDid);
+        const publicKeyMatches = Array.from(rawPubKey).every((byte, index) => byte === parsedPublicKey[index]);
+        
+        console.log('[PasskeyService] DID roundtrip verification:', {
+          originalKeyType: keyType,
+          parsedKeyType: parsedKeyType,
+          keyTypeMatches: keyType === parsedKeyType,
+          originalPublicKeyHex: Array.from(rawPubKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+          parsedPublicKeyHex: Array.from(parsedPublicKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+          publicKeyMatches: publicKeyMatches,
+          lengthMatch: rawPubKey.length === parsedPublicKey.length
+        });
+      } catch (didError) {
+        console.error('[PasskeyService] DID parsing failed:', didError);
+      }
+    }
 
     // 保存映射
     const map = this.loadMap();
@@ -134,7 +216,12 @@ export class PasskeyService {
     localStorage.setItem(USER_DID_KEY, userDid);
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Registered new passkey', { userDid, credentialId: cred.id });
+      console.log('[PasskeyService] Registration completed:', { 
+        userDid, 
+        credentialId: cred.id,
+        credentialIdTruncated: cred.id.substring(0, 20) + '...',
+        mapSize: Object.keys(map).length
+      });
     }
 
     return userDid;
