@@ -121,6 +121,7 @@ module acp_registry::acp_registry {
         let mut_registration_info = object::borrow_mut(mut_registration_info_obj);
         assert!(!table::contains(&mut_registration_info.registry, cap_uri), ErrorCapURIAlreadyRegitser);
         table::add(&mut mut_registration_info.registry, cap_uri, agent_capability_id);
+        object::transfer_extend(agent_capability, creator);
         emit(RegisterEvent{
             cap_uri,
             creator,
@@ -128,8 +129,8 @@ module acp_registry::acp_registry {
         })
     }
 
-    public entry fun update(agent_capability_obj: Object<AgentCapability>, cid: String) {
-        let agent_capability = object::borrow_mut(&mut agent_capability_obj);
+    public entry fun update(agent_capability_obj: &mut Object<AgentCapability>, cid: String) {
+        let agent_capability = object::borrow_mut(agent_capability_obj);
         agent_capability.version = agent_capability.version + 1;
         agent_capability.cid = cid;
         emit(UpdateEvent{
@@ -153,7 +154,7 @@ module acp_registry::acp_registry {
         let registration_info_obj = borrow_registration_info_object();
         let registration_info = object::borrow(registration_info_obj);
         assert!(!table::contains(&registration_info.registry, cap_uri), ErrorCapURINotRegitser);
-        table::borrow(&registration_info.registry, cap_uri)
+        object::borrow(object::borrow_object<AgentCapability>(*table::borrow(&registration_info.registry, cap_uri)))
     }
 
     public fun get_cap_uri(registry: &AgentCapability): String {
