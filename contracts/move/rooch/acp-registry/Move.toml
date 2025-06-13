@@ -1,0 +1,14 @@
+[package]
+name = "AcpRegistry"
+version = "0.0.1"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/rooch-network/rooch.git", subdir = "frameworks/move-stdlib", rev = "17fdc02e620ba116c339c3b99a9b568adcf07a35" }
+MoveosStdlib = { git = "https://github.com/rooch-network/rooch.git", subdir = "frameworks/moveos-stdlib", rev = "17fdc02e620ba116c339c3b99a9b568adcf07a35" }
+RoochFramework = { git = "https://github.com/rooch-network/rooch.git", subdir = "frameworks/rooch-framework", rev = "17fdc02e620ba116c339c3b99a9b568adcf07a35" }
+
+[addresses]
+acp_registry = "0x4"
+std = "0x1"
+moveos_std = "0x2"
+rooch_framework = "0x3"
