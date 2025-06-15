@@ -6,11 +6,8 @@ import { logger } from './utils/logger.js';
 import { ServiceContainer } from './services/ServiceContainer.js';
 import { config } from './config/environment.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
 import custodianRouter from './routes/custodian.js';
-import { proofRouter } from './routes/proof.js';
-import webauthnRouter from './routes/webauthn.js';
 import idpRouter from './routes/idp.js';
 
 async function initializeServices() {
@@ -18,14 +15,6 @@ async function initializeServices() {
     // Initialize ServiceContainer with all service configs
     const serviceConfig = {
       cadopDid: config.service.did,
-      webauthn: {
-        rpName: config.webauthn.rpName,
-        rpID: config.webauthn.rpId,
-        origin: config.webauthn.origin,
-        timeout: config.webauthn.timeout,
-        attestationType: config.webauthn.attestationType,
-        signingKey: config.service.signingKey,
-      },
       custodian: {
         maxDailyMints: config.service.maxDailyMints,
       },
@@ -41,7 +30,6 @@ async function initializeServices() {
 
     logger.info('Application services initialized successfully', {
       cadopDid: config.service.did,
-      rpId: config.webauthn.rpId,
       networkUrl: config.rooch.networkUrl,
     });
   } catch (error) {
@@ -79,10 +67,7 @@ async function startApp(): Promise<Application> {
 
     // API Routes
     app.use('/health', healthRouter);
-    app.use('/auth', authRouter);
     app.use('/api/custodian', custodianRouter);
-    app.use('/api/proof', proofRouter);
-    app.use('/api/webauthn', webauthnRouter);
     app.use('/api/idp', idpRouter);
 
     // 404 handler for undefined routes

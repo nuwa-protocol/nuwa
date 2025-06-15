@@ -9,18 +9,9 @@ const envSchema = z.object({
   // Server
   PORT: z.string().default('8080'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  
-  // Supabase (with development defaults)
-  SUPABASE_URL: z.string().url().default('https://placeholder.supabase.co'),
-  SUPABASE_ANON_KEY: z.string().default('placeholder-anon-key'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().default('placeholder-service-role-key'),
-  
-  // WebAuthn (with development defaults)
-  WEBAUTHN_RP_NAME: z.string().default('CADOP Service'),
+
+  // WebAuthn
   WEBAUTHN_RP_ID: z.string().default('localhost'),
-  WEBAUTHN_ORIGIN: z.string().url().default('http://localhost:3000'),
-  WEBAUTHN_CHALLENGE_TIMEOUT: z.string().default('300000'), // 5 minutes in milliseconds
-  WEBAUTHN_ATTESTATION_TYPE: z.enum(['none', 'indirect', 'direct']).default('none'),
   
   // Rooch Network (with development defaults)
   ROOCH_NETWORK_URL: z.string().url().default('http://localhost:6767'),
@@ -42,9 +33,6 @@ const envSchema = z.object({
   // CORS (with development defaults)
   CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:3000'),
   
-  // Session (with development defaults)
-  SESSION_SECRET: z.string().default('dev-session-secret-key-for-testing-only'),
-  SESSION_DURATION: z.string().default('86400'), // 24 hours in seconds
 });
 
 // Validate environment variables
@@ -56,26 +44,17 @@ export const config = {
     port: parseInt(env.PORT, 10),
     nodeEnv: env.NODE_ENV,
   },
-  supabase: {
-    url: env.SUPABASE_URL,
-    anonKey: env.SUPABASE_ANON_KEY,
-    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
-  },
-  webauthn: {
-    rpName: env.WEBAUTHN_RP_NAME,
-    rpId: env.WEBAUTHN_RP_ID,
-    origin: env.WEBAUTHN_ORIGIN,
-    timeout: parseInt(env.WEBAUTHN_CHALLENGE_TIMEOUT, 10),
-    attestationType: env.WEBAUTHN_ATTESTATION_TYPE,
-  },
   rooch: {
     networkUrl: env.ROOCH_NETWORK_URL,
     networkId: env.ROOCH_NETWORK_ID,
   },
   service: {
     did: env.CADOP_DID,
-    signingKey: env.JWT_SIGNING_KEY,
     maxDailyMints: parseInt(env.CUSTODIAN_MAX_DAILY_MINTS, 10),
+    signingKey: env.JWT_SIGNING_KEY,
+  },
+  webauthn: {
+    rpId: env.WEBAUTHN_RP_ID,
   },
   rateLimit: {
     windowMs: parseInt(env.RATE_LIMIT_WINDOW_MS, 10),
@@ -87,9 +66,5 @@ export const config = {
   },
   cors: {
     origin: env.CORS_ORIGIN.split(',').map((origin: string) => origin.trim()),
-  },
-  session: {
-    secret: env.SESSION_SECRET,
-    duration: parseInt(env.SESSION_DURATION, 10),
   },
 } as const; 

@@ -13,10 +13,8 @@ export interface LocalJWK extends jose.JWK {
 }
 
 export interface CryptoKeys {
-  // WebAuthn ID Token signing key
-  webauthnSigningKey: string;
-  // Session JWT signing key
-  sessionSecret: string;
+  //JWT signing key
+  jwtSigningKey: string;
   // Rooch keypair for custodian
   roochKeypair: Secp256k1KeypairType;
 }
@@ -48,21 +46,15 @@ export class CryptoService {
       const isDevelopment = config.server.nodeEnv === 'development';
       logger.info('Initializing crypto keys', { environment: config.server.nodeEnv });
 
-      // Initialize WebAuthn signing key
-      const webauthnSigningKey = isDevelopment 
+      // Initialize JWT signing key
+      const jwtSigningKey = isDevelopment 
         ? randomBytes(32).toString('hex')
-        : process.env.WEBAUTHN_SIGNING_KEY;
+        : process.env.JWT_SIGNING_KEY;
 
-      if (!webauthnSigningKey) {
-        throw new Error('WebAuthn signing key is required');
+      if (!jwtSigningKey) {
+        throw new Error('JWT signing key is required');
       }
 
-      // Initialize session secret
-      const sessionSecret = config.session.secret;
-
-      if (!sessionSecret || sessionSecret === 'dev-session-secret-key-for-testing-only') {
-        throw new Error('Session secret is required');
-      }
 
       // Initialize Rooch keypair
       let roochKeypair;
@@ -91,15 +83,13 @@ export class CryptoService {
       }
 
       this.keys = {
-        webauthnSigningKey,
-        sessionSecret,
+        jwtSigningKey,
         roochKeypair
       };
 
       logger.info('Crypto keys initialized successfully', {
         environment: config.server.nodeEnv,
-        hasWebAuthnKey: !!webauthnSigningKey,
-        hasSessionSecret: !!sessionSecret,
+        hasJwtKey: !!jwtSigningKey,
         hasRoochKeypair: !!roochKeypair
       });
     } catch (error) {
@@ -111,21 +101,11 @@ export class CryptoService {
   /**
    * Get WebAuthn signing key
    */
-  public getWebAuthnSigningKey(): string {
-    if (!this.keys?.webauthnSigningKey) {
-      throw new Error('WebAuthn signing key not initialized');
+  public getJwtSigningKey(): string {
+    if (!this.keys?.jwtSigningKey) {
+      throw new Error('JWT signing key not initialized');
     }
-    return this.keys.webauthnSigningKey;
-  }
-
-  /**
-   * Get session secret
-   */
-  public getSessionSecret(): string {
-    if (!this.keys?.sessionSecret) {
-      throw new Error('Session secret not initialized');
-    }
-    return this.keys.sessionSecret;
+    return this.keys.jwtSigningKey;
   }
 
   /**
