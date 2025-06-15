@@ -4,16 +4,9 @@
  * All server-side operations are proxied through the backend service.
  */
 
-import { supabase } from '../supabase/config';
 import type {
-  AuthenticatorResponse,
   APIResponse,
-  CredentialInfo,
-  AuthenticationOptions,
-  AuthenticationResult,
-  IDToken,
   AgentDIDCreationStatus,
-  DIDDocument
 } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
 import { useAuth } from '../auth/AuthContext';
@@ -35,19 +28,8 @@ class APIClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const storedSession = sessionStorage.getItem('cadop_session');
-    let session = null;
-    if (storedSession) {
-      try {
-        session = JSON.parse(storedSession);
-      } catch (error) {
-        console.error('Failed to parse session:', error);
-      }
-    }
-
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': session?.accessToken ? `Bearer ${session.accessToken}` : '',
       'X-Client-Type': 'cadop-web'
     };
     console.debug('Request headers:', headers);
@@ -168,44 +150,6 @@ class APIClient {
 }
 
 /**
- * WebAuthn specific API client
- */
-export class WebAuthnAPIClient {
-  constructor(private apiClient: APIClient) {}
-
-  async getAuthenticationOptions(params: {
-    user_did?: string;
-    name?: string;
-    display_name?: string;
-    existing_credential?: {
-      id: string;
-      type: string;
-      transports?: string[];
-    };
-  }): Promise<APIResponse<AuthenticationOptions>> {
-    return this.apiClient.post('/api/webauthn/options', params);
-  }
-
-  async verifyAuthenticationResponse(
-    response: AuthenticatorResponse
-  ): Promise<APIResponse<AuthenticationResult>> {
-    return this.apiClient.post('/api/webauthn/verify', { response });
-  }
-
-  /**
-   * Get ID Token for the authenticated user
-   * @returns Promise<APIResponse<IDToken>>
-   */
-  async getIdToken(): Promise<APIResponse<IDToken>> {
-    return this.apiClient.get('/api/webauthn/id-token');
-  } 
-
-  async cleanupExpiredChallenges(): Promise<APIResponse<{ count: number }>> {
-    return this.apiClient.post('/api/webauthn/cleanup', {});
-  }
-}
-
-/**
  * Custodian specific API client
  */
 export class CustodianAPIClient {
@@ -268,5 +212,4 @@ export class CustodianAPIClient {
 }
 
 export const apiClient = APIClient.getInstance();
-export const webAuthnClient = new WebAuthnAPIClient(apiClient);
 export const custodianClient = new CustodianAPIClient(apiClient);
