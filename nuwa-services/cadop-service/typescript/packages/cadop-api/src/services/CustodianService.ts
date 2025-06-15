@@ -19,7 +19,6 @@ import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/roo
 const { Secp256k1Keypair } = roochSdk;
 
 import jwt from 'jsonwebtoken';
-import { WebAuthnService } from './WebAuthnService.js';
 
 export interface CustodianServiceConfig {
   cadopDid: string;
@@ -33,15 +32,13 @@ export class CustodianService {
   private dailyMintCount: Map<string, number>;
   private lastMintReset: Date;
   private config: CustodianServiceConfig;
-  private webauthnService: WebAuthnService;
 
-  constructor(config: CustodianServiceConfig, webauthnService: WebAuthnService, cadopKit: CadopIdentityKit) {
+  constructor(config: CustodianServiceConfig, cadopKit: CadopIdentityKit) {
     this.config = config;
     this.didCreationRecords = new Map();
     this.userDids = new Map();
     this.dailyMintCount = new Map();
     this.lastMintReset = new Date();
-    this.webauthnService = webauthnService;
     this.cadopKit = cadopKit;
   }
 

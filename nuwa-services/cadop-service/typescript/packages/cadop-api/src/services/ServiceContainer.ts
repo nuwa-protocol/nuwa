@@ -1,5 +1,4 @@
 import { CustodianService } from './CustodianService.js';
-import { WebAuthnService } from './WebAuthnService.js';
 import { logger } from '../utils/logger.js';
 import { BaseMultibaseCodec, CadopIdentityKit, createVDR, VDRInterface, VDRRegistry, LocalSigner, CadopServiceType } from 'nuwa-identity-kit';
 import roochSdk from '@roochnetwork/rooch-sdk';
@@ -9,13 +8,6 @@ const { Secp256k1Keypair } = roochSdk;
 
 export interface ServiceConfig {
   cadopDid: string;
-  webauthn: {
-    rpName: string;
-    rpID: string;
-    origin: string;
-    timeout: number;
-    attestationType: 'none' | 'indirect' | 'direct';
-  };
   custodian: {
     maxDailyMints: number;
   };
@@ -28,7 +20,6 @@ export interface ServiceConfig {
 
 export class ServiceContainer {
   private static instance: ServiceContainer | null = null;
-  private webauthnService!: WebAuthnService;
   private custodianService!: CustodianService;
   private serviceConfig: ServiceConfig;
 
@@ -65,17 +56,6 @@ export class ServiceContainer {
         }
       }
       
-      // Initialize WebAuthn service
-      logger.info('Initializing WebAuthn service...');
-
-      this.webauthnService = new WebAuthnService({
-        ...this.serviceConfig.webauthn,
-        cadopDid: this.serviceConfig.cadopDid,
-        signingKey: cryptoService.getWebAuthnSigningKey()
-      });
-      logger.info('WebAuthn service initialized');
-
-      
 
       // Initialize CadopKit
       logger.info('Initializing CadopKit...');
@@ -93,7 +73,6 @@ export class ServiceContainer {
           cadopDid: this.serviceConfig.cadopDid,
           maxDailyMints: this.serviceConfig.custodian.maxDailyMints,
         },
-        this.webauthnService,
         cadopKit
       );
       logger.info('Custodian service initialized');
@@ -123,12 +102,6 @@ export class ServiceContainer {
     return ServiceContainer.instance;
   }
 
-  getWebAuthnService(): WebAuthnService {
-    if (!this.webauthnService) {
-      throw new Error('WebAuthn service not initialized');
-    }
-    return this.webauthnService;
-  }
 
   getCustodianService(): CustodianService {
     if (!this.custodianService) {
