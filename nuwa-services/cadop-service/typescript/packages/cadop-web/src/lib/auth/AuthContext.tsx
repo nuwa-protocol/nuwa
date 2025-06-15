@@ -1,13 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { AuthContextType } from './types';
-import type { Session } from '@cadop/shared';
 
-const SESSION_STORAGE_KEY = 'cadop_session';
 
 const defaultAuthContext: AuthContextType = {
   isAuthenticated: false,
   isLoading: true,
-  session: null,
   userDid: null,
   error: null,
   signIn: () => {},
@@ -35,21 +32,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<Omit<AuthContextType, 'signIn' | 'signInWithDid' | 'signOut' | 'refreshSession' | 'updateSession'>>({
     isAuthenticated: false,
     isLoading: true,
-    session: null,
     userDid: null,
     error: null,
   });
-
-  const signIn = useCallback((session: Session) => {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-    setState(prev => ({
-      ...prev,
-      isAuthenticated: true,
-      isLoading: false,
-      session,
-      error: null,
-    }));
-  }, []);
 
   const signInWithDid = useCallback((userDid: string) => {
     localStorage.setItem('userDid', userDid);
@@ -63,7 +48,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signOut = useCallback(() => {
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.removeItem('userDid');
     setState({
       isAuthenticated: false,
@@ -74,41 +58,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, []);
 
-  const updateSession = useCallback((updates: Partial<Session>) => {
-    setState(prev => {
-      if (!prev.session) return prev;
-
-      const updatedSession = { ...prev.session, ...updates };
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSession));
-      
-      return {
-        ...prev,
-        session: updatedSession,
-      };
-    });
-  }, []);
-
-  const refreshSession = useCallback(async () => {
-    console.log('TODO: refreshSession');
-  }, []);
 
   useEffect(() => {
-    // restore session from sessionStorage
-    const storedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
     const storedDid = localStorage.getItem('userDid');
-    if (storedSession) {
+    if (storedDid) {
       try {
-        const session = JSON.parse(storedSession) as Session;
         setState({
           isAuthenticated: true,
           isLoading: false,
-          session,
           userDid: storedDid,
           error: null,
         });
       } catch (error) {
         console.error('Failed to restore session:', error);
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
         setState(prev => ({ ...prev, isLoading: false }));
       }
     } else {
@@ -118,11 +80,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     ...state,
-    signIn,
     signInWithDid,
     signOut,
-    refreshSession,
-    updateSession,
   };
 
   return (
