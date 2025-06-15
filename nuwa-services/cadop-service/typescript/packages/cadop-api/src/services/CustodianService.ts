@@ -59,7 +59,7 @@ export class CustodianService {
       }
 
       if (!tokenPayload || tokenPayload.aud !== this.config.cadopDid) {
-        throw new Error('Invalid token audience');
+        throw new Error(`Invalid token audience ${tokenPayload.aud} !== ${this.config.cadopDid}`);
       }
 
       if (!tokenPayload.sub) {

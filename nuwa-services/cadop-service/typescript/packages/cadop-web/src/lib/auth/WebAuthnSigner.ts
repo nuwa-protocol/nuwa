@@ -3,6 +3,9 @@ import type { DIDDocument, SignerInterface, VerificationMethod } from 'nuwa-iden
 import { BaseMultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from 'nuwa-identity-kit';
 import { SignatureScheme, Signer, Authenticator, Transaction, Ed25519PublicKey, Secp256k1PublicKey, PublicKey, Address, BitcoinAddress, RoochAddress, Bytes, bcs, PublicKeyInitData, fromB64 } from '@roochnetwork/rooch-sdk';
 import { CryptoUtils, defaultCryptoProviderFactory } from 'nuwa-identity-kit';
+import { hexToBytes } from '@noble/curves/abstract/utils';
+import { p256 } from '@noble/curves/p256';
+import { PublicKeyUtils } from '../crypto/PublicKeyUtils';
 
 // 临时复制自 rooch-sdk/src/crypto/signatureScheme.ts，待 SDK 更新后可删除
 const SIGNATURE_SCHEME_TO_FLAG = {
@@ -143,6 +146,7 @@ export class EcdsaR1PublicKey extends PublicKey<Address> {
 
 interface WebAuthnSignature {
   signature: Uint8Array;
+  rawSignature: Uint8Array;
   authenticatorData: Uint8Array;
   clientDataJSON: Uint8Array;
 }
@@ -268,29 +272,28 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       
       // 使用 CryptoUtils 验证签名（支持多曲线）
       const isSupported = defaultCryptoProviderFactory.supports(keyInfo.type);
-      let isValid = false;
       if (!isSupported) {
         throw new Error('Unsupported key type');
       } 
-      let sigForVerify = signature;
-      try {
-        
-        isValid = await CryptoUtils.verify(
-          dataToVerify,
-          sigForVerify,
-          publicKeyBytes,
-          keyInfo.type,
-        );
-      } catch (e) {
-        console.warn('CryptoUtils verify error', e);
-      }
+      let rawSignature = this.derToRaw(signature);
+      // Convert canonicalized raw signature back to DER for WebCrypto
+      const lowSDERSignature = p256.Signature.fromCompact(rawSignature).toDERRawBytes();
+
+      const derCanonical = rawToDerCanonical(rawSignature);
+
+      // Use low-S DER for WebCrypto verification (native APIs require canonical form)
+      let isValidByWebCrypto = await verifyByWebCrypto(publicKeyBytes, derCanonical, dataToVerify);
+      let isValidByP256 = await verifyByP256(publicKeyBytes, rawSignature, dataToVerify);
 
       console.log('Signature verification:', {
-        isValid,
+        isValidByWebCrypto,
+        isValidByP256,
         clientDataJSON,
         authenticatorData: Base64.fromUint8Array(authenticatorData),
         signature: Base64.fromUint8Array(signature),
-        sigForVerify: Base64.fromUint8Array(sigForVerify),
+        rawSignature: Base64.fromUint8Array(rawSignature),
+        lowSDERSignature: Base64.fromUint8Array(lowSDERSignature),
+        derCanonical: Base64.fromUint8Array(derCanonical),
         dataToVerify: Base64.fromUint8Array(dataToVerify),
         publicKey: Base64.fromUint8Array(publicKeyBytes),
         keyType: keyInfo.type,
@@ -301,6 +304,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
 
       return {
         signature,
+        rawSignature,
         authenticatorData,
         clientDataJSON,
       };
@@ -376,18 +380,43 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.signWithKeyId(data, this.passkeyAuthMethod?.id);
   }
 
-  private buildAuthenticatorPayload(sig: WebAuthnSignature): Bytes {
-    const schemeFlag = SIGNATURE_SCHEME_TO_FLAG[this.getKeyScheme()];
+  private async buildAuthenticatorPayload(sig: WebAuthnSignature): Promise<Bytes> {
+    const schemeFlag = 2;
 
     const payload = new WebauthnAuthPayload(
       schemeFlag,
-      sig.signature,
+      sig.rawSignature,
       this.getPublicKey().toBytes(),
       sig.authenticatorData,
       sig.clientDataJSON,
     );
+    let clientData = JSON.parse(new TextDecoder().decode(sig.clientDataJSON));
+    console.log('client_data:', clientData);
+    // Log detailed data for Move test case
+    console.log('=== WebAuthn Test Data for Move Test Case ===');
+    console.log('authenticator_data_hex:', Array.from(sig.authenticatorData).map(b => b.toString(16).padStart(2, '0')).join(''));
+    console.log('client_data_json_hex:', Array.from(sig.clientDataJSON).map(b => b.toString(16).padStart(2, '0')).join(''));
+    console.log('signature_der_hex:', Array.from(sig.signature).map(b => b.toString(16).padStart(2, '0')).join(''));
+    console.log('signature_raw_hex:', Array.from(sig.rawSignature).map(b => b.toString(16).padStart(2, '0')).join(''));
+    console.log('public_key_compressed_hex:', Array.from(this.getPublicKey().toBytes()).map(b => b.toString(16).padStart(2, '0')).join(''));
+    
+    // Compute client data hash
+    const clientDataHashBuffer = await crypto.subtle.digest('SHA-256', sig.clientDataJSON);
+    const clientDataHash = new Uint8Array(clientDataHashBuffer);
+    console.log('client_data_hash_hex:', Array.from(clientDataHash).map(b => b.toString(16).padStart(2, '0')).join(''));
+    
+    // Compute verification message (authenticatorData || SHA-256(clientDataJSON))
+    const verificationMessage = new Uint8Array(sig.authenticatorData.length + clientDataHash.length);
+    verificationMessage.set(sig.authenticatorData, 0);
+    verificationMessage.set(clientDataHash, sig.authenticatorData.length);
+    console.log('verification_message_hex:', Array.from(verificationMessage).map(b => b.toString(16).padStart(2, '0')).join(''));
+    
+    // Log BCS payload
+    const payloadBytes = payload.encode();
+    console.log('bcs_payload_hex:', Array.from(payloadBytes).map(b => b.toString(16).padStart(2, '0')).join(''));
+    console.log('=== End WebAuthn Test Data ===');
 
-    return payload.encode();
+    return payloadBytes;
   }
 
   async signTransaction(tx: Transaction): Promise<Authenticator> {
@@ -398,7 +427,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     const sig = await this.signWithWebAuthn(txHash, this.passkeyAuthMethod.id);
 
     // 构造 payload
-    const payloadBytes = this.buildAuthenticatorPayload(sig);
+    const payloadBytes = await this.buildAuthenticatorPayload(sig);
 
     // 构造 Authenticator 对象
     const webauthnAuth = (await WebAuthnAuthenticator.webauthn(
@@ -460,10 +489,20 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     if (s.length === 33 && s[0] === 0x00) {
       s = s.slice(1);
     }
-    if (r.length > 32 || s.length > 32) {
-      throw new Error('Invalid signature length');
-    }
 
+    // === Canonicalize S to low-S form ===
+    const SECP256R1_N = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+    const HALF_N = SECP256R1_N >> BigInt(1);
+    let sBig = BigInt('0x' + Array.from(s).map(b => b.toString(16).padStart(2, '0')).join(''));
+    if (sBig > HALF_N) {
+      sBig = SECP256R1_N - sBig;
+      // convert back to bytes (big-endian, no 0x prefix)
+      let sHex = sBig.toString(16);
+      if (sHex.length % 2 === 1) sHex = '0' + sHex;
+      s = new Uint8Array(
+        sHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+    }
     // Pad to 32 bytes
     const rPad = new Uint8Array(32);
     rPad.set(r, 32 - r.length);
@@ -475,4 +514,89 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     raw.set(sPad, 32);
     return raw;
   }
+
+  
 } 
+
+async function verifyByWebCrypto(publicKey: Uint8Array, signature: Uint8Array, message: Uint8Array): Promise<boolean> {
+  let uncompressed: Uint8Array;
+  if (publicKey.length === 65 && publicKey[0] === 0x04) {
+    uncompressed = publicKey;
+  } else if (publicKey.length === 33) {
+    uncompressed = PublicKeyUtils.decompressP256PublicKey(publicKey);
+  } else {
+    throw new Error('Invalid P-256 public key length');
+  }
+
+  // Convert to JWK (Base64URL without padding)
+  const toB64Url = (bytes: Uint8Array) => {
+    return btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  };
+  const x = toB64Url(uncompressed.slice(1, 33));
+  const y = toB64Url(uncompressed.slice(33, 65));
+
+  console.log('WebCrypto JWK params:', {x, y});
+
+  const jwk: JsonWebKey = {
+    kty: 'EC',
+    crv: 'P-256',
+    x,
+    y,
+    ext: true,
+  };
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['verify']
+  );
+
+  const ok = await crypto.subtle.verify(
+    { name: 'ECDSA', hash: { name: 'SHA-256' } },
+    cryptoKey,
+    signature,
+    message
+  );
+  return ok;
+}
+
+async function verifyByP256(publicKey: Uint8Array, signature: Uint8Array, message: Uint8Array): Promise<boolean> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', message));
+  // 3. Decompress the public key for Noble.js
+  const decompressedKey = PublicKeyUtils.decompressP256PublicKey(publicKey);
+  const isValidSignature = p256.verify(signature, digest, decompressedKey);
+  return isValidSignature;
+}
+
+function rawToDerCanonical(raw: Uint8Array): Uint8Array {
+  const toMinimal = (bytes: Uint8Array) => {
+    // 去掉所有前导 0x00
+    let i = 0;
+    while (i < bytes.length - 1 && bytes[i] === 0x00) i++;
+    let val = bytes.slice(i);
+
+    // 若最高位为 1，再补一个 0x00
+    const needPad = val[0] & 0x80 ? 1 : 0;
+    const out = new Uint8Array(2 + needPad + val.length);
+    out[0] = 0x02;                 // INTEGER
+    out[1] = val.length + needPad; // length
+    if (needPad) out[2] = 0x00;
+    out.set(val, 2 + needPad);
+    return out;
+  };
+
+  const rEnc = toMinimal(raw.slice(0, 32));
+  const sEnc = toMinimal(raw.slice(32, 64));
+
+  const der = new Uint8Array(2 + rEnc.length + sEnc.length);
+  der[0] = 0x30;                           // SEQUENCE
+  der[1] = rEnc.length + sEnc.length;      // total length
+  der.set(rEnc, 2);
+  der.set(sEnc, 2 + rEnc.length);
+  return der;
+}
