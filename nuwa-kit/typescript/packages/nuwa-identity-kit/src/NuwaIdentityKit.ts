@@ -13,6 +13,7 @@ import {
 } from './types';
 import { CryptoUtils } from './cryptoUtils';
 import { VDRRegistry } from './VDRRegistry';
+import { BaseMultibaseCodec } from './multibase';
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
@@ -186,7 +187,7 @@ export class NuwaIdentityKit {
       type: keyInfo.type,
       controller: keyInfo.controller || this.didDocument.id,
       publicKeyMultibase: keyInfo.publicKeyMaterial instanceof Uint8Array 
-        ? await CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type)
+        ? await BaseMultibaseCodec.encodeBase58btc(keyInfo.publicKeyMaterial)
         : undefined,
       publicKeyJwk: !(keyInfo.publicKeyMaterial instanceof Uint8Array)
         ? keyInfo.publicKeyMaterial
