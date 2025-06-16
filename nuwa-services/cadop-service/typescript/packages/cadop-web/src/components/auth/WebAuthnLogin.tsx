@@ -1,54 +1,78 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import { PasskeyService } from '../../lib/passkey/PasskeyService';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { AuthStore, UserStore } from '../../lib/storage';
 
 interface WebAuthnLoginProps {
-  onSuccess: (userId: string) => void;
-  onError: (error: string) => void;
-  email?: string;
+  onSuccess?: (userDid: string) => void;
+  onError?: (error: string) => void;
 }
 
-export function WebAuthnLogin({ onSuccess, onError, email }: WebAuthnLoginProps) {
+export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
   const { signInWithDid } = useAuth();
-
   const passkeyService = new PasskeyService();
 
-  useEffect(() => {
-    passkeyService.isSupported().then(setIsSupported);
-  }, []);
-
-  const handleWebAuthnLogin = useCallback(async () => {
+  const handleSignInWithPasskey = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const userDid = await passkeyService.ensureUser();
+      // First check if there are any credentials stored locally
+      if (!UserStore.hasAnyCredential()) {
+        // If no credentials exist, show a helpful message
+        onError?.('No Passkey found on this device. Please create a new DID first.');
+        return;
+      }
+      
+      // We have credentials, proceed with login
+      const userDid = await passkeyService.login({ mediation: 'required' });
+      
+      // Update auth context
       signInWithDid(userDid);
-      onSuccess(userDid);
+      onSuccess?.(userDid);
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'Authentication failed');
+      console.error('Passkey login failed:', error);
+      onError?.(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
-  }, [email, onSuccess, onError, signInWithDid]);
+  };
 
-  if (!isSupported) {
-    return null;
-  }
+  const handleCreateNewDid = async () => {
+    setIsLoading(true);
+    try {
+      const userDid = await passkeyService.ensureUser();
+      // Note: ensureUser already sets the current user in AuthStore
+      
+      // Update auth context
+      signInWithDid(userDid);
+      onSuccess?.(userDid);
+    } catch (error) {
+      console.error('Passkey registration failed:', error);
+      onError?.(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <button
-      onClick={handleWebAuthnLogin}
-      disabled={isLoading}
-      className="w-full flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
-    >
-      <svg className="h-5 w-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M11.395 44.428C4.557 40.198 0 32.632 0 24 0 10.745 10.745 0 24 0a23.891 23.891 0 0113.997 4.502c-.2 17.907-11.097 33.245-26.602 39.926z" fill="#6875F5"/>
-        <path d="M14.134 45.885A23.914 23.914 0 0024 48c13.255 0 24-10.745 24-24 0-3.516-.756-6.856-2.115-9.866-4.659 15.143-16.608 27.092-31.75 31.751z" fill="#6875F5"/>
-      </svg>
-      <span className="text-sm font-semibold leading-6">
-        {isLoading ? '认证中...' : '使用 Passkey 继续'}
-      </span>
-    </button>
+    <div className="space-y-4">
+      <button
+        type="button"
+        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        onClick={handleSignInWithPasskey}
+        disabled={isLoading}
+      >
+        {isLoading ? 'Loading...' : 'Sign in with Passkey'}
+      </button>
+      
+      <button
+        type="button"
+        className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        onClick={handleCreateNewDid}
+        disabled={isLoading}
+      >
+        {isLoading ? 'Loading...' : 'Create new DID'}
+      </button>
+    </div>
   );
 } 

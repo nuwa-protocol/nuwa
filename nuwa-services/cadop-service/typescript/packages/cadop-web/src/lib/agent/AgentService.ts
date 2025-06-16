@@ -2,9 +2,7 @@ import { apiClient } from '../api/client';
 import { PasskeyService } from '../passkey/PasskeyService';
 import { custodianClient } from '../api/client';
 import type { AgentDIDCreationStatus } from '@cadop/shared';
-
-const ID_TOKEN_KEY = 'agentIdToken';
-const AGENT_DID_MAP_KEY = 'agentDidMap'; // { [userDid]: string[] }
+import { UserStore } from '../storage';
 
 function decodeJWT(jwt: string): any | null {
   const parts = jwt.split('.');
@@ -28,35 +26,13 @@ function isTokenValid(token: string | null): boolean {
 export class AgentService {
   private passkeyService = new PasskeyService();
 
-  private loadAgentDidMap(): Record<string, string[]> {
-    try {
-      return JSON.parse(localStorage.getItem(AGENT_DID_MAP_KEY) ?? '{}');
-    } catch {
-      return {};
-    }
-  }
-
-  private saveAgentDidMap(map: Record<string, string[]>) {
-    localStorage.setItem(AGENT_DID_MAP_KEY, JSON.stringify(map));
-  }
-
   public getCachedAgentDIDs(userDid: string): string[] {
-    const map = this.loadAgentDidMap();
-    return map[userDid] ?? [];
-  }
-
-  private addAgentDid(userDid: string, agentDid: string) {
-    const map = this.loadAgentDidMap();
-    const list = new Set(map[userDid] ?? []);
-    list.add(agentDid);
-    map[userDid] = Array.from(list);
-    this.saveAgentDidMap(map);
+    return UserStore.listAgents(userDid);
   }
 
   public async getIdToken(): Promise<string> {
-    // check cache
-    const cached = localStorage.getItem(ID_TOKEN_KEY);
-    if (isTokenValid(cached)) return cached as string;
+    // We no longer cache idToken as per design doc
+    // Always request a fresh token
 
     // ensure we have userDid
     const userDid = await this.passkeyService.ensureUser();
@@ -74,12 +50,7 @@ export class AgentService {
     );
     if (!verifyResp.data) throw new Error(String(verifyResp.error || 'Failed to get idToken'));
 
-    localStorage.setItem(ID_TOKEN_KEY, verifyResp.data.idToken);
     return verifyResp.data.idToken;
-  }
-
-  public clearIdToken() {
-    localStorage.removeItem(ID_TOKEN_KEY);
   }
 
   public async createAgent(): Promise<AgentDIDCreationStatus> {
@@ -90,7 +61,7 @@ export class AgentService {
     if (!resp.data) throw new Error(String(resp.error || 'Mint failed'));
 
     if (resp.data.agentDid) {
-      this.addAgentDid(userDid, resp.data.agentDid);
+      UserStore.addAgent(userDid, resp.data.agentDid);
     }
     return resp.data;
   }

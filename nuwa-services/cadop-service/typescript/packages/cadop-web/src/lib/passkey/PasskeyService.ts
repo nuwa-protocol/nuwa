@@ -2,10 +2,7 @@ import { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialParameters, 
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
 import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from 'nuwa-identity-kit';
-
-// key in localStorage for userDid and mapping
-const USER_DID_KEY = 'userDid';
-const PASSKEY_MAP_KEY = 'passkeyMap'; // JSON string -> { [credentialId:string]: { userUuid: string; userDid: string } }
+import { AuthStore, UserStore } from '../storage';
 
 // Utils
 function arrayBufferToBase64URL(buffer: ArrayBuffer): string {
@@ -42,27 +39,27 @@ function extractRawPublicKey(spkiInput: ArrayBuffer | Uint8Array, alg: number): 
 export class PasskeyService {
   private developmentMode = import.meta.env.DEV;
 
-  /** 判断浏览器是否支持 Passkey */
+  /** Check if browser supports Passkey */
   public async isSupported(): Promise<boolean> {
     return typeof window !== 'undefined' && window.PublicKeyCredential !== undefined &&
       await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
   }
 
-  /** 读取本地 userDid */
+  /** Get local userDid */
   public getUserDid(): string | null {
-    return localStorage.getItem(USER_DID_KEY);
+    return AuthStore.getCurrentUserDid();
   }
 
-  /** 主入口：确保本地已有 Passkey，并返回 userDid */
+  /** Main entry: ensure local Passkey exists and return userDid */
   public async ensureUser(): Promise<string> {
     const existing = this.getUserDid();
     if (existing) return existing;
 
-    // 若无，则创建新 Passkey
+    // If none exists, create new Passkey
     return this.register();
   }
 
-  /** 创建新 Passkey → userDid */
+  /** Create new Passkey → userDid */
   private async register(): Promise<string> {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
@@ -141,7 +138,7 @@ export class PasskeyService {
 
     if (!publicKey) throw new Error('No publicKey from attestation');
     
-    // 详细记录 SPKI 格式的公钥
+    // Log SPKI format public key details
     const spkiBytes = new Uint8Array(publicKey);
     if (this.developmentMode) {
       console.log('[PasskeyService] SPKI public key details:', {
@@ -190,7 +187,7 @@ export class PasskeyService {
         publicKeyLength: rawPubKey.length
       });
 
-      // 验证 DID 的往返转换
+      // Verify DID roundtrip conversion
       try {
         const { keyType: parsedKeyType, publicKey: parsedPublicKey } = DidKeyCodec.parseDidKey(userDid);
         const publicKeyMatches = Array.from(rawPubKey).every((byte, index) => byte === parsedPublicKey[index]);
@@ -209,32 +206,28 @@ export class PasskeyService {
       }
     }
 
-    // 保存映射
-    const map = this.loadMap();
-    map[cred.id] = { userUuid, userDid };
-    this.saveMap(map);
-    localStorage.setItem(USER_DID_KEY, userDid);
+    // Save credential to user store
+    UserStore.addCredential(userDid, cred.id);
+    // Set as current user
+    AuthStore.setCurrentUserDid(userDid);
 
     if (this.developmentMode) {
       console.log('[PasskeyService] Registration completed:', { 
         userDid, 
         credentialId: cred.id,
-        credentialIdTruncated: cred.id.substring(0, 20) + '...',
-        mapSize: Object.keys(map).length
+        credentialIdTruncated: cred.id.substring(0, 20) + '...'
       });
     }
 
     return userDid;
   }
 
-  /** 登录：利用 silent mediation 或 allowCredentials 选择 */
-  public async login(): Promise<string> {
-    const map = this.loadMap();
-
+  /** Login: using silent mediation or allowCredentials selection */
+  public async login(options?: { mediation?: CredentialMediationRequirement }): Promise<string> {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
 
-    const options: PublicKeyCredentialRequestOptionsJSON = {
+    const requestOptions: PublicKeyCredentialRequestOptionsJSON = {
       challenge: bufferToBase64URLString(challenge),
       rpId: window.location.hostname,
       userVerification: 'preferred',
@@ -242,33 +235,25 @@ export class PasskeyService {
     };
 
     const publicKeyRequest: PublicKeyCredentialRequestOptions = {
-      ...options,
-      challenge: base64URLToArrayBuffer(options.challenge),
+      ...requestOptions,
+      challenge: base64URLToArrayBuffer(requestOptions.challenge),
     } as unknown as PublicKeyCredentialRequestOptions;
 
-    const cred = await navigator.credentials.get({ publicKey: publicKeyRequest, mediation: 'silent' }) as PublicKeyCredential | null;
+    // Default to 'silent' for automatic login attempts in AuthContext
+    // Use 'required' for user-initiated login (always shows UI with available credentials)
+    const mediation = options?.mediation || 'silent';
+    
+    const cred = await navigator.credentials.get({ 
+      publicKey: publicKeyRequest, 
+      mediation 
+    }) as PublicKeyCredential | null;
 
     if (!cred) throw new Error('No credential from get');
 
-    const entry = map[cred.id];
-    if (!entry) throw new Error('Credential not found in local map');
+    // Find user by credential ID
+    const userDid = UserStore.findUserByCredential(cred.id);
+    if (!userDid) throw new Error('Credential not found in local storage');
 
-    localStorage.setItem(USER_DID_KEY, entry.userDid);
-    return entry.userDid;
-  }
-
-  private loadMap(): Record<string, { userUuid: string; userDid: string }> {
-    try {
-      return JSON.parse(localStorage.getItem(PASSKEY_MAP_KEY) ?? '{}');
-    } catch {
-      return {};
-    }
-  }
-  private saveMap(map: Record<string, { userUuid: string; userDid: string }>) {
-    localStorage.setItem(PASSKEY_MAP_KEY, JSON.stringify(map));
-  }
-
-  private base64ToArrayBuffer(base64url: string): ArrayBuffer {
-    return base64URLToArrayBuffer(base64url);
+    return userDid;
   }
 } 

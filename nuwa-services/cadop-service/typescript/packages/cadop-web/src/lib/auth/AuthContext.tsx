@@ -1,17 +1,15 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { AuthContextType } from './types';
-
+import { AuthStore, UserStore } from '../storage';
+import { PasskeyService } from '../passkey/PasskeyService';
 
 const defaultAuthContext: AuthContextType = {
   isAuthenticated: false,
   isLoading: true,
   userDid: null,
   error: null,
-  signIn: () => {},
   signInWithDid: () => {},
   signOut: () => {},
-  refreshSession: async () => {},
-  updateSession: () => {},
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContext);
@@ -29,7 +27,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [state, setState] = useState<Omit<AuthContextType, 'signIn' | 'signInWithDid' | 'signOut' | 'refreshSession' | 'updateSession'>>({
+  const [state, setState] = useState<Omit<AuthContextType, 'signInWithDid' | 'signOut'>>({
     isAuthenticated: false,
     isLoading: true,
     userDid: null,
@@ -37,45 +35,69 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
 
   const signInWithDid = useCallback((userDid: string) => {
-    localStorage.setItem('userDid', userDid);
-    setState(prev => ({
-      ...prev,
-      isAuthenticated: true,
-      isLoading: false,
-      userDid,
-      error: null,
-    }));
+    try {
+      AuthStore.setCurrentUserDid(userDid);
+      setState(prev => ({
+        ...prev,
+        isAuthenticated: true,
+        isLoading: false,
+        userDid,
+        error: null,
+      }));
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : String(error),
+        isLoading: false,
+      }));
+    }
   }, []);
 
   const signOut = useCallback(() => {
-    localStorage.removeItem('userDid');
+    AuthStore.clearCurrentUser();
     setState({
       isAuthenticated: false,
       isLoading: false,
-      session: null,
       userDid: null,
       error: null,
     });
   }, []);
 
-
+  // Bootstrap flow as described in auth-flow.md
   useEffect(() => {
-    const storedDid = localStorage.getItem('userDid');
-    if (storedDid) {
+    async function bootstrapAuth() {
       try {
-        setState({
-          isAuthenticated: true,
-          isLoading: false,
-          userDid: storedDid,
-          error: null,
-        });
+        // Step 1: Check if we have a current user DID
+        const currentUserDid = AuthStore.getCurrentUserDid();
+        
+        if (currentUserDid) {
+          // User is already authenticated
+          setState({
+            isAuthenticated: true,
+            isLoading: false,
+            userDid: currentUserDid,
+            error: null,
+          });
+        }else{
+          setState({
+            isAuthenticated: false,
+            isLoading: false,
+            userDid: null,
+            error: null,
+          });
+        }
       } catch (error) {
-        console.error('Failed to restore session:', error);
-        setState(prev => ({ ...prev, isLoading: false }));
+        // Something went wrong in the authentication process
+        setState({
+          isAuthenticated: false,
+          isLoading: false,
+          userDid: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-    } else {
-      setState(prev => ({ ...prev, userDid: storedDid, isAuthenticated: !!storedDid, isLoading: false }));
     }
+
+    bootstrapAuth();
   }, []);
 
   const value: AuthContextType = {
