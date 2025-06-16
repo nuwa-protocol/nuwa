@@ -17,11 +17,6 @@ export default defineConfig({
           'X-Client-Type': 'cadop-web'
         }
       },
-      '/.well-known': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false
-      }
     },
     headers: {
       'X-Content-Type-Options': 'nosniff',
@@ -38,7 +33,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'supabase': ['@supabase/supabase-js'],
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select']
         }
