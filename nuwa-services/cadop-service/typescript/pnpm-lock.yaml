@@ -54,6 +54,9 @@ importers:
       '@cadop/shared':
         specifier: workspace:*
         version: link:../cadop-shared
+      '@noble/curves':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.4
         version: 0.3.4(typescript@5.8.3)
@@ -66,6 +69,12 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.39.7
         version: 2.49.9
+      cbor:
+        specifier: ^10.0.3
+        version: 10.0.3
+      cbor-x:
+        specifier: ^1.6.0
+        version: 1.6.0
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -236,9 +245,6 @@ importers:
       '@stablelib/ed25519':
         specifier: ^1.0.3
         version: 1.0.3
-      '@supabase/supabase-js':
-        specifier: ^2.39.7
-        version: 2.49.9
       '@tanstack/react-query':
         specifier: ^5.15.0
         version: 5.77.2(react@18.3.1)
@@ -2591,6 +2597,10 @@ packages:
     resolution: {integrity: sha512-9bE8+tueGxONyxpttNKkAKKcGVtAPeoSJ64AjVTTjEuBOuRaeeP76EN9BbmQqkz1ZeTP0QPvksNBKwvEutIUzQ==}
     engines: {node: '>=20'}
 
+  cbor@10.0.3:
+    resolution: {integrity: sha512-72Jnj81xMsqepqdcSdf2+fflz/UDsThOHy5hj2MW5F5xzHL8Oa0KQ6I6V9CwVUPxg5pf+W9xp6W2KilaRXWWtw==}
+    engines: {node: '>=18'}
+
   chai@4.5.0:
     resolution: {integrity: sha512-RITGBfijLkBddZvnn8jdqoTypxvqbOLYQkGGxXzeFjVHvudaPw0HNFD9x928/eUwYWd2dPCugVqspGALTZZQKw==}
     engines: {node: '>=4'}
@@ -4086,6 +4096,10 @@ packages:
     resolution: {integrity: sha512-WDjw3pJ0/0jMFmyNDp3gvY2YizjLmmOUQo6DEBY+JgdvW/yQ9mEeSw6H5ythl5Ny2ytb7f9C2nIbjSxMNzbJXw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  nofilter@3.1.0:
+    resolution: {integrity: sha512-l2NNj07e9afPnhAhvgVrCD/oy2Ai1yfLpuo3EpiO1jFTsB4sFz6oIfAfSZyQzVpkZQ9xS8ZS5g1jCBgq4Hwo0g==}
+    engines: {node: '>=12.19'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -8021,6 +8035,10 @@ snapshots:
     dependencies:
       '@cto.af/wtf8': 0.0.2
 
+  cbor@10.0.3:
+    dependencies:
+      nofilter: 3.1.0
+
   chai@4.5.0:
     dependencies:
       assertion-error: 1.1.0
@@ -9927,6 +9945,8 @@ snapshots:
       supports-color: 5.5.0
       touch: 3.1.1
       undefsafe: 2.0.5
+
+  nofilter@3.1.0: {}
 
   normalize-path@3.0.0: {}
 

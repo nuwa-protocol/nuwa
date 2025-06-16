@@ -14,3 +14,12 @@ export interface IDTokenPayload {
 export interface IDToken {
   id_token: string;
 }
+
+/**
+ * Challenge response from IdP service
+ */
+export interface ChallengeResponse {
+  challenge: string;  // Base64URL-encoded challenge bytes
+  rpId: string;       // Relying party ID
+  nonce: string;      // UUID for tracking and anti-replay
+}

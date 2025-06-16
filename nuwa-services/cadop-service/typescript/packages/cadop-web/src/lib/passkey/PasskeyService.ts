@@ -1,4 +1,4 @@
-import { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialParameters, PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
+import { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialParameters, PublicKeyCredentialRequestOptionsJSON, PublicKeyCredentialJSON, AuthenticatorAssertionResponse, AuthenticatorAttestationResponse, PublicKeyCredentialRequestOptions} from '@simplewebauthn/types';
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
 import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from 'nuwa-identity-kit';
@@ -255,5 +255,89 @@ export class PasskeyService {
     if (!userDid) throw new Error('Credential not found in local storage');
 
     return userDid;
+  }
+
+  /**
+   * Use this method to authenticate with a challenge from the server
+   * @param options WebAuthn request options
+   * @returns assertionJSON and userDid
+   */
+  public async authenticateWithChallenge(options: {
+    challenge: string;
+    rpId: string;
+  }): Promise<{
+    assertionJSON: PublicKeyCredentialJSON;
+    userDid: string;
+  }> {
+    try {
+      let userDid = this.getUserDid();
+      if (!userDid) {
+        throw new Error('No user DID found');
+      }
+      const allowCredentials = UserStore.listCredentials(userDid);
+      if (this.developmentMode) {
+        console.log('[PasskeyService] authenticateWithChallenge options:', {
+          challenge: options.challenge?.substring(0, 20) + '...',
+          rpId: options.rpId,
+          allowCredentials: allowCredentials
+        });
+      }
+
+      const publicKeyRequest: PublicKeyCredentialRequestOptions = {
+        challenge: base64URLToArrayBuffer(options.challenge),
+        rpId: options.rpId,
+        userVerification: 'preferred',
+        timeout: 60000,
+        allowCredentials: allowCredentials.map(cred => ({
+          id: base64URLToArrayBuffer(cred),
+          type: 'public-key',
+        })),
+      } as unknown as PublicKeyCredentialRequestOptions;
+
+      // call WebAuthn API to get assertion
+      const cred = await navigator.credentials.get({ 
+        publicKey: publicKeyRequest,
+        mediation: 'silent'
+      }) as PublicKeyCredential | null;
+
+      if (!cred) throw new Error('No credential from get');
+
+      const userHandle = (cred.response as AuthenticatorAssertionResponse).userHandle;
+      // convert credential to JSON format
+      const assertionJSON: PublicKeyCredentialJSON = {
+        id: cred.id,
+        rawId: arrayBufferToBase64URL(cred.rawId),
+        type: 'public-key',
+        response: {
+          authenticatorData: arrayBufferToBase64URL(
+            (cred.response as AuthenticatorAssertionResponse).authenticatorData
+          ),
+          clientDataJSON: arrayBufferToBase64URL(cred.response.clientDataJSON),
+          signature: arrayBufferToBase64URL(
+            (cred.response as AuthenticatorAssertionResponse).signature
+          ),
+          userHandle: userHandle ? arrayBufferToBase64URL(userHandle) : undefined,
+        },
+        clientExtensionResults: cred.getClientExtensionResults(),
+      };
+
+      if (this.developmentMode) {
+        console.log('[PasskeyService] authenticateWithChallenge result:', {
+          credId: assertionJSON.id.substring(0, 20) + '...',
+          userDid: userDid,
+        });
+      }
+
+      return { assertionJSON, userDid };
+    } catch (error) {
+      if (this.developmentMode) {
+        console.error('[PasskeyService] authenticateWithChallenge error:', 
+          error instanceof Error ? 
+          { name: error.name, message: error.message, stack: error.stack } : 
+          (typeof error === 'object' ? JSON.stringify(error, null, 2) : error)
+        );
+      }
+      throw error;
+    }
   }
 } 

@@ -1,8 +1,9 @@
 import { apiClient } from '../api/client';
 import { PasskeyService } from '../passkey/PasskeyService';
 import { custodianClient } from '../api/client';
-import type { AgentDIDCreationStatus } from '@cadop/shared';
+import type { AgentDIDCreationStatus, ChallengeResponse } from '@cadop/shared';
 import { UserStore } from '../storage';
+import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
 
 function decodeJWT(jwt: string): any | null {
   const parts = jwt.split('.');
@@ -37,20 +38,33 @@ export class AgentService {
     // ensure we have userDid
     const userDid = await this.passkeyService.ensureUser();
 
-    // step 1: get nonce
-    const challengeResp = await apiClient.get<{ nonce: string; rpId: string }>('/api/idp/challenge');
+    // step 1: get challenge
+    const challengeResp = await apiClient.get<ChallengeResponse>('/api/idp/challenge');
     if (!challengeResp.data) throw new Error(String(challengeResp.error || 'Failed to get challenge'));
-    const { nonce } = challengeResp.data;
+    const { challenge, rpId, nonce } = challengeResp.data;
 
-    // step 2: (simplified) directly verify without assertion
-    const verifyResp = await apiClient.post<{ idToken: string }>(
-      '/api/idp/verify',
-      { nonce, userDid },
-      { skipAuth: true }
-    );
-    if (!verifyResp.data) throw new Error(String(verifyResp.error || 'Failed to get idToken'));
-
-    return verifyResp.data.idToken;
+    try {
+      // step 2: call PasskeyService.authenticateWithChallenge to authenticate
+      const { assertionJSON, userDid: authenticatedDid } = await this.passkeyService.authenticateWithChallenge({
+        challenge,
+        rpId,
+      });
+      
+      // step 3: send assertion to server to verify
+      const verifyResp = await apiClient.post<{ idToken: string }>(
+        '/api/idp/verify-assertion',
+        { assertion: assertionJSON, userDid: authenticatedDid, nonce },
+        { skipAuth: true }
+      );
+      
+      if (!verifyResp.data) throw new Error(String(verifyResp.error || 'Failed to verify assertion'));
+      return verifyResp.data.idToken;
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+      console.error('Passkey authentication failed error:', errorMessage);
+      throw error;
+    }
   }
 
   public async createAgent(): Promise<AgentDIDCreationStatus> {
