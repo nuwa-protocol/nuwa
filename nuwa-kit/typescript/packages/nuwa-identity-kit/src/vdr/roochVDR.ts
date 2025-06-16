@@ -15,13 +15,13 @@ import {
   ObjectStateView,
   Ed25519PublicKey,
   Secp256k1PublicKey,
+  EventView,
 } from '@roochnetwork/rooch-sdk';
 import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, SignerInterface, KeyType, KEY_TYPE } from '../types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
   formatDIDString,
-  getDIDAddressFromEvent,
   parseDIDCreatedEvent,
   resolveDidObjectID,
 } from './roochVDRTypes';
@@ -326,10 +326,13 @@ export class RoochVDR extends AbstractVDR {
       }
       
       // Parse the actual created DID
-      const didCreatedEvent = result.output?.events?.find((event: any) => 
+      const didCreatedEvent = result.output?.events?.find((event: EventView) => 
         event.event_type === '0x3::did::DIDCreatedEvent'
       );
-      let actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent); 
+      if (!didCreatedEvent) {
+        throw new Error('DIDCreatedEvent not found');
+      }
+      let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent); 
       
       this.lastCreatedDIDAddress = actualDID;
       
@@ -408,7 +411,7 @@ export class RoochVDR extends AbstractVDR {
       if (!didCreatedEvent) {
         throw new Error('DIDCreatedEvent not found');
       }
-      let actualDID = this.parseDIDCreatedEventAndGetAddress(didCreatedEvent);
+      let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent);
       let didDocument = await this.resolve(actualDID);
       if (!didDocument) {
         throw new Error('DID document not found with DID: ' + actualDID);
@@ -1148,10 +1151,10 @@ export class RoochVDR extends AbstractVDR {
   /**
    * Parse DIDCreatedEvent using BCS schema and return the DID address
    */
-  private parseDIDCreatedEventAndGetAddress(event: any): string {
+  private parseDIDCreatedEventAndGetDID(event: EventView): string {
     try {
       const eventData = parseDIDCreatedEvent(event.event_data);
-      return formatDIDString(eventData.did);
+      return eventData.did;
     } catch (error) {
       this.errorLog('BCS parsing failed:', error);
       throw error;

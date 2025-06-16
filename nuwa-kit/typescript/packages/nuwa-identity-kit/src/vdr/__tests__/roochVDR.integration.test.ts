@@ -44,7 +44,7 @@ describe('RoochVDR Integration Tests', () => {
     try {
       // Create a test keypair
       keypair = Secp256k1Keypair.generate();
-      testAddress = keypair.getRoochAddress().toHexAddress();
+      testAddress = keypair.getRoochAddress().toBech32Address();
 
       // Create RoochVDR instance
       roochVDR = new RoochVDR({
@@ -73,7 +73,7 @@ describe('RoochVDR Integration Tests', () => {
     it('should create a DID document for self', async () => {
       if (!shouldRunIntegrationTests()) return;
 
-      const testDid = `did:rooch:${testAddress}`;
+      const testControllerDid = `did:rooch:${testAddress}`;
       
       // Get the actual public key from the keypair (Secp256k1)
       const publicKeyBytes = keypair.getPublicKey().toBytes();
@@ -90,8 +90,7 @@ describe('RoochVDR Integration Tests', () => {
       const result = await roochVDR.create({
         publicKeyMultibase,
         keyType: 'EcdsaSecp256k1VerificationKey2019',
-        preferredDID: testDid,
-        controller: testDid
+        controller: testControllerDid
       }, { signer: keypair });
 
       expect(result.success).toBe(true);
@@ -144,13 +143,10 @@ describe('RoochVDR Integration Tests', () => {
       const newKeypair = Secp256k1Keypair.generate();
       const publicKeyBytes = newKeypair.getPublicKey().toBytes();
       
-      const multibase = require('multibase');
-      const encoded = multibase.encode('base58btc', publicKeyBytes);
-      const publicKeyMultibase = new TextDecoder().decode(encoded);
+      const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
       
       console.log('Generated new verification method:');
       console.log('- Public key multibase:', publicKeyMultibase);
-      console.log('- Should start with z (base58btc):', publicKeyMultibase.startsWith('z'));
       console.log('- Public key bytes length:', publicKeyBytes.length);
       console.log('- First few bytes:', Array.from(publicKeyBytes.slice(0, 5) as Uint8Array).map((b: number) => '0x' + b.toString(16).padStart(2, '0')));
       
