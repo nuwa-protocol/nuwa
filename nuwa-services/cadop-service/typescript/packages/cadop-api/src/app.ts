@@ -18,6 +18,10 @@ async function initializeServices() {
       custodian: {
         maxDailyMints: config.service.maxDailyMints,
       },
+      idp: {
+        signingKey: config.service.signingKey,
+        rpId: config.webauthn.rpId,
+      },
       rooch: {
         networkUrl: config.rooch.networkUrl,
         networkId: config.rooch.networkId,

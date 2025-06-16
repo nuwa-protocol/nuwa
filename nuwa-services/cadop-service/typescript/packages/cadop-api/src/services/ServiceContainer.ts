@@ -1,4 +1,5 @@
 import { CustodianService } from './CustodianService.js';
+import { IdpService } from './IdpService.js';
 import { logger } from '../utils/logger.js';
 import { BaseMultibaseCodec, CadopIdentityKit, createVDR, VDRInterface, VDRRegistry, LocalSigner, CadopServiceType } from 'nuwa-identity-kit';
 import roochSdk from '@roochnetwork/rooch-sdk';
@@ -11,6 +12,10 @@ export interface ServiceConfig {
   custodian: {
     maxDailyMints: number;
   };
+  idp: {
+    signingKey: string;
+    rpId: string;
+  };
   rooch: {
     networkUrl: string;
     networkId: string;
@@ -21,6 +26,7 @@ export interface ServiceConfig {
 export class ServiceContainer {
   private static instance: ServiceContainer | null = null;
   private custodianService!: CustodianService;
+  private idpService!: IdpService;
   private serviceConfig: ServiceConfig;
 
   private constructor(config: ServiceConfig) {
@@ -35,7 +41,6 @@ export class ServiceContainer {
       logger.info('Initializing crypto service');
       await cryptoService.initializeKeys();
       logger.info('Crypto service initialized successfully');
-
 
       // Initialize VDR and signer for Custodian service
       logger.info('Initializing VDR and signer...');
@@ -77,12 +82,33 @@ export class ServiceContainer {
       );
       logger.info('Custodian service initialized');
 
+      let signingKey = this.serviceConfig.idp.signingKey;
+      let generatedSigningKey = false;
+      if (signingKey === 'signing-key-placeholder'){
+        signingKey = cryptoService.getJwtSigningKey();
+        generatedSigningKey = true;
+      }
+
+      // Initialize IDP service
+      logger.info('Initializing IDP service...');
+      this.idpService = new IdpService({
+        cadopDid: this.serviceConfig.cadopDid,
+        signingKey: signingKey,
+        rpId: this.serviceConfig.idp.rpId,
+      });
+      logger.info('IDP service initialized');
+
       logger.info('All services initialized successfully');
-      if (generatedCadopDid) {
+      if (generatedCadopDid || generatedSigningKey) {
         console.log(`==============================================`);
         console.log(`Please update the cadopDid in the environment variables`);
-        console.log(`CADOP_DID=${generatedCadopDid}`);
-        console.log(`ROOCH_PRIVATE_KEY=${cryptoService.getRoochKeypair().getSecretKey()}`);
+        if (generatedCadopDid) {
+          console.log(`CADOP_DID=${generatedCadopDid}`);
+          console.log(`ROOCH_PRIVATE_KEY=${cryptoService.getRoochKeypair().getSecretKey()}`);
+        }
+        if (generatedSigningKey) {
+          console.log(`JWT_SIGNING_KEY=${signingKey}`);
+        }
         console.log(`==============================================`);
       }
     } catch (error) {
@@ -108,6 +134,13 @@ export class ServiceContainer {
       throw new Error('Custodian service not initialized');
     }
     return this.custodianService;
+  }
+
+  getIdpService(): IdpService {
+    if (!this.idpService) {
+      throw new Error('IDP service not initialized');
+    }
+    return this.idpService;
   }
 
   // For testing purposes only

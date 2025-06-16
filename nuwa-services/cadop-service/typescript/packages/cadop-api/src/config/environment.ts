@@ -19,7 +19,7 @@ const envSchema = z.object({
   
   // Service Configuration
   CADOP_DID: z.string().default('did:rooch:placeholder'),
-  JWT_SIGNING_KEY: z.string().default('test-signing-key'),
+  JWT_SIGNING_KEY: z.string().default('signing-key-placeholder'),
   CUSTODIAN_MAX_DAILY_MINTS: z.string().default('10'),
   
   // Rate Limiting

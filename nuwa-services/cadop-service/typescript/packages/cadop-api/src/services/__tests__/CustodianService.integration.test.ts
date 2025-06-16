@@ -17,6 +17,7 @@ import {
 } from 'nuwa-identity-kit';
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
+import { IdpService } from '../IdpService.js';
 
 // Test configuration
 const DEFAULT_NODE_URL = process.env.ROOCH_NODE_URL || 'http://localhost:6767';
@@ -33,13 +34,14 @@ const shouldRunIntegrationTests = () => {
 
 describe('CustodianService Integration Tests', () => {
   let roochClient: RoochClientType;
-  let serviceKeypair: Secp256k1KeypairType;
+  let cadopServiceKeypair: Secp256k1KeypairType;
   let serviceSigner: SignerInterface;
-  let serviceDID: string;
+  let cadopServiceDID: string;
   let userId: string;
   let userDID: string;
   let mockPublicKey: Buffer;
   let custodianService: CustodianService;
+  let idpService: IdpService;
 
   beforeAll(async () => {
     if (!shouldRunIntegrationTests()) {
@@ -49,8 +51,8 @@ describe('CustodianService Integration Tests', () => {
 
     try {
       // Create a keypair for the service
-      serviceKeypair = Secp256k1Keypair.generate();
-      const serviceAddress = serviceKeypair.getRoochAddress().toBech32Address();
+      cadopServiceKeypair = Secp256k1Keypair.generate();
+      const cadopControllerAddress = cadopServiceKeypair.getRoochAddress().toBech32Address();
 
       
       // Create and register RoochVDR
@@ -60,27 +62,27 @@ describe('CustodianService Integration Tests', () => {
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
-      const publicKeyBytes = serviceKeypair.getPublicKey().toBytes();
+      const publicKeyBytes = cadopServiceKeypair.getPublicKey().toBytes();
       const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
       
       const createResult = await roochVDR.create({
         publicKeyMultibase,
         keyType: 'EcdsaSecp256k1VerificationKey2019',
       }, {
-        signer: serviceKeypair
+        signer: cadopServiceKeypair
       });
 
       console.log('createResult', JSON.stringify(createResult, null, 2))
       expect(createResult.success).toBe(true);
       expect(createResult.didDocument).toBeDefined();
-      serviceDID = createResult.didDocument!.id;
+      cadopServiceDID = createResult.didDocument!.id;
 
       // Create signer adapter
-      const localSigner = await LocalSigner.createEmpty(serviceDID);
-      localSigner.importRoochKeyPair('account-key', serviceKeypair);
+      const localSigner = await LocalSigner.createEmpty(cadopServiceDID);
+      localSigner.importRoochKeyPair('account-key', cadopServiceKeypair);
       serviceSigner = localSigner;
       // Initialize CadopIdentityKit
-      const cadopKit = await CadopIdentityKit.fromServiceDID(serviceDID, localSigner);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(cadopServiceDID, localSigner);
       
 
       // Add CADOP service
@@ -113,15 +115,21 @@ describe('CustodianService Integration Tests', () => {
 
       custodianService = new CustodianService(
         {
-          cadopDid: serviceDID,
+          cadopDid: cadopServiceDID,
           maxDailyMints: 10,
         },
         cadopKit
       );
 
+      idpService = new IdpService({
+        cadopDid: cadopServiceDID,
+        signingKey: 'test-signing-key',
+        rpId: 'test-rp-id',
+      });
+
       console.log('Test setup complete:');
-      console.log(`- Service address: ${serviceAddress}`);
-      console.log(`- Service DID: ${serviceDID}`);
+      console.log(`- Service address: ${cadopControllerAddress}`);
+      console.log(`- Service DID: ${cadopServiceDID}`);
       console.log(`- User DID: ${userDID}`);
 
     } catch (error) {
@@ -140,12 +148,12 @@ describe('CustodianService Integration Tests', () => {
 
       // Get a valid token
       //TODO get id token
-      const id_token = 'test-id-token';
-      //const { id_token } = await webauthnService.getIdToken(userId);
+      const { nonce, rpId } = await idpService.generateChallenge();
+      const { idToken } = await idpService.verifyNonce(nonce, userDID);
 
       // Create agent DID
       const result = await custodianService.createAgentDIDViaCADOP({
-        idToken: id_token,
+        idToken: idToken,
         userDid: userDID
       });
 
