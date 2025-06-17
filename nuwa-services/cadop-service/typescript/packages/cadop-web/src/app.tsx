@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './lib/auth/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/auth/login';
 import { DashboardPage } from './pages/dashboard';
@@ -11,50 +10,40 @@ import { WebAuthnDebugPage } from './pages/webauthn-debug';
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/debug/webauthn" element={<WebAuthnDebugPage />} />
-        
-        {/* Protected routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/agent/:did"
-          element={
-            <ProtectedRoute>
-              <AgentDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="/agent/:did/add-auth-method"
-          element={
-            <ProtectedRoute>
-              <AddAuthMethodPage />
-            </ProtectedRoute>
-          }
-        />
-        
-        {/* Default redirect to dashboard */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
-        {/* 404 page redirect to dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        
-        <Route path="/create-agent-did" element={<CreateAgentDIDPage />} />
-        {/* Add more routes as they are implemented */}
-      </Routes>
-    </AuthProvider>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/debug/webauthn" element={<WebAuthnDebugPage />} />
+      <Route path="/agent/:did" element={<AgentDetailPage />} />
+      
+      {/* Protected routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/agent/:did/add-auth-method"
+        element={
+          <ProtectedRoute>
+            <AddAuthMethodPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Default redirect to dashboard */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      
+      {/* 404 page redirect to dashboard */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      
+      <Route path="/create-agent-did" element={<CreateAgentDIDPage />} />
+      {/* Add more routes as they are implemented */}
+    </Routes>
   );
 };
 

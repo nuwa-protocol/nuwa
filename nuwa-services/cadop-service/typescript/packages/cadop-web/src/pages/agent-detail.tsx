@@ -13,9 +13,11 @@ import {
   KeyOutlined,
   HistoryOutlined,
   TeamOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
-import type { DIDDocument } from '@cadop/shared';
+import type { DIDDocument, VerificationMethod } from 'nuwa-identity-kit';
+import { useAgentBalances } from '../hooks/useAgentBalances';
 
 const { TabPane } = Tabs;
 const { Title, Text, Paragraph } = Typography;
@@ -24,17 +26,20 @@ export function AgentDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
-  const { userDid } = useAuth();
+  const { userDid, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
   const [showDidDocument, setShowDidDocument] = useState(false);
+  const [isController, setIsController] = useState(false);
+
+  const { balances, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalances } = useAgentBalances(did);
 
   useEffect(() => {
     if (did) {
       loadAgentInfo();
     }
-  }, [did]);
+  }, [did, userDid]);
 
   const loadAgentInfo = async () => {
     if (!did) return;
@@ -46,6 +51,15 @@ export function AgentDetailPage() {
       const response = await custodianClient.resolveAgentDID(did);
       if (response.data) {
         setDidDocument(response.data);
+        
+        if (isAuthenticated && userDid) {
+          const hasControllerAccess = response.data.verificationMethod?.some(
+            (method: VerificationMethod) => method.controller === userDid
+          );
+          setIsController(hasControllerAccess);
+        } else {
+          setIsController(false);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
@@ -90,13 +104,13 @@ export function AgentDetailPage() {
           </Button>
           
           <div className="flex justify-between items-center">
-            <Title level={2}>Agent Details</Title>
+            <Title level={2}>{t('agent.details')}</Title>
             <Button
               variant="outline"
               onClick={() => setShowDidDocument(true)}
             >
               <FileTextOutlined className="mr-2" />
-              View DID Document
+              {t('agent.viewDidDocument')}
             </Button>
           </div>
         </div>
@@ -106,7 +120,7 @@ export function AgentDetailPage() {
           <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Agent Identity</CardTitle>
+                <CardTitle>{t('agent.identity')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <DIDDisplay 
@@ -115,12 +129,56 @@ export function AgentDetailPage() {
                   showQR={true}
                   status="active"
                 />
+                {isController && (
+                  <div className="mt-2">
+                    <Tag color="green">{t('agent.youAreController')}</Tag>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>{t('agent.balance')}</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => refetchBalances()} 
+                  className="h-8 w-8 p-0"
+                >
+                  <ReloadOutlined />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {balanceLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Spin size="small" />
+                  </div>
+                ) : balances.length > 0 ? (
+                  <div className="space-y-2">
+                    {balances.map((bal, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center">
+                          <Text strong>{bal.symbol}</Text>
+                          <Text type="secondary" className="ml-2 text-xs">{bal.name}</Text>
+                        </div>
+                        <Text>{bal.fixedBalance}</Text>
+                      </div>
+                    ))}
+                  </div>
+                ) : balanceError ? (
+                  <div className="text-center py-2">
+                    <Text type="danger">{t('agent.balanceLoadFailed')}</Text>
+                  </div>
+                ) : (
+                  <Text type="secondary">{t('agent.noBalance')}</Text>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Authentication Methods</CardTitle>
+                <CardTitle>{t('agent.authMethods')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -139,32 +197,32 @@ export function AgentDetailPage() {
                           <Text strong className="font-mono">{fragment}</Text>
                           <Text className="ml-2">{method.type}</Text>
                           {method.controller === userDid && (
-                            <Tag color="blue" className="ml-2">Controller</Tag>
+                            <Tag color="blue" className="ml-2">{t('agent.controller')}</Tag>
                           )}
                         </div>
                         <div className="text-xs text-gray-400 mb-2">
-                          controller: {method.controller}
+                          {t('agent.controllerLabel')}: {method.controller}
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center">
                             <TeamOutlined className="mr-2" />
-                            <Text type="secondary">Capabilities:</Text>
+                            <Text type="secondary">{t('agent.capabilities')}:</Text>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {isAuthentication && (
-                              <Tag color="green">Authentication</Tag>
+                              <Tag color="green">{t('agent.authentication')}</Tag>
                             )}
                             {isAssertionMethod && (
-                              <Tag color="blue">Assertion</Tag>
+                              <Tag color="blue">{t('agent.assertion')}</Tag>
                             )}
                             {isKeyAgreement && (
-                              <Tag color="purple">Key Agreement</Tag>
+                              <Tag color="purple">{t('agent.keyAgreement')}</Tag>
                             )}
                             {isCapabilityInvocation && (
-                              <Tag color="orange">Capability Invocation</Tag>
+                              <Tag color="orange">{t('agent.capabilityInvocation')}</Tag>
                             )}
                             {isCapabilityDelegation && (
-                              <Tag color="cyan">Capability Delegation</Tag>
+                              <Tag color="cyan">{t('agent.capabilityDelegation')}</Tag>
                             )}
                           </div>
                         </div>
@@ -177,52 +235,54 @@ export function AgentDetailPage() {
           </div>
 
           {/* Right Column - Actions */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Button className="w-full" variant="outline" onClick={() => navigate(`/agent/${did}/add-auth-method`)}>
-                    <KeyOutlined className="mr-2" />
-                    Add Authentication Method
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    <SettingOutlined className="mr-2" />
-                    Manage Settings
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    <HistoryOutlined className="mr-2" />
-                    View History
-                  </Button>
-                </Space>
-              </CardContent>
-            </Card>
-          </div>
+          {isController && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('agent.actions')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Button className="w-full" variant="outline" onClick={() => navigate(`/agent/${did}/add-auth-method`)}>
+                      <KeyOutlined className="mr-2" />
+                      {t('agent.addAuthMethod')}
+                    </Button>
+                    <Button className="w-full" variant="outline">
+                      <SettingOutlined className="mr-2" />
+                      {t('agent.manageSettings')}
+                    </Button>
+                    <Button className="w-full" variant="outline">
+                      <HistoryOutlined className="mr-2" />
+                      {t('agent.viewHistory')}
+                    </Button>
+                  </Space>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Bottom Section - Activity and History */}
         <div className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Activity History</CardTitle>
+              <CardTitle>{t('agent.activityHistory')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultActiveKey="1">
-                <TabPane tab="Recent Activity" key="1">
+                <TabPane tab={t('agent.recentActivity')} key="1">
                   <div className="text-center py-8 text-gray-500">
-                    No recent activity
+                    {t('agent.noRecentActivity')}
                   </div>
                 </TabPane>
-                <TabPane tab="Transactions" key="2">
+                <TabPane tab={t('agent.transactions')} key="2">
                   <div className="text-center py-8 text-gray-500">
-                    No transactions found
+                    {t('agent.noTransactions')}
                   </div>
                 </TabPane>
-                <TabPane tab="Credentials" key="3">
+                <TabPane tab={t('agent.credentials')} key="3">
                   <div className="text-center py-8 text-gray-500">
-                    No credentials issued
+                    {t('agent.noCredentials')}
                   </div>
                 </TabPane>
               </Tabs>
@@ -232,7 +292,7 @@ export function AgentDetailPage() {
       </div>
 
       <Modal
-        title="DID Document"
+        title={t('agent.didDocument')}
         open={showDidDocument}
         onCancel={() => setShowDidDocument(false)}
         footer={null}
