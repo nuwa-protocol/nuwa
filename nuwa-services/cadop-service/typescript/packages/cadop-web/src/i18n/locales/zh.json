@@ -44,7 +44,10 @@
     "noTransactions": "未找到交易",
     "noCredentials": "未发行凭证",
     "didDocument": "DID 文档",
-    "viewDidDocument": "查看 DID 文档"
+    "viewDidDocument": "查看 DID 文档",
+    "claimRgas": "领取 RGAS",
+    "claiming": "领取中...",
+    "claimed": "已领取"
   },
   "dashboard": {
     "welcome": "欢迎使用 Nuwa CADOP 服务",

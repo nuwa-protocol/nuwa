@@ -44,7 +44,10 @@
     "noTransactions": "No transactions found",
     "noCredentials": "No credentials issued",
     "didDocument": "DID Document",
-    "viewDidDocument": "View DID Document"
+    "viewDidDocument": "View DID Document",
+    "claimRgas": "Claim RGAS",
+    "claiming": "Claiming...",
+    "claimed": "Claimed"
   },
   "dashboard": {
     "welcome": "Welcome to Nuwa CADOP Service",
