@@ -4,7 +4,8 @@ import {
   CADOPCreationRequest,
   DIDCreationResult,
   SignerInterface,
-  ServiceInfo
+  ServiceInfo,
+  VerificationRelationship
 } from './types';
 import { VDRRegistry } from './VDRRegistry';
 import { NuwaIdentityKit } from './NuwaIdentityKit';
@@ -36,11 +37,9 @@ export class CadopIdentityKit {
       requiredProperties: [
         'id', 
         'type', 
-        'serviceEndpoint', 
-        'custodianPublicKey',
-        'custodianServiceVMType'
+        'serviceEndpoint',
       ],
-      optionalProperties: ['description', 'fees'],
+      optionalProperties: ['description', 'fees', 'custodianPublicKey', 'custodianServiceVMType'],
       propertyValidators: {
         custodianPublicKey: (value: any) => typeof value === 'string' && value.length > 0,
         custodianServiceVMType: (value: any) => typeof value === 'string' && value.length > 0,
@@ -48,8 +47,8 @@ export class CadopIdentityKit {
       }
     },
     [CadopServiceType.IDP]: {
-      requiredProperties: ['id', 'type', 'serviceEndpoint', 'supportedCredentials'],
-      optionalProperties: ['description', 'fees', 'termsOfService'],
+      requiredProperties: ['id', 'type', 'serviceEndpoint'],
+      optionalProperties: ['supportedCredentials', 'description', 'fees', 'termsOfService'],
       propertyValidators: {
         supportedCredentials: (value: any) => Array.isArray(value) && value.length > 0,
         fees: (value: any) => typeof value === 'object' && value !== null,
@@ -57,8 +56,8 @@ export class CadopIdentityKit {
       }
     },
     [CadopServiceType.WEB2_PROOF]: {
-      requiredProperties: ['id', 'type', 'serviceEndpoint', 'supportedPlatforms'],
-      optionalProperties: ['description', 'fees'],
+      requiredProperties: ['id', 'type', 'serviceEndpoint'],
+      optionalProperties: ['supportedPlatforms', 'description', 'fees'],
       propertyValidators: {
         supportedPlatforms: (value: any) => Array.isArray(value) && value.length > 0,
         fees: (value: any) => typeof value === 'object' && value !== null
@@ -72,21 +71,14 @@ export class CadopIdentityKit {
     this.nuwaKit = nuwaKit;
   }
 
-  private extractCustodianInfo() : {custodianPublicKey?: string, custodianServiceVMType?: string} {
+  private extractCustodianInfo() : ServiceEndpoint {
     const custodianServices = this.findServicesByType(CadopServiceType.CUSTODIAN);
     if (custodianServices.length > 0) {
-      const custodianPublicKey = custodianServices[0].custodianPublicKey;
-      const custodianServiceVMType = custodianServices[0].custodianServiceVMType;
-      console.log('extractCustodianInfo', custodianPublicKey, custodianServiceVMType)
-      return {
-        custodianPublicKey: custodianPublicKey,
-        custodianServiceVMType: custodianServiceVMType
-      }
+      const custodianService = custodianServices[0];
+      console.log('extractCustodianInfo', custodianService)
+      return custodianService;
     }
-    return {
-      custodianPublicKey: undefined,
-      custodianServiceVMType: undefined
-    }
+    throw new Error('Custodian service not found in service document');
   }
 
   /**
@@ -109,14 +101,30 @@ export class CadopIdentityKit {
     options?: Record<string, any>,
   ): Promise<DIDCreationResult> {
     const custodianInfo = this.extractCustodianInfo();
-    if (!custodianInfo.custodianPublicKey || !custodianInfo.custodianServiceVMType) {
+ 
+    const authenticationMethods = this.nuwaKit.findVerificationMethodsByRelationship('authentication');
+    if (authenticationMethods.length === 0) {
+      throw new Error('No authentication method found in service document');
+    }
+    const authenticationMethod = authenticationMethods[0];
+
+    //if the custodianPublicKey and custodianServiceVMType are not found in the service document, use the first authentication method
+    const {custodianPublicKey, custodianServiceVMType} = (custodianInfo.custodianPublicKey && custodianInfo.custodianServiceVMType) ? {
+      custodianPublicKey: custodianInfo.custodianPublicKey,
+      custodianServiceVMType: custodianInfo.custodianServiceVMType
+    } : {
+      custodianPublicKey: authenticationMethod.publicKeyMultibase,
+      custodianServiceVMType: authenticationMethod.type
+    };
+
+    if (!custodianPublicKey || !custodianServiceVMType) {
       throw new Error('Custodian service configuration not found in service document');
     }
 
     const creationRequest: CADOPCreationRequest = {
       userDidKey: userDid,
-      custodianServicePublicKey: custodianInfo.custodianPublicKey,
-      custodianServiceVMType: custodianInfo.custodianServiceVMType,
+      custodianServicePublicKey: custodianPublicKey,
+      custodianServiceVMType: custodianServiceVMType,
     };
 
     return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {

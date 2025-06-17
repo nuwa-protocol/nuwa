@@ -9,7 +9,8 @@ import {
   SignerInterface, 
   VDRInterface, 
   ServiceEndpoint,
-  DIDCreationRequest
+  DIDCreationRequest,
+  VerificationMethod
 } from './types';
 import { CryptoUtils } from './cryptoUtils';
 import { VDRRegistry } from './VDRRegistry';
@@ -532,6 +533,15 @@ export class NuwaIdentityKit {
   // Service Discovery
   findServiceByType(serviceType: string): ServiceEndpoint | undefined {
     return this.didDocument.service?.find(s => s.type === serviceType);
+  }
+
+  findVerificationMethodsByRelationship(relationship: VerificationRelationship): VerificationMethod[] {
+    const relationships = this.didDocument[relationship] as (string | { id: string })[];
+    if (!relationships?.length) {
+      return [];
+    }
+
+    return relationships.map(item => typeof item === 'string' ? item : item.id).map(id => this.didDocument.verificationMethod?.find(vm => vm.id === id)) as VerificationMethod[];
   }
 
   // State Checks
