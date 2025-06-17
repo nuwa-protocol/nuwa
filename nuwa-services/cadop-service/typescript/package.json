@@ -11,7 +11,9 @@
     "build:web": "pnpm --filter @cadop/web run build",
     "test": "pnpm --recursive run test",
     "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "lint:fix": "eslint packages/*/src --ext .ts,.tsx --fix",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\"",
     "clean": "pnpm --recursive run clean"
   },
   "devDependencies": {
@@ -23,6 +25,8 @@
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
     "prettier": "^3.1.1",
     "typescript": "^5.3.3"
   },

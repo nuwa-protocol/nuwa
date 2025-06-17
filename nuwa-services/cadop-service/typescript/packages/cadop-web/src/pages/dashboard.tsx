@@ -57,10 +57,9 @@ export function DashboardPage() {
                 <InfoCircleOutlined className="text-gray-400" />
               </Tooltip>
             </div>
-            
+
             <div className="mt-4 border-t border-gray-200 pt-4">
               <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                
                 {userDid && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
@@ -109,19 +108,15 @@ export function DashboardPage() {
             ) : agentDids.length > 0 ? (
               <div className="grid gap-4">
                 {agentDids.map((did, index) => (
-                  <div
-                    key={did}
-                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                  >
+                  <div key={did} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium text-gray-500">Agent DID {index + 1}</div>
+                        <div className="text-sm font-medium text-gray-500">
+                          Agent DID {index + 1}
+                        </div>
                         <DIDDisplay did={did} />
                       </div>
-                      <AntButton
-                        onClick={() => navigate(`/agent/${did}`)}
-                        size="small"
-                      >
+                      <AntButton onClick={() => navigate(`/agent/${did}`)} size="small">
                         {t('dashboard.agent.manage')}
                       </AntButton>
                     </div>
@@ -145,4 +140,4 @@ export function DashboardPage() {
       </main>
     </div>
   );
-} 
+}

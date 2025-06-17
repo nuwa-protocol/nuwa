@@ -1,7 +1,15 @@
 import { CustodianService } from './CustodianService.js';
 import { IdpService } from './IdpService.js';
 import { logger } from '../utils/logger.js';
-import { BaseMultibaseCodec, CadopIdentityKit, createVDR, VDRInterface, VDRRegistry, LocalSigner, CadopServiceType } from 'nuwa-identity-kit';
+import {
+  BaseMultibaseCodec,
+  CadopIdentityKit,
+  createVDR,
+  VDRInterface,
+  VDRRegistry,
+  LocalSigner,
+  CadopServiceType,
+} from 'nuwa-identity-kit';
 import roochSdk from '@roochnetwork/rooch-sdk';
 import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
 import { cryptoService } from './crypto.js';
@@ -46,29 +54,25 @@ export class ServiceContainer {
       const keypair = cryptoService.getRoochKeypair();
       const roochVDR = createVDR('rooch', {
         rpcUrl: this.serviceConfig.rooch.networkUrl,
-        debug: true
+        debug: true,
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
       let generatedCadopDid: string | undefined;
       const isDevelopment = this.serviceConfig.isDevelopment;
-      if (isDevelopment){
+      if (isDevelopment) {
         //Auto create a new service DID if the did is placeholder
-        if (this.serviceConfig.cadopDid === 'did:rooch:placeholder'){
+        if (this.serviceConfig.cadopDid === 'did:rooch:placeholder') {
           generatedCadopDid = await this.createServiceDID(roochVDR);
           this.serviceConfig.cadopDid = generatedCadopDid;
         }
       }
-      
 
       // Initialize CadopKit
       logger.info('Initializing CadopKit...');
       const signer = await LocalSigner.createEmpty(this.serviceConfig.cadopDid);
       signer.importRoochKeyPair('account-key', keypair);
-      const cadopKit = await CadopIdentityKit.fromServiceDID(
-        this.serviceConfig.cadopDid, 
-        signer
-      );
+      const cadopKit = await CadopIdentityKit.fromServiceDID(this.serviceConfig.cadopDid, signer);
 
       // Initialize Custodian service
       logger.info('Initializing Custodian service...');
@@ -83,7 +87,7 @@ export class ServiceContainer {
 
       let signingKey = this.serviceConfig.idp.signingKey;
       let generatedSigningKey = false;
-      if (signingKey === 'signing-key-placeholder'){
+      if (signingKey === 'signing-key-placeholder') {
         signingKey = cryptoService.getJwtSigningKey();
         generatedSigningKey = true;
       }
@@ -126,7 +130,6 @@ export class ServiceContainer {
     return ServiceContainer.instance;
   }
 
-
   getCustodianService(): CustodianService {
     if (!this.custodianService) {
       throw new Error('Custodian service not initialized');
@@ -151,24 +154,29 @@ export class ServiceContainer {
 
     const publicKeyBytes = serviceKeypair.getPublicKey().toBytes();
     const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
-    
-    const createResult = await roochVDR.create({
-      publicKeyMultibase,
-      keyType: 'EcdsaSecp256k1VerificationKey2019',
-    }, {
-      signer: serviceKeypair
-    });
+
+    const createResult = await roochVDR.create(
+      {
+        publicKeyMultibase,
+        keyType: 'EcdsaSecp256k1VerificationKey2019',
+      },
+      {
+        signer: serviceKeypair,
+      }
+    );
     if (!createResult.success) {
-      throw new Error(`Failed to create service DID, error: ${JSON.stringify(createResult, null, 2)}`);
+      throw new Error(
+        `Failed to create service DID, error: ${JSON.stringify(createResult, null, 2)}`
+      );
     }
 
     const cadopDid = createResult.didDocument!.id;
-    logger.debug("Created service DID Result", createResult);
+    logger.debug('Created service DID Result', createResult);
 
     const localSigner = await LocalSigner.createEmpty(cadopDid);
     localSigner.importRoochKeyPair('account-key', serviceKeypair);
     const cadopKit = await CadopIdentityKit.fromServiceDID(cadopDid, localSigner);
-    
+
     // Add CADOP service
     const serviceId = await cadopKit.addService({
       idFragment: 'custodian',
@@ -177,12 +185,12 @@ export class ServiceContainer {
       additionalProperties: {
         custodianPublicKey: publicKeyMultibase,
         custodianServiceVMType: 'EcdsaSecp256k1VerificationKey2019',
-        description: 'Test Custodian Service'
-      }
+        description: 'Test Custodian Service',
+      },
     });
 
-    logger.info("Please update the cadopDid in the environment variables");
+    logger.info('Please update the cadopDid in the environment variables');
     logger.info(`CADOP DID: ${cadopDid}`);
     return cadopDid;
   }
-} 
+}

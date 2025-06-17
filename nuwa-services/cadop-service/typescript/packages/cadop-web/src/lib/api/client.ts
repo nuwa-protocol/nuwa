@@ -4,10 +4,7 @@
  * All server-side operations are proxied through the backend service.
  */
 
-import type {
-  APIResponse,
-  AgentDIDCreationStatus,
-} from '@cadop/shared';
+import type { APIResponse, AgentDIDCreationStatus } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
 import { useAuth } from '../auth/AuthContext';
 
@@ -30,7 +27,7 @@ class APIClient {
   private async getAuthHeaders(): Promise<HeadersInit> {
     const headers = {
       'Content-Type': 'application/json',
-      'X-Client-Type': 'cadop-web'
+      'X-Client-Type': 'cadop-web',
     };
     console.debug('Request headers:', headers);
     return headers;
@@ -39,7 +36,7 @@ class APIClient {
   private async handleResponse<T>(response: Response): Promise<APIResponse<T>> {
     const contentType = response.headers.get('content-type');
     let responseData;
-    
+
     try {
       if (contentType && contentType.includes('application/json')) {
         responseData = await response.json();
@@ -76,12 +73,12 @@ class APIClient {
 
     console.debug('GET Request:', {
       url: url.toString(),
-      params
+      params,
     });
 
     const response = await fetch(url.toString(), {
       method: 'GET',
-      headers: await this.getAuthHeaders()
+      headers: await this.getAuthHeaders(),
     });
 
     return this.handleResponse<T>(response);
@@ -122,13 +119,13 @@ class APIClient {
     const url = `${this.baseUrl}${endpoint}`;
     console.debug('PUT Request:', {
       url,
-      data
+      data,
     });
 
     const response = await fetch(url, {
       method: 'PUT',
       headers: await this.getAuthHeaders(),
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
     return this.handleResponse<T>(response);
@@ -137,12 +134,12 @@ class APIClient {
   public async delete<T>(endpoint: string): Promise<APIResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
     console.debug('DELETE Request:', {
-      url
+      url,
     });
 
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: await this.getAuthHeaders()
+      headers: await this.getAuthHeaders(),
     });
 
     return this.handleResponse<T>(response);
@@ -175,7 +172,7 @@ export class CustodianAPIClient {
   /**
    * Get all Agent DIDs for a user
    */
-  async getUserAgentDIDs(userDid: string): Promise<APIResponse<{dids: string[]}>> {
+  async getUserAgentDIDs(userDid: string): Promise<APIResponse<{ dids: string[] }>> {
     return this.apiClient.get(`/api/custodian/user/${userDid}/dids`);
   }
 
@@ -196,17 +193,19 @@ export class CustodianAPIClient {
   /**
    * Get detailed information about an Agent DID
    */
-  async getAgentInfo(agentDid: string): Promise<APIResponse<{
-    did: string;
-    sybilLevel: number;
-    verificationMethods: string[];
-    createdAt: string;
-    status: 'active' | 'pending' | 'inactive';
-    capabilities: {
-      canCreateSubAgents: boolean;
-      canManageCredentials: boolean;
-    };
-  }>> {
+  async getAgentInfo(agentDid: string): Promise<
+    APIResponse<{
+      did: string;
+      sybilLevel: number;
+      verificationMethods: string[];
+      createdAt: string;
+      status: 'active' | 'pending' | 'inactive';
+      capabilities: {
+        canCreateSubAgents: boolean;
+        canManageCredentials: boolean;
+      };
+    }>
+  > {
     return this.apiClient.get(`/api/custodian/agent/${agentDid}`);
   }
 }

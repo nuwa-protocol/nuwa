@@ -68,13 +68,14 @@ export const CreateAgentDIDPage: React.FC = () => {
     {
       title: 'Creation',
       description: 'Creating your Agent DID',
-      icon: loading ? <LoadingOutlined /> : <CheckCircleOutlined />
+      icon: loading ? <LoadingOutlined /> : <CheckCircleOutlined />,
     },
     {
       title: 'Complete',
       description: 'Agent DID created successfully',
-      icon: didCreationStatus?.status === 'processing' ? <LoadingOutlined /> : <ClockCircleOutlined />
-    }
+      icon:
+        didCreationStatus?.status === 'processing' ? <LoadingOutlined /> : <ClockCircleOutlined />,
+    },
   ];
 
   const renderStepContent = () => {
@@ -98,26 +99,28 @@ export const CreateAgentDIDPage: React.FC = () => {
       case 1:
         return (
           <div>
-            <DIDCreationStatus
-              status={didCreationStatus}
-              onRetry={handleStartCreation}
-            />
+            <DIDCreationStatus status={didCreationStatus} onRetry={handleStartCreation} />
             {didCreationStatus?.status === 'completed' && (
               <div style={{ textAlign: 'center', marginTop: 24 }}>
                 <DIDDisplayCard
                   {...(didCreationStatus?.agentDid && { agentDid: didCreationStatus.agentDid })}
-                  {...(didCreationStatus?.transactionHash && { transactionHash: didCreationStatus.transactionHash })}
+                  {...(didCreationStatus?.transactionHash && {
+                    transactionHash: didCreationStatus.transactionHash,
+                  })}
                   {...(didCreationStatus?.createdAt && { createdAt: didCreationStatus.createdAt })}
                 />
                 <Space style={{ marginTop: 24 }}>
                   <Button type="default" onClick={() => navigate('/dashboard')}>
                     Go to Dashboard
                   </Button>
-                  <Button type="primary" onClick={() => {
-                    setCurrentStep(0);
-                    setDidCreationStatus(null);
-                    setError(null);
-                  }}>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setCurrentStep(0);
+                      setDidCreationStatus(null);
+                      setError(null);
+                    }}
+                  >
                     Create Another DID
                   </Button>
                 </Space>
@@ -133,7 +136,9 @@ export const CreateAgentDIDPage: React.FC = () => {
 
   if (!isAuthenticated || authLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
+      >
         <Spin size="large" />
       </div>
     );
@@ -153,11 +158,7 @@ export const CreateAgentDIDPage: React.FC = () => {
       </Row>
 
       <Card style={{ marginBottom: 24 }}>
-        <Steps
-          current={currentStep}
-          items={steps}
-          style={{ marginBottom: 32 }}
-        />
+        <Steps current={currentStep} items={steps} style={{ marginBottom: 32 }} />
 
         {error && (
           <Alert
@@ -174,4 +175,4 @@ export const CreateAgentDIDPage: React.FC = () => {
       </Card>
     </div>
   );
-}; 
+};

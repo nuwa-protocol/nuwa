@@ -1,4 +1,12 @@
-import { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialParameters, PublicKeyCredentialRequestOptionsJSON, PublicKeyCredentialJSON, AuthenticatorAssertionResponse, AuthenticatorAttestationResponse, PublicKeyCredentialRequestOptions} from '@simplewebauthn/types';
+import {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialParameters,
+  PublicKeyCredentialRequestOptionsJSON,
+  PublicKeyCredentialJSON,
+  AuthenticatorAssertionResponse,
+  AuthenticatorAttestationResponse,
+  PublicKeyCredentialRequestOptions,
+} from '@simplewebauthn/types';
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
 import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from 'nuwa-identity-kit';
@@ -41,8 +49,11 @@ export class PasskeyService {
 
   /** Check if browser supports Passkey */
   public async isSupported(): Promise<boolean> {
-    return typeof window !== 'undefined' && window.PublicKeyCredential !== undefined &&
-      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    return (
+      typeof window !== 'undefined' &&
+      window.PublicKeyCredential !== undefined &&
+      (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
+    );
   }
 
   /** Get local userDid */
@@ -64,7 +75,7 @@ export class PasskeyService {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
     const userUuid = self.crypto.randomUUID();
-    const userName = "NuwaDID"
+    const userName = 'NuwaDID';
     const options: PublicKeyCredentialCreationOptionsJSON = {
       challenge: bufferToBase64URLString(challenge),
       rp: {
@@ -98,7 +109,7 @@ export class PasskeyService {
         userUuid,
         userName,
         currentHostname: window.location.hostname,
-        currentOrigin: window.location.origin
+        currentOrigin: window.location.origin,
       });
     }
 
@@ -111,54 +122,66 @@ export class PasskeyService {
       },
     } as unknown as PublicKeyCredentialCreationOptions;
 
-    const cred = await navigator.credentials.create({ publicKey: publicKeyOptions }) as PublicKeyCredential;
+    const cred = (await navigator.credentials.create({
+      publicKey: publicKeyOptions,
+    })) as PublicKeyCredential;
 
     if (this.developmentMode) {
       console.log('[PasskeyService] Credential created:', {
         credentialId: cred.id,
         credentialIdLength: cred.id.length,
         credentialType: cred.type,
-        rawIdLength: cred.rawId?.byteLength
+        rawIdLength: cred.rawId?.byteLength,
       });
     }
 
     const attRes = cred.response as AuthenticatorAttestationResponse;
     const publicKey = attRes.getPublicKey();
     const alg = attRes.getPublicKeyAlgorithm();
-    
+
     if (this.developmentMode) {
       console.log('[PasskeyService] Attestation response details:', {
         hasPublicKey: !!publicKey,
         publicKeyLength: publicKey?.byteLength,
         algorithm: alg,
         attestationObjectLength: attRes.attestationObject?.byteLength,
-        clientDataJSONLength: attRes.clientDataJSON?.byteLength
+        clientDataJSONLength: attRes.clientDataJSON?.byteLength,
       });
     }
 
     if (!publicKey) throw new Error('No publicKey from attestation');
-    
+
     // Log SPKI format public key details
     const spkiBytes = new Uint8Array(publicKey);
     if (this.developmentMode) {
       console.log('[PasskeyService] SPKI public key details:', {
         algorithm: alg,
         spkiLength: spkiBytes.length,
-        spkiHex: Array.from(spkiBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-        first20Bytes: Array.from(spkiBytes.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '),
-        last20Bytes: Array.from(spkiBytes.slice(-20)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        spkiHex: Array.from(spkiBytes)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
+        first20Bytes: Array.from(spkiBytes.slice(0, 20))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(' '),
+        last20Bytes: Array.from(spkiBytes.slice(-20))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(' '),
       });
     }
 
     const rawPubKey = extractRawPublicKey(publicKey, alg);
-    
+
     if (this.developmentMode) {
       console.log('[PasskeyService] Raw public key extracted:', {
         rawLength: rawPubKey.length,
-        rawHex: Array.from(rawPubKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+        rawHex: Array.from(rawPubKey)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
         isCompressed: rawPubKey.length === 33 && (rawPubKey[0] === 0x02 || rawPubKey[0] === 0x03),
         compressionFlag: rawPubKey[0]?.toString(16).padStart(2, '0'),
-        first8Bytes: Array.from(rawPubKey.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        first8Bytes: Array.from(rawPubKey.slice(0, 8))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(' '),
       });
     }
 
@@ -168,14 +191,14 @@ export class PasskeyService {
         algorithm: alg,
         resolvedKeyType: keyType,
         isEd25519: keyType === KEY_TYPE.ED25519,
-        isEcdsaR1: keyType === KEY_TYPE.ECDSAR1
+        isEcdsaR1: keyType === KEY_TYPE.ECDSAR1,
       });
     }
 
     if (!keyType) {
       throw new Error(`Unsupported key algorithm: ${alg}`);
     }
-    
+
     const userDid = DidKeyCodec.generateDidKey(rawPubKey, keyType);
 
     if (this.developmentMode) {
@@ -184,22 +207,29 @@ export class PasskeyService {
         didLength: userDid.length,
         didPrefix: userDid.substring(0, 20) + '...',
         keyType,
-        publicKeyLength: rawPubKey.length
+        publicKeyLength: rawPubKey.length,
       });
 
       // Verify DID roundtrip conversion
       try {
-        const { keyType: parsedKeyType, publicKey: parsedPublicKey } = DidKeyCodec.parseDidKey(userDid);
-        const publicKeyMatches = Array.from(rawPubKey).every((byte, index) => byte === parsedPublicKey[index]);
-        
+        const { keyType: parsedKeyType, publicKey: parsedPublicKey } =
+          DidKeyCodec.parseDidKey(userDid);
+        const publicKeyMatches = Array.from(rawPubKey).every(
+          (byte, index) => byte === parsedPublicKey[index]
+        );
+
         console.log('[PasskeyService] DID roundtrip verification:', {
           originalKeyType: keyType,
           parsedKeyType: parsedKeyType,
           keyTypeMatches: keyType === parsedKeyType,
-          originalPublicKeyHex: Array.from(rawPubKey).map(b => b.toString(16).padStart(2, '0')).join(''),
-          parsedPublicKeyHex: Array.from(parsedPublicKey).map(b => b.toString(16).padStart(2, '0')).join(''),
+          originalPublicKeyHex: Array.from(rawPubKey)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
+          parsedPublicKeyHex: Array.from(parsedPublicKey)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
           publicKeyMatches: publicKeyMatches,
-          lengthMatch: rawPubKey.length === parsedPublicKey.length
+          lengthMatch: rawPubKey.length === parsedPublicKey.length,
         });
       } catch (didError) {
         console.error('[PasskeyService] DID parsing failed:', didError);
@@ -212,10 +242,10 @@ export class PasskeyService {
     AuthStore.setCurrentUserDid(userDid);
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Registration completed:', { 
-        userDid, 
+      console.log('[PasskeyService] Registration completed:', {
+        userDid,
         credentialId: cred.id,
-        credentialIdTruncated: cred.id.substring(0, 20) + '...'
+        credentialIdTruncated: cred.id.substring(0, 20) + '...',
       });
     }
 
@@ -242,11 +272,11 @@ export class PasskeyService {
     // Default to 'silent' for automatic login attempts in AuthContext
     // Use 'required' for user-initiated login (always shows UI with available credentials)
     const mediation = options?.mediation || 'silent';
-    
-    const cred = await navigator.credentials.get({ 
-      publicKey: publicKeyRequest, 
-      mediation 
-    }) as PublicKeyCredential | null;
+
+    const cred = (await navigator.credentials.get({
+      publicKey: publicKeyRequest,
+      mediation,
+    })) as PublicKeyCredential | null;
 
     if (!cred) throw new Error('No credential from get');
 
@@ -264,7 +294,7 @@ export class PasskeyService {
    */
   public async authenticateWithChallenge(options: {
     challenge: string;
-    rpId: string|undefined;
+    rpId: string | undefined;
   }): Promise<{
     assertionJSON: PublicKeyCredentialJSON;
     userDid: string;
@@ -279,11 +309,11 @@ export class PasskeyService {
         console.log('[PasskeyService] authenticateWithChallenge options:', {
           challenge: options.challenge?.substring(0, 20) + '...',
           rpId: options.rpId,
-          allowCredentials: allowCredentials
+          allowCredentials: allowCredentials,
         });
       }
 
-      let rpId = options.rpId? options.rpId : window.location.hostname;
+      let rpId = options.rpId ? options.rpId : window.location.hostname;
 
       const publicKeyRequest: PublicKeyCredentialRequestOptions = {
         challenge: base64URLToArrayBuffer(options.challenge),
@@ -297,10 +327,10 @@ export class PasskeyService {
       } as unknown as PublicKeyCredentialRequestOptions;
 
       // call WebAuthn API to get assertion
-      const cred = await navigator.credentials.get({ 
+      const cred = (await navigator.credentials.get({
         publicKey: publicKeyRequest,
-        mediation: 'silent'
-      }) as PublicKeyCredential | null;
+        mediation: 'silent',
+      })) as PublicKeyCredential | null;
 
       if (!cred) throw new Error('No credential from get');
 
@@ -333,13 +363,16 @@ export class PasskeyService {
       return { assertionJSON, userDid };
     } catch (error) {
       if (this.developmentMode) {
-        console.error('[PasskeyService] authenticateWithChallenge error:', 
-          error instanceof Error ? 
-          { name: error.name, message: error.message, stack: error.stack } : 
-          (typeof error === 'object' ? JSON.stringify(error, null, 2) : error)
+        console.error(
+          '[PasskeyService] authenticateWithChallenge error:',
+          error instanceof Error
+            ? { name: error.name, message: error.message, stack: error.stack }
+            : typeof error === 'object'
+              ? JSON.stringify(error, null, 2)
+              : error
         );
       }
       throw error;
     }
   }
-} 
+}

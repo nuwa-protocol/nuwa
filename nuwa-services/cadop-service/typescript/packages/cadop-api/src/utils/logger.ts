@@ -11,17 +11,16 @@ export const logger = winston.createLogger({
   defaultMeta: { service: 'cadop-service' },
   transports: [
     new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
+      format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+    }),
   ],
 });
 
 // If we're not in production, log to the console with a simple format
 if (process.env['NODE_ENV'] !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple()
-  }));
-} 
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    })
+  );
+}

@@ -15,7 +15,7 @@ const App: React.FC = () => {
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/debug/webauthn" element={<WebAuthnDebugPage />} />
       <Route path="/agent/:did" element={<AgentDetailPage />} />
-      
+
       {/* Protected routes */}
       <Route
         path="/dashboard"
@@ -25,7 +25,7 @@ const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      
+
       <Route
         path="/agent/:did/add-auth-method"
         element={
@@ -34,17 +34,17 @@ const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      
+
       {/* Default redirect to dashboard */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      
+
       {/* 404 page redirect to dashboard */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      
+
       <Route path="/create-agent-did" element={<CreateAgentDIDPage />} />
       {/* Add more routes as they are implemented */}
     </Routes>
   );
 };
 
-export default App; 
+export default App;

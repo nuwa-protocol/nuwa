@@ -7,15 +7,15 @@ import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
 import { custodianClient } from '../lib/api/client';
 import { Spin, Alert, Tabs, Space, Typography, Tag, Modal, message } from 'antd';
-import { 
-  ArrowLeftOutlined, 
-  SettingOutlined, 
+import {
+  ArrowLeftOutlined,
+  SettingOutlined,
   KeyOutlined,
   HistoryOutlined,
   TeamOutlined,
   FileTextOutlined,
   ReloadOutlined,
-  GiftOutlined
+  GiftOutlined,
 } from '@ant-design/icons';
 import type { DIDDocument, VerificationMethod } from 'nuwa-identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
@@ -34,7 +34,12 @@ export function AgentDetailPage() {
   const [showDidDocument, setShowDidDocument] = useState(false);
   const [isController, setIsController] = useState(false);
 
-  const { balances, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalances } = useAgentBalances(did);
+  const {
+    balances,
+    isLoading: balanceLoading,
+    isError: balanceError,
+    refetch: refetchBalances,
+  } = useAgentBalances(did);
 
   // ---------------- RGAS Faucet Claim ----------------
   const [isClaiming, setIsClaiming] = useState(false);
@@ -66,7 +71,9 @@ export function AgentDetailPage() {
       const data = await response.json();
       await refetchBalances();
       setHasClaimed(true);
-      message.success(`Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`);
+      message.success(
+        `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`
+      );
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to claim RGAS';
       message.error(errMsg);
@@ -85,15 +92,15 @@ export function AgentDetailPage() {
 
   const loadAgentInfo = async () => {
     if (!did) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await custodianClient.resolveAgentDID(did);
       if (response.data) {
         setDidDocument(response.data);
-        
+
         if (isAuthenticated && userDid) {
           const hasControllerAccess = response.data.verificationMethod?.some(
             (method: VerificationMethod) => method.controller === userDid
@@ -122,12 +129,7 @@ export function AgentDetailPage() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <Alert
-          message={t('common.error')}
-          description={error}
-          type="error"
-          showIcon
-        />
+        <Alert message={t('common.error')} description={error} type="error" showIcon />
       </div>
     );
   }
@@ -136,21 +138,14 @@ export function AgentDetailPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
             <ArrowLeftOutlined className="mr-2" />
             {t('common.back')}
           </Button>
-          
+
           <div className="flex justify-between items-center">
             <Title level={2}>{t('agent.details')}</Title>
-            <Button
-              variant="outline"
-              onClick={() => setShowDidDocument(true)}
-            >
+            <Button variant="outline" onClick={() => setShowDidDocument(true)}>
               <FileTextOutlined className="mr-2" />
               {t('agent.viewDidDocument')}
             </Button>
@@ -165,12 +160,7 @@ export function AgentDetailPage() {
                 <CardTitle>{t('agent.identity')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <DIDDisplay 
-                  did={did || ''} 
-                  showCopy={true}
-                  showQR={true}
-                  status="active"
-                />
+                <DIDDisplay did={did || ''} showCopy={true} showQR={true} status="active" />
                 {isController && (
                   <div className="mt-2">
                     <Tag color="green">{t('agent.youAreController')}</Tag>
@@ -182,10 +172,10 @@ export function AgentDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>{t('agent.balance')}</CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => refetchBalances()} 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchBalances()}
                   className="h-8 w-8 p-0"
                 >
                   <ReloadOutlined />
@@ -199,10 +189,15 @@ export function AgentDetailPage() {
                 ) : balances.length > 0 ? (
                   <div className="space-y-2">
                     {balances.map((bal, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
+                      >
                         <div className="flex items-center">
                           <Text strong>{bal.symbol}</Text>
-                          <Text type="secondary" className="ml-2 text-xs">{bal.name}</Text>
+                          <Text type="secondary" className="ml-2 text-xs">
+                            {bal.name}
+                          </Text>
                         </div>
                         <Text>{bal.fixedBalance}</Text>
                       </div>
@@ -229,17 +224,25 @@ export function AgentDetailPage() {
                     const isAuthentication = didDocument.authentication?.includes(method.id);
                     const isAssertionMethod = didDocument.assertionMethod?.includes(method.id);
                     const isKeyAgreement = didDocument.keyAgreement?.includes(method.id);
-                    const isCapabilityInvocation = didDocument.capabilityInvocation?.includes(method.id);
-                    const isCapabilityDelegation = didDocument.capabilityDelegation?.includes(method.id);
+                    const isCapabilityInvocation = didDocument.capabilityInvocation?.includes(
+                      method.id
+                    );
+                    const isCapabilityDelegation = didDocument.capabilityDelegation?.includes(
+                      method.id
+                    );
 
                     return (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center mb-2">
                           <KeyOutlined className="mr-2" />
-                          <Text strong className="font-mono">{fragment}</Text>
+                          <Text strong className="font-mono">
+                            {fragment}
+                          </Text>
                           <Text className="ml-2">{method.type}</Text>
                           {method.controller === userDid && (
-                            <Tag color="blue" className="ml-2">{t('agent.controller')}</Tag>
+                            <Tag color="blue" className="ml-2">
+                              {t('agent.controller')}
+                            </Tag>
                           )}
                         </div>
                         <div className="text-xs text-gray-400 mb-2">
@@ -254,12 +257,8 @@ export function AgentDetailPage() {
                             {isAuthentication && (
                               <Tag color="green">{t('agent.authentication')}</Tag>
                             )}
-                            {isAssertionMethod && (
-                              <Tag color="blue">{t('agent.assertion')}</Tag>
-                            )}
-                            {isKeyAgreement && (
-                              <Tag color="purple">{t('agent.keyAgreement')}</Tag>
-                            )}
+                            {isAssertionMethod && <Tag color="blue">{t('agent.assertion')}</Tag>}
+                            {isKeyAgreement && <Tag color="purple">{t('agent.keyAgreement')}</Tag>}
                             {isCapabilityInvocation && (
                               <Tag color="orange">{t('agent.capabilityInvocation')}</Tag>
                             )}
@@ -285,7 +284,12 @@ export function AgentDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <Space direction="vertical" style={{ width: '100%' }}>
-                    <Button className="w-full" variant="outline" onClick={() => handleClaimRgas()} disabled={isClaiming || hasClaimed || !agentAddress}>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => handleClaimRgas()}
+                      disabled={isClaiming || hasClaimed || !agentAddress}
+                    >
                       <GiftOutlined className="mr-2" />
                       {!agentAddress
                         ? 'Invalid Address'
@@ -295,7 +299,11 @@ export function AgentDetailPage() {
                             ? t('agent.claimed', { defaultValue: 'Claimed' })
                             : t('agent.claimRgas', { defaultValue: 'Claim RGAS' })}
                     </Button>
-                    <Button className="w-full" variant="outline" onClick={() => navigate(`/agent/${did}/add-auth-method`)}>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => navigate(`/agent/${did}/add-auth-method`)}
+                    >
                       <KeyOutlined className="mr-2" />
                       {t('agent.addAuthMethod')}
                     </Button>
@@ -328,14 +336,10 @@ export function AgentDetailPage() {
                   </div>
                 </TabPane>
                 <TabPane tab={t('agent.transactions')} key="2">
-                  <div className="text-center py-8 text-gray-500">
-                    {t('agent.noTransactions')}
-                  </div>
+                  <div className="text-center py-8 text-gray-500">{t('agent.noTransactions')}</div>
                 </TabPane>
                 <TabPane tab={t('agent.credentials')} key="3">
-                  <div className="text-center py-8 text-gray-500">
-                    {t('agent.noCredentials')}
-                  </div>
+                  <div className="text-center py-8 text-gray-500">{t('agent.noCredentials')}</div>
                 </TabPane>
               </Tabs>
             </CardContent>
@@ -351,11 +355,9 @@ export function AgentDetailPage() {
         width={800}
       >
         <div className="bg-gray-50 p-4 rounded-lg">
-          <pre className="whitespace-pre-wrap text-sm">
-            {JSON.stringify(didDocument, null, 2)}
-          </pre>
+          <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(didDocument, null, 2)}</pre>
         </div>
       </Modal>
     </div>
   );
-} 
+}

@@ -7,10 +7,10 @@ describe('KeyMultibaseCodec', () => {
     it('should encode and decode Ed25519 key correctly', () => {
       const testKey = new Uint8Array(32).fill(1); // 32 bytes for Ed25519
       const encoded = KeyMultibaseCodec.encodeWithType(testKey, KEY_TYPE.ED25519);
-      
+
       // Should start with 'z' (base58btc prefix)
       expect(encoded).toMatch(/^z/);
-      
+
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
       expect(decoded.keyType).toBe(KEY_TYPE.ED25519);
       expect(decoded.bytes).toEqual(testKey);
@@ -29,10 +29,10 @@ describe('KeyMultibaseCodec', () => {
     it('should encode and decode Secp256k1 key correctly', () => {
       const testKey = new Uint8Array(33).fill(2); // 33 bytes for compressed Secp256k1
       const encoded = KeyMultibaseCodec.encodeWithType(testKey, KEY_TYPE.SECP256K1);
-      
+
       // Should start with 'z' (base58btc prefix)
       expect(encoded).toMatch(/^z/);
-      
+
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
       expect(decoded.keyType).toBe(KEY_TYPE.SECP256K1);
       expect(decoded.bytes).toEqual(testKey);
@@ -68,7 +68,7 @@ describe('KeyMultibaseCodec', () => {
       testKey[1] = 0xff; // Invalid prefix
       testKey.set(new Uint8Array(32).fill(1), 2); // Valid key data
       const encoded = BaseMultibaseCodec.encodeBase58btc(testKey);
-      
+
       expect(() => {
         KeyMultibaseCodec.decodeWithType(encoded);
       }).toThrow('Unknown key type prefix');
@@ -80,7 +80,7 @@ describe('KeyMultibaseCodec', () => {
       const testKey = new Uint8Array(32).fill(1);
       const encoded = KeyMultibaseCodec.encodeWithType(testKey, KEY_TYPE.ED25519);
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
-      
+
       // First two bytes should be Ed25519 prefix (0xed01)
       const rawDecoded = Buffer.from(decoded.bytes);
       expect(decoded.keyType).toBe(KEY_TYPE.ED25519);
@@ -91,11 +91,11 @@ describe('KeyMultibaseCodec', () => {
       const testKey = new Uint8Array(33).fill(2);
       const encoded = KeyMultibaseCodec.encodeWithType(testKey, KEY_TYPE.SECP256K1);
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
-      
+
       // First two bytes should be Secp256k1 prefix (0xe701)
       const rawDecoded = Buffer.from(decoded.bytes);
       expect(decoded.keyType).toBe(KEY_TYPE.SECP256K1);
       expect(rawDecoded.length).toBe(33); // Original key length
     });
   });
-}); 
+});

@@ -3,7 +3,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
-    project: ['./packages/*/tsconfig.json'],
+    project: './tsconfig.json',
   },
   plugins: ['@typescript-eslint', 'prettier'],
   extends: [
@@ -11,21 +11,13 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'prettier',
   ],
-  root: true,
   env: {
     node: true,
     jest: true,
+    es6: true,
   },
-  ignorePatterns: [
-    '.eslintrc.js',
-    'dist/',
-    'node_modules/',
-    'packages/*/dist/',
-    'packages/*/node_modules/',
-  ],
   rules: {
     'prettier/prettier': 'error',
-    '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
@@ -34,9 +26,7 @@ module.exports = {
       varsIgnorePattern: '^_',
       ignoreRestSiblings: true 
     }],
-    '@typescript-eslint/no-var-requires': 'error',
-    '@typescript-eslint/no-non-null-assertion': 'warn',
-    '@typescript-eslint/no-empty-function': 'warn',
-    'no-console': 'warn',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
+  ignorePatterns: ['dist', 'node_modules', 'jest.config.js'],
 }; 

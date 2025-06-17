@@ -23,9 +23,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900">
-          Welcome to CADOP
-        </h1>
+        <h1 className="text-center text-3xl font-extrabold text-gray-900">Welcome to CADOP</h1>
         <p className="mt-2 text-center text-sm text-gray-600">
           Sign in with Passkey or create a new DID
         </p>
@@ -60,10 +58,7 @@ export function LoginPage() {
 
           {/* Login options */}
           <div className="space-y-6">
-            <WebAuthnLogin
-              onSuccess={handleLoginSuccess}
-              onError={handleLoginError}
-            />
+            <WebAuthnLogin onSuccess={handleLoginSuccess} onError={handleLoginError} />
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -89,4 +84,4 @@ export function LoginPage() {
       </div>
     </div>
   );
-} 
+}

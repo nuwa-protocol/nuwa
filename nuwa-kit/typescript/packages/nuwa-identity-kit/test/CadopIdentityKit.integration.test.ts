@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { 
+import {
   NuwaIdentityKit,
   DIDDocument,
   ServiceEndpoint,
@@ -7,7 +7,7 @@ import {
   CadopServiceType,
   VDRRegistry,
   KEY_TYPE,
-  BaseMultibaseCodec
+  BaseMultibaseCodec,
 } from '../src';
 import { RoochVDR } from '../src/vdr/roochVDR';
 import { CryptoUtils } from '../src/cryptoUtils';
@@ -15,11 +15,13 @@ import { LocalSigner } from '../src/signers/LocalSigner';
 import { DIDStruct, formatDIDString } from '../src/vdr/roochVDRTypes';
 import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 
-
 // Check if we should run integration tests
 const shouldRunIntegrationTests = () => {
   // Skip if no ROOCH_NODE_URL is set (for CI/CD environments)
-  if (!process.env.ROOCH_NODE_URL && (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')) {
+  if (
+    !process.env.ROOCH_NODE_URL &&
+    (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')
+  ) {
     return false;
   }
   return true;
@@ -38,7 +40,7 @@ describe('CadopIdentityKit Integration Test', () => {
     // Initialize RoochVDR
     roochVDR = new RoochVDR({
       rpcUrl: 'http://localhost:6767',
-      debug: true
+      debug: true,
     });
     VDRRegistry.getInstance().registerVDR(roochVDR);
 
@@ -51,15 +53,25 @@ describe('CadopIdentityKit Integration Test', () => {
     //Use the user's public key as the cadop did key
     const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
 
-    const result = await roochVDR.create({
-      publicKeyMultibase,
-      keyType: 'EcdsaSecp256k1VerificationKey2019',
-      controller: externalUserDid,
-      initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation']
-    },{signer: externalUserKeyPair});
+    const result = await roochVDR.create(
+      {
+        publicKeyMultibase,
+        keyType: 'EcdsaSecp256k1VerificationKey2019',
+        controller: externalUserDid,
+        initialRelationships: [
+          'authentication',
+          'assertionMethod',
+          'capabilityInvocation',
+          'capabilityDelegation',
+        ],
+      },
+      { signer: externalUserKeyPair }
+    );
 
     if (!result.success) {
-      throw new Error(`Failed to create cadop DID, roochVDR.create result: ${JSON.stringify(result)}`);
+      throw new Error(
+        `Failed to create cadop DID, roochVDR.create result: ${JSON.stringify(result)}`
+      );
     }
 
     let cadopDID = result.didDocument!.id;
@@ -75,8 +87,8 @@ describe('CadopIdentityKit Integration Test', () => {
       additionalProperties: {
         custodianPublicKey: publicKeyMultibase,
         custodianServiceVMType: 'EcdsaSecp256k1VerificationKey2019',
-        description: 'Test Custodian Service'
-      }
+        description: 'Test Custodian Service',
+      },
     });
 
     cadopPublicKeyMultibase = publicKeyMultibase;
@@ -85,14 +97,10 @@ describe('CadopIdentityKit Integration Test', () => {
   describe('DID Creation', () => {
     it('should create DID via CADOP', async () => {
       if (!shouldRunIntegrationTests()) return;
-      let {signer:userSigner, keyId} = await LocalSigner.createWithDidKey();
+      let { signer: userSigner, keyId } = await LocalSigner.createWithDidKey();
       let userDid = userSigner.getDid();
 
-      const result = await cadopKit.createDID(
-        'rooch',
-        userDid,
-        { description: 'Test DID' }
-      );
+      const result = await cadopKit.createDID('rooch', userDid, { description: 'Test DID' });
 
       expect(result.success).toBe(true);
       expect(result.didDocument).toBeDefined();
@@ -120,8 +128,8 @@ describe('CadopIdentityKit Integration Test', () => {
         serviceEndpoint: 'https://idp.example.com',
         additionalProperties: {
           supportedCredentials: ['https://example.com/credentials/1'],
-          description: 'Test IdP Service'
-        }
+          description: 'Test IdP Service',
+        },
       });
 
       await cadopKit.addService({
@@ -130,8 +138,8 @@ describe('CadopIdentityKit Integration Test', () => {
         serviceEndpoint: 'https://web2proof.example.com',
         additionalProperties: {
           supportedPlatforms: ['twitter'],
-          description: 'Test Web2 Proof Service'
-        }
+          description: 'Test Web2 Proof Service',
+        },
       });
     });
   });
@@ -157,4 +165,4 @@ describe('CadopIdentityKit Integration Test', () => {
     //   expect(services[0].type).toBe(CadopServiceType.WEB2_PROOF);
     // });
   });
-}); 
+});

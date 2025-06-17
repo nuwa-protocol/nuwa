@@ -10,7 +10,7 @@ import {
   createErrorResponseFromError,
   CADOPMintRequestSchema,
   DIDRecordIdSchema,
-  DIDSchema
+  DIDSchema,
 } from '@cadop/shared';
 
 const router: Router = Router();
@@ -18,31 +18,35 @@ const router: Router = Router();
 // Helper function to handle errors
 const handleError = (error: unknown): { status: number; response: any } => {
   logger.error('API Error:', { error });
-  
+
   if (error instanceof CadopError) {
     return {
       status: 400,
-      response: createErrorResponse(error.message, error.code, error.details)
+      response: createErrorResponse(error.message, error.code, error.details),
     };
   }
-  
+
   if (error instanceof z.ZodError) {
     return {
       status: 400,
-      response: createErrorResponse('Validation error', CadopErrorCode.VALIDATION_ERROR, error.errors)
+      response: createErrorResponse(
+        'Validation error',
+        CadopErrorCode.VALIDATION_ERROR,
+        error.errors
+      ),
     };
   }
-  
+
   if (error instanceof Error) {
     return {
       status: 500,
-      response: createErrorResponse(error.message, CadopErrorCode.INTERNAL_ERROR)
+      response: createErrorResponse(error.message, CadopErrorCode.INTERNAL_ERROR),
     };
   }
-  
+
   return {
     status: 500,
-    response: createErrorResponse('Unknown error occurred', CadopErrorCode.INTERNAL_ERROR)
+    response: createErrorResponse('Unknown error occurred', CadopErrorCode.INTERNAL_ERROR),
   };
 };
 
@@ -54,10 +58,10 @@ router.post('/mint', async (req: Request, res: Response) => {
   try {
     // Validate request body
     const validatedData = CADOPMintRequestSchema.parse(req.body);
-    
+
     logger.info('Received CADOP mint request', {
       hasIdToken: !!validatedData.idToken,
-      userDid: validatedData.userDid
+      userDid: validatedData.userDid,
     });
 
     const container = await ServiceContainer.getInstance();
@@ -68,17 +72,16 @@ router.post('/mint', async (req: Request, res: Response) => {
       idToken: validatedData.idToken,
       userDid: validatedData.userDid,
     });
-    
+
     logger.info('CADOP mint request processed', {
       recordId: result.id,
-      status: result.status
+      status: result.status,
     });
 
     res.status(201).json(createSuccessResponse(result));
-
   } catch (error) {
-    logger.error('CADOP mint request failed', { 
-      error: error instanceof Error ? error.message : 'Unknown error'
+    logger.error('CADOP mint request failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     const { status, response } = handleError(error);
@@ -94,24 +97,22 @@ router.get('/status/:recordId', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
     const { recordId } = DIDRecordIdSchema.parse({ recordId: req.params['recordId'] });
-    
+
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
     const status = await custodianService.getDIDCreationStatus(recordId);
-    
+
     if (!status) {
-      return res.status(404).json(createErrorResponse(
-        'DID creation record not found',
-        CadopErrorCode.NOT_FOUND
-      ));
+      return res
+        .status(404)
+        .json(createErrorResponse('DID creation record not found', CadopErrorCode.NOT_FOUND));
     }
 
     res.json(createSuccessResponse(status));
-
   } catch (error) {
-    logger.error('Failed to get DID creation status', { 
+    logger.error('Failed to get DID creation status', {
       recordId: req.params['recordId'],
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     const { status, response } = handleError(error);
@@ -127,17 +128,16 @@ router.get('/user/:userDid/dids', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
     const { did } = DIDSchema.parse({ did: req.params['userDid'] });
-    
+
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
     const dids = await custodianService.getUserAgentDIDs(did);
-    
-    res.json(createSuccessResponse({ dids }));
 
+    res.json(createSuccessResponse({ dids }));
   } catch (error) {
-    logger.error('Failed to get user Agent DIDs', { 
+    logger.error('Failed to get user Agent DIDs', {
       userId: req.params['userId'],
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     const { status, response } = handleError(error);
@@ -153,24 +153,22 @@ router.get('/resolve/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
     const { did } = DIDSchema.parse({ did: req.params['agentDid'] });
-    
+
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
     const didDocument = await custodianService.resolveAgentDID(did);
-    
+
     if (!didDocument) {
-      return res.status(404).json(createErrorResponse(
-        'Agent DID not found',
-        CadopErrorCode.NOT_FOUND
-      ));
+      return res
+        .status(404)
+        .json(createErrorResponse('Agent DID not found', CadopErrorCode.NOT_FOUND));
     }
 
     res.json(createSuccessResponse(didDocument));
-
   } catch (error) {
-    logger.error('Failed to resolve Agent DID', { 
+    logger.error('Failed to resolve Agent DID', {
       agentDid: req.params['agentDid'],
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     const { status, response } = handleError(error);
@@ -186,17 +184,16 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
   try {
     // Validate path parameter
     const { did } = DIDSchema.parse({ did: req.params['agentDid'] });
-    
+
     const container = await ServiceContainer.getInstance();
     const custodianService = container.getCustodianService();
     const exists = await custodianService.agentDIDExists(did);
-    
-    res.json(createSuccessResponse({ exists }));
 
+    res.json(createSuccessResponse({ exists }));
   } catch (error) {
-    logger.error('Failed to check Agent DID existence', { 
+    logger.error('Failed to check Agent DID existence', {
       agentDid: req.params['agentDid'],
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     const { status, response } = handleError(error);
@@ -204,4 +201,4 @@ router.get('/exists/:agentDid', async (req: Request, res: Response) => {
   }
 });
 
-export default router; 
+export default router;

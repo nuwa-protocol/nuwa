@@ -50,4 +50,4 @@ export const createError = (message: string, statusCode = 500): AppError => {
 
 export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
   Promise.resolve(fn(req, res, next)).catch(next);
-}; 
+};

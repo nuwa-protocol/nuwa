@@ -25,7 +25,11 @@ export interface CryptoProvider {
    * @param publicKey Public key to verify with (can be Uint8Array or JsonWebKey)
    * @returns Whether the signature is valid
    */
-  verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey): Promise<boolean>;
+  verify(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array | JsonWebKey
+  ): Promise<boolean>;
 
   /**
    * Get the key type supported by this provider
@@ -49,4 +53,4 @@ export interface CryptoProviderFactory {
    * @param keyType The key type to check
    */
   supports(keyType: KeyType): boolean;
-} 
+}

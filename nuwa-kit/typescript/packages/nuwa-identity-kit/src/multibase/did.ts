@@ -31,4 +31,4 @@ export class DidKeyCodec {
     const { keyType, bytes } = KeyMultibaseCodec.decodeWithType(multibase);
     return { keyType, publicKey: bytes };
   }
-} 
+}

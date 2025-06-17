@@ -85,11 +85,11 @@ export interface CreateMasterIdentityOptions {
   };
 }
 
-export type VerificationRelationship = 
-  | 'authentication' 
-  | 'assertionMethod' 
-  | 'keyAgreement' 
-  | 'capabilityInvocation' 
+export type VerificationRelationship =
+  | 'authentication'
+  | 'assertionMethod'
+  | 'keyAgreement'
+  | 'capabilityInvocation'
   | 'capabilityDelegation';
 
 /**
@@ -109,19 +109,19 @@ export interface DIDCreationRequest {
   // Basic information
   publicKeyMultibase: string;
   keyType?: string; // Default inferred, e.g., 'EcdsaSecp256k1VerificationKey2019'
-  
+
   // Optional preferred DID (some VDRs may support this)
   preferredDID?: string;
-  
+
   // Controller information
   controller?: string | string[];
-  
+
   // Initial verification relationships
   initialRelationships?: VerificationRelationship[];
-  
+
   // Initial service endpoints
   initialServices?: ServiceEndpoint[];
-  
+
   // Additional verification methods
   additionalVerificationMethods?: VerificationMethod[];
 }
@@ -135,7 +135,7 @@ export interface DIDCreationResult {
   transactionHash?: string;
   blockHeight?: number;
   error?: string;
-  
+
   // Additional information for debugging
   debug?: {
     requestedDID?: string;
@@ -165,41 +165,41 @@ export interface VDRInterface {
    * @returns Promise resolving to the DID Document or null if not found
    */
   resolve(did: string): Promise<DIDDocument | null>;
-  
+
   /**
    * Check if a DID exists in the registry
    * @param did The DID to check
    * @returns Promise resolving to true if the DID exists
    */
   exists(did: string): Promise<boolean>;
-  
+
   /**
    * Get the DID method supported by this VDR
    * @returns The DID method (e.g., 'key', 'web', 'rooch')
    */
   getMethod(): string;
-  
+
   /**
    * Create a new DID
-   * 
+   *
    * @param request DID creation request
    * @param options Creation options
    * @returns DID creation result, containing the actual created DID
    */
   create(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult>;
-  
+
   /**
    * Create a DID via CADOP
-   * 
+   *
    * @param request CADOP creation request
    * @param options Creation options
    * @returns DID creation result
    */
   createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult>;
-  
+
   /**
    * Add a new verification method to a DID document
-   * 
+   *
    * @param did The DID to update
    * @param verificationMethod The verification method to add
    * @param relationships Optional relationships to add the verification method to
@@ -212,52 +212,40 @@ export interface VDRInterface {
     relationships?: VerificationRelationship[],
     options?: any
   ): Promise<boolean>;
-  
+
   /**
    * Remove a verification method from a DID document
-   * 
+   *
    * @param did The DID to update
    * @param id The ID of the verification method to remove
    * @param options Additional options like signer and keyId
    * @returns Promise resolving to true if successful
    */
-  removeVerificationMethod(
-    did: string,
-    id: string,
-    options?: any
-  ): Promise<boolean>;
-  
+  removeVerificationMethod(did: string, id: string, options?: any): Promise<boolean>;
+
   /**
    * Add a service to a DID document
-   * 
+   *
    * @param did The DID to update
    * @param service The service to add
    * @param options Additional options like signer and keyId
    * @returns Promise resolving to true if successful
    */
-  addService(
-    did: string,
-    service: ServiceEndpoint,
-    options?: any
-  ): Promise<boolean>;
-  
+  addService(did: string, service: ServiceEndpoint, options?: any): Promise<boolean>;
+
   /**
    * Remove a service from a DID document
-   * 
+   *
    * @param did The DID to update
    * @param id The ID of the service to remove
    * @param options Additional options like signer and keyId
    * @returns Promise resolving to true if successful
    */
-  removeService(
-    did: string,
-    id: string,
-    options?: any
-  ): Promise<boolean>;
-  
+  removeService(did: string, id: string, options?: any): Promise<boolean>;
+
   /**
    * Update the verification relationships for a verification method
-   * 
+   *
    * @param did The DID to update
    * @param id The ID of the verification method
    * @param add Relationships to add
@@ -272,20 +260,16 @@ export interface VDRInterface {
     remove: VerificationRelationship[],
     options?: any
   ): Promise<boolean>;
-  
+
   /**
    * Update the controller of a DID document
-   * 
+   *
    * @param did The DID to update
    * @param controller The new controller value
    * @param options Additional options like signer and keyId
    * @returns Promise resolving to true if successful
    */
-  updateController(
-    did: string,
-    controller: string | string[],
-    options?: any
-  ): Promise<boolean>;
+  updateController(did: string, controller: string | string[], options?: any): Promise<boolean>;
 }
 
 /**
@@ -302,12 +286,12 @@ export interface SignerInterface {
 
   /**
    * Signs data with a specified key
-   * @param data The data to sign 
+   * @param data The data to sign
    * @param keyId The ID of the key to use for signing
    * @returns A promise that resolves to the signature
    */
   signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array>;
-  
+
   /**
    * Checks if the signer can sign with a specific key
    * @param keyId The ID of the key to check
@@ -352,10 +336,10 @@ export enum AuthMethod {
  * Sybil resistance levels for CADOP
  */
 export enum SybilLevel {
-  None = 0,           // No specific verification
-  EmailBasic = 1,     // Email or basic Web2 OAuth
-  PhoneNumber = 2,    // Phone number verification
-  GovernmentID = 3    // Government ID or strong biometric
+  None = 0, // No specific verification
+  EmailBasic = 1, // Email or basic Web2 OAuth
+  PhoneNumber = 2, // Phone number verification
+  GovernmentID = 3, // Government ID or strong biometric
 }
 
 /**
@@ -373,7 +357,7 @@ export interface CadopCustodianServiceMetadata {
  */
 export interface CadopIdPServiceMetadata {
   name?: string;
-  jwks_uri: string;  // REQUIRED
+  jwks_uri: string; // REQUIRED
   issuer_did?: string;
   authorization_endpoint?: string;
   token_endpoint?: string;
@@ -384,8 +368,8 @@ export interface CadopIdPServiceMetadata {
  */
 export interface Web2ProofServiceMetadata {
   name?: string;
-  accepts?: string[];  // Types of Web2 proofs accepted
-  supportedClaims?: string[];  // Types of claims/VCs this service can issue
+  accepts?: string[]; // Types of Web2 proofs accepted
+  supportedClaims?: string[]; // Types of claims/VCs this service can issue
 }
 
 /**
@@ -393,21 +377,21 @@ export interface Web2ProofServiceMetadata {
  */
 export const CADOP_SERVICE_TYPES = {
   CUSTODIAN: 'CadopCustodianService',
-  IDENTITY_PROVIDER: 'CadopIdPService', 
-  WEB2_PROOF: 'Web2ProofServiceCADOP'
+  IDENTITY_PROVIDER: 'CadopIdPService',
+  WEB2_PROOF: 'Web2ProofServiceCADOP',
 } as const;
 
 /**
  * OIDC ID Token claims required for CADOP
  */
 export interface CadopIdTokenClaims {
-  iss: string;        // Issuer identifier
-  sub: string;        // Subject (user's DID, typically did:key)
-  aud: string;        // Audience (custodian DID)
-  exp: number;        // Expiration time
-  iat: number;        // Issued at time
-  jti: string;        // JWT ID (unique identifier)
-  nonce: string;      // Nonce from state parameter
+  iss: string; // Issuer identifier
+  sub: string; // Subject (user's DID, typically did:key)
+  aud: string; // Audience (custodian DID)
+  exp: number; // Expiration time
+  iat: number; // Issued at time
+  jti: string; // JWT ID (unique identifier)
+  nonce: string; // Nonce from state parameter
   pub_jwk: JsonWebKey; // Public key in JWK format
   sybil_level: SybilLevel; // Sybil resistance level
 }
@@ -416,9 +400,9 @@ export interface CadopIdTokenClaims {
  * CADOP onboarding request payload
  */
 export interface CadopOnboardingRequest {
-  userDID: string;           // User's client-generated DID (e.g., did:key)
+  userDID: string; // User's client-generated DID (e.g., did:key)
   initialAgentKey_pub: JsonWebKey | Uint8Array; // Public key material
-  idToken: string;           // ID Token from CadopIdPService
+  idToken: string; // ID Token from CadopIdPService
   web2ProofAttestations?: string[]; // Optional additional VCs from Web2ProofService
 }
 
@@ -427,8 +411,8 @@ export interface CadopOnboardingRequest {
  */
 export interface CadopOnboardingResponse {
   success: boolean;
-  agentDID?: string;         // Final Agent DID (if newly created)
-  transactionHash?: string;  // On-chain transaction hash (if applicable)
+  agentDID?: string; // Final Agent DID (if newly created)
+  transactionHash?: string; // On-chain transaction hash (if applicable)
   error?: string;
 }
 
@@ -438,10 +422,10 @@ export interface CadopOnboardingResponse {
 export const KEY_TYPE = {
   ED25519: 'Ed25519VerificationKey2020',
   SECP256K1: 'EcdsaSecp256k1VerificationKey2019',
-  ECDSAR1: 'EcdsaSecp256r1VerificationKey2019'
+  ECDSAR1: 'EcdsaSecp256r1VerificationKey2019',
 } as const;
 
-export type KeyType = typeof KEY_TYPE[keyof typeof KEY_TYPE];
+export type KeyType = (typeof KEY_TYPE)[keyof typeof KEY_TYPE];
 
 /**
  * Type guard to check if a string is a valid KeyType
@@ -466,7 +450,7 @@ export function toKeyType(value: string): KeyType {
  * Convert a WebAuthn public key algorithm to KeyType, with runtime validation
  * @throws Error if the string is not a valid KeyType
  */
-export function algorithmToKeyType(algorithm: number): KeyType|undefined {
+export function algorithmToKeyType(algorithm: number): KeyType | undefined {
   switch (algorithm) {
     case -8:
       return KEY_TYPE.ED25519;
@@ -477,7 +461,7 @@ export function algorithmToKeyType(algorithm: number): KeyType|undefined {
   }
 }
 
-export function keyTypeToAlgorithm(keyType: KeyType): number|undefined {
+export function keyTypeToAlgorithm(keyType: KeyType): number | undefined {
   switch (keyType) {
     case KEY_TYPE.ED25519:
       return -8;
@@ -487,7 +471,6 @@ export function keyTypeToAlgorithm(keyType: KeyType): number|undefined {
       return undefined;
   }
 }
-
 
 export function getSupportedAlgorithms(): number[] {
   return [-8, -7];

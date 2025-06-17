@@ -1,7 +1,11 @@
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from '@jest/globals';
 import { CustodianService } from '../CustodianService.js';
 import roochSdk from '@roochnetwork/rooch-sdk';
-import type { RoochClient as RoochClientType, Secp256k1Keypair as Secp256k1KeypairType, Ed25519Keypair as Ed25519KeypairType } from '@roochnetwork/rooch-sdk';
+import type {
+  RoochClient as RoochClientType,
+  Secp256k1Keypair as Secp256k1KeypairType,
+  Ed25519Keypair as Ed25519KeypairType,
+} from '@roochnetwork/rooch-sdk';
 const { RoochClient, Secp256k1Keypair, Ed25519Keypair } = roochSdk;
 import {
   VDRRegistry,
@@ -13,7 +17,7 @@ import {
   SignerInterface,
   BaseMultibaseCodec,
   DidKeyCodec,
-  LocalSigner
+  LocalSigner,
 } from 'nuwa-identity-kit';
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
@@ -26,7 +30,10 @@ const TEST_TIMEOUT = 30000; // 30 seconds
 // Check if we should run integration tests
 const shouldRunIntegrationTests = () => {
   // Skip if no ROOCH_NODE_URL is set (for CI/CD environments)
-  if (!process.env.ROOCH_NODE_URL && (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')) {
+  if (
+    !process.env.ROOCH_NODE_URL &&
+    (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')
+  ) {
     return false;
   }
   return true;
@@ -54,25 +61,27 @@ describe('CustodianService Integration Tests', () => {
       cadopServiceKeypair = Secp256k1Keypair.generate();
       const cadopControllerAddress = cadopServiceKeypair.getRoochAddress().toBech32Address();
 
-      
       // Create and register RoochVDR
       const roochVDR = new RoochVDR({
         rpcUrl: DEFAULT_NODE_URL,
-        debug: true
+        debug: true,
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
       const publicKeyBytes = cadopServiceKeypair.getPublicKey().toBytes();
       const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
-      
-      const createResult = await roochVDR.create({
-        publicKeyMultibase,
-        keyType: 'EcdsaSecp256k1VerificationKey2019',
-      }, {
-        signer: cadopServiceKeypair
-      });
 
-      console.log('createResult', JSON.stringify(createResult, null, 2))
+      const createResult = await roochVDR.create(
+        {
+          publicKeyMultibase,
+          keyType: 'EcdsaSecp256k1VerificationKey2019',
+        },
+        {
+          signer: cadopServiceKeypair,
+        }
+      );
+
+      console.log('createResult', JSON.stringify(createResult, null, 2));
       expect(createResult.success).toBe(true);
       expect(createResult.didDocument).toBeDefined();
       cadopServiceDID = createResult.didDocument!.id;
@@ -83,7 +92,6 @@ describe('CustodianService Integration Tests', () => {
       serviceSigner = localSigner;
       // Initialize CadopIdentityKit
       const cadopKit = await CadopIdentityKit.fromServiceDID(cadopServiceDID, localSigner);
-      
 
       // Add CADOP service
       const serviceId = await cadopKit.addService({
@@ -93,25 +101,22 @@ describe('CustodianService Integration Tests', () => {
         additionalProperties: {
           custodianPublicKey: publicKeyMultibase,
           custodianServiceVMType: 'EcdsaSecp256k1VerificationKey2019',
-          description: 'Test Custodian Service'
-        }
+          description: 'Test Custodian Service',
+        },
       });
 
       expect(serviceId).toBeDefined();
       const custodianServices = cadopKit.findCustodianServices();
       expect(custodianServices).toBeDefined();
       expect(custodianServices.length).toBe(1);
-      console.log('custodianServices', JSON.stringify(custodianServices, null, 2))
-      
+      console.log('custodianServices', JSON.stringify(custodianServices, null, 2));
 
       const userKeypair = Ed25519Keypair.generate();
       const userPublicKeyBytes = userKeypair.getPublicKey().toBytes();
       userDID = DidKeyCodec.generateDidKey(userPublicKeyBytes, KEY_TYPE.ED25519);
-      
 
       // Create mock authenticator
       mockPublicKey = crypto.randomBytes(32);
-      
 
       custodianService = new CustodianService(
         {
@@ -131,59 +136,63 @@ describe('CustodianService Integration Tests', () => {
       console.log(`- Service address: ${cadopControllerAddress}`);
       console.log(`- Service DID: ${cadopServiceDID}`);
       console.log(`- User DID: ${userDID}`);
-
     } catch (error) {
       console.error('Failed to setup integration test environment:', error);
       throw error;
     }
   }, TEST_TIMEOUT);
 
-  afterAll(async () => {
-
-  });
+  afterAll(async () => {});
 
   describe('Agent DID Creation', () => {
-    it('should create agent DID for a user', async () => {
-      if (!shouldRunIntegrationTests()) return;
+    it(
+      'should create agent DID for a user',
+      async () => {
+        if (!shouldRunIntegrationTests()) return;
 
-      // Get a valid token
-      //TODO get id token
-      const { nonce, rpId } = await idpService.generateChallenge();
-      const { idToken } = await idpService.verifyNonce(nonce, userDID);
+        // Get a valid token
+        //TODO get id token
+        const { nonce, rpId } = await idpService.generateChallenge();
+        const { idToken } = await idpService.verifyNonce(nonce, userDID);
 
-      // Create agent DID
-      const result = await custodianService.createAgentDIDViaCADOP({
-        idToken: idToken,
-        userDid: userDID
-      });
+        // Create agent DID
+        const result = await custodianService.createAgentDIDViaCADOP({
+          idToken: idToken,
+          userDid: userDID,
+        });
 
-      logger.debug('createAgentDIDViaCADOP result', JSON.stringify(result, null, 2));
+        logger.debug('createAgentDIDViaCADOP result', JSON.stringify(result, null, 2));
 
-      expect(result).toBeDefined();
-      expect(result.status).toBe('completed');
-      expect(result.agentDid).toBeDefined();
-      expect(result.userDid).toBe(userDID);
+        expect(result).toBeDefined();
+        expect(result.status).toBe('completed');
+        expect(result.agentDid).toBeDefined();
+        expect(result.userDid).toBe(userDID);
 
-      // Verify the agent DID exists
-      const exists = await VDRRegistry.getInstance().exists(result.agentDid!);
-      expect(exists).toBe(true);
+        // Verify the agent DID exists
+        const exists = await VDRRegistry.getInstance().exists(result.agentDid!);
+        expect(exists).toBe(true);
 
-      // Resolve and verify the agent DID
-      const agentDoc = await VDRRegistry.getInstance().resolveDID(result.agentDid!);
-      expect(agentDoc).toBeDefined();
-      expect(agentDoc!.controller).toContain(userDID);
+        // Resolve and verify the agent DID
+        const agentDoc = await VDRRegistry.getInstance().resolveDID(result.agentDid!);
+        expect(agentDoc).toBeDefined();
+        expect(agentDoc!.controller).toContain(userDID);
 
-      console.log('Agent DID creation successful:');
-      console.log(`- User DID: ${userDID}`);
-      console.log(`- Agent DID: ${result.agentDid}`);
-    }, TEST_TIMEOUT);
+        console.log('Agent DID creation successful:');
+        console.log(`- User DID: ${userDID}`);
+        console.log(`- Agent DID: ${result.agentDid}`);
+      },
+      TEST_TIMEOUT
+    );
   });
 
   describe('DID Management', () => {
-    it('should list agent DIDs for a user', async () => {
-      if (!shouldRunIntegrationTests()) return;
-
-    }, TEST_TIMEOUT);
+    it(
+      'should list agent DIDs for a user',
+      async () => {
+        if (!shouldRunIntegrationTests()) return;
+      },
+      TEST_TIMEOUT
+    );
   });
 });
 
@@ -194,4 +203,4 @@ if (process.env.CI === 'true' && !process.env.RUN_INTEGRATION_TESTS) {
       console.log('Integration tests skipped in CI. Set RUN_INTEGRATION_TESTS=true to enable.');
     });
   });
-} 
+}

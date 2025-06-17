@@ -27,12 +27,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 onClick={toggleSidebar}
               >
                 <span className="sr-only">Open sidebar</span>
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -41,9 +36,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                   />
                 </svg>
               </button>
-              <div className="ml-4 text-xl font-semibold text-gray-900">
-                Nuwa CADOP
-              </div>
+              <div className="ml-4 text-xl font-semibold text-gray-900">Nuwa CADOP</div>
             </div>
           </div>
         </div>
@@ -75,4 +68,4 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </nav>
     </div>
   );
-}; 
+};

@@ -4,12 +4,12 @@ export interface CreateAgentDIDRequest {
 }
 
 export interface AgentDIDCreationStatus {
-  id?: string;          // Record ID
+  id?: string; // Record ID
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  userDid: string;         // User's DID
-  agentDid?: string;    // Created Agent DID
+  userDid: string; // User's DID
+  agentDid?: string; // Created Agent DID
   transactionHash?: string;
   error?: string;
   createdAt: Date;
   updatedAt: Date;
-} 
+}

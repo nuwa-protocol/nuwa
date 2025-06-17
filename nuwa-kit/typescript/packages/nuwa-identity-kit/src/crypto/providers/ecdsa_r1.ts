@@ -23,7 +23,7 @@ export class EcdsaR1Provider implements CryptoProvider {
     const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
       {
         name: 'ECDSA',
-        namedCurve: 'P-256'
+        namedCurve: 'P-256',
       },
       true,
       ['sign', 'verify']
@@ -37,7 +37,7 @@ export class EcdsaR1Provider implements CryptoProvider {
 
     return {
       publicKey: compressedPublicKey,
-      privateKey: exportedPrivate
+      privateKey: exportedPrivate,
     };
   }
 
@@ -57,17 +57,19 @@ export class EcdsaR1Provider implements CryptoProvider {
 
     // Create compressed format (0x02 or 0x03) + x coordinate
     const compressedFormat = y[31] % 2 === 0 ? 0x02 : 0x03;
-    
+
     const compressed = new Uint8Array(33);
     compressed[0] = compressedFormat;
     compressed.set(x, 1);
-    
+
     return compressed;
   }
 
   private decompressPublicKey(compressedKey: Uint8Array): Uint8Array {
     if (compressedKey.length !== 33) {
-      throw new Error(`Invalid compressed public key length. Expected 33 bytes, got ${compressedKey.length}`);
+      throw new Error(
+        `Invalid compressed public key length. Expected 33 bytes, got ${compressedKey.length}`
+      );
     }
     const format = compressedKey[0];
     if (format !== 0x02 && format !== 0x03) {
@@ -98,7 +100,7 @@ export class EcdsaR1Provider implements CryptoProvider {
         privateKey,
         {
           name: 'ECDSA',
-          namedCurve: 'P-256'
+          namedCurve: 'P-256',
         },
         false,
         ['sign']
@@ -110,7 +112,7 @@ export class EcdsaR1Provider implements CryptoProvider {
     const signature = await this.crypto.subtle.sign(
       {
         name: 'ECDSA',
-        hash: { name: 'SHA-256' }
+        hash: { name: 'SHA-256' },
       },
       key,
       data
@@ -143,7 +145,11 @@ export class EcdsaR1Provider implements CryptoProvider {
     return hexToBytes(der);
   }
 
-  async verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey): Promise<boolean> {
+  async verify(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array | JsonWebKey
+  ): Promise<boolean> {
     let key: CryptoKey;
     if (publicKey instanceof Uint8Array) {
       // Decompress the public key before importing
@@ -153,7 +159,7 @@ export class EcdsaR1Provider implements CryptoProvider {
         decompressedKey,
         {
           name: 'ECDSA',
-          namedCurve: 'P-256'
+          namedCurve: 'P-256',
         },
         false,
         ['verify']
@@ -164,18 +170,17 @@ export class EcdsaR1Provider implements CryptoProvider {
         publicKey,
         {
           name: 'ECDSA',
-          namedCurve: 'P-256'
+          namedCurve: 'P-256',
         },
         false,
         ['verify']
       );
     }
 
-
     return await this.crypto.subtle.verify(
       {
         name: 'ECDSA',
-        hash: { name: 'SHA-256' }
+        hash: { name: 'SHA-256' },
       },
       key,
       signature,
@@ -186,4 +191,4 @@ export class EcdsaR1Provider implements CryptoProvider {
   getKeyType(): KeyType {
     return KEY_TYPE.ECDSAR1;
   }
-} 
+}

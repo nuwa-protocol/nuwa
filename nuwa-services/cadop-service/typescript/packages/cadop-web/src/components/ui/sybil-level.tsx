@@ -21,23 +21,35 @@ export const SybilLevel: React.FC<SybilLevelProps> = ({
 
   const getLevelColor = (currentLevel: number) => {
     switch (currentLevel) {
-      case 0: return 'text-gray-500';
-      case 1: return 'text-blue-500';
-      case 2: return 'text-green-500';
-      case 3: return 'text-purple-500';
-      case 4: return 'text-yellow-500';
-      default: return 'text-gray-500';
+      case 0:
+        return 'text-gray-500';
+      case 1:
+        return 'text-blue-500';
+      case 2:
+        return 'text-green-500';
+      case 3:
+        return 'text-purple-500';
+      case 4:
+        return 'text-yellow-500';
+      default:
+        return 'text-gray-500';
     }
   };
 
   const getLevelDescription = (currentLevel: number) => {
     switch (currentLevel) {
-      case 0: return '未验证';
-      case 1: return '基础验证';
-      case 2: return '增强验证';
-      case 3: return '高级验证';
-      case 4: return '最高验证';
-      default: return '未知等级';
+      case 0:
+        return '未验证';
+      case 1:
+        return '基础验证';
+      case 2:
+        return '增强验证';
+      case 3:
+        return '高级验证';
+      case 4:
+        return '最高验证';
+      default:
+        return '未知等级';
     }
   };
 
@@ -75,10 +87,7 @@ export const SybilLevel: React.FC<SybilLevelProps> = ({
             <div className="text-sm font-medium">已验证方式：</div>
             <div className="flex flex-wrap gap-2">
               {verificationMethods.map((method, index) => (
-                <div
-                  key={index}
-                  className="px-2 py-1 bg-gray-100 rounded text-sm"
-                >
+                <div key={index} className="px-2 py-1 bg-gray-100 rounded text-sm">
                   {method}
                 </div>
               ))}
@@ -94,4 +103,4 @@ export const SybilLevel: React.FC<SybilLevelProps> = ({
       </CardContent>
     </Card>
   );
-}; 
+};

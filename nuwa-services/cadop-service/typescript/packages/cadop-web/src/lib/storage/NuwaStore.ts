@@ -32,12 +32,12 @@ export interface NuwaState {
 const DEFAULT_STATE: NuwaState = {
   version: 1,
   currentUserDid: null,
-  users: {}
+  users: {},
 };
 
 /**
  * Nuwa Storage Manager
- * 
+ *
  * Responsible for managing core state data, provides read/write methods
  */
 export class NuwaStore {
@@ -101,4 +101,4 @@ export class NuwaStore {
   static now(): number {
     return Math.floor(Date.now() / 1000);
   }
-} 
+}

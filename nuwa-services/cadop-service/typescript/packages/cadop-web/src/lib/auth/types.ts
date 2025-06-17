@@ -8,4 +8,4 @@ export interface AuthState {
 export interface AuthContextType extends AuthState {
   signInWithDid: (userDid: string) => void;
   signOut: () => void;
-} 
+}

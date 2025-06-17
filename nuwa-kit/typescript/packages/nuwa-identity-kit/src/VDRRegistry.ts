@@ -1,9 +1,9 @@
-import { 
-  DIDDocument, 
+import {
+  DIDDocument,
   VDRInterface,
   DIDCreationRequest,
   CADOPCreationRequest,
-  DIDCreationResult
+  DIDCreationResult,
 } from './types';
 
 /**
@@ -71,4 +71,4 @@ export class VDRRegistry {
     }
     return vdr.exists(did);
   }
-} 
+}

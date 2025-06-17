@@ -12,24 +12,23 @@ const envSchema = z.object({
 
   // WebAuthn
   WEBAUTHN_RP_ID: z.string().default('localhost'),
-  
+
   // Rooch Network (with development defaults)
   ROOCH_NETWORK_URL: z.string().url().default('http://localhost:6767'),
   ROOCH_NETWORK_ID: z.string().default('local'),
-  
+
   // Service Configuration
   CADOP_DID: z.string().default('did:rooch:placeholder'),
   JWT_SIGNING_KEY: z.string().default('signing-key-placeholder'),
   CUSTODIAN_MAX_DAILY_MINTS: z.string().default('10'),
-  
+
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
-  
+
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_FORMAT: z.enum(['json', 'simple']).default('json'),
-  
 });
 
 // Validate environment variables
@@ -61,4 +60,4 @@ export const config = {
     level: env.LOG_LEVEL,
     format: env.LOG_FORMAT,
   },
-} as const; 
+} as const;

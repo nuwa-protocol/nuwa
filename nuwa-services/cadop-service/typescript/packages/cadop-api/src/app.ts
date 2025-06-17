@@ -51,16 +51,18 @@ async function startApp(): Promise<Application> {
     // Security middleware
     app.use(helmet());
 
-    app.use(cors({
-      origin: '*',
-      credentials: true
-    }));
+    app.use(
+      cors({
+        origin: '*',
+        credentials: true,
+      })
+    );
 
     // Rate limiting
     const limiter = rateLimit({
       windowMs: config.rateLimit.windowMs,
       max: config.rateLimit.maxRequests,
-      message: 'Too many requests from this IP, please try again later.'
+      message: 'Too many requests from this IP, please try again later.',
     });
     app.use(limiter);
 
@@ -80,7 +82,7 @@ async function startApp(): Promise<Application> {
 
     // Error handling
     app.use(errorHandler);
-    
+
     return app;
   } catch (error) {
     logger.error('Failed to start application', { error });
@@ -88,4 +90,4 @@ async function startApp(): Promise<Application> {
   }
 }
 
-export default startApp; 
+export default startApp;

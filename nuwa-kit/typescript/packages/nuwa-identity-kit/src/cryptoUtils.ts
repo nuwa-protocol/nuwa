@@ -15,7 +15,9 @@ export class CryptoUtils {
    * @param type The key type to generate (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
    * @returns A key pair containing public and private keys
    */
-  static async generateKeyPair(type: KeyTypeInput = KEY_TYPE.ED25519): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
+  static async generateKeyPair(
+    type: KeyTypeInput = KEY_TYPE.ED25519
+  ): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
     return provider.generateKeyPair();
@@ -60,7 +62,7 @@ export class CryptoUtils {
 
     // Convert base64url-encoded x coordinate to Uint8Array
     const publicKeyBytes = base64urlpad.decode(jwk.x);
-    
+
     // Use KeyMultibaseCodec to handle the conversion
     return KeyMultibaseCodec.encodeWithType(publicKeyBytes, keyType);
   }
@@ -72,7 +74,11 @@ export class CryptoUtils {
    * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
    * @returns The signature as a Uint8Array
    */
-  static async sign(data: Uint8Array, privateKey: Uint8Array | CryptoKey, type: KeyTypeInput): Promise<Uint8Array> {
+  static async sign(
+    data: Uint8Array,
+    privateKey: Uint8Array | CryptoKey,
+    type: KeyTypeInput
+  ): Promise<Uint8Array> {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
     return provider.sign(data, privateKey);
@@ -86,7 +92,12 @@ export class CryptoUtils {
    * @param type The key type (Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019)
    * @returns Whether the signature is valid
    */
-  static async verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey, type: KeyTypeInput): Promise<boolean> {
+  static async verify(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array | JsonWebKey,
+    type: KeyTypeInput
+  ): Promise<boolean> {
     const keyType = typeof type === 'string' ? toKeyType(type) : type;
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
     return provider.verify(data, signature, publicKey);

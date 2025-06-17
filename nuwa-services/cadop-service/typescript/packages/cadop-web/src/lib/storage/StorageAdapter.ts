@@ -1,6 +1,6 @@
 /**
  * StorageAdapter - Local storage adapter
- * 
+ *
  * The lowest level storage abstraction, responsible for raw JSON string read/write operations.
  * Default implementation is based on localStorage, can be replaced with IndexedDB or encrypted storage in the future.
  */
@@ -54,4 +54,4 @@ export class LocalStorageAdapter implements StorageAdapter {
 /**
  * Default storage adapter instance
  */
-export const defaultAdapter = new LocalStorageAdapter(); 
+export const defaultAdapter = new LocalStorageAdapter();

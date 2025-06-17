@@ -10,7 +10,11 @@ import { DIDService } from '../lib/did/DIDService';
 import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
 import { Spin, Alert, Form, Space, Typography, Select, Radio } from 'antd';
 import { ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
-import { BaseMultibaseCodec, type OperationalKeyInfo, type VerificationRelationship } from 'nuwa-identity-kit';
+import {
+  BaseMultibaseCodec,
+  type OperationalKeyInfo,
+  type VerificationRelationship,
+} from 'nuwa-identity-kit';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -31,10 +35,9 @@ export function AddAuthMethodPage() {
     }
   }, [did, userDid]);
 
-
   const loadDIDService = async () => {
     if (!did || !userDid) return;
-    
+
     try {
       const service = await DIDService.initialize(did);
       setDidService(service);
@@ -46,16 +49,16 @@ export function AddAuthMethodPage() {
 
   const handleSubmit = async (values: any) => {
     if (!did || !didService) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const keyInfo: OperationalKeyInfo = {
         type: values.type,
         publicKeyMaterial: BaseMultibaseCodec.decodeBase58btc(values.publicKey),
         idFragment: `key-${Date.now()}`,
-        controller: did
+        controller: did,
       };
 
       const keyId = await didService.addVerificationMethod(
@@ -77,15 +80,11 @@ export function AddAuthMethodPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
             <ArrowLeftOutlined className="mr-2" />
             {t('common.back')}
           </Button>
-          
+
           <Title level={2}>Add Authentication Method</Title>
         </div>
 
@@ -104,12 +103,7 @@ export function AddAuthMethodPage() {
               />
             )}
 
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleSubmit}
-              className="space-y-6"
-            >
+            <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-6">
               <Form.Item
                 name="type"
                 label="Method Type"
@@ -118,7 +112,9 @@ export function AddAuthMethodPage() {
                 <Select>
                   <Option value="Ed25519VerificationKey2020">Ed25519VerificationKey2020</Option>
                   {/* <Option value="X25519KeyAgreementKey2020">X25519KeyAgreementKey2020</Option> */}
-                  <Option value="EcdsaSecp256k1VerificationKey2019">EcdsaSecp256k1VerificationKey2019</Option>
+                  <Option value="EcdsaSecp256k1VerificationKey2019">
+                    EcdsaSecp256k1VerificationKey2019
+                  </Option>
                 </Select>
               </Form.Item>
 
@@ -145,16 +141,10 @@ export function AddAuthMethodPage() {
               </Form.Item>
 
               <div className="flex justify-end space-x-4">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(-1)}
-                >
+                <Button variant="outline" onClick={() => navigate(-1)}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                >
+                <Button type="submit" disabled={loading}>
                   {loading ? <Spin size="small" /> : 'Add Method'}
                 </Button>
               </div>
@@ -164,4 +154,4 @@ export function AddAuthMethodPage() {
       </div>
     </div>
   );
-} 
+}

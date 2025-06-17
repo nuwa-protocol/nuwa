@@ -1,4 +1,13 @@
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, SignerInterface, MasterIdentity, KEY_TYPE, KeyType } from '../../src/types';
+import {
+  DIDDocument,
+  ServiceEndpoint,
+  VerificationMethod,
+  VerificationRelationship,
+  SignerInterface,
+  MasterIdentity,
+  KEY_TYPE,
+  KeyType,
+} from '../../src/types';
 import { CryptoUtils } from '../../src/cryptoUtils';
 // For Node.js environments
 import { Buffer } from 'buffer';
@@ -10,17 +19,14 @@ import { Buffer } from 'buffer';
  */
 export function createTestDIDDocument(did: string): DIDDocument {
   return {
-    '@context': [
-      'https://www.w3.org/ns/did/v1',
-      'https://w3id.org/security/suites/jws-2020/v1'
-    ],
+    '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/suites/jws-2020/v1'],
     id: did,
     controller: did,
     verificationMethod: [],
     authentication: [],
     assertionMethod: [],
     capabilityInvocation: [],
-    capabilityDelegation: []
+    capabilityDelegation: [],
   };
 }
 
@@ -34,7 +40,7 @@ export function createTestVerificationMethod(id: string): VerificationMethod {
     id,
     type: KEY_TYPE.ED25519,
     controller: id.split('#')[0],
-    publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+    publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
   };
 }
 
@@ -47,7 +53,7 @@ export function createTestService(id: string): ServiceEndpoint {
   return {
     id,
     type: 'TestService',
-    serviceEndpoint: 'https://example.com/test'
+    serviceEndpoint: 'https://example.com/test',
   };
 }
 
@@ -66,14 +72,17 @@ export async function createTestMasterIdentity(
   // Generate a test key pair
   const actualKeyType = keyType || KEY_TYPE.ED25519;
   const keyPair = await CryptoUtils.generateKeyPair(actualKeyType);
-  const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey as Uint8Array, actualKeyType);
+  const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(
+    keyPair.publicKey as Uint8Array,
+    actualKeyType
+  );
   const did = `did:${method}:${publicKeyMultibase}`;
   const keyId = `${did}#${masterKeyIdFragment || publicKeyMultibase}`;
-  
+
   return {
     did,
     masterKeyId: keyId,
     masterPublicKeyMultibase: publicKeyMultibase,
-    masterPrivateKey: keyPair.privateKey
+    masterPrivateKey: keyPair.privateKey,
   };
 }

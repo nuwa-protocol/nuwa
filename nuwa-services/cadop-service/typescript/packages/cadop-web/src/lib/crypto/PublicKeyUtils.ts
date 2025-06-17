@@ -11,7 +11,7 @@ import { KEY_TYPE, KeyType } from 'nuwa-identity-kit';
 /**
  * Centralized cryptographic utilities using mature libraries
  * Replaces scattered custom implementations throughout the codebase
- * 
+ *
  * TODO: After installing packages, uncomment the imports:
  * import { p256 } from '@noble/curves/p256';
  * import { ed25519 as ed25519Noble } from '@noble/curves/ed25519';
@@ -24,61 +24,80 @@ export class PublicKeyUtils {
    * Extract raw public key from WebAuthn SPKI format
    * Uses @peculiar/asn1-x509 for robust ASN.1 parsing
    */
-  static extractRawPublicKeyFromSPKI(spkiInput: ArrayBuffer | Uint8Array, algorithm: number): Uint8Array {
+  static extractRawPublicKeyFromSPKI(
+    spkiInput: ArrayBuffer | Uint8Array,
+    algorithm: number
+  ): Uint8Array {
     const spkiBytes = spkiInput instanceof Uint8Array ? spkiInput : new Uint8Array(spkiInput);
-    
+
     console.log('[PublicKeyUtils] SPKI extraction started:', {
       algorithm,
       spkiLength: spkiBytes.length,
-      spkiHex: Array.from(spkiBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-      first10Bytes: Array.from(spkiBytes.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      spkiHex: Array.from(spkiBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(''),
+      first10Bytes: Array.from(spkiBytes.slice(0, 10))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' '),
     });
-    
+
     try {
       // Use ASN.1 parser for robust SPKI parsing
       const spki = AsnParser.parse(spkiBytes, SubjectPublicKeyInfo);
       const publicKeyBytes = new Uint8Array(spki.subjectPublicKey);
-      
+
       console.log('[PublicKeyUtils] ASN.1 parsing successful:', {
         publicKeyBytesLength: publicKeyBytes.length,
-        publicKeyHex: Array.from(publicKeyBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-        first10Bytes: Array.from(publicKeyBytes.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        publicKeyHex: Array.from(publicKeyBytes)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
+        first10Bytes: Array.from(publicKeyBytes.slice(0, 10))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(' '),
       });
-      
-      if (algorithm === -8) { // Ed25519
+
+      if (algorithm === -8) {
+        // Ed25519
         const result = publicKeyBytes.slice(-32);
         console.log('[PublicKeyUtils] Ed25519 key extracted:', {
           resultLength: result.length,
-          resultHex: Array.from(result).map(b => b.toString(16).padStart(2, '0')).join('')
+          resultHex: Array.from(result)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
         });
         return result;
-      } else if (algorithm === -7) { // ES256 (P-256)
+      } else if (algorithm === -7) {
+        // ES256 (P-256)
         // Find uncompressed point marker (0x04) and compress
         const uncompressedIndex = publicKeyBytes.findIndex(byte => byte === 0x04);
         console.log('[PublicKeyUtils] P-256 uncompressed point search:', {
           uncompressedIndex,
           found: uncompressedIndex !== -1,
-          availableLength: publicKeyBytes.length - uncompressedIndex
+          availableLength: publicKeyBytes.length - uncompressedIndex,
         });
-        
+
         if (uncompressedIndex === -1 || uncompressedIndex + 65 > publicKeyBytes.length) {
           throw new Error('Invalid P-256 public key format');
         }
-        
+
         const uncompressedPoint = publicKeyBytes.slice(uncompressedIndex, uncompressedIndex + 65);
         console.log('[PublicKeyUtils] P-256 uncompressed point extracted:', {
           pointLength: uncompressedPoint.length,
           firstByte: uncompressedPoint[0].toString(16).padStart(2, '0'),
-          pointHex: Array.from(uncompressedPoint).map(b => b.toString(16).padStart(2, '0')).join('')
+          pointHex: Array.from(uncompressedPoint)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
         });
-        
+
         const compressed = this.compressP256PublicKey(uncompressedPoint);
         console.log('[PublicKeyUtils] P-256 compression completed:', {
           compressedLength: compressed.length,
           compressionFlag: compressed[0].toString(16).padStart(2, '0'),
-          compressedHex: Array.from(compressed).map(b => b.toString(16).padStart(2, '0')).join('')
+          compressedHex: Array.from(compressed)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
         });
-        
+
         return compressed;
       } else {
         throw new Error(`Unsupported algorithm: ${algorithm}`);
@@ -89,7 +108,9 @@ export class PublicKeyUtils {
       const result = this.extractRawPublicKeyLegacy(spkiBytes, algorithm);
       console.log('[PublicKeyUtils] Legacy extraction result:', {
         resultLength: result.length,
-        resultHex: Array.from(result).map(b => b.toString(16).padStart(2, '0')).join('')
+        resultHex: Array.from(result)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
       });
       return result;
     }
@@ -102,7 +123,7 @@ export class PublicKeyUtils {
     console.log('[PublicKeyUtils] P-256 compression started:', {
       inputLength: uncompressedPoint.length,
       firstByte: uncompressedPoint[0]?.toString(16).padStart(2, '0'),
-      isValidFormat: uncompressedPoint.length === 65 && uncompressedPoint[0] === 0x04
+      isValidFormat: uncompressedPoint.length === 65 && uncompressedPoint[0] === 0x04,
     });
 
     if (uncompressedPoint.length !== 65 || uncompressedPoint[0] !== 0x04) {
@@ -113,13 +134,15 @@ export class PublicKeyUtils {
       // Use @noble/curves for reliable point compression
       const point = p256.ProjectivePoint.fromHex(uncompressedPoint);
       const compressed = point.toRawBytes(true); // compressed format
-      
+
       console.log('[PublicKeyUtils] P-256 compression successful:', {
         compressedLength: compressed.length,
         compressionFlag: compressed[0].toString(16).padStart(2, '0'),
-        compressedHex: Array.from(compressed).map(b => b.toString(16).padStart(2, '0')).join('')
+        compressedHex: Array.from(compressed)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
       });
-      
+
       return compressed;
     } catch (error) {
       console.error('[PublicKeyUtils] P-256 compression failed:', error);
@@ -135,7 +158,7 @@ export class PublicKeyUtils {
       inputLength: compressedPoint.length,
       compressionFlag: compressedPoint[0]?.toString(16).padStart(2, '0'),
       isValidLength: compressedPoint.length === 33,
-      isValidCompressionFlag: compressedPoint[0] === 0x02 || compressedPoint[0] === 0x03
+      isValidCompressionFlag: compressedPoint[0] === 0x02 || compressedPoint[0] === 0x03,
     });
 
     if (compressedPoint.length !== 33) {
@@ -145,15 +168,19 @@ export class PublicKeyUtils {
     try {
       const point = p256.ProjectivePoint.fromHex(compressedPoint);
       const decompressed = point.toRawBytes(false); // uncompressed format
-      
+
       console.log('[PublicKeyUtils] P-256 decompression successful:', {
         decompressedLength: decompressed.length,
         firstByte: decompressed[0].toString(16).padStart(2, '0'),
         isValidUncompressed: decompressed.length === 65 && decompressed[0] === 0x04,
-        xCoordinate: Array.from(decompressed.slice(1, 33)).map(b => b.toString(16).padStart(2, '0')).join(''),
-        yCoordinate: Array.from(decompressed.slice(33, 65)).map(b => b.toString(16).padStart(2, '0')).join('')
+        xCoordinate: Array.from(decompressed.slice(1, 33))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
+        yCoordinate: Array.from(decompressed.slice(33, 65))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
       });
-      
+
       return decompressed;
     } catch (error) {
       console.error('[PublicKeyUtils] P-256 decompression failed:', error);
@@ -166,21 +193,21 @@ export class PublicKeyUtils {
    * Similar to ecdsa_r1.ts verify method but supports multiple key types
    */
   static async verify(
-    data: Uint8Array, 
-    signature: Uint8Array, 
-    publicKey: Uint8Array, 
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array,
     keyType: KeyType
   ): Promise<boolean> {
     console.log('[PublicKeyUtils] Signature verification started:', {
       keyType,
       dataLength: data.length,
       signatureLength: signature.length,
-      publicKeyLength: publicKey.length
+      publicKeyLength: publicKey.length,
     });
 
     try {
       let result: boolean;
-      
+
       if (keyType === KEY_TYPE.ED25519) {
         console.log('[PublicKeyUtils] Using Ed25519 verification');
         result = this.verifyEd25519(data, signature, publicKey);
@@ -197,18 +224,21 @@ export class PublicKeyUtils {
       console.log('[PublicKeyUtils] Signature verification result:', {
         keyType,
         result,
-        success: result === true
+        success: result === true,
       });
 
       return result;
     } catch (error) {
       console.error('[PublicKeyUtils] Signature verification failed:', {
         keyType,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : error
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : error,
       });
       return false;
     }
@@ -217,7 +247,11 @@ export class PublicKeyUtils {
   /**
    * Verify Ed25519 signature using @stablelib/ed25519
    */
-  private static verifyEd25519(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array): boolean {
+  private static verifyEd25519(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array
+  ): boolean {
     if (publicKey.length !== 32) {
       throw new Error('Invalid Ed25519 public key length');
     }
@@ -231,36 +265,46 @@ export class PublicKeyUtils {
   /**
    * Verify ECDSA-R1 (P-256) signature using WebCrypto API and @noble/curves
    */
-  private static async verifyEcdsaR1(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array): Promise<boolean> {
+  private static async verifyEcdsaR1(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array
+  ): Promise<boolean> {
     console.log('[PublicKeyUtils] ECDSA-R1 verification started:', {
       dataLength: data.length,
       signatureLength: signature.length,
       publicKeyLength: publicKey.length,
-      signatureHex: Array.from(signature).map(b => b.toString(16).padStart(2, '0')).join(''),
-      publicKeyHex: Array.from(publicKey).map(b => b.toString(16).padStart(2, '0')).join(''),
-      dataFirst20Bytes: Array.from(data.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      signatureHex: Array.from(signature)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(''),
+      publicKeyHex: Array.from(publicKey)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(''),
+      dataFirst20Bytes: Array.from(data.slice(0, 20))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' '),
     });
 
     try {
       // Get crypto object based on environment
       const crypto = this.getCrypto();
-      
+
       // Decompress the public key for WebCrypto
       const decompressedKey = this.decompressP256PublicKey(publicKey);
-      
+
       console.log('[PublicKeyUtils] Public key decompressed for WebCrypto:', {
         originalLength: publicKey.length,
         decompressedLength: decompressedKey.length,
-        isValidUncompressed: decompressedKey.length === 65 && decompressedKey[0] === 0x04
+        isValidUncompressed: decompressedKey.length === 65 && decompressedKey[0] === 0x04,
       });
-      
+
       // Import the public key for WebCrypto
       const cryptoKey = await crypto.subtle.importKey(
         'raw',
         decompressedKey,
         {
           name: 'ECDSA',
-          namedCurve: 'P-256'
+          namedCurve: 'P-256',
         },
         false,
         ['verify']
@@ -270,13 +314,15 @@ export class PublicKeyUtils {
 
       // WebCrypto expects DER format, convert if needed
       const derSignature = SignatureUtils.normalizeSignature(signature, KEY_TYPE.ECDSAR1, 'der');
-      
+
       console.log('[PublicKeyUtils] Signature normalized to DER:', {
         originalLength: signature.length,
         derLength: derSignature.length,
         isDER: derSignature.length > 64 && derSignature[0] === 0x30,
-        derHex: Array.from(derSignature).map(b => b.toString(16).padStart(2, '0')).join(''),
-        wasConverted: !Array.from(signature).every((byte, index) => byte === derSignature[index])
+        derHex: Array.from(derSignature)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join(''),
+        wasConverted: !Array.from(signature).every((byte, index) => byte === derSignature[index]),
       });
 
       // WebCrypto.verify expects the original data, not the hash
@@ -284,18 +330,18 @@ export class PublicKeyUtils {
       const result = await crypto.subtle.verify(
         {
           name: 'ECDSA',
-          hash: { name: 'SHA-256' }
+          hash: { name: 'SHA-256' },
         },
         cryptoKey,
         derSignature,
-        data  // WebCrypto will hash this internally
+        data // WebCrypto will hash this internally
       );
 
       console.log('[PublicKeyUtils] ECDSA-R1 verification completed:', {
         result,
         algorithm: 'ECDSA',
         curve: 'P-256',
-        hash: 'SHA-256'
+        hash: 'SHA-256',
       });
 
       return result;
@@ -320,10 +366,12 @@ export class PublicKeyUtils {
    * Legacy extraction method as fallback
    */
   private static extractRawPublicKeyLegacy(spki: Uint8Array, alg: number): Uint8Array {
-    if (alg === -8) { // Ed25519
+    if (alg === -8) {
+      // Ed25519
       return spki.slice(spki.length - 32);
     }
-    if (alg === -7) { // ES256
+    if (alg === -7) {
+      // ES256
       const idx = spki.indexOf(0x04);
       if (idx === -1 || idx + 65 > spki.length) {
         throw new Error('Invalid P-256 SPKI format');
@@ -373,8 +421,18 @@ export class SignatureUtils {
         const r = rawSignature.slice(0, 32);
         const s = rawSignature.slice(32, 64);
         const signature = new p256.Signature(
-          BigInt('0x' + Array.from(r).map(b => b.toString(16).padStart(2, '0')).join('')),
-          BigInt('0x' + Array.from(s).map(b => b.toString(16).padStart(2, '0')).join(''))
+          BigInt(
+            '0x' +
+              Array.from(r)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+          ),
+          BigInt(
+            '0x' +
+              Array.from(s)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+          )
         );
         return signature.toDERRawBytes();
       } catch (error) {
@@ -389,10 +447,14 @@ export class SignatureUtils {
   /**
    * Auto-detect and normalize signature format
    */
-  static normalizeSignature(signature: Uint8Array, keyType: KeyType, targetFormat: 'raw' | 'der'): Uint8Array {
+  static normalizeSignature(
+    signature: Uint8Array,
+    keyType: KeyType,
+    targetFormat: 'raw' | 'der'
+  ): Uint8Array {
     if (keyType === KEY_TYPE.ECDSAR1) {
       const isDER = signature.length > 64 && signature[0] === 0x30;
-      
+
       if (targetFormat === 'raw') {
         return isDER ? this.derToRaw(signature, keyType) : signature;
       } else {
@@ -444,4 +506,4 @@ export class SignatureUtils {
     raw.set(sPad, 32);
     return raw;
   }
-} 
+}

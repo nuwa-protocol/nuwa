@@ -1,8 +1,4 @@
-import { 
-  CreateAgentDIDRequest, 
-  AgentDIDCreationStatus,
-  IDToken
-} from '@cadop/shared';
+import { CreateAgentDIDRequest, AgentDIDCreationStatus, IDToken } from '@cadop/shared';
 import {
   VDRRegistry,
   NuwaIdentityKit,
@@ -11,7 +7,7 @@ import {
   ServiceEndpoint,
   VDRInterface,
   createVDR,
-  LocalSigner
+  LocalSigner,
 } from 'nuwa-identity-kit';
 import { logger } from '../utils/logger.js';
 import roochSdk from '@roochnetwork/rooch-sdk';
@@ -72,12 +68,12 @@ export class CustodianService {
         status: 'processing',
         createdAt: new Date(),
         updatedAt: new Date(),
-        userDid: request.userDid
+        userDid: request.userDid,
       };
       this.didCreationRecords.set(recordId, status);
 
       // 4. Create DID Document
-      const result = await this.cadopKit.createDID("rooch", request.userDid)
+      const result = await this.cadopKit.createDID('rooch', request.userDid);
 
       if (!result.success) {
         status.status = 'failed';
@@ -87,7 +83,7 @@ export class CustodianService {
         status.userDid = tokenPayload.sub;
         status.agentDid = result.didDocument?.id;
         status.transactionHash = result.transactionHash;
-        
+
         // Update user DIDs mapping
         const userDids = this.userDids.get(tokenPayload.sub) || [];
         userDids.push(result.didDocument!.id);
@@ -97,7 +93,6 @@ export class CustodianService {
       status.updatedAt = new Date();
       this.didCreationRecords.set(recordId, status);
       return { ...status, id: recordId };
-
     } catch (error) {
       logger.error('Failed to create Agent DID', { error });
       throw error;
@@ -123,9 +118,11 @@ export class CustodianService {
   }
 
   private isNewDay(now: Date): boolean {
-    return now.getDate() !== this.lastMintReset.getDate() ||
-           now.getMonth() !== this.lastMintReset.getMonth() ||
-           now.getFullYear() !== this.lastMintReset.getFullYear();
+    return (
+      now.getDate() !== this.lastMintReset.getDate() ||
+      now.getMonth() !== this.lastMintReset.getMonth() ||
+      now.getFullYear() !== this.lastMintReset.getFullYear()
+    );
   }
 
   // Implement other required methods from the API routes
@@ -145,4 +142,3 @@ export class CustodianService {
     return VDRRegistry.getInstance().exists(agentDid);
   }
 }
-

@@ -16,7 +16,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("flex items-center w-full", className)}>
+    <div className={cn('flex items-center w-full', className)}>
       {steps.map((step, index) => {
         const isCompleted = completedSteps.includes(index);
         const isCurrent = currentStep === index;
@@ -27,10 +27,10 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
             <div className="flex items-center">
               <div
                 className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all",
-                  isCompleted && "bg-primary border-primary text-primary-foreground",
-                  isCurrent && "border-primary text-primary",
-                  !isCompleted && !isCurrent && "border-gray-300 text-gray-500"
+                  'flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all',
+                  isCompleted && 'bg-primary border-primary text-primary-foreground',
+                  isCurrent && 'border-primary text-primary',
+                  !isCompleted && !isCurrent && 'border-gray-300 text-gray-500'
                 )}
               >
                 {isCompleted ? (
@@ -41,10 +41,10 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
               </div>
               <div
                 className={cn(
-                  "hidden sm:block ml-3 text-sm font-medium",
-                  isCompleted && "text-primary",
-                  isCurrent && "text-primary",
-                  !isCompleted && !isCurrent && "text-gray-500"
+                  'hidden sm:block ml-3 text-sm font-medium',
+                  isCompleted && 'text-primary',
+                  isCurrent && 'text-primary',
+                  !isCompleted && !isCurrent && 'text-gray-500'
                 )}
               >
                 {step}
@@ -52,10 +52,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
             </div>
             {!isLast && (
               <div
-                className={cn(
-                  "flex-1 h-0.5 mx-4",
-                  isCompleted ? "bg-primary" : "bg-gray-300"
-                )}
+                className={cn('flex-1 h-0.5 mx-4', isCompleted ? 'bg-primary' : 'bg-gray-300')}
               />
             )}
           </React.Fragment>
@@ -63,4 +60,4 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
       })}
     </div>
   );
-}; 
+};

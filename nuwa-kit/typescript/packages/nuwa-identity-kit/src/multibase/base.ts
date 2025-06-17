@@ -30,9 +30,12 @@ export class BaseMultibaseCodec {
    * @returns base16 encoded string with 'f' prefix
    */
   static encodeBase16(bytes: Uint8Array): string {
-    return 'f' + Array.from(bytes)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    return (
+      'f' +
+      Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+    );
   }
 
   /**
@@ -84,4 +87,4 @@ export class BaseMultibaseCodec {
       throw new Error('Invalid multibase format');
     }
   }
-} 
+}

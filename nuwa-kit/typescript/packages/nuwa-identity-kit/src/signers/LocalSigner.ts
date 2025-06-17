@@ -1,7 +1,7 @@
 import { SignerInterface } from '../types';
 import { CryptoUtils } from '../cryptoUtils';
 import { KEY_TYPE, KeyType } from '../types';
-import { decodeRoochSercetKey, Keypair} from '@roochnetwork/rooch-sdk';
+import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 
 interface StoredKeyPair {
   keyId: string;
@@ -32,7 +32,7 @@ export class LocalSigner implements SignerInterface {
    */
   async generateKey(keyIdFragment: string, type: KeyType = KEY_TYPE.ED25519): Promise<string> {
     const keyId = `${this.did}#${keyIdFragment}`;
-    
+
     // Check if key ID is already in use
     if (this.keys.has(keyId)) {
       throw new Error(`Key ID ${keyId} is already in use`);
@@ -40,10 +40,10 @@ export class LocalSigner implements SignerInterface {
 
     // Generate new key pair
     const keyPair = await CryptoUtils.generateKeyPair(type);
-    
+
     // Store the key pair
     await this.addKeyPair(keyId, keyPair, type);
-    
+
     return keyId;
   }
 
@@ -53,7 +53,11 @@ export class LocalSigner implements SignerInterface {
    * @param keyPair The key pair to add
    * @param type The type of the key
    */
-  private async addKeyPair(keyId: string, keyPair: { privateKey: Uint8Array; publicKey: Uint8Array }, type: KeyType): Promise<void> {
+  private async addKeyPair(
+    keyId: string,
+    keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
+    type: KeyType
+  ): Promise<void> {
     // Validate keyId format
     if (!keyId.startsWith(this.did)) {
       throw new Error(`Key ID ${keyId} does not match DID ${this.did}`);
@@ -63,7 +67,7 @@ export class LocalSigner implements SignerInterface {
       keyId,
       privateKey: keyPair.privateKey,
       publicKey: keyPair.publicKey,
-      type
+      type,
     });
   }
 
@@ -91,7 +95,9 @@ export class LocalSigner implements SignerInterface {
     try {
       return await CryptoUtils.sign(data, key.privateKey, key.type);
     } catch (error) {
-      throw new Error(`Failed to sign with key ${keyId}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to sign with key ${keyId}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -154,7 +160,11 @@ export class LocalSigner implements SignerInterface {
     const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
     const didKey = `did:key:${publicKeyMultibase}`;
     const signer = new LocalSigner(didKey);
-    const keyId = await signer.importKeyPair('account-key', { privateKey: privateKey, publicKey: publicKey }, KEY_TYPE.ED25519);
+    const keyId = await signer.importKeyPair(
+      'account-key',
+      { privateKey: privateKey, publicKey: publicKey },
+      KEY_TYPE.ED25519
+    );
     return { signer, keyId };
   }
 
@@ -215,14 +225,14 @@ export class LocalSigner implements SignerInterface {
     type: KeyType = KEY_TYPE.ED25519
   ): Promise<string> {
     const keyId = `${this.did}#${keyIdFragment}`;
-    
+
     // Check if key ID is already in use
     if (this.keys.has(keyId)) {
       throw new Error(`Key ID ${keyId} is already in use`);
     }
     //TODO verify the public key with the private key
     await this.addKeyPair(keyId, keyPair, type);
-    
+
     return keyId;
   }
 
@@ -242,4 +252,4 @@ export class LocalSigner implements SignerInterface {
   getDid(): string {
     return this.did;
   }
-} 
+}

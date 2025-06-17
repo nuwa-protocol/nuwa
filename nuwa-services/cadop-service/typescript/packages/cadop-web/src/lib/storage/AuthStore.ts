@@ -2,7 +2,7 @@ import { NuwaStore } from './NuwaStore';
 
 /**
  * Authentication Store
- * 
+ *
  * Responsible for managing user login state, provides read/write operations for current user DID
  */
 export class AuthStore {
@@ -22,12 +22,12 @@ export class AuthStore {
    */
   static setCurrentUserDid(did: string): void {
     const state = NuwaStore.getState();
-    
+
     // Check if user exists
     if (did && !state.users[did]) {
       throw new Error(`[AuthStore] User does not exist: ${did}`);
     }
-    
+
     state.currentUserDid = did;
     NuwaStore.saveState(state);
   }
@@ -48,4 +48,4 @@ export class AuthStore {
   static isLoggedIn(): boolean {
     return !!this.getCurrentUserDid();
   }
-} 
+}

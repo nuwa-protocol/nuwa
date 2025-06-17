@@ -47,14 +47,13 @@ export class CryptoService {
       logger.info('Initializing crypto keys', { environment: config.server.nodeEnv });
 
       // Initialize JWT signing key
-      const jwtSigningKey = isDevelopment 
+      const jwtSigningKey = isDevelopment
         ? randomBytes(32).toString('hex')
         : process.env.JWT_SIGNING_KEY;
 
       if (!jwtSigningKey) {
         throw new Error('JWT signing key is required');
       }
-
 
       // Initialize Rooch keypair
       let roochKeypair;
@@ -63,7 +62,7 @@ export class CryptoService {
         roochKeypair = Secp256k1Keypair.generate();
         logger.info('Generated new Rooch keypair', {
           publicKey: roochKeypair.getPublicKey().toString(),
-          privateKey: roochKeypair.getSecretKey()
+          privateKey: roochKeypair.getSecretKey(),
         });
       } else {
         // In production, load from environment
@@ -71,7 +70,7 @@ export class CryptoService {
         if (!roochPrivateKey) {
           throw new Error('Rooch private key is required in production');
         }
-        
+
         const { secretKey, schema } = decodeRoochSercetKey(roochPrivateKey);
         if (schema !== 'Secp256k1') {
           throw new Error('Rooch private key is not a Secp256k1 key');
@@ -84,13 +83,13 @@ export class CryptoService {
 
       this.keys = {
         jwtSigningKey,
-        roochKeypair
+        roochKeypair,
       };
 
       logger.info('Crypto keys initialized successfully', {
         environment: config.server.nodeEnv,
         hasJwtKey: !!jwtSigningKey,
-        hasRoochKeypair: !!roochKeypair
+        hasRoochKeypair: !!roochKeypair,
       });
     } catch (error) {
       logger.error('Failed to initialize crypto keys', { error });
@@ -141,4 +140,4 @@ export class CryptoService {
   }
 }
 
-export const cryptoService = CryptoService.getInstance(); 
+export const cryptoService = CryptoService.getInstance();

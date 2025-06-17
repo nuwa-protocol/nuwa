@@ -21,7 +21,7 @@ export class Ed25519Provider implements CryptoProvider {
     const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
       {
         name: 'Ed25519',
-        namedCurve: 'Ed25519'
+        namedCurve: 'Ed25519',
       },
       true,
       ['sign', 'verify']
@@ -32,7 +32,7 @@ export class Ed25519Provider implements CryptoProvider {
 
     return {
       publicKey: exportedPublic,
-      privateKey: exportedPrivate
+      privateKey: exportedPrivate,
     };
   }
 
@@ -44,7 +44,7 @@ export class Ed25519Provider implements CryptoProvider {
         privateKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519'
+          namedCurve: 'Ed25519',
         },
         false,
         ['sign']
@@ -53,16 +53,16 @@ export class Ed25519Provider implements CryptoProvider {
       key = privateKey;
     }
 
-    const signature = await this.crypto.subtle.sign(
-      'Ed25519',
-      key,
-      data
-    );
+    const signature = await this.crypto.subtle.sign('Ed25519', key, data);
 
     return new Uint8Array(signature);
   }
 
-  async verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey): Promise<boolean> {
+  async verify(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array | JsonWebKey
+  ): Promise<boolean> {
     let key: CryptoKey;
     if (publicKey instanceof Uint8Array) {
       key = await this.crypto.subtle.importKey(
@@ -70,7 +70,7 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519'
+          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
@@ -81,22 +81,17 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519'
+          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
       );
     }
 
-    return await this.crypto.subtle.verify(
-      'Ed25519',
-      key,
-      signature,
-      data
-    );
+    return await this.crypto.subtle.verify('Ed25519', key, signature, data);
   }
 
   getKeyType(): KeyType {
     return KEY_TYPE.ED25519;
   }
-} 
+}

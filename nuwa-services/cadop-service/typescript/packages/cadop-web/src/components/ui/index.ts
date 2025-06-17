@@ -20,15 +20,7 @@ export {
 } from '@radix-ui/react-dropdown-menu';
 
 // Re-export Ant Design components
-export {
-  Table,
-  DatePicker,
-  TreeSelect,
-  Upload,
-  Modal,
-  notification,
-  message,
-} from 'antd';
+export { Table, DatePicker, TreeSelect, Upload, Modal, notification, message } from 'antd';
 
 // Export shadcn/ui components
 export * from './button';
@@ -39,4 +31,4 @@ export * from './Input';
 export * from './Select';
 
 // Export custom components
-export * from '../did/DIDDisplay'; 
+export * from '../did/DIDDisplay';

@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { 
+import {
   NuwaIdentityKit,
   DIDDocument,
   DIDCreationRequest,
@@ -8,7 +8,7 @@ import {
   VerificationRelationship,
   SignedData,
   KEY_TYPE,
-  VDRRegistry
+  VDRRegistry,
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
@@ -29,7 +29,10 @@ describe('NuwaIdentityKit', () => {
 
     // Generate a key pair for the DID
     const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(keyPair.publicKey, KEY_TYPE.ED25519);
+    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(
+      keyPair.publicKey,
+      KEY_TYPE.ED25519
+    );
     testDID = `did:key:${publicKeyMultibase}`;
 
     // Create a signer with the correct DID
@@ -41,22 +44,22 @@ describe('NuwaIdentityKit', () => {
 
     // Create DID Document
     mockDIDDocument = {
-      '@context': [
-        'https://www.w3.org/ns/did/v1'
-      ],
+      '@context': ['https://www.w3.org/ns/did/v1'],
       id: testDID,
       controller: [testDID],
-      verificationMethod: [{
-        id: keyId,
-        type: 'Ed25519VerificationKey2020',
-        controller: testDID,
-        publicKeyMultibase
-      }],
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'Ed25519VerificationKey2020',
+          controller: testDID,
+          publicKeyMultibase,
+        },
+      ],
       authentication: [keyId],
       assertionMethod: [keyId],
       capabilityInvocation: [keyId],
       capabilityDelegation: [keyId],
-      service: []
+      service: [],
     };
 
     // Create DID in VDR
@@ -65,7 +68,12 @@ describe('NuwaIdentityKit', () => {
       keyType: 'Ed25519VerificationKey2020',
       preferredDID: testDID,
       controller: testDID,
-      initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation']
+      initialRelationships: [
+        'authentication',
+        'assertionMethod',
+        'capabilityInvocation',
+        'capabilityDelegation',
+      ],
     });
   });
 
@@ -76,7 +84,7 @@ describe('NuwaIdentityKit', () => {
         publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
         keyType: 'Ed25519VerificationKey2020',
         preferredDID: testDID,
-        controller: testDID
+        controller: testDID,
       });
 
       const kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
@@ -92,14 +100,17 @@ describe('NuwaIdentityKit', () => {
 
     it('should create new DID', async () => {
       const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-      const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+      const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(
+        publicKey,
+        KEY_TYPE.ED25519
+      );
       const did = `did:key:${publicKeyMultibase}`;
-      
+
       const creationRequest: DIDCreationRequest = {
         publicKeyMultibase,
         keyType: 'Ed25519VerificationKey2020',
         preferredDID: did,
-        controller: did
+        controller: did,
       };
 
       const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, signer);
@@ -124,7 +135,7 @@ describe('NuwaIdentityKit', () => {
         type: 'MessagingService',
         serviceEndpoint: 'https://example.com/messaging',
         idFragment: 'messaging',
-        additionalProperties: {}
+        additionalProperties: {},
       };
 
       // Add service
@@ -157,7 +168,7 @@ describe('NuwaIdentityKit', () => {
         publicKeyMultibase: mockDIDDocument.verificationMethod![0].publicKeyMultibase!,
         keyType: 'Ed25519VerificationKey2020',
         preferredDID: testDID,
-        controller: testDID
+        controller: testDID,
       });
 
       kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
@@ -174,7 +185,9 @@ describe('NuwaIdentityKit', () => {
     });
 
     it('should return null when DID resolution fails', async () => {
-      const resolved = await VDRRegistry.getInstance().resolveDID('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
+      const resolved = await VDRRegistry.getInstance().resolveDID(
+        'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+      );
       expect(resolved).toBeNull();
     });
   });
@@ -221,7 +234,7 @@ describe('NuwaIdentityKit', () => {
         type: 'MessagingService',
         serviceEndpoint: 'https://example.com/messaging',
         idFragment: 'messaging',
-        additionalProperties: {}
+        additionalProperties: {},
       };
 
       const serviceId = await kit.addService(serviceInfo);

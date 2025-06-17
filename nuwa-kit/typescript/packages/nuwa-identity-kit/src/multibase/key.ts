@@ -23,7 +23,9 @@ export class KeyMultibaseCodec {
     // Validate key length
     const expectedLength = this.getExpectedKeyLength(keyType);
     if (bytes.length !== expectedLength) {
-      throw new Error(`Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`);
+      throw new Error(
+        `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`
+      );
     }
 
     const prefix = this.getMulticodecPrefix(keyType);
@@ -49,7 +51,9 @@ export class KeyMultibaseCodec {
       // Validate key length
       const expectedLength = this.getExpectedKeyLength(keyType);
       if (bytes.length !== expectedLength) {
-        throw new Error(`Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`);
+        throw new Error(
+          `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`
+        );
       }
 
       return { keyType, bytes };
@@ -108,4 +112,4 @@ export class KeyMultibaseCodec {
         throw new Error(`Unsupported key type: ${keyType}`);
     }
   }
-} 
+}

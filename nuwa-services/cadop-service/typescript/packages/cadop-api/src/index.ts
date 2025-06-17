@@ -7,7 +7,7 @@ async function startServer() {
   try {
     // Initialize and get the Express app
     const app = await startApp();
-    
+
     // Start the HTTP server
     const port = config.server.port || 8080;
     app.listen(port, () => {
@@ -17,9 +17,9 @@ async function startServer() {
       });
     });
   } catch (error) {
-    logger.error('Failed to start server', { 
+    logger.error('Failed to start server', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined 
+      stack: error instanceof Error ? error.stack : undefined,
     });
     process.exit(1);
   }
@@ -38,9 +38,9 @@ process.on('SIGINT', () => {
 
 // Start the server
 startServer().catch(error => {
-  logger.error('Unhandled error during server startup', { 
+  logger.error('Unhandled error during server startup', {
     error: error instanceof Error ? error.message : 'Unknown error',
-    stack: error instanceof Error ? error.stack : undefined 
+    stack: error instanceof Error ? error.stack : undefined,
   });
   process.exit(1);
-}); 
+});

@@ -30,4 +30,4 @@ export class DefaultCryptoProviderFactory implements CryptoProviderFactory {
 /**
  * Default instance of the crypto provider factory
  */
-export const defaultCryptoProviderFactory = new DefaultCryptoProviderFactory(); 
+export const defaultCryptoProviderFactory = new DefaultCryptoProviderFactory();

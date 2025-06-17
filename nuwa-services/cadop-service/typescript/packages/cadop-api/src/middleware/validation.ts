@@ -48,7 +48,7 @@ export const validateRequest = (schema: ZodSchema) => {
         });
         return;
       }
-      
+
       // Handle other validation errors
       logger.error('Unexpected validation error', {
         path: req.path,
@@ -111,7 +111,7 @@ export const validateParams = (schema: ZodSchema) => {
         });
         return;
       }
-      
+
       logger.error('Unexpected parameter validation error', {
         path: req.path,
         method: req.method,
@@ -173,7 +173,7 @@ export const validateQuery = (schema: ZodSchema) => {
         });
         return;
       }
-      
+
       logger.error('Unexpected query validation error', {
         path: req.path,
         method: req.method,
@@ -188,4 +188,4 @@ export const validateQuery = (schema: ZodSchema) => {
       });
     }
   };
-}; 
+};

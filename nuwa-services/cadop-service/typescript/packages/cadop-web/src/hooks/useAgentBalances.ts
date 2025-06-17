@@ -32,30 +32,30 @@ export function useAgentBalances(did: string | undefined): AgentBalancesResult {
     isLoading,
     isError,
     error,
-    refetch
+    refetch,
   } = useQuery({
     queryKey: ['agentBalances', did],
     queryFn: async () => {
       if (!did) throw new Error('DID is required');
-      
+
       const address = getRoochAddress(did);
       if (!address) throw new Error('Invalid DID format');
-      
+
       const client = new RoochClient({
         url: import.meta.env.VITE_ROOCH_RPC_URL || 'http://localhost:6767',
       });
-      
-      const resp = await client.getBalances({ 
-        owner: address, 
-        cursor: null, 
-        limit: '100' 
+
+      const resp = await client.getBalances({
+        owner: address,
+        cursor: null,
+        limit: '100',
       });
-      
+
       return resp.data || [];
     },
     enabled: !!did,
     staleTime: 60 * 1000, // 1 minute
-    retry: 1
+    retry: 1,
   });
 
   const refetchBalances = async () => {
@@ -67,6 +67,6 @@ export function useAgentBalances(did: string | undefined): AgentBalancesResult {
     isLoading,
     isError,
     error: error as Error | null,
-    refetch: refetchBalances
+    refetch: refetchBalances,
   };
-} 
+}

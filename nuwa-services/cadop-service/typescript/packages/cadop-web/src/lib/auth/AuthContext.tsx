@@ -69,7 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // Step 1: Check if we have a current user DID
         const currentUserDid = AuthStore.getCurrentUserDid();
-        
+
         if (currentUserDid) {
           // User is already authenticated
           setState({
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             userDid: currentUserDid,
             error: null,
           });
-        }else{
+        } else {
           setState({
             isAuthenticated: false,
             isLoading: false,
@@ -106,9 +106,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-} 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}

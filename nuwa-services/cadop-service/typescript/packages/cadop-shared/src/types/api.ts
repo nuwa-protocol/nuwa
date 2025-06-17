@@ -30,7 +30,7 @@ export type APIErrorResponse = Required<Pick<APIResponse<never>, 'error'>>;
  * Create a success response
  */
 export const createSuccessResponse = <T>(data: T): APISuccessResponse<T> => ({
-  data
+  data,
 });
 
 /**
@@ -44,8 +44,8 @@ export const createErrorResponse = (
   error: {
     message,
     code,
-    details
-  }
+    details,
+  },
 });
 
 /**
@@ -55,14 +55,10 @@ export const createErrorResponseFromError = (error: unknown): APIErrorResponse =
   if (error instanceof CadopError) {
     return createErrorResponse(error.message, error.code, error.details);
   }
-  
+
   if (error instanceof Error) {
     return createErrorResponse(error.message, CadopErrorCode.INTERNAL_ERROR);
   }
-  
-  return createErrorResponse(
-    'Unknown error occurred',
-    CadopErrorCode.INTERNAL_ERROR,
-    error
-  );
-}; 
+
+  return createErrorResponse('Unknown error occurred', CadopErrorCode.INTERNAL_ERROR, error);
+};

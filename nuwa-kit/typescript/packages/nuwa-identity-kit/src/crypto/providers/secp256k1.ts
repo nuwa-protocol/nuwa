@@ -10,7 +10,7 @@ export class Secp256k1Provider implements CryptoProvider {
 
     return {
       publicKey,
-      privateKey
+      privateKey,
     };
   }
 
@@ -23,7 +23,11 @@ export class Secp256k1Provider implements CryptoProvider {
     return signature.toCompactRawBytes();
   }
 
-  async verify(data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array | JsonWebKey): Promise<boolean> {
+  async verify(
+    data: Uint8Array,
+    signature: Uint8Array,
+    publicKey: Uint8Array | JsonWebKey
+  ): Promise<boolean> {
     if (!(publicKey instanceof Uint8Array)) {
       throw new Error('JsonWebKey is not supported for Secp256k1 verification');
     }
@@ -34,4 +38,4 @@ export class Secp256k1Provider implements CryptoProvider {
   getKeyType(): KeyType {
     return KEY_TYPE.SECP256K1;
   }
-} 
+}

@@ -18,9 +18,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
 root.render(
   <React.StrictMode>
@@ -34,4 +32,4 @@ root.render(
       </I18nextProvider>
     </QueryClientProvider>
   </React.StrictMode>
-); 
+);

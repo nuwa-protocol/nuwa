@@ -1,4 +1,12 @@
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
+import {
+  DIDDocument,
+  ServiceEndpoint,
+  VerificationMethod,
+  VerificationRelationship,
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+} from '../types';
 import { AbstractVDR } from './abstractVDR';
 import { CryptoUtils } from '../cryptoUtils';
 import { CadopUtils } from '../cadopUtils';
@@ -7,23 +15,23 @@ import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
 
 /**
  * KeyVDR handles did:key DIDs
- * 
+ *
  * did:key DIDs are self-resolving as they contain the public key material
  * embedded in the identifier. This implementation follows the did:key method
  * specification.
- * 
+ *
  * Example did:key: did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
- * 
+ *
  * Reference: https://w3c-ccg.github.io/did-method-key/
  */
 export class KeyVDR extends AbstractVDR {
   // In-memory cache of documents, shared across all instances
   private static documentCache: Map<string, DIDDocument> = new Map();
-  
+
   constructor() {
     super('key');
   }
-  
+
   /**
    * Resets the document cache - primarily for testing purposes
    * to ensure tests don't interfere with each other.
@@ -31,26 +39,26 @@ export class KeyVDR extends AbstractVDR {
   public reset(): void {
     KeyVDR.documentCache.clear();
   }
-  
+
   /**
    * Parses a did:key identifier to extract the public key
-   * 
+   *
    * @param did The did:key identifier
    * @returns The extracted multibase-encoded public key
    */
   private extractMultibaseKey(did: string): string {
     this.validateDIDMethod(did);
-    
+
     // Extract the multibase-encoded public key from the DID
     // did:key:<multibase-encoded-key>
     const parts = did.split(':');
     if (parts.length !== 3) {
       throw new Error(`Invalid did:key format: ${did}`);
     }
-    
+
     return parts[2];
   }
-  
+
   /**
    * Override resolve to handle test mode
    */
@@ -60,19 +68,19 @@ export class KeyVDR extends AbstractVDR {
       if (KeyVDR.documentCache.has(did)) {
         return KeyVDR.documentCache.get(did)!;
       }
-      
+
       return null;
     } catch (error) {
       console.error(`Error resolving ${did}:`, error);
       return null;
     }
   }
-  
+
   /**
    * Add a verification method to a did:key document
    * For did:key, this is mostly a simulation as the document is derived from the key
    * This operation will update the local cache but not the actual structure of the did:key
-   * 
+   *
    * @param did The DID to update
    * @param verificationMethod The verification method to add
    * @param relationships Optional relationships to add the verification method to
@@ -92,7 +100,12 @@ export class KeyVDR extends AbstractVDR {
       }
 
       // Use parent class validation methods
-      await this.validateUpdateOperation(did, originalDocument, options?.keyId, 'capabilityDelegation');
+      await this.validateUpdateOperation(
+        did,
+        originalDocument,
+        options?.keyId,
+        'capabilityDelegation'
+      );
       this.validateVerificationMethod(did, verificationMethod, originalDocument);
 
       // Check for duplicate verification method ID
@@ -125,12 +138,12 @@ export class KeyVDR extends AbstractVDR {
       throw error;
     }
   }
-  
+
   /**
    * Remove a verification method from a did:key document
    * For did:key, this is mostly a simulation as the document is derived from the key
    * This operation will update the local cache but not the actual structure of the did:key
-   * 
+   *
    * @param did The DID to update
    * @param keyId The ID of the verification method to remove
    * @param options Additional options
@@ -144,13 +157,18 @@ export class KeyVDR extends AbstractVDR {
       }
 
       // Use parent class validation method
-      await this.validateUpdateOperation(did, originalDocument, options?.keyId, 'capabilityDelegation');
+      await this.validateUpdateOperation(
+        did,
+        originalDocument,
+        options?.keyId,
+        'capabilityDelegation'
+      );
 
       const verificationMethods = originalDocument.verificationMethod || [];
       const vmIndex = verificationMethods.findIndex(vm => vm.id === keyId);
       if (vmIndex === -1) {
         // Verification method not found, silently succeed
-        return true; 
+        return true;
       }
 
       const isPrimaryKey = vmIndex === 0;
@@ -160,10 +178,17 @@ export class KeyVDR extends AbstractVDR {
 
       originalDocument.verificationMethod = verificationMethods.filter(vm => vm.id !== keyId);
 
-      const relationships: VerificationRelationship[] = ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'];
+      const relationships: VerificationRelationship[] = [
+        'authentication',
+        'assertionMethod',
+        'capabilityInvocation',
+        'capabilityDelegation',
+      ];
       relationships.forEach(relationship => {
         if (originalDocument[relationship]) {
-          originalDocument[relationship] = originalDocument[relationship]!.filter(id => id !== keyId);
+          originalDocument[relationship] = originalDocument[relationship]!.filter(
+            id => id !== keyId
+          );
         }
       });
 
@@ -174,12 +199,12 @@ export class KeyVDR extends AbstractVDR {
       throw error;
     }
   }
-  
+
   /**
    * Add a service to a did:key document
    * For did:key, this is mostly a simulation as the document is derived from the key
    * This operation will update the local cache but not the actual structure of the did:key
-   * 
+   *
    * @param did The DID to update
    * @param service The service to add
    * @param options Additional options
@@ -193,7 +218,12 @@ export class KeyVDR extends AbstractVDR {
       }
 
       // Use parent class validation methods
-      await this.validateUpdateOperation(did, originalDocument, options?.keyId, 'capabilityInvocation');
+      await this.validateUpdateOperation(
+        did,
+        originalDocument,
+        options?.keyId,
+        'capabilityInvocation'
+      );
       this.validateService(did, service, originalDocument);
 
       if (!originalDocument.service) {
@@ -208,12 +238,12 @@ export class KeyVDR extends AbstractVDR {
       throw error;
     }
   }
-  
+
   /**
    * Remove a service from a did:key document
    * For did:key, this is mostly a simulation as the document is derived from the key
    * This operation will update the local cache but not the actual structure of the did:key
-   * 
+   *
    * @param did The DID to update
    * @param id The ID of the service to remove
    * @param options Additional options
@@ -227,7 +257,12 @@ export class KeyVDR extends AbstractVDR {
       }
 
       // Use parent class validation method
-      await this.validateUpdateOperation(did, originalDocument, options?.keyId, 'capabilityInvocation');
+      await this.validateUpdateOperation(
+        did,
+        originalDocument,
+        options?.keyId,
+        'capabilityInvocation'
+      );
 
       if (!originalDocument.service || !originalDocument.service.some(s => s.id === serviceId)) {
         // Service not found, silently succeed
@@ -254,14 +289,14 @@ export class KeyVDR extends AbstractVDR {
       if (!request.publicKeyMultibase || !request.publicKeyMultibase.startsWith('z')) {
         return {
           success: false,
-          error: 'Invalid key format: publicKeyMultibase must start with "z"'
+          error: 'Invalid key format: publicKeyMultibase must start with "z"',
         };
       }
 
       if (!request.preferredDID || !request.controller) {
         return {
           success: false,
-          error: 'Missing required parameters: preferredDID and controller'
+          error: 'Missing required parameters: preferredDID and controller',
         };
       }
 
@@ -273,19 +308,18 @@ export class KeyVDR extends AbstractVDR {
 
       return {
         success: true,
-        didDocument
+        didDocument,
       };
     } catch (error) {
       console.error(`Error creating DID document:`, error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   async createViaCADOP(request: CADOPCreationRequest, _options?: any): Promise<DIDCreationResult> {
-
     let { keyType, publicKey } = DidKeyCodec.parseDidKey(request.userDidKey);
     try {
       const didCreationRequest: DIDCreationRequest = {
@@ -293,20 +327,20 @@ export class KeyVDR extends AbstractVDR {
         preferredDID: request.userDidKey,
         keyType: keyType,
         controller: request.userDidKey,
-        initialRelationships: ['authentication', 'capabilityDelegation']
+        initialRelationships: ['authentication', 'capabilityDelegation'],
       };
-      
+
       const didDocument = this.buildDIDDocumentFromRequest(didCreationRequest);
       KeyVDR.documentCache.set(didDocument.id!, didDocument);
       return {
         success: true,
-        didDocument
+        didDocument,
       };
     } catch (error) {
       console.error(`Error creating DID document via CADOP:`, error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -328,7 +362,12 @@ export class KeyVDR extends AbstractVDR {
       }
 
       // Use parent class validation method
-      await this.validateUpdateOperation(did, originalDocument, options?.keyId, 'capabilityDelegation');
+      await this.validateUpdateOperation(
+        did,
+        originalDocument,
+        options?.keyId,
+        'capabilityDelegation'
+      );
 
       // Check if the verification method exists
       const verificationMethod = originalDocument.verificationMethod?.find(vm => vm.id === keyId);
@@ -339,7 +378,9 @@ export class KeyVDR extends AbstractVDR {
       // Remove relationships
       remove.forEach(relationship => {
         if (originalDocument[relationship]) {
-          originalDocument[relationship] = originalDocument[relationship]!.filter(id => id !== keyId);
+          originalDocument[relationship] = originalDocument[relationship]!.filter(
+            id => id !== keyId
+          );
         }
       });
 

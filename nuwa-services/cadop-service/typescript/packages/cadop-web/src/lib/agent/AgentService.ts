@@ -40,27 +40,29 @@ export class AgentService {
 
     // step 1: get challenge
     const challengeResp = await apiClient.get<ChallengeResponse>('/api/idp/challenge');
-    if (!challengeResp.data) throw new Error(String(challengeResp.error || 'Failed to get challenge'));
+    if (!challengeResp.data)
+      throw new Error(String(challengeResp.error || 'Failed to get challenge'));
     const { challenge, nonce } = challengeResp.data;
     const rpId = window.location.hostname;
     const origin = window.location.origin;
     try {
       // step 2: call PasskeyService.authenticateWithChallenge to authenticate
-      const { assertionJSON, userDid: authenticatedDid } = await this.passkeyService.authenticateWithChallenge({
-        challenge,
-        rpId,
-      });
-      
+      const { assertionJSON, userDid: authenticatedDid } =
+        await this.passkeyService.authenticateWithChallenge({
+          challenge,
+          rpId,
+        });
+
       // step 3: send assertion to server to verify
       const verifyResp = await apiClient.post<{ idToken: string }>(
         '/api/idp/verify-assertion',
         { assertion: assertionJSON, userDid: authenticatedDid, nonce, rpId, origin },
         { skipAuth: true }
       );
-      
-      if (!verifyResp.data) throw new Error(String(verifyResp.error || 'Failed to verify assertion'));
+
+      if (!verifyResp.data)
+        throw new Error(String(verifyResp.error || 'Failed to verify assertion'));
       return verifyResp.data.idToken;
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
       console.error('Passkey authentication failed error:', errorMessage);
@@ -80,4 +82,4 @@ export class AgentService {
     }
     return resp.data;
   }
-} 
+}

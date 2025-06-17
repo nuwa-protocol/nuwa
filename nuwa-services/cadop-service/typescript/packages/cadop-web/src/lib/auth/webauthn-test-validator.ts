@@ -2,7 +2,7 @@ import { p256 } from '@noble/curves/p256';
 
 /**
  * WebAuthn Test Data Validator
- * 
+ *
  * This script validates WebAuthn signature data consistency between frontend and Move contract.
  * Use this to verify that the data logged by WebAuthnSigner.ts is correct before filling
  * the Move test case.
@@ -11,7 +11,7 @@ import { p256 } from '@noble/curves/p256';
 interface WebAuthnTestData {
   authenticatorDataHex: string;
   clientDataJSONHex: string;
-  signatureRawHex: string;      // 64 bytes raw signature (already converted from DER)
+  signatureRawHex: string; // 64 bytes raw signature (already converted from DER)
   publicKeyCompressedHex: string;
   clientDataHashHex: string;
   verificationMessageHex: string;
@@ -36,7 +36,9 @@ function hexToBytes(hex: string): Uint8Array {
  * Convert Uint8Array to hex string
  */
 function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -89,10 +91,12 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
     }
 
     // 3. Validate verification message construction
-    const computedVerificationMessage = new Uint8Array(authenticatorData.length + computedClientDataHash.length);
+    const computedVerificationMessage = new Uint8Array(
+      authenticatorData.length + computedClientDataHash.length
+    );
     computedVerificationMessage.set(authenticatorData, 0);
     computedVerificationMessage.set(computedClientDataHash, authenticatorData.length);
-    
+
     if (bytesToHex(computedVerificationMessage) !== bytesToHex(expectedVerificationMessage)) {
       errors.push('Verification message construction mismatch');
       details.verificationMessage = {
@@ -103,10 +107,10 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
 
     // 4. Validate ECDSA-R1 signature
     try {
-      const uncompressedPublicKey = p256.ProjectivePoint
-        .fromHex(publicKey)
-        .toRawBytes(false); // 65 bytes uncompressed format
-      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', computedVerificationMessage));
+      const uncompressedPublicKey = p256.ProjectivePoint.fromHex(publicKey).toRawBytes(false); // 65 bytes uncompressed format
+      const digest = new Uint8Array(
+        await crypto.subtle.digest('SHA-256', computedVerificationMessage)
+      );
       const isValidSignature = p256.verify(signatureRaw, digest, uncompressedPublicKey);
       details.signatureVerification = {
         isValid: isValidSignature,
@@ -114,12 +118,14 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
         signatureRawUsed: bytesToHex(signatureRaw),
         verificationMessageUsed: bytesToHex(computedVerificationMessage),
       };
-      
+
       if (!isValidSignature) {
         errors.push('ECDSA-R1 signature verification failed');
       }
     } catch (error) {
-      errors.push(`ECDSA-R1 verification error: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(
+        `ECDSA-R1 verification error: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     // 5. Log Move test data format
@@ -136,11 +142,11 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
 
     // 6. Additional WebCrypto verification
     //if (errors.length === 0) {
-      const webCryptoVerificationResult = await verifyWebCrypto(data);
-      if (!webCryptoVerificationResult.isValid) {
-        errors.push(...webCryptoVerificationResult.errors);
-        details.webCryptoVerification = webCryptoVerificationResult.details;
-      }
+    const webCryptoVerificationResult = await verifyWebCrypto(data);
+    if (!webCryptoVerificationResult.isValid) {
+      errors.push(...webCryptoVerificationResult.errors);
+      details.webCryptoVerification = webCryptoVerificationResult.details;
+    }
     //}
 
     return {
@@ -148,7 +154,6 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
       errors,
       details,
     };
-
   } catch (error) {
     errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
     return {
@@ -160,7 +165,9 @@ export async function validateWebAuthnTestData(data: WebAuthnTestData): Promise<
 }
 
 // ===== WebCrypto verification helper =====
-async function verifyWebCrypto(data: WebAuthnTestData): Promise<{isValid:boolean; errors:string[]; details:any}> {
+async function verifyWebCrypto(
+  data: WebAuthnTestData
+): Promise<{ isValid: boolean; errors: string[]; details: any }> {
   const errors: string[] = [];
   const details: Record<string, any> = {};
   try {
@@ -174,11 +181,16 @@ async function verifyWebCrypto(data: WebAuthnTestData): Promise<{isValid:boolean
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
       pkUncompressed,
-      {name:'ECDSA', namedCurve:'P-256'},
+      { name: 'ECDSA', namedCurve: 'P-256' },
       false,
       ['verify']
     );
-    const ok = await crypto.subtle.verify({name:'ECDSA', hash:{name:'SHA-256'}}, cryptoKey, derSig, msg);
+    const ok = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: { name: 'SHA-256' } },
+      cryptoKey,
+      derSig,
+      msg
+    );
     details.ok = ok;
     // --- Additional debug info ---
     details.msg_hex = bytesToHex(msg);
@@ -186,13 +198,13 @@ async function verifyWebCrypto(data: WebAuthnTestData): Promise<{isValid:boolean
     details.sig_der_hex = bytesToHex(derSig);
     details.pk_uncompressed_hex = bytesToHex(pkUncompressed);
     // -----------------------------
-    if(!ok){
+    if (!ok) {
       errors.push('WebCrypto verification failed');
     }
-  }catch(e){
-    errors.push(`WebCrypto error: ${e instanceof Error?e.message:String(e)}`);
+  } catch (e) {
+    errors.push(`WebCrypto error: ${e instanceof Error ? e.message : String(e)}`);
   }
-  return {isValid: errors.length===0, errors, details};
+  return { isValid: errors.length === 0, errors, details };
 }
 
 /**
@@ -201,54 +213,67 @@ async function verifyWebCrypto(data: WebAuthnTestData): Promise<{isValid:boolean
 export async function runExampleValidation() {
   const exampleData: WebAuthnTestData = {
     // Replace these with actual data from WebAuthnSigner.ts logs
-    authenticatorDataHex: "49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000",
-    clientDataJSONHex: "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2277416d626e544f6d493153735a64715864764969484d7a487278695f4e376e512d7246795036626a495841222c226f726967696e223a22687474703a2f2f6c6f63616c686f73743a33303030222c2263726f73734f726967696e223a66616c73652c226f746865725f6b6579735f63616e5f62655f61646465645f68657265223a22646f206e6f7420636f6d7061726520636c69656e74446174614a534f4e20616761696e737420612074656d706c6174652e205365652068747470733a2f2f676f6f2e676c2f796162506578227d",
-    signatureRawHex: "2cb68340c06cce07bb3fbb5df30ac92dec559dc1fa22ebb770456a9778437b4a278102b8be5dc361e90cee9f0a6a214750c007e65a2f96cd947b5f9c0a44cd30",
-    publicKeyCompressedHex: "03faabaa02f39bae7cf872cbaf009ca1676ed0ced644d991a91f293bc4ccf7c1f5",
-    clientDataHashHex: "ad59f6d421a489c1570f4111cc2ba6cfc8b001de518ae2db6adf92fdfc482bd8",
-    verificationMessageHex: "49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000ad59f6d421a489c1570f4111cc2ba6cfc8b001de518ae2db6adf92fdfc482bd8",
-    bcsPayloadHex: "00402cb68340c06cce07bb3fbb5df30ac92dec559dc1fa22ebb770456a9778437b4a278102b8be5dc361e90cee9f0a6a214750c007e65a2f96cd947b5f9c0a44cd302103faabaa02f39bae7cf872cbaf009ca1676ed0ced644d991a91f293bc4ccf7c1f52549960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000f3017b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2277416d626e544f6d493153735a64715864764969484d7a487278695f4e376e512d7246795036626a495841222c226f726967696e223a22687474703a2f2f6c6f63616c686f73743a33303030222c2263726f73734f726967696e223a66616c73652c226f746865725f6b6579735f63616e5f62655f61646465645f68657265223a22646f206e6f7420636f6d7061726520636c69656e74446174614a534f4e20616761696e737420612074656d706c6174652e205365652068747470733a2f2f676f6f2e676c2f796162506578227d",
+    authenticatorDataHex:
+      '49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000',
+    clientDataJSONHex:
+      '7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2277416d626e544f6d493153735a64715864764969484d7a487278695f4e376e512d7246795036626a495841222c226f726967696e223a22687474703a2f2f6c6f63616c686f73743a33303030222c2263726f73734f726967696e223a66616c73652c226f746865725f6b6579735f63616e5f62655f61646465645f68657265223a22646f206e6f7420636f6d7061726520636c69656e74446174614a534f4e20616761696e737420612074656d706c6174652e205365652068747470733a2f2f676f6f2e676c2f796162506578227d',
+    signatureRawHex:
+      '2cb68340c06cce07bb3fbb5df30ac92dec559dc1fa22ebb770456a9778437b4a278102b8be5dc361e90cee9f0a6a214750c007e65a2f96cd947b5f9c0a44cd30',
+    publicKeyCompressedHex: '03faabaa02f39bae7cf872cbaf009ca1676ed0ced644d991a91f293bc4ccf7c1f5',
+    clientDataHashHex: 'ad59f6d421a489c1570f4111cc2ba6cfc8b001de518ae2db6adf92fdfc482bd8',
+    verificationMessageHex:
+      '49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000ad59f6d421a489c1570f4111cc2ba6cfc8b001de518ae2db6adf92fdfc482bd8',
+    bcsPayloadHex:
+      '00402cb68340c06cce07bb3fbb5df30ac92dec559dc1fa22ebb770456a9778437b4a278102b8be5dc361e90cee9f0a6a214750c007e65a2f96cd947b5f9c0a44cd302103faabaa02f39bae7cf872cbaf009ca1676ed0ced644d991a91f293bc4ccf7c1f52549960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000f3017b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2277416d626e544f6d493153735a64715864764969484d7a487278695f4e376e512d7246795036626a495841222c226f726967696e223a22687474703a2f2f6c6f63616c686f73743a33303030222c2263726f73734f726967696e223a66616c73652c226f746865725f6b6579735f63616e5f62655f61646465645f68657265223a22646f206e6f7420636f6d7061726520636c69656e74446174614a534f4e20616761696e737420612074656d706c6174652e205365652068747470733a2f2f676f6f2e676c2f796162506578227d',
   };
 
   console.log('WebAuthn Test Data Validator');
   console.log('=============================');
-  
+
   if (exampleData.authenticatorDataHex.startsWith('PLACEHOLDER')) {
-    console.log('⚠️  Please replace placeholder data with actual values from WebAuthnSigner.ts logs');
+    console.log(
+      '⚠️  Please replace placeholder data with actual values from WebAuthnSigner.ts logs'
+    );
     return;
   }
 
   const result = await validateWebAuthnTestData(exampleData);
-  
+
   if (result.isValid) {
     console.log('✅ All validations passed! Data is ready for Move test case.');
   } else {
     console.log('❌ Validation failed:');
     result.errors.forEach(error => console.log(`  - ${error}`));
   }
-  
+
   if (Object.keys(result.details).length > 0) {
     console.log('\nDetails:', JSON.stringify(result.details, null, 2));
   }
 
   // Additional debug information
   console.log('\n=== Debug Information ===');
-  console.log('Client Data JSON (decoded):', new TextDecoder().decode(hexToBytes(exampleData.clientDataJSONHex)));
-  
+  console.log(
+    'Client Data JSON (decoded):',
+    new TextDecoder().decode(hexToBytes(exampleData.clientDataJSONHex))
+  );
+
   // Check if the verification steps match
   const authenticatorData = hexToBytes(exampleData.authenticatorDataHex);
   const clientDataJSON = hexToBytes(exampleData.clientDataJSONHex);
-  
+
   const actualHashBuffer = await crypto.subtle.digest('SHA-256', clientDataJSON);
   const actualHash = new Uint8Array(actualHashBuffer);
-  
+
   const actualVerificationMessage = new Uint8Array(authenticatorData.length + actualHash.length);
   actualVerificationMessage.set(authenticatorData, 0);
   actualVerificationMessage.set(actualHash, authenticatorData.length);
-  
+
   console.log('Expected verification message:', exampleData.verificationMessageHex);
   console.log('Computed verification message:', bytesToHex(actualVerificationMessage));
-  console.log('Verification messages match:', exampleData.verificationMessageHex === bytesToHex(actualVerificationMessage));
+  console.log(
+    'Verification messages match:',
+    exampleData.verificationMessageHex === bytesToHex(actualVerificationMessage)
+  );
 }
 
 // Run example if this file is executed directly

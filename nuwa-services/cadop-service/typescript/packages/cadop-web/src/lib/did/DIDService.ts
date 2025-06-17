@@ -1,5 +1,10 @@
 import { createVDR, NuwaIdentityKit, VDRRegistry } from 'nuwa-identity-kit';
-import type { OperationalKeyInfo, VerificationRelationship, SignerInterface, VDRInterface } from 'nuwa-identity-kit';
+import type {
+  OperationalKeyInfo,
+  VerificationRelationship,
+  SignerInterface,
+  VDRInterface,
+} from 'nuwa-identity-kit';
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
 import { Session } from '@cadop/shared';
 
@@ -12,27 +17,24 @@ export class DIDService {
 
   static async initialize(did: string, credentialId?: string): Promise<DIDService> {
     try {
-        const roochVDR = createVDR('rooch', {
-            rpcUrl: import.meta.env.VITE_ROOCH_RPC_URL,
-            debug: true
-        });
-        VDRRegistry.getInstance().registerVDR(roochVDR);
-        const didDocument = await VDRRegistry.getInstance().resolveDID(did);
-        if (!didDocument) {
-            throw new Error('Failed to resolve DID document');
-        }
-        const signer = new WebAuthnSigner(did, {
-            didDocument: didDocument,
-            rpId: window.location.hostname,
-            rpName: 'CADOP',
-            credentialId: credentialId || undefined
-        });
+      const roochVDR = createVDR('rooch', {
+        rpcUrl: import.meta.env.VITE_ROOCH_RPC_URL,
+        debug: true,
+      });
+      VDRRegistry.getInstance().registerVDR(roochVDR);
+      const didDocument = await VDRRegistry.getInstance().resolveDID(did);
+      if (!didDocument) {
+        throw new Error('Failed to resolve DID document');
+      }
+      const signer = new WebAuthnSigner(did, {
+        didDocument: didDocument,
+        rpId: window.location.hostname,
+        rpName: 'CADOP',
+        credentialId: credentialId || undefined,
+      });
 
-        const identityKit = await NuwaIdentityKit.fromDIDDocument(
-            didDocument,
-            signer
-        );
-        return new DIDService(identityKit);
+      const identityKit = await NuwaIdentityKit.fromDIDDocument(didDocument, signer);
+      return new DIDService(identityKit);
     } catch (error) {
       console.error('Failed to initialize DID service:', error);
       throw error;
@@ -64,4 +66,4 @@ export class DIDService {
   async getDIDDocument(): Promise<any> {
     return this.identityKit.getDIDDocument();
   }
-} 
+}

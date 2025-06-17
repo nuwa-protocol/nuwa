@@ -39,30 +39,18 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </span>
               {sybilLevel !== undefined && (
-                <span className="text-sm text-muted-foreground">
-                  Sybil Level: {sybilLevel}
-                </span>
+                <span className="text-sm text-muted-foreground">Sybil Level: {sybilLevel}</span>
               )}
             </div>
           </div>
           <div className="flex gap-2">
             {showCopy && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleCopy}
-                title="复制 DID"
-              >
+              <Button variant="outline" size="icon" onClick={handleCopy} title="复制 DID">
                 <Copy className="h-4 w-4" />
               </Button>
             )}
             {showQR && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {}}
-                title="显示二维码"
-              >
+              <Button variant="outline" size="icon" onClick={() => {}} title="显示二维码">
                 <QrCode className="h-4 w-4" />
               </Button>
             )}
@@ -71,4 +59,4 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
       </CardContent>
     </Card>
   );
-}; 
+};

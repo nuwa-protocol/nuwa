@@ -1,5 +1,5 @@
-import { 
-  bcs, 
+import {
+  bcs,
   address,
   AnnotatedMoveValueView,
   AnnotatedMoveStructView,
@@ -20,10 +20,12 @@ import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../types';
 // SimpleMap schema generator
 export function simpleMapSchema<K, V>(keySchema: any, valueSchema: any) {
   return bcs.struct('SimpleMap', {
-    data: bcs.vector(bcs.struct('Entry', {
-      key: keySchema,
-      value: valueSchema
-    })),
+    data: bcs.vector(
+      bcs.struct('Entry', {
+        key: keySchema,
+        value: valueSchema,
+      })
+    ),
   });
 }
 
@@ -115,7 +117,7 @@ export const ServiceSchema = bcs.struct('Service', {
 });
 
 export const AccountCapSchema = bcs.struct('AccountCap', {
-    addr: bcs.Address,
+  addr: bcs.Address,
 });
 
 // Complete DID Document schema
@@ -155,9 +157,7 @@ export interface SimpleMap<K, V> {
 
 // Convert SimpleMap to standard Map
 export function simpleMapToMap<K, V>(simpleMap: SimpleMap<K, V>): Map<K, V> {
-  return new Map(
-    simpleMap.data.map(entry => [entry.key, entry.value])
-  );
+  return new Map(simpleMap.data.map(entry => [entry.key, entry.value]));
 }
 
 // Convert standard Map to SimpleMap
@@ -165,8 +165,8 @@ export function mapToSimpleMap<K, V>(map: Map<K, V>): SimpleMap<K, V> {
   return {
     data: Array.from(map.entries()).map(([key, value]) => ({
       key,
-      value
-    }))
+      value,
+    })),
   };
 }
 
@@ -174,13 +174,19 @@ export function mapToSimpleMap<K, V>(map: Map<K, V>): SimpleMap<K, V> {
  * Convert Move value to TypeScript value
  */
 export function convertMoveValue<T>(moveValue: AnnotatedMoveValueView): T {
-  if (typeof moveValue === 'string' || typeof moveValue === 'number' || typeof moveValue === 'boolean') {
+  if (
+    typeof moveValue === 'string' ||
+    typeof moveValue === 'number' ||
+    typeof moveValue === 'boolean'
+  ) {
     return moveValue as T;
   }
 
   const annotatedValue = moveValue as AnnotatedMoveStructView;
   if (annotatedValue.type === 'vector') {
-    return (annotatedValue.value as unknown as AnnotatedMoveValueView[]).map(v => convertMoveValue(v)) as T;
+    return (annotatedValue.value as unknown as AnnotatedMoveValueView[]).map(v =>
+      convertMoveValue(v)
+    ) as T;
   } else if (annotatedValue.type.startsWith('0x3::simple_map::SimpleMap')) {
     return simpleMapToMap(annotatedValue.value.data as unknown as SimpleMap<any, any>) as T;
   } else if (annotatedValue.type.startsWith('0x3::did::')) {
@@ -198,19 +204,24 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
   let bcsHex = didDocObject.value;
   // Remove '0x' prefix if present
   bcsHex = bcsHex.startsWith('0x') ? bcsHex.slice(2) : bcsHex;
-  let bcsBytes = new Uint8Array(bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
+  let bcsBytes = new Uint8Array(
+    bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+  );
   let didDoc = DIDDocumentSchema.parse(bcsBytes);
 
   // Create DID string
   const didId = formatDIDString(didDoc.id);
-  
+
   // Convert controllers
   const controllers = didDoc.controller.map(c => formatDIDString(c));
-  
+
   // Convert verification methods
   const verificationMethods: VerificationMethod[] = [];
-  const verificationMethodsMap = simpleMapToMap(didDoc.verification_methods) as Map<string, MoveVerificationMethod>;
-  verificationMethodsMap.forEach((vm) => {
+  const verificationMethodsMap = simpleMapToMap(didDoc.verification_methods) as Map<
+    string,
+    MoveVerificationMethod
+  >;
+  verificationMethodsMap.forEach(vm => {
     verificationMethods.push({
       id: `${formatDIDString(vm.id.did)}#${vm.id.fragment}`,
       type: vm.type,
@@ -221,11 +232,11 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
 
   // Helper function to convert fragment to full DID URL
   const convertFragmentToDIDURL = (fragment: string) => `${didId}#${fragment}`;
-  
+
   // Convert services
   const services: ServiceEndpoint[] = [];
   const servicesMap = simpleMapToMap(didDoc.services) as Map<string, MoveService>;
-  servicesMap.forEach((service) => {
+  servicesMap.forEach(service => {
     const serviceEndpoint: ServiceEndpoint = {
       id: `${formatDIDString(service.id.did)}#${service.id.fragment}`,
       type: service.type,
@@ -236,10 +247,10 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
     if (properties.size > 0) {
       Object.assign(serviceEndpoint, Object.fromEntries(properties));
     }
-    
+
     services.push(serviceEndpoint);
   });
-  
+
   return {
     '@context': ['https://www.w3.org/ns/did/v1'],
     id: didId,
@@ -260,10 +271,11 @@ export function convertMoveDIDDocumentToInterface(didDocObject: ObjectStateView)
  */
 export function parseDIDCreatedEvent(eventData: string): DIDCreatedEventData {
   const hexData = eventData.startsWith('0x') ? eventData.slice(2) : eventData;
-  const bytes = new Uint8Array(hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []);
+  const bytes = new Uint8Array(
+    hexData.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+  );
   return DIDCreatedEventSchema.parse(bytes);
 }
-
 
 // Define StructTag for DIDDocument
 export const DIDDocumentStructTag = {

@@ -31,12 +31,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               onClick={onToggleSidebar}
             >
               <span className="sr-only">Open sidebar</span>
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -85,11 +80,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
 
             {/* User Menu - 可以后续添加 */}
             <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-500 dark:text-gray-400"
-              >
+              <Button variant="ghost" size="sm" className="text-gray-500 dark:text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -105,4 +96,4 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       </div>
     </header>
   );
-}; 
+};

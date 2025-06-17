@@ -29,14 +29,14 @@ export const AuthMethodSelector: React.FC<AuthMethodSelectorProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3", className)}>
-      {methods.map((method) => (
+    <div className={cn('grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3', className)}>
+      {methods.map(method => (
         <Card
           key={method.id}
           className={cn(
-            "cursor-pointer transition-all hover:shadow-lg",
-            selectedMethod === method.id && "ring-2 ring-primary",
-            method.recommended && "border-primary"
+            'cursor-pointer transition-all hover:shadow-lg',
+            selectedMethod === method.id && 'ring-2 ring-primary',
+            method.recommended && 'border-primary'
           )}
           onClick={() => onSelect(method)}
         >
@@ -46,9 +46,7 @@ export const AuthMethodSelector: React.FC<AuthMethodSelectorProps> = ({
                 {method.icon}
                 <CardTitle>{method.title}</CardTitle>
               </div>
-              {method.recommended && (
-                <Badge variant="secondary">推荐</Badge>
-              )}
+              {method.recommended && <Badge variant="secondary">推荐</Badge>}
             </div>
             <CardDescription>{method.description}</CardDescription>
           </CardHeader>
@@ -67,10 +65,10 @@ export const AuthMethodSelector: React.FC<AuthMethodSelectorProps> = ({
               </ul>
               <Button
                 className="w-full mt-4"
-                variant={selectedMethod === method.id ? "default" : "outline"}
+                variant={selectedMethod === method.id ? 'default' : 'outline'}
                 onClick={() => onSelect(method)}
               >
-                {selectedMethod === method.id ? "已选择" : "选择"}
+                {selectedMethod === method.id ? '已选择' : '选择'}
               </Button>
             </div>
           </CardContent>
@@ -78,4 +76,4 @@ export const AuthMethodSelector: React.FC<AuthMethodSelectorProps> = ({
       ))}
     </div>
   );
-}; 
+};

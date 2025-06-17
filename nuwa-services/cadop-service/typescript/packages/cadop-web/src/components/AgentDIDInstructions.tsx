@@ -11,7 +11,7 @@ export interface AgentDIDInstructionsProps {
 
 export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
   onContinue,
-  userSybilLevel
+  userSybilLevel,
 }) => {
   const getSybilLevelInfo = (level: number) => {
     switch (level) {
@@ -38,8 +38,8 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
             <InfoCircleOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
             <Title level={3}>Create Your Agent DID</Title>
             <Paragraph>
-              An Agent DID is your unique decentralized identity on the Rooch network. 
-              It will be created using the CADOP (Custodian-Assisted DID Onboarding Protocol).
+              An Agent DID is your unique decentralized identity on the Rooch network. It will be
+              created using the CADOP (Custodian-Assisted DID Onboarding Protocol).
             </Paragraph>
           </div>
 
@@ -98,9 +98,9 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
           </Card>
 
           <div style={{ textAlign: 'center' }}>
-            <Button 
-              type="primary" 
-              size="large" 
+            <Button
+              type="primary"
+              size="large"
               onClick={onContinue}
               disabled={userSybilLevel < 1}
               icon={<LinkOutlined />}
@@ -112,4 +112,4 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
       </Card>
     </div>
   );
-}; 
+};

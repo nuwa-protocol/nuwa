@@ -3,29 +3,31 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
-    project: ['./packages/*/tsconfig.json'],
+    ecmaFeatures: {
+      jsx: true,
+    },
+    project: './tsconfig.json',
   },
-  plugins: ['@typescript-eslint', 'prettier'],
+  plugins: ['@typescript-eslint', 'prettier', 'react', 'react-hooks'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
+    'plugin:react/recommended',
+    'plugin:react-hooks/recommended',
     'prettier',
   ],
-  root: true,
   env: {
+    browser: true,
     node: true,
-    jest: true,
+    es6: true,
   },
-  ignorePatterns: [
-    '.eslintrc.js',
-    'dist/',
-    'node_modules/',
-    'packages/*/dist/',
-    'packages/*/node_modules/',
-  ],
+  settings: {
+    react: {
+      version: 'detect',
+    },
+  },
   rules: {
     'prettier/prettier': 'error',
-    '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
@@ -34,9 +36,11 @@ module.exports = {
       varsIgnorePattern: '^_',
       ignoreRestSiblings: true 
     }],
-    '@typescript-eslint/no-var-requires': 'error',
-    '@typescript-eslint/no-non-null-assertion': 'warn',
-    '@typescript-eslint/no-empty-function': 'warn',
-    'no-console': 'warn',
+    'react/react-in-jsx-scope': 'off',
+    'react/prop-types': 'off',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
+  ignorePatterns: ['dist', 'node_modules', 'vite.config.ts'],
 }; 

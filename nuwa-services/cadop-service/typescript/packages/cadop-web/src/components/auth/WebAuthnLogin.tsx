@@ -22,10 +22,10 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
         onError?.('No Passkey found on this device. Please create a new DID first.');
         return;
       }
-      
+
       // We have credentials, proceed with login
       const userDid = await passkeyService.login({ mediation: 'required' });
-      
+
       // Update auth context
       signInWithDid(userDid);
       onSuccess?.(userDid);
@@ -42,7 +42,7 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
     try {
       const userDid = await passkeyService.ensureUser();
       // Note: ensureUser already sets the current user in AuthStore
-      
+
       // Update auth context
       signInWithDid(userDid);
       onSuccess?.(userDid);
@@ -64,7 +64,7 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
       >
         {isLoading ? 'Loading...' : 'Sign in with Passkey'}
       </button>
-      
+
       <button
         type="button"
         className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -75,4 +75,4 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
       </button>
     </div>
   );
-} 
+}

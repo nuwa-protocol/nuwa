@@ -1,11 +1,11 @@
-import { 
-  ServiceEndpoint, 
-  DIDDocument, 
+import {
+  ServiceEndpoint,
+  DIDDocument,
   CADOPCreationRequest,
   DIDCreationResult,
   SignerInterface,
   ServiceInfo,
-  VerificationRelationship
+  VerificationRelationship,
 } from './types';
 import { VDRRegistry } from './VDRRegistry';
 import { NuwaIdentityKit } from './NuwaIdentityKit';
@@ -16,7 +16,7 @@ import { NuwaIdentityKit } from './NuwaIdentityKit';
 export enum CadopServiceType {
   CUSTODIAN = 'CadopCustodianService',
   IDP = 'CadopIdPService',
-  WEB2_PROOF = 'CadopWeb2ProofService'
+  WEB2_PROOF = 'CadopWeb2ProofService',
 }
 
 /**
@@ -32,19 +32,18 @@ export interface CadopServiceValidationRule {
  * CadopIdentityKit class for managing CADOP-specific functionality
  */
 export class CadopIdentityKit {
-  private static readonly SERVICE_VALIDATION_RULES: Record<CadopServiceType, CadopServiceValidationRule> = {
+  private static readonly SERVICE_VALIDATION_RULES: Record<
+    CadopServiceType,
+    CadopServiceValidationRule
+  > = {
     [CadopServiceType.CUSTODIAN]: {
-      requiredProperties: [
-        'id', 
-        'type', 
-        'serviceEndpoint',
-      ],
+      requiredProperties: ['id', 'type', 'serviceEndpoint'],
       optionalProperties: ['description', 'fees', 'custodianPublicKey', 'custodianServiceVMType'],
       propertyValidators: {
         custodianPublicKey: (value: any) => typeof value === 'string' && value.length > 0,
         custodianServiceVMType: (value: any) => typeof value === 'string' && value.length > 0,
-        fees: (value: any) => typeof value === 'object' && value !== null
-      }
+        fees: (value: any) => typeof value === 'object' && value !== null,
+      },
     },
     [CadopServiceType.IDP]: {
       requiredProperties: ['id', 'type', 'serviceEndpoint'],
@@ -52,17 +51,17 @@ export class CadopIdentityKit {
       propertyValidators: {
         supportedCredentials: (value: any) => Array.isArray(value) && value.length > 0,
         fees: (value: any) => typeof value === 'object' && value !== null,
-        termsOfService: (value: any) => typeof value === 'string' && value.length > 0
-      }
+        termsOfService: (value: any) => typeof value === 'string' && value.length > 0,
+      },
     },
     [CadopServiceType.WEB2_PROOF]: {
       requiredProperties: ['id', 'type', 'serviceEndpoint'],
       optionalProperties: ['supportedPlatforms', 'description', 'fees'],
       propertyValidators: {
         supportedPlatforms: (value: any) => Array.isArray(value) && value.length > 0,
-        fees: (value: any) => typeof value === 'object' && value !== null
-      }
-    }
+        fees: (value: any) => typeof value === 'object' && value !== null,
+      },
+    },
   };
 
   private nuwaKit: NuwaIdentityKit;
@@ -71,11 +70,11 @@ export class CadopIdentityKit {
     this.nuwaKit = nuwaKit;
   }
 
-  private extractCustodianInfo() : ServiceEndpoint {
+  private extractCustodianInfo(): ServiceEndpoint {
     const custodianServices = this.findServicesByType(CadopServiceType.CUSTODIAN);
     if (custodianServices.length > 0) {
       const custodianService = custodianServices[0];
-      console.log('extractCustodianInfo', custodianService)
+      console.log('extractCustodianInfo', custodianService);
       return custodianService;
     }
     throw new Error('Custodian service not found in service document');
@@ -86,7 +85,7 @@ export class CadopIdentityKit {
    */
   static async fromServiceDID(
     serviceDid: string,
-    signer: SignerInterface,
+    signer: SignerInterface
   ): Promise<CadopIdentityKit> {
     const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, signer);
     return new CadopIdentityKit(nuwaKit);
@@ -98,24 +97,28 @@ export class CadopIdentityKit {
   async createDID(
     method: string,
     userDid: string,
-    options?: Record<string, any>,
+    options?: Record<string, any>
   ): Promise<DIDCreationResult> {
     const custodianInfo = this.extractCustodianInfo();
- 
-    const authenticationMethods = this.nuwaKit.findVerificationMethodsByRelationship('authentication');
+
+    const authenticationMethods =
+      this.nuwaKit.findVerificationMethodsByRelationship('authentication');
     if (authenticationMethods.length === 0) {
       throw new Error('No authentication method found in service document');
     }
     const authenticationMethod = authenticationMethods[0];
 
     //if the custodianPublicKey and custodianServiceVMType are not found in the service document, use the first authentication method
-    const {custodianPublicKey, custodianServiceVMType} = (custodianInfo.custodianPublicKey && custodianInfo.custodianServiceVMType) ? {
-      custodianPublicKey: custodianInfo.custodianPublicKey,
-      custodianServiceVMType: custodianInfo.custodianServiceVMType
-    } : {
-      custodianPublicKey: authenticationMethod.publicKeyMultibase,
-      custodianServiceVMType: authenticationMethod.type
-    };
+    const { custodianPublicKey, custodianServiceVMType } =
+      custodianInfo.custodianPublicKey && custodianInfo.custodianServiceVMType
+        ? {
+            custodianPublicKey: custodianInfo.custodianPublicKey,
+            custodianServiceVMType: custodianInfo.custodianServiceVMType,
+          }
+        : {
+            custodianPublicKey: authenticationMethod.publicKeyMultibase,
+            custodianServiceVMType: authenticationMethod.type,
+          };
 
     if (!custodianPublicKey || !custodianServiceVMType) {
       throw new Error('Custodian service configuration not found in service document');
@@ -129,22 +132,20 @@ export class CadopIdentityKit {
 
     return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {
       signer: this.nuwaKit.getSigner(),
-      ...options
+      ...options,
     });
   }
 
   /**
    * Add a new CADOP service to the service DID document
    */
-  async addService(
-    service: ServiceInfo,
-  ): Promise<string> {
+  async addService(service: ServiceInfo): Promise<string> {
     // Convert ServiceInfo to ServiceEndpoint format for validation
     const serviceEndpoint: ServiceEndpoint = {
       id: `${this.nuwaKit.getDIDDocument().id}#${service.idFragment}`,
       type: service.type,
       serviceEndpoint: service.serviceEndpoint,
-      ...(service.additionalProperties || {})
+      ...(service.additionalProperties || {}),
     };
 
     if (!CadopIdentityKit.validateService(serviceEndpoint, service.type as CadopServiceType)) {
@@ -215,8 +216,8 @@ export class CadopIdentityKit {
     }
 
     // Check required properties
-    const hasAllRequired = rules.requiredProperties.every(prop => 
-      prop in service && service[prop] !== undefined && service[prop] !== null
+    const hasAllRequired = rules.requiredProperties.every(
+      prop => prop in service && service[prop] !== undefined && service[prop] !== null
     );
     if (!hasAllRequired) {
       return false;
@@ -241,4 +242,4 @@ export class CadopIdentityKit {
 
     return true;
   }
-} 
+}
