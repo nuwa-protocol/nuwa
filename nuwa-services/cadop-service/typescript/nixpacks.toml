@@ -15,4 +15,4 @@ cmds = [
 
 [start]
 # Ensure `NODE_ENV=production` is set in your Railway environment variables.
-cmd = 'pnpm start'
+cmd = 'pnpm --filter @cadop/api start'

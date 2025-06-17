@@ -39,7 +39,7 @@
     "helmet": "^7.1.0",
     "jose": "^6.0.11",
     "jsonwebtoken": "^9.0.2",
-    "@nuwa-ai/identity-kit": "0.1.0-beta.1",
+    "@nuwa-ai/identity-kit": "0.1.0-beta.3",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
