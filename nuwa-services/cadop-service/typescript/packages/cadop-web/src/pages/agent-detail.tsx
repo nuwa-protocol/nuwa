@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
 import { custodianClient } from '../lib/api/client';
-import { Spin, Alert, Tabs, Space, Typography, Tag, Modal } from 'antd';
+import { Spin, Alert, Tabs, Space, Typography, Tag, Modal, message } from 'antd';
 import { 
   ArrowLeftOutlined, 
   SettingOutlined, 
@@ -14,7 +14,8 @@ import {
   HistoryOutlined,
   TeamOutlined,
   FileTextOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  GiftOutlined
 } from '@ant-design/icons';
 import type { DIDDocument, VerificationMethod } from 'nuwa-identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
@@ -34,6 +35,47 @@ export function AgentDetailPage() {
   const [isController, setIsController] = useState(false);
 
   const { balances, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalances } = useAgentBalances(did);
+
+  // ---------------- RGAS Faucet Claim ----------------
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(false);
+
+  // Extract Rooch address from DID (format: did:rooch:<address>)
+  const agentAddress = did ? did.split(':')[2] : undefined;
+  const FAUCET_URL = 'https://test-faucet.rooch.network';
+
+  const handleClaimRgas = async () => {
+    if (isClaiming || hasClaimed || !agentAddress) return;
+
+    setIsClaiming(true);
+
+    try {
+      const response = await fetch(`${FAUCET_URL}/faucet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ claimer: agentAddress }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Claim failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      await refetchBalances();
+      setHasClaimed(true);
+      message.success(`Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to claim RGAS';
+      message.error(errMsg);
+      console.error('RGAS claim failed:', err);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+  // ---------------------------------------------------
 
   useEffect(() => {
     if (did) {
@@ -243,6 +285,16 @@ export function AgentDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <Space direction="vertical" style={{ width: '100%' }}>
+                    <Button className="w-full" variant="outline" onClick={() => handleClaimRgas()} disabled={isClaiming || hasClaimed || !agentAddress}>
+                      <GiftOutlined className="mr-2" />
+                      {!agentAddress
+                        ? 'Invalid Address'
+                        : isClaiming
+                          ? t('agent.claiming', { defaultValue: 'Claiming...' })
+                          : hasClaimed
+                            ? t('agent.claimed', { defaultValue: 'Claimed' })
+                            : t('agent.claimRgas', { defaultValue: 'Claim RGAS' })}
+                    </Button>
                     <Button className="w-full" variant="outline" onClick={() => navigate(`/agent/${did}/add-auth-method`)}>
                       <KeyOutlined className="mr-2" />
                       {t('agent.addAuthMethod')}
