@@ -2,16 +2,18 @@ providers = ["node"]
 
 [phases.setup]
 nixPkgs = ['nodejs', 'pnpm']
-cmds = ['cd nuwa-services/cadop-service/typescript']
 
 [phases.install]
+workdir = "/app/nuwa-services/cadop-service/typescript"
 cmds = ['pnpm install']
 
 [phases.build]
+workdir = "/app/nuwa-services/cadop-service/typescript"
 cmds = [
     'pnpm --filter @cadop/shared build',
     'pnpm --filter @cadop/api build'
 ]
 
 [start]
+workdir = "/app/nuwa-services/cadop-service/typescript"
 cmd = 'cd packages/cadop-api && pnpm start:prod'

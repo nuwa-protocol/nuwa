@@ -1,0 +1,65 @@
+# Dependencies
+**/node_modules
+**/.pnpm-store
+
+# Build outputs
+**/dist
+**/build
+**/.next
+**/.nuxt
+**/.output
+
+# Development files
+**/.git
+**/.github
+**/.vscode
+**/.idea
+**/.DS_Store
+**/coverage
+**/.env*
+!**/.env.example
+
+# Test files
+**/test
+**/tests
+**/__tests__
+**/*.test.*
+**/*.spec.*
+
+# Debug files
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# Cache directories
+**/.cache
+**/.temp
+**/.tmp
+.nx/cache
+.webpack
+.rollup.cache
+
+# Docs
+**/docs
+**/doc
+**/documentation
+**/*.md
+!**/README.md
+
+# Examples and samples
+**/examples
+**/sample
+**/demo
+
+# Ignore other services/projects that are not needed
+website/
+nips/
+examples/
+contracts/
+agents/deps/
+deps/
+
+# Keep only necessary parts
+!nuwa-services/cadop-service/typescript/
+!nuwa-kit/typescript/packages/nuwa-identity-kit/ 
