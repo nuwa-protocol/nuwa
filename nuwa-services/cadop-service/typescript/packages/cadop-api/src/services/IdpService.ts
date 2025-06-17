@@ -11,6 +11,7 @@ import {
 } from '@simplewebauthn/types';
 import { DidKeyCodec, algorithmToKeyType, KEY_TYPE } from 'nuwa-identity-kit';
 import { p256 } from '@noble/curves/p256';
+import { ChallengeResponse, VerifyResponse } from '@cadop-shared';
 
 /** In-memory challenge map for dev; clear periodically */
 const challengeMap = new Map<string, { nonce: string, ts: number }>();
@@ -21,17 +22,6 @@ const CHALLENGE_EXPIRATION_MS = 5 * 60 * 1000;
 export interface IdpServiceConfig {
   cadopDid: string;
   signingKey: string;
-  rpId: string;
-}
-
-export interface ChallengeData {
-  challenge: string;
-  rpId: string;
-  nonce: string;
-}
-
-export interface VerifyResponse {
-  idToken: string;
 }
 
 export class IdpService {
@@ -42,7 +32,7 @@ export class IdpService {
   }
 
   /** Generate WebAuthn challenge */
-  generateChallenge(): ChallengeData {
+  generateChallenge(): ChallengeResponse {
     // Generate random challenge
     const challengeBytes = randomBytes(32);
     const challenge = Buffer.from(challengeBytes).toString('base64url');
@@ -58,7 +48,6 @@ export class IdpService {
     
     return {
       challenge,
-      rpId: this.config.rpId,
       nonce
     };
   }
@@ -205,7 +194,9 @@ export class IdpService {
   async verifyAssertion(
     assertion: PublicKeyCredentialJSON, 
     userDid: string, 
-    nonce: string
+    nonce: string,
+    rpId: string,
+    origin: string
   ): Promise<VerifyResponse> {
     if (!assertion || !userDid || !nonce) {
       throw new Error('assertion, userDid and nonce are required');
@@ -259,8 +250,8 @@ export class IdpService {
         const verification = await verifyAuthenticationResponse({
           response: authResponse,
           expectedChallenge: responseChallenge,
-          expectedOrigin: ['http://localhost','http://localhost:3000',`https://${this.config.rpId}`],
-          expectedRPID: this.config.rpId,
+          expectedOrigin: [origin],
+          expectedRPID: rpId,
           credential: {
             id: authResponse.id,
             publicKey: cosePublicKey, // Use COSE encoded public key

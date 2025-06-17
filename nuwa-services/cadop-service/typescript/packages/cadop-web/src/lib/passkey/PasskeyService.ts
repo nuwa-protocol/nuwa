@@ -264,7 +264,7 @@ export class PasskeyService {
    */
   public async authenticateWithChallenge(options: {
     challenge: string;
-    rpId: string;
+    rpId: string|undefined;
   }): Promise<{
     assertionJSON: PublicKeyCredentialJSON;
     userDid: string;
@@ -283,9 +283,11 @@ export class PasskeyService {
         });
       }
 
+      let rpId = options.rpId? options.rpId : window.location.hostname;
+
       const publicKeyRequest: PublicKeyCredentialRequestOptions = {
         challenge: base64URLToArrayBuffer(options.challenge),
-        rpId: options.rpId,
+        rpId: rpId,
         userVerification: 'preferred',
         timeout: 60000,
         allowCredentials: allowCredentials.map(cred => ({

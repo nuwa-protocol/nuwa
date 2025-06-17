@@ -13,17 +13,19 @@ router.get('/challenge', async (_req: Request, res: Response) => {
 });
 
 router.post('/verify-assertion', async (req: Request, res: Response) => {
-  const { assertion, userDid, nonce } = req.body as { 
+  const { assertion, userDid, nonce, rpId, origin } = req.body as { 
     assertion: PublicKeyCredentialJSON; 
     userDid: string; 
-    nonce: string 
+    nonce: string;
+    rpId: string;
+    origin: string;
   };
   
   const serviceContainer = await ServiceContainer.getInstance();
   const idpService = serviceContainer.getIdpService();
   
   try {
-    const response = await idpService.verifyAssertion(assertion, userDid, nonce);
+    const response = await idpService.verifyAssertion(assertion, userDid, nonce, rpId, origin);
     return res.json(createSuccessResponse(response));
   } catch (error) {
     console.error('Assertion verification error:', error);

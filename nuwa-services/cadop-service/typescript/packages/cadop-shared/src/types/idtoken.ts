@@ -20,6 +20,9 @@ export interface IDToken {
  */
 export interface ChallengeResponse {
   challenge: string;  // Base64URL-encoded challenge bytes
-  rpId: string;       // Relying party ID
   nonce: string;      // UUID for tracking and anti-replay
+}
+
+export interface VerifyResponse {
+  idToken: string;
 }

@@ -20,7 +20,6 @@ async function initializeServices() {
       },
       idp: {
         signingKey: config.service.signingKey,
-        rpId: config.webauthn.rpId,
       },
       rooch: {
         networkUrl: config.rooch.networkUrl,
@@ -53,7 +52,7 @@ async function startApp(): Promise<Application> {
     app.use(helmet());
 
     app.use(cors({
-      origin: config.cors.origin,
+      origin: '*',
       credentials: true
     }));
 

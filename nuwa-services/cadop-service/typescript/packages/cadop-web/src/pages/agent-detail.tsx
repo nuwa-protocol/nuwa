@@ -24,7 +24,7 @@ export function AgentDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { userDid } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
@@ -138,12 +138,12 @@ export function AgentDetailPage() {
                           <KeyOutlined className="mr-2" />
                           <Text strong className="font-mono">{fragment}</Text>
                           <Text className="ml-2">{method.type}</Text>
-                          {method.controller === did && (
+                          {method.controller === userDid && (
                             <Tag color="blue" className="ml-2">Controller</Tag>
                           )}
                         </div>
                         <div className="text-xs text-gray-400 mb-2">
-                          {method.id}
+                          controller: {method.controller}
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center">

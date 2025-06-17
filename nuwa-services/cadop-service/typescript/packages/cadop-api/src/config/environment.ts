@@ -30,9 +30,6 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_FORMAT: z.enum(['json', 'simple']).default('json'),
   
-  // CORS (with development defaults)
-  CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:3000'),
-  
 });
 
 // Validate environment variables
@@ -63,8 +60,5 @@ export const config = {
   logging: {
     level: env.LOG_LEVEL,
     format: env.LOG_FORMAT,
-  },
-  cors: {
-    origin: env.CORS_ORIGIN.split(',').map((origin: string) => origin.trim()),
   },
 } as const; 

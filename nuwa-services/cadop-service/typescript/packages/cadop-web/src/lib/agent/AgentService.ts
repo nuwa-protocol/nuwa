@@ -41,8 +41,9 @@ export class AgentService {
     // step 1: get challenge
     const challengeResp = await apiClient.get<ChallengeResponse>('/api/idp/challenge');
     if (!challengeResp.data) throw new Error(String(challengeResp.error || 'Failed to get challenge'));
-    const { challenge, rpId, nonce } = challengeResp.data;
-
+    const { challenge, nonce } = challengeResp.data;
+    const rpId = window.location.hostname;
+    const origin = window.location.origin;
     try {
       // step 2: call PasskeyService.authenticateWithChallenge to authenticate
       const { assertionJSON, userDid: authenticatedDid } = await this.passkeyService.authenticateWithChallenge({
@@ -53,7 +54,7 @@ export class AgentService {
       // step 3: send assertion to server to verify
       const verifyResp = await apiClient.post<{ idToken: string }>(
         '/api/idp/verify-assertion',
-        { assertion: assertionJSON, userDid: authenticatedDid, nonce },
+        { assertion: assertionJSON, userDid: authenticatedDid, nonce, rpId, origin },
         { skipAuth: true }
       );
       

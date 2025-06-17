@@ -14,7 +14,6 @@ export interface ServiceConfig {
   };
   idp: {
     signingKey: string;
-    rpId: string;
   };
   rooch: {
     networkUrl: string;
@@ -94,7 +93,6 @@ export class ServiceContainer {
       this.idpService = new IdpService({
         cadopDid: this.serviceConfig.cadopDid,
         signingKey: signingKey,
-        rpId: this.serviceConfig.idp.rpId,
       });
       logger.info('IDP service initialized');
 
