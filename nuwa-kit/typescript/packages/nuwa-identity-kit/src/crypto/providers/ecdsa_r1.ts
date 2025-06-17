@@ -171,8 +171,6 @@ export class EcdsaR1Provider implements CryptoProvider {
       );
     }
 
-    // WebCrypto expects DER. If we have raw 64B, convert to DER.
-    const derSig = signature.length === 64 ? this.convertRawToDER(signature) : signature;
 
     return await this.crypto.subtle.verify(
       {
@@ -180,7 +178,7 @@ export class EcdsaR1Provider implements CryptoProvider {
         hash: { name: 'SHA-256' }
       },
       key,
-      derSig,
+      signature,
       data
     );
   }

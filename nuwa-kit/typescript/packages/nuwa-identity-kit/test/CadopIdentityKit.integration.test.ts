@@ -84,6 +84,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
   describe('DID Creation', () => {
     it('should create DID via CADOP', async () => {
+      if (!shouldRunIntegrationTests()) return;
       let {signer:userSigner, keyId} = await LocalSigner.createWithDidKey();
       let userDid = userSigner.getDid();
 
@@ -112,6 +113,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
   describe('Service Creation', () => {
     it('should create a service', async () => {
+      if (!shouldRunIntegrationTests()) return;
       await cadopKit.addService({
         idFragment: 'idp-1',
         type: CadopServiceType.IDP,
@@ -136,6 +138,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
   describe('Service Discovery', () => {
     it('should find custodian services', () => {
+      if (!shouldRunIntegrationTests()) return;
       const services = cadopKit.findCustodianServices();
       expect(services).toHaveLength(1);
       expect(services[0].type).toBe(CadopServiceType.CUSTODIAN);
