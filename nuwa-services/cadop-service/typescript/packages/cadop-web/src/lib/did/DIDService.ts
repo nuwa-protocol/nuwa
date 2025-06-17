@@ -1,10 +1,10 @@
-import { createVDR, NuwaIdentityKit, VDRRegistry } from 'nuwa-identity-kit';
+import { createVDR, NuwaIdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
 import type {
   OperationalKeyInfo,
   VerificationRelationship,
   SignerInterface,
   VDRInterface,
-} from 'nuwa-identity-kit';
+} from '@nuwa-ai/identity-kit';
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
 import { Session } from '@cadop/shared';
 

@@ -1,6 +1,6 @@
 import { Base64, isValid } from 'js-base64';
-import type { DIDDocument, SignerInterface, VerificationMethod } from 'nuwa-identity-kit';
-import { BaseMultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from 'nuwa-identity-kit';
+import type { DIDDocument, SignerInterface, VerificationMethod } from '@nuwa-ai/identity-kit';
+import { BaseMultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from '@nuwa-ai/identity-kit';
 import {
   SignatureScheme,
   Signer,
@@ -17,7 +17,7 @@ import {
   PublicKeyInitData,
   fromB64,
 } from '@roochnetwork/rooch-sdk';
-import { CryptoUtils, defaultCryptoProviderFactory } from 'nuwa-identity-kit';
+import { CryptoUtils, defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
 import { hexToBytes } from '@noble/curves/abstract/utils';
 import { p256 } from '@noble/curves/p256';
 import { PublicKeyUtils } from '../crypto/PublicKeyUtils';

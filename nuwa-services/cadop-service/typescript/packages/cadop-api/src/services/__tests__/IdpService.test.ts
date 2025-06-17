@@ -1,5 +1,5 @@
 import { IdpService, IdpServiceConfig } from '../IdpService.js';
-import { DidKeyCodec } from 'nuwa-identity-kit';
+import { DidKeyCodec } from '@nuwa-ai/identity-kit';
 import { randomBytes } from 'crypto';
 import { PublicKeyCredentialJSON } from '@simplewebauthn/types';
 
@@ -8,12 +8,14 @@ jest.mock('@simplewebauthn/server', () => ({
   verifyAuthenticationResponse: jest.fn().mockResolvedValue({ verified: true }),
 }));
 
+const rpId = 'localhost';
+const origin = 'http://localhost:3000';
+
 describe('IdpService', () => {
   let idpService: IdpService;
   const mockConfig: IdpServiceConfig = {
     cadopDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
     signingKey: 'test-signing-key',
-    rpId: 'localhost',
   };
 
   beforeEach(() => {
@@ -26,7 +28,6 @@ describe('IdpService', () => {
       const response = idpService.generateChallenge();
 
       expect(response).toHaveProperty('challenge');
-      expect(response).toHaveProperty('rpId', mockConfig.rpId);
       expect(response).toHaveProperty('nonce');
 
       expect(typeof response.challenge).toBe('string');
@@ -41,29 +42,6 @@ describe('IdpService', () => {
 
       expect(response1.challenge).not.toBe(response2.challenge);
       expect(response1.nonce).not.toBe(response2.nonce);
-    });
-  });
-
-  describe('verifyNonce', () => {
-    it('should verify a valid nonce and return an id token', () => {
-      // Generate a challenge first to create a valid nonce
-      const { nonce } = idpService.generateChallenge();
-      const userDid = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-
-      const response = idpService.verifyNonce(nonce, userDid);
-
-      expect(response).toHaveProperty('idToken');
-      expect(typeof response.idToken).toBe('string');
-      expect(response.idToken.length).toBeGreaterThan(10);
-      expect(response).toHaveProperty('isNewUser', false);
-    });
-
-    it('should throw an error for invalid nonce', () => {
-      const userDid = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
-
-      expect(() => {
-        idpService.verifyNonce('invalid-nonce', userDid);
-      }).toThrow('invalid nonce');
     });
   });
 
@@ -83,7 +61,7 @@ describe('IdpService', () => {
             JSON.stringify({
               type: 'webauthn.get',
               challenge,
-              origin: `https://${mockConfig.rpId}`,
+              origin: origin,
             })
           ).toString('base64url'),
           authenticatorData: 'auth-data-base64',
@@ -93,7 +71,7 @@ describe('IdpService', () => {
         clientExtensionResults: {},
       };
 
-      const response = await idpService.verifyAssertion(mockAssertion, userDid, nonce);
+      const response = await idpService.verifyAssertion(mockAssertion, userDid, nonce, rpId, origin);
 
       expect(response).toHaveProperty('idToken');
       expect(typeof response.idToken).toBe('string');
@@ -115,7 +93,7 @@ describe('IdpService', () => {
             JSON.stringify({
               type: 'webauthn.get',
               challenge: 'invalid-challenge',
-              origin: `https://${mockConfig.rpId}`,
+              origin: origin,
             })
           ).toString('base64url'),
           authenticatorData: 'auth-data-base64',
@@ -125,7 +103,7 @@ describe('IdpService', () => {
         clientExtensionResults: {},
       };
 
-      await expect(idpService.verifyAssertion(mockAssertion, userDid, nonce)).rejects.toThrow(
+      await expect(idpService.verifyAssertion(mockAssertion, userDid, nonce, rpId, origin)).rejects.toThrow(
         'invalid or expired challenge'
       );
     });
@@ -145,7 +123,7 @@ describe('IdpService', () => {
             JSON.stringify({
               type: 'webauthn.get',
               challenge,
-              origin: `https://${mockConfig.rpId}`,
+              origin: origin,
             })
           ).toString('base64url'),
           authenticatorData: 'auth-data-base64',
@@ -156,7 +134,7 @@ describe('IdpService', () => {
       };
 
       await expect(
-        idpService.verifyAssertion(mockAssertion, userDid, 'wrong-nonce')
+        idpService.verifyAssertion(mockAssertion, userDid, 'wrong-nonce', rpId, origin)
       ).rejects.toThrow('nonce mismatch');
     });
   });

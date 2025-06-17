@@ -6,9 +6,9 @@ import {
   VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { PublicKeyCredentialJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
-import { DidKeyCodec, algorithmToKeyType, KEY_TYPE } from 'nuwa-identity-kit';
+import { DidKeyCodec, algorithmToKeyType, KEY_TYPE } from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
-import { ChallengeResponse, VerifyResponse } from '@cadop-shared';
+import { ChallengeResponse, VerifyResponse } from '@cadop/shared';
 
 /** In-memory challenge map for dev; clear periodically */
 const challengeMap = new Map<string, { nonce: string; ts: number }>();

@@ -27,7 +27,7 @@ import {
   CryptoUtils,
   defaultCryptoProviderFactory,
   algorithmToKeyType,
-} from 'nuwa-identity-kit';
+} from '@nuwa-ai/identity-kit';
 import { PublicKeyUtils, SignatureUtils } from '@/lib/crypto/PublicKeyUtils';
 import { Base64 } from 'js-base64';
 import { p256 } from '@noble/curves/p256';

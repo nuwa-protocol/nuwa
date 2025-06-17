@@ -55,82 +55,6 @@ importers:
         specifier: ^5.3.3
         version: 5.8.3
 
-  ../../../nuwa-kit/typescript/packages/nuwa-identity-kit:
-    dependencies:
-      '@jest/globals':
-        specifier: ^29.7.0
-        version: 29.7.0
-      '@noble/curves':
-        specifier: ^1.9.1
-        version: 1.9.1
-      '@noble/hashes':
-        specifier: ^1.8.0
-        version: 1.8.0
-      '@roochnetwork/rooch-sdk':
-        specifier: ^0.3.4
-        version: 0.3.4(typescript@5.8.3)
-      '@simplewebauthn/types':
-        specifier: ^12.0.0
-        version: 12.0.0
-      did-resolver:
-        specifier: ^4.1.0
-        version: 4.1.0
-      jose:
-        specifier: ^5.1.2
-        version: 5.10.0
-      jsonld:
-        specifier: ^8.3.3
-        version: 8.3.3(web-streams-polyfill@3.3.3)
-      multibase:
-        specifier: ^4.0.6
-        version: 4.0.6
-      multicodec:
-        specifier: ^3.2.1
-        version: 3.2.1
-      multiformats:
-        specifier: ^9.9.0
-        version: 9.9.0
-    devDependencies:
-      '@types/jest':
-        specifier: ^29.5.14
-        version: 29.5.14
-      '@types/jsonld':
-        specifier: ^1.5.15
-        version: 1.5.15
-      '@types/node':
-        specifier: ^20.10.0
-        version: 20.17.52
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^7.3.1
-        version: 7.18.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.8.3))(eslint@8.57.1)(typescript@5.8.3)
-      '@typescript-eslint/parser':
-        specifier: ^7.3.1
-        version: 7.18.0(eslint@8.57.1)(typescript@5.8.3)
-      eslint:
-        specifier: ^8.57.0
-        version: 8.57.1
-      eslint-config-prettier:
-        specifier: ^9.1.0
-        version: 9.1.0(eslint@8.57.1)
-      eslint-plugin-prettier:
-        specifier: ^5.1.3
-        version: 5.5.0(eslint-config-prettier@9.1.0(eslint@8.57.1))(eslint@8.57.1)(prettier@3.5.3)
-      jest:
-        specifier: ^29.7.0
-        version: 29.7.0(@types/node@20.17.52)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3))
-      prettier:
-        specifier: ^3.2.5
-        version: 3.5.3
-      rimraf:
-        specifier: ^5.0.5
-        version: 5.0.10
-      ts-jest:
-        specifier: 29.1.1
-        version: 29.1.1(@babel/core@7.27.3)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.3))(jest@29.7.0(@types/node@20.17.52)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3)))(typescript@5.8.3)
-      typescript:
-        specifier: ^5.3.2
-        version: 5.8.3
-
   packages/cadop-api:
     dependencies:
       '@cadop/shared':
@@ -139,6 +63,9 @@ importers:
       '@noble/curves':
         specifier: ^1.9.1
         version: 1.9.1
+      '@nuwa-ai/identity-kit':
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1(typescript@5.8.3)(web-streams-polyfill@3.3.3)
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.4
         version: 0.3.4(typescript@5.8.3)
@@ -178,9 +105,6 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
-      nuwa-identity-kit:
-        specifier: file:../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit
-        version: file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit(typescript@5.8.3)
       winston:
         specifier: ^3.11.0
         version: 3.17.0
@@ -251,6 +175,9 @@ importers:
 
   packages/cadop-shared:
     dependencies:
+      '@nuwa-ai/identity-kit':
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1(typescript@5.8.3)(web-streams-polyfill@3.3.3)
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.4
         version: 0.3.4(typescript@5.8.3)
@@ -260,9 +187,6 @@ importers:
       '@simplewebauthn/types':
         specifier: ^12.0.0
         version: 12.0.0
-      nuwa-identity-kit:
-        specifier: file:../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit
-        version: file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit(typescript@5.8.3)
       zod:
         specifier: ^3.22.4
         version: 3.25.36
@@ -318,6 +242,9 @@ importers:
       '@noble/curves':
         specifier: ^1.9.1
         version: 1.9.1
+      '@nuwa-ai/identity-kit':
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1(typescript@4.9.5)(web-streams-polyfill@3.3.3)
       '@peculiar/asn1-schema':
         specifier: ^2.3.8
         version: 2.3.15
@@ -405,9 +332,6 @@ importers:
       next-themes:
         specifier: ^0.2.1
         version: 0.2.1(next@15.3.2(@babel/core@7.27.3)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      nuwa-identity-kit:
-        specifier: file:../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit
-        version: file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit(typescript@4.9.5)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1477,6 +1401,9 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
+  '@nuwa-ai/identity-kit@0.1.0-beta.1':
+    resolution: {integrity: sha512-HlIi/DTC9ISfBl+/C79K6oCVWPXBiIDFE5Jbqi+Uw4UGDOXVElJHt0Czj7G/A9bquUm5O5Ry2HN4bD7UYUd55A==}
+
   '@paralleldrive/cuid2@2.2.2':
     resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
 
@@ -2211,9 +2138,6 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
-
-  '@types/jsonld@1.5.15':
-    resolution: {integrity: sha512-PlAFPZjL+AuGYmwlqwKEL0IMP8M8RexH0NIPGfCVWSQ041H2rR/8OlyZSD7KsCVoN8vCfWdtWDBxX8yBVP+xow==}
 
   '@types/jsonwebtoken@9.0.9':
     resolution: {integrity: sha512-uoe+GxEuHbvy12OUQct2X9JenKM3qAscquYymuQN4fMWG9DBQtykrQEFcAbVACF7qaLw9BePSodUL0kquqBJpQ==}
@@ -4404,9 +4328,6 @@ packages:
     resolution: {integrity: sha512-ppwTtiJZq0O/ai0z7yfudtBpWIoxM8yE6nHi1X47eFR2EWORqfbu6CnPlNsjeN683eT0qG6H/Pyf9fCcvjnnnQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  nuwa-identity-kit@file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit:
-    resolution: {directory: ../../../nuwa-kit/typescript/packages/nuwa-identity-kit, type: directory}
-
   nwsapi@2.2.20:
     resolution: {integrity: sha512-/ieB+mDe4MrrKMT8z+mQL8klXydZWGR5Dowt4RAGKbJ3kIGEx3X4ljUo+6V73IXtUPWgfOlU5B9MlGxFO5T+cA==}
 
@@ -5484,27 +5405,6 @@ packages:
 
   ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
-
-  ts-jest@29.1.1:
-    resolution: {integrity: sha512-D6xjnnbP17cC85nliwGiL+tpoKN0StpgE0TeOjXQTU6MVCfsB4v7aW05CgQ/1OywGb0x/oy9hHFnN+sczTiRaA==}
-    engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
-    hasBin: true
-    peerDependencies:
-      '@babel/core': '>=7.0.0-beta.0 <8'
-      '@jest/types': ^29.0.0
-      babel-jest: ^29.0.0
-      esbuild: '*'
-      jest: ^29.0.0
-      typescript: '>=4.3 <6'
-    peerDependenciesMeta:
-      '@babel/core':
-        optional: true
-      '@jest/types':
-        optional: true
-      babel-jest:
-        optional: true
-      esbuild:
-        optional: true
 
   ts-jest@29.3.4:
     resolution: {integrity: sha512-Iqbrm8IXOmV+ggWHOTEbjwyCf2xZlUMv5npExksXohL+tk8va4Fjhb+X2+Rt9NBmgO7bJ8WpnMLOwih/DnMlFA==}
@@ -6906,6 +6806,42 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
+  '@nuwa-ai/identity-kit@0.1.0-beta.1(typescript@4.9.5)(web-streams-polyfill@3.3.3)':
+    dependencies:
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.4(typescript@4.9.5)
+      '@simplewebauthn/types': 12.0.0
+      did-resolver: 4.1.0
+      jose: 5.10.0
+      jsonld: 8.3.3(web-streams-polyfill@3.3.3)
+      multibase: 4.0.6
+      multicodec: 3.2.1
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+      - web-streams-polyfill
+
+  '@nuwa-ai/identity-kit@0.1.0-beta.1(typescript@5.8.3)(web-streams-polyfill@3.3.3)':
+    dependencies:
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.4(typescript@5.8.3)
+      '@simplewebauthn/types': 12.0.0
+      did-resolver: 4.1.0
+      jose: 5.10.0
+      jsonld: 8.3.3(web-streams-polyfill@3.3.3)
+      multibase: 4.0.6
+      multicodec: 3.2.1
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+      - web-streams-polyfill
+
   '@paralleldrive/cuid2@2.2.2':
     dependencies:
       '@noble/hashes': 1.8.0
@@ -7732,8 +7668,6 @@ snapshots:
       js-base64: 3.7.7
 
   '@types/json-schema@7.0.15': {}
-
-  '@types/jsonld@1.5.15': {}
 
   '@types/jsonwebtoken@9.0.9':
     dependencies:
@@ -10673,46 +10607,6 @@ snapshots:
     dependencies:
       path-key: 4.0.0
 
-  nuwa-identity-kit@file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit(typescript@4.9.5):
-    dependencies:
-      '@jest/globals': 29.7.0
-      '@noble/curves': 1.9.1
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.4(typescript@4.9.5)
-      '@simplewebauthn/types': 12.0.0
-      did-resolver: 4.1.0
-      jose: 5.10.0
-      jsonld: 8.3.3(web-streams-polyfill@3.3.3)
-      multibase: 4.0.6
-      multicodec: 3.2.1
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - web-streams-polyfill
-
-  nuwa-identity-kit@file:../../../nuwa-kit/typescript/packages/nuwa-identity-kit(typescript@5.8.3):
-    dependencies:
-      '@jest/globals': 29.7.0
-      '@noble/curves': 1.9.1
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.4(typescript@5.8.3)
-      '@simplewebauthn/types': 12.0.0
-      did-resolver: 4.1.0
-      jose: 5.10.0
-      jsonld: 8.3.3(web-streams-polyfill@3.3.3)
-      multibase: 4.0.6
-      multicodec: 3.2.1
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - web-streams-polyfill
-
   nwsapi@2.2.20:
     optional: true
 
@@ -11993,23 +11887,6 @@ snapshots:
       typescript: 5.8.3
 
   ts-interface-checker@0.1.13: {}
-
-  ts-jest@29.1.1(@babel/core@7.27.3)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.3))(jest@29.7.0(@types/node@20.17.52)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3)))(typescript@5.8.3):
-    dependencies:
-      bs-logger: 0.2.6
-      fast-json-stable-stringify: 2.1.0
-      jest: 29.7.0(@types/node@20.17.52)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3))
-      jest-util: 29.7.0
-      json5: 2.2.3
-      lodash.memoize: 4.1.2
-      make-error: 1.3.6
-      semver: 7.7.2
-      typescript: 5.8.3
-      yargs-parser: 21.1.1
-    optionalDependencies:
-      '@babel/core': 7.27.3
-      '@jest/types': 29.6.3
-      babel-jest: 29.7.0(@babel/core@7.27.3)
 
   ts-jest@29.3.4(@babel/core@7.27.3)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.27.3))(jest@29.7.0(@types/node@20.17.52)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@types/node@20.17.52)(typescript@5.8.3)))(typescript@5.8.3):
     dependencies:

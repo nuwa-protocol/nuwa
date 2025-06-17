@@ -9,7 +9,7 @@ import {
   VDRRegistry,
   LocalSigner,
   CadopServiceType,
-} from 'nuwa-identity-kit';
+} from '@nuwa-ai/identity-kit';
 import roochSdk from '@roochnetwork/rooch-sdk';
 import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
 import { cryptoService } from './crypto.js';

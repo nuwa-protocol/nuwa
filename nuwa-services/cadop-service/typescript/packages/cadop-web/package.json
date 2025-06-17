@@ -49,7 +49,7 @@
     "js-base64": "^3.7.7",
     "lucide-react": "^0.309.0",
     "next-themes": "^0.2.1",
-    "nuwa-identity-kit": "file:../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit",
+    "@nuwa-ai/identity-kit": "0.1.0-beta.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^14.0.0",

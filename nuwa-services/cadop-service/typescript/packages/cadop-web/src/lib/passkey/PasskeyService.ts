@@ -9,7 +9,7 @@ import {
 } from '@simplewebauthn/types';
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
-import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from 'nuwa-identity-kit';
+import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from '@nuwa-ai/identity-kit';
 import { AuthStore, UserStore } from '../storage';
 
 // Utils

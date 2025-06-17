@@ -6,7 +6,7 @@ import { ed25519 as ed25519Noble } from '@noble/curves/ed25519';
 import * as ed25519Stable from '@stablelib/ed25519';
 import { AsnParser } from '@peculiar/asn1-schema';
 import { SubjectPublicKeyInfo } from '@peculiar/asn1-x509';
-import { KEY_TYPE, KeyType } from 'nuwa-identity-kit';
+import { KEY_TYPE, KeyType } from '@nuwa-ai/identity-kit';
 
 /**
  * Centralized cryptographic utilities using mature libraries

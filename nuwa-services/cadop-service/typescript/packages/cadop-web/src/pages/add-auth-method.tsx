@@ -14,7 +14,7 @@ import {
   BaseMultibaseCodec,
   type OperationalKeyInfo,
   type VerificationRelationship,
-} from 'nuwa-identity-kit';
+} from '@nuwa-ai/identity-kit';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

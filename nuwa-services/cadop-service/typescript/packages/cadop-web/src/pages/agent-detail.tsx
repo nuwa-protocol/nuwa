@@ -17,7 +17,7 @@ import {
   ReloadOutlined,
   GiftOutlined,
 } from '@ant-design/icons';
-import type { DIDDocument, VerificationMethod } from 'nuwa-identity-kit';
+import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 
 const { TabPane } = Tabs;
