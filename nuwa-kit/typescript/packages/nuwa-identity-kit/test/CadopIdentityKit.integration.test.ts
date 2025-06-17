@@ -15,12 +15,26 @@ import { LocalSigner } from '../src/signers/LocalSigner';
 import { DIDStruct, formatDIDString } from '../src/vdr/roochVDRTypes';
 import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 
+
+// Check if we should run integration tests
+const shouldRunIntegrationTests = () => {
+  // Skip if no ROOCH_NODE_URL is set (for CI/CD environments)
+  if (!process.env.ROOCH_NODE_URL && (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')) {
+    return false;
+  }
+  return true;
+};
+
 describe('CadopIdentityKit Integration Test', () => {
   let roochVDR: RoochVDR;
   let cadopKit: CadopIdentityKit;
   let cadopPublicKeyMultibase: string;
 
   beforeEach(async () => {
+    if (!shouldRunIntegrationTests()) {
+      console.log('Skipping integration tests - ROOCH_NODE_URL not set in CI environment');
+      return;
+    }
     // Initialize RoochVDR
     roochVDR = new RoochVDR({
       rpcUrl: 'http://localhost:6767',
