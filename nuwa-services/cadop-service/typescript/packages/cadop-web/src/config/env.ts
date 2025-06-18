@@ -46,8 +46,8 @@ function resolveFromHost(hostname: string): AppEnvConfig {
     return PRODUCTION_CONFIG;
   }
 
-  // Fallback to local/development config
-  return LOCAL_CONFIG;
+  // Fallback to testnet config
+  return TESTNET_CONFIG;
 }
 
 function buildConfig(): AppEnvConfig {
