@@ -1,19 +1,18 @@
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
-import { webcrypto as nodeWebcrypto } from 'crypto';
 
 // Universal helper to obtain a Web Crypto implementation in both browser and Node.js environments.
 // 1. In browsers (and newer versions of Node.js that expose `globalThis.crypto`) we return the global object.
 // 2. In other Node.js environments we fall back to the built-in `crypto.webcrypto` implementation that was
 //    imported above. This avoids using CommonJS `require`, which is not available in ESM bundles.
 function getCrypto(): Crypto {
-  // Browser or Node >= 19 where `globalThis.crypto` is available.
+  // Use the built-in Web Crypto implementation exposed on globalThis.
   if (typeof globalThis !== 'undefined' && (globalThis as any).crypto) {
     return (globalThis as any).crypto as Crypto;
   }
 
-  // Node.js fallback.
-  return nodeWebcrypto as unknown as Crypto;
+  // If crypto is unavailable (e.g., very old Node versions), throw a descriptive error.
+  throw new Error('Web Crypto API is not available in the current runtime');
 }
 
 export class Ed25519Provider implements CryptoProvider {
