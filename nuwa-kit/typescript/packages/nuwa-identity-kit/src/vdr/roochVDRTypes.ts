@@ -1,9 +1,6 @@
 import {
   bcs,
   address,
-  AnnotatedMoveValueView,
-  AnnotatedMoveStructView,
-  AnnotatedMoveStructVectorView,
   sha3_256,
   toHEX,
   stringToBytes,
@@ -168,32 +165,6 @@ export function mapToSimpleMap<K, V>(map: Map<K, V>): SimpleMap<K, V> {
       value,
     })),
   };
-}
-
-/**
- * Convert Move value to TypeScript value
- */
-export function convertMoveValue<T>(moveValue: AnnotatedMoveValueView): T {
-  if (
-    typeof moveValue === 'string' ||
-    typeof moveValue === 'number' ||
-    typeof moveValue === 'boolean'
-  ) {
-    return moveValue as T;
-  }
-
-  const annotatedValue = moveValue as AnnotatedMoveStructView;
-  if (annotatedValue.type === 'vector') {
-    return (annotatedValue.value as unknown as AnnotatedMoveValueView[]).map(v =>
-      convertMoveValue(v)
-    ) as T;
-  } else if (annotatedValue.type.startsWith('0x3::simple_map::SimpleMap')) {
-    return simpleMapToMap(annotatedValue.value.data as unknown as SimpleMap<any, any>) as T;
-  } else if (annotatedValue.type.startsWith('0x3::did::')) {
-    return annotatedValue.value as T;
-  } else {
-    return annotatedValue.value as T;
-  }
 }
 
 /**

@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         package: ${{ fromJSON(needs.detect-changes.outputs.packages) }}
-        node-version: [18.x, 20.x]
+        node-version: [20.x]
     
     steps:
       - uses: actions/checkout@v3
