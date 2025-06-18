@@ -7,13 +7,15 @@
 import type { APIResponse, AgentDIDCreationStatus } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
 import { useAuth } from '../auth/AuthContext';
+import { API_URL } from '../../config/env';
+import type { DIDDocument } from '@nuwa-ai/identity-kit';
 
 class APIClient {
   private static instance: APIClient;
   private baseUrl: string;
 
   private constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    this.baseUrl = API_URL;
     console.log('APIClient initialized with baseUrl:', this.baseUrl);
   }
 

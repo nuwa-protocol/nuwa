@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { RoochClient, BalanceInfoView } from '@roochnetwork/rooch-sdk';
+import { ROOCH_RPC_URL } from '../config/env';
 
 export interface AgentBalancesResult {
   balances: BalanceInfoView[];
@@ -42,7 +43,7 @@ export function useAgentBalances(did: string | undefined): AgentBalancesResult {
       if (!address) throw new Error('Invalid DID format');
 
       const client = new RoochClient({
-        url: import.meta.env.VITE_ROOCH_RPC_URL || 'http://localhost:6767',
+        url: ROOCH_RPC_URL,
       });
 
       const resp = await client.getBalances({

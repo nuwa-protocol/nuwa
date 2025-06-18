@@ -1,4 +1,5 @@
 import { createVDR, NuwaIdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
+import { ROOCH_RPC_URL } from '../../config/env';
 import type {
   OperationalKeyInfo,
   VerificationRelationship,
@@ -6,7 +7,6 @@ import type {
   VDRInterface,
 } from '@nuwa-ai/identity-kit';
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
-import { Session } from '@cadop/shared';
 
 export class DIDService {
   private identityKit: NuwaIdentityKit;
@@ -18,7 +18,7 @@ export class DIDService {
   static async initialize(did: string, credentialId?: string): Promise<DIDService> {
     try {
       const roochVDR = createVDR('rooch', {
-        rpcUrl: import.meta.env.VITE_ROOCH_RPC_URL,
+        rpcUrl: ROOCH_RPC_URL,
         debug: true,
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
