@@ -1,12 +1,6 @@
 import { beforeAll, describe, expect, it, afterAll, beforeEach } from '@jest/globals';
 import { CustodianService } from '../CustodianService.js';
-import roochSdk from '@roochnetwork/rooch-sdk';
-import type {
-  RoochClient as RoochClientType,
-  Secp256k1Keypair as Secp256k1KeypairType,
-  Ed25519Keypair as Ed25519KeypairType,
-} from '@roochnetwork/rooch-sdk';
-const { RoochClient, Secp256k1Keypair, Ed25519Keypair } = roochSdk;
+import { RoochClient, Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
 import {
   VDRRegistry,
   RoochVDR,
@@ -46,8 +40,8 @@ jest.mock('@simplewebauthn/server', () => ({
 }));
 
 describe('CustodianService Integration Tests', () => {
-  let roochClient: RoochClientType;
-  let cadopServiceKeypair: Secp256k1KeypairType;
+  let roochClient: RoochClient;
+  let cadopServiceKeypair: Secp256k1Keypair;
   let serviceSigner: SignerInterface;
   let cadopServiceDID: string;
   let userId: string;

@@ -2,9 +2,7 @@ import { createHash, randomBytes } from 'crypto';
 import * as jose from 'jose';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/environment.js';
-import roochSdk from '@roochnetwork/rooch-sdk';
-import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
-const { Secp256k1Keypair, decodeRoochSercetKey } = roochSdk;
+import { Secp256k1Keypair, decodeRoochSercetKey } from '@roochnetwork/rooch-sdk';
 
 export interface LocalJWK extends jose.JWK {
   kid?: string;
@@ -16,7 +14,7 @@ export interface CryptoKeys {
   //JWT signing key
   jwtSigningKey: string;
   // Rooch keypair for custodian
-  roochKeypair: Secp256k1KeypairType;
+  roochKeypair: Secp256k1Keypair;
 }
 
 export class CryptoService {
@@ -110,7 +108,7 @@ export class CryptoService {
   /**
    * Get Rooch keypair
    */
-  public getRoochKeypair(): Secp256k1KeypairType {
+  public getRoochKeypair(): Secp256k1Keypair {
     if (!this.keys?.roochKeypair) {
       throw new Error('Rooch keypair not initialized');
     }

@@ -10,10 +10,8 @@ import {
   LocalSigner,
   CadopServiceType,
 } from '@nuwa-ai/identity-kit';
-import roochSdk from '@roochnetwork/rooch-sdk';
-import type { Secp256k1Keypair as Secp256k1KeypairType } from '@roochnetwork/rooch-sdk';
+import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 import { cryptoService } from './crypto.js';
-const { Secp256k1Keypair } = roochSdk;
 
 export interface ServiceConfig {
   cadopDid: string;
