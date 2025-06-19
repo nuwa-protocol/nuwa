@@ -11,6 +11,7 @@ import {
   BaseMultibaseCodec,
   type OperationalKeyInfo,
   type VerificationRelationship,
+  Base64
 } from '@nuwa-ai/identity-kit';
 import { AgentSelector } from '../components/AgentSelector';
 import { PasskeyService } from '../lib/passkey/PasskeyService';
@@ -54,7 +55,7 @@ export function AddKeyPage() {
 
     try {
       // Base64URL decode
-      const decodedPayload = atob(payloadParam.replace(/-/g, '+').replace(/_/g, '/'));
+      const decodedPayload = Base64.decodeToString(payloadParam);
       const parsedPayload = JSON.parse(decodedPayload) as AddKeyPayload;
       
       // Validate required fields
