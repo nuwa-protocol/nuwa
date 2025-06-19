@@ -1,9 +1,10 @@
+import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
 import {
   CreateApiKeyRequest,
   CreateApiKeyResponse,
   GetApiKeyResponse,
-} from "../types";
+} from "../types/index.js";
 
 // Native streamToString tool function, placed outside the class
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
@@ -41,6 +42,7 @@ class OpenRouterService {
   constructor() {
     this.baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";
     this.provisioningApiKey = process.env.OPENROUTER_PROVISIONING_KEY || null;
+    console.log('provisioningApiKey', this.provisioningApiKey);
   }
 
   // Extract error information from axios error

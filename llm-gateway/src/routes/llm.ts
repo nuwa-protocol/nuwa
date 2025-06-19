@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
-import SupabaseService from "../database/supabase";
-import { ApiResponse, RequestLog, DIDInfo } from "../types";
-import OpenRouterService from "../services/openrouter";
-import { authMiddleware } from "../middleware/auth";
-import { userInitMiddleware } from "../middleware/userInit";
+import SupabaseService from "../database/supabase.js";
+import { ApiResponse, RequestLog, DIDInfo } from "../types/index.js";
+import OpenRouterService from "../services/openrouter.js";
+import { didAuthMiddleware } from "../middleware/didAuth.js";
+import { userInitMiddleware } from "../middleware/userInit.js";
 import { parse } from "url";
 import { setImmediate } from "timers";
 
@@ -18,7 +18,7 @@ const SUPPORTED_METHODS = ["get", "post", "put", "delete", "patch"] as const;
 for (const method of SUPPORTED_METHODS) {
   router[method](
     "/*",
-    authMiddleware,
+    didAuthMiddleware,
     userInitMiddleware,
     async (req: Request, res: Response) => {
       return handleOpenRouterProxy(req, res);

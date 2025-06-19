@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import SupabaseService from "../database/supabase";
-import OpenRouterService from "../services/openrouter";
-import { ApiResponse, DIDInfo } from "../types";
+import SupabaseService from "../database/supabase.js";
+import OpenRouterService from "../services/openrouter.js";
+import { ApiResponse, DIDInfo } from "../types/index.js";
 
 const supabaseService = new SupabaseService();
 const openRouterService = new OpenRouterService();

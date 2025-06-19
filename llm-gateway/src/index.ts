@@ -1,10 +1,25 @@
 import * as dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
+// Load default .env (project root) first
+dotenv.config();
+// Then optionally override with .env.local if present (not required)
+dotenv.config({ path: ".env.local", override: true });
+
+// ------ DIDAuth & VDR setup ------
+import {
+  VDRRegistry,
+  initRoochVDR,
+  InMemoryLRUDIDDocumentCache,
+} from "@nuwa-ai/identity-kit";
+
+// Prepare global VDR registry with Rooch method and LRU cache
+const registry = VDRRegistry.getInstance();
+registry.setCache(new InMemoryLRUDIDDocumentCache(2000));
+initRoochVDR("test", undefined, registry);
 
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { llmRoutes } from "./routes/llm";
-import { usageRoutes } from "./routes/usage";
+import { llmRoutes } from "./routes/llm.js";
+import { usageRoutes } from "./routes/usage.js";
 
 const app = express();
 
