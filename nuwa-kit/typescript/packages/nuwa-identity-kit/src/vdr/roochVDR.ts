@@ -70,9 +70,9 @@ export interface RoochVDROptions {
   rpcUrl: string;
 
   /**
-   * Network type (dev, test, main)
+   * Network type (local, dev, test, main)
    */
-  network?: 'dev' | 'test' | 'main';
+  network?: 'local' | 'dev' | 'test' | 'main';
 
   /**
    * Enable debug mode for detailed logging
@@ -1231,9 +1231,12 @@ export class RoochVDR extends AbstractVDR {
   /**
    * Create a RoochVDR instance with default configuration
    */
-  static createDefault(network: 'dev' | 'test' | 'main' = 'test'): RoochVDR {
+  static createDefault(
+    network: 'local' | 'dev' | 'test' | 'main' = 'test',
+    rpcUrl: string | undefined = undefined
+  ): RoochVDR {
     return new RoochVDR({
-      rpcUrl: RoochVDR.getRoochNodeUrl(network),
+      rpcUrl: rpcUrl || RoochVDR.getRoochNodeUrl(network),
       network,
     });
   }
@@ -1241,10 +1244,11 @@ export class RoochVDR extends AbstractVDR {
   /**
    * Get network-specific RPC URL
    */
-  private static getRoochNodeUrl(network: 'dev' | 'test' | 'main'): string {
+  private static getRoochNodeUrl(network: 'local' | 'dev' | 'test' | 'main'): string {
     // Map our network names to Rooch SDK network names
     const networkMap: { [key: string]: string } = {
-      dev: 'localnet',
+      local: 'localnet',
+      dev: 'devnet',
       test: 'testnet',
       main: 'mainnet',
     };

@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { KeyMultibaseCodec, BaseMultibaseCodec } from '../../src/multibase';
 import { KEY_TYPE } from '../../src/types';
+import { Bytes } from '../../src/utils/bytes';
 
 describe('KeyMultibaseCodec', () => {
   describe('Ed25519 keys', () => {
@@ -82,7 +83,7 @@ describe('KeyMultibaseCodec', () => {
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
 
       // First two bytes should be Ed25519 prefix (0xed01)
-      const rawDecoded = Buffer.from(decoded.bytes);
+      const rawDecoded = Bytes.bytesToString(decoded.bytes);
       expect(decoded.keyType).toBe(KEY_TYPE.ED25519);
       expect(rawDecoded.length).toBe(32); // Original key length
     });
@@ -93,7 +94,7 @@ describe('KeyMultibaseCodec', () => {
       const decoded = KeyMultibaseCodec.decodeWithType(encoded);
 
       // First two bytes should be Secp256k1 prefix (0xe701)
-      const rawDecoded = Buffer.from(decoded.bytes);
+      const rawDecoded = Bytes.bytesToString(decoded.bytes);
       expect(decoded.keyType).toBe(KEY_TYPE.SECP256K1);
       expect(rawDecoded.length).toBe(33); // Original key length
     });

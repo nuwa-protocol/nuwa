@@ -9,8 +9,6 @@ import {
   KeyType,
 } from '../../src/types';
 import { CryptoUtils } from '../../src/cryptoUtils';
-// For Node.js environments
-import { Buffer } from 'buffer';
 
 /**
  * Creates a test DID document
