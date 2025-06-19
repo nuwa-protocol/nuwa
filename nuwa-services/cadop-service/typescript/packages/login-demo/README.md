@@ -9,29 +9,10 @@ This is a demo application showcasing third-party login integration with Nuwa Ag
 - Sign challenges using authorized keys
 - Persistent key storage in browser localStorage
 
-## Project Structure
+## Prerequisites
 
-```
-login-demo/
-├── src/
-│   ├── components/         # UI components
-│   │   ├── ConnectButton.tsx
-│   │   └── LoginButton.tsx
-│   ├── pages/              # Page components
-│   │   ├── Home.tsx
-│   │   └── Callback.tsx
-│   ├── services/           # Business logic
-│   │   ├── DeepLink.ts
-│   │   └── KeyStore.ts
-│   ├── utils/              # Utility functions
-│   │   └── base64.ts
-│   ├── App.tsx             # Main app component
-│   ├── main.tsx            # Entry point
-│   └── styles.css          # Global styles
-├── public/                 # Static assets
-├── index.html              # HTML template
-└── package.json            # Project configuration
-```
+- Node.js 18+
+- npm 9+
 
 ## User Flow
 

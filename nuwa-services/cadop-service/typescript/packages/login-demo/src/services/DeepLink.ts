@@ -1,8 +1,7 @@
 /**
  * DeepLink - Utilities for building deep-link URLs to CADOP Web
  */
-import { CryptoUtils } from '@nuwa-ai/identity-kit';
-import { encodeBase64Url } from '../utils/base64';
+import { BaseMultibaseCodec, CryptoUtils, Base64 } from '@nuwa-ai/identity-kit';
 
 export interface AddKeyPayload {
   version: number;
@@ -55,7 +54,7 @@ export async function buildAddKeyUrl(
   } = options;
 
   // Convert public key to multibase format
-  const publicKeyMultibase = CryptoUtils.publicKeyToMultibase(publicKey, keyType);
+  const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKey);
 
   // Create a random state for CSRF protection
   const state = crypto.randomUUID();
@@ -82,7 +81,7 @@ export async function buildAddKeyUrl(
   }
 
   // Encode the payload as Base64URL
-  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+  const encodedPayload = Base64.encode(JSON.stringify(payload));
 
   let fullUrl: string;
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KeyStore } from '../services/KeyStore';
+import { BaseMultibaseCodec } from '@nuwa-ai/identity-kit';
 
 export function Callback() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -20,36 +21,47 @@ export function Callback() {
       return;
     }
 
+    // If a key is already stored (likely the second mount in React.StrictMode), treat as success immediately.
+    if (KeyStore.hasKey()) {
+      setStatus('success');
+      setMessage('Authorization successful! You can close this window.');
+
+      if (window.opener) {
+        window.opener.postMessage(
+          {
+            type: 'nuwa-auth-success',
+            keyId,
+            agentDid,
+            state,
+          },
+          window.location.origin,
+        );
+      }
+      return;
+    }
+
     try {
       // Retrieve the temporary keys from sessionStorage
-      const publicKeyBase64 = sessionStorage.getItem('nuwa-login-demo:temp-public-key');
-      const privateKeyBase64 = sessionStorage.getItem('nuwa-login-demo:temp-private-key');
-
-      if (!publicKeyBase64 || !privateKeyBase64) {
+      const publicKeyBase58 = sessionStorage.getItem('nuwa-login-demo:temp-public-key');
+      const privateKeyBase58 = sessionStorage.getItem('nuwa-login-demo:temp-private-key');
+      if (!publicKeyBase58 || !privateKeyBase58) {
         throw new Error('Key material not found. The authorization flow may have been interrupted.');
       }
 
-      // Convert from Base64 to Uint8Array using browser APIs
-      const publicKeyBinary = atob(publicKeyBase64);
-      const privateKeyBinary = atob(privateKeyBase64);
+      // Convert from Base58btc (string) to Uint8Array
+      const publicKey = BaseMultibaseCodec.decodeBase58btc(publicKeyBase58);
+      const privateKey = BaseMultibaseCodec.decodeBase58btc(privateKeyBase58);
       
-      const publicKey = new Uint8Array(publicKeyBinary.length);
-      const privateKey = new Uint8Array(privateKeyBinary.length);
-      
-      for (let i = 0; i < publicKeyBinary.length; i++) {
-        publicKey[i] = publicKeyBinary.charCodeAt(i);
-      }
-      
-      for (let i = 0; i < privateKeyBinary.length; i++) {
-        privateKey[i] = privateKeyBinary.charCodeAt(i);
-      }
-
       // Store the key in KeyStore
       KeyStore.storeKeyPair(keyId, agentDid, publicKey, privateKey);
 
-      // Clean up temporary storage
-      sessionStorage.removeItem('nuwa-login-demo:temp-public-key');
-      sessionStorage.removeItem('nuwa-login-demo:temp-private-key');
+      // Clean up temporary storage after a short delay so that the
+      // second mount in React.StrictMode (development only) can still
+      // access the data without throwing.
+      setTimeout(() => {
+        sessionStorage.removeItem('nuwa-login-demo:temp-public-key');
+        sessionStorage.removeItem('nuwa-login-demo:temp-private-key');
+      }, 2000);
 
       // Set success status
       setStatus('success');

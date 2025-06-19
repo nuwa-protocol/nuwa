@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateKeyAndBuildUrl } from '../services/DeepLink';
+import { BaseMultibaseCodec } from '@nuwa-ai/identity-kit';
 
 interface ConnectButtonProps {
   onConnecting?: () => void;
@@ -19,8 +20,8 @@ export function ConnectButton({ onConnecting, onError }: ConnectButtonProps) {
 
       // Store the keys temporarily in sessionStorage for the callback to retrieve
       // Convert Uint8Array to base64 string using browser APIs
-      const publicKeyBase64 = btoa(String.fromCharCode.apply(null, Array.from(publicKey)));
-      const privateKeyBase64 = btoa(String.fromCharCode.apply(null, Array.from(privateKey)));
+      const publicKeyBase64 = BaseMultibaseCodec.encodeBase58btc(publicKey);
+      const privateKeyBase64 = BaseMultibaseCodec.encodeBase58btc(privateKey);
       
       sessionStorage.setItem('nuwa-login-demo:temp-public-key', publicKeyBase64);
       sessionStorage.setItem('nuwa-login-demo:temp-private-key', privateKeyBase64);

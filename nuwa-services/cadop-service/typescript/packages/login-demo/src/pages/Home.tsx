@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ConnectButton } from '../components/ConnectButton';
-import { LoginButton } from '../components/LoginButton';
+import { SignButton } from '../components/SignButton';
+import { VerifyButton } from '../components/VerifyButton';
 import { KeyStore } from '../services/KeyStore';
 import { getCadopDomain, setCadopDomain, DEFAULT_CADOP_DOMAIN } from '../services/DeepLink';
 
@@ -10,7 +11,9 @@ export function Home() {
     keyId: string;
     agentDid: string;
   } | null>(null);
-  const [signature, setSignature] = useState<string | null>(null);
+  const [signatureObj, setSignatureObj] = useState<any | null>(null);
+  const [signatureStr, setSignatureStr] = useState<string | null>(null);
+  const [verifyResult, setVerifyResult] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cadopDomain, setCadopDomainState] = useState(getCadopDomain());
 
@@ -54,14 +57,18 @@ export function Home() {
   };
 
   const handleSignatureCreated = (sig: unknown) => {
-    setSignature(formatSignature(sig));
+    setSignatureObj(sig);
+    setSignatureStr(formatSignature(sig));
+    setVerifyResult(null);
   };
 
   const handleDisconnect = () => {
     KeyStore.clear();
     setIsConnected(false);
     setKeyInfo(null);
-    setSignature(null);
+    setSignatureObj(null);
+    setSignatureStr(null);
+    setVerifyResult(null);
   };
 
   const handleDomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +169,7 @@ export function Home() {
               <p>
                 Now you can sign a challenge using your authorized key.
               </p>
-              <LoginButton
+              <SignButton
                 onSignatureCreated={handleSignatureCreated}
                 onError={handleError}
               />
@@ -170,12 +177,19 @@ export function Home() {
           )}
         </div>
 
-        {signature && (
+        {signatureStr && (
           <div className="signature-container">
             <h2>Signature Result</h2>
-            <pre className="signature-output">
-              {signature}
-            </pre>
+            <pre className="signature-output">{signatureStr}</pre>
+            <VerifyButton
+              signature={signatureObj}
+              onVerified={ok => setVerifyResult(ok)}
+            />
+            {verifyResult !== null && (
+              <p style={{ marginTop: '8px' }}>
+                Verify Result: {verifyResult ? '✅ Passed' : '❌ Failed'}
+              </p>
+            )}
           </div>
         )}
       </main>
