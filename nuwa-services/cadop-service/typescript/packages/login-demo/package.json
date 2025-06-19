@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nuwa-ai/identity-kit": "0.1.0-beta.7",
+    "@nuwa-ai/identity-kit": "0.1.0-beta.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3"

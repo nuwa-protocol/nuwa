@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ConnectButton } from '../components/ConnectButton';
 import { SignButton } from '../components/SignButton';
 import { VerifyButton } from '../components/VerifyButton';
+import { GatewayDebugPanel } from '../components/GatewayDebugPanel';
 import { KeyStore } from '../services/KeyStore';
 import { getCadopDomain, setCadopDomain, DEFAULT_CADOP_DOMAIN } from '../services/DeepLink';
 
@@ -191,6 +192,11 @@ export function Home() {
               </p>
             )}
           </div>
+        )}
+
+        {/* Gateway Debug Panel */}
+        {isConnected && (
+          <GatewayDebugPanel />
         )}
       </main>
 

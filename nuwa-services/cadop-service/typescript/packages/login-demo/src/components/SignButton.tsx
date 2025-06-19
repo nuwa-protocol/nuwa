@@ -1,60 +1,16 @@
 import { useState } from 'react';
 import { 
   BaseMultibaseCodec, 
-  KEY_TYPE,
   DIDAuth,
-  CryptoUtils,
 } from '@nuwa-ai/identity-kit';
-import type { SignerInterface, KeyType, DIDDocument } from '@nuwa-ai/identity-kit';
+import type { DIDDocument } from '@nuwa-ai/identity-kit';
 import { KeyStore } from '../services/KeyStore';
 import { registry } from '../services/registry';
+import { SimpleSigner } from '../services/SimpleSigner';
 
 interface SignButtonProps {
   onSignatureCreated: (signature: unknown) => void;
   onError?: (error: Error) => void;
-}
-
-// Simple in-memory signer implementation
-class SimpleSigner implements SignerInterface {
-  private did: string;
-  private keyId: string;
-  private privateKey: Uint8Array;
-
-  constructor(did: string, keyId: string, privateKey: Uint8Array) {
-    this.did = did;
-    this.keyId = keyId;
-    this.privateKey = privateKey;
-  }
-
-  async listKeyIds(): Promise<string[]> {
-    return [this.keyId];
-  }
-
-  async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
-    if (keyId !== this.keyId) {
-      throw new Error(`Key ID not found: ${keyId}`);
-    }
-    return CryptoUtils.sign(data, this.privateKey, KEY_TYPE.ED25519);
-  }
-
-  async canSignWithKeyId(keyId: string): Promise<boolean> {
-    return keyId === this.keyId;
-  }
-
-  getDid(): string {
-    return this.did;
-  }
-
-  async getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined> {
-    if (keyId !== this.keyId) return undefined;
-    
-    // For Ed25519, the public key can be derived from the private key
-    // In a real implementation, you'd store both or derive properly
-    return {
-      type: KEY_TYPE.ED25519,
-      publicKey: new Uint8Array(32) // Placeholder
-    };
-  }
 }
 
 export function SignButton({ onSignatureCreated, onError }: SignButtonProps) {
