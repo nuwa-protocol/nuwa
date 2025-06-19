@@ -115,12 +115,6 @@ export async function verifySignature(
     const canonicalData = canonicalize(signed_data);
     const dataToVerify = Bytes.stringToBytes(DEFAULT_DOMAIN_SEPARATOR + canonicalData);
 
-    console.log('dataToVerify', Bytes.bytesToString(dataToVerify));
-    console.log('signature.value', Bytes.bytesToString(signature.value));
-    console.log('publicKeyMaterial', publicKeyMaterial);
-    console.log('verificationMethod.type', verificationMethod.type);
-    console.log('verificationMethod.id', verificationMethod.id);
-
     return CryptoUtils.verify(
       dataToVerify,
       signature.value,
@@ -148,7 +142,13 @@ export async function verifyAuthHeader(
   header: string,
   resolver: DIDResolver,
   opts: VerifyHeaderOptions = {}
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{
+  ok: true;
+  signedObject: NIP1SignedObject;
+} | {
+  ok: false;
+  error: string;
+}> {
   if (!header || !header.startsWith(HEADER_PREFIX)) {
     return { ok: false, error: 'Unsupported or missing Authorization header' };
   }
@@ -193,7 +193,10 @@ export async function verifyAuthHeader(
   }
 
   const ok = await verifySignature(signedObj, resolver, { maxClockSkew: maxSkew });
-  return ok ? { ok: true } : { ok: false, error: 'Signature verification failed' };
+  if (ok) {
+    return { ok: true, signedObject: signedObj };
+  }
+  return { ok: false, error: 'Signature verification failed' };
 }
 
 export default {
