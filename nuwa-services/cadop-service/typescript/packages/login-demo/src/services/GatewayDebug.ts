@@ -5,7 +5,7 @@ import { registry } from './registry';
 import { SimpleSigner } from './SimpleSigner';
 
 const STORAGE_KEY = 'nuwa-login-demo:gateway-url';
-const DEFAULT_GATEWAY_URL = 'http://localhost:3000';
+const DEFAULT_GATEWAY_URL = 'https://test-llm.nuwa.dev';
 
 export function getGatewayUrl(): string {
   return localStorage.getItem(STORAGE_KEY) || DEFAULT_GATEWAY_URL;
