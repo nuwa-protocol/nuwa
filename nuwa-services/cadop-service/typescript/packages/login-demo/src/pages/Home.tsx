@@ -3,8 +3,17 @@ import { ConnectButton } from '../components/ConnectButton';
 import { SignButton } from '../components/SignButton';
 import { VerifyButton } from '../components/VerifyButton';
 import { GatewayDebugPanel } from '../components/GatewayDebugPanel';
-import { getCadopDomain, setCadopDomain, DEFAULT_CADOP_DOMAIN } from '../services/DeepLink';
 import { useAuth } from '../App';
+
+export const DEFAULT_CADOP_DOMAIN = 'test-id.nuwa.dev';
+
+export function getCadopDomain(): string {
+  return localStorage.getItem('nuwa-login-demo:cadop-domain') || DEFAULT_CADOP_DOMAIN;
+}
+
+export function setCadopDomain(domain: string): void {
+  localStorage.setItem('nuwa-login-demo:cadop-domain', domain);
+}
 
 export function Home() {
   const { state, logout } = useAuth();

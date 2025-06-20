@@ -4,7 +4,7 @@ import { Callback } from './pages/Callback';
 import './styles.css';
 import { createContext, useContext, ReactNode } from 'react';
 import { useNuwaIdentityKit, IdentityKitHook } from '@nuwa-ai/identity-kit-web';
-import { getCadopDomain } from './services/DeepLink';
+import { getCadopDomain } from './pages/Home';
 
 // Create a context for the auth state and methods
 const AuthContext = createContext<IdentityKitHook | null>(null);
