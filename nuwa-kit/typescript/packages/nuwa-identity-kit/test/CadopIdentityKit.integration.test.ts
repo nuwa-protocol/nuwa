@@ -98,7 +98,7 @@ describe('CadopIdentityKit Integration Test', () => {
     it('should create DID via CADOP', async () => {
       if (!shouldRunIntegrationTests()) return;
       let { signer: userSigner, keyId } = await LocalSigner.createWithDidKey();
-      let userDid = userSigner.getDid();
+      let userDid = await userSigner.getDid();
 
       const result = await cadopKit.createDID('rooch', userDid, { description: 'Test DID' });
 

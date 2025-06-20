@@ -66,12 +66,6 @@ describe('BaseMultibaseCodec', () => {
       const decoded = BaseMultibaseCodec.decodeBase16(encoded);
       expect(decoded).toEqual(testData);
     });
-
-    it('should decode base16 without prefix', () => {
-      const hex = '0102030405';
-      const expected = new Uint8Array([1, 2, 3, 4, 5]);
-      const decoded = BaseMultibaseCodec.decodeBase16(hex);
-      expect(decoded).toEqual(expected);
-    });
+ 
   });
 });

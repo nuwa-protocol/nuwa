@@ -6,7 +6,7 @@ export interface VerificationMethod {
   id: string; // e.g., did:example:alice#key-1
   type: string; // e.g., Ed25519VerificationKey2020 or EcdsaSecp256k1VerificationKey2019
   controller: string; // DID of the controller
-  publicKeyMultibase?: string; // Base64 URL encoded public key
+  publicKeyMultibase?: string; // Multibase encoded public key
   publicKeyJwk?: JsonWebKey; // JWK format public key
 }
 
@@ -303,7 +303,7 @@ export interface SignerInterface {
    * Get the DID of the signer
    * @returns The DID of the signer
    */
-  getDid(): string;
+  getDid(): Promise<string>;
 
   /**
    * Get information about a specific key

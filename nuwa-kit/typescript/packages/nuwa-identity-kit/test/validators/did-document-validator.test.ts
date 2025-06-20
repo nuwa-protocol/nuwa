@@ -19,7 +19,7 @@ describe('DID Document Validator', () => {
 
     // Create mock signer
     const { signer: mockSigner, keyId } = await LocalSigner.createWithDidKey();
-    const did = mockSigner.getDid();
+    const did = await mockSigner.getDid();
 
     const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
     const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);

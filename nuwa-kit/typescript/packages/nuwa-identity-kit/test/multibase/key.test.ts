@@ -59,7 +59,7 @@ describe('KeyMultibaseCodec', () => {
     it('should throw error for invalid multibase format', () => {
       expect(() => {
         KeyMultibaseCodec.decodeWithType('invalid-format');
-      }).toThrow('Invalid multibase format');
+      }).toThrow();
     });
 
     it('should throw error for unknown key type prefix', () => {

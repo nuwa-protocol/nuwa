@@ -127,13 +127,14 @@ export class DidAccountSigner extends Signer implements SignerInterface {
 
   private constructor(
     private wrappedSigner: SignerInterface,
+    did: string,
     keyId: string,
     keyType: KeyType,
     publicKey: Uint8Array
   ) {
     super();
     this.keyId = keyId;
-    this.did = wrappedSigner.getDid();
+    this.did = did;
     if (!this.did.startsWith('did:rooch:')) {
       throw new Error('Signer DID must be a did:rooch DID');
     }
@@ -167,7 +168,9 @@ export class DidAccountSigner extends Signer implements SignerInterface {
       throw new Error(`Key info not found for keyId: ${actualKeyId}`);
     }
 
-    return new DidAccountSigner(signer, actualKeyId, keyInfo.type, keyInfo.publicKey);
+    const did = await signer.getDid();
+
+    return new DidAccountSigner(signer, did, actualKeyId, keyInfo.type, keyInfo.publicKey);
   }
 
   // Implement Rooch Signer interface
@@ -215,7 +218,7 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     return [this.keyId];
   }
 
-  getDid(): string {
+  async getDid(): Promise<string> {
     return this.did;
   }
 

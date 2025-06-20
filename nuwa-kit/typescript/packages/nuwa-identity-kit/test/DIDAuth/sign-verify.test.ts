@@ -52,7 +52,7 @@ describe('DIDAuth.v1 basic sign/verify', () => {
       params: { foo: 'bar' },
     } as const;
 
-    const sigObj = await DIDAuth.v1.createSignature(payload, signer, didDoc, keyId);
+    const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
     const ok = await DIDAuth.v1.verifySignature(sigObj, resolver);
     expect(ok).toBe(true);
 
@@ -114,7 +114,7 @@ describe('DIDAuth.v1 basic sign/verify', () => {
       params: { foo: 'bar' },
     } as const;
 
-    const sigObj = await DIDAuth.v1.createSignature(payload, signer, didDocGood, keyId);
+    const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const ok = await DIDAuth.v1.verifySignature(sigObj, registry);
     expect(ok).toBe(true);

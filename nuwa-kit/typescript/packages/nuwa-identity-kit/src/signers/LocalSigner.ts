@@ -249,7 +249,7 @@ export class LocalSigner implements SignerInterface {
    * Get the DID of the signer
    * @returns The DID of the signer
    */
-  getDid(): string {
+  async getDid(): Promise<string> {
     return this.did;
   }
 }

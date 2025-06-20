@@ -39,7 +39,7 @@ nuwa-identity-kit
 createSignature(
   payload: Record<string, any>,
   signer: SignerInterface,
-  didDocument: DIDDocument,
+  didDocument: DIDDocument | undefined,
   keyId: string,
   opts?: {
     nonce?: string;
@@ -85,7 +85,7 @@ import { DIDAuth, KEY_TYPE, type DIDDocument } from '@nuwa-ai/identity-kit';
 import { KeyStoreSigner } from './KeyStoreSigner';
 
 const signer = new KeyStoreSigner();
-const did = signer.getDid();
+const did = await signer.getDid();
 const didDoc: DIDDocument = cache.get(did) ?? await resolve(did);
 
 const payload = {
