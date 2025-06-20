@@ -20,7 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@nuwa-ai/identity-kit": "0.1.0-beta.8",
+    "@nuwa-ai/identity-kit": "0.1.0-beta.10",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
     "cors": "^2.8.5",

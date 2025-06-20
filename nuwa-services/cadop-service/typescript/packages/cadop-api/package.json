@@ -16,19 +16,13 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "db:migrate": "supabase migration up",
-    "db:seed": "supabase db reset --include-seed",
-    "db:status": "supabase status",
-    "db:setup": "supabase db reset",
-    "db:new": "supabase migration new"
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@cadop/shared": "workspace:*",
     "@roochnetwork/rooch-sdk": "^0.3.6",
     "@simplewebauthn/server": "^12.0.0",
     "@simplewebauthn/types": "^12.0.0",
-    "@supabase/supabase-js": "^2.39.7",
     "@noble/curves": "^1.9.1",
     "cbor": "^10.0.3",
     "cbor-x": "^1.6.0",
@@ -58,7 +52,6 @@
     "jest": "^29.7.0",
     "nodemon": "^3.1.10",
     "prettier": "^3.2.5",
-    "supabase": "^2.24.3",
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",

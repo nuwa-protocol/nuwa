@@ -56,7 +56,7 @@ src/
 
 1. **Client** attaches header produced by the Identity Kit:
    ```ts
-   const sigObj = DIDAuth.v1.createSignature(payload, signer, didDoc, keyId);
+   const sigObj = DIDAuth.v1.createSignature(payload, signer, keyId);
    const header  = DIDAuth.v1.toAuthorizationHeader(sigObj);
    fetch("/api/v1/chat/completions", { headers: { Authorization: header } });
    ```
