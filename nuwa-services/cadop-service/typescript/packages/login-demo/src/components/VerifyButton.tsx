@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { DIDAuth } from '@nuwa-ai/identity-kit';
 import type { NIP1SignedObject } from '@nuwa-ai/identity-kit';
-import { registry } from '../services/registry';
+import { useAuth } from '../App';
 
 interface VerifyButtonProps {
   signature: NIP1SignedObject;
@@ -10,11 +9,12 @@ interface VerifyButtonProps {
 
 export function VerifyButton({ signature, onVerified }: VerifyButtonProps) {
   const [isVerifying, setIsVerifying] = useState(false);
+  const { verify } = useAuth();
 
   const handleVerify = async () => {
     try {
       setIsVerifying(true);
-      const ok = await DIDAuth.v1.verifySignature(signature, registry);
+      const ok = await verify(signature);
       onVerified(ok);
     } catch (e) {
       console.error('Verify failed', e);

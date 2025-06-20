@@ -1,8 +1,5 @@
-import { BaseMultibaseCodec, DIDAuth } from '@nuwa-ai/identity-kit';
-import type { DIDDocument } from '@nuwa-ai/identity-kit';
-import { KeyStore } from './KeyStore';
-import { registry } from './registry';
-import { SimpleSigner } from './SimpleSigner';
+import { DIDAuth } from '@nuwa-ai/identity-kit';
+import { useAuth } from '../App';
 
 const STORAGE_KEY = 'nuwa-login-demo:gateway-url';
 const DEFAULT_GATEWAY_URL = 'https://test-llm.nuwa.dev';
@@ -21,31 +18,19 @@ export interface GatewayRequestOptions {
   body?: string; // raw JSON string (will be sent as-is for non-GET)
 }
 
+// This function will be used inside a React component that has access to the auth context
 export async function sendSignedRequest(
   gatewayBaseUrl: string,
-  options: GatewayRequestOptions
+  options: GatewayRequestOptions,
+  sign: ReturnType<typeof useAuth>['sign']
 ): Promise<{ status: number; headers: Record<string, string>; body: string }> {
-  const storedKey = KeyStore.get();
-  if (!storedKey) {
-    throw new Error('No key stored. Please connect your Agent first.');
-  }
-
-  const privateKey = BaseMultibaseCodec.decodeBase58btc(storedKey.privateKey);
-  const signer = new SimpleSigner(storedKey.agentDid, storedKey.keyId, privateKey);
-
-  const didDoc = (await registry.resolveDID(storedKey.agentDid)) as DIDDocument;
-
   const payload = {
     operation: 'gateway-debug',
     params: { method: options.method, path: options.path },
   } as const;
 
-  const signatureObj = await DIDAuth.v1.createSignature(
-    payload,
-    signer,
-    didDoc,
-    storedKey.keyId
-  );
+  // Use the sign function from the hook
+  const signatureObj = await sign(payload);
   const authHeader = DIDAuth.v1.toAuthorizationHeader(signatureObj);
 
   const url = new URL(options.path, gatewayBaseUrl).toString();

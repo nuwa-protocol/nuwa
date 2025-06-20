@@ -355,7 +355,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     }
   }
 
-  getDid(): string {
+  async getDid(): Promise<string> {
     return this.did;
   }
 

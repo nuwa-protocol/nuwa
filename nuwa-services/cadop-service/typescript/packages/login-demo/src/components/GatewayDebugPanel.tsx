@@ -4,8 +4,10 @@ import {
   setGatewayUrl,
   sendSignedRequest,
 } from '../services/GatewayDebug';
+import { useAuth } from '../App';
 
 export function GatewayDebugPanel() {
+  const { sign } = useAuth();
   const [gatewayUrl, setGatewayUrlState] = useState(getGatewayUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
@@ -29,7 +31,7 @@ export function GatewayDebugPanel() {
       setLoading(true);
       setError(null);
       setResponseText(null);
-      const res = await sendSignedRequest(gatewayUrl, { method, path: apiPath, body: requestBody });
+      const res = await sendSignedRequest(gatewayUrl, { method, path: apiPath, body: requestBody }, sign);
 
       // Helper: pretty-print response and parse nested JSON in `body` field if present
       const formatResponse = (response: any): string => {
