@@ -14,3 +14,4 @@ export * from './keys';
 export * from './signers';
 export { InMemoryLRUDIDDocumentCache } from './InMemoryLRUDIDDocumentCache';
 export type { DIDDocumentCache } from './types';
+export { DebugLogger } from './DebugLogger';

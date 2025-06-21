@@ -36,6 +36,7 @@ import {
   parseDIDCreatedEvent,
   resolveDidObjectID,
 } from './roochVDRTypes';
+import { DebugLogger } from '../DebugLogger';
 
 export interface RoochClientConfig {
   url: string;
@@ -244,8 +245,7 @@ export class RoochVDR extends AbstractVDR {
   private client: RoochClient;
   private readonly didContractAddress: string;
   private readonly debug: boolean;
-
-  // Cache for storing the last created DID address
+  private readonly logger: DebugLogger;
   private lastCreatedDIDAddress?: string;
 
   constructor(options: RoochVDROptions) {
@@ -253,6 +253,10 @@ export class RoochVDR extends AbstractVDR {
     this.options = options;
     this.didContractAddress = '0x3::did';
     this.debug = options.debug || false;
+    this.logger = DebugLogger.get('RoochVDR');
+    if (this.debug) {
+      this.logger.setLevel('debug');
+    }
 
     // Initialize Rooch client
     this.client = new RoochClient({ url: options.rpcUrl });
@@ -262,12 +266,10 @@ export class RoochVDR extends AbstractVDR {
    * Log message if debug mode is enabled
    */
   private debugLog(message: string, data?: any) {
-    if (this.debug) {
-      if (data) {
-        console.log(`[RoochVDR Debug] ${message}`, data);
-      } else {
-        console.log(`[RoochVDR Debug] ${message}`);
-      }
+    if (data !== undefined) {
+      this.logger.debug(message, data);
+    } else {
+      this.logger.debug(message);
     }
   }
 
@@ -275,10 +277,10 @@ export class RoochVDR extends AbstractVDR {
    * Log error message (always logged regardless of debug mode)
    */
   private errorLog(message: string, error?: any) {
-    if (error) {
-      console.error(`[RoochVDR Error] ${message}`, error);
+    if (error !== undefined) {
+      this.logger.error(message, error);
     } else {
-      console.error(`[RoochVDR Error] ${message}`);
+      this.logger.error(message);
     }
   }
 
