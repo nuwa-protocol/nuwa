@@ -34,7 +34,7 @@ const ENCODER_MAP: Record<MultibaseName, MultibaseCodecImpl> = {
  */
 export class MultibaseCodec {
   /**
-   * Generic encode 
+   * Generic encode
    * Example: `MultibaseCodec.encode(bytes, 'base64url')`
    */
   static encode(data: Uint8Array | string, base: MultibaseName): string {

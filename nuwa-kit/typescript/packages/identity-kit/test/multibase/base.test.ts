@@ -66,6 +66,5 @@ describe('BaseMultibaseCodec', () => {
       const decoded = BaseMultibaseCodec.decodeBase16(encoded);
       expect(decoded).toEqual(testData);
     });
- 
   });
 });

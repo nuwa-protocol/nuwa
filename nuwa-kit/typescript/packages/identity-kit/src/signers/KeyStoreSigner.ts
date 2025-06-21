@@ -15,7 +15,10 @@ export class KeyStoreSigner implements SignerInterface {
    * @param keyStore The underlying key store to use
    * @param did The DID to associate with this signer
    */
-  constructor(private keyStore: KeyStore, did?: string) {
+  constructor(
+    private keyStore: KeyStore,
+    did?: string
+  ) {
     if (did) {
       this.did = did;
     }
@@ -53,7 +56,7 @@ export class KeyStoreSigner implements SignerInterface {
 
     // Decode the private key from its encoded form
     const privateKeyBytes = MultibaseCodec.decode(key.privateKeyMultibase);
-    
+
     // Use CryptoUtils to sign with the private key
     return CryptoUtils.sign(data, privateKeyBytes, key.keyType);
   }
@@ -104,10 +107,10 @@ export class KeyStoreSigner implements SignerInterface {
 
     // Convert the public key from its encoded form
     const publicKeyBytes = MultibaseCodec.decode(key.publicKeyMultibase);
-    
+
     return {
       type: key.keyType,
-      publicKey: publicKeyBytes
+      publicKey: publicKeyBytes,
     };
   }
-} 
+}

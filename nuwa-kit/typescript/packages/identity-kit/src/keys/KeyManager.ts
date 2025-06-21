@@ -47,18 +47,18 @@ export class KeyManager implements SignerInterface {
     if (!this.did) {
       throw new Error('DID must be set before generating keys');
     }
-    
+
     const type = keyType || this.defaultKeyType;
     const keyPair = await CryptoUtils.generateKeyPair(type);
-    
+
     // Create a key ID with the provided fragment or a timestamp
     const keyFragment = fragment || `key-${Date.now()}`;
     const keyId = `${this.did}#${keyFragment}`;
-    
+
     // Encode the keys
     const publicKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.publicKey);
     const privateKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.privateKey);
-    
+
     // Create the stored key
     const storedKey: StoredKey = {
       keyId,
@@ -66,10 +66,10 @@ export class KeyManager implements SignerInterface {
       publicKeyMultibase: publicKeyEncoded,
       privateKeyMultibase: privateKeyEncoded,
     };
-    
+
     // Save to the store
     await this.store.save(storedKey);
-    
+
     return storedKey;
   }
 
@@ -88,7 +88,7 @@ export class KeyManager implements SignerInterface {
       this.did = didFromKey;
       this.signer.setDid(this.did);
     }
-    
+
     await this.store.save(key);
   }
 
@@ -179,14 +179,14 @@ export class KeyManager implements SignerInterface {
    */
   async findKeyByType(keyType: KeyType): Promise<string | undefined> {
     const keyIds = await this.listKeyIds();
-    
+
     for (const keyId of keyIds) {
       const key = await this.getStoredKey(keyId);
       if (key && key.keyType === keyType) {
         return keyId;
       }
     }
-    
+
     return undefined;
   }
 
@@ -197,4 +197,4 @@ export class KeyManager implements SignerInterface {
   getStore(): KeyStore {
     return this.store;
   }
-} 
+}

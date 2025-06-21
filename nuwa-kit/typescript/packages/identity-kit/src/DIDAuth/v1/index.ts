@@ -44,7 +44,9 @@ export async function createSignature(
   const signerDid = await signer.getDid();
   if (opts.didDocument) {
     if (opts.didDocument.id !== signerDid) {
-      throw new Error(`DID document ID ${opts.didDocument.id} does not match signer DID ${signerDid}`);
+      throw new Error(
+        `DID document ID ${opts.didDocument.id} does not match signer DID ${signerDid}`
+      );
     }
     const verificationMethod = opts.didDocument.verificationMethod?.find(vm => vm.id === keyId);
     if (!verificationMethod) {
@@ -152,13 +154,16 @@ export async function verifyAuthHeader(
   header: string,
   resolver: DIDResolver,
   opts: VerifyHeaderOptions = {}
-): Promise<{
-  ok: true;
-  signedObject: NIP1SignedObject;
-} | {
-  ok: false;
-  error: string;
-}> {
+): Promise<
+  | {
+      ok: true;
+      signedObject: NIP1SignedObject;
+    }
+  | {
+      ok: false;
+      error: string;
+    }
+> {
   if (!header || !header.startsWith(HEADER_PREFIX)) {
     return { ok: false, error: 'Unsupported or missing Authorization header' };
   }
