@@ -23,7 +23,7 @@ jobs:
         id: filter
         with:
           filters: |
-            identity-kit: nuwa-kit/typescript/packages/nuwa-identity-kit/**
+            identity-kit: nuwa-kit/typescript/packages/identity-kit/**
             # 添加其他包
             # package-2: nuwa-kit/typescript/packages/package-2/**
             # package-3: nuwa-kit/typescript/packages/package-3/**
@@ -73,7 +73,7 @@ jobs:
         run: |
           PACKAGE_PATH=""
           if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
-            PACKAGE_PATH="nuwa-kit/typescript/packages/nuwa-identity-kit"
+            PACKAGE_PATH="nuwa-kit/typescript/packages/identity-kit"
           # elif [[ "${{ matrix.package }}" == "package-2" ]]; then
           #   PACKAGE_PATH="nuwa-kit/typescript/packages/package-2"
           fi
