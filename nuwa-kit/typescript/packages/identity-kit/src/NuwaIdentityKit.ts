@@ -356,43 +356,6 @@ export class NuwaIdentityKit {
     return false;
   }
 
-  // DID Resolution
-  async resolveDID(did: string): Promise<DIDDocument | null> {
-    const didMethod = did.split(':')[1];
-    const vdr = VDRRegistry.getInstance().getVDR(didMethod);
-
-    if (!vdr) {
-      throw new Error(`No VDR registered for DID method '${didMethod}'`);
-    }
-
-    try {
-      return await vdr.resolve(did);
-    } catch (error) {
-      console.error(`Failed to resolve DID ${did}:`, error);
-      throw new Error(
-        `Failed to resolve DID: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  async didExists(did: string): Promise<boolean> {
-    const didMethod = did.split(':')[1];
-    const vdr = VDRRegistry.getInstance().getVDR(didMethod);
-
-    if (!vdr) {
-      throw new Error(`No VDR registered for DID method '${didMethod}'`);
-    }
-
-    try {
-      return await vdr.exists(did);
-    } catch (error) {
-      console.error(`Failed to check if DID ${did} exists:`, error);
-      throw new Error(
-        `Failed to check if DID exists: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
   // Document Access
   getDIDDocument(): DIDDocument {
     return JSON.parse(JSON.stringify(this.didDocument));
