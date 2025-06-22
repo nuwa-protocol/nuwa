@@ -8,9 +8,35 @@ import {
   ServiceEndpoint,
   DIDCreationRequest,
   VerificationMethod,
+  KeyTypeInput,
 } from './types';
 import { VDRRegistry } from './VDRRegistry';
+// Key management & crypto utilities
+import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
+import { KeyManager } from './keys/KeyManager';
+import { CryptoUtils } from './cryptoUtils';
+import { DidKeyCodec } from './multibase';
+import { KEY_TYPE, KeyType } from './types';
+import { createVDR, initRoochVDR } from './vdr';
+import { LocalSigner } from './signers/LocalSigner';
 import { BaseMultibaseCodec } from './multibase';
+// Rooch SDK types (optional dependency path is runtime resolved)
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
+
+// Simplified initialization options for the high-level factory method introduced in v1 refactor
+export interface IdentityKitInitOptions {
+  /** DID method to use. Currently supported: 'key' | 'rooch' */
+  method?: 'key' | 'rooch';
+  /** Desired key type for master key – defaults to Ed25519 */
+  keyType?: KeyTypeInput;
+  /** Optional pre-constructed KeyStore implementation. If omitted and method === 'key' a MemoryKeyStore will be created automatically. */
+  keyStore?: KeyStore;
+  /** Rooch specific: target network (local | dev | test | main). Defaults to 'test'. */
+  network?: 'local' | 'dev' | 'test' | 'main';
+  /** Rooch specific: explicit RPC endpoint overriding the default derived from network. */
+  rpcUrl?: string;
+}
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
@@ -86,6 +112,115 @@ export class NuwaIdentityKit {
     }
 
     return new NuwaIdentityKit(result.didDocument, vdr, signer);
+  }
+
+  /**
+   * Unified factory for quickly getting an `NuwaIdentityKit` instance with sane defaults.
+   *
+   *
+   * Example usage:
+   * ```ts
+   * const kit = await NuwaIdentityKit.init({ method: 'rooch' });
+   * ```
+   */
+  static async init(options: IdentityKitInitOptions = {}): Promise<NuwaIdentityKit> {
+    const method = (options.method || 'rooch').toLowerCase();
+    const keyType: KeyType = options.keyType ? (typeof options.keyType === 'string' ? options.keyType as KeyType : options.keyType) : KEY_TYPE.ED25519;
+
+    // ---------------------------------------------------------------------
+    // 1. Ensure a VDR is registered for the requested method
+    // ---------------------------------------------------------------------
+    const registry = VDRRegistry.getInstance();
+    let vdr = registry.getVDR(method);
+
+    if (!vdr) {
+      if (method === 'rooch') {
+        vdr = initRoochVDR(options.network || 'test', options.rpcUrl, registry);
+      } else if (method === 'key') {
+        // Leverage built-in factory
+        vdr = createVDR('key');
+        registry.registerVDR(vdr);
+      } else {
+        // Try generic factory fall-back – may throw for unsupported method
+        vdr = createVDR(method);
+        registry.registerVDR(vdr);
+      }
+    }
+
+    //---------------------------------------------------------------------
+    // 2. Prepare a Signer implementation (KeyManager for did:key, LocalSigner for did:rooch)
+    //---------------------------------------------------------------------
+    if (method === 'key') {
+      // a) KeyStore / KeyManager setup ------------------------------------------------
+      const store: KeyStore = options.keyStore || new MemoryKeyStore();
+      const keyManager = new KeyManager({ store, defaultKeyType: keyType });
+
+      // b) Generate a master key ------------------------------------------------------
+      const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(keyType);
+      const publicKeyMultibase = CryptoUtils.publicKeyToMultibase(publicKey, keyType);
+      const did = DidKeyCodec.generateDidKey(publicKey, keyType);
+      const keyId = `${did}#master`;
+
+      // Persist key material inside KeyStore
+      await store.save({
+        keyId,
+        keyType,
+        publicKeyMultibase,
+        privateKeyMultibase: BaseMultibaseCodec.encodeBase58btc(privateKey),
+      });
+
+      keyManager.setDid(did);
+
+      // c) Publish DID via KeyVDR (purely local for did:key) -------------------------
+      const createResult = await registry.createDID(method, {
+        publicKeyMultibase,
+        keyType,
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'capabilityDelegation'],
+      });
+
+      if (!createResult.success || !createResult.didDocument) {
+        throw new Error(`Failed to initialise did:key: ${createResult.error || 'unknown error'}`);
+      }
+
+      return new NuwaIdentityKit(createResult.didDocument, vdr!, keyManager);
+    }
+
+    if (method === 'rooch') {
+      // Generate a Secp256k1 keypair (more common for Rooch) – fall back to Ed25519 if requested
+      const useSecp = keyType === KEY_TYPE.SECP256K1;
+      const keypair = useSecp ? Secp256k1Keypair.generate() : Ed25519Keypair.generate();
+
+      const publicKeyBytes = keypair.getPublicKey().toBytes();
+      const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+      const address = keypair.getRoochAddress().toBech32Address();
+      const did = `did:rooch:${address}`;
+
+      // LocalSigner holds our generated keypair and implements SignerInterface
+      const localSigner = LocalSigner.createEmpty(did);
+      await localSigner.importRoochKeyPair('account-key', keypair);
+
+      // Create DID on-chain -----------------------------------------------------------
+      const createResult = await registry.createDID(method, {
+        publicKeyMultibase,
+        keyType,
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'capabilityDelegation'],
+      }, {
+        signer: localSigner,
+        keyId: `${did}#account-key`,
+      });
+
+      if (!createResult.success || !createResult.didDocument) {
+        throw new Error(`Failed to create Rooch DID: ${createResult.error || 'unknown error'}`);
+      }
+
+      return new NuwaIdentityKit(createResult.didDocument, vdr!, localSigner);
+    }
+
+    throw new Error(`Unsupported DID method: ${method}`);
   }
 
   // Verification Method Management
