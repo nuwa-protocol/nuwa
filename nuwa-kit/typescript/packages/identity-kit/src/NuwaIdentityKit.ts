@@ -4,15 +4,12 @@ import {
   OperationalKeyInfo,
   VerificationRelationship,
   ServiceInfo,
-  NIP1SignedObject,
-  SignedData,
   SignerInterface,
   VDRInterface,
   ServiceEndpoint,
   DIDCreationRequest,
   VerificationMethod,
 } from './types';
-import { CryptoUtils } from './cryptoUtils';
 import { VDRRegistry } from './VDRRegistry';
 import { BaseMultibaseCodec } from './multibase';
 
@@ -21,7 +18,6 @@ import { BaseMultibaseCodec } from './multibase';
  */
 export class NuwaIdentityKit {
   private didDocument: DIDDocument;
-  private operationalPrivateKeys: Map<string, CryptoKey | Uint8Array> = new Map();
   private vdr: VDRInterface;
   private signer: SignerInterface;
 
@@ -29,31 +25,18 @@ export class NuwaIdentityKit {
   private constructor(
     didDocument: DIDDocument,
     vdr: VDRInterface,
-    signer: SignerInterface,
-    options?: {
-      operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>;
-    }
+    signer: SignerInterface
   ) {
     this.didDocument = didDocument;
     this.vdr = vdr;
     this.signer = signer;
-
-    if (options?.operationalPrivateKeys) {
-      this.operationalPrivateKeys = options.operationalPrivateKeys;
-    }
   }
 
   // Factory methods
   /**
    * Create an instance from an existing DID (for managing existing DIDs)
    */
-  static async fromExistingDID(
-    did: string,
-    signer: SignerInterface,
-    options?: {
-      operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>;
-    }
-  ): Promise<NuwaIdentityKit> {
+  static async fromExistingDID(did: string, signer: SignerInterface): Promise<NuwaIdentityKit> {
     const registry = VDRRegistry.getInstance();
     const method = did.split(':')[1];
     const vdr = registry.getVDR(method);
@@ -67,26 +50,20 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to resolve DID ${did}`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, signer, options);
+    return new NuwaIdentityKit(didDocument, vdr, signer);
   }
 
   /**
    * Create an instance from a DID Document (for scenarios with known DID Document)
    */
-  static fromDIDDocument(
-    didDocument: DIDDocument,
-    signer: SignerInterface,
-    options?: {
-      operationalPrivateKeys?: Map<string, CryptoKey | Uint8Array>;
-    }
-  ): NuwaIdentityKit {
+  static fromDIDDocument(didDocument: DIDDocument, signer: SignerInterface): NuwaIdentityKit {
     const method = didDocument.id.split(':')[1];
     const vdr = VDRRegistry.getInstance().getVDR(method);
     if (!vdr) {
       throw new Error(`No VDR available for DID method '${method}'`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, signer, options);
+    return new NuwaIdentityKit(didDocument, vdr, signer);
   }
 
   /**
@@ -109,7 +86,7 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
     }
 
-    return new NuwaIdentityKit(result.didDocument, vdr, signer, options);
+    return new NuwaIdentityKit(result.didDocument, vdr, signer);
   }
 
   // Verification Method Management
@@ -260,7 +237,6 @@ export class NuwaIdentityKit {
         }
       });
 
-      this.operationalPrivateKeys.delete(keyId);
       return true;
     }
 
@@ -380,119 +356,6 @@ export class NuwaIdentityKit {
     return false;
   }
 
-  // Signing and Verification
-  async createNIP1Signature(
-    payload: Omit<SignedData, 'nonce' | 'timestamp'>,
-    keyId: string
-  ): Promise<NIP1SignedObject> {
-    const verificationMethod = this.didDocument.verificationMethod?.find(vm => vm.id === keyId);
-    if (!verificationMethod) {
-      throw new Error(`Verification method for keyId ${keyId} not found in DID document.`);
-    }
-
-    const keyType = verificationMethod.type;
-    const signedData: SignedData = {
-      ...payload,
-      nonce: crypto.getRandomValues(new Uint32Array(1))[0].toString(),
-      timestamp: Math.floor(Date.now() / 1000),
-    };
-
-    const canonicalData = JSON.stringify(signedData, Object.keys(signedData).sort());
-    const dataToSign = new TextEncoder().encode(canonicalData);
-
-    const privateKey = this.operationalPrivateKeys.get(keyId);
-    if (!privateKey) {
-      throw new Error(
-        `Private key for keyId ${keyId} not found and no suitable external signer is available.`
-      );
-    }
-    const signatureValue = await CryptoUtils.sign(dataToSign, privateKey, keyType);
-
-    return {
-      signed_data: signedData,
-      signature: {
-        signer_did: this.didDocument.id,
-        key_id: keyId,
-        value: signatureValue,
-      },
-    };
-  }
-
-  static async verifyNIP1Signature(
-    signedObject: NIP1SignedObject,
-    resolvedDidDocumentOrVDRs: DIDDocument | VDRInterface[]
-  ): Promise<boolean> {
-    const { signed_data, signature } = signedObject;
-    let resolvedDidDocument: DIDDocument;
-
-    if (Array.isArray(resolvedDidDocumentOrVDRs)) {
-      const did = signature.signer_did;
-      const didMethod = did.split(':')[1];
-      const vdr = resolvedDidDocumentOrVDRs.find(v => v.getMethod() === didMethod);
-
-      if (!vdr) {
-        console.error(`No VDR available for DID method '${didMethod}'`);
-        return false;
-      }
-
-      resolvedDidDocument = (await vdr.resolve(did)) as DIDDocument;
-      if (!resolvedDidDocument) {
-        console.error(`Failed to resolve DID ${did}`);
-        return false;
-      }
-    } else {
-      resolvedDidDocument = resolvedDidDocumentOrVDRs;
-    }
-
-    // Verify timestamp
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - signed_data.timestamp) > 300) {
-      console.warn('Timestamp out of valid window');
-      return false;
-    }
-
-    // Verify signer DID
-    if (resolvedDidDocument.id !== signature.signer_did) {
-      console.error('Signer DID does not match resolved DID document ID');
-      return false;
-    }
-
-    // Find verification method
-    const verificationMethod = resolvedDidDocument.verificationMethod?.find(
-      vm => vm.id === signature.key_id
-    );
-    if (!verificationMethod) {
-      console.error(`Verification method ${signature.key_id} not found in DID document.`);
-      return false;
-    }
-
-    // Extract public key
-    let publicKeyMaterial: JsonWebKey | Uint8Array | null = null;
-    if (verificationMethod.publicKeyJwk) {
-      publicKeyMaterial = verificationMethod.publicKeyJwk;
-    } else if (verificationMethod.publicKeyMultibase) {
-      publicKeyMaterial = new TextEncoder().encode(
-        verificationMethod.publicKeyMultibase.substring(1)
-      );
-    }
-
-    if (!publicKeyMaterial) {
-      console.error('Public key material not found in verification method.');
-      return false;
-    }
-
-    // Verify signature
-    const canonicalData = JSON.stringify(signed_data, Object.keys(signed_data).sort());
-    const dataToVerify = new TextEncoder().encode(canonicalData);
-
-    return await CryptoUtils.verify(
-      dataToVerify,
-      signature.value,
-      publicKeyMaterial,
-      verificationMethod.type
-    );
-  }
-
   // DID Resolution
   async resolveDID(did: string): Promise<DIDDocument | null> {
     const didMethod = did.split(':')[1];
@@ -557,25 +420,21 @@ export class NuwaIdentityKit {
 
   // State Checks
   async canSignWithKey(keyId: string): Promise<boolean> {
-    if (this.operationalPrivateKeys.has(keyId)) {
-      return true;
-    }
-
-    return false;
+    return this.signer.canSignWithKeyId(keyId);
   }
 
-  // Private Key Management Methods
-  private storeOperationalPrivateKey(keyId: string, privateKey: CryptoKey | Uint8Array): void {
-    this.operationalPrivateKeys.set(keyId, privateKey);
+  private async updateLocalDIDDocument(): Promise<void> {
+    this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
+    console.log('After updateLocalDIDDocument', JSON.stringify(this.didDocument, null, 2));
   }
 
-  private getOperationalPrivateKey(keyId: string): CryptoKey | Uint8Array | undefined {
-    return this.operationalPrivateKeys.get(keyId);
+  getSigner(): SignerInterface {
+    return this.signer;
   }
 
   /**
-   * Get all available keys grouped by their verification relationships
-   * @returns Object mapping verification relationships to arrays of key IDs
+   * Get all key IDs that are both present in DID document and available via Signer,
+   * grouped by verification relationship.
    */
   async getAvailableKeyIds(): Promise<{ [key in VerificationRelationship]?: string[] }> {
     const relationships: VerificationRelationship[] = [
@@ -586,24 +445,19 @@ export class NuwaIdentityKit {
       'capabilityDelegation',
     ];
 
+    const availableFromSigner = await this.signer.listKeyIds();
     const result: { [key in VerificationRelationship]?: string[] } = {};
 
-    for (const relationship of relationships) {
-      const keys = await this.findKeysWithRelationship(relationship);
-      if (keys.length > 0) {
-        result[relationship] = keys;
-      }
+    for (const rel of relationships) {
+      const relArray = this.didDocument[rel] as (string | { id: string })[] | undefined;
+      if (!relArray?.length) continue;
+
+      const ids = relArray
+        .map(item => (typeof item === 'string' ? item : item.id))
+        .filter(id => availableFromSigner.includes(id));
+
+      if (ids.length) result[rel] = ids;
     }
-
     return result;
-  }
-
-  private async updateLocalDIDDocument(): Promise<void> {
-    this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
-    console.log('After updateLocalDIDDocument', JSON.stringify(this.didDocument, null, 2));
-  }
-
-  getSigner(): SignerInterface {
-    return this.signer;
   }
 }
