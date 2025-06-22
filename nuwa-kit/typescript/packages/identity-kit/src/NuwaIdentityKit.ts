@@ -1,6 +1,5 @@
 import {
   DIDDocument,
-  MasterIdentity,
   OperationalKeyInfo,
   VerificationRelationship,
   ServiceInfo,
@@ -98,27 +97,7 @@ export class NuwaIdentityKit {
   private async findKeyWithRelationship(
     relationship: VerificationRelationship
   ): Promise<string | undefined> {
-    // Get all available keys from the signer
-    const availableKeyIds = await this.signer.listKeyIds();
-    if (!availableKeyIds.length) {
-      return undefined;
-    }
-
-    // Get keys with the specified relationship from DID Document
-    const relationships = this.didDocument[relationship] as (string | { id: string })[];
-    if (!relationships?.length) {
-      return undefined;
-    }
-
-    // Find the first key that exists in both the DID Document and signer
-    for (const item of relationships) {
-      const keyId = typeof item === 'string' ? item : item.id;
-      if (availableKeyIds.includes(keyId)) {
-        return keyId;
-      }
-    }
-
-    return undefined;
+    return this.findKeysWithRelationship(relationship).then(keys => keys[0]);
   }
 
   /**
