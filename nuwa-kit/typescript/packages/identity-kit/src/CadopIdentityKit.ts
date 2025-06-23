@@ -8,7 +8,7 @@ import {
   VerificationRelationship,
 } from './types';
 import { VDRRegistry } from './VDRRegistry';
-import { NuwaIdentityKit } from './NuwaIdentityKit';
+import { IdentityKit } from './IdentityKit';
 
 /**
  * CADOP service types
@@ -64,9 +64,9 @@ export class CadopIdentityKit {
     },
   };
 
-  private nuwaKit: NuwaIdentityKit;
+  private nuwaKit: IdentityKit;
 
-  private constructor(nuwaKit: NuwaIdentityKit) {
+  private constructor(nuwaKit: IdentityKit) {
     this.nuwaKit = nuwaKit;
   }
 
@@ -87,7 +87,7 @@ export class CadopIdentityKit {
     serviceDid: string,
     signer: SignerInterface
   ): Promise<CadopIdentityKit> {
-    const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, signer);
+    const nuwaKit = await IdentityKit.fromExistingDID(serviceDid, signer);
     return new CadopIdentityKit(nuwaKit);
   }
 
@@ -170,9 +170,9 @@ export class CadopIdentityKit {
   }
 
   /**
-   * Get the underlying NuwaIdentityKit instance
+   * Get the underlying IdentityKit instance
    */
-  getNuwaIdentityKit(): NuwaIdentityKit {
+  getNuwaIdentityKit(): IdentityKit {
     return this.nuwaKit;
   }
 

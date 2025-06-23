@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  NuwaIdentityKit,
+  IdentityKit,
   DIDDocument,
   ServiceEndpoint,
   CadopIdentityKit,

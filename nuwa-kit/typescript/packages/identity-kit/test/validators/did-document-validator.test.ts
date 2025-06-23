@@ -1,4 +1,4 @@
-import { NuwaIdentityKit, VDRRegistry } from '../../src';
+import { IdentityKit, VDRRegistry } from '../../src';
 import { DIDDocument, DIDCreationRequest, SignerInterface, KEY_TYPE } from '../../src/types';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
 import { CryptoUtils } from '../../src/cryptoUtils';
@@ -31,8 +31,8 @@ describe('DID Document Validator', () => {
       controller: did,
     };
 
-    // Create a new DID using NuwaIdentityKit
-    const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, mockSigner);
+    // Create a new DID using IdentityKit
+    const kit = await IdentityKit.createNewDID('key', creationRequest, mockSigner);
     console.log(kit.getDIDDocument());
     validDocument = kit.getDIDDocument();
   });

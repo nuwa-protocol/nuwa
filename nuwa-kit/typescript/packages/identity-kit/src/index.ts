@@ -1,5 +1,5 @@
 export * from './types';
-export * from './NuwaIdentityKit';
+export * from './IdentityKit';
 export * from './CadopIdentityKit';
 export * from './VDRRegistry';
 export * from './vdr';

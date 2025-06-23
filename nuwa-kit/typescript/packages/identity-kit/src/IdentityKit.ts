@@ -40,7 +40,7 @@ export interface IdentityKitInitOptions {
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
  */
-export class NuwaIdentityKit {
+export class IdentityKit {
   private didDocument: DIDDocument;
   private vdr: VDRInterface;
   private signer: SignerInterface;
@@ -60,7 +60,7 @@ export class NuwaIdentityKit {
   /**
    * Create an instance from an existing DID (for managing existing DIDs)
    */
-  static async fromExistingDID(did: string, signer: SignerInterface): Promise<NuwaIdentityKit> {
+  static async fromExistingDID(did: string, signer: SignerInterface): Promise<IdentityKit> {
     const registry = VDRRegistry.getInstance();
     const method = did.split(':')[1];
     const vdr = registry.getVDR(method);
@@ -74,20 +74,20 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to resolve DID ${did}`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, signer);
+    return new IdentityKit(didDocument, vdr, signer);
   }
 
   /**
    * Create an instance from a DID Document (for scenarios with known DID Document)
    */
-  static fromDIDDocument(didDocument: DIDDocument, signer: SignerInterface): NuwaIdentityKit {
+  static fromDIDDocument(didDocument: DIDDocument, signer: SignerInterface): IdentityKit {
     const method = didDocument.id.split(':')[1];
     const vdr = VDRRegistry.getInstance().getVDR(method);
     if (!vdr) {
       throw new Error(`No VDR available for DID method '${method}'`);
     }
 
-    return new NuwaIdentityKit(didDocument, vdr, signer);
+    return new IdentityKit(didDocument, vdr, signer);
   }
 
   /**
@@ -98,7 +98,7 @@ export class NuwaIdentityKit {
     creationRequest: DIDCreationRequest,
     signer: SignerInterface,
     options?: Record<string, any>
-  ): Promise<NuwaIdentityKit> {
+  ): Promise<IdentityKit> {
     const registry = VDRRegistry.getInstance();
     const vdr = registry.getVDR(method);
     if (!vdr) {
@@ -110,19 +110,19 @@ export class NuwaIdentityKit {
       throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
     }
 
-    return new NuwaIdentityKit(result.didDocument, vdr, signer);
+    return new IdentityKit(result.didDocument, vdr, signer);
   }
 
   /**
-   * Unified factory for quickly getting an `NuwaIdentityKit` instance with sane defaults.
+   * Unified factory for quickly getting an `IdentityKit` instance with sane defaults.
    *
    *
    * Example usage:
    * ```ts
-   * const kit = await NuwaIdentityKit.init({ method: 'rooch' });
+   * const kit = await IdentityKit.init({ method: 'rooch' });
    * ```
    */
-  static async init(options: IdentityKitInitOptions = {}): Promise<NuwaIdentityKit> {
+  static async init(options: IdentityKitInitOptions = {}): Promise<IdentityKit> {
     const method = (options.method || 'rooch').toLowerCase();
     const keyType: KeyType = options.keyType ? (typeof options.keyType === 'string' ? options.keyType as KeyType : options.keyType) : KEY_TYPE.ED25519;
 
@@ -183,7 +183,7 @@ export class NuwaIdentityKit {
         throw new Error(`Failed to initialise did:key: ${createResult.error || 'unknown error'}`);
       }
 
-      return new NuwaIdentityKit(createResult.didDocument, vdr!, keyManager);
+      return new IdentityKit(createResult.didDocument, vdr!, keyManager);
     }
 
     if (method === 'rooch') {
@@ -216,7 +216,7 @@ export class NuwaIdentityKit {
         throw new Error(`Failed to create Rooch DID: ${createResult.error || 'unknown error'}`);
       }
 
-      return new NuwaIdentityKit(createResult.didDocument, vdr!, km);
+      return new IdentityKit(createResult.didDocument, vdr!, km);
     }
 
     throw new Error(`Unsupported DID method: ${method}`);
@@ -537,3 +537,5 @@ export class NuwaIdentityKit {
     return result;
   }
 }
+
+export { IdentityKit as NuwaIdentityKit };

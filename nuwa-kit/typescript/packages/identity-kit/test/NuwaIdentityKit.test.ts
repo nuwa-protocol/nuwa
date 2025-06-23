@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  NuwaIdentityKit,
+  IdentityKit,
   DIDDocument,
   DIDCreationRequest,
   OperationalKeyInfo,
@@ -14,7 +14,7 @@ import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
 import { KeyManager } from '../src/keys/KeyManager';
 
-describe('NuwaIdentityKit', () => {
+describe('IdentityKit', () => {
   let keyVDR: KeyVDR;
   let testDID: string;
   let mockDIDDocument: DIDDocument;
@@ -84,14 +84,14 @@ describe('NuwaIdentityKit', () => {
         controller: testDID,
       });
 
-      const kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
-      expect(kit).toBeInstanceOf(NuwaIdentityKit);
+      const kit = await IdentityKit.fromExistingDID(testDID, signer);
+      expect(kit).toBeInstanceOf(IdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
 
     it('should create instance from DID Document', () => {
-      const kit = NuwaIdentityKit.fromDIDDocument(mockDIDDocument, signer);
-      expect(kit).toBeInstanceOf(NuwaIdentityKit);
+      const kit = IdentityKit.fromDIDDocument(mockDIDDocument, signer);
+      expect(kit).toBeInstanceOf(IdentityKit);
       expect(kit.getDIDDocument()).toEqual(mockDIDDocument);
     });
 
@@ -110,17 +110,17 @@ describe('NuwaIdentityKit', () => {
         controller: did,
       };
 
-      const kit = await NuwaIdentityKit.createNewDID('key', creationRequest, signer);
-      expect(kit).toBeInstanceOf(NuwaIdentityKit);
+      const kit = await IdentityKit.createNewDID('key', creationRequest, signer);
+      expect(kit).toBeInstanceOf(IdentityKit);
       expect(kit.getDIDDocument().id).toMatch(/^did:key:/);
     });
   });
 
   describe('Service Management', () => {
-    let kit: NuwaIdentityKit;
+    let kit: IdentityKit;
 
     beforeEach(async () => {
-      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
+      kit = await IdentityKit.fromExistingDID(testDID, signer);
     });
 
     it('should add and remove service', async () => {
@@ -157,7 +157,7 @@ describe('NuwaIdentityKit', () => {
   });
 
   describe('DID Resolution', () => {
-    let kit: NuwaIdentityKit;
+    let kit: IdentityKit;
 
     beforeEach(async () => {
       // Create DID first
@@ -168,7 +168,7 @@ describe('NuwaIdentityKit', () => {
         controller: testDID,
       });
 
-      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
+      kit = await IdentityKit.fromExistingDID(testDID, signer);
     });
 
     it('should resolve DID', async () => {
@@ -197,10 +197,10 @@ describe('NuwaIdentityKit', () => {
   });
 
   describe('Key Management', () => {
-    let kit: NuwaIdentityKit;
+    let kit: IdentityKit;
 
     beforeEach(async () => {
-      kit = await NuwaIdentityKit.fromExistingDID(testDID, signer);
+      kit = await IdentityKit.fromExistingDID(testDID, signer);
 
       // Debug: Log available keys in signer
       const signerKeys = await signer.listKeyIds();
