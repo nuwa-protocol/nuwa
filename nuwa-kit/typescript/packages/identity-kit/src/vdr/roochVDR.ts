@@ -34,6 +34,7 @@ import {
   resolveDidObjectID,
 } from './roochVDRTypes';
 import { DebugLogger } from '../utils/DebugLogger';
+import { parseDid, extractFragmentFromId } from '../utils/did';
 
 export interface RoochClientConfig {
   url: string;
@@ -143,8 +144,8 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     if (!this.did.startsWith('did:rooch:')) {
       throw new Error('Signer DID must be a did:rooch DID');
     }
-    const didParts = this.did.split(':');
-    this.didAddress = new RoochAddress(didParts[2]);
+    const didParts = parseDid(did);
+    this.didAddress = new RoochAddress(didParts.identifier);
     this.keyType = keyType;
     this.publicKey = publicKey;
   }
@@ -497,12 +498,10 @@ export class RoochVDR extends AbstractVDR {
       this.validateDIDMethod(did);
 
       // Extract address from did:rooch:address format
-      const didParts = did.split(':');
-      if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
+      const { method, identifier } = parseDid(did);
+      if (method !== 'rooch') {
         throw new Error('Invalid DID format. Expected did:rooch:address');
       }
-
-      const identifier = didParts[2];
 
       // Calculate Object ID from identifier
       const objectId = resolveDidObjectID(identifier);
@@ -539,12 +538,12 @@ export class RoochVDR extends AbstractVDR {
       this.validateDIDMethod(did);
 
       // Extract address from did:rooch:address format
-      const didParts = did.split(':');
-      if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
+      const { method, identifier } = parseDid(did);
+      if (method !== 'rooch') {
         return false;
       }
 
-      const address = didParts[2];
+      const address = identifier;
 
       // Call DID contract's exists_did_for_address view function on Rooch network
       const result = await this.client.executeViewFunction({
@@ -617,7 +616,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::add_verification_method_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(verificationMethod.id)),
+          Args.string(extractFragmentFromId(verificationMethod.id)),
           Args.string(verificationMethod.type),
           Args.string(verificationMethod.publicKeyMultibase),
           Args.vec('u8', relationshipValues),
@@ -627,7 +626,7 @@ export class RoochVDR extends AbstractVDR {
 
       this.debugLog(`Executing transaction: add_verification_method_entry`);
       this.debugLog(`Args:`, [
-        this.extractFragmentFromId(verificationMethod.id),
+        extractFragmentFromId(verificationMethod.id),
         verificationMethod.type,
         verificationMethod.publicKeyMultibase,
         relationshipValues,
@@ -703,7 +702,7 @@ export class RoochVDR extends AbstractVDR {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_verification_method_entry`,
-        args: [Args.string(this.extractFragmentFromId(id))],
+        args: [Args.string(extractFragmentFromId(id))],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
 
@@ -789,7 +788,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::add_service_with_properties_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(service.id)),
+          Args.string(extractFragmentFromId(service.id)),
           Args.string(service.type),
           Args.string(service.serviceEndpoint),
           Args.vec('string', propertyKeys),
@@ -800,7 +799,7 @@ export class RoochVDR extends AbstractVDR {
 
       console.log(`📤 Executing transaction: add_service_entry`);
       console.log(`📋 Args:`, [
-        this.extractFragmentFromId(service.id),
+        extractFragmentFromId(service.id),
         service.type,
         service.serviceEndpoint,
       ]);
@@ -880,7 +879,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::add_service_with_properties_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(service.id)),
+          Args.string(extractFragmentFromId(service.id)),
           Args.string(service.type),
           Args.string(service.serviceEndpoint),
           Args.vec('string', propertyKeys),
@@ -941,7 +940,7 @@ export class RoochVDR extends AbstractVDR {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_service_entry`,
-        args: [Args.string(this.extractFragmentFromId(id))],
+        args: [Args.string(extractFragmentFromId(id))],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
 
@@ -995,7 +994,7 @@ export class RoochVDR extends AbstractVDR {
         return false;
       }
 
-      const fragment = this.extractFragmentFromId(id);
+      const fragment = extractFragmentFromId(id);
 
       // Add relationships
       for (const relationship of add) {
@@ -1078,17 +1077,6 @@ export class RoochVDR extends AbstractVDR {
       default:
         throw new Error(`Unknown verification relationship: ${relationship}`);
     }
-  }
-
-  /**
-   * Extract fragment from a full ID (e.g., "did:rooch:address#fragment" -> "fragment")
-   */
-  private extractFragmentFromId(id: string): string {
-    const hashIndex = id.indexOf('#');
-    if (hashIndex === -1) {
-      throw new Error(`Invalid ID format: ${id}. Expected format: did:rooch:address#fragment`);
-    }
-    return id.substring(hashIndex + 1);
   }
 
   /**

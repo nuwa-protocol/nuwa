@@ -5,6 +5,7 @@ import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
 import { signWithKeyStore, canSignWithKeyStore, getKeyInfoFromKeyStore } from '../signers/keyStoreUtils';
 import { BaseMultibaseCodec, KeyMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
+import { getDidWithoutFragment } from '../utils/did';
 
 /**
  * Options for initializing a KeyManager
@@ -78,7 +79,7 @@ export class KeyManager implements SignerInterface {
    * @param key The key to import
    */
   async importKey(key: StoredKey): Promise<void> {
-    const didFromKey = key.keyId.split('#')[0];
+    const didFromKey = getDidWithoutFragment(key.keyId);
 
     if (this.did && didFromKey !== this.did) {
       throw new Error(`Key belongs to a different DID: ${didFromKey}`);
@@ -133,7 +134,7 @@ export class KeyManager implements SignerInterface {
     // Attempt to derive from stored keys
     const keyIds = await this.listKeyIds();
     if (keyIds.length > 0) {
-      this.did = keyIds[0].split('#')[0];
+      this.did = getDidWithoutFragment(keyIds[0]);
       return this.did;
     }
 

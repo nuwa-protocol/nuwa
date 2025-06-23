@@ -37,26 +37,7 @@ export class KeyVDR extends AbstractVDR {
    */
   public reset(): void {
     KeyVDR.documentCache.clear();
-  }
-
-  /**
-   * Parses a did:key identifier to extract the public key
-   *
-   * @param did The did:key identifier
-   * @returns The extracted multibase-encoded public key
-   */
-  private extractMultibaseKey(did: string): string {
-    this.validateDIDMethod(did);
-
-    // Extract the multibase-encoded public key from the DID
-    // did:key:<multibase-encoded-key>
-    const parts = did.split(':');
-    if (parts.length !== 3) {
-      throw new Error(`Invalid did:key format: ${did}`);
-    }
-
-    return parts[2];
-  }
+  } 
 
   /**
    * Override resolve to handle test mode

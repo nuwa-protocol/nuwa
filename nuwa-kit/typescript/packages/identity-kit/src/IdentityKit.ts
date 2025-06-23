@@ -17,6 +17,7 @@ import { DidKeyCodec, KeyMultibaseCodec } from './multibase';
 import { createVDR, initRoochVDR } from './vdr';
 import { BaseMultibaseCodec } from './multibase';
 import { Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
+import { extractMethod, parseDid } from './utils/did';
 
 // Simplified initialization options for the high-level factory method introduced in v1 refactor
 export interface IdentityKitInitOptions {
@@ -57,7 +58,7 @@ export class IdentityKit {
    */
   static async fromExistingDID(did: string, signer: SignerInterface): Promise<IdentityKit> {
     const registry = VDRRegistry.getInstance();
-    const method = did.split(':')[1];
+    const method = extractMethod(did);
     const vdr = registry.getVDR(method);
     if (!vdr) {
       throw new Error(`No VDR available for DID method '${method}'`);
@@ -76,7 +77,7 @@ export class IdentityKit {
    * Create an instance from a DID Document (for scenarios with known DID Document)
    */
   static fromDIDDocument(didDocument: DIDDocument, signer: SignerInterface): IdentityKit {
-    const method = didDocument.id.split(':')[1];
+    const { method } = parseDid(didDocument.id);
     const vdr = VDRRegistry.getInstance().getVDR(method);
     if (!vdr) {
       throw new Error(`No VDR available for DID method '${method}'`);

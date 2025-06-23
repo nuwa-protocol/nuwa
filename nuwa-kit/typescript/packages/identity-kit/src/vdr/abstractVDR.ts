@@ -10,6 +10,7 @@ import {
   CADOPCreationRequest,
   VDRInterface,
 } from './types';
+import { parseDid } from '../utils/did';
 
 /**
  * Abstract base class for implementing Verifiable Data Registry functionality
@@ -44,8 +45,8 @@ export abstract class AbstractVDR implements VDRInterface {
    * @throws Error if the DID doesn't match this VDR's method
    */
   protected validateDIDMethod(did: string): void {
-    const parts = did.split(':');
-    if (parts.length < 3 || parts[0] !== 'did' || parts[1] !== this.method) {
+    const { method } = parseDid(did);
+    if (method !== this.method) {
       throw new Error(`DID ${did} is not a valid did:${this.method} identifier`);
     }
   }
