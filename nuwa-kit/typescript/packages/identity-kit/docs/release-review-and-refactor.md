@@ -145,3 +145,34 @@
 ---
 
 **以上即为 v1 发布前的最终 Review 与重构建议**。 
+
+---
+
+## 重构进度追踪 (更新于 2025-06-21)
+
+| 评估分类 | 状态 | 说明 |
+| :--- | :--- | :--- |
+| **1. 命名与类型** | | |
+| 1.1 `NuwaIdentityKit` -> `IdentityKit` | ✅ **完成** | 核心类已重命名。 |
+| 1.2 `KEY_TYPE` 常量枚举化 | ✅ **完成** | 已重构为 `enum KeyType` 并保留向后兼容。 |
+| 1.3 签名 API 统一 | ✅ **完成** | 已移除 `createNIP1Signature` 等旧方法。 |
+| 1.4 `RoochVDROperationOptions` 精简 | ✅ **完成** | 链上细节参数已收敛到 `advanced` 对象中。 |
+| **2. 初始化与易用性** | | |
+| 2.1 `IdentityKit.init()` 工厂函数 | ✅ **完成** | 已提供快捷初始化方法。 |
+| 2.2 `IdentityKitBuilder` 链式 API | ❌ **未完成** | Builder 模式尚未实现。 |
+| 2.3 README Quick-Start 精简 | 🟡 **待检查** | 代码已支持，需确认文档是否同步更新。 |
+| **3. 代码冗余** | | |
+| 3.1 删除旧签名 API | ✅ **完成** | 已完成。 |
+| 3.2 删除 `operationalPrivateKeys` | ✅ **完成** | 已完成。 |
+| 3.3 `KeyManager` / `KeyStoreSigner` 逻辑收敛 | ✅ **完成** | 签名逻辑抽取到 `keyStoreUtils`, KeyManager 不再持有内部 KeyStoreSigner，无重复代码。 |
+| 3.4 VDR 工具函数去重 | ✅ **完成** | 提取 `vdr/utils.ts`，RoochVDR 等复用公共函数。 |
+| **4. 内置模块** | | |
+| 4.1 **默认 DID 解析缓存** | ✅ **完成** | `VDRRegistry` 已默认启用 `InMemoryLRUDIDDocumentCache`。 |
+| 4.2 **轻量级调试日志器** | ✅ **完成** | `DebugLogger.ts` 模块已实现。 |
+| 4.3 `identityKit.validate()` 快捷方法 | ❌ **未完成** | 尚未在 `IdentityKit` 上提供此快捷方法。 暂时不考虑|
+| 4.4 高阶 Service Builders | ❌ **未完成** | 尚未实现。 |
+| **5. 其他** | | |
+| 5.1 包名统一 | ✅ **完成** | 已统一为 `@nuwa-ai/identity-kit`。 |
+| 5.2 Tree-shaking 优化 | ❌ **未完成** | 未发现明确的打包优化配置或体积快照。 |
+| 5.3 `types.ts` 按功能域拆分 | ✅ **完成** | `types` 目录已模块化。 |
+| 5.4 `WebAuthnSigner` 安全缺省 | ❌ **未完成** | `credentialId` 字段仍为公开。 | 

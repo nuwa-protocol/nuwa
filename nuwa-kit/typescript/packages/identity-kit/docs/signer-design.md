@@ -134,7 +134,7 @@ async addVerificationMethod(
     type: keyInfo.type,
     controller: keyInfo.controller || this.didDocument.id,
     publicKeyMultibase: keyInfo.publicKeyMaterial instanceof Uint8Array 
-      ? await CryptoUtils.publicKeyToMultibase(keyInfo.publicKeyMaterial, keyInfo.type)
+      ? await KeyMultibaseCodec.encodeWithType(keyInfo.publicKeyMaterial, keyInfo.type)
       : undefined,
     publicKeyJwk: !(keyInfo.publicKeyMaterial instanceof Uint8Array)
       ? keyInfo.publicKeyMaterial
