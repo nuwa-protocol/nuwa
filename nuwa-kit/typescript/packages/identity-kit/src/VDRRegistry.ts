@@ -1,7 +1,7 @@
 import { DIDDocument, DIDDocumentCache, DIDResolver } from './types/did';
 import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types/vdr';
 
-import { InMemoryLRUDIDDocumentCache } from './InMemoryLRUDIDDocumentCache';
+import { InMemoryLRUDIDDocumentCache } from './cache/InMemoryLRUDIDDocumentCache';
 
 /**
  * Global registry for VDR (Verifiable Data Registry) implementations

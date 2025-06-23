@@ -5,7 +5,7 @@ import { CryptoUtils } from '../../src/crypto';
 import { BaseMultibaseCodec } from '../../src/multibase';
 import { KeyManager } from '../../src/keys/KeyManager';
 import { VDRRegistry } from '../../src/VDRRegistry';
-import { InMemoryLRUDIDDocumentCache } from '../../src/InMemoryLRUDIDDocumentCache';
+import { InMemoryLRUDIDDocumentCache } from '../../src/cache/InMemoryLRUDIDDocumentCache';
 
 // Simple resolver returning static DID Document
 class StaticResolver implements DIDResolver {

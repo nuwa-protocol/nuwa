@@ -1,4 +1,4 @@
-import { DIDDocument, DIDDocumentCache } from './types/did';
+import { DIDDocument, DIDDocumentCache } from '../types/did';
 
 /**
  * A lightweight in-memory LRU cache implementation for DID Documents.
@@ -49,4 +49,4 @@ export class InMemoryLRUDIDDocumentCache implements DIDDocumentCache {
   clear(): void {
     this.map.clear();
   }
-}
+} 

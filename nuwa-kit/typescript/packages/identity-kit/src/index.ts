@@ -12,6 +12,6 @@ export { DIDAuth } from './auth';
 export { initRoochVDR } from './vdr';
 export * from './keys';
 export * from './signers';
-export { InMemoryLRUDIDDocumentCache } from './InMemoryLRUDIDDocumentCache';
+export { InMemoryLRUDIDDocumentCache } from './cache/InMemoryLRUDIDDocumentCache';
 export type { DIDDocumentCache } from './types/did';
 export { DebugLogger } from './DebugLogger';
