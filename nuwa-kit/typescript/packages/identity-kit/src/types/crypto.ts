@@ -81,28 +81,3 @@ export interface OperationalKeyInfo {
   publicKeyMaterial: Uint8Array | JsonWebKey; // The public key material
   controller?: string; // Defaults to the master DID if not provided
 }
-
-/**
- * Result of creating a master identity.
- */
-export interface MasterIdentity {
-  did: string;
-  masterKeyId: string; // ID of the primary master key in verificationMethod
-  masterPublicKeyMultibase: string; // Multibase encoded public key
-  masterPrivateKey: CryptoKey | Uint8Array; // The private key material for the master key
-}
-
-/**
- * Options for creating a master DID.
- */
-export interface CreateMasterIdentityOptions {
-  method?: string; // e.g., 'key', 'web', or a future chain-specific method like 'rooch'
-  // Additional options specific to the DID method can be added here
-  keyCurve?: string; // Specifies the curve to use for key generation (e.g., 'secp256k1', 'ed25519')
-  masterKeyIdFragment?: string; // Custom fragment for the master key ID
-  initialOperationalKey?: {
-    publicKeyMaterial: Uint8Array | JsonWebKey;
-    type: string; // e.g., Ed25519VerificationKey2020
-    relationships?: string[]; // Verification relationships
-  };
-} 
