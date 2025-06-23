@@ -101,14 +101,21 @@ export interface RoochVDROperationOptions {
   keyId?: string;
 
   /**
+   * Advanced blockchain transaction options
+   * For high-level users who need fine-grained control over transaction parameters
+   */
+  advanced?: RoochTxnOptions;
+}
+
+/**
+ * Advanced Rooch blockchain transaction options
+ * These options are typically only needed for advanced use cases
+ */
+export interface RoochTxnOptions {
+  /**
    * Maximum gas limit for the transaction
    */
   maxGas?: number;
-
-  /**
-   * Whether to wait for transaction confirmation
-   */
-  waitForConfirmation?: boolean;
 }
 
 /**
@@ -310,7 +317,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::create_did_object_for_self_entry`,
         args: [Args.string(request.publicKeyMultibase)],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog('Creating DID Transaction:', transaction);
@@ -397,7 +404,7 @@ export class RoochVDR extends AbstractVDR {
           Args.string(request.custodianServicePublicKey),
           Args.string(request.custodianServiceVMType),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog('Creating DID via CADOP Transaction:', transaction);
@@ -615,7 +622,7 @@ export class RoochVDR extends AbstractVDR {
           Args.string(verificationMethod.publicKeyMultibase),
           Args.vec('u8', relationshipValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog(`Executing transaction: add_verification_method_entry`);
@@ -697,7 +704,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_verification_method_entry`,
         args: [Args.string(this.extractFragmentFromId(id))],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -788,7 +795,7 @@ export class RoochVDR extends AbstractVDR {
           Args.vec('string', propertyKeys),
           Args.vec('string', propertyValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       console.log(`📤 Executing transaction: add_service_entry`);
@@ -879,7 +886,7 @@ export class RoochVDR extends AbstractVDR {
           Args.vec('string', propertyKeys),
           Args.vec('string', propertyValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -935,7 +942,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_service_entry`,
         args: [Args.string(this.extractFragmentFromId(id))],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -997,7 +1004,7 @@ export class RoochVDR extends AbstractVDR {
         transaction.callFunction({
           target: `${this.didContractAddress}::add_to_verification_relationship_entry`,
           args: [Args.string(fragment), Args.u8(relationshipValue)],
-          maxGas: options?.maxGas || 100000000,
+          maxGas: options?.advanced?.maxGas || 100000000,
         });
 
         const result = await this.client.signAndExecuteTransaction({
@@ -1018,7 +1025,7 @@ export class RoochVDR extends AbstractVDR {
         transaction.callFunction({
           target: `${this.didContractAddress}::remove_from_verification_relationship_entry`,
           args: [Args.string(fragment), Args.u8(relationshipValue)],
-          maxGas: options?.maxGas || 100000000,
+          maxGas: options?.advanced?.maxGas || 100000000,
         });
 
         const result = await this.client.signAndExecuteTransaction({
