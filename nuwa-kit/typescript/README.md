@@ -15,13 +15,8 @@ This package provides the official TypeScript/JavaScript SDK for the Nuwa Protoc
 
 This SDK is structured as a monorepo using pnpm workspaces. Key packages include:
 
-*   `packages/core`: Core types, utilities, and foundational logic.
-*   `packages/identity`: Identity creation, authentication, and management.
-*   `packages/state`: Agent state model and synchronization.
-*   `packages/payments`: Payment channel and fiat proxy interactions.
-*   `packages/capabilities`: Capability discovery and usage.
-*   `packages/agent`: High-level SDK for building Nuwa agents.
-*   *(More packages will be added as features are developed)*
+*   `packages/identity-kit`: Identity creation, authentication, and management.
+*   `packages/identity-kit-web`: Identity creation, authentication, and management for web.
 
 ## Installation
 
@@ -29,17 +24,7 @@ This SDK is structured as a monorepo using pnpm workspaces. Key packages include
 
 ```bash
 # Example for a specific package (once published)
-pnpm add @nuwa/core @nuwa/identity
-```
-
-## Usage
-
-(Basic usage examples will be provided here)
-
-```typescript
-// Example:
-// import { NuwaAgent } from '''@nuwa/agent''';
-// const agent = new NuwaAgent(...);
+pnpm add @nuwa-ai/identity-kit
 ```
 
 ## Development
@@ -62,7 +47,3 @@ pnpm run build
 ```bash
 pnpm test
 ```
-
-## Examples
-
-See the `examples/` directory within this SDK for more detailed usage scenarios.
