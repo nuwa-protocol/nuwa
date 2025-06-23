@@ -1,6 +1,6 @@
 import { SignerInterface, KeyType } from '../types';
 import { KeyStore, StoredKey } from '../keys/KeyStore';
-import { CryptoUtils } from '../cryptoUtils';
+import { CryptoUtils } from '../crypto';
 import { MultibaseCodec } from '../multibase';
 
 /**

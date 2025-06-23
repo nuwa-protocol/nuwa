@@ -6,7 +6,6 @@ export * from './vdr';
 export * from './cadopUtils';
 export * from './multibase';
 export * from './crypto';
-export * from './cryptoUtils';
 export * from './utils/base64';
 export { DIDAuth } from './auth';
 export { initRoochVDR } from './vdr';

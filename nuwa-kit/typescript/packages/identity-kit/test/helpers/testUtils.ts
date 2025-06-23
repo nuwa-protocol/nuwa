@@ -8,7 +8,7 @@ import {
   KEY_TYPE,
   KeyType,
 } from '../../src/types';
-import { CryptoUtils } from '../../src/cryptoUtils';
+import { CryptoUtils } from '../../src/crypto';
 
 /**
  * Creates a test DID document

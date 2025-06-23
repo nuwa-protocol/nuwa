@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { DIDAuth } from '../../src';
 import { DIDDocument, DIDResolver, KEY_TYPE } from '../../src/types';
-import { CryptoUtils } from '../../src/cryptoUtils';
+import { CryptoUtils } from '../../src/crypto';
 import { BaseMultibaseCodec } from '../../src/multibase';
 import { KeyManager } from '../../src/keys/KeyManager';
 import { VDRRegistry } from '../../src/VDRRegistry';

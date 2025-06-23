@@ -14,7 +14,7 @@ import { VDRRegistry } from './VDRRegistry';
 // Key management & crypto utilities
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
 import { KeyManager } from './keys/KeyManager';
-import { CryptoUtils } from './cryptoUtils';
+import { CryptoUtils } from './crypto';
 import { DidKeyCodec } from './multibase';
 import { KEY_TYPE, KeyType } from './types';
 import { createVDR, initRoochVDR } from './vdr';

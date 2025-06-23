@@ -5,7 +5,7 @@ import {
   CadopOnboardingRequest,
   KeyType,
 } from './types';
-import { CryptoUtils } from './cryptoUtils';
+import { CryptoUtils } from './crypto';
 import { DidKeyCodec } from './multibase';
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { CryptoUtils } from '../../src/cryptoUtils';
+import { CryptoUtils } from '../../src/crypto';
 import { KEY_TYPE } from '../../src/types';
 import { base64url } from 'multiformats/bases/base64';
 

@@ -1,9 +1,7 @@
-import { webcrypto } from 'crypto';
-import { base58btc } from 'multiformats/bases/base58';
 import { base64urlpad } from 'multiformats/bases/base64';
-import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from './types';
-import { defaultCryptoProviderFactory } from './crypto/factory';
-import { KeyMultibaseCodec } from './multibase';
+import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from '../types';
+import { defaultCryptoProviderFactory } from './factory';
+import { KeyMultibaseCodec } from '../multibase';
 
 /**
  * CryptoUtils provides cross-platform cryptographic utilities for DID operations.

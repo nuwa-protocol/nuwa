@@ -1,7 +1,7 @@
 import { IdentityKit, VDRRegistry } from '../../src';
 import { DIDDocument, DIDCreationRequest, SignerInterface, KEY_TYPE } from '../../src/types';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
-import { CryptoUtils } from '../../src/cryptoUtils';
+import { CryptoUtils } from '../../src/crypto';
 import { KeyVDR } from '../../src/vdr/keyVDR';
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { KeyManager } from '../../src/keys/KeyManager';

@@ -6,7 +6,7 @@ import {
   DIDResolver,
 } from '../../types';
 import { canonicalize } from './utils';
-import { CryptoUtils } from '../../cryptoUtils';
+import { CryptoUtils } from '../../crypto';
 import { NonceStore, defaultNonceStore } from './nonceStore';
 import { BaseMultibaseCodec } from '../../multibase';
 import { Base64 } from '../../utils/base64';

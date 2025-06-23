@@ -8,7 +8,7 @@ import {
   CADOPCreationRequest,
 } from '../types';
 import { AbstractVDR } from './abstractVDR';
-import { CryptoUtils } from '../cryptoUtils';
+import { CryptoUtils } from '../crypto';
 import { CadopUtils } from '../cadopUtils';
 import { KeyMultibaseCodec } from '../multibase/key';
 import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';

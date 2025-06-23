@@ -10,7 +10,7 @@ import {
   KEY_TYPE,
   VDRRegistry,
 } from '../src';
-import { CryptoUtils } from '../src/cryptoUtils';
+import { CryptoUtils } from '../src/crypto';
 import { KeyVDR } from '../src/vdr/keyVDR';
 import { KeyManager } from '../src/keys/KeyManager';
 

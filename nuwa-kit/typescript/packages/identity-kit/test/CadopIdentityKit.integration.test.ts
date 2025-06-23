@@ -10,7 +10,7 @@ import {
   BaseMultibaseCodec,
 } from '../src';
 import { RoochVDR } from '../src/vdr/roochVDR';
-import { CryptoUtils } from '../src/cryptoUtils';
+import { CryptoUtils } from '../src/crypto';
 import { KeyManager } from '../src/keys/KeyManager';
 import { DIDStruct, formatDIDString } from '../src/vdr/roochVDRTypes';
 import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
