@@ -1,5 +1,5 @@
 import { base64urlpad } from 'multiformats/bases/base64';
-import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from '../types';
+import { KEY_TYPE, KeyType, KeyTypeInput, toKeyType } from '../types/crypto';
 import { defaultCryptoProviderFactory } from './factory';
 import { KeyMultibaseCodec } from '../multibase';
 

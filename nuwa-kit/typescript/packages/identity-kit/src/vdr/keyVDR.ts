@@ -1,12 +1,14 @@
 import {
   DIDDocument,
-  ServiceEndpoint,
   VerificationMethod,
   VerificationRelationship,
+  ServiceEndpoint,
+} from '../types/did';
+import {
   DIDCreationRequest,
   DIDCreationResult,
   CADOPCreationRequest,
-} from '../types';
+} from '../types/vdr';
 import { AbstractVDR } from './abstractVDR';
 import { CryptoUtils } from '../crypto';
 import { CadopUtils } from '../cadopUtils';

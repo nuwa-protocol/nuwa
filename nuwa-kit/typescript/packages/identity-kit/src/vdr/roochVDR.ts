@@ -19,16 +19,17 @@ import {
 } from '@roochnetwork/rooch-sdk';
 import {
   DIDDocument,
-  ServiceEndpoint,
   VerificationMethod,
   VerificationRelationship,
+  ServiceEndpoint,
+} from '../types/did';
+import { SignerInterface } from '../types/signer';
+import { KeyType, KEY_TYPE, KeyTypeInput, toKeyType } from '../types/crypto';
+import {
   DIDCreationRequest,
   DIDCreationResult,
   CADOPCreationRequest,
-  SignerInterface,
-  KeyType,
-  KEY_TYPE,
-} from '../types';
+} from '../types/vdr';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,

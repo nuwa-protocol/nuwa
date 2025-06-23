@@ -1,4 +1,4 @@
-import { VDRInterface } from '../types';
+import { VDRInterface } from '../types/vdr';
 import { KeyVDR } from './keyVDR';
 import { RoochVDR } from './roochVDR';
 import { VDRRegistry } from '../VDRRegistry';

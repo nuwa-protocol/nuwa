@@ -1,22 +1,19 @@
 import {
   DIDDocument,
-  OperationalKeyInfo,
+  VerificationMethod,
   VerificationRelationship,
   ServiceInfo,
-  SignerInterface,
-  VDRInterface,
   ServiceEndpoint,
-  DIDCreationRequest,
-  VerificationMethod,
-  KeyTypeInput,
-} from './types';
+} from './types/did';
+import { SignerInterface } from './types/signer';
+import { KeyTypeInput, KEY_TYPE, KeyType, OperationalKeyInfo } from './types/crypto';
+import { VDRInterface, DIDCreationRequest } from './types/vdr';
 import { VDRRegistry } from './VDRRegistry';
 // Key management & crypto utilities
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
 import { KeyManager } from './keys/KeyManager';
 import { CryptoUtils } from './crypto';
 import { DidKeyCodec } from './multibase';
-import { KEY_TYPE, KeyType } from './types';
 import { createVDR, initRoochVDR } from './vdr';
 import { BaseMultibaseCodec } from './multibase';
 // Rooch SDK types (optional dependency path is runtime resolved)

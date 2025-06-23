@@ -1,4 +1,5 @@
-import { DIDDocument, VDRInterface } from '../types';
+import { DIDDocument } from '../types/did';
+import { VDRInterface } from '../types/vdr';
 
 /**
  * Resolves a DID using an array of VDRs

@@ -1,12 +1,11 @@
 import {
   ServiceEndpoint,
   DIDDocument,
-  CADOPCreationRequest,
-  DIDCreationResult,
-  SignerInterface,
   ServiceInfo,
   VerificationRelationship,
-} from './types';
+} from './types/did';
+import { SignerInterface } from './types/signer';
+import { CADOPCreationRequest, DIDCreationResult } from './types/vdr';
 import { VDRRegistry } from './VDRRegistry';
 import { IdentityKit } from './IdentityKit';
 

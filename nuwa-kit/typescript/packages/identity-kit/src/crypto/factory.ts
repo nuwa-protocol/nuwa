@@ -2,7 +2,7 @@ import { CryptoProvider, CryptoProviderFactory } from './providers';
 import { Ed25519Provider } from './providers/ed25519';
 import { Secp256k1Provider } from './providers/secp256k1';
 import { EcdsaR1Provider } from './providers/ecdsa_r1';
-import { KEY_TYPE, KeyType } from '../types';
+import { KEY_TYPE, KeyType } from '../types/crypto';
 
 export class DefaultCryptoProviderFactory implements CryptoProviderFactory {
   private providers: Map<KeyType, CryptoProvider>;

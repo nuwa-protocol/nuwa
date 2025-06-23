@@ -1,4 +1,4 @@
-import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../types';
+import { DIDDocument, ServiceEndpoint, VerificationMethod } from '../types/did';
 
 export interface ValidationResult {
   isValid: boolean;

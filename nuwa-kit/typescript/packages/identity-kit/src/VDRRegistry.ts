@@ -1,12 +1,5 @@
-import {
-  DIDDocument,
-  VDRInterface,
-  DIDCreationRequest,
-  CADOPCreationRequest,
-  DIDCreationResult,
-  DIDResolver,
-  DIDDocumentCache,
-} from './types';
+import { DIDDocument, DIDDocumentCache, DIDResolver } from './types/did';
+import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types/vdr';
 
 import { InMemoryLRUDIDDocumentCache } from './InMemoryLRUDIDDocumentCache';
 

@@ -1,4 +1,4 @@
-import { KeyType } from '../types';
+import { KeyType } from '../types/crypto';
 
 /**
  * Represents a stored cryptographic key with its metadata

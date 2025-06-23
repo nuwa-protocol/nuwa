@@ -1,4 +1,5 @@
-export * from './types';
+// Using the new modular types system
+export * from './types/index';
 export * from './IdentityKit';
 export * from './CadopIdentityKit';
 export * from './VDRRegistry';
@@ -12,5 +13,5 @@ export { initRoochVDR } from './vdr';
 export * from './keys';
 export * from './signers';
 export { InMemoryLRUDIDDocumentCache } from './InMemoryLRUDIDDocumentCache';
-export type { DIDDocumentCache } from './types';
+export type { DIDDocumentCache } from './types/did';
 export { DebugLogger } from './DebugLogger';

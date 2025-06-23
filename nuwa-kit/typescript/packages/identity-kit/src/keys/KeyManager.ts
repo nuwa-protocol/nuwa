@@ -1,7 +1,8 @@
-import { SignerInterface, KeyType, KEY_TYPE } from '../types';
+import { SignerInterface } from '../types/signer';
+import { KeyType, KEY_TYPE } from '../types/crypto';
+import { CryptoUtils } from '../crypto';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
 import { KeyStoreSigner } from '../signers/KeyStoreSigner';
-import { CryptoUtils } from '../crypto';
 import { BaseMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 

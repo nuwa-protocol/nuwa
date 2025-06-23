@@ -1,10 +1,14 @@
+import { DIDDocument, VerificationRelationship } from './types/did';
+import { KeyType } from './types/crypto';
 import {
-  DIDDocument,
-  VerificationRelationship,
   CadopIdTokenClaims,
+  SybilLevel,
+  AuthMethod,
+} from './types/auth';
+import {
   CadopOnboardingRequest,
-  KeyType,
-} from './types';
+  CadopOnboardingResponse,
+} from './types/cadop';
 import { CryptoUtils } from './crypto';
 import { DidKeyCodec } from './multibase';
 

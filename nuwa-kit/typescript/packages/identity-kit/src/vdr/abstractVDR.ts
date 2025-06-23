@@ -1,13 +1,15 @@
 import {
   DIDDocument,
-  ServiceEndpoint,
-  VDRInterface,
   VerificationMethod,
   VerificationRelationship,
+  ServiceEndpoint,
+} from '../types/did';
+import {
   DIDCreationRequest,
   DIDCreationResult,
   CADOPCreationRequest,
-} from '../types';
+  VDRInterface,
+} from '../types/vdr';
 
 /**
  * Abstract base class for implementing Verifiable Data Registry functionality
