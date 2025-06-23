@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { DIDAuth } from '../../src';
 import { DIDDocument, KEY_TYPE } from '../../src';
 import { CryptoUtils } from '../../src/crypto';
-import { BaseMultibaseCodec } from '../../src/multibase';
+import { MultibaseCodec } from '../../src/multibase';
 import { KeyManager } from '../../src/keys/KeyManager';
 import { VDRRegistry } from '../../src/vdr/VDRRegistry';
 import { InMemoryLRUDIDDocumentCache } from '../../src/cache/InMemoryLRUDIDDocumentCache';
@@ -25,7 +25,7 @@ function buildDidDoc(pubKey: Uint8Array, did: string, keyId: string): DIDDocumen
         id: keyId,
         type: 'Ed25519VerificationKey2020',
         controller: did,
-        publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(pubKey),
+        publicKeyMultibase: MultibaseCodec.encodeBase58btc(pubKey),
       },
     ],
     authentication: [keyId],

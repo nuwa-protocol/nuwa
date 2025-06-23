@@ -1,7 +1,7 @@
 import { base58btc } from 'multiformats/bases/base58';
 import { base64pad, base64, base64url, base64urlpad } from 'multiformats/bases/base64';
 import { base16 } from 'multiformats/bases/base16';
-import { stringToBytes } from '../utils/bytes';
+import { bytesToString, stringToBytes } from '../utils/bytes';
 
 /**
  * Supported multibase names – use these with the generic `encode()` API.
@@ -145,6 +145,15 @@ export class MultibaseCodec {
     return base64url.decode(encoded);
   }
 
+    /**
+   * Decode base64url string to string
+   * @param encoded The base64url encoded string
+   * @returns decoded string
+   */
+  static decodeBase64urlToString(encoded: string): string {
+    return bytesToString(this.decodeBase64url(encoded));
+  }
+
   /**
    * Decode base64urlpad string to bytes
    * @param encoded The base64urlpad encoded string
@@ -152,6 +161,15 @@ export class MultibaseCodec {
    */
   static decodeBase64urlpad(encoded: string): Uint8Array {
     return base64urlpad.decode(encoded);
+  }
+
+  /**
+   * Decode base64urlpad string to string
+   * @param encoded The base64urlpad encoded string
+   * @returns decoded string
+   */
+  static decodeBase64urlpadToString(encoded: string): string {
+    return bytesToString(this.decodeBase64urlpad(encoded));
   }
 
   /**
@@ -182,8 +200,3 @@ export class MultibaseCodec {
     }
   }
 }
-
-// Back-compat: keep the old name as an alias so existing imports don't break.
-// TODO: remove BaseMultibaseCodec after the next major version bump.
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const BaseMultibaseCodec = MultibaseCodec;

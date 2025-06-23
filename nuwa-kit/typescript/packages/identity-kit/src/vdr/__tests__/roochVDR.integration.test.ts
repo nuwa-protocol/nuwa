@@ -12,7 +12,7 @@ import {
   RoochAddress,
 } from '@roochnetwork/rooch-sdk';
 import { KeyMultibaseCodec } from '../../multibase/key';
-import { BaseMultibaseCodec } from '../../multibase';
+import { MultibaseCodec } from '../../multibase';
 import { KeyManager } from '../../keys/KeyManager';
 
 // Test configuration
@@ -85,7 +85,7 @@ describe('RoochVDR Integration Tests', () => {
         // Get the actual public key from the keypair (Secp256k1)
         const publicKeyBytes = keypair.getPublicKey().toBytes();
 
-        const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+        const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
         console.log('Using public key multibase (raw):', publicKeyMultibase);
         console.log('Should start with z (base58btc):', publicKeyMultibase.startsWith('z'));
@@ -171,7 +171,7 @@ describe('RoochVDR Integration Tests', () => {
         const newKeypair = Secp256k1Keypair.generate();
         const publicKeyBytes = newKeypair.getPublicKey().toBytes();
 
-        const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+        const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
         console.log('Generated new verification method:');
         console.log('- Public key multibase:', publicKeyMultibase);

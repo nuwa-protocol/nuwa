@@ -4,7 +4,7 @@ import {
   DIDAuth,
   VDRRegistry,
   SignedData,
-  initRoochVDR,
+  IdentityKit,
 } from '@nuwa-ai/identity-kit';
 import { LocalStorageKeyStore } from './keystore/LocalStorageKeyStore';
 import { IndexedDBKeyStore } from './keystore/IndexedDBKeyStore';
@@ -49,36 +49,45 @@ export class IdentityKitWeb {
   static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
     const { appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
-    
-    // Initialize Rooch VDR (idempotent)
+
+    // Resolve Rooch network and RPC URL
     const network = resolveNetworkFromHost(cadopDomain);
-    const rpcUrl = options.roochRpcUrl || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_ROOCH_RPC_URL : undefined);
-    initRoochVDR(network, rpcUrl);
-    
-    // Create or use provided KeyManager
-    let keyManager = options.keyManager;
-    if (!keyManager) {
-      let store;
-      
-      // Create appropriate KeyStore based on options
-      switch (options.storage) {
-        case 'indexeddb':
-          store = new IndexedDBKeyStore();
-          break;
-        case 'local':
-        default:
-          store = new LocalStorageKeyStore();
-          break;
-      }
-      
-      keyManager = new KeyManager({ store });
+    const rpcUrl =
+      options.roochRpcUrl ||
+      (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_ROOCH_RPC_URL : undefined);
+
+    // Determine KeyStore based on storage preference (defaults to LocalStorage)
+    let keyStore: any | undefined;
+    switch (options.storage) {
+      case 'indexeddb':
+        keyStore = new IndexedDBKeyStore();
+        break;
+      case 'memory':
+        keyStore = undefined; // let IdentityKit create an in-memory store
+        break;
+      case 'local':
+      default:
+        keyStore = new LocalStorageKeyStore();
+        break;
     }
-    
-    // Create or use provided DeepLinkManager
-    const deepLinkManager = options.deepLinkManager || new DeepLinkManager({
-      keyManager,
+
+    // Bootstrap IdentityEnv which internally registers VDRs and prepares KeyManager
+    const env = await IdentityKit.bootstrap({
+      method: 'rooch',
+      keyStore,
+      vdrOptions: { network, rpcUrl },
     });
-    
+
+    // Use provided KeyManager if specified, otherwise take from env
+    const keyManager = options.keyManager || env.keyManager;
+
+    // Create or use provided DeepLinkManager
+    const deepLinkManager =
+      options.deepLinkManager ||
+      new DeepLinkManager({
+        keyManager,
+      });
+
     return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, appName);
   }
 

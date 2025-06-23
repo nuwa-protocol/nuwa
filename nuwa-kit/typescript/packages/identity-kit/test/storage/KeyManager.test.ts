@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { KeyManager, MemoryKeyStore, StoredKey } from '../../src/keys';
 import { KEY_TYPE } from '../../src/types';
-import { BaseMultibaseCodec } from '../../src/multibase';
+import { MultibaseCodec } from '../../src/multibase';
 
 describe('KeyManager', () => {
   const TEST_DID = 'did:example:123';

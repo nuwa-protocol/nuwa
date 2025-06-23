@@ -4,8 +4,7 @@ import { NIP1SignedObject, SignedData } from '../types';
 import { canonicalize } from './utils';
 import { CryptoUtils } from '../../crypto';
 import { NonceStore, defaultNonceStore } from './nonceStore';
-import { BaseMultibaseCodec } from '../../multibase';
-import { MultibaseCodec } from '../../multibase/base';
+import { MultibaseCodec } from '../../multibase';
 import { Bytes } from '../../utils/bytes';
 
 // Authorization scheme identifier for HTTP headers
@@ -116,7 +115,7 @@ export async function verifySignature(
     if (verificationMethod.publicKeyJwk) {
       publicKeyMaterial = verificationMethod.publicKeyJwk;
     } else if (verificationMethod.publicKeyMultibase) {
-      publicKeyMaterial = BaseMultibaseCodec.decodeBase58btc(verificationMethod.publicKeyMultibase);
+      publicKeyMaterial = MultibaseCodec.decodeBase58btc(verificationMethod.publicKeyMultibase);
     }
     if (!publicKeyMaterial) return false;
 

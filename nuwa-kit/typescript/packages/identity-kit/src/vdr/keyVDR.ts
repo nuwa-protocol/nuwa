@@ -6,7 +6,7 @@ import {
 } from '../types/did';
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
-import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
+import { MultibaseCodec, DidKeyCodec } from '../multibase';
 import { DebugLogger } from '../utils/DebugLogger';
 
 /**
@@ -304,7 +304,7 @@ export class KeyVDR extends AbstractVDR {
     let { keyType, publicKey } = DidKeyCodec.parseDidKey(request.userDidKey);
     try {
       const didCreationRequest: DIDCreationRequest = {
-        publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(publicKey),
+        publicKeyMultibase: MultibaseCodec.encodeBase58btc(publicKey),
         preferredDID: request.userDidKey,
         keyType: keyType,
         controller: request.userDidKey,

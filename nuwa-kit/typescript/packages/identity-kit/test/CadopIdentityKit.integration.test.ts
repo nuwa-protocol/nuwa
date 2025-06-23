@@ -7,7 +7,7 @@ import {
   CadopServiceType,
   VDRRegistry,
   KEY_TYPE,
-  BaseMultibaseCodec,
+  MultibaseCodec,
 } from '../src';
 import { RoochVDR } from '../src/vdr/roochVDR';
 import { CryptoUtils } from '../src/crypto';
@@ -51,7 +51,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
     const publicKeyBytes = externalUserKeyPair.getPublicKey().toBytes();
     //Use the user's public key as the cadop did key
-    const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+    const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
     const result = await roochVDR.create(
       {

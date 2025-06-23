@@ -1,5 +1,5 @@
 import { KeyType } from '../types/crypto';
-import { BaseMultibaseCodec } from './base';
+import { MultibaseCodec } from './base';
 import { KeyMultibaseCodec } from './key';
 
 /**

@@ -1,5 +1,5 @@
 import { KeyType, KEY_TYPE } from '../types/crypto';
-import { BaseMultibaseCodec } from './base';
+import { MultibaseCodec } from './base';
 
 /**
  * Key multibase codec implementation
@@ -30,7 +30,7 @@ export class KeyMultibaseCodec {
 
     const prefix = this.getMulticodecPrefix(keyType);
     const prefixedKey = this.concatenateBytes(prefix, bytes);
-    return BaseMultibaseCodec.encodeBase58btc(prefixedKey);
+    return MultibaseCodec.encodeBase58btc(prefixedKey);
   }
 
   /**
@@ -40,7 +40,7 @@ export class KeyMultibaseCodec {
    */
   static decodeWithType(encoded: string): { keyType: KeyType; bytes: Uint8Array } {
     try {
-      const decoded = BaseMultibaseCodec.decodeBase58btc(encoded);
+      const decoded = MultibaseCodec.decodeBase58btc(encoded);
       if (decoded.length < 2) {
         throw new Error('Invalid key format: too short');
       }

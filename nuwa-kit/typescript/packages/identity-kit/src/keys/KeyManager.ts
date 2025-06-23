@@ -7,7 +7,7 @@ import {
   canSignWithKeyStore,
   getKeyInfoFromKeyStore,
 } from '../signers/keyStoreUtils';
-import { BaseMultibaseCodec, KeyMultibaseCodec } from '../multibase';
+import { MultibaseCodec, KeyMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 import { getDidWithoutFragment } from '../utils/did';
 
@@ -61,8 +61,8 @@ export class KeyManager implements SignerInterface {
     const keyId = `${this.did}#${keyFragment}`;
 
     // Encode the keys
-    const publicKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.publicKey);
-    const privateKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.privateKey);
+    const publicKeyEncoded = MultibaseCodec.encodeBase58btc(keyPair.publicKey);
+    const privateKeyEncoded = MultibaseCodec.encodeBase58btc(keyPair.privateKey);
 
     // Create the stored key
     const storedKey: StoredKey = {
@@ -258,8 +258,8 @@ export class KeyManager implements SignerInterface {
     await this.importKey({
       keyId,
       keyType: type,
-      publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(keyPair.publicKey),
-      privateKeyMultibase: BaseMultibaseCodec.encodeBase58btc(keyPair.privateKey),
+      publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
+      privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
     });
 
     return keyId;

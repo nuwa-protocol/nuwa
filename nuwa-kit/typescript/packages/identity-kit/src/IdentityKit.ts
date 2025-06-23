@@ -11,7 +11,7 @@ import { VDRInterface, DIDCreationRequest } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 // Key management & crypto utilities
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
-import { BaseMultibaseCodec } from './multibase';
+import { MultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
@@ -176,7 +176,7 @@ export class IdentityKit {
       controller: keyInfo.controller || this.didDocument.id,
       publicKeyMultibase:
         keyInfo.publicKeyMaterial instanceof Uint8Array
-          ? await BaseMultibaseCodec.encodeBase58btc(keyInfo.publicKeyMaterial)
+          ? await MultibaseCodec.encodeBase58btc(keyInfo.publicKeyMaterial)
           : undefined,
       publicKeyJwk: !(keyInfo.publicKeyMaterial instanceof Uint8Array)
         ? keyInfo.publicKeyMaterial
