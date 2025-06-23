@@ -6,6 +6,10 @@ import {
 } from '../types/did';
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, VDRInterface } from './types';
 import { parseDid } from '../utils/did';
+import { DebugLogger } from '../utils/DebugLogger';
+
+// Unified logger for AbstractVDR
+const logger = DebugLogger.get('AbstractVDR');
 
 /**
  * Abstract base class for implementing Verifiable Data Registry functionality
@@ -111,7 +115,7 @@ export abstract class AbstractVDR implements VDRInterface {
   ): boolean {
     const keyExists = didDocument.verificationMethod?.some(vm => vm.id === keyId);
     if (!keyExists) {
-      console.error(`Key ${keyId} not found in DID document`);
+      logger.error(`Key ${keyId} not found in DID document`);
       return false;
     }
 
@@ -123,7 +127,7 @@ export abstract class AbstractVDR implements VDRInterface {
     const hasPermission = didDocument[requiredRelationship]?.includes(keyId);
 
     if (!hasPermission) {
-      console.error(`Key ${keyId} does not have ${requiredRelationship} permission`);
+      logger.error(`Key ${keyId} does not have ${requiredRelationship} permission`);
       return false;
     }
 

@@ -7,6 +7,7 @@ import {
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
+import { DebugLogger } from '../utils/DebugLogger';
 
 /**
  * KeyVDR handles did:key DIDs
@@ -19,6 +20,10 @@ import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
  *
  * Reference: https://w3c-ccg.github.io/did-method-key/
  */
+
+// Unified logger for KeyVDR
+const logger = DebugLogger.get('KeyVDR');
+
 export class KeyVDR extends AbstractVDR {
   // In-memory cache of documents, shared across all instances
   private static documentCache: Map<string, DIDDocument> = new Map();
@@ -47,7 +52,7 @@ export class KeyVDR extends AbstractVDR {
 
       return null;
     } catch (error) {
-      console.error(`Error resolving ${did}:`, error);
+      logger.error(`Error resolving ${did}:`, error);
       return null;
     }
   }
@@ -110,7 +115,7 @@ export class KeyVDR extends AbstractVDR {
       KeyVDR.documentCache.set(did, originalDocument);
       return true;
     } catch (error) {
-      console.error(`Error adding verification method to ${did}:`, error);
+      logger.error(`Error adding verification method to ${did}:`, error);
       throw error;
     }
   }
@@ -171,7 +176,7 @@ export class KeyVDR extends AbstractVDR {
       KeyVDR.documentCache.set(did, originalDocument);
       return true;
     } catch (error) {
-      console.error(`Error removing verification method from ${did}:`, error);
+      logger.error(`Error removing verification method from ${did}:`, error);
       throw error;
     }
   }
@@ -210,7 +215,7 @@ export class KeyVDR extends AbstractVDR {
       KeyVDR.documentCache.set(did, originalDocument);
       return true;
     } catch (error) {
-      console.error(`Error adding service to ${did}:`, error);
+      logger.error(`Error adding service to ${did}:`, error);
       throw error;
     }
   }
@@ -250,7 +255,7 @@ export class KeyVDR extends AbstractVDR {
       KeyVDR.documentCache.set(did, originalDocument);
       return true;
     } catch (error) {
-      console.error(`Error removing service from ${did}:`, error);
+      logger.error(`Error removing service from ${did}:`, error);
       throw error;
     }
   }
@@ -287,7 +292,7 @@ export class KeyVDR extends AbstractVDR {
         didDocument,
       };
     } catch (error) {
-      console.error(`Error creating DID document:`, error);
+      logger.error(`Error creating DID document:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -313,7 +318,7 @@ export class KeyVDR extends AbstractVDR {
         didDocument,
       };
     } catch (error) {
-      console.error(`Error creating DID document via CADOP:`, error);
+      logger.error(`Error creating DID document via CADOP:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -374,7 +379,7 @@ export class KeyVDR extends AbstractVDR {
       KeyVDR.documentCache.set(did, originalDocument);
       return true;
     } catch (error) {
-      console.error(`Error updating relationships for ${did}:`, error);
+      logger.error(`Error updating relationships for ${did}:`, error);
       throw error;
     }
   }

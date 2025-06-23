@@ -35,5 +35,5 @@
   ],
   "maxConcurrency": 1,
   "maxWorkers": 1,
-  "silent": false
+  "silent": true
 }

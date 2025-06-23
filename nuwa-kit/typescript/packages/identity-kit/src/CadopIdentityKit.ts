@@ -3,6 +3,7 @@ import { SignerInterface } from './signers/types';
 import { CADOPCreationRequest, DIDCreationResult } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 import { IdentityKit } from './IdentityKit';
+import { DebugLogger } from './utils/DebugLogger';
 
 /**
  * CADOP service types
@@ -68,7 +69,8 @@ export class CadopIdentityKit {
     const custodianServices = this.findServicesByType(CadopServiceType.CUSTODIAN);
     if (custodianServices.length > 0) {
       const custodianService = custodianServices[0];
-      console.log('extractCustodianInfo', custodianService);
+      const logger = DebugLogger.get('CadopIdentityKit');
+      logger.debug('extractCustodianInfo', custodianService);
       return custodianService;
     }
     throw new Error('Custodian service not found in service document');

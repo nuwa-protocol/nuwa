@@ -14,6 +14,7 @@ import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
 import { BaseMultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
+import { DebugLogger } from './utils/DebugLogger';
 
 // Simplified initialization options for the high-level factory method introduced in v1 refactor
 export interface IdentityKitInitOptions {
@@ -332,7 +333,7 @@ export class IdentityKit {
     }
     // Update local state
     this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
-    console.log('After addService', JSON.stringify(this.didDocument, null, 2));
+    IdentityKit.logger.debug('After addService', this.didDocument);
     return serviceId;
   }
 
@@ -396,7 +397,7 @@ export class IdentityKit {
 
   private async updateLocalDIDDocument(): Promise<void> {
     this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
-    console.log('After updateLocalDIDDocument', JSON.stringify(this.didDocument, null, 2));
+    IdentityKit.logger.debug('After updateLocalDIDDocument', this.didDocument);
   }
 
   getSigner(): SignerInterface {
@@ -431,6 +432,9 @@ export class IdentityKit {
     }
     return result;
   }
+
+  // Logger instance for this class
+  private static readonly logger = DebugLogger.get('IdentityKit');
 }
 
 export { IdentityKit as NuwaIdentityKit };
