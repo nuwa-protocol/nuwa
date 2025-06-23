@@ -45,12 +45,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nuwa-protocol/nuwa.git",
-    "directory": "nuwa-kit/typescript/packages/nuwa-identity-kit"
+    "directory": "nuwa-kit/typescript/packages/identity-kit"
   },
   "bugs": {
     "url": "https://github.com/nuwa-protocol/nuwa/issues"
   },
-  "homepage": "https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/packages/nuwa-identity-kit#readme",
+  "homepage": "https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/packages/identity-kit#readme",
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",

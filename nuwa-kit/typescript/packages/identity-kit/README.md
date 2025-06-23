@@ -13,7 +13,7 @@ SDK for NIP-1 Agent Single DID Multi-Key Model and NIP-3 CADOP (Custodian-Assist
 ## Installation
 
 ```bash
-npm install nuwa-identity-kit @roochnetwork/rooch-sdk
+npm install @nuwa-ai/identity-kit @roochnetwork/rooch-sdk
 ```
 
 ## Core Concepts
@@ -38,7 +38,7 @@ There are several ways to get an instance of `NuwaIdentityKit`:
 To create a brand new DID and its associated document, you'll use `NuwaIdentityKit.createNewDID()`. This requires a `DIDCreationRequest` object detailing the new DID's properties, a VDR instance (e.g., `RoochVDR` configured for your target network), and a signer instance compliant with the `SignerInterface`.
 
 ```typescript
-import { NuwaIdentityKit, RoochVDR, DIDCreationRequest, SignerInterface } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, RoochVDR, DIDCreationRequest, SignerInterface } from '@nuwa-ai/identity-kit';
 // import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk'; // Example for a key management library
 // import { YourVDRImplementation } from './your-vdr';
 // import { YourSignerImplementation } from './your-signer'; // You'll need to provide a class that implements SignerInterface
@@ -52,7 +52,7 @@ import { NuwaIdentityKit, RoochVDR, DIDCreationRequest, SignerInterface } from '
 // */
 
 // 2. Obtain or configure your Signer instance
-// The signer must implement the SignerInterface from 'nuwa-identity-kit'.
+// The signer must implement the SignerInterface from '@nuwa-ai/identity-kit'.
 // It will be used to authorize the creation of the DID and subsequent operations.
 // For Rooch, this might involve a Keypair from '@roochnetwork/rooch-sdk' adapted to SignerInterface.
 // const keypair = Secp256k1Keypair.generate(); // Example key generation
@@ -95,7 +95,7 @@ async function setupNewDID(vdr: RoochVDR, signer: SignerInterface) { // Pass con
 To manage a DID that already exists, use `NuwaIdentityKit.fromExistingDID()`. You'll need the DID string and an array of VDR instances that can resolve and interact with that DID's method.
 
 ```typescript
-import { NuwaIdentityKit, RoochVDR, SignerInterface } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, RoochVDR, SignerInterface } from '@nuwa-ai/identity-kit';
 // import { YourSignerImplementation } from './your-signer'; 
 
 // 1. Obtain or configure VDR instance(s) for the DID method(s) you'll be working with.
@@ -134,7 +134,7 @@ async function manageExistingDID(vdrs: RoochVDR[], externalSigner?: SignerInterf
 If you have the complete DID Document object, you can initialize `NuwaIdentityKit` using `NuwaIdentityKit.fromDIDDocument()`. This is useful if the DID Document was obtained externally.
 
 ```typescript
-import { NuwaIdentityKit, DIDDocument, RoochVDR, SignerInterface } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, DIDDocument, RoochVDR, SignerInterface } from '@nuwa-ai/identity-kit';
 // import { YourSignerImplementation } from './your-signer'; 
 
 // const knownDidDocument: DIDDocument = { /* ... your DID Document object ... */ };
@@ -234,7 +234,7 @@ This operation is performed by a VDR (Verifiable Data Registry) that supports th
 The custodian (who is running the code below) will need a `SignerInterface` instance to authorize the DID creation on the VDR.
 
 ```typescript
-import { NuwaIdentityKit, RoochVDR, CADOPCreationRequest, SignerInterface, DIDCreationResult } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, RoochVDR, CADOPCreationRequest, SignerInterface, DIDCreationResult } from '@nuwa-ai/identity-kit';
 
 // Assume `custodianNuwaKit` is an initialized NuwaIdentityKit instance for the custodian.
 // It should have a VDR registered (e.g., RoochVDR) that supports CADOP for the desired DID method.
@@ -300,7 +300,7 @@ async function createDIDForUserViaCADOP(
 All key management operations that modify the DID document require a signer capable of authorizing changes for the DID. This is typically provided via the `options` argument in each method, specifying the `keyId` to sign with and the `signer` instance.
 
 ```typescript
-import { NuwaIdentityKit, OperationalKeyInfo, VerificationRelationship, SignerInterface } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, OperationalKeyInfo, VerificationRelationship, SignerInterface } from '@nuwa-ai/identity-kit';
 
 // Assume `nuwaKit` is an initialized NuwaIdentityKit instance for the DID being managed.
 // Assume `signerForDIDManagement` is a SignerInterface instance authorized 
@@ -401,7 +401,7 @@ async function updateKeyRelationships(nuwaKit: NuwaIdentityKit, signer: SignerIn
 Similar to key management, operations that modify service endpoints in the DID document require a signer.
 
 ```typescript
-import { NuwaIdentityKit, ServiceInfo, SignerInterface } from 'nuwa-identity-kit';
+import { NuwaIdentityKit, ServiceInfo, SignerInterface } from '@nuwa-ai/identity-kit';
 
 // Assume `nuwaKit` is an initialized NuwaIdentityKit instance for the DID being managed.
 // Assume `signerForDIDManagement` is a SignerInterface instance authorized 
@@ -494,7 +494,7 @@ The SDK employs a pluggable VDR pattern. Each VDR is an implementation of the `V
 
   ```typescript
   // Example of a custom VDR structure (conceptual)
-  import { AbstractVDR, DIDDocument, DIDCreationRequest, DIDCreationResult } from 'nuwa-identity-kit'; // Assuming these are correct paths
+  import { AbstractVDR, DIDDocument, DIDCreationRequest, DIDCreationResult } from '@nuwa-ai/identity-kit'; // Assuming these are correct paths
 
   class CustomVDR extends AbstractVDR {
     constructor(methodName: string /*, ...other options */) {
