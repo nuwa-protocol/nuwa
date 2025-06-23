@@ -37,7 +37,7 @@ import {
   parseDIDCreatedEvent,
   resolveDidObjectID,
 } from './roochVDRTypes';
-import { DebugLogger } from '../DebugLogger';
+import { DebugLogger } from '../utils/DebugLogger';
 
 export interface RoochClientConfig {
   url: string;

@@ -1,8 +1,6 @@
-// Using the new modular types system
-export * from './types/index';
+export * from './types';
 export * from './IdentityKit';
 export * from './CadopIdentityKit';
-export * from './VDRRegistry';
 export * from './vdr';
 export * from './cadopUtils';
 export * from './multibase';
@@ -14,4 +12,4 @@ export * from './keys';
 export * from './signers';
 export { InMemoryLRUDIDDocumentCache } from './cache/InMemoryLRUDIDDocumentCache';
 export type { DIDDocumentCache } from './types/did';
-export { DebugLogger } from './DebugLogger';
+export { DebugLogger } from './utils/DebugLogger';
