@@ -1,5 +1,11 @@
 # @nuwa-ai/identity-kit
 
+## 0.2.1
+
+### Patch Changes
+
+- Fix VerificationRelationship in AddKeyRequestPayloadV1
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,4 +1,5 @@
 import { KeyType } from './crypto';
+import { VerificationRelationship } from './did';
 
 /**
  * VerificationMethod info sent in deep-link add-key request.
@@ -25,7 +26,7 @@ export interface AddKeyRequestPayloadV1 {
   /** Verification method details for the key being added */
   verificationMethod: VerificationMethodInput;
   /** DID document relationships to attach the new key to */
-  verificationRelationships: string[];
+  verificationRelationships: VerificationRelationship[];
   /** Absolute callback URL handled on browser side */
   redirectUri: string;
   /** Random string used for CSRF protection */

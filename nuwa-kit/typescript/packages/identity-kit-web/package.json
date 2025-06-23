@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/identity-kit-web",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Web extensions for Nuwa Identity Kit",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
