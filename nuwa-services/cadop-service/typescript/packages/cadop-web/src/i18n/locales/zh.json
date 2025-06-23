@@ -1,0 +1,107 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "back": "返回"
+  },
+  "navigation": {
+    "dashboard": "仪表盘",
+    "didManagement": "DID 管理",
+    "verification": "身份验证",
+    "settings": "设置"
+  },
+  "agent": {
+    "details": "Agent 详情",
+    "identity": "Agent 身份",
+    "balance": "余额",
+    "balanceLoadFailed": "加载余额失败，请重试",
+    "noBalance": "无余额",
+    "authMethods": "认证方式",
+    "controller": "控制者",
+    "youAreController": "你是此 Agent 的控制者",
+    "controllerLabel": "控制者",
+    "capabilities": "能力",
+    "authentication": "认证",
+    "assertion": "断言",
+    "keyAgreement": "密钥协商",
+    "capabilityInvocation": "能力调用",
+    "capabilityDelegation": "能力委托",
+    "actions": "操作",
+    "addAuthMethod": "添加认证方式",
+    "manageSettings": "管理设置",
+    "viewHistory": "查看历史",
+    "activityHistory": "活动历史",
+    "recentActivity": "最近活动",
+    "transactions": "交易",
+    "credentials": "凭证",
+    "noRecentActivity": "无最近活动",
+    "noTransactions": "未找到交易",
+    "noCredentials": "未发行凭证",
+    "didDocument": "DID 文档",
+    "viewDidDocument": "查看 DID 文档",
+    "claimRgas": "领取 RGAS",
+    "claiming": "领取中...",
+    "claimed": "已领取"
+  },
+  "dashboard": {
+    "welcome": "欢迎使用 Nuwa CADOP 服务",
+    "createDID": "创建新 DID",
+    "verifyIdentity": "验证身份",
+    "manageDID": "管理 DID",
+    "status": {
+      "title": "状态概览",
+      "totalDIDs": "DID 总数",
+      "verifiedIdentities": "已验证身份",
+      "recentActivity": "最近活动"
+    },
+    "identity": {
+      "title": "身份信息",
+      "userId": "用户 ID",
+      "userDid": "用户 DID",
+      "userDidTooltip": "这是您的主要身份标识",
+      "agentDidTooltip": "用户 DID 是您的主要身份标识，Agent DID 是您创建的 AI 代理身份"
+    },
+    "agent": {
+      "title": "AI Agent DIDs",
+      "createNew": "创建新 Agent",
+      "manage": "管理",
+      "noAgents": "您还没有创建任何 Agent DID",
+      "createFirst": "创建第一个 Agent"
+    },
+    "signOut": "退出登录"
+  },
+  "did": {
+    "creation": {
+      "title": "创建新 DID",
+      "step1": "选择认证方式",
+      "step2": "身份验证",
+      "step3": "配置 DID",
+      "step4": "确认创建"
+    },
+    "management": {
+      "title": "DID 管理",
+      "noDIDs": "未找到 DID",
+      "createFirst": "创建你的第一个 DID"
+    }
+  },
+  "verification": {
+    "title": "身份验证",
+    "methods": {
+      "title": "可用方式",
+      "web2": "Web2 认证",
+      "web3": "Web3 钱包"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知"
+  }
+} 

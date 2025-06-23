@@ -58,7 +58,7 @@ jobs:
         run: |
           PACKAGE_PATH=""
           if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
-            PACKAGE_PATH="nuwa-kit/typescript/packages/nuwa-identity-kit"
+            PACKAGE_PATH="nuwa-kit/typescript/packages/identity-kit"
           # Add more packages when available
           # elif [[ "${{ matrix.package }}" == "package-2" ]]; then
           #   PACKAGE_PATH="nuwa-kit/typescript/packages/package-2"

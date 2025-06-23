@@ -1,8 +1,6 @@
 // DID 相关类型
 export interface DIDInfo {
   did: string;
-  signature?: string;
-  timestamp?: number;
 }
 
 // 用户 API Key 相关

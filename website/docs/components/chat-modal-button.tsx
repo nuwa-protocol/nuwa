@@ -28,7 +28,7 @@ const ChatModalButton = () => {
           <DialogTitle>
             <span className="flex items-center gap-2 rounded-full">
               <Image
-                src="/nuwa-app.png"
+                src="/logos/logo-gradient2.png"
                 alt="Nuwa App Icon"
                 width={24}
                 height={24}

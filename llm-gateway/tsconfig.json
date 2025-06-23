@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "Node16",
-    "lib": ["ES2020", "DOM"],
+    "module": "NodeNext",
+    "lib": ["ES2020", "DOM", "ESNext"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
@@ -13,7 +13,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node16"
+    "moduleResolution": "NodeNext",
+    "types": ["node", "express", "cors"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

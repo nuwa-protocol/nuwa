@@ -1,0 +1,18 @@
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ['nodejs', 'pnpm']
+# No commands needed here, just package installation
+
+[phases.install]
+cmds = ['pnpm install']
+
+[phases.build]
+cmds = [
+    # Building the target package will also build its workspace dependencies
+    'pnpm --filter @cadop/api... build'
+]
+
+[start]
+# Ensure `NODE_ENV=production` is set in your Railway environment variables.
+cmd = 'pnpm --filter @cadop/api start'

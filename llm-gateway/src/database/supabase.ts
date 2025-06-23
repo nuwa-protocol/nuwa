@@ -1,5 +1,6 @@
+import "dotenv/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { RequestLog } from "../types";
+import { RequestLog } from "../types/index.js";
 import * as crypto from "crypto";
 
 class SupabaseService {
@@ -10,7 +11,6 @@ class SupabaseService {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
     if (!supabaseUrl || !supabaseKey) {
       throw new Error("Missing Supabase configuration");
     }

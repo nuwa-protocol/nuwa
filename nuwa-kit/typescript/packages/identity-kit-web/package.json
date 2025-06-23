@@ -1,0 +1,44 @@
+{
+  "name": "@nuwa-ai/identity-kit-web",
+  "version": "0.1.0-beta.11",
+  "description": "Web extensions for Nuwa Identity Kit",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "nuwa",
+    "identity",
+    "did",
+    "web"
+  ],
+  "author": "Nuwa Team",
+  "license": "MIT",
+  "dependencies": {
+    "@nuwa-ai/identity-kit": "0.1.0-beta.10"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/react": "^18.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  }
+} 

@@ -1,0 +1,107 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "didManagement": "DID Management",
+    "verification": "Identity Verification",
+    "settings": "Settings"
+  },
+  "agent": {
+    "details": "Agent Details",
+    "identity": "Agent Identity",
+    "balance": "Balance",
+    "balanceLoadFailed": "Failed to load balance. Please try again.",
+    "noBalance": "No balance",
+    "authMethods": "Authentication Methods",
+    "controller": "Controller",
+    "youAreController": "You are a controller of this agent",
+    "controllerLabel": "controller",
+    "capabilities": "Capabilities",
+    "authentication": "Authentication",
+    "assertion": "Assertion",
+    "keyAgreement": "Key Agreement",
+    "capabilityInvocation": "Capability Invocation",
+    "capabilityDelegation": "Capability Delegation",
+    "actions": "Actions",
+    "addAuthMethod": "Add Authentication Method",
+    "manageSettings": "Manage Settings",
+    "viewHistory": "View History",
+    "activityHistory": "Activity History",
+    "recentActivity": "Recent Activity",
+    "transactions": "Transactions",
+    "credentials": "Credentials",
+    "noRecentActivity": "No recent activity",
+    "noTransactions": "No transactions found",
+    "noCredentials": "No credentials issued",
+    "didDocument": "DID Document",
+    "viewDidDocument": "View DID Document",
+    "claimRgas": "Claim RGAS",
+    "claiming": "Claiming...",
+    "claimed": "Claimed"
+  },
+  "dashboard": {
+    "welcome": "Welcome to Nuwa CADOP Service",
+    "createDID": "Create New DID",
+    "verifyIdentity": "Verify Identity",
+    "manageDID": "Manage DID",
+    "status": {
+      "title": "Status Overview",
+      "totalDIDs": "Total DIDs",
+      "verifiedIdentities": "Verified Identities",
+      "recentActivity": "Recent Activity"
+    },
+    "identity": {
+      "title": "Identity Information",
+      "userId": "User ID",
+      "userDid": "User DID",
+      "userDidTooltip": "This is your main identity identifier",
+      "agentDidTooltip": "User DID is your main identity identifier, Agent DID is the AI agent identity you created"
+    },
+    "agent": {
+      "title": "AI Agent DIDs",
+      "createNew": "Create New Agent",
+      "manage": "Manage",
+      "noAgents": "You haven't created any Agent DIDs yet",
+      "createFirst": "Create Your First Agent"
+    },
+    "signOut": "Sign Out"
+  },
+  "did": {
+    "creation": {
+      "title": "Create New DID",
+      "step1": "Choose Authentication Method",
+      "step2": "Identity Verification",
+      "step3": "Configure DID",
+      "step4": "Confirm Creation"
+    },
+    "management": {
+      "title": "DID Management",
+      "noDIDs": "No DIDs found",
+      "createFirst": "Create your first DID"
+    }
+  },
+  "verification": {
+    "title": "Identity Verification",
+    "methods": {
+      "title": "Available Methods",
+      "web2": "Web2 Authentication",
+      "web3": "Web3 Wallet"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications"
+  }
+} 

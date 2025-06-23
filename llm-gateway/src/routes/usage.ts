@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
-import SupabaseService from "../database/supabase";
-import { authMiddleware } from "../middleware/auth";
-import { ApiResponse, DIDInfo } from "../types";
+import SupabaseService from "../database/supabase.js";
+import { didAuthMiddleware } from "../middleware/didAuth.js";
+import { ApiResponse, DIDInfo } from "../types/index.js";
 
 const supabaseService = new SupabaseService();
 const router = Router();
 
-router.get("/", authMiddleware, async (req: Request, res: Response) => {
+router.get("/", didAuthMiddleware, async (req: Request, res: Response) => {
   const didInfo = req.didInfo as DIDInfo;
   const { start_date, end_date } = req.query as {
     start_date?: string;

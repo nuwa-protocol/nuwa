@@ -226,7 +226,7 @@ SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # OpenRouter Configuration
-OPENROUTER_API_URL=https://openrouter.ai/api/v1
+OPENROUTER_API_URL=https://openrouter.ai/
 OPENROUTER_PROVISIONING_KEY=your_openrouter_provisioning_key
 
 # API Key Encryption
@@ -240,7 +240,7 @@ X_TITLE=LLM Gateway
 ### Key Configuration Explanations
 
 - `OPENROUTER_PROVISIONING_KEY`: Management key for automatically creating user API keys in OpenRouter
-- `API_KEY_ENCRYPTION_KEY`: Key for encrypting stored user API keys; must be changed in production
+- `API_KEY_ENCRYPTION_KEY`: Key for encrypting stored user API keys; must be changed in production, use command `openssl rand -base64 32` to generate a random key
 - `HOST`: Server host address (defaults to 0.0.0.0 for all interfaces)
 
 ## Automatic User Initialization

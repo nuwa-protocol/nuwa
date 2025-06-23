@@ -1,9 +1,10 @@
+import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
 import {
   CreateApiKeyRequest,
   CreateApiKeyResponse,
   GetApiKeyResponse,
-} from "../types";
+} from "../types/index.js";
 
 // Native streamToString tool function, placed outside the class
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
