@@ -42,11 +42,7 @@ export class IdentityKit {
   private signer: SignerInterface;
 
   // Private constructor, force use of factory methods
-  private constructor(
-    didDocument: DIDDocument,
-    vdr: VDRInterface,
-    signer: SignerInterface
-  ) {
+  private constructor(didDocument: DIDDocument, vdr: VDRInterface, signer: SignerInterface) {
     this.didDocument = didDocument;
     this.vdr = vdr;
     this.signer = signer;
@@ -120,7 +116,11 @@ export class IdentityKit {
    */
   static async init(options: IdentityKitInitOptions = {}): Promise<IdentityKit> {
     const method = (options.method || 'rooch').toLowerCase();
-    const keyType: KeyType = options.keyType ? (typeof options.keyType === 'string' ? options.keyType as KeyType : options.keyType) : KEY_TYPE.ED25519;
+    const keyType: KeyType = options.keyType
+      ? typeof options.keyType === 'string'
+        ? (options.keyType as KeyType)
+        : options.keyType
+      : KEY_TYPE.ED25519;
 
     // ---------------------------------------------------------------------
     // 1. Ensure a VDR is registered for the requested method
@@ -197,16 +197,20 @@ export class IdentityKit {
       await km.importRoochKeyPair('account-key', keypair);
 
       // Create DID on-chain -----------------------------------------------------------
-      const createResult = await registry.createDID(method, {
-        publicKeyMultibase,
-        keyType,
-        preferredDID: did,
-        controller: did,
-        initialRelationships: ['authentication', 'capabilityDelegation'],
-      }, {
-        signer: km,
-        keyId: `${did}#account-key`,
-      });
+      const createResult = await registry.createDID(
+        method,
+        {
+          publicKeyMultibase,
+          keyType,
+          preferredDID: did,
+          controller: did,
+          initialRelationships: ['authentication', 'capabilityDelegation'],
+        },
+        {
+          signer: km,
+          keyId: `${did}#account-key`,
+        }
+      );
 
       if (!createResult.success || !createResult.didDocument) {
         throw new Error(`Failed to create Rooch DID: ${createResult.error || 'unknown error'}`);

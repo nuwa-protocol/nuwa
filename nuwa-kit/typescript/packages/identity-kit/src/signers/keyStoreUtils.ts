@@ -38,10 +38,7 @@ export async function signWithKeyStore(
 /**
  * Test whether a key can be used for signing in this KeyStore.
  */
-export async function canSignWithKeyStore(
-  keyStore: KeyStore,
-  keyId: string
-): Promise<boolean> {
+export async function canSignWithKeyStore(keyStore: KeyStore, keyId: string): Promise<boolean> {
   if (typeof (keyStore as any).sign === 'function') {
     const keyExists = await keyStore.load(keyId);
     return keyExists !== null;
@@ -61,4 +58,4 @@ export async function getKeyInfoFromKeyStore(
   if (!key) return undefined;
   const publicKeyBytes = MultibaseCodec.decode(key.publicKeyMultibase);
   return { type: key.keyType, publicKey: publicKeyBytes };
-} 
+}

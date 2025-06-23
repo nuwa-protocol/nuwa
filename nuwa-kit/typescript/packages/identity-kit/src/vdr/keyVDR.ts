@@ -4,11 +4,7 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import {
-  DIDCreationRequest,
-  DIDCreationResult,
-  CADOPCreationRequest,
-} from './types';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
 
@@ -37,7 +33,7 @@ export class KeyVDR extends AbstractVDR {
    */
   public reset(): void {
     KeyVDR.documentCache.clear();
-  } 
+  }
 
   /**
    * Override resolve to handle test mode

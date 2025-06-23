@@ -170,4 +170,4 @@ export interface VDRInterface {
    * @returns Promise resolving to true if successful
    */
   updateController(did: string, controller: string | string[], options?: any): Promise<boolean>;
-} 
+}

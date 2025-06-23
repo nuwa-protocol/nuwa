@@ -93,4 +93,4 @@ export function sameDid(a: string, b: string): boolean {
 export function getDidWithoutFragment(did: string): string {
   const { method, identifier } = parseDid(did);
   return buildDid(method, identifier);
-} 
+}

@@ -1,4 +1,4 @@
-import { SignatureScheme } from "@roochnetwork/rooch-sdk";
+import { SignatureScheme } from '@roochnetwork/rooch-sdk';
 
 // Cryptographic types and constants
 

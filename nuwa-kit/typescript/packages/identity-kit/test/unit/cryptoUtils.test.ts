@@ -43,12 +43,7 @@ describe('CryptoUtils', () => {
       const signature = await CryptoUtils.sign(data, keyPair.privateKey, KeyType.ED25519);
       expect(signature).toBeDefined();
 
-      const isValid = await CryptoUtils.verify(
-        data,
-        signature,
-        keyPair.publicKey,
-        KeyType.ED25519
-      );
+      const isValid = await CryptoUtils.verify(data, signature, keyPair.publicKey, KeyType.ED25519);
       expect(isValid).toBe(true);
     });
 
@@ -75,12 +70,7 @@ describe('CryptoUtils', () => {
       const signature = await CryptoUtils.sign(data, keyPair.privateKey, KeyType.ECDSAR1);
       expect(signature).toBeDefined();
 
-      const isValid = await CryptoUtils.verify(
-        data,
-        signature,
-        keyPair.publicKey,
-        KeyType.ECDSAR1
-      );
+      const isValid = await CryptoUtils.verify(data, signature, keyPair.publicKey, KeyType.ECDSAR1);
       expect(isValid).toBe(true);
     });
 

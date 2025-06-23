@@ -4,12 +4,7 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import {
-  DIDCreationRequest,
-  DIDCreationResult,
-  CADOPCreationRequest,
-  VDRInterface,
-} from './types';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, VDRInterface } from './types';
 import { parseDid } from '../utils/did';
 
 /**

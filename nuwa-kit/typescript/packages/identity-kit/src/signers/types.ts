@@ -41,4 +41,4 @@ export interface SignerInterface {
    * @returns Key information or undefined if not found
    */
   getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined>;
-} 
+}

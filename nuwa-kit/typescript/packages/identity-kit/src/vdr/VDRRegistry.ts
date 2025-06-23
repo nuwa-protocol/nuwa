@@ -1,11 +1,6 @@
 import { DIDDocument, DIDResolver } from '../types';
 import { DIDDocumentCache } from '../cache';
-import {
-  VDRInterface,
-  DIDCreationRequest,
-  DIDCreationResult,
-  CADOPCreationRequest,
-} from './types';
+import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 
 import { InMemoryLRUDIDDocumentCache } from '../cache/InMemoryLRUDIDDocumentCache';
 
@@ -54,10 +49,7 @@ export class VDRRegistry implements DIDResolver {
     return this.cache;
   }
 
-  async resolveDID(
-    did: string,
-    options?: { forceRefresh?: boolean }
-  ): Promise<DIDDocument | null> {
+  async resolveDID(did: string, options?: { forceRefresh?: boolean }): Promise<DIDDocument | null> {
     const method = did.split(':')[1];
     const vdr = this.vdrs.get(method);
     if (!vdr) {
@@ -127,4 +119,4 @@ export class VDRRegistry implements DIDResolver {
     // We don't cache the existence check result here to avoid stale data.
     return exists;
   }
-} 
+}

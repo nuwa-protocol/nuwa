@@ -1,9 +1,4 @@
-import {
-  DIDDocument,
-  ServiceEndpoint,
-  VerificationMethod,
-  KEY_TYPE,
-} from '../../src/index';
+import { DIDDocument, ServiceEndpoint, VerificationMethod, KEY_TYPE } from '../../src/index';
 
 /**
  * Creates a test DID document

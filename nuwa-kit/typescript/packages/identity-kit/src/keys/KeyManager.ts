@@ -2,7 +2,11 @@ import { SignerInterface } from '../signers/types';
 import { KeyType, roochSignatureSchemeToKeyType } from '../types/crypto';
 import { CryptoUtils } from '../crypto';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
-import { signWithKeyStore, canSignWithKeyStore, getKeyInfoFromKeyStore } from '../signers/keyStoreUtils';
+import {
+  signWithKeyStore,
+  canSignWithKeyStore,
+  getKeyInfoFromKeyStore,
+} from '../signers/keyStoreUtils';
 import { BaseMultibaseCodec, KeyMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 import { getDidWithoutFragment } from '../utils/did';
@@ -262,15 +266,16 @@ export class KeyManager implements SignerInterface {
   }
 
   /** Instance helper: import Rooch Keypair */
-  async importRoochKeyPair(
-    fragment: string,
-    roochKeyPair: Keypair
-  ): Promise<string> {
+  async importRoochKeyPair(fragment: string, roochKeyPair: Keypair): Promise<string> {
     const { secretKey, schema } = decodeRoochSercetKey(roochKeyPair.getSecretKey());
     const keyType: KeyType = roochSignatureSchemeToKeyType(schema);
-    return this.importKeyPair(fragment, {
-      privateKey: secretKey,
-      publicKey: roochKeyPair.getPublicKey().toBytes(),
-    }, keyType);
+    return this.importKeyPair(
+      fragment,
+      {
+        privateKey: secretKey,
+        publicKey: roochKeyPair.getPublicKey().toBytes(),
+      },
+      keyType
+    );
   }
 }

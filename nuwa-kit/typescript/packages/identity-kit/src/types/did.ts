@@ -58,7 +58,3 @@ export interface DIDResolver {
     }
   ): Promise<DIDDocument | null>;
 }
-
-
-
- 

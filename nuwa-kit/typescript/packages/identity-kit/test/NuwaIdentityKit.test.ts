@@ -95,10 +95,7 @@ describe('IdentityKit', () => {
 
     it('should create new DID', async () => {
       const { publicKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
-      const publicKeyMultibase = await KeyMultibaseCodec.encodeWithType(
-        publicKey,
-        KeyType.ED25519
-      );
+      const publicKeyMultibase = await KeyMultibaseCodec.encodeWithType(publicKey, KeyType.ED25519);
       const did = `did:key:${publicKeyMultibase}`;
 
       const creationRequest: DIDCreationRequest = {

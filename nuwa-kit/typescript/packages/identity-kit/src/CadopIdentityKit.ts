@@ -1,9 +1,4 @@
-import {
-  ServiceEndpoint,
-  DIDDocument,
-  ServiceInfo,
-  VerificationRelationship,
-} from './types/did';
+import { ServiceEndpoint, DIDDocument, ServiceInfo, VerificationRelationship } from './types/did';
 import { SignerInterface } from './signers/types';
 import { CADOPCreationRequest, DIDCreationResult } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';

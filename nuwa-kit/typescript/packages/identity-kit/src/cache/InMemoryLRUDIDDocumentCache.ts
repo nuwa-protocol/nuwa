@@ -50,4 +50,4 @@ export class InMemoryLRUDIDDocumentCache implements DIDDocumentCache {
   clear(): void {
     this.map.clear();
   }
-} 
+}

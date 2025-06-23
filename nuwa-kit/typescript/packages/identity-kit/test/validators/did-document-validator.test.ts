@@ -1,4 +1,11 @@
-import { IdentityKit, VDRRegistry, DIDDocument, DIDCreationRequest, KeyType, KeyMultibaseCodec } from '../../src';
+import {
+  IdentityKit,
+  VDRRegistry,
+  DIDDocument,
+  DIDCreationRequest,
+  KeyType,
+  KeyMultibaseCodec,
+} from '../../src';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
 import { CryptoUtils } from '../../src/crypto';
 import { KeyVDR } from '../../src/vdr/keyVDR';
