@@ -1,3 +1,5 @@
+import { SignatureScheme } from "@roochnetwork/rooch-sdk";
+
 // Cryptographic types and constants
 
 /**
@@ -34,6 +36,17 @@ export function toKeyType(value: string): KeyType {
     return value;
   }
   throw new Error(`Invalid key type: ${value}`);
+}
+
+export function roochSignatureSchemeToKeyType(scheme: SignatureScheme): KeyType {
+  if (scheme === 'Secp256k1') {
+    return KeyType.SECP256K1;
+  } else if (scheme === 'ED25519') {
+    return KeyType.ED25519;
+  } else if (scheme === 'EcdsaR1') {
+    return KeyType.ECDSAR1;
+  }
+  throw new Error(`Unsupported Rooch signature scheme: ${scheme}`);
 }
 
 /**
