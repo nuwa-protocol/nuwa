@@ -2,7 +2,7 @@
 
 > Status: Draft · 2025-06-20
 
-This document records how the *Nuwa Agent Login Demo* consumes the yet-to-be-published **identity-kit-web** package **from the local monorepo**, and how the UI migrates to the new high-level APIs (`NuwaIdentityKitWeb` & `useNuwaIdentityKit`).
+This document records how the *Nuwa Agent Login Demo* consumes the yet-to-be-published **identity-kit-web** package **from the local monorepo**, and how the UI migrates to the new high-level APIs (`IdentityKitWeb` & `useIdentityKit`).
 
 ---
 
@@ -30,10 +30,10 @@ Because `identity-kit-web` has not been released to npm you must link it via **f
 The easiest way to integrate is to rely on the hook exported by the web-SDK.
 
 ```tsx
-import { useNuwaIdentityKit } from '@nuwa-ai/identity-kit-web';
+import { useIdentityKit } from '@nuwa-ai/identity-kit-web';
 
 export function App() {
-  const { state, connect, sign, verify, logout } = useNuwaIdentityKit({
+  const { state, connect, sign, verify, logout } = useIdentityKit({
     appName: 'Nuwa Login Demo',        // optional – readable key fragment
     cadopDomain: localStorage.getItem('cadop-domain') ?? 'https://test-id.nuwa.dev',
     storage: 'indexeddb',              // or 'local'
@@ -55,7 +55,7 @@ export function App() {
 
 | Legacy file | Action | Notes |
 |-------------|--------|-------|
-| `src/services/DeepLink.ts` | **Delete** | replaced by `NuwaIdentityKitWeb.connect()` / `.handleCallback()` |
+| `src/services/DeepLink.ts` | **Delete** | replaced by `IdentityKitWeb.connect()` / `.handleCallback()` |
 | `src/services/KeyStore.ts` | **Delete** | browser storage now handled by SDK KeyStore implementations |
 | `src/services/SimpleSigner.ts` | **Delete** | signing handled via SDK / DIDAuth |
 | `src/components/ConnectButton.tsx` | simplify to call `connect()` |
@@ -67,12 +67,12 @@ export function App() {
 
 ```tsx
 import { useEffect } from 'react';
-import { NuwaIdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 
 export function Callback() {
   useEffect(() => {
     (async () => {
-      const sdk = await NuwaIdentityKitWeb.init();
+      const sdk = await IdentityKitWeb.init();
       await sdk.handleCallback(location.search);
       window.close();
     })();
@@ -99,7 +99,7 @@ No other changes are required.
 ## 5  FAQ
 
 **Q : What if I still need custom encryption for KeyStore?**  
-A : Pass a custom `KeyManager` with your KeyStore implementation into `NuwaIdentityKitWeb.init({ keyManager })`.
+A : Pass a custom `KeyManager` with your KeyStore implementation into `IdentityKitWeb.init({ keyManager })`.
 
 **Q : Will the deep-link URL format change?**  
 A : The SDK generates the same `/add-key?payload=…` route as the original helper, so existing CADOP Web routes keep working.

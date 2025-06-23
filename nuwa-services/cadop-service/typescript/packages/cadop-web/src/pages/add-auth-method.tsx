@@ -11,7 +11,7 @@ import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
 import { Spin, Alert, Form, Space, Typography, Select, Radio } from 'antd';
 import { ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import {
-  BaseMultibaseCodec,
+  MultibaseCodec,
   type OperationalKeyInfo,
   type VerificationRelationship,
 } from '@nuwa-ai/identity-kit';
@@ -56,7 +56,7 @@ export function AddAuthMethodPage() {
     try {
       const keyInfo: OperationalKeyInfo = {
         type: values.type,
-        publicKeyMaterial: BaseMultibaseCodec.decodeBase58btc(values.publicKey),
+        publicKeyMaterial: MultibaseCodec.decodeBase58btc(values.publicKey),
         idFragment: `key-${Date.now()}`,
         controller: did,
       };

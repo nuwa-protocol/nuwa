@@ -1,6 +1,6 @@
 import { Base64, isValid } from 'js-base64';
 import type { DIDDocument, SignerInterface, VerificationMethod } from '@nuwa-ai/identity-kit';
-import { BaseMultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from '@nuwa-ai/identity-kit';
+import { MultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from '@nuwa-ai/identity-kit';
 import {
   SignatureScheme,
   Signer,
@@ -220,7 +220,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     for (const authMethod of verificationMethod) {
       if (authMethod.publicKeyMultibase) {
         try {
-          let authPublicKeyBytes = BaseMultibaseCodec.decodeBase58btc(
+          let authPublicKeyBytes = MultibaseCodec.decodeBase58btc(
             authMethod.publicKeyMultibase
           );
           // compare public keys
@@ -291,7 +291,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       }
 
       // 解码 Base58 格式的公钥
-      const publicKeyBytes = BaseMultibaseCodec.decodeBase58btc(webauthnPublicKey);
+      const publicKeyBytes = MultibaseCodec.decodeBase58btc(webauthnPublicKey);
 
       // 使用 CryptoUtils 验证签名（支持多曲线）
       const isSupported = defaultCryptoProviderFactory.supports(keyInfo.type);
@@ -376,7 +376,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     let canonicalKeyType = toKeyType(this.passkeyAuthMethod.type);
     return {
       type: canonicalKeyType,
-      publicKey: BaseMultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase),
+      publicKey: MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase),
     };
   }
 
@@ -515,7 +515,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
   }
 
   getPublicKey(): PublicKey<Address> {
-    let publicKey = BaseMultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase!);
+    let publicKey = MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase!);
     if (this.passkeyAuthMethod.type === KEY_TYPE.SECP256K1) {
       return new Secp256k1PublicKey(publicKey);
     } else if (this.passkeyAuthMethod.type === KEY_TYPE.ECDSAR1) {

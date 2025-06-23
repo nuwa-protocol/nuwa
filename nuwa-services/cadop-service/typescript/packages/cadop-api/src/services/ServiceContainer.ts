@@ -2,15 +2,14 @@ import { CustodianService } from './CustodianService.js';
 import { IdpService } from './IdpService.js';
 import { logger } from '../utils/logger.js';
 import {
-  BaseMultibaseCodec,
+  MultibaseCodec,
   CadopIdentityKit,
   createVDR,
   VDRInterface,
   VDRRegistry,
-  LocalSigner,
+  KeyManager,
   CadopServiceType,
 } from '@nuwa-ai/identity-kit';
-import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 import { cryptoService } from './crypto.js';
 
 export interface ServiceConfig {
@@ -68,9 +67,9 @@ export class ServiceContainer {
 
       // Initialize CadopKit
       logger.info('Initializing CadopKit...');
-      const signer = await LocalSigner.createEmpty(this.serviceConfig.cadopDid);
-      signer.importRoochKeyPair('account-key', keypair);
-      const cadopKit = await CadopIdentityKit.fromServiceDID(this.serviceConfig.cadopDid, signer);
+      const keyManager = KeyManager.createEmpty(this.serviceConfig.cadopDid);
+      await keyManager.importRoochKeyPair('account-key', keypair);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(this.serviceConfig.cadopDid, keyManager);
 
       // Initialize Custodian service
       logger.info('Initializing Custodian service...');
@@ -151,7 +150,7 @@ export class ServiceContainer {
     const serviceKeypair = cryptoService.getRoochKeypair();
 
     const publicKeyBytes = serviceKeypair.getPublicKey().toBytes();
-    const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+    const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
     const createResult = await roochVDR.create(
       {
@@ -171,9 +170,9 @@ export class ServiceContainer {
     const cadopDid = createResult.didDocument!.id;
     logger.debug('Created service DID Result', createResult);
 
-    const localSigner = await LocalSigner.createEmpty(cadopDid);
-    localSigner.importRoochKeyPair('account-key', serviceKeypair);
-    const cadopKit = await CadopIdentityKit.fromServiceDID(cadopDid, localSigner);
+    const keyManager = KeyManager.createEmpty(cadopDid);
+    await keyManager.importRoochKeyPair('account-key', serviceKeypair);
+    const cadopKit = await CadopIdentityKit.fromServiceDID(cadopDid, keyManager);
 
     // Add CADOP service
     const serviceId = await cadopKit.addService({

@@ -7,11 +7,10 @@ import {
   CadopIdentityKit,
   CadopServiceType,
   KEY_TYPE,
-  CryptoUtils,
   SignerInterface,
-  BaseMultibaseCodec,
+  MultibaseCodec,
   DidKeyCodec,
-  LocalSigner,
+  KeyManager,
 } from '@nuwa-ai/identity-kit';
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
@@ -69,7 +68,7 @@ describe('CustodianService Integration Tests', () => {
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
       const publicKeyBytes = cadopServiceKeypair.getPublicKey().toBytes();
-      const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+      const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
       const createResult = await roochVDR.create(
         {
@@ -87,11 +86,11 @@ describe('CustodianService Integration Tests', () => {
       cadopServiceDID = createResult.didDocument!.id;
 
       // Create signer adapter
-      const localSigner = await LocalSigner.createEmpty(cadopServiceDID);
-      localSigner.importRoochKeyPair('account-key', cadopServiceKeypair);
-      serviceSigner = localSigner;
+      const keyManager = KeyManager.createEmpty(cadopServiceDID);
+      await keyManager.importRoochKeyPair('account-key', cadopServiceKeypair);
+      serviceSigner = keyManager;
       // Initialize CadopIdentityKit
-      const cadopKit = await CadopIdentityKit.fromServiceDID(cadopServiceDID, localSigner);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(cadopServiceDID, keyManager);
 
       // Add CADOP service
       const serviceId = await cadopKit.addService({

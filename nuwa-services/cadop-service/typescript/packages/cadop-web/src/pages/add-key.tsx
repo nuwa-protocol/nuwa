@@ -8,10 +8,10 @@ import { DIDService } from '../lib/did/DIDService';
 import { Spin, Alert, Typography, Descriptions, Tag, Space } from 'antd';
 import { ArrowLeftOutlined, KeyOutlined, SafetyOutlined, WarningOutlined } from '@ant-design/icons';
 import {
-  BaseMultibaseCodec,
+  MultibaseCodec,
+  AddKeyRequestPayloadV1,
   type OperationalKeyInfo,
   type VerificationRelationship,
-  Base64
 } from '@nuwa-ai/identity-kit';
 import { AgentSelector } from '../components/AgentSelector';
 import { PasskeyService } from '../lib/passkey/PasskeyService';
@@ -19,19 +19,19 @@ import { PasskeyService } from '../lib/passkey/PasskeyService';
 const { Title, Text, Paragraph } = Typography;
 
 // Payload interface definition
-interface AddKeyPayload {
-  version: number;
-  agentDid?: string;
-  verificationMethod: {
-    type: string;
-    publicKeyMultibase?: string;
-    publicKeyJwk?: Record<string, any>;
-    idFragment?: string;
-  };
-  verificationRelationships: VerificationRelationship[];
-  redirectUri: string;
-  state: string;
-}
+// interface AddKeyPayload {
+//   version: number;
+//   agentDid?: string;
+//   verificationMethod: {
+//     type: string;
+//     publicKeyMultibase?: string;
+//     publicKeyJwk?: Record<string, any>;
+//     idFragment?: string;
+//   };
+//   verificationRelationships: VerificationRelationship[];
+//   redirectUri: string;
+//   state: string;
+// }
 
 export function AddKeyPage() {
   const { t } = useTranslation();
@@ -40,7 +40,7 @@ export function AddKeyPage() {
   const { userDid, isAuthenticated, signInWithDid } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [payload, setPayload] = useState<AddKeyPayload | null>(null);
+  const [payload, setPayload] = useState<AddKeyRequestPayloadV1 | null>(null);
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [didService, setDidService] = useState<DIDService | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
@@ -55,8 +55,8 @@ export function AddKeyPage() {
 
     try {
       // Base64URL decode
-      const decodedPayload = Base64.decodeToString(payloadParam);
-      const parsedPayload = JSON.parse(decodedPayload) as AddKeyPayload;
+      const decodedPayload = MultibaseCodec.decodeBase64urlToString(payloadParam);
+      const parsedPayload = JSON.parse(decodedPayload) as AddKeyRequestPayloadV1;
       
       // Validate required fields
       if (!parsedPayload.version || !parsedPayload.verificationMethod || !parsedPayload.redirectUri || !parsedPayload.state) {
@@ -143,11 +143,7 @@ export function AddKeyPage() {
 
       // Handle different public key formats
       if (payload.verificationMethod.publicKeyMultibase) {
-        keyInfo.publicKeyMaterial = BaseMultibaseCodec.decodeBase58btc(payload.verificationMethod.publicKeyMultibase);
-      } else if (payload.verificationMethod.publicKeyJwk) {
-        // Assuming there's a function to convert JWK to raw public key
-        // keyInfo.publicKeyMaterial = convertJwkToRaw(payload.verificationMethod.publicKeyJwk);
-        throw new Error('JWK format not yet supported');
+        keyInfo.publicKeyMaterial = MultibaseCodec.decodeBase58btc(payload.verificationMethod.publicKeyMultibase);
       } else {
         throw new Error('No valid public key format provided');
       }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NuwaIdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 
 export function Callback() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -9,7 +9,7 @@ export function Callback() {
     const handleCallback = async () => {
       try {
         // Initialize SDK and handle callback
-        const sdk = await NuwaIdentityKitWeb.init({
+        const sdk = await IdentityKitWeb.init({
           appName: 'Nuwa Login Demo'
         });
         await sdk.handleCallback(window.location.search);

@@ -1,4 +1,4 @@
-import { createVDR, NuwaIdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
+import { createVDR, IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
 import { ROOCH_RPC_URL } from '../../config/env';
 import type {
   OperationalKeyInfo,
@@ -9,9 +9,9 @@ import type {
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
 
 export class DIDService {
-  private identityKit: NuwaIdentityKit;
+  private identityKit: IdentityKit;
 
-  constructor(identityKit: NuwaIdentityKit) {
+  constructor(identityKit: IdentityKit) {
     this.identityKit = identityKit;
   }
 
@@ -33,7 +33,7 @@ export class DIDService {
         credentialId: credentialId || undefined,
       });
 
-      const identityKit = await NuwaIdentityKit.fromDIDDocument(didDocument, signer);
+      const identityKit = await IdentityKit.fromDIDDocument(didDocument, signer);
       return new DIDService(identityKit);
     } catch (error) {
       console.error('Failed to initialize DID service:', error);
