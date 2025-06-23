@@ -1,1 +1,1 @@
-export * from './useNuwaIdentityKit'; 
+export * from './useIdentityKit'; 

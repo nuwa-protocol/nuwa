@@ -22,10 +22,10 @@ export interface IdentityKitWebOptions {
 }
 
 /**
- * NuwaIdentityKitWeb – High-level Web SDK for Nuwa Identity Kit
+ * IdentityKitWeb – High-level Web SDK for Nuwa Identity Kit
  * Provides a high-level API for web applications
  */
-export class NuwaIdentityKitWeb {
+export class IdentityKitWeb {
   private keyManager: KeyManager;
   private deepLinkManager: DeepLinkManager;
   private cadopDomain: string;
@@ -44,9 +44,9 @@ export class NuwaIdentityKitWeb {
   }
 
   /**
-   * Initialize the NuwaIdentityKitWeb
+   * Initialize the IdentityKitWeb
    */
-  static async init(options: IdentityKitWebOptions = {}): Promise<NuwaIdentityKitWeb> {
+  static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
     const { appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
     
@@ -79,7 +79,7 @@ export class NuwaIdentityKitWeb {
       keyManager,
     });
     
-    return new NuwaIdentityKitWeb(keyManager, deepLinkManager, cadopDomain, appName);
+    return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, appName);
   }
 
   /**

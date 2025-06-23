@@ -1,9 +1,17 @@
-import { KeyManager, CryptoUtils, StoredKey, MultibaseCodec, KeyType} from '@nuwa-ai/identity-kit';
+import type { KeyType, AddKeyRequestPayloadV1 } from '@nuwa-ai/identity-kit';
+import {
+  KeyManager,
+  CryptoUtils,
+  StoredKey,
+  MultibaseCodec,
+  KeyTypeInput,
+  toKeyType,
+} from '@nuwa-ai/identity-kit';
 import { LocalStorageKeyStore } from '../keystore';
 
 export interface ConnectOptions {
   cadopDomain?: string;
-  keyType?: string;          // Default: Ed25519VerificationKey2020
+  keyType?: KeyTypeInput;          // Default: KeyType.ED25519
   idFragment?: string;
   relationships?: string[];  // Default: ['authentication']
   redirectPath?: string;     // Default: '/callback'
@@ -56,7 +64,7 @@ export class DeepLinkManager {
       : (/^(localhost|\d+\.\d+\.\d+\.\d+(:\d+)?)$/.test(cadopDomainRaw)
           ? `http://${cadopDomainRaw}`
           : `https://${cadopDomainRaw}`);
-    const keyType = opts.keyType || 'Ed25519VerificationKey2020';
+    const keyType = toKeyType((opts.keyType ?? 'Ed25519VerificationKey2020') as KeyTypeInput);
     const idFragment = opts.idFragment || `key-${Date.now()}`;
     const relationships = opts.relationships || ['authentication'];
     const redirectPath = opts.redirectPath || '/callback';
@@ -80,7 +88,7 @@ export class DeepLinkManager {
     // Build payload per spec (versioned JSON -> Base64URL)
     const redirectUri = new URL(redirectPath, window.location.origin).toString();
 
-    const payload: any = {
+    const payload: AddKeyRequestPayloadV1 = {
       version: 1,
       verificationMethod: {
         type: keyType,

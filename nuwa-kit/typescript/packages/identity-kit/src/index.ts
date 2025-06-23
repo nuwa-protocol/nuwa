@@ -4,7 +4,7 @@ export * from './CadopIdentityKit';
 export * from './vdr';
 export * from './multibase';
 export * from './crypto';
-export { DIDAuth } from './auth';
+export * from './auth';
 export { initRoochVDR } from './vdr';
 export * from './keys';
 export * from './signers';

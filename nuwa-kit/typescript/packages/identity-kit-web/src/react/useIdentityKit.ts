@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { NuwaIdentityKitWeb } from '..';
+import { IdentityKitWeb } from '..';
 import { NIP1SignedObject } from '@nuwa-ai/identity-kit';
 
 export interface IdentityKitState {
@@ -16,7 +16,7 @@ export interface IdentityKitHook {
   sign: (payload: any) => Promise<NIP1SignedObject>;
   verify: (sig: NIP1SignedObject) => Promise<boolean>;
   logout: () => Promise<void>;
-  sdk: NuwaIdentityKitWeb | null;
+  sdk: IdentityKitWeb | null;
 }
 
 export interface UseIdentityKitOptions {
@@ -29,8 +29,8 @@ export interface UseIdentityKitOptions {
 /**
  * React hook for Nuwa Identity Kit (Web)
  */
-export function useNuwaIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
-  const [sdk, setSdk] = useState<NuwaIdentityKitWeb | null>(null);
+export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
+  const [sdk, setSdk] = useState<IdentityKitWeb | null>(null);
   const [state, setState] = useState<IdentityKitState>({
     isConnected: false,
     isConnecting: false,
@@ -42,7 +42,7 @@ export function useNuwaIdentityKit(options: UseIdentityKitOptions = {}): Identit
   /**
    * Helper – refresh connection state from SDK instance
    */
-  async function refreshConnection(kit: NuwaIdentityKitWeb | null = sdk) {
+  async function refreshConnection(kit: IdentityKitWeb | null = sdk) {
     if (!kit) return;
     const isConnected = await kit.isConnected();
     if (isConnected) {
@@ -68,7 +68,7 @@ export function useNuwaIdentityKit(options: UseIdentityKitOptions = {}): Identit
   useEffect(() => {
     async function initSdk() {
       try {
-        const newSdk = await NuwaIdentityKitWeb.init({
+        const newSdk = await IdentityKitWeb.init({
           appName: options.appName,
           cadopDomain: options.cadopDomain,
           storage: options.storage,
