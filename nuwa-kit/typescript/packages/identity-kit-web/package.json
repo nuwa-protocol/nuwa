@@ -20,10 +20,10 @@
     "did",
     "web"
   ],
-  "author": "Nuwa Team",
-  "license": "MIT",
+  "author": "Nuwa Community",
+  "license": "Apache-2.0",
   "dependencies": {
-    "@nuwa-ai/identity-kit": "0.1.0-beta.10"
+    "@nuwa-ai/identity-kit": "workspace:*"
   },
   "peerDependencies": {
     "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
