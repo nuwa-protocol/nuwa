@@ -1,6 +1,6 @@
 // Signer interfaces and types
 
-import { KeyType } from './crypto';
+import { KeyType } from '../types/crypto';
 
 /**
  * Interface for external signers that can be used for master key operations

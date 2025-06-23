@@ -8,7 +8,7 @@ import {
   DIDCreationRequest,
   DIDCreationResult,
   CADOPCreationRequest,
-} from '../types/vdr';
+} from './types';
 import { AbstractVDR } from './abstractVDR';
 import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
 

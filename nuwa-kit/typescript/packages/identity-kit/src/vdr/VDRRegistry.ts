@@ -5,7 +5,7 @@ import {
   DIDCreationRequest,
   DIDCreationResult,
   CADOPCreationRequest,
-} from '../types/vdr';
+} from './types';
 
 import { InMemoryLRUDIDDocumentCache } from '../cache/InMemoryLRUDIDDocumentCache';
 

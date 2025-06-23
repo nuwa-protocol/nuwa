@@ -7,4 +7,5 @@ export const DIDAuth = {
   v1,
 } as const;
 
+export * from './types';
 export default DIDAuth;

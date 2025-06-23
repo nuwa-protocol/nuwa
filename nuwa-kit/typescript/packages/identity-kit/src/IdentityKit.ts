@@ -5,9 +5,9 @@ import {
   ServiceInfo,
   ServiceEndpoint,
 } from './types/did';
-import { SignerInterface } from './types/signer';
+import { SignerInterface } from './signers/types';
 import { KeyTypeInput, KEY_TYPE, KeyType, OperationalKeyInfo } from './types/crypto';
-import { VDRInterface, DIDCreationRequest } from './types/vdr';
+import { VDRInterface, DIDCreationRequest } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 // Key management & crypto utilities
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
@@ -16,8 +16,6 @@ import { CryptoUtils } from './crypto';
 import { DidKeyCodec } from './multibase';
 import { createVDR, initRoochVDR } from './vdr';
 import { BaseMultibaseCodec } from './multibase';
-// Rooch SDK types (optional dependency path is runtime resolved)
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
 
 // Simplified initialization options for the high-level factory method introduced in v1 refactor

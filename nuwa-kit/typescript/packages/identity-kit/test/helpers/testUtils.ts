@@ -7,7 +7,7 @@ import {
   MasterIdentity,
   KEY_TYPE,
   KeyType,
-} from '../../src/types';
+} from '../../src/index';
 import { CryptoUtils } from '../../src/crypto';
 
 /**

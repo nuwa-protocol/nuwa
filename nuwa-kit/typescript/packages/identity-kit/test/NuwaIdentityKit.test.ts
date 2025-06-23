@@ -3,10 +3,7 @@ import {
   IdentityKit,
   DIDDocument,
   DIDCreationRequest,
-  OperationalKeyInfo,
   ServiceInfo,
-  VerificationRelationship,
-  SignedData,
   KEY_TYPE,
   VDRRegistry,
 } from '../src';

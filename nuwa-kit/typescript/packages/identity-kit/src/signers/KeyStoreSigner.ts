@@ -1,8 +1,8 @@
-import { SignerInterface } from '../types/signer';
+import { SignerInterface } from '../signers/types';
 import { KeyType } from '../types/crypto';
 import { CryptoUtils } from '../crypto';
 import { MultibaseCodec } from '../multibase';
-import { KeyStore, StoredKey } from '../keys/KeyStore';
+import { KeyStore } from '../keys/KeyStore';
 
 /**
  * A unified signer adapter that works with any KeyStore implementation

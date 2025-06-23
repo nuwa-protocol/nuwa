@@ -1,4 +1,4 @@
-import { VDRInterface } from '../types/vdr';
+import { VDRInterface } from './types';
 import { KeyVDR } from './keyVDR';
 import { RoochVDR } from './roochVDR';
 import { VDRRegistry } from './VDRRegistry';
@@ -61,6 +61,7 @@ export function initRoochVDR(
 }
 
 // Export VDR implementations
+export * from './types';
 export * from './keyVDR';
 export * from './abstractVDR';
 export * from './roochVDR';

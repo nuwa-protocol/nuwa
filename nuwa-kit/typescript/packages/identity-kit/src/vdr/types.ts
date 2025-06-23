@@ -1,7 +1,6 @@
 // Verifiable Data Registry (VDR) related types
 
-import { DIDDocument, VerificationRelationship, ServiceEndpoint } from './did';
-import { SignerInterface } from './signer';
+import { DIDDocument, VerificationRelationship, ServiceEndpoint } from '../types';
 
 /**
  * DID creation request information

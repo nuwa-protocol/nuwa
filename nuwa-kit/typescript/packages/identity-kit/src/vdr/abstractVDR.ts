@@ -9,7 +9,7 @@ import {
   DIDCreationResult,
   CADOPCreationRequest,
   VDRInterface,
-} from '../types/vdr';
+} from './types';
 
 /**
  * Abstract base class for implementing Verifiable Data Registry functionality

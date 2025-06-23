@@ -23,13 +23,9 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { SignerInterface } from '../types/signer';
+import { SignerInterface } from '../signers/types';
 import { KeyType, KEY_TYPE, KeyTypeInput, toKeyType } from '../types/crypto';
-import {
-  DIDCreationRequest,
-  DIDCreationResult,
-  CADOPCreationRequest,
-} from '../types/vdr';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,

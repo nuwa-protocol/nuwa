@@ -1,5 +1,4 @@
-import { IdentityKit, VDRRegistry } from '../../src';
-import { DIDDocument, DIDCreationRequest, SignerInterface, KEY_TYPE } from '../../src/types';
+import { IdentityKit, VDRRegistry, DIDDocument, DIDCreationRequest, KEY_TYPE } from '../../src';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
 import { CryptoUtils } from '../../src/crypto';
 import { KeyVDR } from '../../src/vdr/keyVDR';

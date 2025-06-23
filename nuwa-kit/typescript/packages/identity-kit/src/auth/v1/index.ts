@@ -1,10 +1,6 @@
-import {
-  NIP1SignedObject,
-  SignedData,
-  DIDDocument,
-  SignerInterface,
-  DIDResolver,
-} from '../../types';
+import { DIDDocument, DIDResolver } from '../../types';
+import { SignerInterface } from '../../signers/types';
+import { NIP1SignedObject, SignedData } from '../types';
 import { canonicalize } from './utils';
 import { CryptoUtils } from '../../crypto';
 import { NonceStore, defaultNonceStore } from './nonceStore';

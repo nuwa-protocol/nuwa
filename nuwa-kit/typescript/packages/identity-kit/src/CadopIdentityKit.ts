@@ -4,8 +4,8 @@ import {
   ServiceInfo,
   VerificationRelationship,
 } from './types/did';
-import { SignerInterface } from './types/signer';
-import { CADOPCreationRequest, DIDCreationResult } from './types/vdr';
+import { SignerInterface } from './signers/types';
+import { CADOPCreationRequest, DIDCreationResult } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 import { IdentityKit } from './IdentityKit';
 

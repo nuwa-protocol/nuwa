@@ -1,4 +1,4 @@
-import { SignerInterface } from '../types/signer';
+import { SignerInterface } from '../signers/types';
 import { KeyType, KEY_TYPE } from '../types/crypto';
 import { CryptoUtils } from '../crypto';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
