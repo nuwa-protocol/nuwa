@@ -10,3 +10,4 @@ export * from './keys';
 export * from './signers';
 export * from './cache';
 export { DebugLogger } from './utils/DebugLogger';
+export * from './IdentityEnv';

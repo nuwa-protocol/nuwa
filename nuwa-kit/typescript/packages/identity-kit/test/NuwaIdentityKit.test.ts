@@ -233,4 +233,35 @@ describe('IdentityKit', () => {
       expect(serviceId).toBe(`${testDID}#messaging`);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // New tests – Bootstrap Environment API (v1 refactor)
+  // ---------------------------------------------------------------------------
+  describe('Environment Bootstrap', () => {
+    it('should bootstrap env and create/load DID', async () => {
+      // 1. Bootstrap env for did:key
+      const env = await IdentityKit.bootstrap({ method: 'key' });
+
+      // 2. Create a new DID via env.createDid()
+      const kp = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      const pubMb = await KeyMultibaseCodec.encodeWithType(kp.publicKey, KeyType.ED25519);
+      const did = `did:key:${pubMb}`;
+
+      const req: DIDCreationRequest = {
+        publicKeyMultibase: pubMb,
+        keyType: 'Ed25519VerificationKey2020',
+        preferredDID: did,
+        controller: did,
+        initialRelationships: ['authentication', 'capabilityDelegation'],
+      };
+
+      const kitFromCreate = await env.createDid('key', req);
+      expect(kitFromCreate.getDIDDocument().id).toBe(did);
+
+      // 3. Bootstrap a fresh env and load the DID
+      const env2 = await IdentityKit.bootstrap({ method: 'key' });
+      const kitFromLoad = await env2.loadDid(did, signer);
+      expect(kitFromLoad.getDIDDocument()).toEqual(kitFromCreate.getDIDDocument());
+    });
+  });
 });
