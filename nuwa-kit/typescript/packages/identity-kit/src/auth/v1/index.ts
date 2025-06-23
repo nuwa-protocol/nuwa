@@ -9,7 +9,7 @@ import { canonicalize } from './utils';
 import { CryptoUtils } from '../../crypto';
 import { NonceStore, defaultNonceStore } from './nonceStore';
 import { BaseMultibaseCodec } from '../../multibase';
-import { Base64 } from '../../utils/base64';
+import { MultibaseCodec } from '../../multibase/base';
 import { Bytes } from '../../utils/bytes';
 
 // Authorization scheme identifier for HTTP headers
@@ -82,11 +82,11 @@ export function toAuthorizationHeader(obj: NIP1SignedObject): string {
     signed_data: obj.signed_data,
     signature: {
       ...obj.signature,
-      value: Base64.encode(obj.signature.value),
+      value: MultibaseCodec.encodeBase64url(obj.signature.value),
     },
   };
   const json = JSON.stringify(cloned);
-  const b64url = Base64.encode(json);
+  const b64url = MultibaseCodec.encodeBase64url(json);
   return `${HEADER_PREFIX}${b64url}`;
 }
 
@@ -170,7 +170,7 @@ export async function verifyAuthHeader(
   const b64url = header.substring(HEADER_PREFIX.length).trim();
   let payloadStr: string;
   try {
-    payloadStr = Bytes.bytesToString(Base64.decodeToBytes(b64url));
+    payloadStr = Bytes.bytesToString(MultibaseCodec.decodeBase64url(b64url));
   } catch (e) {
     return { ok: false, error: 'Invalid base64 credentials' };
   }
@@ -186,7 +186,7 @@ export async function verifyAuthHeader(
   if (!parsed?.signature?.value) {
     return { ok: false, error: 'Missing signature value' };
   }
-  parsed.signature.value = Base64.decodeToBytes(parsed.signature.value);
+  parsed.signature.value = MultibaseCodec.decodeBase64url(parsed.signature.value);
   const signedObj = parsed as NIP1SignedObject;
 
   // basic replay protection: nonce & timestamp
