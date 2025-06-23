@@ -1,4 +1,5 @@
-import { DIDDocument, DIDDocumentCache } from '../types/did';
+import { DIDDocument } from '../types';
+import { DIDDocumentCache } from './index';
 
 /**
  * A lightweight in-memory LRU cache implementation for DID Documents.

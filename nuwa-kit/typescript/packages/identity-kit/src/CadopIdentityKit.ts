@@ -6,7 +6,7 @@ import {
 } from './types/did';
 import { SignerInterface } from './types/signer';
 import { CADOPCreationRequest, DIDCreationResult } from './types/vdr';
-import { VDRRegistry } from './VDRRegistry';
+import { VDRRegistry } from './vdr/VDRRegistry';
 import { IdentityKit } from './IdentityKit';
 
 /**

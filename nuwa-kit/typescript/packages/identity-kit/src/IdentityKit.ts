@@ -8,7 +8,7 @@ import {
 import { SignerInterface } from './types/signer';
 import { KeyTypeInput, KEY_TYPE, KeyType, OperationalKeyInfo } from './types/crypto';
 import { VDRInterface, DIDCreationRequest } from './types/vdr';
-import { VDRRegistry } from './VDRRegistry';
+import { VDRRegistry } from './vdr/VDRRegistry';
 // Key management & crypto utilities
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
 import { KeyManager } from './keys/KeyManager';

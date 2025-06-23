@@ -1,4 +1,5 @@
-import { DIDDocument, DIDDocumentCache, DIDResolver } from '../types/did';
+import { DIDDocument, DIDResolver } from '../types';
+import { DIDDocumentCache } from '../cache';
 import {
   VDRInterface,
   DIDCreationRequest,
