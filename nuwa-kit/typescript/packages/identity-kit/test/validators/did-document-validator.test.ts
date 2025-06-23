@@ -1,4 +1,4 @@
-import { IdentityKit, VDRRegistry, DIDDocument, DIDCreationRequest, KEY_TYPE } from '../../src';
+import { IdentityKit, VDRRegistry, DIDDocument, DIDCreationRequest, KeyType, KeyMultibaseCodec } from '../../src';
 import { validateDIDDocument } from '../../src/validators/did-document-validator';
 import { CryptoUtils } from '../../src/crypto';
 import { KeyVDR } from '../../src/vdr/keyVDR';
@@ -19,8 +19,8 @@ describe('DID Document Validator', () => {
     // Create mock signer
     const { keyManager: mockSigner, keyId, did } = await KeyManager.createWithDidKey();
 
-    const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+    const publicKeyMultibase = await KeyMultibaseCodec.encodeWithType(publicKey, KeyType.ED25519);
 
     // Create DID creation request
     const creationRequest: DIDCreationRequest = {

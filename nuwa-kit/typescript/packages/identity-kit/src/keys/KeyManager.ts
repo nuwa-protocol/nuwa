@@ -1,9 +1,9 @@
 import { SignerInterface } from '../signers/types';
-import { KeyType, KEY_TYPE, roochSignatureSchemeToKeyType } from '../types/crypto';
+import { KeyType, roochSignatureSchemeToKeyType } from '../types/crypto';
 import { CryptoUtils } from '../crypto';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
 import { signWithKeyStore, canSignWithKeyStore, getKeyInfoFromKeyStore } from '../signers/keyStoreUtils';
-import { BaseMultibaseCodec } from '../multibase';
+import { BaseMultibaseCodec, KeyMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 
 /**
@@ -195,11 +195,7 @@ export class KeyManager implements SignerInterface {
     return this.store;
   }
 
-  /* ------------------------------------------------------------------
-   * Convenience helpers – 提供与旧 LocalSigner 等价的快速创建/导入能力
-   * ------------------------------------------------------------------ */
-
-  /** Create an empty KeyManager instance并绑定 DID */
+  /** Create an empty KeyManager instance and bind DID */
   static createEmpty(did: string, store: KeyStore = new MemoryKeyStore()): KeyManager {
     const km = new KeyManager({ store });
     km.setDid(did);
@@ -210,7 +206,7 @@ export class KeyManager implements SignerInterface {
   static async createWithNewKey(
     did: string,
     fragment = `key-${Date.now()}`,
-    type: KeyType = KEY_TYPE.ED25519,
+    type: KeyType = KeyType.ED25519,
     store: KeyStore = new MemoryKeyStore()
   ): Promise<{ keyManager: KeyManager; keyId: string }> {
     const km = KeyManager.createEmpty(did, store);
@@ -223,7 +219,7 @@ export class KeyManager implements SignerInterface {
     did: string,
     keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
     fragment = 'account-key',
-    type: KeyType = KEY_TYPE.ED25519,
+    type: KeyType = KeyType.ED25519,
     store: KeyStore = new MemoryKeyStore()
   ): Promise<{ keyManager: KeyManager; keyId: string }> {
     const km = KeyManager.createEmpty(did, store);
@@ -234,7 +230,7 @@ export class KeyManager implements SignerInterface {
   /** Utility: generate did:key + master key */
   static async createWithDidKey(): Promise<{ keyManager: KeyManager; keyId: string; did: string }> {
     const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
-    const publicKeyMultibase = CryptoUtils.publicKeyToMultibase(publicKey, KeyType.ED25519);
+    const publicKeyMultibase = KeyMultibaseCodec.encodeWithType(publicKey, KeyType.ED25519);
     const didKey = `did:key:${publicKeyMultibase}`;
     const km = KeyManager.createEmpty(didKey);
     const keyId = await km.importKeyPair('account-key', { privateKey, publicKey }, KeyType.ED25519);

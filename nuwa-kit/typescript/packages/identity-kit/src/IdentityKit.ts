@@ -13,7 +13,7 @@ import { VDRRegistry } from './vdr/VDRRegistry';
 import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
 import { KeyManager } from './keys/KeyManager';
 import { CryptoUtils } from './crypto';
-import { DidKeyCodec } from './multibase';
+import { DidKeyCodec, KeyMultibaseCodec } from './multibase';
 import { createVDR, initRoochVDR } from './vdr';
 import { BaseMultibaseCodec } from './multibase';
 import { Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
@@ -151,7 +151,7 @@ export class IdentityKit {
 
       // b) Generate a master key ------------------------------------------------------
       const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(keyType);
-      const publicKeyMultibase = CryptoUtils.publicKeyToMultibase(publicKey, keyType);
+      const publicKeyMultibase = KeyMultibaseCodec.encodeWithType(publicKey, keyType);
       const did = DidKeyCodec.generateDidKey(publicKey, keyType);
       const keyId = `${did}#master`;
 

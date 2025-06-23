@@ -4,8 +4,9 @@ import {
   DIDDocument,
   DIDCreationRequest,
   ServiceInfo,
-  KEY_TYPE,
+  KeyType,
   VDRRegistry,
+  KeyMultibaseCodec,
 } from '../src';
 import { CryptoUtils } from '../src/crypto';
 import { KeyVDR } from '../src/vdr/keyVDR';
@@ -25,16 +26,16 @@ describe('IdentityKit', () => {
     VDRRegistry.getInstance().registerVDR(keyVDR);
 
     // Generate a key pair for the DID
-    const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-    const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(
+    const keyPair = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+    const publicKeyMultibase = await KeyMultibaseCodec.encodeWithType(
       keyPair.publicKey,
-      KEY_TYPE.ED25519
+      KeyType.ED25519
     );
     testDID = `did:key:${publicKeyMultibase}`;
 
     // Create an empty KeyManager and import the DID's key pair
     signer = KeyManager.createEmpty(testDID);
-    keyId = await signer.importKeyPair('account-key', keyPair, KEY_TYPE.ED25519);
+    keyId = await signer.importKeyPair('account-key', keyPair, KeyType.ED25519);
 
     // Create DID Document
     mockDIDDocument = {
@@ -93,10 +94,10 @@ describe('IdentityKit', () => {
     });
 
     it('should create new DID', async () => {
-      const { publicKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-      const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(
+      const { publicKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      const publicKeyMultibase = await KeyMultibaseCodec.encodeWithType(
         publicKey,
-        KEY_TYPE.ED25519
+        KeyType.ED25519
       );
       const did = `did:key:${publicKeyMultibase}`;
 
