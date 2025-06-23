@@ -189,7 +189,7 @@ window.close();
 
 ```ts
 const signer = new WebAuthnSigner(userDid, { didDocument, credentialId });
-const kit = await NuwaIdentityKit.fromExistingDID(agentDid, signer);
+const kit = await IdentityKit.fromExistingDID(agentDid, signer);
 
 await kit.addVerificationMethod(
   {
@@ -319,7 +319,7 @@ window.addEventListener('message', async evt => {
 }
 ```
 
-3. 使用 **Operational Key** (`key_id`) 调 `NuwaIdentityKit.createNIP1Signature()` —— 该方法生成的结构字段 (`signed_data`, `signature`) 与 [NIP-2](../nips/nip-2.md) 中 **Core Authentication Data Structure** 完全兼容。  
+3. 使用 **Operational Key** (`key_id`) 调 `IdentityKit.createNIP1Signature()` —— 该方法生成的结构字段 (`signed_data`, `signature`) 与 [NIP-2](../nips/nip-2.md) 中 **Core Authentication Data Structure** 完全兼容。  
 4. 把 `NIP2AuthData`（即上一步生成结果的 Base64url/JSON） 放入请求头或请求体：
 
 ```http
@@ -387,10 +387,10 @@ window.localStorage.setItem('nuwa:kp_app_priv', Buffer.from(privateKey).toString
 ### 8.2 注册 verificationMethod
 
 ```ts
-import { NuwaIdentityKit } from '@nuwa-ai/identity-kit';
+import { IdentityKit } from '@nuwa-ai/identity-kit';
 import { CustodianAPI } from './sdk';
 
-const kit = await NuwaIdentityKit.fromExistingDID(agentDid, signer /* Passkey */);
+const kit = await IdentityKit.fromExistingDID(agentDid, signer /* Passkey */);
 const keyId = await kit.addVerificationMethod({
   type: 'Ed25519VerificationKey2020',
   publicKeyMaterial: publicKey,
