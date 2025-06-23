@@ -10,9 +10,6 @@ import {
   CADOPCreationRequest,
 } from '../types/vdr';
 import { AbstractVDR } from './abstractVDR';
-import { CryptoUtils } from '../crypto';
-import { CadopUtils } from '../cadopUtils';
-import { KeyMultibaseCodec } from '../multibase/key';
 import { BaseMultibaseCodec, DidKeyCodec } from '../multibase';
 
 /**

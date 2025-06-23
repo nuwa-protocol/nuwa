@@ -2,7 +2,6 @@ export * from './types';
 export * from './IdentityKit';
 export * from './CadopIdentityKit';
 export * from './vdr';
-export * from './cadopUtils';
 export * from './multibase';
 export * from './crypto';
 export * from './utils/base64';
