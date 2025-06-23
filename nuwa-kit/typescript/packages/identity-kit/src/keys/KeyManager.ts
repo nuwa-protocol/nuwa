@@ -36,7 +36,7 @@ export class KeyManager implements SignerInterface {
     this.store = options?.store || new MemoryKeyStore();
     this.did = options?.did;
     this.signer = new KeyStoreSigner(this.store, this.did);
-    this.defaultKeyType = options?.defaultKeyType || 'Ed25519VerificationKey2020';
+    this.defaultKeyType = options?.defaultKeyType || KeyType.ED25519;
   }
 
   /**

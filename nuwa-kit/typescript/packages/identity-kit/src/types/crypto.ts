@@ -1,21 +1,28 @@
 // Cryptographic types and constants
 
 /**
- * Key type constants for cryptographic operations
+ * Readable enum for supported verification key suites.
+ *
+ * NOTE: Replaces the old `KEY_TYPE` const object. Use this in new code to
+ * improve clarity. Values keep the same long-form strings to avoid breaking
+ * existing behavior when serialized into DID Documents.
  */
-export const KEY_TYPE = {
-  ED25519: 'Ed25519VerificationKey2020',
-  SECP256K1: 'EcdsaSecp256k1VerificationKey2019',
-  ECDSAR1: 'EcdsaSecp256r1VerificationKey2019',
-} as const;
+export enum KeyType {
+  ED25519 = 'Ed25519VerificationKey2020',
+  SECP256K1 = 'EcdsaSecp256k1VerificationKey2019',
+  ECDSAR1 = 'EcdsaSecp256r1VerificationKey2019',
+}
 
-export type KeyType = (typeof KEY_TYPE)[keyof typeof KEY_TYPE];
+/**
+ * @deprecated Will be removed in the next major version. Use `KeyType` enum instead.
+ */
+export const KEY_TYPE = KeyType;
 
 /**
  * Type guard to check if a string is a valid KeyType
  */
 export function isKeyType(value: string): value is KeyType {
-  return Object.values(KEY_TYPE).includes(value as KeyType);
+  return Object.values(KeyType).includes(value as KeyType);
 }
 
 /**
@@ -37,9 +44,9 @@ export function toKeyType(value: string): KeyType {
 export function algorithmToKeyType(algorithm: number): KeyType | undefined {
   switch (algorithm) {
     case -8:
-      return KEY_TYPE.ED25519;
+      return KeyType.ED25519;
     case -7:
-      return KEY_TYPE.ECDSAR1;
+      return KeyType.ECDSAR1;
     default:
       return undefined;
   }
@@ -50,9 +57,9 @@ export function algorithmToKeyType(algorithm: number): KeyType | undefined {
  */
 export function keyTypeToAlgorithm(keyType: KeyType): number | undefined {
   switch (keyType) {
-    case KEY_TYPE.ED25519:
+    case KeyType.ED25519:
       return -8;
-    case KEY_TYPE.ECDSAR1:
+    case KeyType.ECDSAR1:
       return -7;
     default:
       return undefined;
