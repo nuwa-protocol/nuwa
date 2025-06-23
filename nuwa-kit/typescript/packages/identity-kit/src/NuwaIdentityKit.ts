@@ -18,7 +18,6 @@ import { CryptoUtils } from './cryptoUtils';
 import { DidKeyCodec } from './multibase';
 import { KEY_TYPE, KeyType } from './types';
 import { createVDR, initRoochVDR } from './vdr';
-import { LocalSigner } from './signers/LocalSigner';
 import { BaseMultibaseCodec } from './multibase';
 // Rooch SDK types (optional dependency path is runtime resolved)
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -197,9 +196,9 @@ export class NuwaIdentityKit {
       const address = keypair.getRoochAddress().toBech32Address();
       const did = `did:rooch:${address}`;
 
-      // LocalSigner holds our generated keypair and implements SignerInterface
-      const localSigner = LocalSigner.createEmpty(did);
-      await localSigner.importRoochKeyPair('account-key', keypair);
+      // Use KeyManager with in-memory store to hold generated Rooch keypair
+      const km = KeyManager.createEmpty(did);
+      await km.importRoochKeyPair('account-key', keypair);
 
       // Create DID on-chain -----------------------------------------------------------
       const createResult = await registry.createDID(method, {
@@ -209,7 +208,7 @@ export class NuwaIdentityKit {
         controller: did,
         initialRelationships: ['authentication', 'capabilityDelegation'],
       }, {
-        signer: localSigner,
+        signer: km,
         keyId: `${did}#account-key`,
       });
 
@@ -217,7 +216,7 @@ export class NuwaIdentityKit {
         throw new Error(`Failed to create Rooch DID: ${createResult.error || 'unknown error'}`);
       }
 
-      return new NuwaIdentityKit(createResult.didDocument, vdr!, localSigner);
+      return new NuwaIdentityKit(createResult.didDocument, vdr!, km);
     }
 
     throw new Error(`Unsupported DID method: ${method}`);

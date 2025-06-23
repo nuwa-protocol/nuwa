@@ -3,7 +3,7 @@ import { DIDAuth } from '../../src';
 import { DIDDocument, DIDResolver, KEY_TYPE } from '../../src/types';
 import { CryptoUtils } from '../../src/cryptoUtils';
 import { BaseMultibaseCodec } from '../../src/multibase';
-import { LocalSigner } from '../../src/signers/LocalSigner';
+import { KeyManager } from '../../src/keys/KeyManager';
 import { VDRRegistry } from '../../src/VDRRegistry';
 import { InMemoryLRUDIDDocumentCache } from '../../src/InMemoryLRUDIDDocumentCache';
 
@@ -39,7 +39,7 @@ describe('DIDAuth.v1 basic sign/verify', () => {
     const keyId = `${did}#key-1`;
     const didDoc = buildDidDoc(publicKey, did, keyId);
 
-    const { signer } = await LocalSigner.createWithKeyPair(
+    const { keyManager: signer } = await KeyManager.createWithKeyPair(
       did,
       { privateKey, publicKey },
       'key-1',
@@ -76,7 +76,7 @@ describe('DIDAuth.v1 basic sign/verify', () => {
     const didDocBad = buildDidDoc(badKeyPair.publicKey, did, keyId);
 
     // signer with good key
-    const { signer } = await LocalSigner.createWithKeyPair(
+    const { keyManager: signer } = await KeyManager.createWithKeyPair(
       did,
       { privateKey: goodKeyPair.privateKey, publicKey: goodKeyPair.publicKey },
       'key-1',

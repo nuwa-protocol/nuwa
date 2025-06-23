@@ -1,8 +1,9 @@
-import { SignerInterface, KeyType } from '../types';
+import { SignerInterface, KeyType, KEY_TYPE } from '../types';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
 import { KeyStoreSigner } from '../signers/KeyStoreSigner';
 import { CryptoUtils } from '../cryptoUtils';
 import { BaseMultibaseCodec } from '../multibase';
+import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 
 /**
  * Options for initializing a KeyManager
@@ -196,5 +197,87 @@ export class KeyManager implements SignerInterface {
    */
   getStore(): KeyStore {
     return this.store;
+  }
+
+  /* ------------------------------------------------------------------
+   * Convenience helpers – 提供与旧 LocalSigner 等价的快速创建/导入能力
+   * ------------------------------------------------------------------ */
+
+  /** Create an empty KeyManager instance并绑定 DID */
+  static createEmpty(did: string, store: KeyStore = new MemoryKeyStore()): KeyManager {
+    const km = new KeyManager({ store });
+    km.setDid(did);
+    return km;
+  }
+
+  /** Create KeyManager and immediately generate a key */
+  static async createWithNewKey(
+    did: string,
+    fragment = `key-${Date.now()}`,
+    type: KeyType = KEY_TYPE.ED25519,
+    store: KeyStore = new MemoryKeyStore()
+  ): Promise<{ keyManager: KeyManager; keyId: string }> {
+    const km = KeyManager.createEmpty(did, store);
+    const stored = await km.generateKey(fragment, type);
+    return { keyManager: km, keyId: stored.keyId };
+  }
+
+  /** Create KeyManager and import existing key pair */
+  static async createWithKeyPair(
+    did: string,
+    keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
+    fragment = 'account-key',
+    type: KeyType = KEY_TYPE.ED25519,
+    store: KeyStore = new MemoryKeyStore()
+  ): Promise<{ keyManager: KeyManager; keyId: string }> {
+    const km = KeyManager.createEmpty(did, store);
+    const keyId = await km.importKeyPair(fragment, keyPair, type);
+    return { keyManager: km, keyId };
+  }
+
+  /** Utility: generate did:key + master key */
+  static async createWithDidKey(): Promise<{ keyManager: KeyManager; keyId: string; did: string }> {
+    const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
+    const publicKeyMultibase = CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
+    const didKey = `did:key:${publicKeyMultibase}`;
+    const km = KeyManager.createEmpty(didKey);
+    const keyId = await km.importKeyPair('account-key', { privateKey, publicKey }, KEY_TYPE.ED25519);
+    return { keyManager: km, keyId, did: didKey };
+  }
+
+  /** Instance helper: import raw key pair (Uint8Array) */
+  async importKeyPair(
+    fragment: string,
+    keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
+    type: KeyType = KEY_TYPE.ED25519
+  ): Promise<string> {
+    const did = await this.getDid();
+    const keyId = `${did}#${fragment}`;
+
+    if (await this.getKeyInfo(keyId)) {
+      throw new Error(`Key ID ${keyId} already exists in store`);
+    }
+
+    await this.importKey({
+      keyId,
+      keyType: type,
+      publicKeyMultibase: BaseMultibaseCodec.encodeBase58btc(keyPair.publicKey),
+      privateKeyMultibase: BaseMultibaseCodec.encodeBase58btc(keyPair.privateKey),
+    });
+
+    return keyId;
+  }
+
+  /** Instance helper: import Rooch Keypair */
+  async importRoochKeyPair(
+    fragment: string,
+    roochKeyPair: Keypair
+  ): Promise<string> {
+    const { secretKey, schema } = decodeRoochSercetKey(roochKeyPair.getSecretKey());
+    const keyType: KeyType = schema === 'Secp256k1' ? KEY_TYPE.SECP256K1 : KEY_TYPE.ED25519;
+    return this.importKeyPair(fragment, {
+      privateKey: secretKey,
+      publicKey: roochKeyPair.getPublicKey().toBytes(),
+    }, keyType);
   }
 }

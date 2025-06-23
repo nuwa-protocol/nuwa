@@ -12,13 +12,13 @@ import {
 } from '../src';
 import { CryptoUtils } from '../src/cryptoUtils';
 import { KeyVDR } from '../src/vdr/keyVDR';
-import { LocalSigner } from '../src/signers/LocalSigner';
+import { KeyManager } from '../src/keys/KeyManager';
 
 describe('NuwaIdentityKit', () => {
   let keyVDR: KeyVDR;
   let testDID: string;
   let mockDIDDocument: DIDDocument;
-  let signer: LocalSigner;
+  let signer: KeyManager;
   let keyId: string;
 
   beforeEach(async () => {
@@ -35,11 +35,8 @@ describe('NuwaIdentityKit', () => {
     );
     testDID = `did:key:${publicKeyMultibase}`;
 
-    // Create a signer with the correct DID
-    const { signer: newSigner } = await LocalSigner.createWithNewKey(testDID);
-    signer = newSigner;
-
-    // Import the DID's key pair to the signer
+    // Create an empty KeyManager and import the DID's key pair
+    signer = KeyManager.createEmpty(testDID);
     keyId = await signer.importKeyPair('account-key', keyPair, KEY_TYPE.ED25519);
 
     // Create DID Document

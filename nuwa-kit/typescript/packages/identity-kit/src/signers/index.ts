@@ -4,4 +4,3 @@
  */
 
 export * from './KeyStoreSigner';
-export * from './LocalSigner';

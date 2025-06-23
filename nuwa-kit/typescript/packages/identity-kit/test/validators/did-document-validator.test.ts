@@ -4,12 +4,12 @@ import { validateDIDDocument } from '../../src/validators/did-document-validator
 import { CryptoUtils } from '../../src/cryptoUtils';
 import { KeyVDR } from '../../src/vdr/keyVDR';
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { LocalSigner } from '../../src/signers/LocalSigner';
+import { KeyManager } from '../../src/keys/KeyManager';
 
 describe('DID Document Validator', () => {
   let validDocument: DIDDocument;
   let keyVDR: KeyVDR;
-  let mockSigner: LocalSigner;
+  let mockSigner: KeyManager;
 
   beforeEach(async () => {
     // Initialize KeyVDR
@@ -18,8 +18,7 @@ describe('DID Document Validator', () => {
     VDRRegistry.getInstance().registerVDR(keyVDR);
 
     // Create mock signer
-    const { signer: mockSigner, keyId } = await LocalSigner.createWithDidKey();
-    const did = await mockSigner.getDid();
+    const { keyManager: mockSigner, keyId, did } = await KeyManager.createWithDidKey();
 
     const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
     const publicKeyMultibase = await CryptoUtils.publicKeyToMultibase(publicKey, KEY_TYPE.ED25519);
