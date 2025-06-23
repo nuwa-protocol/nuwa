@@ -1,42 +1,42 @@
-# Identity Kit: 设计与开发文档
+# Identity Kit: Design & Development Guide
 
-> **目标读者**: `identity-kit` 的未来贡献者与维护者。
-> **目的**: 本文档旨在阐述 `@nuwa-ai/identity-kit` 的核心设计理念、架构、关键模块以及与 Nuwa 协议（特别是 NIP-1 和 NIP-2）的集成方式。
+> **Target Audience**: Future contributors and maintainers of `identity-kit`.
+> **Purpose**: This document explains the core design philosophy, architecture, key modules, and the integration points with the Nuwa protocol (notably NIP-1 and NIP-2) for `@nuwa-ai/identity-kit`.
 
 ---
 
-## 1. 核心设计理念
+## 1. Core Design Philosophy
 
-`identity-kit` 是 Nuwa 协议在 TypeScript 环境下的核心身份层实现。它的首要目标是为上层应用（如 Nuwa Agent、Web 应用、后端服务）提供一套完整、易用且安全的去中心化身份（DID）管理和认证功能。
+`identity-kit` is the canonical identity layer implementation of the Nuwa protocol for TypeScript runtimes. Its primary goal is to deliver a complete, developer-friendly, and secure decentralized identity (DID) management & authentication toolkit for upper-layer applications such as Nuwa Agent, web front-ends, and backend services.
 
-其设计遵循以下原则：
+Design principles:
 
-*   **NIP-1 兼容**: 严格遵循 [NIP-1: Agent 单一 DID 多密钥模型](https://github.com/nuwa-protocol/NIPs/blob/main/nips/nip-1.md) 的规范。SDK 的核心功能，如主密钥、操作密钥的管理、DID Document 的构建与解析，都围绕 NIP-1 的概念展开。
-*   **NIP-2 赋能**: 为 [NIP-2: 基于 DID 的认证协议](https://github.com/nuwa-protocol/NIPs/blob/main/nips/nip-2.md) 提供基础能力。SDK 本身不强制实现特定的认证流程，但提供必要的签名和验签工具，使开发者能轻松构建符合 NIP-2 规范的认证机制。
-*   **开箱即用 (Out-of-the-Box)**: 通过 `IdentityKit.bootstrap()` 或 `IdentityEnvBuilder` 一行代码即可装配 KeyStore、Signer、VDR 等依赖，让开发者快速上手。
-*   **模块化与可扩展性**: 核心组件（如 `VDR`, `KeyStore`）被设计为可插拔的接口。这允许社区未来扩展支持新的 DID 方法或密钥存储方案，而无需修改核心逻辑。
-*   **安全默认**: 在 API 设计上倾向于安全，例如，将敏感的链上交互参数收敛到 `advanced` 选项中，避免开发者误用。
+* **NIP-1 Compliance** – Fully aligned with [NIP-1: Agent Single DID / Multi-Key Model](https://github.com/nuwa-protocol/NIPs/blob/main/nips/nip-1.md). Core features (master key, operational keys, DID Document construction & parsing) revolve around the concepts defined in NIP-1.
+* **NIP-2 Enablement** – Provides the cryptographic building blocks required by [NIP-2: DID-based Authentication Protocol](https://github.com/nuwa-protocol/NIPs/blob/main/nips/nip-2.md). The SDK does **not** enforce any specific authentication flow, but ships signature / verification utilities developers can freely compose.
+* **Out of the Box** – A single `IdentityKit.bootstrap()` or `IdentityEnvBuilder` call assembles all dependencies (KeyStore, Signer, VDR, …) so developers can focus on business logic.
+* **Modular & Extensible** – Core components (`VDR`, `KeyStore`, …) are pluggable interfaces. The community can add new DID methods or storage back-ends without touching core logic.
+* **Secure by Default** – APIs favor security. For example, chain-specific parameters are grouped under an `advanced` option to reduce accidental misuse.
 
-## 2. 系统架构
+## 2. System Architecture
 
-`identity-kit` 的架构是分层的，自下而上依次为：
+The architecture is layered from bottom to top:
 
 ```mermaid
 graph TD
-    subgraph "应用层 (Application Layer)"
+    subgraph "Application Layer"
         A["Nuwa Agent / Web Apps / Services"]
     end
 
-    subgraph "SDK 核心 (IdentityKit Core)"
+    subgraph "SDK Core"
         IK["IdentityKit (facade)"]
         IK -- "manages" --> KM & VDRR
         KM[KeyManager] -- "uses" --> KS
         VDRR["VDRRegistry"] -- "manages" --> VDRs
     end
 
-    subgraph "基础模块 (Foundation Modules)"
-        KS["KeyStore (e.g., BrowserLocalStorage)"]
-        VDRs["VDRs (e.g., RoochVDR, KeyVDR)"]
+    subgraph "Foundation Modules"
+        KS["KeyStore (e.g. BrowserLocalStorage)"]
+        VDRs["VDRs (e.g. RoochVDR, KeyVDR)"]
         Signer["SignerInterface (implemented by KeyManager)"]
         Cache["DID Document Cache"]
         Logger["DebugLogger"]
@@ -52,35 +52,37 @@ graph TD
     style VDRR fill:#dae8fc,stroke:#333
 ```
 
-**关键组件说明**:
+**Component Glossary**
 
-*   **`IdentityKit`**: SDK 的主入口和外观（Facade）。它整合了 `KeyManager` 和 `VDRRegistry` 的功能，为上层应用提供统一、简洁的 API 接口，如 `createDID()`, `sign()`, `resolveDID()` 等。
-*   **`KeyManager`**: 密钥管理器。负责密钥的生成、存储、检索和使用。它实现了 `SignerInterface`，是所有签名操作的执行者。`KeyManager` 将具体的密钥存储操作委托给 `KeyStore`。
-*   **`KeyStore`**: 密钥存储接口。定义了密钥的持久化存储规范。SDK 内置了 `BrowserLocalStorageKeyStore` 用于浏览器环境。该接口可被扩展以支持其他存储后端（如内存、加密文件、硬件安全模块等）。
-*   **`VDRRegistry`**: VDR (Verifiable Data Registry) 注册表。用于管理不同 DID 方法的解析器（`VDR`）。例如，当需要解析 `did:rooch:...` 时，它会自动选择 `RoochVDR`。
-*   **`AbstractVDR`**: VDR 的抽象基类。定义了所有 VDR 实现必须遵守的接口，如 `resolve()` 和 `update()`。`RoochVDR`, `KeyVDR`, `WebVDR` 都是它的具体实现。
-*   **`SignerInterface`**: 签名者接口。定义了签名和获取公钥的标准方法，由 `KeyManager` 实现。这使得签名逻辑与具体的密钥管理和存储解耦。
-*   **DID Document Cache**: SDK 内置了一个基于内存的 LRU 缓存 (`InMemoryLRUDIDDocumentCache`)，并默认在 `VDRRegistry` 中启用。这可以显著减少对 VDR 的重复请求，提高 DID 解析性能。
-*   **`DebugLogger`**: 一个轻量级的调试日志器，支持不同级别的日志输出，并可在生产环境中通过 tree-shaking 移除，以减小包体积。
+* **`IdentityKit`** – Facade & primary entry-point. Combines `KeyManager` and `VDRRegistry`, exposing a concise API (`createDID()`, `sign()`, `resolveDID()`, …).
+* **`KeyManager`** – Lifecycle manager for keys (generation, storage, retrieval, usage). Implements `SignerInterface` and delegates persistence to `KeyStore`.
+* **`KeyStore`** – Persistence abstraction. The SDK ships a `BrowserLocalStorageKeyStore` for browsers; additional back-ends (in-memory, encrypted file, HSM, …) can be plugged in.
+* **`VDRRegistry`** – Registry of DID resolvers. Automatically selects the correct `VDR` (e.g. `RoochVDR`) when resolving `did:rooch:*`.
+* **`AbstractVDR`** – Base class all VDRs must extend, defining `resolve()` / `update()` contracts. Concrete implementations include `RoochVDR`, `KeyVDR`, and `WebVDR`.
+* **`SignerInterface`** – Abstract signer contract implemented by `KeyManager`. Decouples signing logic from key storage.
+* **DID Document Cache** – In-memory LRU cache (`InMemoryLRUDIDDocumentCache`) enabled by default inside `VDRRegistry` to reduce network requests.
+* **`DebugLogger`** – Lightweight logger with build-time tree-shaking to keep production bundle size small.
 
-## 3. 核心流程实现
+## 3. Core Workflow Implementation
 
-### 3.1 环境装配流程 (`IdentityKit.bootstrap / IdentityEnvBuilder`)
+### 3.1 Environment Bootstrap (`IdentityKit.bootstrap` / `IdentityEnvBuilder`)
 
-`identity-kit` 采用「先装配环境 👉 再绑定 DID」的两阶段流程。
+`identity-kit` follows a two-step workflow: **assemble environment ➜ bind DID**.
 
-**最简用法 – `bootstrap()`**
+**Quick start – `bootstrap()`**
+
 ```ts
 const env = await IdentityKit.bootstrap({
-  method: 'rooch',              // 自动注册 RoochVDR
-  vdrOptions: { rpcUrl: '...' } // 其他 VDR 初始化参数
+  method: 'rooch',              // Auto-register RoochVDR
+  vdrOptions: { rpcUrl: '...' } // Additional VDR init params
 });
 
-// 加载或创建 DID
+// Load or create a DID
 const kit = await env.loadDid(did);
 ```
 
-**高级用法 – `IdentityEnvBuilder`**
+**Advanced – `IdentityEnvBuilder`**
+
 ```ts
 const env = await new IdentityEnvBuilder()
   .useVDR('rooch', { rpcUrl: '...' })
@@ -88,25 +90,25 @@ const env = await new IdentityEnvBuilder()
   .init();
 ```
 
-内部执行步骤：
-1. Builder/Bootstrap 根据配置注册所需 VDR 实例到全局 `VDRRegistry`。
-2. 创建 `KeyStore`（默认 LocalStorageKeyStore / MemoryKeyStore）。
-3. 创建 `KeyManager` 并与 `KeyStore` 绑定。
-4. 返回 `IdentityEnv`，其中持有 `registry` 与 `keyManager`，供后续 `loadDid / createDid` 使用。
+Internal steps:
+1. Builder/bootstrap registers required VDRs into the global `VDRRegistry`.
+2. Creates a `KeyStore` (defaults to LocalStorage / Memory).
+3. Instantiates `KeyManager` and binds it to the `KeyStore`.
+4. Returns an `IdentityEnv` instance containing the `registry` & `keyManager` for subsequent `loadDid` / `createDid` operations.
 
-### 3.2 签名与验签流程 (`SignerInterface` & `auth/v1`)
+### 3.2 Signing & Verification (`SignerInterface` & `auth/v1`)
 
-本节概述 SDK 如何在不同层级执行数据签名与验签，并给出常见使用范式。
+This section outlines how the SDK performs signing & verification across different layers and provides common usage patterns.
 
-#### 3.2.1 SignerInterface —— 低层签名抽象
+#### 3.2.1 `SignerInterface` – Low-level Signing Abstraction
 
-* **定位**: `SignerInterface` 定义于 `src/signers/types.ts`，由 `KeyManager` 实现，也可由外部钱包 / HSM 等实现。
-* **核心方法**:
-  * `listKeyIds()` – 查询所有可用 `keyId`。
-  * `signWithKeyId(data, keyId)` – 使用指定密钥对字节数组签名。
-  * `canSignWithKeyId(keyId)` – 判断 signer 是否持有某密钥。
-  * `getKeyInfo(keyId)` – 查询密钥类型及公钥。
-* **示例**:
+* **Location**: `src/signers/types.ts`. Implemented by `KeyManager`, but external wallets / HSMs can also implement it.
+* **Key APIs**
+  * `listKeyIds()` – list all available `keyId`s.
+  * `signWithKeyId(data, keyId)` – sign a byte array with the specified key.
+  * `canSignWithKeyId(keyId)` – check if a key is usable.
+  * `getKeyInfo(keyId)` – return key type & public key.
+* **Example**
 
 ```ts
 import { Bytes } from '@nuwa-ai/identity-kit';
@@ -118,49 +120,49 @@ if (!keyId) throw new Error('No auth key');
 const signature = await signer.signWithKeyId(payload, keyId);
 ```
 
-> **⚠️ 注意**: 签名算法由 `keyId` 对应的 `VerificationMethod.type` 决定。SDK 内部通过 `algorithmToKeyType()` 辅助方法完成 **算法 → KeyType** 的映射，无需自行维护[[memory:7955943334320115518]].
+> **⚠️ Note** – The signature algorithm is determined by `VerificationMethod.type` referenced by `keyId`. The SDK automatically maps **algorithm → KeyType** via `algorithmToKeyType()`, no manual bookkeeping required.
 
-#### 3.2.2 DIDAuth v1 —— 高层 NIP-2 兼容签名
+#### 3.2.2 DIDAuth v1 – High-level NIP-2 Compatible Signatures
 
-为了简化基于 DID 的 HTTP 认证（[NIP-2]），SDK 提供 `auth/v1` 模块封装 DIDAuth v1 逻辑，包括:
+To simplify DID-based HTTP authentication ([NIP-2]), the SDK ships the `auth/v1` module encapsulating DIDAuth v1:
 
-* `createSignature()` – 生成带 `nonce` / `timestamp` 的签名对象。
-* `toAuthorizationHeader()` – 将签名对象编码为 HTTP `Authorization` 头值。
-* `verifySignature()` – 在服务端验证签名有效性。
-* `verifyAuthHeader()` – 直接对 HTTP 头进行校验，并提供重放保护。
+* `createSignature()` – Generate a signed object containing `nonce` & `timestamp`.
+* `toAuthorizationHeader()` – Encode the signed object as an HTTP `Authorization` header.
+* `verifySignature()` – Server-side signature validation.
+* `verifyAuthHeader()` – Directly validate an `Authorization` header with replay-attack protection.
 
 ```ts
 import { DIDAuth } from '@nuwa-ai/identity-kit';
 
-// 1) 生成签名
+// 1) Create a signature
 const signed = await DIDAuth.v1.createSignature(
-  { operation: 'transfer', params: { amount: 100 } }, // 自定义 payload
+  { operation: 'transfer', params: { amount: 100 } }, // Custom payload
   env.keyManager,                                     // SignerInterface
-  keyId                                               // 选定的 keyId
+  keyId                                               // Selected keyId
 );
 
-// 2) 转为 HTTP Authorization 头
+// 2) Convert to HTTP Authorization header
 const authHeader = DIDAuth.v1.toAuthorizationHeader(signed);
 
-// 3) 服务端验证
+// 3) Server-side validation
 const ok = await DIDAuth.v1.verifySignature(signed, env.registry);
 ```
 
-**实现要点**:
-1. 使用 `canonicalize()` 确保待签名 JSON 拥有确定性序列化。
-2. 加入 `nonce` + `timestamp` 提供重放攻击防护（默认允许 ±300s 时钟偏移）。
-3. 默认 **域分隔符** 为 `"DIDAuthV1:"`，避免不同协议间签名重复利用。
+**Implementation Highlights**
+1. Deterministic JSON serialisation via `canonicalize()`.
+2. `nonce` + `timestamp` prevent replay attacks (±300 s clock skew by default).
+3. Default **domain separator** is `"DIDAuthV1:"` to avoid cross-protocol signature reuse.
 
-#### 3.2.3 支持的签名算法
+#### 3.2.3 Supported Signature Algorithms
 
-| VerificationMethod.type | KeyType (自动推导) | 说明 |
-|-------------------------|--------------------|------|
-| `Ed25519VerificationKey2020` | `ED25519` | 默认首选，高性能、短签名 |
-| `EcdsaSecp256k1VerificationKey2019` | `ECDSA_SECP256K1` | 兼容 EVM / BTC 生态 |
-| `RoochSecp256r1` | `ECDSA_P256R1` | Rooch 链内置 |
+| `VerificationMethod.type` | Inferred `KeyType` | Notes |
+|---------------------------|--------------------|-------|
+| `Ed25519VerificationKey2020` | `ED25519` | Default, high-performance, compact signatures |
+| `EcdsaSecp256k1VerificationKey2019` | `ECDSA_SECP256K1` | Compatible with EVM / BTC ecosystems |
+| `RoochSecp256r1` | `ECDSA_P256R1` | Built-in Rooch chain scheme |
 
-新算法支持需:
-1. 在 `crypto/providers/` 实现对应 `sign()` / `verify()`。
-2. 在 `algorithmToKeyType()` 中注册映射。
+To add a new algorithm:
+1. Implement `sign()` / `verify()` in `crypto/providers/`.
+2. Register the mapping inside `algorithmToKeyType()`.
 
----
+--- 
