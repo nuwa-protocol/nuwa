@@ -8,7 +8,7 @@ export * from './multibase';
 export * from './crypto';
 export * from './cryptoUtils';
 export * from './utils/base64';
-export { DIDAuth } from './DIDAuth';
+export { DIDAuth } from './auth';
 export { initRoochVDR } from './vdr';
 export * from './keys';
 export * from './signers';
