@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { WebAuthnLogin } from '../../components/auth/WebAuthnLogin';
+import { UserStore } from '../../lib/storage';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -10,8 +11,13 @@ export function LoginPage() {
   // Get the page user was trying to access
   const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard';
 
-  const handleLoginSuccess = (_userDid: string) => {
-    navigate(from, { replace: true });
+  const handleLoginSuccess = (_userDid: string, isNew: boolean) => {
+    if (isNew) {
+      // go to onboarding
+      navigate('/setup?target=/dashboard', { replace: true });
+    } else {
+      navigate(from, { replace: true });
+    }
   };
 
   const handleLoginError = (error: string) => {
@@ -20,12 +26,14 @@ export function LoginPage() {
     setTimeout(() => setError(null), 5000);
   };
 
+  const hasCredential = UserStore.hasAnyCredential();
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h1 className="text-center text-3xl font-extrabold text-gray-900">Welcome to CADOP</h1>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in with Passkey or create a new DID
+          {hasCredential ? 'Sign in with Passkey' : 'Create your first DID'}
         </p>
       </div>
 

@@ -57,14 +57,19 @@ export function AddKeyPage() {
       // Base64URL decode
       const decodedPayload = MultibaseCodec.decodeBase64urlToString(payloadParam);
       const parsedPayload = JSON.parse(decodedPayload) as AddKeyRequestPayloadV1;
-      
+
       // Validate required fields
-      if (!parsedPayload.version || !parsedPayload.verificationMethod || !parsedPayload.redirectUri || !parsedPayload.state) {
+      if (
+        !parsedPayload.version ||
+        !parsedPayload.verificationMethod ||
+        !parsedPayload.redirectUri ||
+        !parsedPayload.state
+      ) {
         throw new Error('Invalid payload: missing required fields');
       }
-      
+
       setPayload(parsedPayload);
-      
+
       // If agentDid is specified, set it directly
       if (parsedPayload.agentDid) {
         setSelectedAgentDid(parsedPayload.agentDid);
@@ -143,7 +148,9 @@ export function AddKeyPage() {
 
       // Handle different public key formats
       if (payload.verificationMethod.publicKeyMultibase) {
-        keyInfo.publicKeyMaterial = MultibaseCodec.decodeBase58btc(payload.verificationMethod.publicKeyMultibase);
+        keyInfo.publicKeyMaterial = MultibaseCodec.decodeBase58btc(
+          payload.verificationMethod.publicKeyMultibase
+        );
       } else {
         throw new Error('No valid public key format provided');
       }
@@ -155,35 +162,37 @@ export function AddKeyPage() {
       );
 
       console.log('Added verification method:', keyId);
-      
+
       // Construct redirect URL
       const redirectUrl = new URL(payload.redirectUri);
       redirectUrl.searchParams.append('success', '1');
       redirectUrl.searchParams.append('key_id', keyId);
       redirectUrl.searchParams.append('agent', selectedAgentDid);
       redirectUrl.searchParams.append('state', payload.state);
-      
+
       // Handle special case: if same origin page, can use postMessage
       if (payload.redirectUri.startsWith(window.location.origin)) {
         if (window.opener) {
-          window.opener.postMessage({
-            success: 1,
-            key_id: keyId,
-            agent: selectedAgentDid,
-            state: payload.state
-          }, new URL(payload.redirectUri).origin);
+          window.opener.postMessage(
+            {
+              success: 1,
+              key_id: keyId,
+              agent: selectedAgentDid,
+              state: payload.state,
+            },
+            new URL(payload.redirectUri).origin
+          );
           window.close();
           return;
         }
       }
-      
+
       // Standard redirect
       window.location.href = redirectUrl.toString();
-      
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
-      
+
       // Need to redirect with error info on failure too
       try {
         const redirectUrl = new URL(payload.redirectUri);
@@ -274,11 +283,8 @@ export function AddKeyPage() {
                     </Descriptions.Item>
                     <Descriptions.Item label="Permissions">
                       <Space direction="vertical">
-                        {payload.verificationRelationships.map((rel) => (
-                          <Tag 
-                            key={rel} 
-                            color={rel === 'capabilityDelegation' ? 'error' : 'blue'}
-                          >
+                        {payload.verificationRelationships.map(rel => (
+                          <Tag key={rel} color={rel === 'capabilityDelegation' ? 'error' : 'blue'}>
                             {rel === 'capabilityDelegation' && <WarningOutlined />} {rel}
                           </Tag>
                         ))}
@@ -307,9 +313,7 @@ export function AddKeyPage() {
                   ) : (
                     <div className="mt-6">
                       <Descriptions title="Selected Agent" bordered>
-                        <Descriptions.Item label="Agent DID">
-                          {selectedAgentDid}
-                        </Descriptions.Item>
+                        <Descriptions.Item label="Agent DID">{selectedAgentDid}</Descriptions.Item>
                       </Descriptions>
                     </div>
                   )}
@@ -318,12 +322,14 @@ export function AddKeyPage() {
                     <Button variant="outline" onClick={handleCancel} disabled={processing}>
                       {t('common.cancel')}
                     </Button>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       onClick={handleConfirm}
                       disabled={!selectedAgentDid || loading || processing}
                     >
-                      {processing ? <Spin size="small" /> : (
+                      {processing ? (
+                        <Spin size="small" />
+                      ) : (
                         <>
                           <SafetyOutlined className="mr-2" />
                           {t('Authorize')}
@@ -339,4 +345,4 @@ export function AddKeyPage() {
       </div>
     </div>
   );
-} 
+}

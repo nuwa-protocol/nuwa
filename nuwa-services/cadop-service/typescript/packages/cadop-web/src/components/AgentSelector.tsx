@@ -46,11 +46,11 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
       style={{ width: '100%' }}
       onChange={handleChange}
     >
-      {agents.map((agent) => (
+      {agents.map(agent => (
         <Option key={agent} value={agent}>
           {agent}
         </Option>
       ))}
     </Select>
   );
-} 
+}

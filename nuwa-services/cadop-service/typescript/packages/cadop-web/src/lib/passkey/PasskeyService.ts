@@ -9,8 +9,17 @@ import {
 } from '@simplewebauthn/types';
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
-import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from '@nuwa-ai/identity-kit';
+import {
+  DidKeyCodec,
+  KeyType,
+  KEY_TYPE,
+  algorithmToKeyType as algo2key,
+} from '@nuwa-ai/identity-kit';
 import { AuthStore, UserStore } from '../storage';
+
+// Global session flag to avoid multiple register() calls leading to duplicate
+// navigator.credentials.create() prompts (e.g., QR code popup on some platforms).
+let passkeyAlreadyRegisteredThisSession = false;
 
 // Utils
 function arrayBufferToBase64URL(buffer: ArrayBuffer): string {
@@ -66,7 +75,13 @@ export class PasskeyService {
     const existing = this.getUserDid();
     if (existing) return existing;
 
-    // If none exists, create new Passkey
+    if (passkeyAlreadyRegisteredThisSession) {
+      // Prevent re-invoking navigator.credentials.create which could trigger a
+      // second QR/passkey dialog in the same tab. Throw so caller can handle.
+      throw new Error('Passkey has already been registered in this session');
+    }
+
+    passkeyAlreadyRegisteredThisSession = true;
     return this.register();
   }
 
@@ -295,6 +310,7 @@ export class PasskeyService {
   public async authenticateWithChallenge(options: {
     challenge: string;
     rpId: string | undefined;
+    mediation?: CredentialMediationRequirement;
   }): Promise<{
     assertionJSON: PublicKeyCredentialJSON;
     userDid: string;
@@ -329,7 +345,7 @@ export class PasskeyService {
       // call WebAuthn API to get assertion
       const cred = (await navigator.credentials.get({
         publicKey: publicKeyRequest,
-        mediation: 'silent',
+        mediation: options.mediation || 'silent',
       })) as PublicKeyCredential | null;
 
       if (!cred) throw new Error('No credential from get');

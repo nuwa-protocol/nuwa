@@ -220,9 +220,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     for (const authMethod of verificationMethod) {
       if (authMethod.publicKeyMultibase) {
         try {
-          let authPublicKeyBytes = MultibaseCodec.decodeBase58btc(
-            authMethod.publicKeyMultibase
-          );
+          let authPublicKeyBytes = MultibaseCodec.decodeBase58btc(authMethod.publicKeyMultibase);
           // compare public keys
           if (this.arePublicKeysEqual(controllerPublicKey, authPublicKeyBytes)) {
             return authMethod;

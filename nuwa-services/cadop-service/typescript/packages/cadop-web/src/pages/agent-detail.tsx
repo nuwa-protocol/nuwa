@@ -19,6 +19,7 @@ import {
 } from '@ant-design/icons';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
+import { claimTestnetGas } from '@/lib/rooch/faucet';
 
 const { TabPane } = Tabs;
 const { Title, Text, Paragraph } = Typography;
@@ -47,7 +48,7 @@ export function AgentDetailPage() {
 
   // Extract Rooch address from DID (format: did:rooch:<address>)
   const agentAddress = did ? did.split(':')[2] : undefined;
-  const FAUCET_URL = 'https://test-faucet.rooch.network';
+  const FAUCET_URL = undefined; // use default
 
   const handleClaimRgas = async () => {
     if (isClaiming || hasClaimed || !agentAddress) return;
@@ -55,20 +56,8 @@ export function AgentDetailPage() {
     setIsClaiming(true);
 
     try {
-      const response = await fetch(`${FAUCET_URL}/faucet`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ claimer: agentAddress }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Claim failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const claimed = await claimTestnetGas(agentAddress, FAUCET_URL || undefined);
+      const data = { gas: claimed };
       await refetchBalances();
       setHasClaimed(true);
       message.success(
@@ -105,7 +94,7 @@ export function AgentDetailPage() {
           const hasControllerAccess = response.data.verificationMethod?.some(
             (method: VerificationMethod) => method.controller === userDid
           );
-          setIsController(hasControllerAccess);
+          setIsController(!!hasControllerAccess);
         } else {
           setIsController(false);
         }

@@ -8,6 +8,8 @@ import { AgentDetailPage } from './pages/agent-detail';
 import { AddAuthMethodPage } from './pages/add-auth-method';
 import { AddKeyPage } from './pages/add-key';
 import { WebAuthnDebugPage } from './pages/webauthn-debug';
+import { OnboardingGuard } from './components/onboarding/OnboardingGuard';
+import { OnboardingPage } from './pages/onboarding';
 
 const App: React.FC = () => {
   return (
@@ -16,7 +18,15 @@ const App: React.FC = () => {
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/debug/webauthn" element={<WebAuthnDebugPage />} />
       <Route path="/agent/:did" element={<AgentDetailPage />} />
-      <Route path="/add-key" element={<AddKeyPage />} />
+      <Route
+        path="/add-key"
+        element={
+          <OnboardingGuard>
+            <AddKeyPage />
+          </OnboardingGuard>
+        }
+      />
+      <Route path="/setup" element={<OnboardingPage />} />
 
       {/* Protected routes */}
       <Route

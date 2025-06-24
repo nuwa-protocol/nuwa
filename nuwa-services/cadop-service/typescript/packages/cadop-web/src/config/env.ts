@@ -71,4 +71,4 @@ function buildConfig(): AppEnvConfig {
 const CONFIG = buildConfig();
 
 export const ROOCH_RPC_URL = CONFIG.roochRpcUrl;
-export const API_URL = CONFIG.apiUrl; 
+export const API_URL = CONFIG.apiUrl;
