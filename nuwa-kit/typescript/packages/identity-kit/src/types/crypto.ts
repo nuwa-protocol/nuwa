@@ -49,6 +49,17 @@ export function roochSignatureSchemeToKeyType(scheme: SignatureScheme): KeyType 
   throw new Error(`Unsupported Rooch signature scheme: ${scheme}`);
 }
 
+export function keyTypeToRoochSignatureScheme(keyType: KeyType): SignatureScheme {
+  if (keyType === KeyType.SECP256K1) {
+    return 'Secp256k1';
+  } else if (keyType === KeyType.ED25519) {
+    return 'ED25519';
+  } else if (keyType === KeyType.ECDSAR1) {
+    return 'EcdsaR1';
+  }
+  throw new Error(`Unsupported key type: ${keyType}`);
+}
+
 /**
  * https://www.w3.org/TR/webauthn-2/#typedefdef-cosealgorithmidentifier
  * Convert a WebAuthn public key algorithm to KeyType, with runtime validation

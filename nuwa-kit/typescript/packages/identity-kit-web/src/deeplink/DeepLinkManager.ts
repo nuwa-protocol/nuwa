@@ -1,4 +1,4 @@
-import type { KeyType, AddKeyRequestPayloadV1 } from '@nuwa-ai/identity-kit';
+import type { KeyType, AddKeyRequestPayloadV1, VerificationRelationship } from '@nuwa-ai/identity-kit';
 import {
   KeyManager,
   CryptoUtils,
@@ -13,7 +13,7 @@ export interface ConnectOptions {
   cadopDomain?: string;
   keyType?: KeyTypeInput;          // Default: KeyType.ED25519
   idFragment?: string;
-  relationships?: string[];  // Default: ['authentication']
+  relationships?: VerificationRelationship[];  // Default: ['authentication']
   redirectPath?: string;     // Default: '/callback'
   agentDid?: string;         // Target Agent DID, optional
 }

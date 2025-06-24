@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/identity-kit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "SDK for NIP-1 Agent Single DID Multi-Key Model and NIP-3 CADOP (Custodian-Assisted DID Onboarding Protocol)",
   "type": "module",
   "main": "./dist/index.cjs",

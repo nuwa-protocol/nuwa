@@ -6,29 +6,16 @@ import {
   ServiceEndpoint,
 } from './types/did';
 import { SignerInterface } from './signers/types';
-import { KeyTypeInput, KEY_TYPE, KeyType, OperationalKeyInfo } from './types/crypto';
+import { OperationalKeyInfo } from './types/crypto';
 import { VDRInterface, DIDCreationRequest } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 // Key management & crypto utilities
-import { KeyStore, MemoryKeyStore } from './keys/KeyStore';
+import { KeyStore } from './keys/KeyStore';
 import { MultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
 
-// Simplified initialization options for the high-level factory method introduced in v1 refactor
-export interface IdentityKitInitOptions {
-  /** DID method to use. Currently supported: 'key' | 'rooch' */
-  method?: 'key' | 'rooch';
-  /** Desired key type for master key – defaults to Ed25519 */
-  keyType?: KeyTypeInput;
-  /** Optional pre-constructed KeyStore implementation. If omitted and method === 'key' a MemoryKeyStore will be created automatically. */
-  keyStore?: KeyStore;
-  /** Rooch specific: target network (local | dev | test | main). Defaults to 'test'. */
-  network?: 'local' | 'dev' | 'test' | 'main';
-  /** Rooch specific: explicit RPC endpoint overriding the default derived from network. */
-  rpcUrl?: string;
-}
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model

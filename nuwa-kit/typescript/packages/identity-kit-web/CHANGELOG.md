@@ -1,5 +1,14 @@
 # @nuwa-ai/identity-kit-web
 
+## 0.2.2
+
+### Patch Changes
+
+- Fix VDR init
+
+- Updated dependencies []:
+  - @nuwa-ai/identity-kit@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

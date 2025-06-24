@@ -24,6 +24,7 @@ export interface UseIdentityKitOptions {
   cadopDomain?: string;
   storage?: 'local' | 'indexeddb';
   autoConnect?: boolean;
+  roochRpcUrl?: string;
 }
 
 /**
@@ -72,6 +73,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
           appName: options.appName,
           cadopDomain: options.cadopDomain,
           storage: options.storage,
+          roochRpcUrl: options.roochRpcUrl,
         });
         setSdk(newSdk);
 

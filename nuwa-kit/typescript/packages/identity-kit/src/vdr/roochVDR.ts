@@ -24,7 +24,7 @@ import {
   ServiceEndpoint,
 } from '../types/did';
 import { SignerInterface } from '../signers/types';
-import { KeyType, KEY_TYPE, KeyTypeInput, toKeyType } from '../types/crypto';
+import { KeyType, keyTypeToRoochSignatureScheme} from '../types/crypto';
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
@@ -66,7 +66,7 @@ export interface RoochVDROptions {
   /**
    * Rooch RPC endpoint URL
    */
-  rpcUrl: string;
+  rpcUrl?: string;
 
   /**
    * Network type (local, dev, test, main)
@@ -193,14 +193,18 @@ export class DidAccountSigner extends Signer implements SignerInterface {
   }
 
   getKeyScheme(): SignatureScheme {
-    return this.keyType === KEY_TYPE.SECP256K1 ? 'Secp256k1' : 'ED25519';
+    return keyTypeToRoochSignatureScheme(this.keyType);
   }
 
   getPublicKey(): PublicKey<Address> {
-    if (this.keyType === KEY_TYPE.SECP256K1) {
+    if (this.keyType === KeyType.SECP256K1) {
       return new Secp256k1PublicKey(this.publicKey);
-    } else {
+    } else if (this.keyType === KeyType.ED25519) {
       return new Ed25519PublicKey(this.publicKey);
+    } else if (this.keyType === KeyType.ECDSAR1) {
+      throw new Error('ECDSAR1 is not supported for DID account');
+    } else {
+      throw new Error(`Unsupported key type: ${this.keyType}`);
     }
   }
 
@@ -263,8 +267,13 @@ export class RoochVDR extends AbstractVDR {
       this.logger.setLevel('debug');
     }
 
+    let rpcUrl = options.rpcUrl;
+    if (!rpcUrl) {
+      rpcUrl = RoochVDR.getRoochNodeUrl(options.network || 'test');
+    }
+    this.logger.debug(`RoochVDR initialized with rpcUrl: ${rpcUrl}`);
     // Initialize Rooch client
-    this.client = new RoochClient({ url: options.rpcUrl });
+    this.client = new RoochClient({ url: rpcUrl });
   }
 
   /**
