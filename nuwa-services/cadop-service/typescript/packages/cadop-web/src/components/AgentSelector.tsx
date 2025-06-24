@@ -13,6 +13,7 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
   const { userDid } = useAuth();
   const [loading, setLoading] = useState(false);
   const [agents, setAgents] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | undefined>();
 
   useEffect(() => {
     if (userDid) {
@@ -28,6 +29,14 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
       // Get agent DIDs from local storage
       const agentDids = UserStore.listAgents(userDid);
       setAgents(agentDids || []);
+
+      // Auto-select the first agent to reduce one user action
+      if (agentDids && agentDids.length > 0) {
+        setSelected(agentDids[0]);
+        onSelect(agentDids[0]);
+      } else {
+        setSelected(undefined);
+      }
     } catch (error) {
       console.error('Failed to load agents from storage:', error);
     } finally {
@@ -36,6 +45,7 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
   };
 
   const handleChange = (value: string) => {
+    setSelected(value);
     onSelect(value);
   };
 
@@ -44,6 +54,7 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
       placeholder="Select an Agent DID"
       loading={loading}
       style={{ width: '100%' }}
+      value={selected}
       onChange={handleChange}
     >
       {agents.map(agent => (

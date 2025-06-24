@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../lib/auth/AuthContext';
 import { DIDService } from '../lib/did/DIDService';
+import { UserStore } from '../lib/storage';
 import { Spin, Alert, Typography, Descriptions, Tag, Space } from 'antd';
 import { ArrowLeftOutlined, KeyOutlined, SafetyOutlined, WarningOutlined } from '@ant-design/icons';
 import {
@@ -115,9 +116,13 @@ export function AddKeyPage() {
   const initializeDIDService = async () => {
     if (!selectedAgentDid) return;
 
+    // Get credentialId from local UserStore (if exists)
+    const credentialIds = userDid ? UserStore.listCredentials(userDid) : [];
+    const credentialId = credentialIds.length > 0 ? credentialIds[0] : undefined;
+
     setLoading(true);
     try {
-      const service = await DIDService.initialize(selectedAgentDid);
+      const service = await DIDService.initialize(selectedAgentDid, credentialId);
       setDidService(service);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
