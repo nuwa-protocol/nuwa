@@ -4,10 +4,6 @@ import { randomBytes } from 'crypto';
 import { PublicKeyCredentialJSON } from '@simplewebauthn/types';
 import { jest } from '@jest/globals';
 
-// Mock @simplewebauthn/server
-jest.mock('@simplewebauthn/server', () => ({
-  verifyAuthenticationResponse: jest.fn().mockResolvedValue({ verified: true }),
-}));
 
 const rpId = 'localhost';
 const origin = 'http://localhost:3000';
