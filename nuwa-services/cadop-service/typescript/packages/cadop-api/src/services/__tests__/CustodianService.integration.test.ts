@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, afterAll, beforeEach } from '@jest/globals';
+import { beforeAll, describe, expect, it, afterAll, beforeEach, jest } from '@jest/globals';
 import { CustodianService } from '../CustodianService.js';
 import { RoochClient, Secp256k1Keypair, Ed25519Keypair } from '@roochnetwork/rooch-sdk';
 import {
@@ -6,7 +6,7 @@ import {
   RoochVDR,
   CadopIdentityKit,
   CadopServiceType,
-  KEY_TYPE,
+  KeyType,
   SignerInterface,
   MultibaseCodec,
   DidKeyCodec,
@@ -33,11 +33,6 @@ const shouldRunIntegrationTests = () => {
   return true;
 };
 
-// Mock @simplewebauthn/server
-jest.mock('@simplewebauthn/server', () => ({
-  verifyAuthenticationResponse: jest.fn().mockResolvedValue({ verified: true }),
-}));
-
 describe('CustodianService Integration Tests', () => {
   let roochClient: RoochClient;
   let cadopServiceKeypair: Secp256k1Keypair;
@@ -63,7 +58,6 @@ describe('CustodianService Integration Tests', () => {
       // Create and register RoochVDR
       const roochVDR = new RoochVDR({
         rpcUrl: DEFAULT_NODE_URL,
-        debug: true,
       });
       VDRRegistry.getInstance().registerVDR(roochVDR);
 
@@ -112,7 +106,7 @@ describe('CustodianService Integration Tests', () => {
 
       const userKeypair = Ed25519Keypair.generate();
       const userPublicKeyBytes = userKeypair.getPublicKey().toBytes();
-      userDID = DidKeyCodec.generateDidKey(userPublicKeyBytes, KEY_TYPE.ED25519);
+      userDID = DidKeyCodec.generateDidKey(userPublicKeyBytes, KeyType.ED25519);
 
       // Create mock authenticator
       mockPublicKey = crypto.randomBytes(32);
@@ -129,6 +123,15 @@ describe('CustodianService Integration Tests', () => {
         cadopDid: cadopServiceDID,
         signingKey: 'test-signing-key',
       });
+
+      // Mock verifyAssertion to bypass WebAuthn signature verification complexity
+      jest
+        .spyOn(idpService, 'verifyAssertion')
+        .mockImplementation(async (_assertion, userDid: string, nonce: string) => {
+          return {
+            idToken: IdpService.buildIdToken(userDid, nonce, cadopServiceDID, 'test-signing-key'),
+          };
+        });
 
       console.log('Test setup complete:');
       console.log(`- Service address: ${cadopControllerAddress}`);
@@ -149,21 +152,23 @@ describe('CustodianService Integration Tests', () => {
         if (!shouldRunIntegrationTests()) return;
 
         // Get a valid token
-  
-        const { nonce } = await idpService.generateChallenge();
+        const origin = 'http://localhost:3000';
+        const credentialId = Buffer.from('credential-id').toString('base64url');
+        const authenticatorData = Buffer.from('auth-data-base64-at-least-37-bytes-long').toString('base64url');
+        const { nonce, challenge } = await idpService.generateChallenge();
         const mockAssertion: PublicKeyCredentialJSON = {
-          id: 'credential-id',
-          rawId: 'raw-id-base64',
+          id: credentialId,
+          rawId: credentialId,
           type: 'public-key',
           response: {
             clientDataJSON: Buffer.from(
               JSON.stringify({
                 type: 'webauthn.get',
-                challenge: 'invalid-challenge',
+                challenge: challenge,
                 origin: origin,
               })
             ).toString('base64url'),
-            authenticatorData: 'auth-data-base64',
+            authenticatorData: authenticatorData,
             signature: 'signature-base64',
             userHandle: undefined,
           },
