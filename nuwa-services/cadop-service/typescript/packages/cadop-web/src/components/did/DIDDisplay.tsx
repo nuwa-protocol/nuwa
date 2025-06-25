@@ -1,12 +1,11 @@
 import React from 'react';
-import { Copy, QrCode, ExternalLink } from 'lucide-react';
+import { Copy} from 'lucide-react';
 import { Button, Badge, Card, CardContent } from '@/components/ui';
 
 interface DIDDisplayProps {
   did: string;
   alias?: string;
   showCopy?: boolean;
-  showQR?: boolean;
   shortForm?: boolean;
   sybilLevel?: 0 | 1 | 2 | 3 | 4;
   status?: 'active' | 'pending' | 'inactive' | 'error';
@@ -31,7 +30,6 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
   did,
   alias,
   showCopy = true,
-  showQR = false,
   shortForm = false,
   sybilLevel,
   status,
@@ -70,12 +68,6 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
               <Button variant="ghost" size="sm" onClick={() => copyToClipboard(did)} className="h-8 w-8 p-0">
                 <Copy className="h-4 w-4" />
                 <span className="sr-only">Copy DID</span>
-              </Button>
-            )}
-            {showQR && (
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <QrCode className="h-4 w-4" />
-                <span className="sr-only">Show QR Code</span>
               </Button>
             )}
           </div>

@@ -186,7 +186,7 @@ export function AgentDetailPage() {
                 <CardTitle>{t('agent.identity')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <DIDDisplay did={did || ''} showCopy={true} showQR={true} status="active" />
+                <DIDDisplay did={did || ''} showCopy={true} status="active" />
                 {isController && (
                   <div className="mt-2">
                     <Tag color="green">{t('agent.youAreController')}</Tag>
