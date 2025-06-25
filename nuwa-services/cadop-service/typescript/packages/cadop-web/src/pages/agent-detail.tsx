@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
-import { custodianClient } from '../lib/api/client';
+import { VDRRegistry } from '@nuwa-ai/identity-kit';
 import { Spin, Alert, Tabs, Space, Typography, Tag, Modal, message } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -86,12 +86,14 @@ export function AgentDetailPage() {
     setError(null);
 
     try {
-      const response = await custodianClient.resolveAgentDID(did);
-      if (response.data) {
-        setDidDocument(response.data);
+      // Resolve directly via VDR, bypassing backend cache and forcing refresh
+      const doc = await VDRRegistry.getInstance().resolveDID(did, { forceRefresh: true });
+
+      if (doc) {
+        setDidDocument(doc);
 
         if (isAuthenticated && userDid) {
-          const hasControllerAccess = response.data.verificationMethod?.some(
+          const hasControllerAccess = doc.verificationMethod?.some(
             (method: VerificationMethod) => method.controller === userDid
           );
           setIsController(!!hasControllerAccess);
@@ -127,7 +129,7 @@ export function AgentDetailPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+          <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-4">
             <ArrowLeftOutlined className="mr-2" />
             {t('common.back')}
           </Button>

@@ -4,10 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../lib/auth/AuthContext';
-import { DIDService } from '../lib/did/DIDService';
-import { UserStore } from '../lib/storage';
+import { useDIDService } from '@/hooks/useDIDService';
 import { Spin, Alert, Typography, Descriptions, Tag, Space } from 'antd';
-import { ArrowLeftOutlined, KeyOutlined, SafetyOutlined, WarningOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, KeyOutlined, WarningOutlined, SafetyOutlined } from '@ant-design/icons';
 import {
   MultibaseCodec,
   AddKeyRequestPayloadV1,
@@ -17,33 +16,17 @@ import {
 import { AgentSelector } from '../components/AgentSelector';
 import { PasskeyService } from '../lib/passkey/PasskeyService';
 
-const { Title, Text, Paragraph } = Typography;
-
-// Payload interface definition
-// interface AddKeyPayload {
-//   version: number;
-//   agentDid?: string;
-//   verificationMethod: {
-//     type: string;
-//     publicKeyMultibase?: string;
-//     publicKeyJwk?: Record<string, any>;
-//     idFragment?: string;
-//   };
-//   verificationRelationships: VerificationRelationship[];
-//   redirectUri: string;
-//   state: string;
-// }
+const { Title, Paragraph } = Typography;
 
 export function AddKeyPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { userDid, isAuthenticated, signInWithDid } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<AddKeyRequestPayloadV1 | null>(null);
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
-  const [didService, setDidService] = useState<DIDService | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
 
   // Parse payload parameter
@@ -81,12 +64,8 @@ export function AddKeyPage() {
     }
   }, [searchParams]);
 
-  // Initialize DIDService when user is authenticated and agentDid is selected
-  useEffect(() => {
-    if (isAuthenticated && selectedAgentDid) {
-      initializeDIDService();
-    }
-  }, [isAuthenticated, selectedAgentDid]);
+  // Obtain didService via the shared hook once agent DID has been chosen
+  const { didService, error: didServiceError } = useDIDService(selectedAgentDid);
 
   // Authenticate user if not already authenticated
   useEffect(() => {
@@ -113,92 +92,55 @@ export function AddKeyPage() {
     authenticateUser();
   }, [payload, isAuthenticated, signInWithDid]);
 
-  const initializeDIDService = async () => {
-    if (!selectedAgentDid) return;
-
-    // Get credentialId from local UserStore (if exists)
-    const credentialIds = userDid ? UserStore.listCredentials(userDid) : [];
-    const credentialId = credentialIds.length > 0 ? credentialIds[0] : undefined;
-
-    setLoading(true);
-    try {
-      const service = await DIDService.initialize(selectedAgentDid, credentialId);
-      setDidService(service);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
-      setError(`Failed to initialize DID service: ${message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAgentSelect = (did: string) => {
     setSelectedAgentDid(did);
   };
 
   const handleConfirm = async () => {
-    if (!payload || !didService || !selectedAgentDid) return;
+    if (!didService || !payload || !selectedAgentDid) return;
 
     setProcessing(true);
     setError(null);
 
     try {
-      // Prepare verificationMethod data
       const keyInfo: OperationalKeyInfo = {
         type: payload.verificationMethod.type,
         controller: selectedAgentDid,
         idFragment: payload.verificationMethod.idFragment || `key-${Date.now()}`,
-        publicKeyMaterial: new Uint8Array(), // Initialize with empty array, will be updated below
+        publicKeyMaterial: MultibaseCodec.decodeBase58btc(
+          payload.verificationMethod.publicKeyMultibase || ''
+        ),
       };
 
-      // Handle different public key formats
-      if (payload.verificationMethod.publicKeyMultibase) {
-        keyInfo.publicKeyMaterial = MultibaseCodec.decodeBase58btc(
-          payload.verificationMethod.publicKeyMultibase
-        );
-      } else {
-        throw new Error('No valid public key format provided');
-      }
-
-      // Add verification method
       const keyId = await didService.addVerificationMethod(
         keyInfo,
-        payload.verificationRelationships
+        payload.verificationRelationships as VerificationRelationship[]
       );
 
-      console.log('Added verification method:', keyId);
-
-      // Construct redirect URL
       const redirectUrl = new URL(payload.redirectUri);
       redirectUrl.searchParams.append('success', '1');
       redirectUrl.searchParams.append('key_id', keyId);
       redirectUrl.searchParams.append('agent', selectedAgentDid);
       redirectUrl.searchParams.append('state', payload.state);
 
-      // Handle special case: if same origin page, can use postMessage
-      if (payload.redirectUri.startsWith(window.location.origin)) {
-        if (window.opener) {
-          window.opener.postMessage(
-            {
-              success: 1,
-              key_id: keyId,
-              agent: selectedAgentDid,
-              state: payload.state,
-            },
-            new URL(payload.redirectUri).origin
-          );
-          window.close();
-          return;
-        }
+      if (payload.redirectUri.startsWith(window.location.origin) && window.opener) {
+        window.opener.postMessage(
+          {
+            success: 1,
+            key_id: keyId,
+            agent: selectedAgentDid,
+            state: payload.state,
+          },
+          new URL(payload.redirectUri).origin
+        );
+        window.close();
+      } else {
+        window.location.href = redirectUrl.toString();
       }
-
-      // Standard redirect
-      window.location.href = redirectUrl.toString();
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
 
-      // Need to redirect with error info on failure too
       try {
         const redirectUrl = new URL(payload.redirectUri);
         redirectUrl.searchParams.append('success', '0');
@@ -206,7 +148,6 @@ export function AddKeyPage() {
         redirectUrl.searchParams.append('state', payload.state);
         window.location.href = redirectUrl.toString();
       } catch (redirectErr) {
-        // If redirect fails, at least show error on page
         console.error('Failed to redirect with error:', redirectErr);
       }
     } finally {
@@ -231,7 +172,7 @@ export function AddKeyPage() {
     }
   };
 
-  // Check if high risk permissions are requested
+  // Check if high risk permissions are requested (from payload initial relationships)
   const hasHighRiskPermission = payload?.verificationRelationships.includes('capabilityDelegation');
 
   return (
@@ -249,10 +190,10 @@ export function AddKeyPage() {
           </Title>
         </div>
 
-        {error && (
+        {(error || didServiceError) && (
           <Alert
             message={t('common.error')}
-            description={error}
+            description={error || didServiceError}
             type="error"
             showIcon
             className="mb-4"
@@ -330,7 +271,7 @@ export function AddKeyPage() {
                     <Button
                       type="submit"
                       onClick={handleConfirm}
-                      disabled={!selectedAgentDid || loading || processing}
+                      disabled={!selectedAgentDid || processing}
                     >
                       {processing ? (
                         <Spin size="small" />
