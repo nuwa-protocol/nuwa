@@ -19,6 +19,7 @@ import {
   Clock,
   RotateCcw
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface DIDStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -52,18 +53,23 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
     );
   }
 
-  const getStatusIcon = () => {
+  // Helper to render status icon with optional size. Lucide icons default to 24×24 which
+  // can break the layout inside the compact Tag component. We therefore allow passing a
+  // "small" size that constrains the icon to 0.75rem (12px).
+  const getStatusIcon = (size: 'small' | 'default' = 'default') => {
+    const sizeClass = size === 'small' ? 'h-3 w-3' : '';
+
     switch (status.status) {
       case 'pending':
-        return <Clock className="text-amber-400" />;
+        return <Clock className={cn('text-amber-400', sizeClass)} />;
       case 'processing':
-        return <Loader className="text-blue-500 animate-spin" />;
+        return <Loader className={cn('text-blue-500 animate-spin', sizeClass)} />;
       case 'completed':
-        return <CheckCircle className="text-green-500" />;
+        return <CheckCircle className={cn('text-green-500', sizeClass)} />;
       case 'failed':
-        return <AlertCircle className="text-red-500" />;
+        return <AlertCircle className={cn('text-red-500', sizeClass)} />;
       default:
-        return <Clock className="text-gray-300" />;
+        return <Clock className={cn('text-gray-300', sizeClass)} />;
     }
   };
 
@@ -175,11 +181,11 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
       <CardContent>
         <Space direction="vertical" size="large" className="w-full">
           <div className="text-center">
-            <div className="text-5xl mb-4">{getStatusIcon()}</div>
             <Title level={3}>DID Creation Status</Title>
             <Space>
               <Text>Status:</Text>
-              <Tag variant={getStatusColor()} icon={getStatusIcon()}>
+              {/* Use a smaller icon inside the Tag to avoid overlapping with text. */}
+              <Tag variant={getStatusColor()} icon={getStatusIcon('small')}>
                 {status.status.toUpperCase()}
               </Tag>
             </Space>
