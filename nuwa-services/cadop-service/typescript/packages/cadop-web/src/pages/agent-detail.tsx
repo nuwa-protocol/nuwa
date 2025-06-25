@@ -368,8 +368,11 @@ export function AgentDetailPage() {
         onClose={() => setShowDidDocument(false)}
         width={800}
       >
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(didDocument, null, 2)}</pre>
+        {/* Container set with max height and scroll to ensure long documents are viewable */}
+        <div className="bg-gray-50 p-4 rounded-lg max-h-[70vh] overflow-y-auto">
+          <pre className="whitespace-pre-wrap text-sm overflow-x-auto">
+            {JSON.stringify(didDocument, null, 2)}
+          </pre>
         </div>
       </Modal>
 

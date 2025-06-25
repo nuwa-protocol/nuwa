@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Copy} from 'lucide-react';
 import { Button, Badge, Card, CardContent } from '@/components/ui';
 
@@ -36,11 +36,18 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
 }) => {
   const displayDID = shortForm ? `${did.slice(0, 8)}...${did.slice(-6)}` : did;
 
+  const [copyFeedback, setCopyFeedback] = useState<null | 'success' | 'error'>(null);
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopyFeedback('success');
     } catch (err) {
       console.error('Failed to copy:', err);
+      setCopyFeedback('error');
+    } finally {
+      // Hide feedback after 2 seconds
+      setTimeout(() => setCopyFeedback(null), 2000);
     }
   };
 
@@ -69,6 +76,12 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
                 <Copy className="h-4 w-4" />
                 <span className="sr-only">Copy DID</span>
               </Button>
+            )}
+            {copyFeedback === 'success' && (
+              <span className="text-xs text-green-600">Copied!</span>
+            )}
+            {copyFeedback === 'error' && (
+              <span className="text-xs text-red-600">Failed to copy</span>
             )}
           </div>
         </div>
