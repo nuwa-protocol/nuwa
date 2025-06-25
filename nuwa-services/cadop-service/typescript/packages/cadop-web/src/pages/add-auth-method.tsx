@@ -6,7 +6,6 @@ import { useAuth } from '../lib/auth/AuthContext';
 import { custodianClient } from '../lib/api/client';
 import { DIDService } from '../lib/did/DIDService';
 import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
-import { Form, Space, Typography, Select, Radio } from 'antd';
 import { ArrowLeft, Key } from 'lucide-react';
 import {
   MultibaseCodec,
@@ -16,9 +15,6 @@ import {
 import { VerificationMethodForm, VerificationMethodFormValues } from '@/components/did/VerificationMethodForm';
 import { useDIDService } from '@/hooks/useDIDService';
 import { Alert, AlertTitle, AlertDescription, Spinner, SpinnerContainer } from '@/components/ui';
-
-const { Title, Text } = Typography;
-const { Option } = Select;
 
 export function AddAuthMethodPage() {
   const { t } = useTranslation();
@@ -85,7 +81,7 @@ export function AddAuthMethodPage() {
             {t('common.back')}
           </Button>
 
-          <Title level={2}>Add Authentication Method</Title>
+          <h2 className="text-3xl font-bold tracking-tight">Add Authentication Method</h2>
         </div>
 
         <Card>

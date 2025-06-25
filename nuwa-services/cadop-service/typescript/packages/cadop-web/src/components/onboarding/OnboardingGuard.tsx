@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Spin, message } from 'antd';
+import { Spinner, SpinnerContainer } from '@/components/ui';
 
 import { AuthStore, UserStore } from '@/lib/storage';
 import { PasskeyService } from '@/lib/passkey/PasskeyService';
@@ -104,7 +104,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   if (step === 'checking' || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Spin size="large" />
+        <Spinner size="large" />
       </div>
     );
   }

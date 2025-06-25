@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { 
+  Button, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  Modal,
+  Spinner, 
+  SpinnerContainer, 
+  Tag 
+} from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
-import { Alert, Tabs, Space, Typography, message } from 'antd';
 import {
   ArrowLeft,
   Settings,
@@ -20,17 +32,16 @@ import {
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
-import { Modal, Spinner, SpinnerContainer, Tag } from '@/components/ui';
 import { buildRoochScanAccountUrl } from '@/config/env';
-
-const { TabPane } = Tabs;
-const { Title, Text, Paragraph } = Typography;
+import { useToast } from '@/hooks/use-toast';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
   const { userDid, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  
   const {
     didService,
     isLoading: serviceLoading,
@@ -43,6 +54,9 @@ export function AgentDetailPage() {
   const [isController, setIsController] = useState(false);
   // state for delete confirmation modal
   const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState('info');
 
   const {
     balances,
@@ -69,12 +83,18 @@ export function AgentDetailPage() {
       const data = { gas: claimed };
       await refetchBalances();
       setHasClaimed(true);
-      message.success(
-        `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`
-      );
+      toast({
+        variant: "success",
+        title: "RGAS Claimed",
+        description: `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`,
+      });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to claim RGAS';
-      message.error(errMsg);
+      toast({
+        variant: "destructive",
+        title: "Claim Failed",
+        description: errMsg,
+      });
       console.error('RGAS claim failed:', err);
     } finally {
       setIsClaiming(false);
@@ -125,10 +145,17 @@ export function AgentDetailPage() {
       await didService.removeVerificationMethod(keyId);
       const updatedDoc = await didService.getDIDDocument();
       setDidDocument(updatedDoc);
-      message.success(t('agent.removed', { defaultValue: 'Removed' }));
+      toast({
+        variant: "default",
+        title: t('agent.removed', { defaultValue: 'Removed' }),
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      message.error(msg);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: msg,
+      });
     } finally {
       setLoading(false);
       setPendingDeletion(null);
@@ -155,7 +182,10 @@ export function AgentDetailPage() {
     const errMsg = error || serviceError;
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <Alert message={t('common.error')} description={errMsg} type="error" showIcon />
+        <Alert variant="destructive">
+          <AlertTitle>{t('common.error')}</AlertTitle>
+          <AlertDescription>{errMsg}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -170,7 +200,7 @@ export function AgentDetailPage() {
           </Button>
 
           <div className="flex justify-between items-center">
-            <Title level={2}>{t('agent.details')}</Title>
+            <h2 className="text-3xl font-bold tracking-tight">{t('agent.details')}</h2>
             <Button variant="outline" onClick={() => setShowDidDocument(true)}>
               <FileText className="mr-2 h-4 w-4" />
               {t('agent.viewDidDocument')}
@@ -189,7 +219,7 @@ export function AgentDetailPage() {
                 <DIDDisplay did={did || ''} showCopy={true} status="active" />
                 {isController && (
                   <div className="mt-2">
-                    <Tag color="green">{t('agent.youAreController')}</Tag>
+                    <Tag variant="success">{t('agent.youAreController')}</Tag>
                   </div>
                 )}
               </CardContent>
@@ -218,21 +248,21 @@ export function AgentDetailPage() {
                         className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
                       >
                         <div className="flex items-center">
-                          <Text strong>{bal.symbol}</Text>
-                          <Text type="secondary" className="ml-2 text-xs">
+                          <span className="font-medium">{bal.symbol}</span>
+                          <span className="ml-2 text-xs text-gray-500">
                             {bal.name}
-                          </Text>
+                          </span>
                         </div>
-                        <Text>{bal.fixedBalance}</Text>
+                        <span>{bal.fixedBalance}</span>
                       </div>
                     ))}
                   </div>
                 ) : balanceError ? (
                   <div className="text-center py-2">
-                    <Text type="danger">{t('agent.balanceLoadFailed')}</Text>
+                    <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
                   </div>
                 ) : (
-                  <Text type="secondary">{t('agent.noBalance')}</Text>
+                  <span className="text-gray-500">{t('agent.noBalance')}</span>
                 )}
               </CardContent>
             </Card>
@@ -242,7 +272,7 @@ export function AgentDetailPage() {
                 <CardTitle>{t('agent.authMethods')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <div className="flex flex-col gap-4">
                   {didDocument?.verificationMethod?.map((method, index) => {
                     const fragment = method.id.split('#')[1];
                     const isAuthentication = didDocument.authentication?.includes(method.id);
@@ -259,12 +289,12 @@ export function AgentDetailPage() {
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center mb-2">
                           <Key className="mr-2 h-4 w-4" />
-                          <Text strong className="font-mono">
+                          <span className="font-mono font-bold">
                             {fragment}
-                          </Text>
-                          <Text className="ml-2">{method.type}</Text>
+                          </span>
+                          <span className="ml-2">{method.type}</span>
                           {method.controller === userDid && (
-                            <Tag color="blue" className="ml-2">
+                            <Tag variant="blue" className="ml-2">
                               {t('agent.controller')}
                             </Tag>
                           )}
@@ -285,26 +315,26 @@ export function AgentDetailPage() {
                         <div className="space-y-2">
                           <div className="flex items-center">
                             <Users className="mr-2 h-4 w-4" />
-                            <Text type="secondary">{t('agent.capabilities')}:</Text>
+                            <span className="text-gray-500">{t('agent.capabilities')}:</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {isAuthentication && (
-                              <Tag color="green">{t('agent.authentication')}</Tag>
+                              <Tag variant="success">{t('agent.authentication')}</Tag>
                             )}
-                            {isAssertionMethod && <Tag color="blue">{t('agent.assertion')}</Tag>}
-                            {isKeyAgreement && <Tag color="purple">{t('agent.keyAgreement')}</Tag>}
+                            {isAssertionMethod && <Tag variant="blue">{t('agent.assertion')}</Tag>}
+                            {isKeyAgreement && <Tag variant="purple">{t('agent.keyAgreement')}</Tag>}
                             {isCapabilityInvocation && (
-                              <Tag color="orange">{t('agent.capabilityInvocation')}</Tag>
+                              <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
                             )}
                             {isCapabilityDelegation && (
-                              <Tag color="cyan">{t('agent.capabilityDelegation')}</Tag>
+                              <Tag variant="default">{t('agent.capabilityDelegation')}</Tag>
                             )}
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                </Space>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -317,7 +347,7 @@ export function AgentDetailPage() {
                   <CardTitle>{t('agent.actions')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                  <div className="flex flex-col gap-2">
                     <Button
                       className="w-full"
                       variant="outline"
@@ -353,7 +383,7 @@ export function AgentDetailPage() {
                       <History className="mr-2 h-4 w-4" />
                       {t('agent.viewHistory')}
                     </Button>
-                  </Space>
+                  </div>
                 </CardContent>
               </Card>
             </div>

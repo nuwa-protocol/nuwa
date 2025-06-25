@@ -1,9 +1,22 @@
 import React from 'react';
-import { Form, Input, Select, Button } from 'antd';
+import { useForm } from 'react-hook-form';
+import { 
+  Button,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage
+} from '@/components/ui';
 import type { OperationalKeyInfo, VerificationRelationship } from '@nuwa-ai/identity-kit';
 import { MultibaseCodec } from '@nuwa-ai/identity-kit';
-
-const { Option } = Select;
 
 export interface VerificationMethodFormValues {
   type: string;
@@ -20,59 +33,133 @@ interface Props {
 }
 
 export function VerificationMethodForm({ initial, onSubmit, submitting, submitText = 'Submit' }: Props) {
-  const [form] = Form.useForm();
+  const form = useForm<VerificationMethodFormValues>({
+    defaultValues: {
+      type: initial?.type || 'Ed25519VerificationKey2020',
+      publicKeyMultibase: initial?.publicKeyMultibase || '',
+      relationships: initial?.relationships || [],
+      idFragment: initial?.idFragment || `key-${Date.now()}`
+    }
+  });
 
-  const handleFinish = (values: any) => {
-    const cleaned: VerificationMethodFormValues = {
-      type: values.type,
-      publicKeyMultibase: values.publicKey,
-      relationships: values.relationships,
-      idFragment: values.idFragment || `key-${Date.now()}`,
-    };
-    onSubmit(cleaned);
+  const handleSubmit = (values: VerificationMethodFormValues) => {
+    onSubmit(values);
   };
 
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      initialValues={{
-        type: initial?.type,
-        publicKey: initial?.publicKeyMultibase,
-        relationships: initial?.relationships,
-        idFragment: initial?.idFragment ?? `key-${Date.now()}`,
-      }}
-      onFinish={handleFinish}
-    >
-      <Form.Item name="type" label="Method Type" rules={[{ required: true }]}>
-        <Select>
-          <Option value="Ed25519VerificationKey2020">Ed25519VerificationKey2020</Option>
-          <Option value="EcdsaSecp256k1VerificationKey2019">EcdsaSecp256k1VerificationKey2019</Option>
-        </Select>
-      </Form.Item>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Method Type</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                defaultValue={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select method type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Ed25519VerificationKey2020">Ed25519VerificationKey2020</SelectItem>
+                  <SelectItem value="EcdsaSecp256k1VerificationKey2019">EcdsaSecp256k1VerificationKey2019</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Form.Item name="publicKey" label="Public Key (Base58)" rules={[{ required: true }]}>
-        <Input placeholder="z...." />
-      </Form.Item>
+        <FormField
+          control={form.control}
+          name="publicKeyMultibase"
+          rules={{ required: true }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Public Key (Base58)</FormLabel>
+              <FormControl>
+                <Input placeholder="z...." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Form.Item name="relationships" label="Capabilities" rules={[{ required: true }]}>
-        <Select mode="multiple">
-          <Option value="authentication">authentication</Option>
-          <Option value="assertionMethod">assertionMethod</Option>
-          <Option value="capabilityInvocation">capabilityInvocation</Option>
-          <Option value="capabilityDelegation">capabilityDelegation</Option>
-        </Select>
-      </Form.Item>
+        <FormField
+          control={form.control}
+          name="relationships"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Capabilities</FormLabel>
+              <Select
+                onValueChange={(value) => {
+                  // Handle multi-select manually since shadcn/ui Select doesn't have built-in multi-select
+                  const currentValues = field.value || [];
+                  const newValues = currentValues.includes(value as VerificationRelationship)
+                    ? currentValues.filter(v => v !== value)
+                    : [...currentValues, value as VerificationRelationship];
+                  field.onChange(newValues);
+                }}
+                value={field.value?.[0] || undefined} // Show first selected value
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select capabilities" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="authentication">authentication</SelectItem>
+                  <SelectItem value="assertionMethod">assertionMethod</SelectItem>
+                  <SelectItem value="capabilityInvocation">capabilityInvocation</SelectItem>
+                  <SelectItem value="capabilityDelegation">capabilityDelegation</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {field.value?.map(rel => (
+                  <div key={rel} className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-md flex items-center">
+                    {rel}
+                    <button 
+                      type="button"
+                      className="ml-1 text-xs"
+                      onClick={() => {
+                        field.onChange(field.value?.filter(v => v !== rel));
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Form.Item name="idFragment" label="ID Fragment" rules={[{ required: true }]}>
-        <Input placeholder="key-123" />
-      </Form.Item>
+        <FormField
+          control={form.control}
+          name="idFragment"
+          rules={{ required: true }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>ID Fragment</FormLabel>
+              <FormControl>
+                <Input placeholder="key-123" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <div className="flex justify-end">
-        <Button type="primary" htmlType="submit" loading={submitting}>
-          {submitText}
-        </Button>
-      </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={submitting}>
+            {submitText}
+          </Button>
+        </div>
+      </form>
     </Form>
   );
 } 

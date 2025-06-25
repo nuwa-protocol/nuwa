@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Button, Spin, Progress } from 'antd';
+import { Button, Spinner, Progress } from '@/components/ui';
 import { AgentService } from '@/lib/agent/AgentService';
 import { DIDCreationStatus } from '@/components/DIDCreationStatus';
 import type { AgentDIDCreationStatus as DIDStatus } from '@cadop/shared';
@@ -49,8 +49,8 @@ export const CreateAgentStep: React.FC<Props> = ({ userDid, onComplete }) => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <Spin size="large" />
-        <Progress percent={70} status="active" style={{ width: 300 }} />
+        <Spinner size="large" />
+        <Progress value={70} className="w-[300px]" />
         <div>Creating your Agent DID…</div>
       </div>
     );
@@ -80,7 +80,7 @@ export const CreateAgentStep: React.FC<Props> = ({ userDid, onComplete }) => {
       <div className="flex flex-col items-center justify-center min-h-screen space-y-6">
         <DIDCreationStatus status={didStatus} onRetry={retry} />
         {isCompleted && agentDid && (
-          <Button type="primary" onClick={() => onComplete(agentDid)}>
+          <Button onClick={() => onComplete(agentDid)}>
             Next
           </Button>
         )}

@@ -19,6 +19,8 @@ export * from './timeline';
 export * from './typography';
 export * from './space';
 export * from './descriptions';
+export * from './toast';
+export * from './toaster';
 
 // Export custom domain components that build on the ui primitives
 export * from '../did/DIDDisplay';

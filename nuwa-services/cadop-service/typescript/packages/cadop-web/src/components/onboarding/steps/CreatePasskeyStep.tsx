@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Spin, Result } from 'antd';
+import { Button, Spinner, Alert, AlertTitle, AlertDescription } from '@/components/ui';
 import { PasskeyService } from '@/lib/passkey/PasskeyService';
 
 interface Props {
@@ -27,7 +27,7 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Spin size="large" />
+        <Spinner size="large" />
       </div>
     );
   }
@@ -35,22 +35,23 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
   return (
     <div className="flex items-center justify-center min-h-screen">
       {error ? (
-        <Result
-          status="error"
-          title="Failed to create Passkey"
-          subTitle={error}
-          extra={[<Button onClick={handleCreate}>Retry</Button>]}
-        />
+        <div className="w-full max-w-md">
+          <Alert variant="destructive">
+            <AlertTitle>Failed to create Passkey</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <div className="mt-4 flex justify-center">
+            <Button variant="outline" onClick={handleCreate}>Retry</Button>
+          </div>
+        </div>
       ) : (
-        <Result
-          title="Create a Passkey to get started"
-          subTitle="We will use a platform Passkey to generate your user DID."
-          extra={[
-            <Button type="primary" onClick={handleCreate}>
-              Create Passkey
-            </Button>,
-          ]}
-        />
+        <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md text-center">
+          <h2 className="text-2xl font-bold mb-2">Create a Passkey to get started</h2>
+          <p className="text-gray-600 mb-6">We will use a platform Passkey to generate your user DID.</p>
+          <Button onClick={handleCreate}>
+            Create Passkey
+          </Button>
+        </div>
       )}
     </div>
   );

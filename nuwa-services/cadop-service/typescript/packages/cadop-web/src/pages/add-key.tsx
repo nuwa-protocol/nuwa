@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { 
+  Button, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  Alert, 
+  AlertTitle, 
+  AlertDescription,
+  Spinner,
+  SpinnerContainer,
+  Tag 
+} from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '@/hooks/useDIDService';
-import { Spin, Alert, Typography, Descriptions, Tag, Space } from 'antd';
 import { ArrowLeft, Key, AlertTriangle, ShieldCheck } from 'lucide-react';
 import {
   MultibaseCodec,
@@ -14,8 +25,6 @@ import {
 } from '@nuwa-ai/identity-kit';
 import { AgentSelector } from '../components/AgentSelector';
 import { PasskeyService } from '../lib/passkey/PasskeyService';
-
-const { Title, Paragraph } = Typography;
 
 export function AddKeyPage() {
   const { t } = useTranslation();
@@ -183,30 +192,27 @@ export function AddKeyPage() {
             {t('common.cancel')}
           </Button>
 
-          <Title level={2}>
-            <Key className="mr-2 h-4 w-4" />
+          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Key className="h-6 w-6" />
             {t('Add Authentication Key')}
-          </Title>
+          </h2>
         </div>
 
         {(error || didServiceError) && (
-          <Alert
-            message={t('common.error')}
-            description={error || didServiceError}
-            type="error"
-            showIcon
-            className="mb-4"
-          />
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>{t('common.error')}</AlertTitle>
+            <AlertDescription>{error || didServiceError}</AlertDescription>
+          </Alert>
         )}
 
         {payload && (
           <Card>
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="flex items-center">
                 {t('Authorization Request')}
                 {hasHighRiskPermission && (
-                  <Tag color="error" className="ml-2">
-                    <AlertTriangle className="h-3 w-3 mr-1" /> High Risk
+                  <Tag variant="destructive" className="ml-2 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> High Risk
                   </Tag>
                 )}
               </CardTitle>
@@ -214,52 +220,57 @@ export function AddKeyPage() {
             <CardContent>
               {!isAuthenticated ? (
                 <div className="text-center py-8">
-                  <Spin size="large" />
-                  <Paragraph className="mt-4">{t('Waiting for authentication...')}</Paragraph>
+                  <SpinnerContainer loading={true} />
+                  <p className="mt-4">{t('Waiting for authentication...')}</p>
                 </div>
               ) : (
                 <>
-                  <Descriptions title="Key Details" bordered column={1}>
-                    <Descriptions.Item label="Key Type">
-                      {payload.verificationMethod.type}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Key ID">
-                      {payload.verificationMethod.idFragment || 'Auto-generated'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Permissions">
-                      <Space direction="vertical">
+                  <div className="border rounded-md p-4 mb-4">
+                    <h3 className="font-medium mb-2">Key Details</h3>
+                    <dl className="grid grid-cols-[1fr_2fr] gap-2">
+                      <dt className="text-sm font-medium text-gray-500">Key Type</dt>
+                      <dd>{payload.verificationMethod.type}</dd>
+                      
+                      <dt className="text-sm font-medium text-gray-500">Key ID</dt>
+                      <dd>{payload.verificationMethod.idFragment || 'Auto-generated'}</dd>
+                      
+                      <dt className="text-sm font-medium text-gray-500">Permissions</dt>
+                      <dd className="flex flex-wrap gap-1">
                         {payload.verificationRelationships.map(rel => (
-                          <Tag key={rel} color={rel === 'capabilityDelegation' ? 'error' : 'blue'}>
-                            {rel === 'capabilityDelegation' && <AlertTriangle className="h-3 w-3 mr-1" />} {rel}
+                          <Tag 
+                            key={rel} 
+                            variant={rel === 'capabilityDelegation' ? 'destructive' : 'default'}
+                            className="flex items-center gap-1"
+                          >
+                            {rel === 'capabilityDelegation' && <AlertTriangle className="h-3 w-3" />} {rel}
                           </Tag>
                         ))}
-                      </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Redirect URI">
-                      {payload.redirectUri}
-                    </Descriptions.Item>
-                  </Descriptions>
+                      </dd>
+                      
+                      <dt className="text-sm font-medium text-gray-500">Redirect URI</dt>
+                      <dd className="break-all">{payload.redirectUri}</dd>
+                    </dl>
+                  </div>
 
                   {hasHighRiskPermission && (
-                    <Alert
-                      message="High Risk Permission"
-                      description="This key is requesting capability delegation permission, which allows it to manage other keys and modify your DID document. Only grant this to highly trusted devices/environments."
-                      type="warning"
-                      showIcon
-                      className="my-4"
-                    />
+                    <Alert variant="warning" className="my-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>High Risk Permission</AlertTitle>
+                      <AlertDescription>
+                        This key is requesting capability delegation permission, which allows it to manage other keys and modify your DID document. Only grant this to highly trusted devices/environments.
+                      </AlertDescription>
+                    </Alert>
                   )}
 
                   {!selectedAgentDid ? (
                     <div className="mt-6">
-                      <Title level={4}>Select Agent DID</Title>
+                      <h4 className="text-lg font-medium mb-2">Select Agent DID</h4>
                       <AgentSelector onSelect={handleAgentSelect} />
                     </div>
                   ) : (
-                    <div className="mt-6">
-                      <Descriptions title="Selected Agent" bordered>
-                        <Descriptions.Item label="Agent DID">{selectedAgentDid}</Descriptions.Item>
-                      </Descriptions>
+                    <div className="mt-6 border rounded-md p-4">
+                      <h4 className="font-medium mb-2">Selected Agent</h4>
+                      <div className="text-sm break-all">{selectedAgentDid}</div>
                     </div>
                   )}
 
@@ -268,12 +279,11 @@ export function AddKeyPage() {
                       {t('common.cancel')}
                     </Button>
                     <Button
-                      type="submit"
                       onClick={handleConfirm}
                       disabled={!selectedAgentDid || processing}
                     >
                       {processing ? (
-                        <Spin size="small" />
+                        <SpinnerContainer loading={true} size="small" />
                       ) : (
                         <>
                           <ShieldCheck className="mr-2 h-4 w-4" />
