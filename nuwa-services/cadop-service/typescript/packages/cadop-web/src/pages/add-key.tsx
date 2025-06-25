@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '@/hooks/useDIDService';
-import { ArrowLeft, Key, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Key, AlertTriangle, ShieldCheck, RotateCcw } from 'lucide-react';
 import {
   MultibaseCodec,
   AddKeyRequestPayloadV1,
@@ -36,6 +36,7 @@ export function AddKeyPage() {
   const [payload, setPayload] = useState<AddKeyRequestPayloadV1 | null>(null);
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
+  const [manualSelectMode, setManualSelectMode] = useState<boolean>(false);
 
   // Parse payload parameter
   useEffect(() => {
@@ -102,6 +103,12 @@ export function AddKeyPage() {
 
   const handleAgentSelect = (did: string) => {
     setSelectedAgentDid(did);
+    setManualSelectMode(false);
+  };
+
+  const handleChangeAgent = () => {
+    setSelectedAgentDid(null);
+    setManualSelectMode(true);
   };
 
   const handleConfirm = async () => {
@@ -211,7 +218,7 @@ export function AddKeyPage() {
               <CardTitle className="flex items-center">
                 {t('Authorization Request')}
                 {hasHighRiskPermission && (
-                  <Tag variant="destructive" className="ml-2 flex items-center gap-1">
+                  <Tag variant="danger" className="ml-2 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" /> High Risk
                   </Tag>
                 )}
@@ -239,7 +246,7 @@ export function AddKeyPage() {
                         {payload.verificationRelationships.map(rel => (
                           <Tag 
                             key={rel} 
-                            variant={rel === 'capabilityDelegation' ? 'destructive' : 'default'}
+                            variant={rel === 'capabilityDelegation' ? 'danger' : 'default'}
                             className="flex items-center gap-1"
                           >
                             {rel === 'capabilityDelegation' && <AlertTriangle className="h-3 w-3" />} {rel}
@@ -253,7 +260,7 @@ export function AddKeyPage() {
                   </div>
 
                   {hasHighRiskPermission && (
-                    <Alert variant="warning" className="my-4">
+                    <Alert variant="destructive" className="my-4">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>High Risk Permission</AlertTitle>
                       <AlertDescription>
@@ -265,11 +272,16 @@ export function AddKeyPage() {
                   {!selectedAgentDid ? (
                     <div className="mt-6">
                       <h4 className="text-lg font-medium mb-2">Select Agent DID</h4>
-                      <AgentSelector onSelect={handleAgentSelect} />
+                      <AgentSelector onSelect={handleAgentSelect} autoSelectFirst={!manualSelectMode} />
                     </div>
                   ) : (
                     <div className="mt-6 border rounded-md p-4">
-                      <h4 className="font-medium mb-2">Selected Agent</h4>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        Selected Agent
+                        <button type="button" onClick={handleChangeAgent} className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1">
+                          <RotateCcw className="h-3 w-3" /> Change
+                        </button>
+                      </h4>
                       <div className="text-sm break-all">{selectedAgentDid}</div>
                     </div>
                   )}

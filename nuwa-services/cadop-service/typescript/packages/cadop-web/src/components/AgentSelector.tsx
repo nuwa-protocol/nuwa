@@ -12,9 +12,14 @@ import { UserStore } from '../lib/storage';
 
 interface AgentSelectorProps {
   onSelect: (did: string) => void;
+  /**
+   * Whether to automatically select the first agent in the list when the component mounts.
+   * Defaults to true. Pass false if you want the user to make an explicit choice each time.
+   */
+  autoSelectFirst?: boolean;
 }
 
-export function AgentSelector({ onSelect }: AgentSelectorProps) {
+export function AgentSelector({ onSelect, autoSelectFirst = true }: AgentSelectorProps) {
   const { userDid } = useAuth();
   const [loading, setLoading] = useState(false);
   const [agents, setAgents] = useState<string[]>([]);
@@ -35,10 +40,14 @@ export function AgentSelector({ onSelect }: AgentSelectorProps) {
       const agentDids = UserStore.listAgents(userDid);
       setAgents(agentDids || []);
 
-      // Auto-select the first agent to reduce one user action
       if (agentDids && agentDids.length > 0) {
-        setSelected(agentDids[0]);
-        onSelect(agentDids[0]);
+        if (autoSelectFirst) {
+          // Auto-select the first agent to reduce one user action
+          setSelected(agentDids[0]);
+          onSelect(agentDids[0]);
+        } else {
+          setSelected(undefined);
+        }
       } else {
         setSelected(undefined);
       }

@@ -43,7 +43,8 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
     }
     const firstAgent = agents[0];
     setAgentDid(firstAgent);
-    setStep('gas');
+    // Check existing gas balance before deciding the next step
+    checkGas(firstAgent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -79,7 +80,10 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   // Agent created callback
   const handleAgentCreated = (did: string) => {
     setAgentDid(did);
-    setStep('gas');
+    // Show loading spinner while checking gas for the new agent
+    setStep('checking');
+    // After creating a new agent, verify if gas needs to be claimed
+    checkGas(did);
   };
 
   const handleGasClaimed = () => {
