@@ -26,6 +26,7 @@ export class DIDService {
       if (!didDocument) {
         throw new Error('Failed to resolve DID document');
       }
+      console.log('initialize with credentialId', credentialId);
       const signer = new WebAuthnSigner(did, {
         didDocument: didDocument,
         rpId: window.location.hostname,

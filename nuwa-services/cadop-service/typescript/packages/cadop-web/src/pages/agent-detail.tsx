@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
-import { useVDR } from '@/lib/identity/VDRProvider';
+import { useDIDService } from '../hooks/useDIDService';
 import { Alert, Tabs, Space, Typography, message } from 'antd';
 import {
   ArrowLeft,
@@ -14,12 +14,14 @@ import {
   Users,
   FileText,
   RotateCcw,
-  Gift
+  Gift,
+  Trash2
 } from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { Modal, Spinner, SpinnerContainer, Tag } from '@/components/ui';
+import { buildRoochScanAccountUrl } from '@/config/env';
 
 const { TabPane } = Tabs;
 const { Title, Text, Paragraph } = Typography;
@@ -29,12 +31,18 @@ export function AgentDetailPage() {
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
   const { userDid, isAuthenticated } = useAuth();
-  const { registry, initialised } = useVDR();
+  const {
+    didService,
+    isLoading: serviceLoading,
+    error: serviceError,
+  } = useDIDService(did);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
   const [showDidDocument, setShowDidDocument] = useState(false);
   const [isController, setIsController] = useState(false);
+  // state for delete confirmation modal
+  const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
 
   const {
     balances,
@@ -75,21 +83,20 @@ export function AgentDetailPage() {
   // ---------------------------------------------------
 
   useEffect(() => {
-    if (did && initialised) {
+    if (didService) {
       loadAgentInfo();
     }
-  }, [did, userDid, initialised]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [didService, userDid]);
 
   const loadAgentInfo = async () => {
-    if (!did) return;
+    if (!didService) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      if (!initialised) return;
-      // Resolve via shared VDRRegistry instance (already initialised)
-      const doc = await registry.resolveDID(did, { forceRefresh: true });
+      const doc = await didService.getDIDDocument();
 
       if (doc) {
         setDidDocument(doc);
@@ -111,7 +118,32 @@ export function AgentDetailPage() {
     }
   };
 
-  if (loading) {
+  const handleRemoveKey = async (keyId: string) => {
+    if (!didService) return;
+    try {
+      setLoading(true);
+      await didService.removeVerificationMethod(keyId);
+      const updatedDoc = await didService.getDIDDocument();
+      setDidDocument(updatedDoc);
+      message.success(t('agent.removed', { defaultValue: 'Removed' }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      message.error(msg);
+    } finally {
+      setLoading(false);
+      setPendingDeletion(null);
+    }
+  };
+
+  const confirmRemoveKey = (method: VerificationMethod) => {
+    setPendingDeletion(method);
+  };
+
+  const handleCancelDelete = () => {
+    setPendingDeletion(null);
+  };
+
+  if (loading || serviceLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Spinner size="large" />
@@ -119,10 +151,11 @@ export function AgentDetailPage() {
     );
   }
 
-  if (error) {
+  if (error || serviceError) {
+    const errMsg = error || serviceError;
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <Alert message={t('common.error')} description={error} type="error" showIcon />
+        <Alert message={t('common.error')} description={errMsg} type="error" showIcon />
       </div>
     );
   }
@@ -235,6 +268,16 @@ export function AgentDetailPage() {
                               {t('agent.controller')}
                             </Tag>
                           )}
+                          {isController && method.controller !== userDid && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-2 text-destructive hover:bg-destructive/10"
+                              onClick={() => confirmRemoveKey(method)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                         <div className="text-xs text-gray-400 mb-2">
                           {t('agent.controllerLabel')}: {method.controller}
@@ -298,11 +341,15 @@ export function AgentDetailPage() {
                       <Key className="mr-2 h-4 w-4" />
                       {t('agent.addAuthMethod')}
                     </Button>
-                    <Button className="w-full" variant="outline">
-                      <Settings className="mr-2 h-4 w-4" />
-                      {t('agent.manageSettings')}
-                    </Button>
-                    <Button className="w-full" variant="outline">
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      disabled={!agentAddress}
+                      onClick={() => {
+                        if (!agentAddress) return;
+                        window.open(buildRoochScanAccountUrl(agentAddress), '_blank');
+                      }}
+                    >
                       <History className="mr-2 h-4 w-4" />
                       {t('agent.viewHistory')}
                     </Button>
@@ -313,29 +360,6 @@ export function AgentDetailPage() {
           )}
         </div>
 
-        {/* Bottom Section - Activity and History */}
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('agent.activityHistory')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultActiveKey="1">
-                <TabPane tab={t('agent.recentActivity')} key="1">
-                  <div className="text-center py-8 text-gray-500">
-                    {t('agent.noRecentActivity')}
-                  </div>
-                </TabPane>
-                <TabPane tab={t('agent.transactions')} key="2">
-                  <div className="text-center py-8 text-gray-500">{t('agent.noTransactions')}</div>
-                </TabPane>
-                <TabPane tab={t('agent.credentials')} key="3">
-                  <div className="text-center py-8 text-gray-500">{t('agent.noCredentials')}</div>
-                </TabPane>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <Modal
@@ -346,6 +370,32 @@ export function AgentDetailPage() {
       >
         <div className="bg-gray-50 p-4 rounded-lg">
           <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(didDocument, null, 2)}</pre>
+        </div>
+      </Modal>
+
+      <Modal
+        title={t('agent.confirmDelete', { defaultValue: 'Confirm delete key' })}
+        open={!!pendingDeletion}
+        onClose={handleCancelDelete}
+        width="sm"
+      >
+        <div className="space-y-4">
+          <p>{t('agent.deleteKeyPrompt', {
+            defaultValue: 'Are you sure you want to delete this authentication method?',
+          })}</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleCancelDelete}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingDeletion) handleRemoveKey(pendingDeletion.id);
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

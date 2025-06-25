@@ -292,7 +292,7 @@ export class PasskeyService {
         allowCredentialIds.push(...UserStore.listCredentials(did));
       }
     }
-
+    console.log('allowCredentialIds', allowCredentialIds);
     const publicKeyRequest: PublicKeyCredentialRequestOptions = {
       ...requestOptions,
       challenge: base64URLToArrayBuffer(requestOptions.challenge),
