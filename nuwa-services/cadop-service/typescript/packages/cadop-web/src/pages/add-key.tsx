@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '@/hooks/useDIDService';
 import { Spin, Alert, Typography, Descriptions, Tag, Space } from 'antd';
-import { ArrowLeftOutlined, KeyOutlined, WarningOutlined, SafetyOutlined } from '@ant-design/icons';
+import { ArrowLeft, Key, AlertTriangle, ShieldCheck } from 'lucide-react';
 import {
   MultibaseCodec,
   AddKeyRequestPayloadV1,
@@ -180,12 +179,12 @@ export function AddKeyPage() {
       <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" onClick={handleCancel} className="mb-4">
-            <ArrowLeftOutlined className="mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.cancel')}
           </Button>
 
           <Title level={2}>
-            <KeyOutlined className="mr-2" />
+            <Key className="mr-2 h-4 w-4" />
             {t('Add Authentication Key')}
           </Title>
         </div>
@@ -207,7 +206,7 @@ export function AddKeyPage() {
                 {t('Authorization Request')}
                 {hasHighRiskPermission && (
                   <Tag color="error" className="ml-2">
-                    <WarningOutlined /> High Risk
+                    <AlertTriangle className="h-3 w-3 mr-1" /> High Risk
                   </Tag>
                 )}
               </CardTitle>
@@ -231,7 +230,7 @@ export function AddKeyPage() {
                       <Space direction="vertical">
                         {payload.verificationRelationships.map(rel => (
                           <Tag key={rel} color={rel === 'capabilityDelegation' ? 'error' : 'blue'}>
-                            {rel === 'capabilityDelegation' && <WarningOutlined />} {rel}
+                            {rel === 'capabilityDelegation' && <AlertTriangle className="h-3 w-3 mr-1" />} {rel}
                           </Tag>
                         ))}
                       </Space>
@@ -277,7 +276,7 @@ export function AddKeyPage() {
                         <Spin size="small" />
                       ) : (
                         <>
-                          <SafetyOutlined className="mr-2" />
+                          <ShieldCheck className="mr-2 h-4 w-4" />
                           {t('Authorize')}
                         </>
                       )}

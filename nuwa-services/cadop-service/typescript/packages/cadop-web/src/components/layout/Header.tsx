@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthContext';
 
 interface HeaderProps {

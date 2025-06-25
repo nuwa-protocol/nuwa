@@ -2,13 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { 
+  Button, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  Alert,
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+  Spinner 
+} from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { custodianClient } from '../lib/api/client';
-import { Spin, Alert, Tooltip, Button as AntButton } from 'antd';
-import { InfoCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
+import { Info, PlusCircle } from 'lucide-react';
 import { AgentService } from '../lib/agent/AgentService';
 
 export function DashboardPage() {
@@ -33,9 +43,16 @@ export function DashboardPage() {
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">{t('dashboard.identity.title')}</h2>
-              <Tooltip title={t('dashboard.identity.agentDidTooltip')}>
-                <InfoCircleOutlined className="text-gray-400" />
-              </Tooltip>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t('dashboard.identity.agentDidTooltip')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
             <div className="mt-4 border-t border-gray-200 pt-4">
@@ -44,9 +61,16 @@ export function DashboardPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">
                       {t('dashboard.identity.userDid')}
-                      <Tooltip title={t('dashboard.identity.userDidTooltip')}>
-                        <InfoCircleOutlined className="ml-1 text-gray-400" />
-                      </Tooltip>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="ml-1 h-4 w-4 text-gray-400" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {t('dashboard.identity.userDidTooltip')}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
                       <DIDDisplay did={userDid} />
@@ -62,28 +86,25 @@ export function DashboardPage() {
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">{t('dashboard.agent.title')}</h2>
-              <AntButton
+              <Button
                 onClick={() => navigate('/create-agent-did')}
-                icon={<PlusCircleOutlined />}
-                type="primary"
+                className="flex items-center"
               >
+                <PlusCircle className="h-4 w-4 mr-2" />
                 {t('dashboard.agent.createNew')}
-              </AntButton>
+              </Button>
             </div>
 
             {error && (
-              <Alert
-                message={t('common.error')}
-                description={error}
-                type="error"
-                closable
-                className="mb-4"
-              />
+              <Alert variant="destructive" className="mb-4">
+                <h4 className="font-medium">{t('common.error')}</h4>
+                <p>{error}</p>
+              </Alert>
             )}
 
             {loading ? (
               <div className="flex justify-center py-8">
-                <Spin size="large" />
+                <Spinner size="large" />
               </div>
             ) : agentDids.length > 0 ? (
               <div className="grid gap-4">
@@ -96,9 +117,13 @@ export function DashboardPage() {
                         </div>
                         <DIDDisplay did={did} />
                       </div>
-                      <AntButton onClick={() => navigate(`/agent/${did}`)} size="small">
+                      <Button 
+                        onClick={() => navigate(`/agent/${did}`)} 
+                        variant="outline" 
+                        size="sm"
+                      >
                         {t('dashboard.agent.manage')}
-                      </AntButton>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -106,13 +131,12 @@ export function DashboardPage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>{t('dashboard.agent.noAgents')}</p>
-                <AntButton
+                <Button
                   onClick={() => navigate('/create-agent-did')}
-                  type="primary"
                   className="mt-4"
                 >
                   {t('dashboard.agent.createFirst')}
-                </AntButton>
+                </Button>
               </div>
             )}
           </div>

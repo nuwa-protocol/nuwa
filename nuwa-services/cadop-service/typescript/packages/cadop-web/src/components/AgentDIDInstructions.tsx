@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Button, Typography, List, Tag, Space } from 'antd';
-import { InfoCircleOutlined, SecurityScanOutlined, LinkOutlined } from '@ant-design/icons';
+import { Info, ShieldCheck, Link } from 'lucide-react';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -35,7 +35,7 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
       <Card>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div style={{ textAlign: 'center' }}>
-            <InfoCircleOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
+            <Info className="w-12 h-12 text-blue-500 mb-4 mx-auto" />
             <Title level={3}>Create Your Agent DID</Title>
             <Paragraph>
               An Agent DID is your unique decentralized identity on the Rooch network. It will be
@@ -62,7 +62,7 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
 
           <Card size="small" title="Your Sybil Protection Level">
             <Space>
-              <SecurityScanOutlined />
+              <ShieldCheck className="h-4 w-4" />
               <Text>Current Level:</Text>
               <Tag color={sybilInfo.color}>{sybilInfo.text}</Tag>
               <Text type="secondary">({sybilInfo.risk})</Text>
@@ -103,7 +103,7 @@ export const AgentDIDInstructions: React.FC<AgentDIDInstructionsProps> = ({
               size="large"
               onClick={onContinue}
               disabled={userSybilLevel < 1}
-              icon={<LinkOutlined />}
+              icon={<Link className="h-4 w-4" />}
             >
               {userSybilLevel >= 1 ? 'Continue to Create' : 'Need More Verification'}
             </Button>

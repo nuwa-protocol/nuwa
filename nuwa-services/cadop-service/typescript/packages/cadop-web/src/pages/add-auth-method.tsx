@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/Input';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { custodianClient } from '../lib/api/client';
 import { DIDService } from '../lib/did/DIDService';
 import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
-import { Spin, Alert, Form, Space, Typography, Select, Radio } from 'antd';
-import { ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
+import { Form, Space, Typography, Select, Radio } from 'antd';
+import { ArrowLeft, Key } from 'lucide-react';
 import {
   MultibaseCodec,
   type OperationalKeyInfo,
@@ -17,6 +15,7 @@ import {
 } from '@nuwa-ai/identity-kit';
 import { VerificationMethodForm, VerificationMethodFormValues } from '@/components/did/VerificationMethodForm';
 import { useDIDService } from '@/hooks/useDIDService';
+import { Alert, AlertTitle, AlertDescription, Spinner, SpinnerContainer } from '@/components/ui';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -82,7 +81,7 @@ export function AddAuthMethodPage() {
       <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeftOutlined className="mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.back')}
           </Button>
 
@@ -95,13 +94,10 @@ export function AddAuthMethodPage() {
           </CardHeader>
           <CardContent>
             {(error || serviceError) && (
-              <Alert
-                message={t('common.error')}
-                description={error || serviceError}
-                type="error"
-                showIcon
-                className="mb-4"
-              />
+              <Alert variant="destructive" className="mb-4">
+                <AlertTitle>{t('common.error')}</AlertTitle>
+                <AlertDescription>{error || serviceError}</AlertDescription>
+              </Alert>
             )}
 
             <VerificationMethodForm

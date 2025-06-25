@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Alert, Spin, message, Input, Space, Button as AntButton } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { RotateCcw } from 'lucide-react';
 import {
   bufferToBase64URLString,
   base64URLStringToBuffer,
@@ -1186,7 +1185,7 @@ export function WebAuthnDebugPage() {
                       value={messageToSign}
                       onChange={e => setMessageToSign(e.target.value)}
                     />
-                    <AntButton icon={<ReloadOutlined />} onClick={generateRandomMessage} />
+                    <AntButton icon={<RotateCcw />} onClick={generateRandomMessage} />
                   </Space.Compact>
                 </div>
                 <Button onClick={handleSign} disabled={loading || !messageToSign || !did}>

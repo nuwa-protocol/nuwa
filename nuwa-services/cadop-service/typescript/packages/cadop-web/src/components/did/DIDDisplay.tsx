@@ -1,8 +1,6 @@
 import React from 'react';
 import { Copy, QrCode, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button, Badge, Card, CardContent } from '@/components/ui';
 
 interface DIDDisplayProps {
   did: string;

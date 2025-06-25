@@ -1,25 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
 import { VDRRegistry } from '@nuwa-ai/identity-kit';
-import { Spin, Alert, Tabs, Space, Typography, Tag, Modal, message } from 'antd';
+import { Alert, Tabs, Space, Typography, message } from 'antd';
 import {
-  ArrowLeftOutlined,
-  SettingOutlined,
-  KeyOutlined,
-  HistoryOutlined,
-  TeamOutlined,
-  FileTextOutlined,
-  ReloadOutlined,
-  GiftOutlined,
-} from '@ant-design/icons';
+  ArrowLeft,
+  Settings,
+  Key,
+  History,
+  Users,
+  FileText,
+  RotateCcw,
+  Gift
+} from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
+import { Modal, Spinner, SpinnerContainer, Tag } from '@/components/ui';
 
 const { TabPane } = Tabs;
 const { Title, Text, Paragraph } = Typography;
@@ -112,7 +112,7 @@ export function AgentDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Spin size="large" />
+        <Spinner size="large" />
       </div>
     );
   }
@@ -130,14 +130,14 @@ export function AgentDetailPage() {
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-4">
-            <ArrowLeftOutlined className="mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.back')}
           </Button>
 
           <div className="flex justify-between items-center">
             <Title level={2}>{t('agent.details')}</Title>
             <Button variant="outline" onClick={() => setShowDidDocument(true)}>
-              <FileTextOutlined className="mr-2" />
+              <FileText className="mr-2 h-4 w-4" />
               {t('agent.viewDidDocument')}
             </Button>
           </div>
@@ -169,14 +169,12 @@ export function AgentDetailPage() {
                   onClick={() => refetchBalances()}
                   className="h-8 w-8 p-0"
                 >
-                  <ReloadOutlined />
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent>
                 {balanceLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Spin size="small" />
-                  </div>
+                  <SpinnerContainer loading={true} size="small" />
                 ) : balances.length > 0 ? (
                   <div className="space-y-2">
                     {balances.map((bal, idx) => (
@@ -225,7 +223,7 @@ export function AgentDetailPage() {
                     return (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center mb-2">
-                          <KeyOutlined className="mr-2" />
+                          <Key className="mr-2 h-4 w-4" />
                           <Text strong className="font-mono">
                             {fragment}
                           </Text>
@@ -241,7 +239,7 @@ export function AgentDetailPage() {
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center">
-                            <TeamOutlined className="mr-2" />
+                            <Users className="mr-2 h-4 w-4" />
                             <Text type="secondary">{t('agent.capabilities')}:</Text>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -281,7 +279,7 @@ export function AgentDetailPage() {
                       onClick={() => handleClaimRgas()}
                       disabled={isClaiming || hasClaimed || !agentAddress}
                     >
-                      <GiftOutlined className="mr-2" />
+                      <Gift className="mr-2 h-4 w-4" />
                       {!agentAddress
                         ? 'Invalid Address'
                         : isClaiming
@@ -295,15 +293,15 @@ export function AgentDetailPage() {
                       variant="outline"
                       onClick={() => navigate(`/agent/${did}/add-auth-method`)}
                     >
-                      <KeyOutlined className="mr-2" />
+                      <Key className="mr-2 h-4 w-4" />
                       {t('agent.addAuthMethod')}
                     </Button>
                     <Button className="w-full" variant="outline">
-                      <SettingOutlined className="mr-2" />
+                      <Settings className="mr-2 h-4 w-4" />
                       {t('agent.manageSettings')}
                     </Button>
                     <Button className="w-full" variant="outline">
-                      <HistoryOutlined className="mr-2" />
+                      <History className="mr-2 h-4 w-4" />
                       {t('agent.viewHistory')}
                     </Button>
                   </Space>
@@ -341,8 +339,7 @@ export function AgentDetailPage() {
       <Modal
         title={t('agent.didDocument')}
         open={showDidDocument}
-        onCancel={() => setShowDidDocument(false)}
-        footer={null}
+        onClose={() => setShowDidDocument(false)}
         width={800}
       >
         <div className="bg-gray-50 p-4 rounded-lg">

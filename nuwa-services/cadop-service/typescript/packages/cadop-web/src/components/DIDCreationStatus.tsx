@@ -1,12 +1,24 @@
 import React from 'react';
-import { Card, Progress, Typography, Space, Tag, Button, Timeline } from 'antd';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  Progress,
+  Button,
+  Typography,
+  Space,
+  Tag,
+  Timeline,
+  TimelineItem
+} from '@/components/ui';
 import {
-  LoadingOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  ClockCircleOutlined,
-  RedoOutlined,
-} from '@ant-design/icons';
+  Loader,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  RotateCcw
+} from 'lucide-react';
 
 export interface DIDStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -31,11 +43,11 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
   if (!status) {
     return (
       <Card>
-        <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <ClockCircleOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
+        <CardContent className="text-center py-12">
+          <Clock className="w-12 h-12 text-amber-400 mb-4 mx-auto" />
           <Title level={4}>Waiting to Start</Title>
           <Text type="secondary">DID creation hasn't started yet</Text>
-        </div>
+        </CardContent>
       </Card>
     );
   }
@@ -43,15 +55,15 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
   const getStatusIcon = () => {
     switch (status.status) {
       case 'pending':
-        return <ClockCircleOutlined style={{ color: '#faad14' }} />;
+        return <Clock className="text-amber-400" />;
       case 'processing':
-        return <LoadingOutlined style={{ color: '#1890ff' }} />;
+        return <Loader className="text-blue-500 animate-spin" />;
       case 'completed':
-        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+        return <CheckCircle className="text-green-500" />;
       case 'failed':
-        return <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />;
+        return <AlertCircle className="text-red-500" />;
       default:
-        return <ClockCircleOutlined style={{ color: '#d9d9d9' }} />;
+        return <Clock className="text-gray-300" />;
     }
   };
 
@@ -60,11 +72,11 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
       case 'pending':
         return 'warning';
       case 'processing':
-        return 'processing';
+        return 'default';
       case 'completed':
         return 'success';
       case 'failed':
-        return 'error';
+        return 'danger';
       default:
         return 'default';
     }
@@ -104,9 +116,9 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
     {
       dot:
         status.status === 'pending' ? (
-          <LoadingOutlined />
+          <Loader className="h-4 w-4 animate-spin" />
         ) : (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircle className="h-4 w-4 text-green-500" />
         ),
       children: (
         <div>
@@ -119,11 +131,11 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
     {
       dot:
         status.status === 'processing' ? (
-          <LoadingOutlined />
+          <Loader className="h-4 w-4 animate-spin" />
         ) : status.status === 'completed' ? (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircle className="h-4 w-4 text-green-500" />
         ) : (
-          <ClockCircleOutlined style={{ color: '#d9d9d9' }} />
+          <Clock className="h-4 w-4 text-gray-300" />
         ),
       children: (
         <div>
@@ -142,9 +154,9 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
     {
       dot:
         status.status === 'completed' ? (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircle className="h-4 w-4 text-green-500" />
         ) : (
-          <ClockCircleOutlined style={{ color: '#d9d9d9' }} />
+          <Clock className="h-4 w-4 text-gray-300" />
         ),
       children: (
         <div>
@@ -160,80 +172,78 @@ export const DIDCreationStatus: React.FC<DIDCreationStatusComponentProps> = ({
 
   return (
     <Card>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>{getStatusIcon()}</div>
-          <Title level={3}>DID Creation Status</Title>
-          <Space>
-            <Text>Status:</Text>
-            <Tag color={getStatusColor()} icon={getStatusIcon()}>
-              {status.status.toUpperCase()}
-            </Tag>
-          </Space>
-        </div>
-
-        <Progress
-          percent={getProgressPercent()}
-          status={
-            status.status === 'failed'
-              ? 'exception'
-              : status.status === 'completed'
-                ? 'success'
-                : 'active'
-          }
-          strokeColor={
-            status.status === 'failed'
-              ? '#ff4d4f'
-              : status.status === 'completed'
-                ? '#52c41a'
-                : '#1890ff'
-          }
-        />
-
-        <Card size="small">
-          <Paragraph>{getStatusText()}</Paragraph>
-
-          {status.transactionHash && (
-            <div style={{ marginTop: 16 }}>
-              <Text strong>Transaction Hash:</Text>
-              <br />
-              <Text code copyable style={{ fontSize: '12px' }}>
-                {status.transactionHash}
-              </Text>
-            </div>
-          )}
-
-          {status.agentDid && (
-            <div style={{ marginTop: 16 }}>
-              <Text strong>Agent DID:</Text>
-              <br />
-              <Text code copyable style={{ fontSize: '12px' }}>
-                {status.agentDid}
-              </Text>
-            </div>
-          )}
-
-          {status.error && (
-            <div style={{ marginTop: 16 }}>
-              <Text type="danger" strong>
-                Error:
-              </Text>
-              <br />
-              <Text type="danger">{status.error}</Text>
-            </div>
-          )}
-        </Card>
-
-        <Timeline items={timelineItems} />
-
-        {status.status === 'failed' && (
-          <div style={{ textAlign: 'center' }}>
-            <Button type="primary" danger icon={<RedoOutlined />} onClick={onRetry}>
-              Retry Creation
-            </Button>
+      <CardContent>
+        <Space direction="vertical" size="large" className="w-full">
+          <div className="text-center">
+            <div className="text-5xl mb-4">{getStatusIcon()}</div>
+            <Title level={3}>DID Creation Status</Title>
+            <Space>
+              <Text>Status:</Text>
+              <Tag variant={getStatusColor()} icon={getStatusIcon()}>
+                {status.status.toUpperCase()}
+              </Tag>
+            </Space>
           </div>
-        )}
-      </Space>
+
+          <Progress
+            value={getProgressPercent()}
+            className={
+              status.status === 'failed'
+                ? 'text-destructive'
+                : status.status === 'completed'
+                  ? 'text-green-500'
+                  : 'text-blue-500'
+            }
+          />
+
+          <Card className="bg-muted">
+            <CardContent className="pt-6">
+              <Paragraph>{getStatusText()}</Paragraph>
+
+              {status.transactionHash && (
+                <div className="mt-4">
+                  <Text strong>Transaction Hash:</Text>
+                  <br />
+                  <Text code copyable className="text-xs">
+                    {status.transactionHash}
+                  </Text>
+                </div>
+              )}
+
+              {status.agentDid && (
+                <div className="mt-4">
+                  <Text strong>Agent DID:</Text>
+                  <br />
+                  <Text code copyable className="text-xs">
+                    {status.agentDid}
+                  </Text>
+                </div>
+              )}
+
+              {status.error && (
+                <div className="mt-4">
+                  <Text type="danger" strong>
+                    Error:
+                  </Text>
+                  <br />
+                  <Text type="danger">{status.error}</Text>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Timeline items={timelineItems} />
+
+          {status.status === 'failed' && (
+            <div className="text-center">
+              <Button variant="destructive" onClick={onRetry} className="flex items-center mx-auto">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Retry Creation
+              </Button>
+            </div>
+          )}
+        </Space>
+      </CardContent>
     </Card>
   );
 };
