@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../lib/auth/AuthContext';
@@ -26,29 +27,8 @@ export function DashboardPage() {
   }, [userDid]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">CADOP</h1>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={signOut}
-                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {t('dashboard.signOut')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* 用户身份信息卡片 */}
+    <MainLayout hasSidebar={false}>
+      <div className="max-w-7xl mx-auto">
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between">
@@ -137,7 +117,7 @@ export function DashboardPage() {
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </MainLayout>
   );
 }

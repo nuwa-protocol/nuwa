@@ -40,17 +40,18 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
 }) => {
   const displayDID = shortForm ? `${did.slice(0, 8)}...${did.slice(-6)}` : did;
 
-  const handleCopy = async () => {
+  const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(did);
+      await navigator.clipboard.writeText(text);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
   };
 
+
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {alias && <span className="text-sm font-medium text-gray-700">{alias}</span>}
@@ -68,7 +69,7 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             {showCopy && (
-              <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 w-8 p-0">
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(did)} className="h-8 w-8 p-0">
                 <Copy className="h-4 w-4" />
                 <span className="sr-only">Copy DID</span>
               </Button>
@@ -81,6 +82,7 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
             )}
           </div>
         </div>
+
       </CardContent>
     </Card>
   );

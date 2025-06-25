@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Button, Spin, Result, Progress } from 'antd';
+import { Button, Spin, Progress } from 'antd';
 import { AgentService } from '@/lib/agent/AgentService';
+import { DIDCreationStatus } from '@/components/DIDCreationStatus';
+import type { AgentDIDCreationStatus as DIDStatus } from '@cadop/shared';
 
 interface Props {
   userDid: string;
@@ -10,7 +12,8 @@ interface Props {
 export const CreateAgentStep: React.FC<Props> = ({ userDid, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [agentDid, setAgentDid] = useState<string | null>(null);
+  const [didStatus, setDidStatus] = useState<DIDStatus | null>(null);
+  const agentDid = didStatus?.agentDid ?? null;
 
   const handleCreate = async (interactive = true) => {
     if (loading || agentDid) return; // guard against duplicate calls
@@ -18,11 +21,9 @@ export const CreateAgentStep: React.FC<Props> = ({ userDid, onComplete }) => {
     setError(null);
     try {
       const service = new AgentService();
-      const status = await service.createAgent(interactive);
-      if (status.agentDid) {
-        setAgentDid(status.agentDid);
-        // Wait for user confirmation via Next button instead of auto continue
-      } else {
+      const statusResp = await service.createAgent(interactive);
+      setDidStatus(statusResp);
+      if (!statusResp.agentDid) {
         throw new Error('Agent creation returned no DID');
       }
     } catch (e: any) {
@@ -59,30 +60,30 @@ export const CreateAgentStep: React.FC<Props> = ({ userDid, onComplete }) => {
     const retry = () => handleCreate(true);
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Result
-          status="error"
-          title="Agent creation failed"
-          subTitle={error}
-          extra={[<Button onClick={retry}>Retry</Button>]}
+        <DIDCreationStatus
+          status={{
+            status: 'failed',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            error,
+          }}
+          onRetry={retry}
         />
       </div>
     );
   }
 
-  // Success UI – show details & Next button
-  if (agentDid) {
+  if (didStatus) {
+    const retry = () => handleCreate(true);
+    const isCompleted = didStatus.status === 'completed';
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Result
-          status="success"
-          title="Agent DID Created"
-          subTitle={agentDid}
-          extra={[
-            <Button type="primary" key="next" onClick={() => onComplete(agentDid)}>
-              Next
-            </Button>,
-          ]}
-        />
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-6">
+        <DIDCreationStatus status={didStatus} onRetry={retry} />
+        {isCompleted && agentDid && (
+          <Button type="primary" onClick={() => onComplete(agentDid)}>
+            Next
+          </Button>
+        )}
       </div>
     );
   }

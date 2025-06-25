@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -9,6 +10,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const { t, i18n } = useTranslation();
   const [isDark, setIsDark] = React.useState(false);
+  const { signOut } = useAuth();
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'en' ? 'zh' : 'en';
@@ -78,19 +80,15 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               )}
             </Button>
 
-            {/* User Menu - 可以后续添加 */}
-            <div className="relative">
-              <Button variant="ghost" size="sm" className="text-gray-500 dark:text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </Button>
-            </div>
+            {/* Sign Out */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={signOut}
+              className="text-gray-500 dark:text-gray-400"
+            >
+              {t('dashboard.signOut')}
+            </Button>
           </div>
         </div>
       </div>
