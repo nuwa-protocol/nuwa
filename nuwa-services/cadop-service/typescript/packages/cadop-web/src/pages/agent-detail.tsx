@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
-import { VDRRegistry } from '@nuwa-ai/identity-kit';
+import { useVDR } from '@/lib/identity/VDRProvider';
 import { Alert, Tabs, Space, Typography, message } from 'antd';
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ export function AgentDetailPage() {
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
   const { userDid, isAuthenticated } = useAuth();
+  const { registry, initialised } = useVDR();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
@@ -74,10 +75,10 @@ export function AgentDetailPage() {
   // ---------------------------------------------------
 
   useEffect(() => {
-    if (did) {
+    if (did && initialised) {
       loadAgentInfo();
     }
-  }, [did, userDid]);
+  }, [did, userDid, initialised]);
 
   const loadAgentInfo = async () => {
     if (!did) return;
@@ -86,8 +87,9 @@ export function AgentDetailPage() {
     setError(null);
 
     try {
-      // Resolve directly via VDR, bypassing backend cache and forcing refresh
-      const doc = await VDRRegistry.getInstance().resolveDID(did, { forceRefresh: true });
+      if (!initialised) return;
+      // Resolve via shared VDRRegistry instance (already initialised)
+      const doc = await registry.resolveDID(did, { forceRefresh: true });
 
       if (doc) {
         setDidDocument(doc);

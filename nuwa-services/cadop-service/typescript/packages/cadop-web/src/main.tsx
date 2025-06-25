@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './lib/auth/AuthContext';
+import { VDRProvider } from './lib/identity/VDRProvider';
 
 import App from './app';
 import i18n from './i18n';
@@ -25,9 +26,11 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <VDRProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </VDRProvider>
         </BrowserRouter>
       </I18nextProvider>
     </QueryClientProvider>
