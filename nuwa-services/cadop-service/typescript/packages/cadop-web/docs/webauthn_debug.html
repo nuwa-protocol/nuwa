@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WebAuthn × WebCrypto Verification Repro</title>
+    <style>
+      body { font-family: sans-serif; padding: 20px; }
+      button { margin-right: 12px; padding: 6px 12px; }
+      pre { margin-top: 20px; background: #f5f5f5; padding: 12px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h2>WebAuthn / WebCrypto Minimal Reproduction</h2>
+    <p>
+      1. Click <strong>Register Passkey</strong> to create a new credential on this origin.<br />
+      2. Click <strong>Sign &amp; Verify</strong> to obtain an assertion, then verify it twice:<br />
+      &nbsp;&nbsp;• <strong>WebCrypto.verify</strong> (native)<br />
+      &nbsp;&nbsp;• <strong>@noble/curves p256.verify</strong> (JS implementation)<br />
+      The log below shows both results so you can observe the mismatch.
+    </p>
+
+    <button id="register">Register Passkey</button>
+    <button id="sign">Sign &amp; Verify</button>
+    <pre id="log"></pre>
+
+    <!-- ESM build of @noble/curves -->
+    <script type="module">
+      // Use esm.sh CDN for proper ESM export of p256
+      import { p256 } from 'https://esm.sh/@noble/curves@1.4.0/p256';
+
+      // ---------- helpers ----------
+      const $ = id => /** @type {HTMLElement} */ (document.getElementById(id));
+      const log = (...args) => {
+        console.log(...args);
+        $('log').textContent += args.join(' ') + '\n';
+      };
+      const toB64Url = bytes =>
+        btoa(String.fromCharCode(...bytes))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+      let credentialId; // ArrayBuffer
+      /** @type {Uint8Array|undefined} */
+      let publicKeyU;   // 65-byte uncompressed key (0x04 | X | Y)
+
+      // ---------- registration ----------
+      $('register').addEventListener('click', async () => {
+        try {
+          const userId = crypto.getRandomValues(new Uint8Array(16));
+          const cred = /** @type {PublicKeyCredential} */ (
+            await navigator.credentials.create({
+              publicKey: {
+                rp: { id: location.hostname, name: 'Demo' },
+                user: { id: userId, name: 'demo', displayName: 'demo' },
+                challenge: crypto.getRandomValues(new Uint8Array(32)),
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }], // ES256
+              },
+            })
+          );
+
+          credentialId = cred.rawId;
+
+          // ---- obtain public key (requires modern browser) ----
+          if (typeof cred.response.getPublicKey !== 'function') {
+            throw new Error('Browser does not support CredentialResponse.getPublicKey');
+          }
+          const spki = new Uint8Array(cred.response.getPublicKey());
+
+          // Extract uncompressed EC public key (0x04 | X32 | Y32) from SPKI
+          const idx = spki.indexOf(0x04);
+          if (idx === -1 || idx + 65 > spki.length) {
+            throw new Error('Uncompressed P-256 key not found in SPKI');
+          }
+          publicKeyU = spki.slice(idx, idx + 65);
+
+          log('✅ Registration succeeded. Now click "Sign & Verify".');
+        } catch (e) {
+          console.error(e);
+          log('Registration error:', e.message || e);
+        }
+      });
+
+      // ---------- signing & verification ----------
+      $('sign').addEventListener('click', async () => {
+        if (!credentialId) return log('⚠️  Please register first.');
+        try {
+          const challenge = crypto.getRandomValues(new Uint8Array(32));
+          const assertion = /** @type {PublicKeyCredential} */ (
+            await navigator.credentials.get({
+              publicKey: {
+                challenge,
+                rpId: location.hostname,
+                allowCredentials: [{ id: credentialId, type: 'public-key' }],
+              },
+            })
+          );
+
+          const res = /** @type {AuthenticatorAssertionResponse} */ (assertion.response);
+          const authData = new Uint8Array(res.authenticatorData);
+          const clientData = new Uint8Array(res.clientDataJSON);
+          const clientHash = new Uint8Array(await crypto.subtle.digest('SHA-256', clientData));
+          const msg = new Uint8Array(authData.length + clientHash.length);
+          msg.set(authData);
+          msg.set(clientHash, authData.length);
+
+          // ---- WebCrypto verification ----
+          const key = await crypto.subtle.importKey('raw', publicKeyU, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+          const sigDER = new Uint8Array(res.signature);
+          const sigRaw = p256.Signature.fromDER(sigDER).toCompactRawBytes();
+
+          const okWebCryptoRaw = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, sigRaw, msg);
+          log('WebCrypto.verify (raw) =>', okWebCryptoRaw);
+          
+          const okWebCryptoDER = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, sigDER, msg);
+          log('WebCrypto.verify (DER) =>', okWebCryptoDER);
+
+          // ---- Noble verification ----
+          
+          const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', msg));
+          const okNoble = p256.verify(sigRaw, digest, publicKeyU);
+          log('noble p256.verify =>', okNoble);
+        } catch (e) {
+          console.error(e);
+          log('Signing error:', e.message || e);
+        }
+      });
+    </script>
+  </body>
+</html> 
