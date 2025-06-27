@@ -121,9 +121,13 @@ interface CallbackResult {
 function waitForCallback(expectedState: string): Promise<CallbackResult> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      const reqUrl = new URL(req.url || "", `http://localhost:${REDIRECT_PORT}`);
+      if (reqUrl.pathname !== "/callback") {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not Found");
+        return; // ignore unrelated paths
+      }
       try {
-        const reqUrl = new URL(req.url || "", `http://localhost:${REDIRECT_PORT}`);
-        if (reqUrl.pathname !== "/callback") return; // ignore unrelated paths
         const params = reqUrl.searchParams;
         const state = params.get("state") || undefined;
         const success = params.get("success") === "1";
