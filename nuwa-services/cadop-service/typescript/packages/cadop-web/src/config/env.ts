@@ -71,4 +71,16 @@ function buildConfig(): AppEnvConfig {
 const CONFIG = buildConfig();
 
 export const ROOCH_RPC_URL = CONFIG.roochRpcUrl;
-export const API_URL = CONFIG.apiUrl; 
+export const API_URL = CONFIG.apiUrl;
+
+// ---------------- RoochScan helpers ----------------
+const ROOCH_SCAN_BASE = CONFIG.roochRpcUrl.includes('test')
+  ? 'https://test.roochscan.io'
+  : 'https://roochscan.io';
+
+/**
+ * Build a RoochScan account URL for given Rooch address.
+ */
+export function buildRoochScanAccountUrl(address: string): string {
+  return `${ROOCH_SCAN_BASE}/account/${address}`;
+}

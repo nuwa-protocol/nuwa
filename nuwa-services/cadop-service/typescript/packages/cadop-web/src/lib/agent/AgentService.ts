@@ -2,7 +2,7 @@ import { apiClient } from '../api/client';
 import { PasskeyService } from '../passkey/PasskeyService';
 import { custodianClient } from '../api/client';
 import type { AgentDIDCreationStatus, ChallengeResponse } from '@cadop/shared';
-import { UserStore } from '../storage';
+import { UserStore, AuthStore } from '../storage';
 import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
 
 function decodeJWT(jwt: string): any | null {
@@ -31,12 +31,15 @@ export class AgentService {
     return UserStore.listAgents(userDid);
   }
 
-  public async getIdToken(): Promise<string> {
+  public async getIdToken(interactive = false): Promise<string> {
     // We no longer cache idToken as per design doc
     // Always request a fresh token
 
     // ensure we have userDid
-    const userDid = await this.passkeyService.ensureUser();
+    const userDid = AuthStore.getCurrentUserDid();
+    if (!userDid) {
+      throw new Error('User did not exist');
+    }
 
     // step 1: get challenge
     const challengeResp = await apiClient.get<ChallengeResponse>('/api/idp/challenge');
@@ -51,6 +54,7 @@ export class AgentService {
         await this.passkeyService.authenticateWithChallenge({
           challenge,
           rpId,
+          mediation: interactive ? 'required' : 'silent',
         });
 
       // step 3: send assertion to server to verify
@@ -70,9 +74,12 @@ export class AgentService {
     }
   }
 
-  public async createAgent(): Promise<AgentDIDCreationStatus> {
-    const idToken = await this.getIdToken();
-    const userDid = await this.passkeyService.ensureUser();
+  public async createAgent(interactive = false): Promise<AgentDIDCreationStatus> {
+    const idToken = await this.getIdToken(interactive);
+    const userDid = AuthStore.getCurrentUserDid();
+    if (!userDid) {
+      throw new Error('User did not exist');
+    }
 
     const resp = await custodianClient.mint({ idToken, userDid });
     if (!resp.data) throw new Error(String(resp.error || 'Mint failed'));

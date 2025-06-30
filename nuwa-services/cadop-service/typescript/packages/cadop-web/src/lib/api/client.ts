@@ -6,7 +6,6 @@
 
 import type { APIResponse, AgentDIDCreationStatus } from '@cadop/shared';
 import { createErrorResponse } from '@cadop/shared';
-import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../../config/env';
 import type { DIDDocument } from '@nuwa-ai/identity-kit';
 
@@ -164,52 +163,6 @@ export class CustodianAPIClient {
     return this.apiClient.post('/api/custodian/mint', params);
   }
 
-  /**
-   * Get DID creation status by record ID
-   */
-  async getStatus(recordId: string): Promise<APIResponse<AgentDIDCreationStatus>> {
-    return this.apiClient.get(`/api/custodian/status/${recordId}`);
-  }
-
-  /**
-   * Get all Agent DIDs for a user
-   */
-  async getUserAgentDIDs(userDid: string): Promise<APIResponse<{ dids: string[] }>> {
-    return this.apiClient.get(`/api/custodian/user/${userDid}/dids`);
-  }
-
-  /**
-   * Resolve Agent DID document
-   */
-  async resolveAgentDID(agentDid: string): Promise<APIResponse<DIDDocument>> {
-    return this.apiClient.get(`/api/custodian/resolve/${agentDid}`);
-  }
-
-  /**
-   * Check if Agent DID exists
-   */
-  async agentDIDExists(agentDid: string): Promise<APIResponse<{ exists: boolean }>> {
-    return this.apiClient.get(`/api/custodian/exists/${agentDid}`);
-  }
-
-  /**
-   * Get detailed information about an Agent DID
-   */
-  async getAgentInfo(agentDid: string): Promise<
-    APIResponse<{
-      did: string;
-      sybilLevel: number;
-      verificationMethods: string[];
-      createdAt: string;
-      status: 'active' | 'pending' | 'inactive';
-      capabilities: {
-        canCreateSubAgents: boolean;
-        canManageCredentials: boolean;
-      };
-    }>
-  > {
-    return this.apiClient.get(`/api/custodian/agent/${agentDid}`);
-  }
 }
 
 export const apiClient = APIClient.getInstance();

@@ -5,7 +5,7 @@ import {
   VerificationMethod,
   VerificationRelationship,
   DIDCreationRequest,
-} from '../../src/types';
+} from '../../src/index';
 import {
   createTestDIDDocument,
   createTestVerificationMethod,

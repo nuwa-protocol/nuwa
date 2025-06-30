@@ -4,7 +4,7 @@ This directory contains implementations of the VDR (Verifiable Data Registry) in
 
 ## Overview
 
-The VDR system provides a unified way to interact with different DID methods, allowing NuwaIdentityKit to support multiple DID methods through a consistent interface.
+The VDR system provides a unified way to interact with different DID methods, allowing IdentityKit to support multiple DID methods through a consistent interface.
 
 ## Available VDR Implementations
 
@@ -24,10 +24,10 @@ In the Rooch DID system, all on-chain operations (such as adding/removing verifi
 
 ## How to Use
 
-### Basic Usage with NuwaIdentityKit
+### Basic Usage with IdentityKit
 
 ```typescript
-import { NuwaIdentityKit } from '../index';
+import { IdentityKit } from '../index';
 import { createDefaultVDRs } from './index';
 import { DIDDocument } from '../types'; // Assuming DIDDocument is needed for agent construction
 
@@ -37,8 +37,8 @@ const didDocument: DIDDocument = { /* ... your agent's initial DID Document ... 
 // Create default VDRs for 'key' and 'rooch' methods
 const vdrs = createDefaultVDRs();
 
-// Create a NuwaIdentityKit instance with VDRs
-const kit = new NuwaIdentityKit(didDocument, { vdrs });
+// Create a IdentityKit instance with VDRs
+const kit = new IdentityKit(didDocument, { vdrs });
 
 // Resolve a DID using the registered VDRs
 const resolvedDoc = await kit.resolveDID('did:rooch:rooch1z0en78drsglz5wkw9ze85zd4sfu2d0kyg6y5rph7z4k5fn9lzw8qkccsg3');
@@ -62,7 +62,7 @@ To create a custom VDR implementation:
 
 1.  Extend the `AbstractVDR` class (see `abstractVDR.ts`).
 2.  Implement the methods from the `VDRInterface` (see below), primarily `create` (and `createViaCADOP` if applicable) for DID generation, and `resolve` for fetching DID documents. Implement update methods (`addVerificationMethod`, etc.) as needed by your VDR.
-3.  Register your custom VDR with `NuwaIdentityKit`.
+3.  Register your custom VDR with `IdentityKit`.
 
 For detailed implementation guidance, **refer to the `AbstractVDR.ts` class and existing implementations like `RoochVDR.ts` and `KeyVDR.ts`**. These files provide concrete examples of method implementations, option handling, and error management.
 

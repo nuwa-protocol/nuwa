@@ -1,16 +1,11 @@
-import { CreateAgentDIDRequest, AgentDIDCreationStatus, IDToken } from '@cadop/shared';
+import { CreateAgentDIDRequest, AgentDIDCreationStatus } from '@cadop/shared';
 import {
   VDRRegistry,
-  NuwaIdentityKit,
-  CadopIdentityKit,
   DIDDocument,
-  ServiceEndpoint,
-  VDRInterface,
-  createVDR,
-  LocalSigner,
+  CadopIdentityKit,
 } from '@nuwa-ai/identity-kit';
 import { logger } from '../utils/logger.js';
-import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
+import crypto from 'crypto';
 
 import jwt from 'jsonwebtoken';
 

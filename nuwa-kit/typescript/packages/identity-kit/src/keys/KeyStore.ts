@@ -1,4 +1,4 @@
-import { KeyType } from '../types';
+import { KeyType } from '../types/crypto';
 
 /**
  * Represents a stored cryptographic key with its metadata
@@ -26,26 +26,26 @@ export interface KeyStore {
    * @returns Promise resolving to array of key IDs
    */
   listKeyIds(): Promise<string[]>;
-  
+
   /**
    * Load a key by its ID
    * @param keyId Optional key ID to load (if omitted, may return a default key)
    * @returns Promise resolving to the stored key or null if not found
    */
   load(keyId?: string): Promise<StoredKey | null>;
-  
+
   /**
    * Save a key to storage
    * @param key The key to save
    */
   save(key: StoredKey): Promise<void>;
-  
+
   /**
    * Clear a specific key or all keys
    * @param keyId Optional key ID to clear (if omitted, clears all keys)
    */
   clear(keyId?: string): Promise<void>;
-  
+
   /**
    * Optional: Sign data directly using the specified key
    * Implementations for WebAuthn or non-extractable CryptoKeys should provide this
@@ -62,14 +62,14 @@ export interface KeyStore {
  */
 export class MemoryKeyStore implements KeyStore {
   private map = new Map<string, StoredKey>();
-  
+
   /**
    * List all available key IDs in this store
    */
   async listKeyIds(): Promise<string[]> {
     return Array.from(this.map.keys());
   }
-  
+
   /**
    * Load a key by its ID
    * @param keyId Key ID to load
@@ -82,7 +82,7 @@ export class MemoryKeyStore implements KeyStore {
     }
     return this.map.get(keyId) || null;
   }
-  
+
   /**
    * Save a key to in-memory storage
    * @param key The key to save
@@ -90,7 +90,7 @@ export class MemoryKeyStore implements KeyStore {
   async save(key: StoredKey): Promise<void> {
     this.map.set(key.keyId, key);
   }
-  
+
   /**
    * Clear a specific key or all keys
    * @param keyId Optional key ID to clear (if omitted, clears all keys)
@@ -104,4 +104,4 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   // No sign implementation for MemoryKeyStore; relies on plaintext extraction.
-} 
+}

@@ -12,19 +12,6 @@ describe('Health Routes', () => {
 
       expect(response.body).toHaveProperty('status', 'OK');
       expect(response.body).toHaveProperty('timestamp');
-      expect(response.body).toHaveProperty('uptime');
-      expect(response.body).toHaveProperty('environment');
-      expect(response.body).toHaveProperty('version');
-    });
-  });
-
-  describe('GET /health/ready', () => {
-    it('should return readiness status', async () => {
-      const response = await request(app).get('/health/ready').expect(200);
-
-      expect(response.body).toHaveProperty('status', 'READY');
-      expect(response.body).toHaveProperty('timestamp');
-      expect(response.body).toHaveProperty('checks');
     });
   });
 

@@ -1,7 +1,7 @@
-import { VDRInterface } from '../types';
+import { VDRInterface } from './types';
 import { KeyVDR } from './keyVDR';
 import { RoochVDR } from './roochVDR';
-import { VDRRegistry } from '../VDRRegistry';
+import { VDRRegistry } from './VDRRegistry';
 
 /**
  * Factory function to create a VDR instance based on the DID method
@@ -61,6 +61,8 @@ export function initRoochVDR(
 }
 
 // Export VDR implementations
+export * from './types';
 export * from './keyVDR';
 export * from './abstractVDR';
 export * from './roochVDR';
+export * from './VDRRegistry';

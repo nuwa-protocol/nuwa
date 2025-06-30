@@ -1,8 +1,15 @@
-import { SignerInterface, KeyType } from '../types';
+import { SignerInterface } from '../signers/types';
+import { KeyType, roochSignatureSchemeToKeyType } from '../types/crypto';
+import { CryptoUtils } from '../crypto';
 import { KeyStore, StoredKey, MemoryKeyStore } from './KeyStore';
-import { KeyStoreSigner } from '../signers/KeyStoreSigner';
-import { CryptoUtils } from '../cryptoUtils';
-import { BaseMultibaseCodec } from '../multibase';
+import {
+  signWithKeyStore,
+  canSignWithKeyStore,
+  getKeyInfoFromKeyStore,
+} from '../signers/keyStoreUtils';
+import { MultibaseCodec, KeyMultibaseCodec } from '../multibase';
+import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
+import { getDidWithoutFragment } from '../utils/did';
 
 /**
  * Options for initializing a KeyManager
@@ -22,7 +29,6 @@ export interface KeyManagerOptions {
  */
 export class KeyManager implements SignerInterface {
   private store: KeyStore;
-  private signer: KeyStoreSigner;
   private defaultKeyType: KeyType;
   private did?: string;
 
@@ -33,8 +39,7 @@ export class KeyManager implements SignerInterface {
   constructor(options?: KeyManagerOptions) {
     this.store = options?.store || new MemoryKeyStore();
     this.did = options?.did;
-    this.signer = new KeyStoreSigner(this.store, this.did);
-    this.defaultKeyType = options?.defaultKeyType || 'Ed25519VerificationKey2020';
+    this.defaultKeyType = options?.defaultKeyType || KeyType.ED25519;
   }
 
   /**
@@ -47,18 +52,18 @@ export class KeyManager implements SignerInterface {
     if (!this.did) {
       throw new Error('DID must be set before generating keys');
     }
-    
+
     const type = keyType || this.defaultKeyType;
     const keyPair = await CryptoUtils.generateKeyPair(type);
-    
+
     // Create a key ID with the provided fragment or a timestamp
     const keyFragment = fragment || `key-${Date.now()}`;
     const keyId = `${this.did}#${keyFragment}`;
-    
+
     // Encode the keys
-    const publicKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.publicKey);
-    const privateKeyEncoded = BaseMultibaseCodec.encodeBase58btc(keyPair.privateKey);
-    
+    const publicKeyEncoded = MultibaseCodec.encodeBase58btc(keyPair.publicKey);
+    const privateKeyEncoded = MultibaseCodec.encodeBase58btc(keyPair.privateKey);
+
     // Create the stored key
     const storedKey: StoredKey = {
       keyId,
@@ -66,10 +71,10 @@ export class KeyManager implements SignerInterface {
       publicKeyMultibase: publicKeyEncoded,
       privateKeyMultibase: privateKeyEncoded,
     };
-    
+
     // Save to the store
     await this.store.save(storedKey);
-    
+
     return storedKey;
   }
 
@@ -78,7 +83,7 @@ export class KeyManager implements SignerInterface {
    * @param key The key to import
    */
   async importKey(key: StoredKey): Promise<void> {
-    const didFromKey = key.keyId.split('#')[0];
+    const didFromKey = getDidWithoutFragment(key.keyId);
 
     if (this.did && didFromKey !== this.did) {
       throw new Error(`Key belongs to a different DID: ${didFromKey}`);
@@ -86,9 +91,8 @@ export class KeyManager implements SignerInterface {
 
     if (!this.did) {
       this.did = didFromKey;
-      this.signer.setDid(this.did);
     }
-    
+
     await this.store.save(key);
   }
 
@@ -104,7 +108,7 @@ export class KeyManager implements SignerInterface {
    * List all available key IDs
    */
   async listKeyIds(): Promise<string[]> {
-    return this.signer.listKeyIds();
+    return this.store.listKeyIds();
   }
 
   /**
@@ -122,7 +126,6 @@ export class KeyManager implements SignerInterface {
    */
   setDid(did: string): void {
     this.did = did;
-    this.signer.setDid(did);
   }
 
   /**
@@ -135,8 +138,7 @@ export class KeyManager implements SignerInterface {
     // Attempt to derive from stored keys
     const keyIds = await this.listKeyIds();
     if (keyIds.length > 0) {
-      this.did = keyIds[0].split('#')[0];
-      this.signer.setDid(this.did);
+      this.did = getDidWithoutFragment(keyIds[0]);
       return this.did;
     }
 
@@ -151,7 +153,7 @@ export class KeyManager implements SignerInterface {
    * @returns The signature
    */
   async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
-    return this.signer.signWithKeyId(data, keyId);
+    return signWithKeyStore(this.store, data, keyId);
   }
 
   /**
@@ -160,7 +162,7 @@ export class KeyManager implements SignerInterface {
    * @returns True if the key exists and can be used for signing
    */
   async canSignWithKeyId(keyId: string): Promise<boolean> {
-    return this.signer.canSignWithKeyId(keyId);
+    return canSignWithKeyStore(this.store, keyId);
   }
 
   /**
@@ -169,7 +171,7 @@ export class KeyManager implements SignerInterface {
    * @returns Key information or undefined if not found
    */
   async getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined> {
-    return this.signer.getKeyInfo(keyId);
+    return getKeyInfoFromKeyStore(this.store, keyId);
   }
 
   /**
@@ -179,14 +181,14 @@ export class KeyManager implements SignerInterface {
    */
   async findKeyByType(keyType: KeyType): Promise<string | undefined> {
     const keyIds = await this.listKeyIds();
-    
+
     for (const keyId of keyIds) {
       const key = await this.getStoredKey(keyId);
       if (key && key.keyType === keyType) {
         return keyId;
       }
     }
-    
+
     return undefined;
   }
 
@@ -197,4 +199,83 @@ export class KeyManager implements SignerInterface {
   getStore(): KeyStore {
     return this.store;
   }
-} 
+
+  /** Create an empty KeyManager instance and bind DID */
+  static createEmpty(did: string, store: KeyStore = new MemoryKeyStore()): KeyManager {
+    const km = new KeyManager({ store });
+    km.setDid(did);
+    return km;
+  }
+
+  /** Create KeyManager and immediately generate a key */
+  static async createWithNewKey(
+    did: string,
+    fragment = `key-${Date.now()}`,
+    type: KeyType = KeyType.ED25519,
+    store: KeyStore = new MemoryKeyStore()
+  ): Promise<{ keyManager: KeyManager; keyId: string }> {
+    const km = KeyManager.createEmpty(did, store);
+    const stored = await km.generateKey(fragment, type);
+    return { keyManager: km, keyId: stored.keyId };
+  }
+
+  /** Create KeyManager and import existing key pair */
+  static async createWithKeyPair(
+    did: string,
+    keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
+    fragment = 'account-key',
+    type: KeyType = KeyType.ED25519,
+    store: KeyStore = new MemoryKeyStore()
+  ): Promise<{ keyManager: KeyManager; keyId: string }> {
+    const km = KeyManager.createEmpty(did, store);
+    const keyId = await km.importKeyPair(fragment, keyPair, type);
+    return { keyManager: km, keyId };
+  }
+
+  /** Utility: generate did:key + master key */
+  static async createWithDidKey(): Promise<{ keyManager: KeyManager; keyId: string; did: string }> {
+    const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+    const publicKeyMultibase = KeyMultibaseCodec.encodeWithType(publicKey, KeyType.ED25519);
+    const didKey = `did:key:${publicKeyMultibase}`;
+    const km = KeyManager.createEmpty(didKey);
+    const keyId = await km.importKeyPair('account-key', { privateKey, publicKey }, KeyType.ED25519);
+    return { keyManager: km, keyId, did: didKey };
+  }
+
+  /** Instance helper: import raw key pair (Uint8Array) */
+  async importKeyPair(
+    fragment: string,
+    keyPair: { privateKey: Uint8Array; publicKey: Uint8Array },
+    type: KeyType = KeyType.ED25519
+  ): Promise<string> {
+    const did = await this.getDid();
+    const keyId = `${did}#${fragment}`;
+
+    if (await this.getKeyInfo(keyId)) {
+      throw new Error(`Key ID ${keyId} already exists in store`);
+    }
+
+    await this.importKey({
+      keyId,
+      keyType: type,
+      publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
+      privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
+    });
+
+    return keyId;
+  }
+
+  /** Instance helper: import Rooch Keypair */
+  async importRoochKeyPair(fragment: string, roochKeyPair: Keypair): Promise<string> {
+    const { secretKey, schema } = decodeRoochSercetKey(roochKeyPair.getSecretKey());
+    const keyType: KeyType = roochSignatureSchemeToKeyType(schema);
+    return this.importKeyPair(
+      fragment,
+      {
+        privateKey: secretKey,
+        publicKey: roochKeyPair.getPublicKey().toBytes(),
+      },
+      keyType
+    );
+  }
+}

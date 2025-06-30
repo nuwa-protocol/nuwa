@@ -4,4 +4,4 @@
  */
 
 export * from './KeyStore';
-export * from './KeyManager'; 
+export * from './KeyManager';

@@ -63,19 +63,37 @@ export class IdpService {
    * Issue ID token
    */
   private issueIdToken(userDid: string, nonce: string): VerifyResponse {
+    const idToken = IdpService.buildIdToken(
+      userDid,
+      nonce,
+      this.config.cadopDid,
+      this.config.signingKey,
+    );
+    return { idToken };
+  }
+
+  /**
+   * Helper: build a valid ID-Token (JWT) outside of IdpService instance, mainly for testing.
+   */
+  public static buildIdToken(
+    userDid: string,
+    nonce: string,
+    cadopDid: string,
+    signingKey: string,
+    expiresInSec: number = 3600
+  ): string {
     const now = Math.floor(Date.now() / 1000);
     const payload = {
-      iss: this.config.cadopDid,
+      iss: cadopDid,
       sub: userDid,
-      aud: this.config.cadopDid,
-      exp: now + 3600,
+      aud: cadopDid,
+      exp: now + expiresInSec,
       iat: now,
       jti: randomUUID(),
       nonce,
     };
 
-    const idToken = jwt.sign(payload, this.config.signingKey);
-    return { idToken };
+    return jwt.sign(payload, signingKey);
   }
 
   /**

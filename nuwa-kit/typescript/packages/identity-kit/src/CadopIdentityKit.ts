@@ -1,14 +1,9 @@
-import {
-  ServiceEndpoint,
-  DIDDocument,
-  CADOPCreationRequest,
-  DIDCreationResult,
-  SignerInterface,
-  ServiceInfo,
-  VerificationRelationship,
-} from './types';
-import { VDRRegistry } from './VDRRegistry';
-import { NuwaIdentityKit } from './NuwaIdentityKit';
+import { ServiceEndpoint, DIDDocument, ServiceInfo, VerificationRelationship } from './types/did';
+import { SignerInterface } from './signers/types';
+import { CADOPCreationRequest, DIDCreationResult } from './vdr/types';
+import { VDRRegistry } from './vdr/VDRRegistry';
+import { IdentityKit } from './IdentityKit';
+import { DebugLogger } from './utils/DebugLogger';
 
 /**
  * CADOP service types
@@ -64,9 +59,9 @@ export class CadopIdentityKit {
     },
   };
 
-  private nuwaKit: NuwaIdentityKit;
+  private nuwaKit: IdentityKit;
 
-  private constructor(nuwaKit: NuwaIdentityKit) {
+  private constructor(nuwaKit: IdentityKit) {
     this.nuwaKit = nuwaKit;
   }
 
@@ -74,7 +69,8 @@ export class CadopIdentityKit {
     const custodianServices = this.findServicesByType(CadopServiceType.CUSTODIAN);
     if (custodianServices.length > 0) {
       const custodianService = custodianServices[0];
-      console.log('extractCustodianInfo', custodianService);
+      const logger = DebugLogger.get('CadopIdentityKit');
+      logger.debug('extractCustodianInfo', custodianService);
       return custodianService;
     }
     throw new Error('Custodian service not found in service document');
@@ -87,7 +83,7 @@ export class CadopIdentityKit {
     serviceDid: string,
     signer: SignerInterface
   ): Promise<CadopIdentityKit> {
-    const nuwaKit = await NuwaIdentityKit.fromExistingDID(serviceDid, signer);
+    const nuwaKit = await IdentityKit.fromExistingDID(serviceDid, signer);
     return new CadopIdentityKit(nuwaKit);
   }
 
@@ -170,9 +166,9 @@ export class CadopIdentityKit {
   }
 
   /**
-   * Get the underlying NuwaIdentityKit instance
+   * Get the underlying IdentityKit instance
    */
-  getNuwaIdentityKit(): NuwaIdentityKit {
+  getNuwaIdentityKit(): IdentityKit {
     return this.nuwaKit;
   }
 

@@ -6,8 +6,8 @@ export * from './keystore';
 // DeepLink
 export * from './deeplink';
 
-// NuwaIdentityKitWeb
-export { NuwaIdentityKitWeb } from './NuwaIdentityKitWeb';
+// IdentityKitWeb
+export { IdentityKitWeb } from './IdentityKitWeb';
 
 // React hooks (optional)
 export * from './react';

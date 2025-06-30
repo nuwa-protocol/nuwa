@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { KeyMultibaseCodec, BaseMultibaseCodec } from '../../src/multibase';
+import { KeyMultibaseCodec, MultibaseCodec } from '../../src/multibase';
 import { KEY_TYPE } from '../../src/types';
 import { Bytes } from '../../src/utils/bytes';
 
@@ -68,7 +68,7 @@ describe('KeyMultibaseCodec', () => {
       testKey[0] = 0xff; // Invalid prefix
       testKey[1] = 0xff; // Invalid prefix
       testKey.set(new Uint8Array(32).fill(1), 2); // Valid key data
-      const encoded = BaseMultibaseCodec.encodeBase58btc(testKey);
+      const encoded = MultibaseCodec.encodeBase58btc(testKey);
 
       expect(() => {
         KeyMultibaseCodec.decodeWithType(encoded);

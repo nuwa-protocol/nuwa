@@ -1,4 +1,4 @@
-import { KeyType } from '../types';
+import { KeyType } from '../types/crypto';
 
 /**
  * Interface for key pair generation and cryptographic operations

@@ -8,8 +8,8 @@ Web extensions for Nuwa Identity Kit, providing browser-friendly implementations
   - `LocalStorageKeyStore` - Uses browser's localStorage for key storage
   - `IndexedDBKeyStore` - Uses IndexedDB for key storage, supports CryptoKey objects
 - `DeepLinkManager` - Manages deep link authentication flow
-- `NuwaIdentityKitWeb` - High-level API for web applications
-- React hooks (optional) - `useNuwaIdentityKit` hook for React applications
+- `IdentityKitWeb` - High-level API for web applications
+- React hooks (optional) - `useIdentityKit` hook for React applications
 
 ## Installation
 
@@ -22,10 +22,10 @@ npm install @nuwa-ai/identity-kit-web
 ### Basic Usage
 
 ```typescript
-import { NuwaIdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 
 // Initialize the SDK
-const nuwa = await NuwaIdentityKitWeb.init();
+const nuwa = await IdentityKitWeb.init();
 
 // Connect to Cadop
 await nuwa.connect();
@@ -46,10 +46,10 @@ await nuwa.logout();
 ### React Hook
 
 ```tsx
-import { useNuwaIdentityKit } from '@nuwa-ai/identity-kit-web';
+import { useIdentityKit } from '@nuwa-ai/identity-kit-web';
 
 function MyComponent() {
-  const { state, connect, sign, verify, logout } = useNuwaIdentityKit();
+  const { state, connect, sign, verify, logout } = useIdentityKit();
 
   if (state.isConnecting) {
     return <div>Connecting...</div>;
@@ -72,7 +72,7 @@ function MyComponent() {
 
 ```typescript
 import { 
-  NuwaIdentityKitWeb, 
+  IdentityKitWeb, 
   IndexedDBKeyStore, 
   KeyManager 
 } from '@nuwa-ai/identity-kit-web';
@@ -84,7 +84,7 @@ const store = new IndexedDBKeyStore();
 const keyManager = new KeyManager({ store });
 
 // Initialize SDK with custom components
-const nuwa = await NuwaIdentityKitWeb.init({
+const nuwa = await IdentityKitWeb.init({
   cadopDomain: 'https://my-cadop-instance.com',
   keyManager
 });

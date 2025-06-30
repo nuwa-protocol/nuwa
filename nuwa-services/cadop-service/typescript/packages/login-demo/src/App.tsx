@@ -3,7 +3,7 @@ import { Home } from './pages/Home';
 import { Callback } from './pages/Callback';
 import './styles.css';
 import { createContext, useContext, ReactNode } from 'react';
-import { useNuwaIdentityKit, IdentityKitHook } from '@nuwa-ai/identity-kit-web';
+import { useIdentityKit, IdentityKitHook } from '@nuwa-ai/identity-kit-web';
 import { getCadopDomain } from './pages/Home';
 
 // Create a context for the auth state and methods
@@ -20,7 +20,7 @@ export function useAuth(): IdentityKitHook {
 
 // Auth Provider component
 function AuthProvider({ children }: { children: ReactNode }) {
-  const auth = useNuwaIdentityKit({
+  const auth = useIdentityKit({
     appName: 'Nuwa Login Demo',
     cadopDomain: getCadopDomain(),
     storage: 'local',

@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/identity-kit-web",
-  "version": "0.1.0-beta.11",
+  "version": "0.2.2",
   "description": "Web extensions for Nuwa Identity Kit",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,10 +20,10 @@
     "did",
     "web"
   ],
-  "author": "Nuwa Team",
-  "license": "MIT",
+  "author": "Nuwa Community",
+  "license": "Apache-2.0",
   "dependencies": {
-    "@nuwa-ai/identity-kit": "0.1.0-beta.10"
+    "@nuwa-ai/identity-kit": "workspace:*"
   },
   "peerDependencies": {
     "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
@@ -41,4 +41,4 @@
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
   }
-} 
+}

@@ -59,7 +59,3 @@ examples/
 contracts/
 agents/deps/
 deps/
-
-# Keep only necessary parts
-!nuwa-services/cadop-service/typescript/
-!nuwa-kit/typescript/packages/nuwa-identity-kit/ 

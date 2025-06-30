@@ -9,8 +9,17 @@ import {
 } from '@simplewebauthn/types';
 import { bufferToBase64URLString } from '@simplewebauthn/browser';
 import { Base64 } from 'js-base64';
-import { DidKeyCodec, KeyType, KEY_TYPE, algorithmToKeyType as algo2key } from '@nuwa-ai/identity-kit';
+import {
+  DidKeyCodec,
+  KeyType,
+  KEY_TYPE,
+  algorithmToKeyType as algo2key,
+} from '@nuwa-ai/identity-kit';
 import { AuthStore, UserStore } from '../storage';
+
+// Global session flag to avoid multiple register() calls leading to duplicate
+// navigator.credentials.create() prompts (e.g., QR code popup on some platforms).
+let passkeyAlreadyRegisteredThisSession = false;
 
 // Utils
 function arrayBufferToBase64URL(buffer: ArrayBuffer): string {
@@ -66,7 +75,13 @@ export class PasskeyService {
     const existing = this.getUserDid();
     if (existing) return existing;
 
-    // If none exists, create new Passkey
+    if (passkeyAlreadyRegisteredThisSession) {
+      // Prevent re-invoking navigator.credentials.create which could trigger a
+      // second QR/passkey dialog in the same tab. Throw so caller can handle.
+      throw new Error('Passkey has already been registered in this session');
+    }
+
+    passkeyAlreadyRegisteredThisSession = true;
     return this.register();
   }
 
@@ -264,9 +279,29 @@ export class PasskeyService {
       timeout: 60000,
     };
 
+    // Gather credential IDs from local store so the authenticator can directly
+    // display the matching passkey. Prefer credentials of the current user if
+    // we already have a login session, otherwise fall back to all credentials
+    // stored on this device.
+    let allowCredentialIds: string[] = [];
+    const currentUserDid = AuthStore.getCurrentUserDid();
+    if (currentUserDid) {
+      allowCredentialIds = UserStore.listCredentials(currentUserDid);
+    } else {
+      for (const did of UserStore.getAllUsers()) {
+        allowCredentialIds.push(...UserStore.listCredentials(did));
+      }
+    }
+    console.log('allowCredentialIds', allowCredentialIds);
     const publicKeyRequest: PublicKeyCredentialRequestOptions = {
       ...requestOptions,
       challenge: base64URLToArrayBuffer(requestOptions.challenge),
+      ...(allowCredentialIds.length > 0 && {
+        allowCredentials: allowCredentialIds.map(id => ({
+          id: base64URLToArrayBuffer(id),
+          type: 'public-key',
+        })),
+      }),
     } as unknown as PublicKeyCredentialRequestOptions;
 
     // Default to 'silent' for automatic login attempts in AuthContext
@@ -280,9 +315,11 @@ export class PasskeyService {
 
     if (!cred) throw new Error('No credential from get');
 
-    // Find user by credential ID
-    const userDid = UserStore.findUserByCredential(cred.id);
-    if (!userDid) throw new Error('Credential not found in local storage');
+    // Resolve user DID by credential ID
+    let userDid = UserStore.findUserByCredential(cred.id);
+    if (!userDid) {
+      throw new Error('Unable to resolve user DID from credential');
+    }
 
     return userDid;
   }
@@ -295,33 +332,41 @@ export class PasskeyService {
   public async authenticateWithChallenge(options: {
     challenge: string;
     rpId: string | undefined;
+    mediation?: CredentialMediationRequirement;
   }): Promise<{
     assertionJSON: PublicKeyCredentialJSON;
     userDid: string;
   }> {
     try {
+      // 1. Collect credentials to be sent to the authenticator
       let userDid = this.getUserDid();
-      if (!userDid) {
-        throw new Error('No user DID found');
+      let allowCredentialIds: string[] = [];
+      if (userDid) {
+        allowCredentialIds = UserStore.listCredentials(userDid);
+      } else {
+        // If we don't know which user is logging in, enumerate every stored credential
+        for (const did of UserStore.getAllUsers()) {
+          allowCredentialIds.push(...UserStore.listCredentials(did));
+        }
       }
-      const allowCredentials = UserStore.listCredentials(userDid);
+
       if (this.developmentMode) {
         console.log('[PasskeyService] authenticateWithChallenge options:', {
           challenge: options.challenge?.substring(0, 20) + '...',
           rpId: options.rpId,
-          allowCredentials: allowCredentials,
+          allowCredentials: allowCredentialIds,
         });
       }
 
-      let rpId = options.rpId ? options.rpId : window.location.hostname;
+      const rpId = options.rpId ? options.rpId : window.location.hostname;
 
       const publicKeyRequest: PublicKeyCredentialRequestOptions = {
         challenge: base64URLToArrayBuffer(options.challenge),
         rpId: rpId,
         userVerification: 'preferred',
         timeout: 60000,
-        allowCredentials: allowCredentials.map(cred => ({
-          id: base64URLToArrayBuffer(cred),
+        allowCredentials: allowCredentialIds.map(id => ({
+          id: base64URLToArrayBuffer(id),
           type: 'public-key',
         })),
       } as unknown as PublicKeyCredentialRequestOptions;
@@ -329,10 +374,18 @@ export class PasskeyService {
       // call WebAuthn API to get assertion
       const cred = (await navigator.credentials.get({
         publicKey: publicKeyRequest,
-        mediation: 'silent',
+        mediation: options.mediation || 'silent',
       })) as PublicKeyCredential | null;
 
       if (!cred) throw new Error('No credential from get');
+
+      // 2. If we didn't know the user beforehand, resolve it now using the credential ID
+      if (!userDid) {
+        userDid = UserStore.findUserByCredential(cred.id);
+      }
+      if (!userDid) {
+        throw new Error('Unable to resolve user DID from credential');
+      }
 
       const userHandle = (cred.response as AuthenticatorAssertionResponse).userHandle;
       // convert credential to JSON format
@@ -360,7 +413,10 @@ export class PasskeyService {
         });
       }
 
-      return { assertionJSON, userDid };
+      return { assertionJSON, userDid } as {
+        assertionJSON: PublicKeyCredentialJSON;
+        userDid: string;
+      };
     } catch (error) {
       if (this.developmentMode) {
         console.error(

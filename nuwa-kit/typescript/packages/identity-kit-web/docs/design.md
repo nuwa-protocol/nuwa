@@ -27,7 +27,7 @@ Login-demo 暴露的痛点：
    ├─ deeplink/
    │   └─ DeepLinkManager.ts
    ├─ react/                       ← *可选* React Hooks
-   │   └─ useNuwaIdentityKit.ts
+   │   └─ useIdentityKit.ts
    ├─ index.ts                     ← 出口
    └─ docs/                        ← 当前文件
 ```
@@ -70,11 +70,11 @@ class DeepLinkManager {
 ### 3.4 WebSDK 高阶封装
 
 ```ts
-export class NuwaIdentityKitWeb {
+export class IdentityKitWeb {
   static async init(opts?: {
     cadopDomain?: string;
     storage?: 'local' | 'indexeddb' | KeyStore;
-  }): Promise<NuwaIdentityKitWeb>;
+  }): Promise<IdentityKitWeb>;
 
   connect(): Promise<void>;        // 触发 deep-link
   sign(payload: any): Promise<NIP1SignedObject>;
@@ -85,7 +85,7 @@ export class NuwaIdentityKitWeb {
 
 React 开发者可使用：
 ```ts
-const { state, connect, sign, verify } = useNuwaIdentityKit();
+const { state, connect, sign, verify } = useIdentityKit();
 ```
 
 ## 4. 安全考虑
@@ -119,8 +119,8 @@ const { state, connect, sign, verify } = useNuwaIdentityKit();
 2. 删除本地 `KeyStore.ts`, `SimpleSigner.ts`, `DeepLink.ts`。
 3. 初始化：
    ```ts
-   import { NuwaIdentityKitWeb } from '@nuwa-ai/identity-kit-web';
-   const nuwa = await NuwaIdentityKitWeb.init();
+   import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+   const nuwa = await IdentityKitWeb.init();
    ```
 4. 调 `nuwa.connect()` 取代 `generateKeyAndBuildUrl` + window.open。
 5. 回调页：

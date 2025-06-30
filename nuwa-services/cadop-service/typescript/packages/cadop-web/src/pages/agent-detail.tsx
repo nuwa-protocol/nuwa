@@ -1,38 +1,62 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { 
+  Button, 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle,
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  Modal,
+  Spinner, 
+  SpinnerContainer, 
+  Tag 
+} from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
-import { custodianClient } from '../lib/api/client';
-import { Spin, Alert, Tabs, Space, Typography, Tag, Modal, message } from 'antd';
+import { useDIDService } from '../hooks/useDIDService';
 import {
-  ArrowLeftOutlined,
-  SettingOutlined,
-  KeyOutlined,
-  HistoryOutlined,
-  TeamOutlined,
-  FileTextOutlined,
-  ReloadOutlined,
-  GiftOutlined,
-} from '@ant-design/icons';
+  ArrowLeft,
+  Settings,
+  Key,
+  History,
+  Users,
+  FileText,
+  RotateCcw,
+  Gift,
+  Trash2
+} from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
-
-const { TabPane } = Tabs;
-const { Title, Text, Paragraph } = Typography;
+import { claimTestnetGas } from '@/lib/rooch/faucet';
+import { buildRoochScanAccountUrl } from '@/config/env';
+import { useToast } from '@/hooks/use-toast';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
   const { did } = useParams<{ did: string }>();
   const navigate = useNavigate();
   const { userDid, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  
+  const {
+    didService,
+    isLoading: serviceLoading,
+    error: serviceError,
+  } = useDIDService(did);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
   const [showDidDocument, setShowDidDocument] = useState(false);
   const [isController, setIsController] = useState(false);
+  // state for delete confirmation modal
+  const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState('info');
 
   const {
     balances,
@@ -47,7 +71,7 @@ export function AgentDetailPage() {
 
   // Extract Rooch address from DID (format: did:rooch:<address>)
   const agentAddress = did ? did.split(':')[2] : undefined;
-  const FAUCET_URL = 'https://test-faucet.rooch.network';
+  const FAUCET_URL = undefined; // use default
 
   const handleClaimRgas = async () => {
     if (isClaiming || hasClaimed || !agentAddress) return;
@@ -55,28 +79,22 @@ export function AgentDetailPage() {
     setIsClaiming(true);
 
     try {
-      const response = await fetch(`${FAUCET_URL}/faucet`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ claimer: agentAddress }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Claim failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const claimed = await claimTestnetGas(agentAddress, FAUCET_URL || undefined);
+      const data = { gas: claimed };
       await refetchBalances();
       setHasClaimed(true);
-      message.success(
-        `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`
-      );
+      toast({
+        variant: "success",
+        title: "RGAS Claimed",
+        description: `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`,
+      });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to claim RGAS';
-      message.error(errMsg);
+      toast({
+        variant: "destructive",
+        title: "Claim Failed",
+        description: errMsg,
+      });
       console.error('RGAS claim failed:', err);
     } finally {
       setIsClaiming(false);
@@ -85,27 +103,29 @@ export function AgentDetailPage() {
   // ---------------------------------------------------
 
   useEffect(() => {
-    if (did) {
+    if (didService) {
       loadAgentInfo();
     }
-  }, [did, userDid]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [didService, userDid]);
 
   const loadAgentInfo = async () => {
-    if (!did) return;
+    if (!didService) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await custodianClient.resolveAgentDID(did);
-      if (response.data) {
-        setDidDocument(response.data);
+      const doc = await didService.getDIDDocument();
+
+      if (doc) {
+        setDidDocument(doc);
 
         if (isAuthenticated && userDid) {
-          const hasControllerAccess = response.data.verificationMethod?.some(
+          const hasControllerAccess = doc.verificationMethod?.some(
             (method: VerificationMethod) => method.controller === userDid
           );
-          setIsController(hasControllerAccess);
+          setIsController(!!hasControllerAccess);
         } else {
           setIsController(false);
         }
@@ -118,18 +138,54 @@ export function AgentDetailPage() {
     }
   };
 
-  if (loading) {
+  const handleRemoveKey = async (keyId: string) => {
+    if (!didService) return;
+    try {
+      setLoading(true);
+      await didService.removeVerificationMethod(keyId);
+      const updatedDoc = await didService.getDIDDocument();
+      setDidDocument(updatedDoc);
+      toast({
+        variant: "default",
+        title: t('agent.removed', { defaultValue: 'Removed' }),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: msg,
+      });
+    } finally {
+      setLoading(false);
+      setPendingDeletion(null);
+    }
+  };
+
+  const confirmRemoveKey = (method: VerificationMethod) => {
+    setPendingDeletion(method);
+  };
+
+  const handleCancelDelete = () => {
+    setPendingDeletion(null);
+  };
+
+  if (loading || serviceLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Spin size="large" />
+        <Spinner size="large" />
       </div>
     );
   }
 
-  if (error) {
+  if (error || serviceError) {
+    const errMsg = error || serviceError;
     return (
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <Alert message={t('common.error')} description={error} type="error" showIcon />
+        <Alert variant="destructive">
+          <AlertTitle>{t('common.error')}</AlertTitle>
+          <AlertDescription>{errMsg}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -138,15 +194,15 @@ export function AgentDetailPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeftOutlined className="mr-2" />
+          <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.back')}
           </Button>
 
           <div className="flex justify-between items-center">
-            <Title level={2}>{t('agent.details')}</Title>
+            <h2 className="text-3xl font-bold tracking-tight">{t('agent.details')}</h2>
             <Button variant="outline" onClick={() => setShowDidDocument(true)}>
-              <FileTextOutlined className="mr-2" />
+              <FileText className="mr-2 h-4 w-4" />
               {t('agent.viewDidDocument')}
             </Button>
           </div>
@@ -160,10 +216,10 @@ export function AgentDetailPage() {
                 <CardTitle>{t('agent.identity')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <DIDDisplay did={did || ''} showCopy={true} showQR={true} status="active" />
+                <DIDDisplay did={did || ''} showCopy={true} status="active" />
                 {isController && (
                   <div className="mt-2">
-                    <Tag color="green">{t('agent.youAreController')}</Tag>
+                    <Tag variant="success">{t('agent.youAreController')}</Tag>
                   </div>
                 )}
               </CardContent>
@@ -178,14 +234,12 @@ export function AgentDetailPage() {
                   onClick={() => refetchBalances()}
                   className="h-8 w-8 p-0"
                 >
-                  <ReloadOutlined />
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent>
                 {balanceLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Spin size="small" />
-                  </div>
+                  <SpinnerContainer loading={true} size="small" />
                 ) : balances.length > 0 ? (
                   <div className="space-y-2">
                     {balances.map((bal, idx) => (
@@ -194,21 +248,21 @@ export function AgentDetailPage() {
                         className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
                       >
                         <div className="flex items-center">
-                          <Text strong>{bal.symbol}</Text>
-                          <Text type="secondary" className="ml-2 text-xs">
+                          <span className="font-medium">{bal.symbol}</span>
+                          <span className="ml-2 text-xs text-gray-500">
                             {bal.name}
-                          </Text>
+                          </span>
                         </div>
-                        <Text>{bal.fixedBalance}</Text>
+                        <span>{bal.fixedBalance}</span>
                       </div>
                     ))}
                   </div>
                 ) : balanceError ? (
                   <div className="text-center py-2">
-                    <Text type="danger">{t('agent.balanceLoadFailed')}</Text>
+                    <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
                   </div>
                 ) : (
-                  <Text type="secondary">{t('agent.noBalance')}</Text>
+                  <span className="text-gray-500">{t('agent.noBalance')}</span>
                 )}
               </CardContent>
             </Card>
@@ -218,7 +272,7 @@ export function AgentDetailPage() {
                 <CardTitle>{t('agent.authMethods')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                <div className="flex flex-col gap-4">
                   {didDocument?.verificationMethod?.map((method, index) => {
                     const fragment = method.id.split('#')[1];
                     const isAuthentication = didDocument.authentication?.includes(method.id);
@@ -234,15 +288,25 @@ export function AgentDetailPage() {
                     return (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center mb-2">
-                          <KeyOutlined className="mr-2" />
-                          <Text strong className="font-mono">
+                          <Key className="mr-2 h-4 w-4" />
+                          <span className="font-mono font-bold">
                             {fragment}
-                          </Text>
-                          <Text className="ml-2">{method.type}</Text>
+                          </span>
+                          <span className="ml-2">{method.type}</span>
                           {method.controller === userDid && (
-                            <Tag color="blue" className="ml-2">
+                            <Tag variant="blue" className="ml-2">
                               {t('agent.controller')}
                             </Tag>
+                          )}
+                          {isController && method.controller !== userDid && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-2 text-destructive hover:bg-destructive/10"
+                              onClick={() => confirmRemoveKey(method)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                         <div className="text-xs text-gray-400 mb-2">
@@ -250,27 +314,27 @@ export function AgentDetailPage() {
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center">
-                            <TeamOutlined className="mr-2" />
-                            <Text type="secondary">{t('agent.capabilities')}:</Text>
+                            <Users className="mr-2 h-4 w-4" />
+                            <span className="text-gray-500">{t('agent.capabilities')}:</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {isAuthentication && (
-                              <Tag color="green">{t('agent.authentication')}</Tag>
+                              <Tag variant="success">{t('agent.authentication')}</Tag>
                             )}
-                            {isAssertionMethod && <Tag color="blue">{t('agent.assertion')}</Tag>}
-                            {isKeyAgreement && <Tag color="purple">{t('agent.keyAgreement')}</Tag>}
+                            {isAssertionMethod && <Tag variant="blue">{t('agent.assertion')}</Tag>}
+                            {isKeyAgreement && <Tag variant="purple">{t('agent.keyAgreement')}</Tag>}
                             {isCapabilityInvocation && (
-                              <Tag color="orange">{t('agent.capabilityInvocation')}</Tag>
+                              <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
                             )}
                             {isCapabilityDelegation && (
-                              <Tag color="cyan">{t('agent.capabilityDelegation')}</Tag>
+                              <Tag variant="default">{t('agent.capabilityDelegation')}</Tag>
                             )}
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                </Space>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -283,14 +347,14 @@ export function AgentDetailPage() {
                   <CardTitle>{t('agent.actions')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                  <div className="flex flex-col gap-2">
                     <Button
                       className="w-full"
                       variant="outline"
                       onClick={() => handleClaimRgas()}
                       disabled={isClaiming || hasClaimed || !agentAddress}
                     >
-                      <GiftOutlined className="mr-2" />
+                      <Gift className="mr-2 h-4 w-4" />
                       {!agentAddress
                         ? 'Invalid Address'
                         : isClaiming
@@ -304,58 +368,67 @@ export function AgentDetailPage() {
                       variant="outline"
                       onClick={() => navigate(`/agent/${did}/add-auth-method`)}
                     >
-                      <KeyOutlined className="mr-2" />
+                      <Key className="mr-2 h-4 w-4" />
                       {t('agent.addAuthMethod')}
                     </Button>
-                    <Button className="w-full" variant="outline">
-                      <SettingOutlined className="mr-2" />
-                      {t('agent.manageSettings')}
-                    </Button>
-                    <Button className="w-full" variant="outline">
-                      <HistoryOutlined className="mr-2" />
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      disabled={!agentAddress}
+                      onClick={() => {
+                        if (!agentAddress) return;
+                        window.open(buildRoochScanAccountUrl(agentAddress), '_blank');
+                      }}
+                    >
+                      <History className="mr-2 h-4 w-4" />
                       {t('agent.viewHistory')}
                     </Button>
-                  </Space>
+                  </div>
                 </CardContent>
               </Card>
             </div>
           )}
         </div>
 
-        {/* Bottom Section - Activity and History */}
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('agent.activityHistory')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultActiveKey="1">
-                <TabPane tab={t('agent.recentActivity')} key="1">
-                  <div className="text-center py-8 text-gray-500">
-                    {t('agent.noRecentActivity')}
-                  </div>
-                </TabPane>
-                <TabPane tab={t('agent.transactions')} key="2">
-                  <div className="text-center py-8 text-gray-500">{t('agent.noTransactions')}</div>
-                </TabPane>
-                <TabPane tab={t('agent.credentials')} key="3">
-                  <div className="text-center py-8 text-gray-500">{t('agent.noCredentials')}</div>
-                </TabPane>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <Modal
         title={t('agent.didDocument')}
         open={showDidDocument}
-        onCancel={() => setShowDidDocument(false)}
-        footer={null}
+        onClose={() => setShowDidDocument(false)}
         width={800}
       >
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(didDocument, null, 2)}</pre>
+        {/* Container set with max height and scroll to ensure long documents are viewable */}
+        <div className="bg-gray-50 p-4 rounded-lg max-h-[70vh] overflow-y-auto">
+          <pre className="whitespace-pre-wrap text-sm overflow-x-auto">
+            {JSON.stringify(didDocument, null, 2)}
+          </pre>
+        </div>
+      </Modal>
+
+      <Modal
+        title={t('agent.confirmDelete', { defaultValue: 'Confirm delete key' })}
+        open={!!pendingDeletion}
+        onClose={handleCancelDelete}
+        width="sm"
+      >
+        <div className="space-y-4">
+          <p>{t('agent.deleteKeyPrompt', {
+            defaultValue: 'Are you sure you want to delete this authentication method?',
+          })}</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleCancelDelete}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingDeletion) handleRemoveKey(pendingDeletion.id);
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

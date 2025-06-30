@@ -19,16 +19,13 @@ import {
 } from '@roochnetwork/rooch-sdk';
 import {
   DIDDocument,
-  ServiceEndpoint,
   VerificationMethod,
   VerificationRelationship,
-  DIDCreationRequest,
-  DIDCreationResult,
-  CADOPCreationRequest,
-  SignerInterface,
-  KeyType,
-  KEY_TYPE,
-} from '../types';
+  ServiceEndpoint,
+} from '../types/did';
+import { SignerInterface } from '../signers/types';
+import { KeyType, keyTypeToRoochSignatureScheme} from '../types/crypto';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
@@ -36,6 +33,8 @@ import {
   parseDIDCreatedEvent,
   resolveDidObjectID,
 } from './roochVDRTypes';
+import { DebugLogger } from '../utils/DebugLogger';
+import { parseDid, extractFragmentFromId } from '../utils/did';
 
 export interface RoochClientConfig {
   url: string;
@@ -67,7 +66,7 @@ export interface RoochVDROptions {
   /**
    * Rooch RPC endpoint URL
    */
-  rpcUrl: string;
+  rpcUrl?: string;
 
   /**
    * Network type (local, dev, test, main)
@@ -103,14 +102,21 @@ export interface RoochVDROperationOptions {
   keyId?: string;
 
   /**
+   * Advanced blockchain transaction options
+   * For high-level users who need fine-grained control over transaction parameters
+   */
+  advanced?: RoochTxnOptions;
+}
+
+/**
+ * Advanced Rooch blockchain transaction options
+ * These options are typically only needed for advanced use cases
+ */
+export interface RoochTxnOptions {
+  /**
    * Maximum gas limit for the transaction
    */
   maxGas?: number;
-
-  /**
-   * Whether to wait for transaction confirmation
-   */
-  waitForConfirmation?: boolean;
 }
 
 /**
@@ -138,8 +144,8 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     if (!this.did.startsWith('did:rooch:')) {
       throw new Error('Signer DID must be a did:rooch DID');
     }
-    const didParts = this.did.split(':');
-    this.didAddress = new RoochAddress(didParts[2]);
+    const didParts = parseDid(did);
+    this.didAddress = new RoochAddress(didParts.identifier);
     this.keyType = keyType;
     this.publicKey = publicKey;
   }
@@ -187,14 +193,18 @@ export class DidAccountSigner extends Signer implements SignerInterface {
   }
 
   getKeyScheme(): SignatureScheme {
-    return this.keyType === KEY_TYPE.SECP256K1 ? 'Secp256k1' : 'ED25519';
+    return keyTypeToRoochSignatureScheme(this.keyType);
   }
 
   getPublicKey(): PublicKey<Address> {
-    if (this.keyType === KEY_TYPE.SECP256K1) {
+    if (this.keyType === KeyType.SECP256K1) {
       return new Secp256k1PublicKey(this.publicKey);
-    } else {
+    } else if (this.keyType === KeyType.ED25519) {
       return new Ed25519PublicKey(this.publicKey);
+    } else if (this.keyType === KeyType.ECDSAR1) {
+      throw new Error('ECDSAR1 is not supported for DID account');
+    } else {
+      throw new Error(`Unsupported key type: ${this.keyType}`);
     }
   }
 
@@ -244,8 +254,7 @@ export class RoochVDR extends AbstractVDR {
   private client: RoochClient;
   private readonly didContractAddress: string;
   private readonly debug: boolean;
-
-  // Cache for storing the last created DID address
+  private readonly logger: DebugLogger;
   private lastCreatedDIDAddress?: string;
 
   constructor(options: RoochVDROptions) {
@@ -253,21 +262,28 @@ export class RoochVDR extends AbstractVDR {
     this.options = options;
     this.didContractAddress = '0x3::did';
     this.debug = options.debug || false;
+    this.logger = DebugLogger.get('RoochVDR');
+    if (this.debug) {
+      this.logger.setLevel('debug');
+    }
 
+    let rpcUrl = options.rpcUrl;
+    if (!rpcUrl) {
+      rpcUrl = RoochVDR.getRoochNodeUrl(options.network || 'test');
+    }
+    this.logger.debug(`RoochVDR initialized with rpcUrl: ${rpcUrl}`);
     // Initialize Rooch client
-    this.client = new RoochClient({ url: options.rpcUrl });
+    this.client = new RoochClient({ url: rpcUrl });
   }
 
   /**
    * Log message if debug mode is enabled
    */
   private debugLog(message: string, data?: any) {
-    if (this.debug) {
-      if (data) {
-        console.log(`[RoochVDR Debug] ${message}`, data);
-      } else {
-        console.log(`[RoochVDR Debug] ${message}`);
-      }
+    if (data !== undefined) {
+      this.logger.debug(message, data);
+    } else {
+      this.logger.debug(message);
     }
   }
 
@@ -275,10 +291,10 @@ export class RoochVDR extends AbstractVDR {
    * Log error message (always logged regardless of debug mode)
    */
   private errorLog(message: string, error?: any) {
-    if (error) {
-      console.error(`[RoochVDR Error] ${message}`, error);
+    if (error !== undefined) {
+      this.logger.error(message, error);
     } else {
-      console.error(`[RoochVDR Error] ${message}`);
+      this.logger.error(message);
     }
   }
 
@@ -311,7 +327,7 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::create_did_object_for_self_entry`,
         args: [Args.string(request.publicKeyMultibase)],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog('Creating DID Transaction:', transaction);
@@ -398,7 +414,7 @@ export class RoochVDR extends AbstractVDR {
           Args.string(request.custodianServicePublicKey),
           Args.string(request.custodianServiceVMType),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog('Creating DID via CADOP Transaction:', transaction);
@@ -491,12 +507,10 @@ export class RoochVDR extends AbstractVDR {
       this.validateDIDMethod(did);
 
       // Extract address from did:rooch:address format
-      const didParts = did.split(':');
-      if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
+      const { method, identifier } = parseDid(did);
+      if (method !== 'rooch') {
         throw new Error('Invalid DID format. Expected did:rooch:address');
       }
-
-      const identifier = didParts[2];
 
       // Calculate Object ID from identifier
       const objectId = resolveDidObjectID(identifier);
@@ -533,12 +547,12 @@ export class RoochVDR extends AbstractVDR {
       this.validateDIDMethod(did);
 
       // Extract address from did:rooch:address format
-      const didParts = did.split(':');
-      if (didParts.length !== 3 || didParts[0] !== 'did' || didParts[1] !== 'rooch') {
+      const { method, identifier } = parseDid(did);
+      if (method !== 'rooch') {
         return false;
       }
 
-      const address = didParts[2];
+      const address = identifier;
 
       // Call DID contract's exists_did_for_address view function on Rooch network
       const result = await this.client.executeViewFunction({
@@ -548,7 +562,7 @@ export class RoochVDR extends AbstractVDR {
 
       return result?.vm_status === 'Executed' && result.return_values?.[0]?.decoded_value === true;
     } catch (error) {
-      console.error(`Error checking DID existence on Rooch network:`, error);
+      this.errorLog(`Error checking DID existence on Rooch network:`, error);
       return false;
     }
   }
@@ -611,17 +625,17 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::add_verification_method_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(verificationMethod.id)),
+          Args.string(extractFragmentFromId(verificationMethod.id)),
           Args.string(verificationMethod.type),
           Args.string(verificationMethod.publicKeyMultibase),
           Args.vec('u8', relationshipValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       this.debugLog(`Executing transaction: add_verification_method_entry`);
       this.debugLog(`Args:`, [
-        this.extractFragmentFromId(verificationMethod.id),
+        extractFragmentFromId(verificationMethod.id),
         verificationMethod.type,
         verificationMethod.publicKeyMultibase,
         relationshipValues,
@@ -689,7 +703,7 @@ export class RoochVDR extends AbstractVDR {
         signerAddress &&
         !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')
       ) {
-        console.error(`Signer does not have capabilityDelegation permission for ${did}`);
+        this.errorLog(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
       }
 
@@ -697,8 +711,8 @@ export class RoochVDR extends AbstractVDR {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_verification_method_entry`,
-        args: [Args.string(this.extractFragmentFromId(id))],
-        maxGas: options?.maxGas || 100000000,
+        args: [Args.string(extractFragmentFromId(id))],
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -710,7 +724,7 @@ export class RoochVDR extends AbstractVDR {
 
       return result.execution_info.status.type === 'executed';
     } catch (error) {
-      console.error(`Error removing verification method from ${did}:`, error);
+      this.errorLog(`Error removing verification method from ${did}:`, error);
       return false;
     }
   }
@@ -738,8 +752,8 @@ export class RoochVDR extends AbstractVDR {
         throw new Error(`DID document ${did} not found`);
       }
 
-      console.log(`🔧 Adding service to DID: ${did}`);
-      console.log(
+      this.debugLog(`Adding service to DID: ${did}`);
+      this.debugLog(
         `🗝️ Using signer with address: ${didAccountSigner.getRoochAddress().toBech32Address()}`
       );
 
@@ -751,8 +765,8 @@ export class RoochVDR extends AbstractVDR {
         signerAddress &&
         !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')
       ) {
-        console.error(`❌ Signer does not have capabilityInvocation permission for ${did}`);
-        console.log(
+        this.errorLog(`Signer does not have capabilityInvocation permission for ${did}`);
+        this.debugLog(
           `💡 Note: DID operations may require the DID account itself to sign, not the controller`
         );
         return false;
@@ -773,28 +787,28 @@ export class RoochVDR extends AbstractVDR {
       const propertyValues = Object.values(additionalProperties).map(value =>
         value ? value.toString() : ''
       );
-      console.log('service', JSON.stringify(service, null, 2));
-      console.log('additionalProperties', JSON.stringify(additionalProperties, null, 2));
-      console.log('propertyKeys', JSON.stringify(propertyKeys, null, 2));
-      console.log('propertyValues', JSON.stringify(propertyValues, null, 2));
+      this.debugLog('service', service);
+      this.debugLog('additionalProperties', additionalProperties);
+      this.debugLog('propertyKeys', propertyKeys);
+      this.debugLog('propertyValues', propertyValues);
 
       // Create transaction for simple service (without properties)
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::add_service_with_properties_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(service.id)),
+          Args.string(extractFragmentFromId(service.id)),
           Args.string(service.type),
           Args.string(service.serviceEndpoint),
           Args.vec('string', propertyKeys),
           Args.vec('string', propertyValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
-      console.log(`📤 Executing transaction: add_service_entry`);
-      console.log(`📋 Args:`, [
-        this.extractFragmentFromId(service.id),
+      this.debugLog('Executing transaction: add_service_entry');
+      this.debugLog('Args:', [
+        extractFragmentFromId(service.id),
         service.type,
         service.serviceEndpoint,
       ]);
@@ -806,25 +820,25 @@ export class RoochVDR extends AbstractVDR {
         option: { withOutput: true },
       });
 
-      console.log(`📊 Transaction execution result:`, {
+      this.debugLog('Transaction execution result:', {
         status: result.execution_info.status,
         gas_used: result.execution_info.gas_used,
         events_count: result.output?.events?.length || 0,
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        console.error(`❌ Transaction failed:`, result.execution_info);
+        this.errorLog('Transaction failed:', result.execution_info);
         if (result.execution_info.status.type === 'moveabort') {
-          console.error(`🔥 Move abort code:`, (result.execution_info.status as any).abort_code);
-          console.error(`🔥 Move abort location:`, (result.execution_info.status as any).location);
+          this.errorLog('Move abort code:', (result.execution_info.status as any).abort_code);
+          this.errorLog('Move abort location:', (result.execution_info.status as any).location);
         }
         return false;
       }
 
-      console.log(`✅ Service added successfully`);
+      this.debugLog('Service added successfully');
       return true;
     } catch (error) {
-      console.error(`❌ Error adding service to ${did}:`, error);
+      this.errorLog(`Error adding service to ${did}:`, error);
       return false;
     }
   }
@@ -861,7 +875,7 @@ export class RoochVDR extends AbstractVDR {
         signerAddress &&
         !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')
       ) {
-        console.error(`Signer does not have capabilityInvocation permission for ${did}`);
+        this.errorLog(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
       }
 
@@ -874,13 +888,13 @@ export class RoochVDR extends AbstractVDR {
       transaction.callFunction({
         target: `${this.didContractAddress}::add_service_with_properties_entry`,
         args: [
-          Args.string(this.extractFragmentFromId(service.id)),
+          Args.string(extractFragmentFromId(service.id)),
           Args.string(service.type),
           Args.string(service.serviceEndpoint),
           Args.vec('string', propertyKeys),
           Args.vec('string', propertyValues),
         ],
-        maxGas: options?.maxGas || 100000000,
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -892,7 +906,7 @@ export class RoochVDR extends AbstractVDR {
 
       return result.execution_info.status.type === 'executed';
     } catch (error) {
-      console.error(`Error adding service with properties to ${did}:`, error);
+      this.errorLog(`Error adding service with properties to ${did}:`, error);
       return false;
     }
   }
@@ -927,7 +941,7 @@ export class RoochVDR extends AbstractVDR {
         signerAddress &&
         !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityInvocation')
       ) {
-        console.error(`Signer does not have capabilityInvocation permission for ${did}`);
+        this.errorLog(`Signer does not have capabilityInvocation permission for ${did}`);
         return false;
       }
 
@@ -935,8 +949,8 @@ export class RoochVDR extends AbstractVDR {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::remove_service_entry`,
-        args: [Args.string(this.extractFragmentFromId(id))],
-        maxGas: options?.maxGas || 100000000,
+        args: [Args.string(extractFragmentFromId(id))],
+        maxGas: options?.advanced?.maxGas || 100000000,
       });
 
       // Execute transaction
@@ -948,7 +962,7 @@ export class RoochVDR extends AbstractVDR {
 
       return result.execution_info.status.type === 'executed';
     } catch (error) {
-      console.error(`Error removing service from ${did}:`, error);
+      this.errorLog(`Error removing service from ${did}:`, error);
       return false;
     }
   }
@@ -985,11 +999,11 @@ export class RoochVDR extends AbstractVDR {
         signerAddress &&
         !this.hasPermissionForOperation(currentDoc, signerAddress, 'capabilityDelegation')
       ) {
-        console.error(`Signer does not have capabilityDelegation permission for ${did}`);
+        this.errorLog(`Signer does not have capabilityDelegation permission for ${did}`);
         return false;
       }
 
-      const fragment = this.extractFragmentFromId(id);
+      const fragment = extractFragmentFromId(id);
 
       // Add relationships
       for (const relationship of add) {
@@ -998,7 +1012,7 @@ export class RoochVDR extends AbstractVDR {
         transaction.callFunction({
           target: `${this.didContractAddress}::add_to_verification_relationship_entry`,
           args: [Args.string(fragment), Args.u8(relationshipValue)],
-          maxGas: options?.maxGas || 100000000,
+          maxGas: options?.advanced?.maxGas || 100000000,
         });
 
         const result = await this.client.signAndExecuteTransaction({
@@ -1019,7 +1033,7 @@ export class RoochVDR extends AbstractVDR {
         transaction.callFunction({
           target: `${this.didContractAddress}::remove_from_verification_relationship_entry`,
           args: [Args.string(fragment), Args.u8(relationshipValue)],
-          maxGas: options?.maxGas || 100000000,
+          maxGas: options?.advanced?.maxGas || 100000000,
         });
 
         const result = await this.client.signAndExecuteTransaction({
@@ -1035,7 +1049,7 @@ export class RoochVDR extends AbstractVDR {
 
       return true;
     } catch (error) {
-      console.error(`Error updating relationships for ${did}:`, error);
+      this.errorLog(`Error updating relationships for ${did}:`, error);
       return false;
     }
   }
@@ -1072,17 +1086,6 @@ export class RoochVDR extends AbstractVDR {
       default:
         throw new Error(`Unknown verification relationship: ${relationship}`);
     }
-  }
-
-  /**
-   * Extract fragment from a full ID (e.g., "did:rooch:address#fragment" -> "fragment")
-   */
-  private extractFragmentFromId(id: string): string {
-    const hashIndex = id.indexOf('#');
-    if (hashIndex === -1) {
-      throw new Error(`Invalid ID format: ${id}. Expected format: did:rooch:address#fragment`);
-    }
-    return id.substring(hashIndex + 1);
   }
 
   /**
@@ -1260,75 +1263,3 @@ export class RoochVDR extends AbstractVDR {
     return sdkGetRoochNodeUrl(roochNetwork as any);
   }
 }
-
-/**
- * Usage Examples:
- *
- * // 1. Basic setup with default configuration
- * const roochVDR = RoochVDR.createDefault('test');
- *
- * // 2. Custom configuration with your own client
- * import { RoochClient } from '@roochnetwork/rooch-sdk';
- * const client = new RoochClient({ url: 'https://test-seed.rooch.network/' });
- * const roochVDR = new RoochVDR({
- *   rpcUrl: 'https://test-seed.rooch.network/',
- *   client: client,
- * });
- *
- * // 3. Store a DID document (self-creation)
- * const didDocument = {
- *   id: 'did:rooch:0x123...',
- *   verificationMethod: [{
- *     id: 'did:rooch:0x123...#account-key',
- *     type: 'EcdsaSecp256k1VerificationKey2019',
- *     controller: 'did:rooch:0x123...',
- *     publicKeyMultibase: 'z...'
- *   }],
- *   // ... other DID document fields
- * };
- *
- * const success = await roochVDR.store(didDocument, {
- *   signer: yourRoochSigner
- * });
- *
- * // 4. Create DID via CADOP
- * const success = await roochVDR.createViaCADOP(
- *   'did:key:z6Mk...',
- *   'z6Mk...', // custodian service public key
- *   'Ed25519VerificationKey2020',
- *   {
- *     signer: custodianSigner
- *   }
- * );
- *
- * // 5. Resolve a DID document
- * const resolvedDoc = await roochVDR.resolve('did:rooch:0x123...');
- *
- * // 6. Add a verification method
- * await roochVDR.addVerificationMethod(
- *   'did:rooch:0x123...',
- *   {
- *     id: 'did:rooch:0x123...#key-2',
- *     type: 'Ed25519VerificationKey2020',
- *     controller: 'did:rooch:0x123...',
- *     publicKeyMultibase: 'z6Mk...'
- *   },
- *   ['authentication', 'assertionMethod'],
- *   {
- *     signer: yourRoochSigner
- *   }
- * );
- *
- * // 7. Add a service endpoint
- * await roochVDR.addService(
- *   'did:rooch:0x123...',
- *   {
- *     id: 'did:rooch:0x123...#service-1',
- *     type: 'LinkedDomains',
- *     serviceEndpoint: 'https://example.com'
- *   },
- *   {
- *     signer: yourRoochSigner
- *   }
- * );
- */

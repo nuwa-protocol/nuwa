@@ -4,4 +4,4 @@
  */
 
 export * from './KeyStoreSigner';
-export * from './LocalSigner';
+export * from './types';

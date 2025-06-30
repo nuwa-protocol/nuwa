@@ -1,17 +1,17 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  NuwaIdentityKit,
+  IdentityKit,
   DIDDocument,
   ServiceEndpoint,
   CadopIdentityKit,
   CadopServiceType,
   VDRRegistry,
   KEY_TYPE,
-  BaseMultibaseCodec,
+  MultibaseCodec,
 } from '../src';
 import { RoochVDR } from '../src/vdr/roochVDR';
-import { CryptoUtils } from '../src/cryptoUtils';
-import { LocalSigner } from '../src/signers/LocalSigner';
+import { CryptoUtils } from '../src/crypto';
+import { KeyManager } from '../src/keys/KeyManager';
 import { DIDStruct, formatDIDString } from '../src/vdr/roochVDRTypes';
 import { Secp256k1Keypair } from '@roochnetwork/rooch-sdk';
 
@@ -51,7 +51,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
     const publicKeyBytes = externalUserKeyPair.getPublicKey().toBytes();
     //Use the user's public key as the cadop did key
-    const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+    const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
     const result = await roochVDR.create(
       {
@@ -76,7 +76,7 @@ describe('CadopIdentityKit Integration Test', () => {
 
     let cadopDID = result.didDocument!.id;
 
-    let signer = LocalSigner.createEmpty(cadopDID);
+    let signer = KeyManager.createEmpty(cadopDID);
     await signer.importRoochKeyPair('account-key', externalUserKeyPair);
     cadopKit = await CadopIdentityKit.fromServiceDID(cadopDID, signer);
 
@@ -97,8 +97,7 @@ describe('CadopIdentityKit Integration Test', () => {
   describe('DID Creation', () => {
     it('should create DID via CADOP', async () => {
       if (!shouldRunIntegrationTests()) return;
-      let { signer: userSigner, keyId } = await LocalSigner.createWithDidKey();
-      let userDid = await userSigner.getDid();
+      let { keyManager: userSigner, keyId, did: userDid } = await KeyManager.createWithDidKey();
 
       const result = await cadopKit.createDID('rooch', userDid, { description: 'Test DID' });
 

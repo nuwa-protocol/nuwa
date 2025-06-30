@@ -12,8 +12,8 @@ import {
   RoochAddress,
 } from '@roochnetwork/rooch-sdk';
 import { KeyMultibaseCodec } from '../../multibase/key';
-import { BaseMultibaseCodec } from '../../multibase';
-import { LocalSigner } from '../../signers/LocalSigner';
+import { MultibaseCodec } from '../../multibase';
+import { KeyManager } from '../../keys/KeyManager';
 
 // Test configuration
 const DEFAULT_NODE_URL = process.env.ROOCH_NODE_URL || 'http://localhost:6767';
@@ -85,7 +85,7 @@ describe('RoochVDR Integration Tests', () => {
         // Get the actual public key from the keypair (Secp256k1)
         const publicKeyBytes = keypair.getPublicKey().toBytes();
 
-        const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+        const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
         console.log('Using public key multibase (raw):', publicKeyMultibase);
         console.log('Should start with z (base58btc):', publicKeyMultibase.startsWith('z'));
@@ -171,7 +171,7 @@ describe('RoochVDR Integration Tests', () => {
         const newKeypair = Secp256k1Keypair.generate();
         const publicKeyBytes = newKeypair.getPublicKey().toBytes();
 
-        const publicKeyMultibase = BaseMultibaseCodec.encodeBase58btc(publicKeyBytes);
+        const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
         console.log('Generated new verification method:');
         console.log('- Public key multibase:', publicKeyMultibase);
@@ -190,8 +190,8 @@ describe('RoochVDR Integration Tests', () => {
           publicKeyMultibase: publicKeyMultibase,
         };
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const success = await roochVDR.addVerificationMethod(
           actualDID,
@@ -218,8 +218,8 @@ describe('RoochVDR Integration Tests', () => {
 
         console.log(`🗑️ Attempting to remove verification method from DID: ${actualDID}`);
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const success = await roochVDR.removeVerificationMethod(actualDID, `${actualDID}#key-2`, {
           signer: signer,
@@ -246,8 +246,8 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🔧 Adding service to DID: ${actualDID}`);
         console.log(`🗝️ Using signer with address: ${testAddress}`);
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const success = await roochVDR.addService(
           actualDID,
@@ -275,8 +275,8 @@ describe('RoochVDR Integration Tests', () => {
 
         console.log(`🔧 Adding service with properties to DID: ${actualDID}`);
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const success = await roochVDR.addServiceWithProperties(
           actualDID,
@@ -310,8 +310,8 @@ describe('RoochVDR Integration Tests', () => {
 
         console.log(`🗑️ Attempting to remove service from DID: ${actualDID}`);
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const success = await roochVDR.removeService(actualDID, `${actualDID}#service-1`, {
           signer: signer,
@@ -341,8 +341,8 @@ describe('RoochVDR Integration Tests', () => {
 
         console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDID}`);
 
-        let signer = LocalSigner.createEmpty(actualDID);
-        signer.importRoochKeyPair('key-2', keypair);
+        let signer = KeyManager.createEmpty(actualDID);
+        await signer.importRoochKeyPair('key-2', keypair);
 
         const serviceAddResult = await roochVDR.addServiceWithProperties(
           actualDID,

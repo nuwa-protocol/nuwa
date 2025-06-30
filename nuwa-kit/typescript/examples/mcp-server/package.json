@@ -1,0 +1,20 @@
+{
+  "name": "@nuwa-example/mcp-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p .",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastmcp": "^3.5.0",
+    "zod": "^3.25.0",
+    "@nuwa-ai/identity-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "~5.4.0"
+  }
+} 
