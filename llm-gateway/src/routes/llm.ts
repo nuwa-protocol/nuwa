@@ -4,34 +4,72 @@ import { ApiResponse, RequestLog, DIDInfo } from "../types/index.js";
 import OpenRouterService from "../services/openrouter.js";
 import { didAuthMiddleware } from "../middleware/didAuth.js";
 import { userInitMiddleware } from "../middleware/userInit.js";
+import { userInitLiteLLMMiddleware } from "../middleware/userInitLiteLLM.js";
 import { parse } from "url";
 import { setImmediate } from "timers";
+import LiteLLMService from "../services/litellm.js";
 
 const supabaseService = new SupabaseService();
-const openRouterService = new OpenRouterService();
+const litellmProvider = new LiteLLMService();
 const router = Router();
 
 // Define supported HTTP methods
 const SUPPORTED_METHODS = ["get", "post", "put", "delete", "patch"] as const;
 
-// Generic OpenRouter proxy route - supports all paths and methods
-for (const method of SUPPORTED_METHODS) {
-  router[method](
-    "/*",
-    didAuthMiddleware,
-    userInitMiddleware,
-    async (req: Request, res: Response) => {
-      return handleOpenRouterProxy(req, res);
-    }
-  );
+// Environment variable: LLM_BACKEND=openrouter | litellm | both  (default both)
+const backendEnv = (process.env.LLM_BACKEND || "both").toLowerCase();
+const OPENROUTER_ENABLED = backendEnv === "openrouter" || backendEnv === "both";
+const LITELLM_ENABLED = backendEnv === "litellm" || backendEnv === "both";
+
+// Provider instances
+const openrouterProvider = new OpenRouterService();
+
+// Register path-based routes
+if (OPENROUTER_ENABLED) {
+  for (const method of SUPPORTED_METHODS) {
+    router[method](
+      "/openrouter/*",
+      didAuthMiddleware,
+      userInitMiddleware, // Only OpenRouter requires automatic user key creation
+      async (req: Request, res: Response) => {
+        return handleLLMProxy(req, res, openrouterProvider, "/openrouter");
+      }
+    );
+  }
+}
+
+if (LITELLM_ENABLED) {
+  for (const method of SUPPORTED_METHODS) {
+    router[method](
+      "/litellm/*",
+      didAuthMiddleware,
+      userInitLiteLLMMiddleware,
+      async (req: Request, res: Response) => {
+        return handleLLMProxy(req, res, litellmProvider, "/litellm");
+      }
+    );
+  }
 }
 
 export const llmRoutes = router;
 
-// Generic OpenRouter proxy handler function
-async function handleOpenRouterProxy(
+// -----------------------------------------------------------------------------
+// General-purpose proxy handler supporting arbitrary LLM providers
+// -----------------------------------------------------------------------------
+async function handleLLMProxy(
   req: Request,
-  res: Response
+  res: Response,
+  provider: {
+    forwardRequest: (
+      apiKey: string,
+      apiPath: string,
+      method: string,
+      data?: any,
+      isStream?: boolean
+    ) => Promise<any>;
+    parseResponse: (response: any) => any;
+  },
+  basePrefix: string
 ): Promise<void> {
   const requestTime = new Date().toISOString();
   const didInfo = req.didInfo as DIDInfo;
@@ -165,7 +203,7 @@ async function handleOpenRouterProxy(
     }
 
     // 3. Forward request to OpenRouter
-    const response = await openRouterService.forwardRequest(
+    const response = await provider.forwardRequest(
       apiKey,
       apiPath,
       method,
@@ -301,7 +339,7 @@ async function handleOpenRouterProxy(
       }
     } else {
       // Non-stream response processing
-      const responseData = openRouterService.parseResponse(response);
+      const responseData = provider.parseResponse(response);
 
       // Extract usage info
       extractUsageInfo(responseData);
