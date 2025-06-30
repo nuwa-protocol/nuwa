@@ -63,6 +63,60 @@ server.addTool({
 });
 
 // -----------------------------------------------------------------------------
+// Example prompt – shout (returns upper-cased text)
+// -----------------------------------------------------------------------------
+
+server.addPrompt({
+  name: "shout",
+  description: "Transform input text to uppercase and surround by >>> <<<.",
+  arguments: [
+    {
+      name: "text",
+      description: "Text to transform",
+      required: true,
+    },
+  ],
+  async load({ text }: { text: string }) {
+    return `>>> ${text.toUpperCase()} <<<`;
+  },
+});
+
+// -----------------------------------------------------------------------------
+// Example resources
+// -----------------------------------------------------------------------------
+
+// Static resource – server info
+server.addResource({
+  uri: "info://version",
+  name: "Server Version Info",
+  mimeType: "text/plain",
+  async load() {
+    return {
+      text: `FastMCP demo server version 0.1.0`,
+    };
+  },
+});
+
+// Resource template – greet user
+server.addResourceTemplate({
+  uriTemplate: "greet://{name}",
+  name: "Greeting message",
+  mimeType: "text/plain",
+  arguments: [
+    {
+      name: "name",
+      description: "Name of the person to greet",
+      required: true,
+    },
+  ],
+  async load({ name }: { name: string }) {
+    return {
+      text: `Hello, ${name}! Welcome to FastMCP demo server.`,
+    };
+  },
+});
+
+// -----------------------------------------------------------------------------
 // Start server
 // -----------------------------------------------------------------------------
 server.start({
