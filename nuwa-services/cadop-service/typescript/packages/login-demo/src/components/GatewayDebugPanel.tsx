@@ -11,6 +11,7 @@ export function GatewayDebugPanel() {
   const [gatewayUrl, setGatewayUrlState] = useState(getGatewayUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
+  const [provider, setProvider] = useState<'openrouter' | 'litellm'>('openrouter');
   const [requestBody, setRequestBody] = useState(`{
     "model": "deepseek/deepseek-r1-0528:free",
     "messages": [
@@ -31,7 +32,16 @@ export function GatewayDebugPanel() {
       setLoading(true);
       setError(null);
       setResponseText(null);
-      const res = await sendSignedRequest(gatewayUrl, { method, path: apiPath, body: requestBody }, sign);
+      const additionalHeaders: Record<string, string> = {};
+      if (provider) {
+        additionalHeaders['X-LLM-Provider'] = provider;
+      }
+
+      const res = await sendSignedRequest(
+        gatewayUrl,
+        { method, path: apiPath, body: requestBody, headers: additionalHeaders },
+        sign
+      );
 
       // Helper: pretty-print response and parse nested JSON in `body` field if present
       const formatResponse = (response: any): string => {
@@ -107,6 +117,15 @@ export function GatewayDebugPanel() {
           onChange={e => setApiPath(e.target.value)}
           style={{ width: '70%', marginLeft: '8px' }}
         />
+      </div>
+
+      <div className="provider-select" style={{ marginBottom: '1rem' }}>
+        <label style={{ marginRight: '8px' }}>Provider:</label>
+        <select value={provider} onChange={e => setProvider(e.target.value as any)}>
+          <option value="openrouter">openrouter</option>
+          <option value="litellm">litellm</option>
+        </select>
+        <small style={{ marginLeft: '8px' }}>(adds X-LLM-Provider header)</small>
       </div>
 
       {method !== 'GET' && method !== 'DELETE' && (

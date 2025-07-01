@@ -16,6 +16,7 @@ export interface GatewayRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string; // e.g. /api/v1/chat/completions
   body?: string; // raw JSON string (will be sent as-is for non-GET)
+  headers?: Record<string, string>; // extra headers e.g. { 'X-LLM-Provider': 'litellm' }
 }
 
 // This function will be used inside a React component that has access to the auth context
@@ -35,12 +36,15 @@ export async function sendSignedRequest(
 
   const url = new URL(options.path, gatewayBaseUrl).toString();
 
+  const headerObj: Record<string, string> = {
+    'Authorization': authHeader,
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
   const fetchOptions: RequestInit = {
     method: options.method,
-    headers: {
-      'Authorization': authHeader,
-      'Content-Type': 'application/json',
-    },
+    headers: headerObj,
   };
   if (options.method !== 'GET' && options.method !== 'DELETE' && options.body) {
     fetchOptions.body = options.body;
