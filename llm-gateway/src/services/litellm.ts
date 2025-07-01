@@ -37,7 +37,7 @@ class LiteLLMService {
       const fullUrl = `${this.baseURL}${apiPath}`; // Note: apiPath already contains leading slash
 
       const response = await axios({
-        method: method.toLowerCase() as any,
+        method: method.toLowerCase(),
         url: fullUrl,
         data: requestData,
         headers,
