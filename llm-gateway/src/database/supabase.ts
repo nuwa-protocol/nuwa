@@ -71,13 +71,18 @@ class SupabaseService {
   }
 
   // 根据 DID 获取用户的实际 API Key（解密后）
-  async getUserActualApiKey(did: string): Promise<string | null> {
+  async getUserActualApiKey(did: string, provider?: string): Promise<string | null> {
     try {
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from("user_api_keys")
         .select("encrypted_api_key")
-        .eq("did", did)
-        .single();
+        .eq("did", did);
+
+      if (provider) {
+        query = query.eq("provider", provider);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) {
         console.error("Error fetching user actual API key:", error);
@@ -104,9 +109,10 @@ class SupabaseService {
   // 创建用户 API Key 记录
   async createUserApiKey(
     did: string,
-    openrouterKeyHash: string,
+    providerKeyId: string,
     actualApiKey: string,
     name: string,
+    provider: string = "openrouter",
     limit?: number
   ): Promise<boolean> {
     try {
@@ -115,7 +121,8 @@ class SupabaseService {
 
       const { error } = await this.supabase.from("user_api_keys").insert({
         did: did,
-        openrouter_key_hash: openrouterKeyHash,
+        provider: provider,
+        provider_key_id: providerKeyId,
         encrypted_api_key: encryptedApiKey,
         key_name: name,
         credit_limit: limit,
@@ -139,8 +146,9 @@ class SupabaseService {
   // 更新用户 API Key
   async updateUserApiKey(
     did: string,
+    provider: string,
     updates: {
-      openrouter_key_hash?: string;
+      provider_key_id?: string;
       actualApiKey?: string;
       name?: string;
       limit?: number;
@@ -151,8 +159,8 @@ class SupabaseService {
         updated_at: new Date().toISOString(),
       };
 
-      if (updates.openrouter_key_hash) {
-        updateData.openrouter_key_hash = updates.openrouter_key_hash;
+      if (updates.provider_key_id) {
+        updateData.provider_key_id = updates.provider_key_id;
       }
 
       if (updates.actualApiKey) {
@@ -170,7 +178,8 @@ class SupabaseService {
       const { error } = await this.supabase
         .from("user_api_keys")
         .update(updateData)
-        .eq("did", did);
+        .eq("did", did)
+        .eq("provider", provider);
 
       if (error) {
         console.error("Error updating user API key:", error);
@@ -186,19 +195,21 @@ class SupabaseService {
   }
 
   // 删除用户 API Key
-  async deleteUserApiKey(did: string): Promise<boolean> {
+  async deleteUserApiKey(did: string, provider?: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
-        .from("user_api_keys")
-        .delete()
-        .eq("did", did);
+      let query = this.supabase.from("user_api_keys").delete().eq("did", did);
+      if (provider) {
+        query = query.eq("provider", provider);
+      }
+
+      const { error } = await query;
 
       if (error) {
         console.error("Error deleting user API key:", error);
         return false;
       }
 
-      console.log(`✅ Deleted API key for DID: ${did}`);
+      console.log(`✅ Deleted API key for DID: ${did}, provider: ${provider ?? 'all'}`);
       return true;
     } catch (error) {
       console.error("Error in deleteUserApiKey:", error);
@@ -207,15 +218,20 @@ class SupabaseService {
   }
 
   // 获取用户 API Key 的完整信息
-  async getUserApiKeyInfo(did: string): Promise<any | null> {
+  async getUserApiKeyInfo(did: string, provider?: string): Promise<any | null> {
     try {
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from("user_api_keys")
         .select(
-          "did, openrouter_key_hash, key_name, credit_limit, created_at, updated_at"
+          "did, provider, provider_key_id, key_name, credit_limit, created_at, updated_at"
         )
-        .eq("did", did)
-        .single();
+        .eq("did", did);
+
+      if (provider) {
+        query = query.eq("provider", provider);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) {
         console.error("Error fetching user API key info:", error);

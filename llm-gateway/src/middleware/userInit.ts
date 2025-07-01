@@ -25,7 +25,7 @@ export async function userInitMiddleware(
     }
 
     // 检查用户是否已经有 API key 记录
-    const existingApiKey = await supabaseService.getUserApiKeyInfo(didInfo.did);
+    const existingApiKey = await supabaseService.getUserApiKeyInfo(didInfo.did, "openrouter");
 
     if (existingApiKey) {
       // 用户已存在，继续处理
@@ -61,7 +61,8 @@ export async function userInitMiddleware(
       didInfo.did,
       openRouterResponse.data.hash,
       openRouterResponse.key,
-      keyName
+      keyName,
+      "openrouter"
     );
 
     if (!createSuccess) {

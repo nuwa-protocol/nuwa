@@ -28,7 +28,7 @@ export async function userInitLiteLLMMiddleware(
     }
 
     // Check existing record
-    const existing = await supabaseService.getUserApiKeyInfo(didInfo.did);
+    const existing = await supabaseService.getUserApiKeyInfo(didInfo.did, "litellm");
     if (existing) {
       next();
       return;
@@ -55,7 +55,8 @@ export async function userInitLiteLLMMiddleware(
       didInfo.did,
       keyHash,
       key,
-      keyName
+      keyName,
+      "litellm"
     );
 
     if (!saved) {

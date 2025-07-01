@@ -24,31 +24,53 @@ const LITELLM_ENABLED = backendEnv === "litellm" || backendEnv === "both";
 // Provider instances
 const openrouterProvider = new OpenRouterService();
 
-// Register path-based routes
-if (OPENROUTER_ENABLED) {
-  for (const method of SUPPORTED_METHODS) {
-    router[method](
-      "/openrouter/*",
-      didAuthMiddleware,
-      userInitMiddleware, // Only OpenRouter requires automatic user key creation
-      async (req: Request, res: Response) => {
-        return handleLLMProxy(req, res, openrouterProvider, "/openrouter");
-      }
-    );
-  }
-}
+// -----------------------------------------------------------------------------
+// Header-based routing – unified path `/api/v1/*`
+// -----------------------------------------------------------------------------
 
-if (LITELLM_ENABLED) {
-  for (const method of SUPPORTED_METHODS) {
-    router[method](
-      "/litellm/*",
-      didAuthMiddleware,
-      userInitLiteLLMMiddleware,
-      async (req: Request, res: Response) => {
-        return handleLLMProxy(req, res, litellmProvider, "/litellm");
+// Helper to run an Express middleware manually inside async handler
+const runMiddleware = (
+  req: Request,
+  res: Response,
+  fn: (req: Request, res: Response, next: (err?: any) => void) => void
+) =>
+  new Promise<void>((resolve, reject) => {
+    fn(req, res, (err?: any) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+
+for (const method of SUPPORTED_METHODS) {
+  router[method](
+    "/*", // match everything under /api/v1 from index.ts
+    didAuthMiddleware,
+    async (req: Request, res: Response) => {
+      // Determine provider from header or fallback env
+      const providerHeader = (req.headers["x-llm-provider"] as string | undefined)?.toLowerCase();
+      let backendEnvVar = (process.env.LLM_BACKEND || "openrouter").toLowerCase();
+      if (backendEnvVar === "both") backendEnvVar = "openrouter"; // default provider when both enabled
+      const providerName = providerHeader || backendEnvVar;
+
+      let provider: any = openrouterProvider;
+
+      try {
+        if (providerName === "litellm" && LITELLM_ENABLED) {
+          await runMiddleware(req, res, userInitLiteLLMMiddleware);
+          provider = litellmProvider;
+        } else if (OPENROUTER_ENABLED) {
+          await runMiddleware(req, res, userInitMiddleware);
+        } else {
+          return res.status(503).json({ success: false, error: "Requested provider not enabled" });
+        }
+      } catch (err) {
+        console.error("Middleware error:", err);
+        return res.status(500).json({ success: false, error: "Middleware failed" });
       }
-    );
-  }
+
+      return handleLLMProxy(req, res, provider, providerName);
+    }
+  );
 }
 
 export const llmRoutes = router;
@@ -69,7 +91,7 @@ async function handleLLMProxy(
     ) => Promise<any>;
     parseResponse: (response: any) => any;
   },
-  basePrefix: string
+  providerName: string
 ): Promise<void> {
   const requestTime = new Date().toISOString();
   const didInfo = req.didInfo as DIDInfo;
@@ -79,13 +101,15 @@ async function handleLLMProxy(
   const { pathname } = parse(req.url);
 
   // Only pass path part, not concatenate baseURL
-  const apiPath = pathname || "";
+  let apiPath = pathname || "";
 
   // Get request data and enable usage tracking
   let requestData = ["GET", "DELETE"].includes(method) ? undefined : req.body;
 
-  // Enable usage tracking for supported endpoints
+  // Enable usage tracking only when forwarding to OpenRouter
+  const isOpenRouterProvider = provider instanceof (OpenRouterService as any);
   if (
+    isOpenRouterProvider &&
     requestData &&
     (apiPath.includes("/chat/completions") || apiPath.includes("/completions"))
   ) {
@@ -95,7 +119,7 @@ async function handleLLMProxy(
         include: true,
       },
     };
-    console.log("✅ Usage tracking enabled for request");
+    console.log("✅ Usage tracking enabled (OpenRouter)");
   }
 
   // Check if it's a stream request
@@ -105,7 +129,7 @@ async function handleLLMProxy(
   const model = (requestData as any)?.model || "unknown";
 
   console.log(
-    `📨 Received ${method} request to ${req.url}, forwarding to OpenRouter: ${apiPath}`
+    `📨 Received ${method} request to ${req.url}, forwarding to ${providerName}: ${apiPath}`
   );
 
   // Usage tracking data
@@ -174,7 +198,7 @@ async function handleLLMProxy(
 
   try {
     // 1. Get user's actual API Key (from encrypted storage)
-    const apiKey = await supabaseService.getUserActualApiKey(didInfo.did);
+    const apiKey = await supabaseService.getUserActualApiKey(didInfo.did, providerName);
     if (!apiKey) {
       const response: ApiResponse = {
         success: false,
