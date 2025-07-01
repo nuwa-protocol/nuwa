@@ -75,43 +75,18 @@ llm-gateway/
 
 ## Database Initialization
 
-Create the following two tables in Supabase:
+Up-to-date SQL schema is located at [`database/schema.sql`](./database/schema.sql).  
+Run the script in Supabase / PostgreSQL and you're good to go.
 
-```sql
--- User API Keys table
-CREATE TABLE user_api_keys (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  did TEXT NOT NULL UNIQUE,
-  openrouter_key_hash TEXT NOT NULL,
-  encrypted_api_key TEXT NOT NULL,
-  key_name TEXT NOT NULL,
-  credit_limit DECIMAL(10,2),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-CREATE INDEX idx_user_api_keys_did ON user_api_keys(did);
-CREATE INDEX idx_user_api_keys_hash ON user_api_keys(openrouter_key_hash);
+Key changes vs. earlier versions:
 
--- Request logs table (includes Usage Tracking fields)
-CREATE TABLE request_logs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  did TEXT NOT NULL,
-  model TEXT NOT NULL,
-  input_tokens INTEGER,                    -- Number of input tokens
-  output_tokens INTEGER,                   -- Number of output tokens
-  total_cost DECIMAL(10,6),               -- Total cost (USD)
-  request_time TIMESTAMP WITH TIME ZONE NOT NULL,
-  response_time TIMESTAMP WITH TIME ZONE,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'failed')),
-  error_message TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-CREATE INDEX idx_request_logs_did ON request_logs(did);
-CREATE INDEX idx_request_logs_request_time ON request_logs(request_time);
-CREATE INDEX idx_request_logs_status ON request_logs(status);
-CREATE INDEX idx_request_logs_model ON request_logs(model);
-CREATE INDEX idx_request_logs_cost ON request_logs(total_cost);
-```
+| Column | Notes |
+|--------|-------|
+| `provider` | identifies backend (`openrouter`, `litellm`, …); part of unique key `(did, provider)` |
+| `provider_key_id` | replaces legacy `openrouter_key_hash` |
+| unique index | `UNIQUE (did, provider)` prevents duplicates |
+
+If you are upgrading, remove `idx_user_api_keys_did` and old `openrouter_key_hash`-based indices—the new schema adds composite indices.
 
 ## Main API Endpoints
 
@@ -119,27 +94,23 @@ CREATE INDEX idx_request_logs_cost ON request_logs(total_cost);
 - `<METHOD> /api/v1/openrouter/*`: Universal OpenRouter proxy (requires DID authentication)
 - `GET /api/v1/usage`: Get user usage statistics (requires DID authentication)
 
-### OpenRouter Proxy Logic Overview
+### Proxy Logic Overview
 
-- All requests to `/api/v1/openrouter/*` paths are handled uniformly by `handleOpenRouterProxy`:
-  - Validates DID identity and signature
-  - Looks up and decrypts user API key from database based on DID
-  - **Automatically enables Usage Tracking**: Adds `usage: { include: true }` parameter for supported endpoints
-  - Forwards requests to corresponding OpenRouter API paths
-  - Supports both streaming and non-streaming responses, automatically forwards response headers and status codes
-  - **Intelligently extracts Usage information**: Parses tokens and cost data from responses
-  - **Automatically logs**: Saves usage information to database
-  - Automatically rolls back logs and returns error information on failure
+- All client requests use unified path prefix `/api/v1/*`.
+- Target backend is chosen by HTTP header `X-LLM-Provider: openrouter | litellm` (case-insensitive).  
+  If the header is missing the value from `LLM_BACKEND` env (`openrouter`/`litellm`/`both`) is used.
+- Usage-tracking parameters are automatically added **only for OpenRouter** requests.
 
 ## Examples
 
 ### Basic Chat Completion Request (Usage Tracking automatically enabled)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/openrouter/chat/completions \
+curl -X POST http://localhost:8080/api/v1/chat/completions \
   -H "x-did: did:example:123" \
   -H "x-did-signature: ..." \
   -H "x-did-timestamp: ..." \
+  -H "X-LLM-Provider: openrouter" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "openai/gpt-3.5-turbo",
@@ -152,10 +123,11 @@ curl -X POST http://localhost:8080/api/v1/openrouter/chat/completions \
 ### Streaming Request (also supports Usage Tracking)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/openrouter/chat/completions \
+curl -X POST http://localhost:8080/api/v1/chat/completions \
   -H "x-did: did:example:123" \
   -H "x-did-signature: ..." \
   -H "x-did-timestamp: ..." \
+  -H "X-LLM-Provider: openrouter" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "openai/gpt-3.5-turbo",
@@ -239,9 +211,13 @@ X_TITLE=LLM Gateway
 
 ### Key Configuration Explanations
 
-- `OPENROUTER_PROVISIONING_KEY`: Management key for automatically creating user API keys in OpenRouter
-- `API_KEY_ENCRYPTION_KEY`: Key for encrypting stored user API keys; must be changed in production, use command `openssl rand -base64 32` to generate a random key
-- `HOST`: Server host address (defaults to 0.0.0.0 for all interfaces)
+| Variable | Description |
+|----------|-------------|
+| `OPENROUTER_PROVISIONING_KEY` | Master key to create sub-keys in OpenRouter |
+| `LITELLM_MASTER_KEY` | Master key for LiteLLM proxy (only if you enable it) |
+| `LLM_BACKEND` | `openrouter` \| `litellm` \| `both` (default `both`) |
+| `API_KEY_ENCRYPTION_KEY` | AES key used to encrypt user api keys in DB (generate via `openssl rand -base64 32`) |
+| `HOST` | server bind address (default `0.0.0.0`) |
 
 ## Automatic User Initialization
 
