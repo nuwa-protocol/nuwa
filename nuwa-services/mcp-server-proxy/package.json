@@ -1,0 +1,50 @@
+{
+  "name": "@nuwa-services/mcp-server-proxy",
+  "version": "0.1.0",
+  "description": "MCP Server Proxy with DIDAuth support for Nuwa ecosystem",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "node build.js",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint --ext .ts src/",
+    "format": "prettier --write 'src/**/*.ts'"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.0",
+    "@nuwa-ai/identity-kit": "^0.1.0",
+    "fastify": "^4.26.0",
+    "fastify-plugin": "^4.5.1",
+    "fastify-sse-v2": "^3.1.2",
+    "fastmcp": "^3.5.0",
+    "js-yaml": "^4.1.0",
+    "pino": "^8.19.0",
+    "pino-pretty": "^10.3.1",
+    "undici": "^6.6.0",
+    "zod": "^3.22.4",
+    "@modelcontextprotocol/sdk": "^1.13.2"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "esbuild-node-externals": "^1.13.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "supertest": "^6.3.4",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  },
+  "author": "Nuwa Team",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
+}

@@ -1,0 +1,46 @@
+# MCP Server Proxy Configuration
+
+# HTTP Server Settings
+server:
+  host: "0.0.0.0"
+  port: 8088
+  cors:
+    origin: "*"
+    methods: ["GET", "POST", "OPTIONS"]
+  logger:
+    level: "info"
+    prettyPrint: true
+
+# Default upstream when no route matches
+defaultUpstream: "context7"
+
+# Upstream MCP servers
+upstreams:
+
+  # 1) LiteLLM MCP server (experimental, default localhost:4000)
+  # litellm-mcp:
+  #   type: "httpStream"
+  #   baseURL: "http://localhost:4000/mcp"
+  #   # Supports OpenAI-style API Key via Authorization header.
+  #   auth:
+  #     scheme: "header"
+  #     header: "Authorization"
+  #     value: "Bearer ${LITELLM_MCP_API_KEY}"
+ 
+
+  # 2) Context7 demo MCP (Upstash, runs via npx – stdio transport)
+  context7:
+    type: "stdio"
+    command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+
+# Routing rules
+routes:
+
+  # Hostname route example mapped to math-mcp
+  - matchHostname: "context7.mcp-proxy.local"
+    upstream: "context7"
+
+# DIDAuth settings
+didAuth:
+  required: false
+  allowedDidMethods: ["rooch"]
