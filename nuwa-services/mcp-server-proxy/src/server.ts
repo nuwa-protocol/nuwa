@@ -11,8 +11,7 @@ import { fileURLToPath } from 'node:url';
 // Import modules
 import { didAuthMiddleware } from './auth.js';
 import { determineUpstream, setUpstreamInContext } from './router.js';
-import * as httpAdapter from './adapter/http.js';
-import * as stdioAdapter from './adapter/stdio.js';
+import { initUpstream, forwardToolList, forwardToolCall, forwardPromptLoad } from './upstream.js';
 import { ProxyConfig, UpstreamRegistry } from './types.js';
 
 // Get directory name in ESM
@@ -37,11 +36,7 @@ async function initializeUpstreams(config: ProxyConfig): Promise<UpstreamRegistr
   
   for (const [name, upstreamConfig] of Object.entries(config.upstreams)) {
     try {
-      if (upstreamConfig.type === 'httpStream') {
-        upstreams[name] = await httpAdapter.initHttpUpstream(name, upstreamConfig);
-      } else if (upstreamConfig.type === 'stdio') {
-        upstreams[name] = stdioAdapter.initStdioUpstream(name, upstreamConfig);
-      }
+      upstreams[name] = await initUpstream(name, upstreamConfig);
     } catch (error) {
       console.error(`Failed to initialize upstream ${name}:`, error);
     }
@@ -118,11 +113,7 @@ function registerRoutes(
     }
     
     try {
-      if (upstream.type === 'httpStream') {
-        await httpAdapter.forwardToolList(request, reply, upstream);
-      } else if (upstream.type === 'stdio') {
-        await stdioAdapter.forwardToolList(request, reply, upstream);
-      }
+      await forwardToolList(request, reply, upstream);
     } catch (error) {
       console.error('Error handling tool.list:', error);
       return reply.status(500).send({
@@ -144,11 +135,7 @@ function registerRoutes(
     }
     
     try {
-      if (upstream.type === 'httpStream') {
-        await httpAdapter.forwardToolCall(request, reply, upstream);
-      } else if (upstream.type === 'stdio') {
-        await stdioAdapter.forwardToolCall(request, reply, upstream);
-      }
+      await forwardToolCall(request, reply, upstream);
     } catch (error) {
       console.error('Error handling tool.call:', error);
       return reply.status(500).send({
@@ -170,14 +157,7 @@ function registerRoutes(
     }
     
     try {
-      if (upstream.type === 'httpStream') {
-        await httpAdapter.forwardPromptLoad(request, reply, upstream);
-      } else {
-        // stdio doesn't support prompt.load yet
-        return reply.status(501).send({
-          error: 'prompt.load not supported for stdio upstreams',
-        });
-      }
+      await forwardPromptLoad(request, reply, upstream);
     } catch (error) {
       console.error('Error handling prompt.load:', error);
       return reply.status(500).send({

@@ -2,7 +2,6 @@
  * MCP Server Proxy - Type Definitions
  */
 import { FastifyRequest } from 'fastify';
-import type { Client as MCPClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { ChildProcess } from 'child_process';
 
 // Configuration Types
@@ -74,19 +73,13 @@ export interface ProxyConfig {
 }
 
 // Runtime Types
-export interface HttpStreamUpstream {
-  type: 'httpStream';
-  client: MCPClient;
-  config: HttpStreamUpstreamConfig;
+// Using any for MCPClient to simplify typings
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Upstream {
+  type: 'httpStream' | 'stdio';
+  client: any;
+  config: UpstreamConfig;
 }
-
-export interface StdioUpstream {
-  type: 'stdio';
-  process: ChildProcess;
-  config: StdioUpstreamConfig;
-}
-
-export type Upstream = HttpStreamUpstream | StdioUpstream;
 
 export interface UpstreamRegistry {
   [key: string]: Upstream;
