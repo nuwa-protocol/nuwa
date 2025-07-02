@@ -3,6 +3,7 @@
  */
 import { FastifyRequest } from 'fastify';
 import { ChildProcess } from 'child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 // Configuration Types
 export interface ServerConfig {
@@ -73,11 +74,9 @@ export interface ProxyConfig {
 }
 
 // Runtime Types
-// Using any for MCPClient to simplify typings
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface Upstream {
   type: 'httpStream' | 'stdio';
-  client: any;
+  client: Client;
   config: UpstreamConfig;
 }
 

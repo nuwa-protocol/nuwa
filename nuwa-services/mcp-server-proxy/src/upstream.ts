@@ -1,7 +1,5 @@
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import type { Client as MCPClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { UpstreamConfig, AuthConfig, Upstream } from './types.js';
 
@@ -41,7 +39,6 @@ export async function initUpstream(name: string, cfg: UpstreamConfig): Promise<U
 
   const client: any = new Client({ name: `proxy-${name}`, version: '0.1.0' }, {});
   await client.connect(transport);
-  await client.initialize();
 
   return { type: cfg.type, client, config: cfg };
 }
@@ -64,22 +61,61 @@ export async function forwardToolCall(req: FastifyRequest, reply: FastifyReply, 
   const args = body?.arguments || {};
   if (!name) return reply.status(400).send({ error: 'Missing name' });
   try {
-    const result = await up.client.request({ method: 'tools/call', params: { name, arguments: args } }, {} as any);
+    const result = await up.client.callTool({ name, arguments: args });
     reply.send(result);
   } catch (e) {
     reply.status(500).send({ error: 'callTool failed', message: String(e) });
   }
 }
 
-export async function forwardPromptLoad(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardPromptGet(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
   const body: any = req.body;
   const name = body?.name;
   const args = body?.arguments || {};
   if (!name) return reply.status(400).send({ error: 'Missing name' });
   try {
-    const result = await up.client.request({ method: 'prompts/get', params: { name, arguments: args } }, {} as any);
+    const result = await up.client.getPrompt({ name, arguments: args });
     reply.send(result);
   } catch (e) {
     reply.status(500).send({ error: 'prompt.load failed', message: String(e) });
+  }
+}
+
+export async function forwardPromptList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+  try {
+    const res = await up.client.listPrompts();
+    reply.send(res);
+  } catch (error) {
+    reply.status(500).send({ error: 'listPrompts failed', message: String(error) });
+  }
+}
+
+export async function forwardResourceList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+  try {
+    const res = await up.client.listResources();
+    reply.send(res);
+  } catch (error) {
+    reply.status(500).send({ error: 'listResources failed', message: String(error) });
+  }
+}
+
+export async function forwardResourceTemplateList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+  try {
+    const res = await up.client.listResourceTemplates();
+    reply.send(res);
+  } catch (error) {
+    reply.status(500).send({ error: 'listResourceTemplates failed', message: String(error) });
+  }
+}
+
+export async function forwardResourceRead(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+  const body: any = req.body;
+  const params = body?.params;
+  if (!params) return reply.status(400).send({ error: 'Missing params' });
+  try {
+    const res = await up.client.readResource(params);
+    reply.send(res);
+  } catch (error) {
+    reply.status(500).send({ error: 'readResource failed', message: String(error) });
   }
 } 
