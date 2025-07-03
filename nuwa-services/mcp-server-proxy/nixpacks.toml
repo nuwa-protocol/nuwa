@@ -1,0 +1,21 @@
+providers = ["node"]
+
+[phases.setup]
+# Install Node.js and pnpm from Nix packages
+nixPkgs = ["nodejs", "pnpm"]
+
+[phases.install]
+# Install only production dependencies
+cmds = [
+  "pnpm install --prod"
+]
+
+[phases.build]
+# Bundle TypeScript sources into dist/
+cmds = [
+  "pnpm run build"
+]
+
+[start]
+# Start the compiled proxy, Railway will expose $PORT automatically
+cmd = "pnpm start" 
