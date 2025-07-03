@@ -1,7 +1,8 @@
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { UpstreamConfig, AuthConfig, Upstream, McpCapabilities} from './types.js';
+import { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import { UpstreamConfig, AuthConfig, Upstream} from './types.js';
 
 function buildHeaders(auth?: AuthConfig): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -41,7 +42,7 @@ export async function initUpstream(name: string, cfg: UpstreamConfig): Promise<U
   await client.connect(transport);
 
   // Fetch capabilities after connect using getServerCapabilities
-  let capabilities: McpCapabilities = {};
+  let capabilities: ServerCapabilities = {};
   try {
     if (typeof client.getServerCapabilities === 'function') {
       capabilities = await client.getServerCapabilities();

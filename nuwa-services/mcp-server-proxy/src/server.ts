@@ -357,6 +357,35 @@ async function main() {
     // Register routes
     registerRoutes(server, config, upstreams);
     
+    // Graceful shutdown: close upstream clients when server stops
+    server.addHook('onClose', (instance, done) => {
+      instance.log.info('Closing upstream connections...');
+      Promise.all(
+        Object.values(upstreams).map(async (up) => {
+          try {
+            if (up.client && typeof up.client.close === 'function') {
+              await up.client.close();
+            }
+          } catch (err) {
+            instance.log.error({ err }, `Failed to close upstream ${(up.config as any)?.name || ''}`);
+          }
+        }),
+      ).then(() => done()).catch(done);
+    });
+
+    // Handle process signals for graceful shutdown
+    const shutdown = async () => {
+      try {
+        await server.close();
+      } catch (e) {
+        console.error('Error during server.close():', e);
+        process.exit(1);
+      }
+      process.exit(0);
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+
     // Start server
     await server.listen({
       host: config.server.host,
