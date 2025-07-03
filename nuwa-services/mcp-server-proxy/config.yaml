@@ -22,17 +22,16 @@ upstreams:
     command: ["npx", "-y", "@upstash/context7-mcp@latest"]
   amap:
     type: "http"
-    baseURL: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
+    url: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
   
 
 # Routing rules
 routes:
-  - matchHostname: "context7.mcp-proxy.local"
+  - hostname: "context7."
     upstream: "context7"
-  - matchHostname: "amap.mcp-proxy.local"
+  - hostname: "amap."
     upstream: "amap"
 
 # DIDAuth settings
 didAuth:
   required: true
-  allowedDidMethods: ["rooch"]

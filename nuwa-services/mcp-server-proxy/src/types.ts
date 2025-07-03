@@ -22,7 +22,6 @@ export interface ServerConfig {
 
 export interface DIDAuthConfig {
   required: boolean;
-  allowedDidMethods: string[];
 }
 
 export interface HeaderAuthConfig {
@@ -46,7 +45,11 @@ export type AuthConfig = HeaderAuthConfig | BasicAuthConfig | BearerAuthConfig;
 
 export interface HttpStreamUpstreamConfig {
   type: 'httpStream'|'http';
-  baseURL: string;
+  /**
+   * Base URL of the upstream MCP server.
+   * Renamed from `baseURL` to `url` for simplicity.
+   */
+  url: string;
   auth?: AuthConfig;
 }
 
@@ -60,7 +63,11 @@ export interface StdioUpstreamConfig {
 export type UpstreamConfig = HttpStreamUpstreamConfig | StdioUpstreamConfig;
 
 export interface RouteConfig {
-  matchHostname?: string;
+  /**
+   * Hostname (or prefix) to match for this route. For example "amap." will
+   * match any hostname starting with "amap." such as "amap.mcpproxy.xyz".
+   */
+  hostname?: string;
   upstream: string;
 }
 

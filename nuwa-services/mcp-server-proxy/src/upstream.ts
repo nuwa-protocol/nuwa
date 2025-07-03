@@ -26,15 +26,17 @@ function buildHeaders(auth?: AuthConfig): Record<string, string> {
 export async function initUpstream(name: string, cfg: UpstreamConfig): Promise<Upstream> {
   let transport: any;
   if (cfg.type === 'httpStream' || cfg.type === 'http') {
-    transport = new StreamableHTTPClientTransport(new URL(cfg.baseURL), {
+    transport = new StreamableHTTPClientTransport(new URL(cfg.url), {
       requestInit: { headers: buildHeaders(cfg.auth) },
     } as any);
   } else {
+    // cfg here is StdioUpstreamConfig
+    const stdioCfg = cfg as any; // type cast for clarity
     transport = new StdioClientTransport({
-      command: cfg.command[0],
-      args: cfg.command.slice(1),
-      cwd: cfg.cwd,
-      env: cfg.env,
+      command: stdioCfg.command[0],
+      args: stdioCfg.command.slice(1),
+      cwd: stdioCfg.cwd,
+      env: stdioCfg.env,
     });
   }
 

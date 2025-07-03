@@ -2,7 +2,7 @@
  * MCP Server Proxy - Router Module
  */
 import { FastifyRequest } from 'fastify';
-import { RouteConfig, RequestContext } from './types.js';
+import { RouteConfig } from './types.js';
 
 /**
  * Determines the appropriate upstream for a request based on routing rules
@@ -20,8 +20,17 @@ export function determineUpstream(
 
   // Check each route rule for hostname match
   for (const route of routes) {
-    // Match by hostname
-    if (route.matchHostname && hostname === route.matchHostname) {
+    if (!route.hostname) continue;
+
+    // 1) Exact match
+    if (hostname === route.hostname) {
+      return route.upstream;
+    }
+
+    // 2) Prefix (startsWith) match – allows writing "amap." to match
+    //    "amap.mcpproxy.xyz", etc. This keeps configuration simple while
+    //    providing flexibility for wildcard-like routing.
+    if (hostname.startsWith(route.hostname)) {
       return route.upstream;
     }
   }
