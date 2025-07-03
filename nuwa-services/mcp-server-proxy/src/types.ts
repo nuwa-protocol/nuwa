@@ -22,6 +22,10 @@ export interface ServerConfig {
 
 export interface DIDAuthConfig {
   required: boolean;
+  /**
+   * List of allowed DID methods for authentication.
+   * Middleware should enforce that only these methods are permitted.
+   */
 }
 
 export interface HeaderAuthConfig {

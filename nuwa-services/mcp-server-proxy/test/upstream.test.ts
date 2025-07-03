@@ -75,7 +75,7 @@ describe('Upstream (stdio) integration', () => {
     const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now() } };
     await forwardResourceList(mockReq as any, reply as any, upstream);
     expect(reply.payload.resources[0].name).toBe('test.txt');
-    console.log('reply.payload', reply.payload);
+    
   });
 
   it('forwardResourceTemplateList returns template1', async () => {

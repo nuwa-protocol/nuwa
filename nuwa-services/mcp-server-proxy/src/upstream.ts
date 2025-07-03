@@ -127,7 +127,7 @@ export async function forwardPromptGet(req: FastifyRequest, reply: FastifyReply,
     if (jsonRpcId !== undefined) {
       reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'promptGet failed: ' + message } });
     } else {
-      reply.status(500).send({ error: 'prompt.load failed', message });
+      reply.status(500).send({ error: 'promptGet failed', message });
     }
   }
 }
