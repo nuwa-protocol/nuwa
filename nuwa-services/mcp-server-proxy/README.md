@@ -277,3 +277,65 @@ Rules:
 1. `GET /mcp` always returns a **200** SSE stream (keep-alive) so JSON-RPC clients can establish a long connection.
 2. `POST /mcp` is internally mapped to `/mcp/tools` or `/mcp/tool.call` depending on `method`.
 3. Unknown methods return JSON-RPC error `-32601`. 
+
+## 配置
+
+### 配置文件路径
+
+配置文件默认位于项目根目录下的 `config.yaml`。可以通过环境变量 `CONFIG_PATH` 指定自定义配置文件路径：
+
+```bash
+# 使用自定义配置文件启动服务
+CONFIG_PATH=/path/to/your/config.yaml node dist/index.js
+```
+
+### 环境变量替换
+
+配置文件中可以使用 `${ENV_VAR_NAME}` 语法引用环境变量，在服务启动时会自动替换为对应的环境变量值：
+
+```yaml
+upstreams:
+  litellm-mcp:
+    type: "httpStream"
+    baseURL: "http://localhost:4000/mcp"
+    auth:
+      scheme: "header"
+      header: "Authorization"
+      value: "Bearer ${LITELLM_MCP_API_KEY}"
+```
+
+启动服务时设置环境变量：
+
+```bash
+LITELLM_MCP_API_KEY=your_api_key node dist/index.js
+```
+
+## 路由规则
+
+当前版本支持基于主机名的路由规则，可以在配置文件中指定：
+
+```yaml
+routes:
+  - matchHostname: "context7.mcp-proxy.local"
+    upstream: "context7"
+```
+
+## 开发
+
+### 构建
+
+```bash
+npm run build
+```
+
+### 运行
+
+```bash
+npm start
+```
+
+### 测试
+
+```bash
+npm test
+``` 

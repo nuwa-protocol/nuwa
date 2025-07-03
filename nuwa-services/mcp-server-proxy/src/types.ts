@@ -45,7 +45,7 @@ export interface BearerAuthConfig {
 export type AuthConfig = HeaderAuthConfig | BasicAuthConfig | BearerAuthConfig;
 
 export interface HttpStreamUpstreamConfig {
-  type: 'httpStream';
+  type: 'httpStream'|'http';
   baseURL: string;
   auth?: AuthConfig;
 }
@@ -60,8 +60,6 @@ export interface StdioUpstreamConfig {
 export type UpstreamConfig = HttpStreamUpstreamConfig | StdioUpstreamConfig;
 
 export interface RouteConfig {
-  matchTool?: string;
-  matchDidPrefix?: string;
   matchHostname?: string;
   upstream: string;
 }
@@ -97,7 +95,6 @@ export interface DIDAuthResult {
 export interface RequestContext {
   callerDid?: string;
   upstream: string;
-  toolName?: string;
   startTime: number;
 }
 

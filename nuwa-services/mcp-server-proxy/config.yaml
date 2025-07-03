@@ -12,35 +12,27 @@ server:
     prettyPrint: true
 
 # Default upstream when no route matches
-defaultUpstream: "context7"
+defaultUpstream: "amap"
 
 # Upstream MCP servers
 upstreams:
 
-  # 1) LiteLLM MCP server (experimental, default localhost:4000)
-  # litellm-mcp:
-  #   type: "httpStream"
-  #   baseURL: "http://localhost:4000/mcp"
-  #   # Supports OpenAI-style API Key via Authorization header.
-  #   auth:
-  #     scheme: "header"
-  #     header: "Authorization"
-  #     value: "Bearer ${LITELLM_MCP_API_KEY}"
- 
-
-  # 2) Context7 demo MCP (Upstash, runs via npx – stdio transport)
   context7:
     type: "stdio"
     command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+  amap:
+    type: "http"
+    baseURL: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
+  
 
 # Routing rules
 routes:
-
-  # Hostname route example mapped to math-mcp
   - matchHostname: "context7.mcp-proxy.local"
     upstream: "context7"
+  - matchHostname: "amap.mcp-proxy.local"
+    upstream: "amap"
 
 # DIDAuth settings
 didAuth:
-  required: false
+  required: true
   allowedDidMethods: ["rooch"]

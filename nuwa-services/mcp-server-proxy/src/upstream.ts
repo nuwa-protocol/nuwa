@@ -25,7 +25,7 @@ function buildHeaders(auth?: AuthConfig): Record<string, string> {
 
 export async function initUpstream(name: string, cfg: UpstreamConfig): Promise<Upstream> {
   let transport: any;
-  if (cfg.type === 'httpStream') {
+  if (cfg.type === 'httpStream' || cfg.type === 'http') {
     transport = new StreamableHTTPClientTransport(new URL(cfg.baseURL), {
       requestInit: { headers: buildHeaders(cfg.auth) },
     } as any);

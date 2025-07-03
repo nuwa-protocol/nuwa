@@ -5,6 +5,9 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { DIDAuth, VDRRegistry, initRoochVDR } from '@nuwa-ai/identity-kit';
 import { DIDAuthResult } from './types.js';
 
+// Symbol used to cache caller DID on a TCP socket once it has been verified.
+const SOCKET_DID_KEY = Symbol('callerDid');
+
 // Initialize VDR Registry with default VDRs
 const registry = VDRRegistry.getInstance();
 // Ensure rooch VDR is registered
@@ -44,7 +47,7 @@ export async function verifyDIDAuth(authHeader: string): Promise<DIDAuthResult> 
         error: `Invalid DIDAuth: ${msg}` 
       };
     }
-
+    
     const signerDid = verify.signedObject.signature.signer_did;
     return { 
       isValid: true, 
@@ -66,6 +69,20 @@ export async function didAuthMiddleware(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
+  // Each Fastify request has a raw Node socket; reuse DID cached there to avoid
+  // verifying the same DIDAuth header for every message on a long-lived connection
+  const sock = request.raw.socket as any;
+
+  // If this socket was verified before, reuse the cached DID and skip verification
+  if (sock[SOCKET_DID_KEY]) {
+    console.debug('request '+ request.id +' reuse cached DID', sock[SOCKET_DID_KEY]);
+    request.ctx = {
+      ...request.ctx,
+      callerDid: sock[SOCKET_DID_KEY] as string,
+    };
+    return; // already authenticated
+  }
+
   const authHeader = extractAuthHeader(request);
   
   if (!authHeader) {
@@ -73,14 +90,16 @@ export async function didAuthMiddleware(
       .status(401)
       .send({ error: 'Missing Authorization header' });
   }
-
   const result = await verifyDIDAuth(authHeader);
-  
+  console.debug('request '+ request.id +' verifyDIDAuth result', result);
   if (!result.isValid) {
     return reply
       .status(403)
       .send({ error: result.error || 'DIDAuth verification failed' });
   }
+
+  // Cache DID on socket so subsequent requests over the same connection skip verification
+  sock[SOCKET_DID_KEY] = result.did;
 
   // Store the authenticated DID in request context
   request.ctx = {
