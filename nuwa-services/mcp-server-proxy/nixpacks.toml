@@ -5,9 +5,9 @@ providers = ["node"]
 nixPkgs = ["nodejs", "pnpm"]
 
 [phases.install]
-# Install only production dependencies
+# Install all dependencies
 cmds = [
-  "pnpm install --prod"
+  "pnpm install"
 ]
 
 [phases.build]
