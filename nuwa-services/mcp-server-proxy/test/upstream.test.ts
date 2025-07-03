@@ -29,6 +29,17 @@ describe('Upstream (stdio) integration', () => {
     await upstream.client.close();
   });
 
+  it('upstream exposes capabilities', async () => {
+    expect(upstream.capabilities).toBeDefined();
+    expect(typeof upstream.capabilities).toBe('object');
+    // At least one of the main capability keys should exist
+    expect(
+      'tools' in upstream.capabilities ||
+      'prompts' in upstream.capabilities ||
+      'resources' in upstream.capabilities
+    ).toBe(true);
+  });
+
   // Mock FastifyReply
   class MockReply {
     statusCode = 200;
@@ -105,6 +116,17 @@ describe('Upstream (httpStream) integration', () => {
   afterAll(async () => {
     await upstream.client.close();
     serverProcess.kill();
+  });
+
+  it('upstream exposes capabilities', async () => {
+    expect(upstream.capabilities).toBeDefined();
+    console.log('upstream.capabilities', upstream.capabilities);
+    expect(typeof upstream.capabilities).toBe('object');
+    expect(
+      'tools' in upstream.capabilities ||
+      'prompts' in upstream.capabilities ||
+      'resources' in upstream.capabilities
+    ).toBe(true);
   });
 
   // Mock FastifyReply

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 // Import modules
 import { didAuthMiddleware } from './auth.js';
 import { determineUpstream, setUpstreamInContext } from './router.js';
-import { initUpstream, forwardToolList, forwardToolCall, forwardPromptLoad } from './upstream.js';
+import { initUpstream, forwardToolList, forwardToolCall, forwardPromptList, forwardPromptGet, forwardResourceList, forwardResourceTemplateList, forwardResourceRead } from './upstream.js';
 import { ProxyConfig, UpstreamRegistry } from './types.js';
 
 // Get directory name in ESM
@@ -36,7 +36,8 @@ async function initializeUpstreams(config: ProxyConfig): Promise<UpstreamRegistr
   
   for (const [name, upstreamConfig] of Object.entries(config.upstreams)) {
     try {
-      upstreams[name] = await initUpstream(name, upstreamConfig);
+      const upstream = await initUpstream(name, upstreamConfig);
+      upstreams[name] = upstream;
     } catch (error) {
       console.error(`Failed to initialize upstream ${name}:`, error);
     }
@@ -157,7 +158,7 @@ function registerRoutes(
     }
     
     try {
-      await forwardPromptLoad(request, reply, upstream);
+      await forwardPromptList(request, reply, upstream);
     } catch (error) {
       console.error('Error handling prompt.load:', error);
       return reply.status(500).send({
@@ -215,11 +216,35 @@ function registerRoutes(
     }
 
     const { method, params, id } = payload || {};
+    const upstreamName = request.ctx.upstream;
+    const upstream = upstreams[upstreamName];
+    const caps = upstream?.capabilities || {};
 
-    // Notifications (id is undefined or null) should not return error; acknowledge silently
+    // Silently acknowledge 'notifications/initialized' notification
     if ((id === undefined || id === null) && method === 'notifications/initialized') {
-      reply.code(204).send(); // No Content
+      reply.code(204).send();
       return;
+    }
+
+    // Helper to check if a method is supported by the upstream's capabilities
+    function isSupported(method: string) {
+      if (method.startsWith('tools/')) {
+        if (caps.tools === undefined) return true;
+        return Boolean(caps.tools);
+      }
+      if (method.startsWith('prompts/')) {
+        if (caps.prompts === undefined) return true;
+        return Boolean(caps.prompts);
+      }
+      if (method.startsWith('resources/')) {
+        if (caps.resources === undefined) return true;
+        return Boolean(caps.resources);
+      }
+      if (method.startsWith('resourceTemplates/')) {
+        if (caps.resourceTemplates === undefined) return true;
+        return Boolean(caps.resourceTemplates);
+      }
+      return true;
     }
 
     const jsonRpcError = (code: number, message: string) => reply.code(404).send({
@@ -228,55 +253,82 @@ function registerRoutes(
       id: id ?? null,
     });
 
-    // Map to existing REST-like routes by internal inject
     switch (method) {
       case 'tools/list': {
-        const res = await server.inject({
-          method: 'GET',
-          url: '/mcp/tools',
-          headers: request.headers as any,
-        });
-        reply.code(res.statusCode).send(res.payload);
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        try {
+          await forwardToolList(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'tools/list failed');
+        }
         return;
       }
       case 'tools/call': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
         if (!params?.name) return jsonRpcError(-32602, 'Missing params.name');
-
-        const res = await server.inject({
-          method: 'POST',
-          url: '/mcp/tool.call',
-          payload: { name: params.name, arguments: params.arguments || {} },
-          headers: request.headers as any,
-        });
-
-        // Payload may be streamed (SSE). If so, pipe directly.
-        const ctype = (res.headers['content-type'] as unknown as string) || '';
-        if (ctype.includes('text/event-stream')) {
-          reply.raw.writeHead(res.statusCode, res.headers as any);
-          reply.raw.write(res.rawPayload || res.payload);
-          return;
+        // Forge req.body for forwardToolCall
+        (request as any).body = { name: params.name, arguments: params.arguments || {} };
+        try {
+          await forwardToolCall(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'tools/call failed');
         }
-
-        // Otherwise send as JSON-RPC result
-        reply.code(res.statusCode).send({
-          jsonrpc: '2.0',
-          result: JSON.parse(res.payload),
-          id,
-        });
+        return;
+      }
+      case 'prompts/list': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        try {
+          await forwardPromptList(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'prompts/list failed');
+        }
+        return;
+      }
+      case 'prompts/get': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        (request as any).body = { name: params?.name, arguments: params?.arguments || {} };
+        try {
+          await forwardPromptGet(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'prompts/get failed');
+        }
+        return;
+      }
+      case 'resources/list': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        try {
+          await forwardResourceList(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'resources/list failed');
+        }
+        return;
+      }
+      case 'resources/read': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        (request as any).body = { params };
+        try {
+          await forwardResourceRead(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'resources/read failed');
+        }
+        return;
+      }
+      case 'resourceTemplates/list': {
+        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
+        try {
+          await forwardResourceTemplateList(request, reply, upstream, id);
+        } catch (error) {
+          return jsonRpcError(-32000, 'resourceTemplates/list failed');
+        }
         return;
       }
       case 'initialize': {
-        // TODO: In future, forward initialize to upstream and merge capabilities.
         return reply.send({
           jsonrpc: '2.0',
           result: {
-            protocolVersion: '2024-11-05', // TODO: fetch from upstream or constant
+            protocolVersion: '2024-11-05',
             serverInfo: { name: 'nuwa-mcp-proxy', version: '0.1.0' },
-            capabilities: {
-              tools: { listChanged: true },
-              prompts: { load: true },
-              resources: { read: true },
-            },
+            capabilities: caps,
           },
           id,
         });

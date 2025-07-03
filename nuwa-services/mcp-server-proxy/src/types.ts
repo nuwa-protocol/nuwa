@@ -4,6 +4,7 @@
 import { FastifyRequest } from 'fastify';
 import { ChildProcess } from 'child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Configuration Types
 export interface ServerConfig {
@@ -75,9 +76,10 @@ export interface ProxyConfig {
 
 // Runtime Types
 export interface Upstream {
-  type: 'httpStream' | 'stdio';
-  client: Client;
+  type: string;
+  client: any;
   config: UpstreamConfig;
+  capabilities: ServerCapabilities;
 }
 
 export interface UpstreamRegistry {

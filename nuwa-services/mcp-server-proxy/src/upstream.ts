@@ -1,7 +1,7 @@
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { UpstreamConfig, AuthConfig, Upstream } from './types.js';
+import { UpstreamConfig, AuthConfig, Upstream, McpCapabilities} from './types.js';
 
 function buildHeaders(auth?: AuthConfig): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -40,82 +40,171 @@ export async function initUpstream(name: string, cfg: UpstreamConfig): Promise<U
   const client: any = new Client({ name: `proxy-${name}`, version: '0.1.0' }, {});
   await client.connect(transport);
 
-  return { type: cfg.type, client, config: cfg };
+  // Fetch capabilities after connect using getServerCapabilities
+  let capabilities: McpCapabilities = {};
+  try {
+    if (typeof client.getServerCapabilities === 'function') {
+      capabilities = await client.getServerCapabilities();
+    }
+  } catch (e) {
+    console.warn(`Upstream ${name} getServerCapabilities failed:`, e);
+  }
+
+  return { type: cfg.type, client, config: cfg, capabilities };
 }
 
 // ---------- forwarding helpers (used by server.ts) -----------------
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
-export async function forwardToolList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+// Add optional jsonRpcId parameter to unify REST and JSON-RPC responses
+export async function forwardToolList(_req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   try {
-    const res = await up.client.listTools();
-    reply.send(res);
+    const result = await up.client.listTools();
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
   } catch (error) {
-    reply.status(500).send({ error: 'listTools failed', message: String(error) });
+    const message = String(error);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'listTools failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'listTools failed', message });
+    }
   }
 }
 
-export async function forwardToolCall(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardToolCall(req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   const body: any = req.body;
   const name = body?.name;
   const args = body?.arguments || {};
-  if (!name) return reply.status(400).send({ error: 'Missing name' });
+  if (!name) {
+    if (jsonRpcId !== undefined) {
+      return reply.status(400).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32602, message: 'Missing name' } });
+    }
+    return reply.status(400).send({ error: 'Missing name' });
+  }
   try {
     const result = await up.client.callTool({ name, arguments: args });
-    reply.send(result);
-  } catch (e) {
-    reply.status(500).send({ error: 'callTool failed', message: String(e) });
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
+  } catch (e: any) {
+    const message = String(e);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'callTool failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'callTool failed', message });
+    }
   }
 }
 
-export async function forwardPromptGet(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardPromptGet(req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   const body: any = req.body;
   const name = body?.name;
   const args = body?.arguments || {};
-  if (!name) return reply.status(400).send({ error: 'Missing name' });
+  if (!name) {
+    if (jsonRpcId !== undefined) {
+      return reply.status(400).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32602, message: 'Missing name' } });
+    }
+    return reply.status(400).send({ error: 'Missing name' });
+  }
   try {
     const result = await up.client.getPrompt({ name, arguments: args });
-    reply.send(result);
-  } catch (e) {
-    reply.status(500).send({ error: 'prompt.load failed', message: String(e) });
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
+  } catch (e: any) {
+    const message = String(e);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'promptGet failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'prompt.load failed', message });
+    }
   }
 }
 
-export async function forwardPromptList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardPromptList(_req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   try {
-    const res = await up.client.listPrompts();
-    reply.send(res);
+    const result = await up.client.listPrompts();
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
   } catch (error) {
-    reply.status(500).send({ error: 'listPrompts failed', message: String(error) });
+    const message = String(error);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'listPrompts failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'listPrompts failed', message });
+    }
   }
 }
 
-export async function forwardResourceList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardResourceList(_req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   try {
-    const res = await up.client.listResources();
-    reply.send(res);
+    const result = await up.client.listResources();
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
   } catch (error) {
-    reply.status(500).send({ error: 'listResources failed', message: String(error) });
+    const message = String(error);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'listResources failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'listResources failed', message });
+    }
   }
 }
 
-export async function forwardResourceTemplateList(_req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardResourceTemplateList(_req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   try {
-    const res = await up.client.listResourceTemplates();
-    reply.send(res);
+    const result = await up.client.listResourceTemplates();
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
   } catch (error) {
-    reply.status(500).send({ error: 'listResourceTemplates failed', message: String(error) });
+    const message = String(error);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'listResourceTemplates failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'listResourceTemplates failed', message });
+    }
   }
 }
 
-export async function forwardResourceRead(req: FastifyRequest, reply: FastifyReply, up: Upstream) {
+export async function forwardResourceRead(req: FastifyRequest, reply: FastifyReply, up: Upstream, jsonRpcId?: string | number | null) {
   const body: any = req.body;
   const params = body?.params;
-  if (!params) return reply.status(400).send({ error: 'Missing params' });
+  if (!params) {
+    if (jsonRpcId !== undefined) {
+      return reply.status(400).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32602, message: 'Missing params' } });
+    }
+    return reply.status(400).send({ error: 'Missing params' });
+  }
   try {
-    const res = await up.client.readResource(params);
-    reply.send(res);
+    const result = await up.client.readResource(params);
+    if (jsonRpcId !== undefined) {
+      reply.send({ jsonrpc: '2.0', id: jsonRpcId, result });
+    } else {
+      reply.send(result);
+    }
   } catch (error) {
-    reply.status(500).send({ error: 'readResource failed', message: String(error) });
+    const message = String(error);
+    if (jsonRpcId !== undefined) {
+      reply.status(500).send({ jsonrpc: '2.0', id: jsonRpcId, error: { code: -32000, message: 'readResource failed: ' + message } });
+    } else {
+      reply.status(500).send({ error: 'readResource failed', message });
+    }
   }
 } 
