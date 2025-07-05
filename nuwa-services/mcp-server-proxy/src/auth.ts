@@ -4,6 +4,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { DIDAuth, VDRRegistry, initRoochVDR } from '@nuwa-ai/identity-kit';
 import { DIDAuthResult } from './types.js';
+import { performance } from 'node:perf_hooks';
 
 // Symbol used to cache caller DID on a TCP socket once it has been verified.
 const SOCKET_DID_KEY = Symbol('callerDid');
@@ -69,7 +70,7 @@ export async function didAuthMiddleware(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  const t0 = Date.now();
+  const t0 = performance.now();
   // Each Fastify request has a raw Node socket; reuse DID cached there to avoid
   // verifying the same DIDAuth header for every message on a long-lived connection
   const sock = request.raw.socket as any;
@@ -81,14 +82,14 @@ export async function didAuthMiddleware(
       ...request.ctx,
       callerDid: sock[SOCKET_DID_KEY] as string,
     };
-    request.ctx.timings.auth = Date.now() - t0;
+    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
     return; // already authenticated
   }
 
   const authHeader = extractAuthHeader(request);
   
   if (!authHeader) {
-    request.ctx.timings.auth = Date.now() - t0;
+    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
     return reply
       .status(401)
       .send({ error: 'Missing Authorization header' });
@@ -96,7 +97,7 @@ export async function didAuthMiddleware(
   const result = await verifyDIDAuth(authHeader);
   console.debug('request '+ request.id +' verifyDIDAuth result', result);
   if (!result.isValid) {
-    request.ctx.timings.auth = Date.now() - t0;
+    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
     return reply
       .status(403)
       .send({ error: result.error || 'DIDAuth verification failed' });
@@ -110,5 +111,5 @@ export async function didAuthMiddleware(
     ...request.ctx,
     callerDid: result.did,
   };
-  request.ctx.timings.auth = Date.now() - t0;
+  request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
 } 
