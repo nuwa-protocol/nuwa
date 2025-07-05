@@ -45,7 +45,7 @@ describe('Proxy e2e', () => {
       upstreams: {
         'mock-http': {
           type: 'httpStream',
-          baseURL: 'http://localhost:4000/mcp',
+          url: 'http://localhost:4000/mcp',
         } as any,
       },
     } as any;

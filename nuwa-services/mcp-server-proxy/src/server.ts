@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { fileURLToPath } from 'node:url';
+import { performance } from 'node:perf_hooks';
 
 // Import modules
 import { didAuthMiddleware } from './auth.js';
@@ -79,8 +80,9 @@ function registerRoutes(
   // Middleware to initialize request context
   server.addHook('onRequest', (request, reply, done) => {
     request.ctx = {
-      startTime: Date.now(),
+      startTime: performance.now(),
       upstream: config.defaultUpstream,
+      timings: {},
     };
     done();
   });
@@ -92,8 +94,10 @@ function registerRoutes(
   
   // Router middleware
   server.addHook('preHandler', (request, reply, done) => {
+    const tRouteStart = performance.now();
     const upstream = determineUpstream(request, config.routes, config.defaultUpstream);
     setUpstreamInContext(request, upstream);
+    request.ctx.timings.route = Number((performance.now() - tRouteStart).toFixed(3));
     done();
   });
   
@@ -214,6 +218,9 @@ function registerRoutes(
         id: null,
       });
     }
+
+    // Record JSON-RPC method to ctx
+    request.ctx.rpcMethod = payload?.method ?? null;
 
     const { method, params, id } = payload || {};
     const upstreamName = request.ctx.upstream;
@@ -340,6 +347,35 @@ function registerRoutes(
   };
   server.post('/mcp', rpcHandler);
   server.post('/mcp/', rpcHandler);
+
+  // --- logging ---
+  server.addHook('onResponse', (request, reply, done) => {
+    const total = Number((performance.now() - request.ctx.startTime).toFixed(3));
+    const summary = {
+      reqId: request.id,
+      did: request.ctx.callerDid ?? null,
+      method: request.method,
+      url: request.url,
+      status: reply.statusCode,
+      upstream: request.ctx.upstream,
+      rpcMethod: request.ctx.rpcMethod ?? null,
+      timings: { ...request.ctx.timings, total },
+    };
+    request.log.info(summary, 'request.summary');
+    done();
+  });
+
+  server.addHook('onError', (request, reply, error, done) => {
+    request.log.error({
+      reqId: request.id,
+      did: request.ctx?.callerDid ?? null,
+      stage: 'error',
+      upstream: request.ctx?.upstream,
+      rpcMethod: request.ctx?.rpcMethod ?? null,
+      err: error,
+    }, 'request.error');
+    done();
+  });
 }
 
 // Main function

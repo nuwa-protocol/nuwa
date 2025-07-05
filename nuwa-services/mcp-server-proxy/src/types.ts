@@ -107,6 +107,8 @@ export interface RequestContext {
   callerDid?: string;
   upstream: string;
   startTime: number;
+  timings: Record<string, number>;
+  rpcMethod?: string | null;
 }
 
 // Billing Types
