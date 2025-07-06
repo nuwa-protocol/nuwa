@@ -422,13 +422,14 @@ async function main() {
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
 
+    let port = process.env.PORT || config.server.port || 8088;
     // Start server
     await server.listen({
       host: config.server.host,
-      port: config.server.port,
+      port: Number(port),
     });
     
-    console.log(`MCP Server Proxy started on ${config.server.host}:${config.server.port}`);
+    console.log(`MCP Server Proxy started on ${config.server.host}:${port}`);
     console.log(`Available upstreams: ${Object.keys(upstreams).join(', ')}`);
   } catch (error) {
     console.error('Failed to start server:', error);
