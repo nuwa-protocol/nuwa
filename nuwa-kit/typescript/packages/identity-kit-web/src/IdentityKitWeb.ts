@@ -114,6 +114,29 @@ export class IdentityKitWeb {
   }
 
   /**
+   * Build the connect URL without opening a window
+   * This allows the client to handle the window opening to avoid popup blocking
+   */
+  async buildConnectUrl(): Promise<string> {
+    const idFragment = this.generateIdFragment();
+
+    const { url } = await this.deepLinkManager.buildAddKeyUrl({
+      cadopDomain: this.cadopDomain,
+      idFragment,
+    });
+    
+    return url;
+  }
+
+  /**
+   * Open a connect URL in a new window
+   * This should be called immediately in response to a user action
+   */
+  openConnectUrl(url: string): void {
+    window.open(url, '_blank');
+  }
+
+  /**
    * Connect to Cadop
    * This will open a new window with the Cadop add-key page
    */

@@ -13,6 +13,8 @@ export interface IdentityKitState {
 export interface IdentityKitHook {
   state: IdentityKitState;
   connect: () => Promise<void>;
+  buildConnectUrl: () => Promise<string>;
+  openConnectUrl: (url: string) => void;
   sign: (payload: any) => Promise<NIP1SignedObject>;
   verify: (sig: NIP1SignedObject) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -109,6 +111,18 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     }
   }, [sdk, options.autoConnect, state.isConnected, state.isConnecting]);
 
+  // Build connect URL
+  const buildConnectUrl = useCallback(async (): Promise<string> => {
+    if (!sdk) throw new Error('SDK not initialized');
+    return sdk.buildConnectUrl();
+  }, [sdk]);
+
+  // Open connect URL
+  const openConnectUrl = useCallback((url: string): void => {
+    if (!sdk) throw new Error('SDK not initialized');
+    sdk.openConnectUrl(url);
+  }, [sdk]);
+
   // Connect action
   const connect = useCallback(async () => {
     if (!sdk) {
@@ -159,5 +173,5 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     });
   }, [sdk]);
 
-  return { state, connect, sign, verify, logout, sdk };
+  return { state, connect, buildConnectUrl, openConnectUrl, sign, verify, logout, sdk };
 } 
