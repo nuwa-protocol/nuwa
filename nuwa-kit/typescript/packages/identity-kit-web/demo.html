@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuwa Identity Kit - Popup-Safe Connection Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .code-block {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .info {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Nuwa Identity Kit - Popup-Safe Connection Demo</h1>
+    
+    <div class="demo-section">
+        <h2>Problem Demonstration</h2>
+        <p>Modern browsers may block popups that are opened after asynchronous operations. Click the button below to see the original approach that may face popup blocking:</p>
+        
+        <button id="legacy-connect">Legacy Connect (May Be Blocked)</button>
+        <div id="legacy-status"></div>
+        
+        <div class="code-block">
+// Legacy approach - may be blocked by browsers
+async function legacyConnect() {
+    // This async operation breaks the user activation chain
+    const url = await buildConnectionUrl();
+    window.open(url, '_blank'); // ❌ May be blocked
+}
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>Solution: Popup-Safe Connection</h2>
+        <p>The new approach separates URL building from window opening to avoid popup blocking:</p>
+        
+        <button id="safe-connect">Popup-Safe Connect</button>
+        <button id="prepare-url">Prepare URL First</button>
+        <div id="safe-status"></div>
+        
+        <div class="code-block">
+// New approach - popup-safe
+let connectUrl = null;
+
+// Step 1: Pre-build URL (can be done ahead of time)
+async function prepareConnection() {
+    connectUrl = await sdk.buildConnectUrl();
+}
+
+// Step 2: Open immediately in user action (no async operations)
+function handleConnect() {
+    if (connectUrl) {
+        sdk.openConnectUrl(connectUrl); // ✅ Won't be blocked
+    }
+}
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>React Hook Usage</h2>
+        <p>Here's how to use the new methods in React:</p>
+        
+        <div class="code-block">
+import { useIdentityKit } from '@nuwa-ai/identity-kit-web';
+
+function ConnectButton() {
+    const { state, buildConnectUrl, openConnectUrl } = useIdentityKit();
+    const [connectUrl, setConnectUrl] = useState(null);
+
+    // Pre-build URL when component mounts
+    useEffect(() => {
+        if (!state.isConnected && !connectUrl) {
+            buildConnectUrl().then(setConnectUrl);
+        }
+    }, [state.isConnected, connectUrl, buildConnectUrl]);
+
+    // Handle click - no async operations
+    const handleConnect = () => {
+        if (connectUrl) {
+            openConnectUrl(connectUrl);
+            setConnectUrl(null); // Clear for next use
+        }
+    };
+
+    return (
+        &lt;button onClick={handleConnect} disabled={!connectUrl}&gt;
+            Sign-in with DID
+        &lt;/button&gt;
+    );
+}
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>API Reference</h2>
+        <h3>IdentityKitWeb Methods</h3>
+        <ul>
+            <li><strong>buildConnectUrl()</strong>: Returns Promise&lt;string&gt; - Pre-builds the connection URL</li>
+            <li><strong>openConnectUrl(url)</strong>: Opens the URL in a new window immediately</li>
+            <li><strong>connect()</strong>: Original method (still available for backward compatibility)</li>
+        </ul>
+        
+        <h3>React Hook Methods</h3>
+        <ul>
+            <li><strong>buildConnectUrl()</strong>: Returns Promise&lt;string&gt; - Pre-builds the connection URL</li>
+            <li><strong>openConnectUrl(url)</strong>: Opens the URL in a new window immediately</li>
+            <li><strong>connect()</strong>: Original method (still available for backward compatibility)</li>
+        </ul>
+    </div>
+
+    <script>
+        // Mock implementation for demonstration
+        class MockSDK {
+            constructor() {
+                this.cadopDomain = 'https://test-id.nuwa.dev';
+            }
+
+            // Simulate the async URL building process
+            async buildConnectUrl() {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const url = `${this.cadopDomain}/add-key?payload=demo-payload-${Date.now()}`;
+                        resolve(url);
+                    }, 100);
+                });
+            }
+
+            openConnectUrl(url) {
+                console.log('Opening URL:', url);
+                // In real implementation: window.open(url, '_blank');
+                // For demo, we'll just show a message
+                alert(`Would open: ${url}`);
+            }
+
+            // Original connect method
+            async connect() {
+                const url = await this.buildConnectUrl();
+                this.openConnectUrl(url);
+            }
+        }
+
+        const sdk = new MockSDK();
+        let preparedUrl = null;
+
+        // Status display helpers
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">🔄 ${message}</div>`;
+        }
+
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+
+        // Legacy connect (may be blocked)
+        document.getElementById('legacy-connect').addEventListener('click', async () => {
+            showStatus('legacy-status', 'Connecting with legacy method...');
+            try {
+                await sdk.connect();
+                showSuccess('legacy-status', 'Legacy connection completed (but may have been blocked by browser)');
+            } catch (error) {
+                showError('legacy-status', `Legacy connection failed: ${error.message}`);
+            }
+        });
+
+        // Prepare URL
+        document.getElementById('prepare-url').addEventListener('click', async () => {
+            showStatus('safe-status', 'Preparing connection URL...');
+            try {
+                preparedUrl = await sdk.buildConnectUrl();
+                showSuccess('safe-status', `URL prepared: ${preparedUrl.substring(0, 50)}...`);
+                document.getElementById('safe-connect').disabled = false;
+            } catch (error) {
+                showError('safe-status', `Failed to prepare URL: ${error.message}`);
+            }
+        });
+
+        // Safe connect (popup-safe)
+        document.getElementById('safe-connect').addEventListener('click', () => {
+            if (preparedUrl) {
+                showStatus('safe-status', 'Opening connection with popup-safe method...');
+                sdk.openConnectUrl(preparedUrl);
+                showSuccess('safe-status', 'Popup-safe connection completed successfully!');
+                preparedUrl = null;
+                document.getElementById('safe-connect').disabled = true;
+            } else {
+                showError('safe-status', 'No URL prepared. Click "Prepare URL First" button.');
+            }
+        });
+
+        // Initial state
+        document.getElementById('safe-connect').disabled = true;
+    </script>
+</body>
+</html>
