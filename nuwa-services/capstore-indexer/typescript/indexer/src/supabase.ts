@@ -9,18 +9,16 @@ config();
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!;
 
-// 创建 Supabase 客户端
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 存储数据到 Supabase
-export async function storeToSupabase(data: YamlData): Promise<void> {
+export async function storeToSupabase(data: YamlData, cid: String): Promise<void> {
   const { error } = await supabase
     .from('ipfs_data')
     .upsert(
       {
         name: data.name,
         id: data.id,
-        cid: data.cid,
+        cid: cid,
         timestamp: new Date().toISOString()
       },
       { onConflict: 'cid' }
@@ -31,7 +29,6 @@ export async function storeToSupabase(data: YamlData): Promise<void> {
   }
 }
 
-// 从 Supabase 查询 CID
 export async function queryCIDFromSupabase(name: string, id: string): Promise<{ cid: string }> {
   const { data, error } = await supabase
     .from('ipfs_data')

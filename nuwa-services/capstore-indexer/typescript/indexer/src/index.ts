@@ -27,7 +27,6 @@ const mcp = new FastMCP({
   },
 });
 
-// 注册事件处理器
 setupRoochEventListener();
 
 mcp.addTool({
@@ -73,7 +72,6 @@ mcp.addTool({
   }
 });
 
-// 启动 MCP 服务
 mcp.start({
   transportType: "httpStream",
   httpStream: {
