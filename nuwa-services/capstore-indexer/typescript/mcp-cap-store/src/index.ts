@@ -4,10 +4,11 @@ import { DIDAuth, VDRRegistry, initRoochVDR } from "@nuwa-ai/identity-kit";
 import { create } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { Readable } from 'stream';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
 
 
-dotenv.config();
+config();
+
 // Initialize IPFS client (connects to go-ipfs node)
 let ipfsClient: any;
 
@@ -181,7 +182,7 @@ server.addResourceTemplate({
 server.start({
   transportType: "httpStream",
   httpStream: {
-    port: 8080,
+    port: 8081,
   },
 });
 
