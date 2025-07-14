@@ -4,6 +4,7 @@
  */
 
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
+import { DidAccountSigner } from '@nuwa-ai/identity-kit';
 import { RoochPaymentChannelContract } from './contract';
 import type { 
   ChannelMetadata, 
@@ -243,12 +244,8 @@ export class RoochPaymentChannelClient {
 
   /**
    * Convert SignerInterface to Rooch Signer
-   * TODO: Implement proper conversion when Rooch SDK integration is ready
    */
-  private async convertToRoochSigner(): Promise<any> {
-    // This is a placeholder
-    // In the real implementation, this should convert the SignerInterface
-    // to a Rooch SDK compatible signer
-    throw new Error('SignerInterface to Rooch Signer conversion not yet implemented');
+  private async convertToRoochSigner(): Promise<DidAccountSigner> {
+    return DidAccountSigner.create(this.signer, this.defaultKeyId);
   }
 } 

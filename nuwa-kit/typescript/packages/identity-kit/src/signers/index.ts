@@ -5,3 +5,4 @@
 
 export * from './KeyStoreSigner';
 export * from './types';
+export * from './didAccountSigner';
