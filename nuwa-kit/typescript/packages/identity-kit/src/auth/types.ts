@@ -8,6 +8,11 @@ export interface SignedData {
   params: Record<string, any>;
   nonce: string;
   timestamp: number; // Unix timestamp
+  /**
+   * A unique identifier for the service, typically its canonical URL.
+   * As per NIP-2, this is required for HTTP authentication to prevent cross-service replay attacks.
+   */
+  audience?: string;
 }
 
 export interface NIP1Signature {
