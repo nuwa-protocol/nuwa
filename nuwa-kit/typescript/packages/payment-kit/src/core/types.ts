@@ -6,6 +6,8 @@
  * Sub-channel Receipt And Voucher - the core payment message in NIP-4
  */
 export interface SubRAV {
+  /** Protocol version (default: 1) */
+  version: number;
   /** Blockchain identifier (e.g., 4 for Rooch testnet) */
   chainId: bigint;
   /** Deterministic channel identifier (32-byte hex string) */

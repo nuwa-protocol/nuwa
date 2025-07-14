@@ -138,6 +138,7 @@ const response = HttpHeaderCodec.buildResponseHeader({
 
 ```ts
 export interface SubRAV {
+  version: number;          // Protocol version, default 1
   chainId: bigint;          // 区块链标识符
   channelId: string;        // 通道 ID (32-byte hex)
   channelEpoch: bigint;     // 通道纪元，防止重放攻击

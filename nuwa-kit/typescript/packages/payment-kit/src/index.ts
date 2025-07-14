@@ -54,5 +54,13 @@ export async function createRoochPaymentChannelClient(opts: {
 
 // Re-export important classes for convenience
 export { RoochPaymentChannelClient } from './rooch/client';
-export { SubRAVSigner, SubRAVCodec } from './core/subrav';
+export { 
+  SubRAVSigner, 
+  SubRAVCodec, 
+  SubRAVUtils, 
+  SubRAVValidator, 
+  SubRAVSchema,
+  CURRENT_SUBRAV_VERSION, 
+  SUBRAV_VERSION_1 
+} from './core/subrav';
 export { HttpHeaderCodec } from './core/http-header';

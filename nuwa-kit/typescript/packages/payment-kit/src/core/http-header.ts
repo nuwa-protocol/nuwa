@@ -104,6 +104,7 @@ export class HttpHeaderCodec {
    */
   private static serializeSubRAV(subRav: SubRAV): Record<string, string> {
     return {
+      version: subRav.version.toString(),
       chainId: subRav.chainId.toString(),
       channelId: subRav.channelId,
       channelEpoch: subRav.channelEpoch.toString(),
@@ -118,6 +119,7 @@ export class HttpHeaderCodec {
    */
   private static deserializeSubRAV(data: Record<string, string>): SubRAV {
     return {
+      version: parseInt(data.version),
       chainId: BigInt(data.chainId),
       channelId: data.channelId,
       channelEpoch: BigInt(data.channelEpoch),

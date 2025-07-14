@@ -4,62 +4,97 @@
 
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import { CryptoUtils, MultibaseCodec } from '@nuwa-ai/identity-kit';
+import { bcs, type BcsType } from '@roochnetwork/rooch-sdk';
 import type { SubRAV, SignedSubRAV } from './types';
 
 /**
- * BCS-compatible structure for SubRAV serialization
- * Note: We'll implement a simple serialization for now, 
- * proper BCS integration can be added later
+ * Constants for SubRAV protocol versions
  */
-interface SubRAVStruct {
-  chain_id: string;
-  channel_id: string;
-  channel_epoch: string;
-  vm_id_fragment: string;
-  accumulated_amount: string;
-  nonce: string;
-}
+export const SUBRAV_VERSION_1 = 1;
+export const CURRENT_SUBRAV_VERSION = SUBRAV_VERSION_1;
 
 /**
- * SubRAV codec for encoding and decoding
+ * BCS Schema for SubRAV serialization
+ * Must match the Move contract SubRAV struct definition
+ */
+export const SubRAVSchema: BcsType<any> = bcs.struct('SubRAV', {
+  version: bcs.u8(),
+  chain_id: bcs.u64(),
+  channel_id: bcs.ObjectId,
+  channel_epoch: bcs.u64(),
+  vm_id_fragment: bcs.string(),
+  accumulated_amount: bcs.u256(),
+  nonce: bcs.u64(),
+});
+
+/**
+ * SubRAV codec for encoding and decoding using BCS
  */
 export class SubRAVCodec {
   /**
-   * Encode a SubRAV to bytes using canonical serialization
-   * TODO: Replace with proper BCS serialization when available
+   * Encode a SubRAV to bytes using BCS serialization
+   * This ensures cross-platform consistency with Move contracts
    */
   static encode(subRav: SubRAV): Uint8Array {
-    // Convert bigints to strings for serialization
-    const struct: SubRAVStruct = {
-      chain_id: subRav.chainId.toString(),
-      channel_id: subRav.channelId,
-      channel_epoch: subRav.channelEpoch.toString(),
-      vm_id_fragment: subRav.vmIdFragment,
-      accumulated_amount: subRav.accumulatedAmount.toString(),
-      nonce: subRav.nonce.toString(),
-    };
+    try {
+      // Convert to BCS-compatible format
+      // Note: BCS expects string representations for large numbers
+      const bcsSubRAV = {
+        version: subRav.version,
+        chain_id: subRav.chainId.toString(),
+        channel_id: subRav.channelId,
+        channel_epoch: subRav.channelEpoch.toString(),
+        vm_id_fragment: subRav.vmIdFragment,
+        accumulated_amount: subRav.accumulatedAmount.toString(),
+        nonce: subRav.nonce.toString(),
+      };
 
-    // Use deterministic JSON serialization for now
-    const jsonStr = JSON.stringify(struct, Object.keys(struct).sort());
-    return new TextEncoder().encode(jsonStr);
+      return SubRAVSchema.serialize(bcsSubRAV).toBytes();
+    } catch (error) {
+      throw new Error(`Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**
-   * Decode bytes to SubRAV
-   * TODO: Replace with proper BCS deserialization when available
+   * Decode bytes to SubRAV using BCS deserialization
    */
   static decode(bytes: Uint8Array): SubRAV {
-    const jsonStr = new TextDecoder().decode(bytes);
-    const struct: SubRAVStruct = JSON.parse(jsonStr);
+    try {
+      const bcsSubRAV = SubRAVSchema.parse(bytes);
 
-    return {
-      chainId: BigInt(struct.chain_id),
-      channelId: struct.channel_id,
-      channelEpoch: BigInt(struct.channel_epoch),
-      vmIdFragment: struct.vm_id_fragment,
-      accumulatedAmount: BigInt(struct.accumulated_amount),
-      nonce: BigInt(struct.nonce),
-    };
+      return {
+        version: bcsSubRAV.version,
+        chainId: BigInt(bcsSubRAV.chain_id),
+        channelId: bcsSubRAV.channel_id,
+        channelEpoch: BigInt(bcsSubRAV.channel_epoch),
+        vmIdFragment: bcsSubRAV.vm_id_fragment,
+        accumulatedAmount: BigInt(bcsSubRAV.accumulated_amount),
+        nonce: BigInt(bcsSubRAV.nonce),
+      };
+    } catch (error) {
+      throw new Error(`Failed to decode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get the BCS hex string representation of a SubRAV (useful for debugging)
+   */
+  static toHex(subRav: SubRAV): string {
+    const bytes = this.encode(subRav);
+    return '0x' + Array.from(bytes)
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  /**
+   * Create SubRAV from BCS hex string
+   */
+  static fromHex(hex: string): SubRAV {
+    const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+    const bytes = new Uint8Array(
+      cleanHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+    );
+    return this.decode(bytes);
   }
 }
 
@@ -142,6 +177,16 @@ export class SubRAVValidator {
   static validate(subRav: SubRAV): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
+    // Check version
+    if (!Number.isInteger(subRav.version) || subRav.version < 1) {
+      errors.push('Version must be a positive integer (minimum 1)');
+    }
+
+    // For now, only support version 1
+    if (subRav.version !== SUBRAV_VERSION_1) {
+      errors.push(`Unsupported SubRAV version: ${subRav.version}. Supported versions: ${SUBRAV_VERSION_1}`);
+    }
+
     // Check required fields
     if (!subRav.channelId || subRav.channelId.length !== 66) {
       errors.push('Invalid channel ID format (must be 32-byte hex string with 0x prefix)');
@@ -180,6 +225,11 @@ export class SubRAVValidator {
     const errors: string[] = [];
 
     if (prev) {
+      // Check version compatibility
+      if (prev.version !== current.version) {
+        errors.push('Version mismatch between previous and current SubRAV');
+      }
+
       // Check same channel and sub-channel
       if (prev.channelId !== current.channelId) {
         errors.push('Channel ID mismatch');
@@ -207,5 +257,32 @@ export class SubRAVValidator {
       valid: errors.length === 0,
       errors,
     };
+  }
+} 
+
+/**
+ * Helper functions for creating SubRAV instances
+ */
+export class SubRAVUtils {
+  /**
+   * Create a new SubRAV with default version
+   */
+  static create(params: Omit<SubRAV, 'version'> & { version?: number }): SubRAV {
+    return {
+      version: params.version ?? CURRENT_SUBRAV_VERSION,
+      chainId: params.chainId,
+      channelId: params.channelId,
+      channelEpoch: params.channelEpoch,
+      vmIdFragment: params.vmIdFragment,
+      accumulatedAmount: params.accumulatedAmount,
+      nonce: params.nonce,
+    };
+  }
+
+  /**
+   * Check if a SubRAV version is supported
+   */
+  static isSupportedVersion(version: number): boolean {
+    return version === SUBRAV_VERSION_1;
   }
 } 

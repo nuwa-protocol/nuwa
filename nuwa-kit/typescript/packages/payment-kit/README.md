@@ -7,6 +7,8 @@
 ## ✨ 功能特性
 
 - **NIP-4 兼容**: 完整实现 SubRAV (Sub-channel Receipt And Voucher) 协议
+- **版本化协议**: 支持 SubRAV 版本控制，确保向后兼容性和协议演进
+- **BCS 序列化**: 使用 Rooch 原生 BCS 序列化，确保与链上合约的完全兼容
 - **多设备支持**: 支持单一通道内的多个子通道，每个绑定不同的验证方法
 - **链兼容**: 抽象化设计，当前支持 Rooch，未来可扩展到其他区块链
 - **HTTP Gateway**: 内置 `X-Payment-Channel-Data` 头处理，支持 HTTP 服务集成
@@ -101,6 +103,7 @@ const responseHeader = HttpHeaderCodec.buildResponseHeader({
 
 ```typescript
 interface SubRAV {
+  version: number;          // Protocol version (default: 1)
   chainId: bigint;
   channelId: string;        // 32-byte hex string
   channelEpoch: bigint;
@@ -157,13 +160,37 @@ class SubRAVSigner {
 }
 ```
 
+### SubRAV BCS 序列化
+
+```typescript
+import { SubRAVCodec, SubRAVUtils } from '@nuwa-ai/payment-kit';
+
+// 创建 SubRAV (自动使用当前版本)
+const subRav = SubRAVUtils.create({
+  chainId: BigInt(4),
+  channelId: '0x1234...',
+  channelEpoch: BigInt(0),
+  vmIdFragment: 'device-key',
+  accumulatedAmount: BigInt(1000),
+  nonce: BigInt(1),
+});
+
+// BCS 序列化
+const encoded = SubRAVCodec.encode(subRav);
+const hex = SubRAVCodec.toHex(subRav);
+
+// 反序列化
+const decoded = SubRAVCodec.decode(encoded);
+const fromHex = SubRAVCodec.fromHex(hex);
+```
+
 ## 📁 项目结构
 
 ```
 src/
 ├── core/                   # 链无关的协议实现
 │   ├── types.ts           # 核心类型定义
-│   ├── subrav.ts          # SubRAV 生成和验证
+│   ├── subrav.ts          # SubRAV BCS 序列化、生成和验证
 │   └── http-header.ts     # HTTP Gateway Profile 实现
 ├── rooch/                 # Rooch 链特定实现
 │   ├── contract.ts        # Move 合约调用封装
@@ -201,4 +228,6 @@ npm run test:integration
 
 ## 📄 许可证
 
-Apache-2.0 
+Apache-2.0
+
+```

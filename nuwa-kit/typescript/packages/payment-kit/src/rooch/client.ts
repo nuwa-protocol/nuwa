@@ -12,7 +12,7 @@ import type {
   SubChannelState, 
   TransactionResult 
 } from '../core/types';
-import { SubRAVSigner } from '../core/subrav';
+import { SubRAVSigner, SubRAVUtils } from '../core/subrav';
 import { generateNonce, extractFragment } from '../utils';
 
 export interface PaymentChannelClientOptions {
@@ -139,14 +139,14 @@ export class RoochPaymentChannelClient {
     }
 
     // Create new SubRAV
-    const subRav = {
+    const subRav = SubRAVUtils.create({
       chainId: BigInt(4), // TODO: Get actual chain ID
       channelId: state.channelId,
       channelEpoch: state.epoch,
       vmIdFragment: extractFragment(effectiveKeyId),
       accumulatedAmount: state.accumulatedAmount + deltaAmount,
       nonce: state.nonce + BigInt(1),
-    };
+    });
 
     // Sign the SubRAV
     const signedSubRAV = await SubRAVSigner.sign(subRav, this.signer, effectiveKeyId);

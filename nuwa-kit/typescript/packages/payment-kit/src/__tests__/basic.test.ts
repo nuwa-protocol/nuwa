@@ -10,7 +10,8 @@ import {
   generateNonce,
   extractFragment,
   isValidHex,
-  formatAmount 
+  formatAmount,
+  SUBRAV_VERSION_1
 } from '../index';
 import type { SubRAV, SignedSubRAV } from '../core/types';
 
@@ -18,6 +19,7 @@ describe('Payment Kit Basic Tests', () => {
   describe('SubRAV Types and Validation', () => {
     it('should validate valid SubRAV', () => {
       const subRav: SubRAV = {
+        version: SUBRAV_VERSION_1,
         chainId: BigInt(4),
         channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
         channelEpoch: BigInt(0),
@@ -33,6 +35,7 @@ describe('Payment Kit Basic Tests', () => {
 
     it('should reject invalid SubRAV', () => {
       const subRav: SubRAV = {
+        version: SUBRAV_VERSION_1,
         chainId: BigInt(-1), // Invalid negative chain ID
         channelId: 'invalid', // Invalid channel ID format
         channelEpoch: BigInt(0),
@@ -50,6 +53,7 @@ describe('Payment Kit Basic Tests', () => {
   describe('SubRAV Codec', () => {
     it('should encode and decode SubRAV correctly', () => {
       const original: SubRAV = {
+        version: SUBRAV_VERSION_1,
         chainId: BigInt(4),
         channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
         channelEpoch: BigInt(0),
@@ -107,6 +111,7 @@ describe('Payment Kit Basic Tests', () => {
   describe('SubRAV Sequence Validation', () => {
     it('should validate correct sequence', () => {
       const prev: SubRAV = {
+        version: SUBRAV_VERSION_1,
         chainId: BigInt(4),
         channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
         channelEpoch: BigInt(0),
@@ -127,6 +132,7 @@ describe('Payment Kit Basic Tests', () => {
 
     it('should reject invalid sequence', () => {
       const prev: SubRAV = {
+        version: SUBRAV_VERSION_1,
         chainId: BigInt(4),
         channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
         channelEpoch: BigInt(0),
