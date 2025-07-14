@@ -5,10 +5,17 @@ import { VDRRegistry } from '@nuwa-ai/identity-kit';
 export * from './core/types';
 export * from './core/subrav';
 export * from './core/http-header';
+export * from './core/storage';
+export * from './core/claim-scheduler';
+
+// SQL storage (separate export for optional dependency)
+// Note: sql-storage requires 'pg' dependency to be installed separately
+// export * from './core/sql-storage';
 
 // Rooch implementation
 export * from './rooch/contract';
 export * from './rooch/client';
+export * from './rooch/payee-client';
 
 // Utilities
 export * from './utils';

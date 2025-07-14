@@ -171,48 +171,60 @@ export interface AssetInfo {
 ### 4.2 SubRAV 编解码器 (`core/subrav.ts`)
 
 ```ts
+// BCS Schema 与 Move `SubRAV` 结构保持一致
+export const SubRAVSchema = bcs.struct('SubRAV', {
+  version: bcs.u8(),
+  chain_id: bcs.u64(),
+  channel_id: bcs.ObjectId,
+  channel_epoch: bcs.u64(),
+  vm_id_fragment: bcs.string(),
+  accumulated_amount: bcs.u256(),
+  nonce: bcs.u64(),
+});
+
 export class SubRAVCodec {
-  static encode(subRav: SubRAV): Uint8Array {
-    // 使用 BCS 序列化，确保跨语言一致性
-    return bcs.serialize(SubRAVStruct, subRav);
+  static encode(rav: SubRAV): Uint8Array {
+    // 大整数字段转字符串以兼容 BCS
+    return SubRAVSchema.serialize({
+      ...rav,
+      chain_id: rav.chainId.toString(),
+      channel_epoch: rav.channelEpoch.toString(),
+      accumulated_amount: rav.accumulatedAmount.toString(),
+      nonce: rav.nonce.toString(),
+    }).toBytes();
   }
 
   static decode(bytes: Uint8Array): SubRAV {
-    return bcs.deserialize(SubRAVStruct, bytes);
+    const r = SubRAVSchema.parse(bytes);
+    return {
+      ...r,
+      chainId: BigInt(r.chain_id),
+      channelEpoch: BigInt(r.channel_epoch),
+      accumulatedAmount: BigInt(r.accumulated_amount),
+      nonce: BigInt(r.nonce),
+    };
   }
 }
+```
 
-export class SubRAVSigner {
-  static async sign(
-    subRav: SubRAV,
-    signer: SignerInterface,
-    keyId: string
-  ): Promise<SignedSubRAV> {
-    const bytes = SubRAVCodec.encode(subRav);
-    const signature = await signer.signWithKeyId(bytes, keyId);
-    return { subRav, signature };
-  }
+### 4.3 CloseProofs 编解码器 (`rooch/contract.ts`)
 
-  static async verify(
-    signedSubRAV: SignedSubRAV,
-    resolver: DIDResolver
-  ): Promise<boolean> {
-    const bytes = SubRAVCodec.encode(signedSubRAV.subRav);
-    // 从 vmIdFragment 解析出完整的 keyId
-    const did = await this.extractDidFromSubRAV(signedSubRAV.subRav);
-    const keyId = `${did}#${signedSubRAV.subRav.vmIdFragment}`;
-    
-    // 解析 DID 文档获取公钥
-    const didDoc = await resolver.resolveDID(did);
-    if (!didDoc) return false;
-    
-    const vm = didDoc.verificationMethod?.find(vm => vm.id === keyId);
-    if (!vm) return false;
-    
-    // 验证签名
-    return CryptoUtils.verify(bytes, signedSubRAV.signature, vm.publicKeyMultibase, vm.type);
-  }
-}
+```ts
+// CloseProof -> Move `payment_channel::CloseProof`
+const CloseProofSchema = bcs.struct('CloseProof', {
+  vm_id_fragment: bcs.string(),
+  accumulated_amount: bcs.u256(),
+  nonce: bcs.u64(),
+  sender_signature: bcs.vector(bcs.u8()),
+});
+
+// CloseProofs -> vector<CloseProof>
+export const CloseProofsSchema = bcs.struct('CloseProofs', {
+  proofs: bcs.vector(CloseProofSchema),
+});
+
+// 在 encodeCloseProofs 中使用
+return CloseProofsSchema.serialize({ proofs }).toBytes();
 ```
 
 ### 4.3 Rooch 合约接口 (`rooch/contract.ts`)
@@ -383,6 +395,144 @@ export class RoochPaymentChannelClient {
 }
 ```
 
+### 4.5 收款方工作流与存储层设计
+
+> ⚠️ 以下方案主要针对 **Payee / 服务端** 场景（例如 HTTP Gateway 或后台守护进程）。浏览器端 DApp 也可采用 IndexedDB 适配器实现相同接口。
+
+#### 核心组件
+
+| 组件 | 说明 |
+| ---- | ---- |
+| `RAVStore` | 统一的 RAV 持久化接口，负责保存、检索、去重 `SignedSubRAV`。支持多种后端（内存 / IndexedDB / SQLite / Postgres）。 |
+| `ClaimScheduler` | 周期性检查待结算的 RAV，按策略批量调用 `claim_from_channel`，减少链上交易次数。 |
+| `PayeeClient` | 封装验证 → 存储 → 定时 claim 全流程，对 `PaymentChannelClient` 做按需裁剪，仅保留收款相关 API。 |
+
+#### RAVStore 接口
+```ts
+export interface RAVStore {
+  /** 保存一个新的 RAV（幂等） */
+  save(rav: SignedSubRAV): Promise<void>;
+
+  /** 获取指定子通道最新的 RAV，用于增量校验 */
+  getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null>;
+
+  /** 列出指定通道所有 RAV（可分页） */
+  list(channelId: string): AsyncIterable<SignedSubRAV>;
+}
+```
+> 默认实现：`MemoryRAVStore`（测试） + `IndexedDBRAVStore`（浏览器） + `SqlRAVStore`（Node.js / 服务端）。
+
+#### SqlRAVStore（PostgreSQL / Supabase 实现）
+
+> **目标**：在不引入额外基础设施的前提下，提供一个生产可用的服务端持久化实现。
+>
+> 初期仅支持 **PostgreSQL** 协议，部署到自管 Postgres 或 Supabase（本质也是 Postgres）。后续可抽象 `DatabaseDriver` 以支持 MySQL、SQLite 等。
+
+```ts
+export class SqlRAVStore implements RAVStore {
+  constructor(private pool: Pool) {}
+
+  async save(rav: SignedSubRAV): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO ravs(channel_id, vm_id_fragment, nonce, accumulated_amount, rav_data)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (channel_id, vm_id_fragment, nonce) DO NOTHING`,
+      [
+        rav.subRav.channelId,
+        rav.subRav.vmIdFragment,
+        rav.subRav.nonce.toString(),
+        rav.subRav.accumulatedAmount.toString(),
+        Buffer.from(MultibaseCodec.encodeBase64url(JSON.stringify(rav))),
+      ],
+    );
+  }
+
+  async getLatest(channelId: string, vmIdFragment: string) {
+    const { rows } = await this.pool.query(
+      `SELECT rav_data FROM ravs
+       WHERE channel_id = $1 AND vm_id_fragment = $2
+       ORDER BY nonce DESC LIMIT 1`,
+      [channelId, vmIdFragment],
+    );
+    return rows[0] ? JSON.parse(MultibaseCodec.decodeBase64url(rows[0].rav_data)) : null;
+  }
+
+  async *list(channelId: string) {
+    const cursor = await this.pool.query(
+      `SELECT rav_data FROM ravs WHERE channel_id = $1 ORDER BY nonce`,
+      [channelId],
+    );
+    for (const row of cursor.rows) {
+      yield JSON.parse(MultibaseCodec.decodeBase64url(row.rav_data));
+    }
+  }
+}
+```
+
+**表结构（DDL）**
+```sql
+CREATE TABLE IF NOT EXISTS ravs (
+  id                SERIAL PRIMARY KEY,
+  channel_id        TEXT NOT NULL,
+  vm_id_fragment    TEXT NOT NULL,
+  nonce             NUMERIC(78,0) NOT NULL,
+  accumulated_amount NUMERIC(78,0) NOT NULL,
+  rav_data          BYTEA NOT NULL,
+  UNIQUE(channel_id, vm_id_fragment, nonce)
+);
+CREATE INDEX IF NOT EXISTS idx_ravs_channel ON ravs(channel_id);
+```
+
+- 使用 `NUMERIC(78,0)` 存储大整数，兼容 JS `BigInt`。
+- `rav_data` 保存完整 JSON，经 base64url 编码保证二进制安全。
+- 与 Supabase 集成时，只需提供数据库 URL 和服务端密钥；SQL 语法保持一致。
+
+> **依赖**：`pg` 或 `@supabase/postgrest-js`。推荐直接使用 `pg`，Supabase 连接串也兼容。
+
+---
+
+#### ClaimScheduler 流程
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as ClaimScheduler
+    participant RS as RAVStore
+    participant C as RoochPaymentChannelContract
+
+    S->>RS: poll latest RAVs (by channel)
+    alt 有增量金额 or 超时
+        S->>C: claim_from_channel(finalRav)
+        C-->>S: txHash / events
+        S->>RS: mark RAVs as claimed
+    else 无操作
+        Note over S: skip
+    end
+```
+
+- **触发策略**
+  1. **金额阈值**：累计可提取金额 ≥ `minClaimAmount` 即触发
+  2. **时间阈值**：距离上次 claim 超过 `maxIntervalMs`
+  3. **手动触发**：运维 API / CLI
+
+- **并发控制**：同一通道同一时间只允许一个 claim 任务在跑，避免 nonce 冲突。
+
+#### PayeeClient 快速示例
+```ts
+const payee = await createPayeeClient({
+  rpcUrl: 'https://test-seed.rooch.network',
+  signer: receiverSigner,
+  store: new SqlRAVStore(db),
+  claimOptions: {
+    minClaimAmount: BigInt('10000000000000000'), // 0.01 RGAS
+    maxIntervalMs: 5 * 60_000,                  // 5 分钟
+  }
+});
+
+// 当收到 HTTP 请求头中的 RAV 时：
+await payee.handleIncomingRAV(requestHeader);
+// 1) verify ➜ 2) save ➜ 3) 触发 Scheduler
+```
+
 ---
 
 ## 5. 扩展性设计
@@ -449,33 +599,31 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 
 ---
 
-## 7. 渐进式开发里程碑
+## 7. 渐进式开发里程碑（更新）
 
-### M1 - 核心协议层 (Week 1-2)
-- [ ] `core/types.ts` - 基础类型定义
-- [ ] `core/subrav.ts` - SubRAV 编解码和签名
-- [ ] `utils/bcs.ts` - BCS 序列化工具
-- [ ] 单元测试覆盖率 > 80%
+### M1 - 核心协议层 (已完成)
+- [x] `core/types.ts` - 核心数据结构
+- [x] `core/subrav.ts` - SubRAV 编解码 & 签名验证
+- [x] BCS 序列化集成（直接使用 `@roochnetwork/rooch-sdk` 提供的 `bcs`）
+- [x] 单元测试覆盖关键路径（SubRAV & CloseProofs）
 
-### M2 - Rooch 合约封装 (Week 3-4)
-- [ ] `rooch/contract.ts` - Move 合约调用
-- [ ] 与 Rooch testnet 的集成测试
-- [ ] 事件解析和错误处理
+### M2 - Rooch 合约封装（进行中）
+- [x] `rooch/contract.ts` - 基础通道操作（open / claim / close）
+- [x] CloseProofs BCS 序列化实现 ✅
+- [ ] 与 Rooch testnet 的集成测试 & 事件解析
 
-### M3 - 高级客户端 (Week 5-6)
-- [ ] `rooch/client.ts` - 用户友好的 API
-- [ ] 状态缓存和管理
-- [ ] E2E 测试场景
+### M3 - 高级客户端 & Payee 支持（进行中）
+- [ ] `rooch/client.ts` - Signer 转换、状态缓存等剩余 TODO
+- [ ] **PayeeClient / RAVStore / ClaimScheduler 设计与实现** ⬅️ 新增
+- [ ] 端到端测试场景
 
-### M4 - HTTP Gateway (Week 7)
-- [ ] `core/http-header.ts` - HTTP Profile 实现
+### M4 - HTTP Gateway
+- [x] `core/http-header.ts` - HTTP Profile 实现
 - [ ] 示例 HTTP 服务器和客户端
-- [ ] 与现有 HTTP 服务的集成测试
 
-### M5 - 文档和发布 (Week 8)
-- [ ] README 和 API 文档
-- [ ] 示例应用程序
-- [ ] `changeset` 发布流程
+### M5 - 文档和发布
+- [ ] README / API 文档补充
+- [ ] 示例应用 / Changeset 发布
 
 ---
 
