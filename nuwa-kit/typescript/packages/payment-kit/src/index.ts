@@ -10,7 +10,7 @@ export * from './core/claim-scheduler';
 
 // SQL storage (separate export for optional dependency)
 // Note: sql-storage requires 'pg' dependency to be installed separately
-// export * from './core/sql-storage';
+//export * from './core/sql-storage';
 
 // Rooch implementation
 export * from './rooch/contract';

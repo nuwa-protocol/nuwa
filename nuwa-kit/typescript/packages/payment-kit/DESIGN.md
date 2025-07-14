@@ -648,3 +648,43 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 ---
 
 这个设计方案提供了完整的架构指导，涵盖了从核心协议实现到高级 API 封装的所有层面。每个模块都有明确的职责边界和接口定义，确保代码的可维护性和可扩展性。 
+
+## 9. Future Refactor TODOs
+
+> 以下事项计划在 **M4 之后** 着手实施，用于提升架构一致性与多链扩展能力。
+
+1. **命名调整 – `PayeeClient` ➜ `PayeeService`**  
+   - 运行环境主要是服务器端（或云函数），更符合 *Service / Gateway* 语义。
+   - 对外暴露 API 保持不变，仅修改类名与导出路径。
+
+2. **链无关抽象 – `IPaymentChannelContract`**  
+   - 在 `contracts/` 目录新增统一接口：
+     ```ts
+     export interface IPaymentChannelContract {
+       openChannel(...): Promise<OpenChannelResult>;
+       authorizeSubChannel(...): Promise<TxResult>;
+       claimFromChannel(...): Promise<ClaimResult>;
+       closeChannel(...): Promise<TxResult>;
+       getChannelStatus(...): Promise<ChannelInfo>;
+       // ...其他共性方法
+     }
+     ```
+   - 现有 `RoochPaymentChannelContract` **实现**该接口；未来新增 `EVMPaymentChannelContract`、`SolanaPaymentChannelContract` 等。
+   - `RoochPaymentChannelClient` 与 `PayeeService` 构造函数仅接收 `IPaymentChannelContract` 实例，实现真正链无关。
+
+3. **Signer 解耦 – `IChainSigner`**  
+   - 抽象签名能力接口，避免 `DidAccountSigner` 与 Rooch 耦合。
+   - 各链实现自定义 signer 转换逻辑。
+
+4. **Factory / Registry**  
+   - 根据配置动态注入不同链的 `IPaymentChannelContract` 和 `IChainSigner` 实现。
+
+5. **迁移步骤**  
+   - [ ] 创建接口与默认实现。
+   - [ ] 更新 `client.ts` / `payee-service.ts` 依赖注入。
+   - [ ] 调整单元测试与集成测试。
+   - [ ] 更新文档与示例代码。
+
+---
+
+以上 TODO 将在后续迭代中逐步落地，实现真正的多链支持与更清晰的职责划分。 
