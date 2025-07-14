@@ -109,8 +109,6 @@ export class RoochPaymentChannelClient {
     await this.contract.authorizeSubChannel({
       channelId,
       vmIdFragment: params.vmIdFragment,
-      publicKey: publicKeyHex,
-      methodType: keyInfo.type,
       signer: roochSigner,
     });
 
@@ -217,12 +215,12 @@ export class RoochPaymentChannelClient {
 
     const metadata: ChannelMetadata = {
       channelId,
-      payerDid: status.payer!,
-      payeeDid: status.payee!,
-      asset: status.asset!,
-      totalCollateral: status.collateral!,
+      payerDid: status.sender!,
+      payeeDid: status.receiver!,
+      asset: { assetId: status.coinType!, symbol: status.coinType },
+      totalCollateral: BigInt(0), // TODO: Get actual collateral from contract
       epoch: status.epoch!,
-      status: status.status!,
+      status: status.status === 'cancelling' ? 'closing' : status.status!,
     };
 
     return { exists: true, metadata };

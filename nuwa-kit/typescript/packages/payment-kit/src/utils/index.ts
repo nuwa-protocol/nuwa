@@ -2,6 +2,9 @@
  * Utility functions for payment kit
  */
 
+// Re-export DebugLogger from identity-kit to maintain consistency
+export { DebugLogger } from '@nuwa-ai/identity-kit';
+
 /**
  * Convert BigInt to string safely
  */
