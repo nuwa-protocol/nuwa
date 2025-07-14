@@ -11,9 +11,10 @@ import {
   EventView,
   getRoochNodeUrl,
 } from '@roochnetwork/rooch-sdk';
-import type { SignedSubRAV, AssetInfo, TransactionResult } from '../core/types';
+import type { SignedSubRAV, AssetInfo, TransactionResult, SubRAV } from '../core/types';
 import { SubRAVCodec } from '../core/subrav';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
+import { bcs, type BcsType } from '@roochnetwork/rooch-sdk';
 
 export interface RoochContractOptions {
   rpcUrl?: string;
@@ -70,6 +71,25 @@ export interface SubChannelInfo {
   lastClaimedAmount?: bigint;
   lastConfirmedNonce?: bigint;
 }
+
+/**
+ * BCS Schema for CloseProof serialization
+ * Must match the Move contract CloseProof struct definition
+ */
+export const CloseProofSchema: BcsType<any> = bcs.struct('CloseProof', {
+  vm_id_fragment: bcs.string(),
+  accumulated_amount: bcs.u256(),
+  nonce: bcs.u64(),
+  sender_signature: bcs.vector(bcs.u8()),
+});
+
+/**
+ * BCS Schema for CloseProofs serialization
+ * Must match the Move contract CloseProofs struct definition
+ */
+export const CloseProofsSchema: BcsType<any> = bcs.struct('CloseProofs', {
+  proofs: bcs.vector(CloseProofSchema),
+});
 
 /**
  * Rooch Payment Channel Contract wrapper
@@ -522,14 +542,25 @@ export class RoochPaymentChannelContract {
   }
 
   private encodeCloseProofs(proofs: any[]): Uint8Array {
-    // TODO: Implement proper BCS encoding for CloseProofs struct
-    // This is a placeholder - in actual implementation, we would use
-    // the BCS schema from the Move contract
-    
-    // For now, return empty array - this needs to be implemented when
-    // BCS encoding utilities are available
-    this.logger.warn('BCS encoding for CloseProofs not yet implemented');
-    return new Uint8Array(0);
+    try {
+      // Convert to BCS-compatible format
+      // Each proof needs to be converted to match the BCS schema
+      const bcsProofs = proofs.map((proof) => ({
+        vm_id_fragment: proof.vm_id_fragment,
+        accumulated_amount: proof.accumulated_amount.toString(), // Convert BigInt to string for BCS
+        nonce: proof.nonce.toString(), // Convert BigInt to string for BCS
+        sender_signature: proof.sender_signature, // Already in the correct format
+      }));
+
+      const closeProofsContainer = {
+        proofs: bcsProofs,
+      };
+
+      return CloseProofsSchema.serialize(closeProofsContainer).toBytes();
+    } catch (error) {
+      this.logger.error('Failed to encode CloseProofs:', error);
+      throw new Error(`Failed to encode CloseProofs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   private getRoochNodeUrl(network: 'local' | 'dev' | 'test' | 'main'): string {
