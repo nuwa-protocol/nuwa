@@ -70,7 +70,9 @@
   "dependencies": {
     "@nuwa-ai/identity-kit": "workspace:*",
     "@roochnetwork/rooch-sdk": "^0.3.6",
+    "@types/js-yaml": "^4.0.9",
     "@types/pg": "^8.15.4",
+    "js-yaml": "^4.1.0",
     "pg": "^8.16.3"
   },
   "peerDependencies": {
