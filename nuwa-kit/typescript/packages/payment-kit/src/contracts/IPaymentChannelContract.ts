@@ -107,12 +107,12 @@ export interface ChannelInfo {
   payerDid: string;
   payeeDid: string;
   asset: AssetInfo;
-  totalCollateral: bigint;
-  claimedAmount: bigint;
   epoch: bigint;
   status: 'active' | 'closing' | 'closed';
   // Note: Sub-channel list should be obtained from DID Document or local storage
   // Use getSubChannel() method to query individual sub-channel dynamic states
+  // Aggregated values like totalCollateral and claimedAmount should be calculated
+  // separately by querying the payment hub and individual sub-channels as needed
 }
 
 /**

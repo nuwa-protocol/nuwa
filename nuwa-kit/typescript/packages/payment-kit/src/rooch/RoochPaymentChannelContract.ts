@@ -419,8 +419,6 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         payerDid: `did:rooch:${channelData.sender}`,
         payeeDid: `did:rooch:${channelData.receiver}`,
         asset: { assetId: channelData.coin_type },
-        totalCollateral: BigInt(0), // TODO: Calculate from hub balance
-        claimedAmount: BigInt(0), // TODO: Calculate from sub-channel states
         epoch: channelData.channel_epoch,
         status: statusString,
       };
@@ -740,41 +738,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     return parts[parts.length - 1] || 'UNKNOWN';
   }
 
-  /**
-   * Calculate total collateral from PaymentHub
-   * @param hubId PaymentHub ObjectID
-   * @param coinType Coin type to check balance for
-   * @returns Total collateral amount
-   */
-  private async calculateTotalCollateral(hubId: string, coinType: string): Promise<bigint> {
-    try {
-      // TODO: Implement querying PaymentHub's MultiCoinStore balance
-      // This would require accessing the multi_coin_store object and checking the balance
-      // for the specific coin type
-      this.logger.debug(`Calculating total collateral for hub: ${hubId}, coin: ${coinType}`);
-      return BigInt(0);
-    } catch (error) {
-      this.logger.error('Error calculating total collateral:', error);
-      return BigInt(0);
-    }
-  }
 
-  /**
-   * Calculate total claimed amount from all sub-channels
-   * @param channelData Parsed PaymentChannel data
-   * @returns Total claimed amount across all sub-channels
-   */
-  private async calculateClaimedAmount(channelData: PaymentChannelData): Promise<bigint> {
-    try {
-      // TODO: Implement summing up last_claimed_amount from all SubChannels
-      // This would require iterating through the sub_channels Table
-      this.logger.debug(`Calculating claimed amount for channel with ${channelData.sub_channels} sub-channels table`);
-      return BigInt(0);
-    } catch (error) {
-      this.logger.error('Error calculating claimed amount:', error);
-      return BigInt(0);
-    }
-  }
 
   /**
    * Parse asset ID string to StructTag
