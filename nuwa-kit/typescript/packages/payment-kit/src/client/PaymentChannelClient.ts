@@ -215,8 +215,8 @@ export class PaymentChannelClient {
   /**
    * Get asset price in pUSD
    */
-  async getAssetPrice(assetId: string, quote?: string): Promise<bigint> {
-    return this.contract.getAssetPrice(assetId, quote);
+  async getAssetPrice(assetId: string): Promise<bigint> {
+    return this.contract.getAssetPrice(assetId);
   }
 
   // -------- Private Helpers --------

@@ -61,7 +61,7 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     };
   }
 
-  async getAssetPrice(assetId: string, quote?: string): Promise<bigint> {
+  async getAssetPrice(assetId: string): Promise<bigint> {
     // Return mock price in pUSD (100 pUSD = 0.0001 USD)
     return BigInt('100');
   }

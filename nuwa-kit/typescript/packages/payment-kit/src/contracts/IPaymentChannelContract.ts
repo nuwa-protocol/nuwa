@@ -141,8 +141,7 @@ export interface IPaymentChannelContract {
   /**
    * Get current asset price for off-chain billing
    * @param assetId Chain-specific asset identifier
-   * @param quote Currency quote (default: USD)
-   * @returns Price in pUSD (micro-USD, 1 USD = 1,000,000 pUSD)
+   * @returns Price in pUSD (pico-USD, 1 USD = 1,000,000,000,000 pUSD)
    */
-  getAssetPrice(assetId: string, quote?: 'USD' | 'CNY' | string): Promise<bigint>;
+  getAssetPrice(assetId: string): Promise<bigint>;
 } 

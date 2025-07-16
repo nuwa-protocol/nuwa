@@ -94,8 +94,7 @@ console.log(assetInfo);
 // { assetId: '0x3::gas_coin::RGas', symbol: 'RGAS' }
 
 // Get price in different currencies
-const usdPrice = await client.getAssetPrice('0x3::gas_coin::RGas', 'USD');
-const cnyPrice = await client.getAssetPrice('0x3::gas_coin::RGas', 'CNY');
+const usdPrice = await client.getAssetPrice('0x3::gas_coin::RGas');
 
 // Calculate payment value in USD
 const paymentAmount = BigInt('1000000000000000000'); // 1 RGAS
