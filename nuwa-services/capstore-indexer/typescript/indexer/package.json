@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p .",
+    "build": "pnpm i && tsc -p .",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.50.5",
     "axios": "^1.10.0",
     "dotenv": "^17.0.0",
+    "zod": "^3.25.0",
     "@roochnetwork/rooch-sdk": "0.3.6",
     "fastmcp": "^3.8.5",
     "js-yaml": "^4.1.0"

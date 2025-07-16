@@ -1,5 +1,6 @@
 import { FastMCP } from "fastmcp";
 import { config } from 'dotenv';
+import { z } from "zod";
 import {queryCID, setupRoochEventListener} from './eventHandle';
 import {DIDAuth, VDRRegistry} from "@nuwa-ai/identity-kit";
 
@@ -29,31 +30,25 @@ const mcp = new FastMCP({
 
 setupRoochEventListener();
 
+interface QueryCIDArgs {
+  name?: string;
+  id?: string;
+}
+
 mcp.addTool({
   name: "queryCID",
   description: "Query CID by name and ID",
-  parameters: {
-    type: "object",
-    properties: {
-      name: {
-        type: "string",
-        description: "Resource name"
-      },
-      id: {
-        type: "string",
-        description: "Resource identifier"
-      }
-    },
-    required: ["name", "id"]
-  },
+  parameters:  z.object({
+    name: z.string().describe("Resource name"),
+    id: z.string().describe("Resource identifier"),
+  }),
   annotations: {
     readOnlyHint: true,
     openWorldHint: true
   },
-  async execute(args) {
+  async execute(args: QueryCIDArgs) {
     try {
       const { name, id } = args;
-      if (!name || !id) throw new Error('Missing name or id parameter');
 
       const {success, cid} = await queryCID(name, id)
 

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",        // 匹配最新的ES特性
+    "module": "ESNext",        // 支持ES模块规范（符合 package.json 的 "type": "module"）
+    "rootDir": "./src",        // 指定源代码目录（匹配您的项目结构）
+    "outDir": "./dist",        // 编译输出目录（与 build 脚本的 dist 一致）
+    "moduleResolution": "node",// 使用Node.js的模块解析逻辑
+    "esModuleInterop": false,   // 改善 CommonJS/ES 模块的互操作性
+    "strict": false,            // 启用所有严格类型检查
+    "skipLibCheck": true,      // 跳过第三方库类型检查（提升速度）
+    "resolveJsonModule": true, // 允许导入JSON文件
+    "typeRoots": ["./node_modules/@types", "./types"],
+  },
+  "include": ["src/**/*.ts"]   // 仅编译 src 下的 .ts 文件
+}
