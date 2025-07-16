@@ -6,7 +6,7 @@ module acp_registry::acp_registry {
     use std::vector;
     use moveos_std::string_utils;
     use moveos_std::event::emit;
-    use rooch_framework::did::get_did_identifier;
+    use rooch_framework::did::{get_did_identifier_string, doc_id};
     use rooch_framework::did;
     use moveos_std::object::{Object, ObjectID};
     use moveos_std::table;
@@ -105,9 +105,8 @@ module acp_registry::acp_registry {
     public entry fun register (account: &signer, name: String, cid: String) {
         assert!(is_validate_string(&name), ErrorInvalidChar);
         let creator = address_of(account);
-        let did_document = did::get_did_document(creator);
-        let did_identifier = get_did_identifier(did_document);
-        let cap_uri = did::format_did(did_identifier);
+        let did_document = did::get_did_document_by_address(creator);
+        let cap_uri = get_did_identifier_string(doc_id(did_document));
         string::append_utf8(&mut cap_uri, b":");
         string::append(&mut cap_uri, name);
         let agent_capability = object::new_with_id(cap_uri, AgentCapability{
@@ -142,9 +141,8 @@ module acp_registry::acp_registry {
     }
 
     public fun get_agent_capability_id(creator: address, name: String): ObjectID {
-        let did_document = did::get_did_document(creator);
-        let did_identifier = get_did_identifier(did_document);
-        let cap_uri = did::format_did(did_identifier);
+        let did_document = did::get_did_document_by_address(creator);
+        let cap_uri = get_did_identifier_string(doc_id(did_document));
         string::append_utf8(&mut cap_uri, b":");
         string::append(&mut cap_uri, name);
         object::custom_object_id<String, AgentCapability>(cap_uri)
