@@ -31,6 +31,10 @@ import type {
   CloseParams,
   ChannelStatusParams,
   ChannelInfo,
+  SubChannelParams,
+  SubChannelInfo,
+} from '../contracts/IPaymentChannelContract';
+import type { 
   AssetInfo,
   SignedSubRAV,
   SubRAV,
@@ -128,6 +132,17 @@ export interface PaymentHubData {
 export const PaymentHubSchema: any = bcs.struct('PaymentHub', {
   multi_coin_store: bcs.ObjectId,
   active_channels: bcs.ObjectId, // Table<String, u64>
+});
+
+// DynamicField struct for parsing Table fields
+export interface DynamicField<K, V> {
+  name: K;
+  value: V;
+}
+
+export const DynamicFieldSubChannelSchema: any = bcs.struct('DynamicField', {
+  name: bcs.string(),
+  value: SubChannelSchema,
 });
 
 export interface ChannelKey {
@@ -399,10 +414,6 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Convert status number to string
       const statusString = this.convertChannelStatus(channelData.status);
       
-      // TODO: Get sub-channel information from the sub_channels Table
-      // For now, we'll leave authorizedSubChannels empty as it requires additional queries
-      const authorizedSubChannels: string[] = [];
-      
       return {
         channelId: params.channelId,
         payerDid: `did:rooch:${channelData.sender}`,
@@ -412,10 +423,47 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         claimedAmount: BigInt(0), // TODO: Calculate from sub-channel states
         epoch: channelData.channel_epoch,
         status: statusString,
-        authorizedSubChannels,
       };
     } catch (error) {
       this.logger.error('Error getting channel status:', error);
+      throw error;
+    }
+  }
+
+  async getSubChannel(params: SubChannelParams): Promise<SubChannelInfo> {
+    try {
+      this.logger.debug('Getting sub-channel info for:', params);
+      
+      // First get the channel to obtain the sub_channels table ID
+      const channelObject = await this.client.getObjectStates({
+        ids: [params.channelId],
+      });
+
+      if (!channelObject || channelObject.length === 0 || !channelObject[0]) {
+        throw new Error(`Channel ${params.channelId} not found`);
+      }
+
+      const channelData = this.parseChannelData(channelObject[0].value);
+      
+      // Get the sub-channel data from the sub_channels Table
+      const subChannelData = await this.getSubChannelData(
+        channelData.sub_channels,
+        params.vmIdFragment
+      );
+
+      if (!subChannelData) {
+        throw new Error(`Sub-channel ${params.vmIdFragment} not found in channel ${params.channelId}`);
+      }
+
+      return {
+        vmIdFragment: params.vmIdFragment,
+        publicKey: subChannelData.pk_multibase,
+        methodType: subChannelData.method_type,
+        lastClaimedAmount: subChannelData.last_claimed_amount,
+        lastConfirmedNonce: subChannelData.last_confirmed_nonce,
+      };
+    } catch (error) {
+      this.logger.error('Error getting sub-channel info:', error);
       throw error;
     }
   }
@@ -648,10 +696,28 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
    */
   private async getSubChannelData(subChannelsTableId: string, vmIdFragment: string): Promise<SubChannel | null> {
     try {
-      // TODO: Implement querying specific Table field
-      // This would require using the field access API to get the SubChannel data
       this.logger.debug(`Getting sub-channel data for: ${vmIdFragment} from table: ${subChannelsTableId}`);
-      return null;
+      
+      // Create field key from vm_id_fragment - this follows Rooch's FieldKey::derive_from_string logic
+      const fieldKey = this.deriveFieldKeyFromString(vmIdFragment);
+      
+      // Query specific field by key using getFieldStates API
+      const fieldStates = await this.client.getFieldStates({
+        objectId: subChannelsTableId,
+        fieldKey: [fieldKey],
+      });
+
+      if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
+        this.logger.debug(`Sub-channel ${vmIdFragment} not found in table ${subChannelsTableId}`);
+        return null;
+      }
+
+      const fieldState = fieldStates[0];
+      
+      // Parse the DynamicField<String, SubChannel> from BCS
+      const dynamicField = this.parseDynamicFieldSubChannel(fieldState.value);
+      
+      return dynamicField.value;
     } catch (error) {
       this.logger.error('Error getting sub-channel data:', error);
       return null;
@@ -750,6 +816,71 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       return Serializer.structTagToCanonicalString(structTag);
     } catch (error) {
       throw new Error(`Failed to convert struct tag to canonical string: ${error}`);
+    }
+  }
+
+  /**
+   * Derive a FieldKey from a string VM ID fragment.
+   * This follows Rooch's FieldKey::derive_from_string logic:
+   * hash(bcs(MoveString) || canonical_type_tag_string)
+   * @param vmIdFragment The VM ID fragment string
+   * @returns FieldKey as hex string
+   */
+  private deriveFieldKeyFromString(vmIdFragment: string): string {
+    this.logger.debug(`Deriving FieldKey from VM ID fragment: ${vmIdFragment}`);
+    
+    try {
+      // BCS serialize the vmIdFragment as MoveString using Rooch's bcs library
+      const keyBytes = bcs.string().serialize(vmIdFragment).toBytes();
+      
+      // Get the canonical type tag string for String type
+      const stringTypeTag = "0x1::string::String";
+      const typeTagBytes = new TextEncoder().encode(stringTypeTag);
+      
+      // Concatenate: bcs(key) + canonical_type_tag_string
+      const combinedBytes = new Uint8Array(keyBytes.length + typeTagBytes.length);
+      combinedBytes.set(keyBytes);
+      combinedBytes.set(typeTagBytes, keyBytes.length);
+      
+      // SHA3-256 hash
+      const hash = sha3_256(combinedBytes);
+      return `0x${toHEX(hash)}`;
+    } catch (error) {
+      this.logger.error('Error deriving field key:', error);
+      throw new Error(`Failed to derive field key: ${error}`);
+    }
+  }
+
+  /**
+   * Parse a DynamicField<String, SubChannel> from BCS hex string.
+   * @param value BCS encoded hex string from a DynamicField
+   * @returns Parsed DynamicField<String, SubChannel> object
+   */
+  private parseDynamicFieldSubChannel(value: string): DynamicField<string, SubChannel> {
+    this.logger.debug(`Parsing DynamicField<String, SubChannel> from BCS hex: ${value}`);
+    
+    try {
+      // Remove '0x' prefix if present
+      const bcsHex = value.startsWith('0x') ? value.slice(2) : value;
+      const bcsBytes = new Uint8Array(
+        bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+      );
+      
+      // Parse using DynamicField BCS schema
+      const parsed = DynamicFieldSubChannelSchema.parse(bcsBytes);
+      
+      return {
+        name: parsed.name,
+        value: {
+          pk_multibase: parsed.value.pk_multibase,
+          method_type: parsed.value.method_type,
+          last_claimed_amount: BigInt(parsed.value.last_claimed_amount),
+          last_confirmed_nonce: BigInt(parsed.value.last_confirmed_nonce),
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error parsing DynamicField:', error);
+      throw new Error(`Failed to parse DynamicField: ${error}`);
     }
   }
 } 

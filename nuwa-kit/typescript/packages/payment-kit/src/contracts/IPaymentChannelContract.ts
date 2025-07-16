@@ -81,6 +81,25 @@ export interface ChannelStatusParams {
 }
 
 /**
+ * Parameters for querying sub-channel information
+ */
+export interface SubChannelParams {
+  channelId: string;
+  vmIdFragment: string;
+}
+
+/**
+ * Sub-channel information and status
+ */
+export interface SubChannelInfo {
+  vmIdFragment: string;
+  publicKey: string;
+  methodType: string;
+  lastClaimedAmount: bigint;
+  lastConfirmedNonce: bigint;
+}
+
+/**
  * Channel information and status
  */
 export interface ChannelInfo {
@@ -92,7 +111,8 @@ export interface ChannelInfo {
   claimedAmount: bigint;
   epoch: bigint;
   status: 'active' | 'closing' | 'closed';
-  authorizedSubChannels?: string[]; // List of authorized vmIdFragments
+  // Note: Sub-channel list should be obtained from DID Document or local storage
+  // Use getSubChannel() method to query individual sub-channel dynamic states
 }
 
 /**
@@ -128,6 +148,12 @@ export interface IPaymentChannelContract {
    * Get current channel status and metadata
    */
   getChannelStatus(params: ChannelStatusParams): Promise<ChannelInfo>;
+
+  /**
+   * Get individual sub-channel dynamic state information
+   * Use this to query real-time status like lastClaimedAmount and lastConfirmedNonce
+   */
+  getSubChannel(params: SubChannelParams): Promise<SubChannelInfo>;
 
   // -------- Asset Information & Pricing --------
 
