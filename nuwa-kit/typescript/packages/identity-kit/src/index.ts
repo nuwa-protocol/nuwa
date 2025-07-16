@@ -12,3 +12,4 @@ export * from './cache';
 export { DebugLogger } from './utils/DebugLogger';
 export * from './IdentityEnv';
 export * from './utils/bytes';
+export * from './utils/did';
