@@ -6,7 +6,7 @@
 // Note: 'pg' is an optional dependency. Install with: npm install pg @types/pg
 import type { Pool, PoolClient } from 'pg';
 import { MultibaseCodec } from '@nuwa-ai/identity-kit';
-import type { RAVStore } from './storage';
+import type { RAVStore } from './BaseStorage';
 import type { SignedSubRAV } from './types';
 
 export interface SqlRAVStoreOptions {

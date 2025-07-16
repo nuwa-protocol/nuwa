@@ -2,6 +2,20 @@
  * Core types for NIP-4 Payment Channel protocol
  */
 
+// Re-export contract interface types for convenience
+export type {
+  IPaymentChannelContract,
+  TxResult,
+  OpenChannelParams,
+  OpenChannelResult,
+  AuthorizeSubChannelParams,
+  ClaimParams,
+  ClaimResult,
+  CloseParams,
+  ChannelStatusParams,
+  ChannelInfo
+} from '../contracts/IPaymentChannelContract';
+
 /**
  * Sub-channel Receipt And Voucher - the core payment message in NIP-4
  */

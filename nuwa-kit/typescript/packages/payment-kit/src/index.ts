@@ -4,27 +4,50 @@ import { VDRRegistry } from '@nuwa-ai/identity-kit';
 // Core types and utilities
 export * from './core/types';
 export * from './core/subrav';
-export * from './core/http-header';
-export * from './core/storage';
 export * from './core/claim-scheduler';
 
-// SQL storage (separate export for optional dependency)
-// Note: sql-storage requires 'pg' dependency to be installed separately
-//export * from './core/sql-storage';
+// Contract interfaces
+export * from './contracts/IPaymentChannelContract';
+
+// Chain-agnostic client
+export * from './client/PaymentChannelClient';
+
+// Factory for creating clients
+export * from './factory/chainFactory';
+
+// Storage layer - unified storage abstractions
+export type { 
+  RAVStore, 
+  ChannelStateStorage as BaseChannelStateStorage,
+  ChannelStateCache 
+} from './core/BaseStorage';
+export { 
+  MemoryRAVStore, 
+  IndexedDBRAVStore,
+  MemoryChannelStateCache 
+} from './core/BaseStorage';
+
+// Extended storage implementations with advanced features  
+export type { 
+  ChannelStateStorage, 
+  CacheStats, 
+  StorageOptions 
+} from './core/ChannelStateStorage';
+export { 
+  MemoryChannelStateStorage, 
+  IndexedDBChannelStateStorage,
+  SQLChannelStateStorage
+} from './core/ChannelStateStorage';
 
 // Rooch implementation
-export * from './rooch/contract';
-export * from './rooch/client';
-export * from './rooch/payee-client';
-
-// Utilities
-export * from './utils';
+export * from './rooch/RoochPaymentChannelContract';
 
 // Import after exports to avoid circular issue
-import { RoochPaymentChannelClient } from './rooch/client';
+import { PaymentChannelClient } from './client/PaymentChannelClient';
+import { createRoochPaymentChannelClient as factoryCreateRoochClient } from './factory/chainFactory';
 
 /**
- * Helper to create a RoochPaymentChannelClient directly from an IdentityKit instance.
+ * Helper to create a PaymentChannelClient for Rooch from an IdentityKit instance.
  * If `rpcUrl` is omitted, it will be inferred from the registered RoochVDR
  * that was configured during `IdentityKit.bootstrap()`.
  */
@@ -34,7 +57,7 @@ export async function createRoochPaymentChannelClient(opts: {
   contractAddress?: string;
   debug?: boolean;
   rpcUrl?: string;
-}): Promise<RoochPaymentChannelClient> {
+}): Promise<PaymentChannelClient> {
   const signer = opts.kit.getSigner();
 
   // Infer RPC URL from RoochVDR when not supplied
@@ -50,18 +73,19 @@ export async function createRoochPaymentChannelClient(opts: {
     throw new Error('rpcUrl not provided and could not be inferred from the IdentityKit environment');
   }
 
-  return new RoochPaymentChannelClient({
-    rpcUrl,
+  // Use factory to create client
+  return factoryCreateRoochClient({
     signer,
     keyId: opts.keyId,
     contractAddress: opts.contractAddress,
     debug: opts.debug,
+    rpcUrl,
   });
 }
 
-// Re-export important classes for convenience
-export { RoochPaymentChannelClient } from './rooch/client';
+// Core SubRAV utilities for advanced use cases
 export { 
+  SubRAVManager,
   SubRAVSigner, 
   SubRAVCodec, 
   SubRAVUtils, 
@@ -70,4 +94,18 @@ export {
   CURRENT_SUBRAV_VERSION, 
   SUBRAV_VERSION_1 
 } from './core/subrav';
+
+// HTTP Header codec for Gateway Profile implementation
 export { HttpHeaderCodec } from './core/http-header';
+
+// Utility functions
+export { 
+  generateNonce, 
+  extractFragment, 
+  isValidHex, 
+  formatAmount,
+  generateChannelId,
+  bigintToString,
+  stringToBigint,
+  DebugLogger 
+} from './utils';

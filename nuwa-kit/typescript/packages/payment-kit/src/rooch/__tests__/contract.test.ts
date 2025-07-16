@@ -3,7 +3,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { CloseProofSchema, CloseProofsSchema } from '../contract';
+import { CloseProofSchema, CloseProofsSchema } from '../RoochPaymentChannelContract';
 
 describe('RoochPaymentChannelContract BCS Serialization', () => {
   describe('CloseProofs serialization', () => {

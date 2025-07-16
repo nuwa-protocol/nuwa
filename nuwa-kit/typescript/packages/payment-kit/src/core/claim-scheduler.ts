@@ -3,10 +3,10 @@
  * Monitors unclaimed RAVs and triggers claim transactions based on policies
  */
 
-import type { RAVStore } from './storage';
 import type { SignedSubRAV } from './types';
-import type { RoochPaymentChannelContract } from '../rooch/contract';
-import type { Signer } from '@roochnetwork/rooch-sdk';
+import type { RAVStore } from './BaseStorage';
+import type { IPaymentChannelContract } from '../contracts/IPaymentChannelContract';
+import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 export interface ClaimPolicy {
@@ -31,10 +31,10 @@ export interface ClaimSchedulerOptions {
   store: RAVStore;
   
   /** Payment channel contract instance */
-  contract: RoochPaymentChannelContract;
+  contract: IPaymentChannelContract;
   
   /** Signer for claim transactions */
-  signer: Signer;
+  signer: SignerInterface;
   
   /** Claiming policy configuration */
   policy: ClaimPolicy;
@@ -75,8 +75,8 @@ export interface ClaimAttempt {
  */
 export class ClaimScheduler {
   private store: RAVStore;
-  private contract: RoochPaymentChannelContract;
-  private signer: Signer;
+  private contract: IPaymentChannelContract;
+  private signer: SignerInterface;
   private policy: ClaimPolicy;
   private pollIntervalMs: number;
   private logger: DebugLogger;

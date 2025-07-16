@@ -1,9 +1,11 @@
 /**
  * Storage layer interfaces and implementations for Payment Kit
- * Supports both Payer and Payee workflows
+ * Unified storage abstractions for both Payer and Payee workflows
  */
 
 import type { SignedSubRAV, SubChannelState, ChannelMetadata } from './types';
+
+// ==================== RAV Store Interfaces ====================
 
 /**
  * RAV storage interface for Payee (服务端收款方)
@@ -26,11 +28,14 @@ export interface RAVStore {
   markAsClaimed(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void>;
 }
 
+// ==================== Channel State Storage Interfaces ====================
+
 /**
- * Channel state cache interface for Payer (客户端付款方)
- * Manages local sub-channel state for generating next SubRAV
+ * Channel state storage interface for Payer (客户端付款方)
+ * Responsible for persistent storage of channel metadata and sub-channel state
+ * This is a STORAGE layer (persistent, reliable) not a CACHE layer (temporary, lossy)
  */
-export interface ChannelStateCache {
+export interface ChannelStateStorage {
   /** Get channel metadata */
   getChannelMetadata(channelId: string): Promise<ChannelMetadata | null>;
   
@@ -43,9 +48,28 @@ export interface ChannelStateCache {
   /** Update sub-channel state */
   updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void>;
 
+  /** Clear all stored data */
+  clear(): Promise<void>;
+}
+
+// ==================== Cache Layer Interfaces ====================
+
+/**
+ * True cache interface for temporary, performance-oriented data storage
+ * This is a CACHE layer (temporary, lossy, with TTL) not a STORAGE layer (persistent, reliable)
+ */
+export interface ChannelStateCache {
+  /** Get cached value by key */
+  get<T>(key: string): Promise<T | null>;
+  
+  /** Set cached value with optional TTL */
+  set<T>(key: string, value: T, ttl?: number): Promise<void>;
+  
   /** Clear all cached data */
   clear(): Promise<void>;
 }
+
+// ==================== RAV Store Implementations ====================
 
 /**
  * Memory-based RAV store implementation (for testing)
@@ -127,50 +151,11 @@ export class MemoryRAVStore implements RAVStore {
   }
 }
 
-/**
- * Memory-based channel state cache implementation
- */
-export class MemoryChannelStateCache implements ChannelStateCache {
-  private channels = new Map<string, ChannelMetadata>();
-  private subChannels = new Map<string, SubChannelState>();
-
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
-    return this.channels.get(channelId) || null;
-  }
-
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
-    this.channels.set(channelId, metadata);
-  }
-
-  async getSubChannelState(keyId: string): Promise<SubChannelState> {
-    return this.subChannels.get(keyId) || {
-      channelId: '',
-      epoch: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0),
-      lastUpdated: Date.now(),
-    };
-  }
-
-  async updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void> {
-    const current = await this.getSubChannelState(keyId);
-    this.subChannels.set(keyId, {
-      ...current,
-      ...updates,
-      lastUpdated: Date.now(),
-    });
-  }
-
-  async clear(): Promise<void> {
-    this.channels.clear();
-    this.subChannels.clear();
-  }
-}
+// ==================== Browser Storage Implementations ====================
 
 /**
- * Browser IndexedDB-based implementations
+ * Browser IndexedDB-based RAV store implementation
  */
-
 export class IndexedDBRAVStore implements RAVStore {
   private dbName = 'nuwa-payment-kit-ravs';
   private version = 1;
@@ -307,110 +292,41 @@ export class IndexedDBRAVStore implements RAVStore {
   }
 }
 
-export class IndexedDBChannelStateCache implements ChannelStateCache {
-  private dbName = 'nuwa-payment-kit-cache';
-  private version = 1;
+// ==================== Cache Layer Implementations ====================
 
-  private async getDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version);
-      
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-      
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        
-        if (!db.objectStoreNames.contains('channels')) {
-          db.createObjectStore('channels', { keyPath: 'channelId' });
-        }
-        
-        if (!db.objectStoreNames.contains('subChannels')) {
-          db.createObjectStore('subChannels', { keyPath: 'keyId' });
-        }
-      };
-    });
+/**
+ * Memory-based cache implementation with TTL support
+ */
+export class MemoryChannelStateCache implements ChannelStateCache {
+  private cache = new Map<string, { value: any; expires?: number }>();
+
+  async get<T>(key: string): Promise<T | null> {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return null;
+    }
+    
+    // Check TTL
+    if (entry.expires && Date.now() > entry.expires) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.value as T;
   }
 
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
-    const db = await this.getDB();
-    const tx = db.transaction(['channels'], 'readonly');
-    const store = tx.objectStore('channels');
+  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+    const entry: { value: T; expires?: number } = { value };
     
-    return new Promise((resolve, reject) => {
-      const request = store.get(channelId);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
-    const db = await this.getDB();
-    const tx = db.transaction(['channels'], 'readwrite');
-    const store = tx.objectStore('channels');
+    if (ttl && ttl > 0) {
+      entry.expires = Date.now() + ttl;
+    }
     
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(metadata);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async getSubChannelState(keyId: string): Promise<SubChannelState> {
-    const db = await this.getDB();
-    const tx = db.transaction(['subChannels'], 'readonly');
-    const store = tx.objectStore('subChannels');
-    
-    const result = await new Promise<SubChannelState | null>((resolve, reject) => {
-      const request = store.get(keyId);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-    
-    return result || {
-      channelId: '',
-      epoch: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0),
-      lastUpdated: Date.now(),
-    };
-  }
-
-  async updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void> {
-    const current = await this.getSubChannelState(keyId);
-    const updated = {
-      ...current,
-      ...updates,
-      keyId,
-      lastUpdated: Date.now(),
-    };
-    
-    const db = await this.getDB();
-    const tx = db.transaction(['subChannels'], 'readwrite');
-    const store = tx.objectStore('subChannels');
-    
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(updated);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
+    this.cache.set(key, entry);
   }
 
   async clear(): Promise<void> {
-    const db = await this.getDB();
-    const tx = db.transaction(['channels', 'subChannels'], 'readwrite');
-    
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        const request = tx.objectStore('channels').clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      }),
-      new Promise<void>((resolve, reject) => {
-        const request = tx.objectStore('subChannels').clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      }),
-    ]);
+    this.cache.clear();
   }
-} 
+}

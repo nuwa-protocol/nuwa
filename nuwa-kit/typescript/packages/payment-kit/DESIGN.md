@@ -649,42 +649,226 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 
 这个设计方案提供了完整的架构指导，涵盖了从核心协议实现到高级 API 封装的所有层面。每个模块都有明确的职责边界和接口定义，确保代码的可维护性和可扩展性。 
 
-## 9. Future Refactor TODOs
+## 9. Chain-Agnostic Refactor (✅ COMPLETED)
 
-> 以下事项计划在 **M4 之后** 着手实施，用于提升架构一致性与多链扩展能力。
+> 链无关抽象重构已完成，实现了真正的多链支持和清晰的职责划分。
 
-1. **命名调整 – `PayeeClient` ➜ `PayeeService`**  
-   - 运行环境主要是服务器端（或云函数），更符合 *Service / Gateway* 语义。
-   - 对外暴露 API 保持不变，仅修改类名与导出路径。
+### 已实现的改进
 
-2. **链无关抽象 – `IPaymentChannelContract`**  
-   - 在 `contracts/` 目录新增统一接口：
-     ```ts
-     export interface IPaymentChannelContract {
-       openChannel(...): Promise<OpenChannelResult>;
-       authorizeSubChannel(...): Promise<TxResult>;
-       claimFromChannel(...): Promise<ClaimResult>;
-       closeChannel(...): Promise<TxResult>;
-       getChannelStatus(...): Promise<ChannelInfo>;
-       // ...其他共性方法
-     }
-     ```
-   - 现有 `RoochPaymentChannelContract` **实现**该接口；未来新增 `EVMPaymentChannelContract`、`SolanaPaymentChannelContract` 等。
-   - `RoochPaymentChannelClient` 与 `PayeeService` 构造函数仅接收 `IPaymentChannelContract` 实例，实现真正链无关。
+1. **✅ 链无关抽象 – `IPaymentChannelContract`**  
+   - ✅ 创建了统一的 `IPaymentChannelContract` 接口，包含所有通道操作
+   - ✅ 实现了 `getAssetInfo` 和 `getAssetPrice` 方法，价格统一返回 pUSD (微美元)
+   - ✅ `RoochPaymentChannelContract` 实现了新接口
+   - ✅ 为未来扩展做好准备 (`EVMPaymentChannelContract`, `SolanaPaymentChannelContract` 等)
 
-3. **Signer 解耦 – `IChainSigner`**  
-   - 抽象签名能力接口，避免 `DidAccountSigner` 与 Rooch 耦合。
-   - 各链实现自定义 signer 转换逻辑。
+2. **✅ 客户端重构 – `PaymentChannelClient`**  
+   - ✅ 创建了链无关的 `PaymentChannelClient`，构造函数接收 `IPaymentChannelContract` 实例
+   - ✅ 移除了 Rooch 特定的依赖，实现真正的链抽象
+   - ✅ 保持了相同的高级 API，向下兼容
 
-4. **Factory / Registry**  
-   - 根据配置动态注入不同链的 `IPaymentChannelContract` 和 `IChainSigner` 实现。
+3. **✅ Factory Pattern – `PaymentChannelFactory`**  
+   - ✅ 实现了工厂模式，支持根据配置动态创建不同链的合约实例
+   - ✅ 提供便捷的 `createRoochPaymentChannelClient` 函数
+   - ✅ 支持链配置的类型安全
 
-5. **迁移步骤**  
-   - [ ] 创建接口与默认实现。
-   - [ ] 更新 `client.ts` / `payee-service.ts` 依赖注入。
-   - [ ] 调整单元测试与集成测试。
-   - [ ] 更新文档与示例代码。
+4. **✅ 缓存抽象 – `ChannelStateCache`**  
+   - ✅ 定义了统一的缓存接口，支持多种存储后端
+   - ✅ 实现了 `MemoryChannelStateCache` 作为默认实现
+   - ✅ 为未来的 IndexedDB、SQL 等实现做好准备
+
+5. **✅ 统一定价 – pUSD 标准**  
+   - ✅ 所有价格 API 统一返回 pUSD (1 USD = 1,000,000 pUSD)
+   - ✅ 便于跨链计费和价格比较
+   - ✅ 为链下计费系统提供统一的价格单位
+
+### 架构优势
+
+- **🔧 链抽象化**: 同一套 API 可以在不同区块链上工作
+- **🚀 扩展性**: 添加新链不会破坏现有代码
+- **💰 统一计费**: pUSD 标准化价格，便于跨链计费
+- **🏭 工厂模式**: 简化客户端创建，支持配置驱动
+- **🔒 类型安全**: 完整的 TypeScript 接口定义
+
+### 使用示例
+
+```ts
+// 链无关的客户端创建
+const client = createRoochPaymentChannelClient({
+  signer: yourSigner,
+  rpcUrl: 'https://test-seed.rooch.network'
+});
+
+// 统一的价格查询 (返回 pUSD)
+const price = await client.getAssetPrice('0x3::gas_coin::RGas');
+
+// 未来添加新链时，API 保持一致
+const evmClient = createEVMPaymentChannelClient({ ... }); // 未来实现
+```
+
+详细的 API 使用说明请参考 [EXAMPLE.md](./EXAMPLE.md)。 
 
 ---
 
-以上 TODO 将在后续迭代中逐步落地，实现真正的多链支持与更清晰的职责划分。 
+## 4.6 Cache 层与 Storage 层职责分工澄清
+
+> **问题识别**：当前架构中 Cache 层和 Storage 层的职责边界模糊，IndexedDB "Cache" 实际上承担了 Storage 职责。
+
+### 4.6.1 重新定义层次结构
+
+```mermaid
+graph TD
+    subgraph "Application Layer"
+        App[PaymentChannelClient]
+    end
+    
+    subgraph "Cache Layer (临时缓存)"
+        MC[MemoryCache]
+        RC[RedisCache] 
+    end
+    
+    subgraph "Storage Layer (持久化存储)"
+        IDB[IndexedDBStorage]
+        SQL[SQLStorage]
+        Memory[MemoryStorage]
+    end
+    
+    App --> MC
+    MC --> IDB
+    MC --> SQL
+    App --> IDB
+    App --> SQL
+    
+    style MC fill:#e1f5fe,stroke:#0277bd
+    style RC fill:#e1f5fe,stroke:#0277bd  
+    style IDB fill:#f3e5f5,stroke:#7b1fa2
+    style SQL fill:#f3e5f5,stroke:#7b1fa2
+    style Memory fill:#f3e5f5,stroke:#7b1fa2
+```
+
+### 4.6.2 明确职责分工
+
+#### Cache 层 (缓存层)
+- **目的**：提升性能，减少 I/O 操作
+- **特性**：临时性、可丢失、有 TTL
+- **实现**：内存、Redis、LRU Cache
+- **职责**：
+  - 缓存频繁访问的数据
+  - 提供快速读取
+  - 支持 TTL 和 LRU 淘汰
+  - **不提供管理 API**（如删除、列表等）
+
+```ts
+interface Cache<K, V> {
+  get(key: K): Promise<V | null>;
+  set(key: K, value: V, ttl?: number): Promise<void>;
+  clear(): Promise<void>;
+  // 不提供 delete, list 等管理操作
+}
+```
+
+#### Storage 层 (存储层)
+- **目的**：持久化数据，提供可靠存储
+- **特性**：持久性、事务性、查询能力
+- **实现**：IndexedDB、SQLite、PostgreSQL、内存（测试用）
+- **职责**：
+  - 持久化保存数据
+  - 提供 CRUD 操作
+  - 支持查询和事务
+  - **提供完整管理 API**
+
+```ts
+interface Storage<T> {
+  save(id: string, data: T): Promise<void>;
+  get(id: string): Promise<T | null>;
+  list(filter?: FilterOptions): Promise<T[]>;
+  remove(id: string): Promise<void>;
+  clear(): Promise<void>;
+}
+```
+
+### 4.6.3 重构建议
+
+#### 方案 A：重命名现有实现
+```ts
+// 原来的 ChannelStateCache -> ChannelStateStorage  
+export interface ChannelStateStorage {
+  getChannelMetadata(channelId: string): Promise<ChannelMetadata | null>;
+  setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void>;
+  listChannelMetadata(): Promise<ChannelMetadata[]>;        // 管理 API
+  removeChannelMetadata(channelId: string): Promise<void>;  // 管理 API
+  // ... 其他 CRUD 操作
+}
+
+// 新增真正的 Cache 层
+export interface ChannelStateCache {
+  get(key: string): Promise<any>;
+  set(key: string, value: any, ttl?: number): Promise<void>;
+  clear(): Promise<void>;
+}
+```
+
+#### 方案 B：组合模式
+```ts
+export class PaymentChannelClient {
+  private storage: ChannelStateStorage;    // 持久化存储
+  private cache: ChannelStateCache;        // 临时缓存
+  
+  constructor(options: {
+    storage: ChannelStateStorage;
+    cache?: ChannelStateCache;  // 可选缓存层
+  }) {
+    this.storage = options.storage;
+    this.cache = options.cache || new NoOpCache();
+  }
+  
+  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
+    // 1. 先查缓存
+    let metadata = await this.cache.get(`channel:${channelId}`);
+    if (metadata) return metadata;
+    
+    // 2. 缓存未命中，查存储
+    metadata = await this.storage.getChannelMetadata(channelId);
+    if (metadata) {
+      // 3. 写入缓存
+      await this.cache.set(`channel:${channelId}`, metadata, 5 * 60 * 1000); // 5分钟TTL
+    }
+    
+    return metadata;
+  }
+}
+```
+
+### 4.6.4 现实应用场景
+
+#### Browser 端
+```ts
+const client = new PaymentChannelClient({
+  storage: new IndexedDBChannelStateStorage(),  // 持久化到 IndexedDB
+  cache: new MemoryChannelStateCache()          // 内存缓存提升性能
+});
+```
+
+#### Node.js 服务端
+```ts
+const client = new PaymentChannelClient({
+  storage: new SQLChannelStateStorage(dbPool),   // 持久化到 PostgreSQL
+  cache: new RedisChannelStateCache(redisClient) // Redis 缓存
+});
+```
+
+#### 测试环境
+```ts
+const client = new PaymentChannelClient({
+  storage: new MemoryChannelStateStorage(),    // 内存存储，便于测试
+  cache: new NoOpCache()                       // 禁用缓存，便于调试
+});
+```
+
+### 4.6.5 迁移路径
+
+1. **Phase 1**: 重命名现有 `ChannelStateCache` → `ChannelStateStorage`
+2. **Phase 2**: 引入真正的 Cache 接口和实现
+3. **Phase 3**: 更新 `PaymentChannelClient` 支持 Storage + Cache 组合
+4. **Phase 4**: 提供向后兼容的适配器
+
+这样的设计更符合软件架构的分层原则，职责清晰，便于扩展和测试。 

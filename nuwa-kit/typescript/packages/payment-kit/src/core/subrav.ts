@@ -261,6 +261,43 @@ export class SubRAVValidator {
 } 
 
 /**
+ * SubRAV Manager for high-level SubRAV operations
+ * Combines encoding, signing, and validation
+ */
+export class SubRAVManager {
+  /**
+   * Sign a SubRAV using the provided signer
+   */
+  async sign(
+    subRav: SubRAV,
+    signer: SignerInterface,
+    keyId: string
+  ): Promise<SignedSubRAV> {
+    return SubRAVSigner.sign(subRav, signer, keyId);
+  }
+
+  /**
+   * Verify a signed SubRAV
+   */
+  async verify(
+    signedSubRAV: SignedSubRAV,
+    resolver: DIDResolver
+  ): Promise<boolean> {
+    return SubRAVSigner.verify(signedSubRAV, resolver);
+  }
+
+  /**
+   * Validate SubRAV business logic
+   */
+  async validate(
+    signedSubRAV: SignedSubRAV
+  ): Promise<boolean> {
+    const result = SubRAVValidator.validate(signedSubRAV.subRav);
+    return result.valid;
+  }
+}
+
+/**
  * Helper functions for creating SubRAV instances
  */
 export class SubRAVUtils {
