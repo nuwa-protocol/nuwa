@@ -34,7 +34,7 @@ describe('IdentityKit Integration Test', () => {
 
     console.log(`Test setup completed:
       Test DID: ${testDid.did}
-      Test Address: ${testDid.address}`);
+      Test VM ID Fragment: ${testDid.vmIdFragment}`);
   });
 
   describe('Basic DID Operations', () => {
