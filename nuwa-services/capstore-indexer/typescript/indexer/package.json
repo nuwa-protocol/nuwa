@@ -20,6 +20,9 @@
     "fastmcp": "^3.8.5",
     "js-yaml": "^4.1.0"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "tsx": "^4.7.0",
     "typescript": "~5.4.0"
