@@ -45,7 +45,9 @@ export class IdentityKit {
     }
 
     // Resolve DID to get DID Document
-    const didDocument = await registry.resolveDID(did);
+    // We force refresh to ensure we get the latest DID Document from the VDR
+    // Maybe we should find a better way to clear the cache when we add a service or verification method
+    const didDocument = await registry.resolveDID(did, { forceRefresh: true });
     if (!didDocument) {
       throw new Error(`Failed to resolve DID ${did}`);
     }
@@ -354,7 +356,7 @@ export class IdentityKit {
 
   // Document Access
   getDIDDocument(): DIDDocument {
-    return JSON.parse(JSON.stringify(this.didDocument));
+    return this.didDocument;
   }
 
   // Service Discovery

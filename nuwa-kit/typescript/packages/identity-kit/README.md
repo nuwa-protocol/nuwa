@@ -13,6 +13,7 @@
 * **Pluggable architecture** – VDR plugins for `did:key`, `did:rooch`, and custom methods.
 * **Browser friendly** – Built-in `LocalStorage` / `IndexedDB` KeyStores while still compatible with Node.js / Deno.
 * **Type-safe** – 100 % TypeScript with rich type definitions.
+* **Test helpers** – Integrated testing utilities for Rooch DID integration tests.
 
 ## 📦 Installation
 
@@ -68,6 +69,42 @@ const sig = await DIDAuth.v1.createSignature(
 
 ---
 
+## 🧪 Integration Testing
+
+For Rooch DID integration tests, use the built-in test helpers:
+
+```ts
+import { TestEnv, createSelfDid } from '@nuwa-ai/identity-kit/testHelpers';
+
+describe('My Integration Test', () => {
+  beforeEach(async () => {
+    // Skip if no Rooch node available (CI-friendly)
+    if (TestEnv.skipIfNoNode()) return;
+    
+    // Bootstrap test environment
+    const env = await TestEnv.bootstrap();
+    
+    // Create real on-chain DIDs
+    const payer = await createSelfDid(env, {
+      keyType: 'EcdsaSecp256k1VerificationKey2019'
+    });
+    
+    // DIDs are ready for use in tests
+    console.log('Created DID:', payer.did);
+  });
+});
+```
+
+The test helpers ensure:
+- DIDs are actually created on-chain (not just local key generation)
+- Proper relationship between private keys and DID accounts
+- CI/CD friendly environment detection
+- Automatic cleanup and funding
+
+[📖 Full Test Helpers Documentation](./src/testHelpers/README.md)
+
+---
+
 ## 🛠️ Quick Reference
 
 | Concept | Description |
@@ -77,6 +114,7 @@ const sig = await DIDAuth.v1.createSignature(
 | `KeyManager` | Built-in key lifecycle manager implementing `SignerInterface`; can sign directly. |
 | `KeyStore` | Key persistence backend. Browsers use `LocalStorageKeyStore` / `IndexedDBKeyStore` by default. |
 | `IdentityKit` | High-level object bound to **one DID**, exposing key / service / signing / resolving APIs. |
+| `TestEnv` | Test environment for integration testing with real on-chain DIDs. |
 
 ---
 

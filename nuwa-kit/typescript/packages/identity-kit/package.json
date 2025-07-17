@@ -11,6 +11,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./testHelpers": {
+      "types": "./dist/testHelpers/index.d.ts",
+      "import": "./dist/testHelpers/index.js",
+      "require": "./dist/testHelpers/index.cjs"
     }
   },
   "scripts": {
@@ -75,7 +80,8 @@
   },
   "tsup": {
     "entry": [
-      "src/index.ts"
+      "src/index.ts",
+      "src/testHelpers/index.ts"
     ],
     "format": [
       "esm",
