@@ -11,18 +11,22 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@nuwa-ai/identity-kit/testHelpers": ["../identity-kit/src/testHelpers/index.ts"]
+    }
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "test/**/*",
+    "__tests__/**/*"
   ],
   "exclude": [
     "dist",
-    "node_modules",
-    "**/*.test.ts",
-    "**/__tests__/**/*"
+    "node_modules"
   ]
 } 

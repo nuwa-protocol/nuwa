@@ -40,8 +40,6 @@ export interface OpenChannelResult {
 export interface AuthorizeSubChannelParams {
   channelId: string;
   vmIdFragment: string;
-  publicKey: string;
-  methodType: string;
   signer: SignerInterface;
 }
 

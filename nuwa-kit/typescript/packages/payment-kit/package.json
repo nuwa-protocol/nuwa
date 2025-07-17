@@ -75,9 +75,6 @@
     "js-yaml": "^4.1.0",
     "pg": "^8.16.3"
   },
-  "peerDependencies": {
-    "@nuwa-ai/identity-kit": ">=0.2.0"
-  },
   "tsup": {
     "entry": [
       "src/index.ts"

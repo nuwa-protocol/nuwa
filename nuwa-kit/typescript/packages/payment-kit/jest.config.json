@@ -1,16 +1,17 @@
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "roots": ["<rootDir>/src", "<rootDir>/__tests__"],
+  "extensionsToTreatAsEsm": [".ts"],
+  "roots": ["<rootDir>/src", "<rootDir>/__tests__", "<rootDir>/test"],
   "transform": {
     "^.+\\.tsx?$": ["ts-jest", {
       "tsconfig": "tsconfig.json"
     }]
   },
-  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "testMatch": ["**/__tests__/**/*.ts", "**/test/**/*.ts", "**/?(*.)+(spec|test).ts"],
   "moduleFileExtensions": ["ts", "js", "json"],
   "verbose": false,
-  "collectCoverage": true,
+  "collectCoverage": false,
   "coverageDirectory": "coverage",
   "coverageReporters": ["text-summary"],
   "collectCoverageFrom": [
@@ -35,5 +36,8 @@
   ],
   "maxConcurrency": 1,
   "maxWorkers": 1,
-  "silent": false
+  "silent": false,
+  "moduleNameMapper": {
+    "^@nuwa-ai/identity-kit/testHelpers$": "<rootDir>/../identity-kit/src/testHelpers/index.ts"
+  }
 } 

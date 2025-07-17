@@ -108,17 +108,9 @@ export class PaymentChannelClient {
     const channelId = params.channelId || await this.getDefaultChannelId();
     const chainSigner = await this.convertToChainSigner();
 
-    // Get public key and method type from signer
-    // TODO: Implement proper key extraction from SignerInterface
-    // For now, use placeholder values
-    const publicKey = 'placeholder-public-key';
-    const methodType = 'secp256k1';
-
     const result = await this.contract.authorizeSubChannel({
       channelId,
       vmIdFragment: params.vmIdFragment,
-      publicKey,
-      methodType,
       signer: chainSigner,
     });
 

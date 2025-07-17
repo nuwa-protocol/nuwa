@@ -9,6 +9,8 @@ import type {
   OpenChannelResult,
   ClaimParams,
   ClaimResult,
+  SubChannelInfo,
+  SubChannelParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo } from '../core/types';
 import { PaymentChannelClient } from '../client/PaymentChannelClient';
@@ -17,6 +19,15 @@ import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 // Mock implementation of IPaymentChannelContract for testing
 class MockPaymentChannelContract implements IPaymentChannelContract {
+  async getSubChannel(params: SubChannelParams): Promise<SubChannelInfo> {
+    return {
+      vmIdFragment: 'test-key-1',
+      publicKey: 'test-key-1',
+      methodType: 'secp256k1',
+      lastClaimedAmount: BigInt('0'),
+      lastConfirmedNonce: BigInt('0'),
+    };
+  }
   async openChannel(params: OpenChannelParams): Promise<OpenChannelResult> {
     return {
       channelId: '0x1234567890abcdef1234567890abcdef12345678',

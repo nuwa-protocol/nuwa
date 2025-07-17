@@ -33,7 +33,7 @@ export async function createSelfDid(
   const {
     keyType = KeyType.SECP256K1,
     keyFragment = 'account-key',
-    skipFunding = false
+    skipFunding = true
   } = options;
 
   // Generate keypair based on type
@@ -82,9 +82,9 @@ export async function createSelfDid(
 
   return {
     did,
+    vmIdFragment: keyFragment,
     keyManager,
-    signer,
-    address: address.toBech32Address()
+    signer
   };
 }
 
@@ -167,16 +167,14 @@ export async function createDidViaCadop(
     throw new Error(`Failed to create user DID via CADOP: ${cadopResult.error || 'Unknown error'}`);
   } 
 
-  // Extract user address from DID document
   const userDid = cadopResult.didDocument.id;
-  const userAddress = userDid.split(':')[2]; // Extract address from did:rooch:address
-
 
   // Create user's KeyManager with the did:key keypair
   const userKeyStore = new MemoryKeyStore();
   const userKeyManager = KeyManager.createEmpty(userDid, userKeyStore);
+  const userKeyFragment = 'account-key';
   const userKeyId = await userKeyManager.importKeyPair(
-    'account-key',
+    userKeyFragment,
     userKeyPair,
     userKeyType
   );
@@ -186,9 +184,9 @@ export async function createDidViaCadop(
 
   return {
     did: userDid,
+    vmIdFragment: userKeyFragment,
     keyManager: userKeyManager,
     signer: userSigner,
-    address: userAddress
   };
 }
 

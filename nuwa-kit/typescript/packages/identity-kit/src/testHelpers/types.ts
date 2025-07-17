@@ -25,12 +25,12 @@ export interface TestEnvOptions {
 export interface CreateSelfDidResult {
   /** The created DID string */
   did: string;
+  /** The VM ID fragment associated with this DID */
+  vmIdFragment: string;
   /** KeyManager with the account key imported */
   keyManager: KeyManager;
   /** Signer interface for this DID */
   signer: SignerInterface;
-  /** The Rooch address associated with this DID */
-  address: string;
 }
 
 /**

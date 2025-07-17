@@ -414,10 +414,12 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Convert status number to string
       const statusString = this.convertChannelStatus(channelData.status);
       
+      const channel_sender = new RoochAddress(channelData.sender);
+      const channel_receiver = new RoochAddress(channelData.receiver);
       return {
         channelId: params.channelId,
-        payerDid: `did:rooch:${channelData.sender}`,
-        payeeDid: `did:rooch:${channelData.receiver}`,
+        payerDid: `did:rooch:${channel_sender.toBech32Address()}`,
+        payeeDid: `did:rooch:${channel_receiver.toBech32Address()}`,
         asset: { assetId: channelData.coin_type },
         epoch: channelData.channel_epoch,
         status: statusString,
@@ -486,12 +488,11 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     try {
       this.logger.debug('Getting asset price for:', assetId);
       
-      // Convert assetId to StructTag for comparison
-      const structTag = this.parseAssetIdToStructTag(assetId);
-      const canonicalStructTag = this.structTagToCanonicalString(structTag);
+      // Normalize asset ID to canonical string
+      const canonicalAssetId = this.normalizeAssetId(assetId);
       
       //Currently only support RGas
-      if (canonicalStructTag === RGAS_CANONICAL_TAG) {
+      if (canonicalAssetId === RGAS_CANONICAL_TAG) {
         // RGas pricing calculation:
         // - 1 RGas = 0.01 USD
         // - RGas has 8 decimals, so 1 RGas = 10^8 base units
@@ -529,17 +530,15 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
    * @returns Channel object ID as hex string
    */
   private calcChannelObjectId(senderAddress: string, receiverAddress: string, coinType: string): string {
-    this.logger.debug('Calculating channel object ID for:', { senderAddress, receiverAddress, coinType });
     
-    // Normalize addresses to ensure consistent format
-    const normalizedSender = normalizeRoochAddress(senderAddress);
-    const normalizedReceiver = normalizeRoochAddress(receiverAddress);
+    let coin_type = this.normalizeAssetId(coinType);
+    this.logger.debug('Calculating channel object ID for:', { senderAddress, receiverAddress, coin_type });
     
     // Create ChannelKey struct - this must match the Move struct exactly
     const channelKey: ChannelKey  = {
-      sender: normalizedSender,
-      receiver: normalizedReceiver,
-      coin_type: coinType,
+      sender: senderAddress,
+      receiver: receiverAddress,
+      coin_type: coin_type,
     };
     
     // Create PaymentChannel struct tag  
@@ -669,24 +668,6 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   }
 
   /**
-   * Get sub-channel information from the sub_channels Table
-   * @param subChannelsTableId The ObjectID of the sub_channels Table
-   * @returns List of authorized sub-channel IDs
-   */
-  private async getAuthorizedSubChannels(subChannelsTableId: string): Promise<string[]> {
-    try {
-      // TODO: Implement querying Table fields to get sub-channel keys
-      // This would require using the indexer or iterating through table fields
-      // For now, return empty array as this is a complex operation
-      this.logger.debug(`Getting authorized sub-channels from table: ${subChannelsTableId}`);
-      return [];
-    } catch (error) {
-      this.logger.error('Error getting authorized sub-channels:', error);
-      return [];
-    }
-  }
-
-  /**
    * Get sub-channel data by VM ID fragment
    * @param subChannelsTableId The ObjectID of the sub_channels Table
    * @param vmIdFragment The VM ID fragment to query
@@ -747,27 +728,25 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
    */
   private parseAssetIdToStructTag(assetId: string): any {
     try {
-      // Parse the asset ID string into components
-      const parts = assetId.split('::');
-      if (parts.length !== 3) {
-        throw new Error(`Invalid asset ID format: ${assetId}`);
+      // Use Rooch SDK's built-in parser with address normalization
+      const typeTag = Serializer.typeTagParseFromStr(assetId, true);
+      
+      // Ensure it's a struct type (not a primitive type)
+      if (!('struct' in typeTag)) {
+        throw new Error(`Asset ID must be a struct type, got: ${assetId}`);
       }
-
-      const [address, module, name] = parts;
       
-      // Normalize the address (handle short addresses like "0x3")
-      const normalizedAddress = normalizeRoochAddress(address);
-      
-      return {
-        address: normalizedAddress,
-        module,
-        name,
-        typeParams: [], // No type parameters for basic coin types
-      };
+      return typeTag.struct;
     } catch (error) {
       this.logger.error('Error parsing asset ID to struct tag:', error);
       throw new Error(`Failed to parse asset ID: ${assetId}`);
     }
+  }
+
+  public normalizeAssetId(assetId: string): string {
+    let coinTypeTag = this.parseAssetIdToStructTag(assetId);
+    let canonicalString = this.structTagToCanonicalString(coinTypeTag);
+    return canonicalString;
   }
 
   /**

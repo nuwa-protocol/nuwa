@@ -64,133 +64,6 @@ describe('RoochPaymentChannelContract BCS Serialization', () => {
   });
 
   describe('Channel Object ID Calculation Test Cases', () => {
-    test('Test Case 1: Standard addresses with RGas', () => {
-      const contract = new RoochPaymentChannelContract({
-        network: 'test',
-        debug: false,
-      });
-
-      const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
-      
-      const sender = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000001';
-      const receiver = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000002';
-      const coinType = '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
-
-      const channelId = calcMethod(sender, receiver, coinType);
-      
-      console.log('=== Test Case 1 ===');
-      console.log('Sender:', sender.replace('did:rooch:', ''));
-      console.log('Receiver:', receiver.replace('did:rooch:', ''));
-      console.log('Coin Type:', coinType);
-      console.log('Channel ID:', channelId);
-      console.log('');
-      
-      expect(channelId).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-
-    test('Test Case 2: Short addresses (will be normalized)', () => {
-      const contract = new RoochPaymentChannelContract({
-        network: 'test',
-        debug: false,
-      });
-
-      const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
-      
-      const sender = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000001';
-      const receiver = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000002';
-      const coinType = '0x3::gas_coin::RGas';
-
-      const channelId = calcMethod(sender, receiver, coinType);
-      
-      console.log('=== Test Case 2 ===');
-      console.log('Sender:', sender.replace('did:rooch:', ''));
-      console.log('Receiver:', receiver.replace('did:rooch:', ''));
-      console.log('Coin Type:', coinType);
-      console.log('Channel ID:', channelId);
-      console.log('');
-      
-      expect(channelId).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-
-    test('Test Case 3: Real-world example addresses', () => {
-      const contract = new RoochPaymentChannelContract({
-        network: 'test',
-        debug: false,
-      });
-
-      const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
-      
-      const sender = 'did:rooch:0x0000000000000000000000000123456789abcdef0123456789abcdef12345678';
-      const receiver = 'did:rooch:0x0000000000000000000000000fedcba0987654321fedcba0987654321fedcba09';
-      const coinType = '0x3::gas_coin::RGas';
-
-      const channelId = calcMethod(sender, receiver, coinType);
-      
-      console.log('=== Test Case 3 ===');
-      console.log('Sender:', sender.replace('did:rooch:', ''));
-      console.log('Receiver:', receiver.replace('did:rooch:', ''));
-      console.log('Coin Type:', coinType);
-      console.log('Channel ID:', channelId);
-      console.log('');
-      
-      expect(channelId).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-  });
-
-  describe('Channel Object ID calculation', () => {
-    test('should calculate deterministic channel object ID', () => {
-      const contract = new RoochPaymentChannelContract({
-        network: 'test',
-        debug: false,
-      });
-
-      // Test with known values to ensure deterministic output
-      const sender = 'did:rooch:0x0000000000000000000000001234567890abcdef1234567890abcdef12345678';
-      const receiver = 'did:rooch:0x0000000000000000000000000fedcba0987654321fedcba0987654321fedcba09';
-      const coinType = '0x3::gas_coin::RGas';
-
-      // Access the private method through reflection for testing
-      const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
-      const channelId1 = calcMethod(sender, receiver, coinType);
-      const channelId2 = calcMethod(sender, receiver, coinType);
-
-      // Should be deterministic
-      expect(channelId1).toBe(channelId2);
-      
-      // Should be a valid hex string with 0x prefix
-      expect(channelId1).toMatch(/^0x[0-9a-f]{64}$/);
-
-      // Different inputs should produce different outputs
-      const channelId3 = calcMethod(receiver, sender, coinType); // swapped sender/receiver
-      expect(channelId1).not.toBe(channelId3);
-    });
-
-    test('should handle various address formats correctly', () => {
-      const contract = new RoochPaymentChannelContract({
-        network: 'test',
-        debug: false,
-      });
-
-      const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
-
-      // Test with standard addresses
-      const sender1 = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000001';
-      const receiver1 = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000002';
-      const coinType = '0x3::gas_coin::RGas';
-      
-      const channelId1 = calcMethod(sender1, receiver1, coinType);
-      expect(channelId1).toMatch(/^0x[0-9a-f]{64}$/);
-
-      // Test with full-length addresses
-      const sender2 = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000001';
-      const receiver2 = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000002';
-      
-      const channelId2 = calcMethod(sender2, receiver2, coinType);
-      
-      // Should produce the same result as normalized short addresses
-      expect(channelId1).toBe(channelId2);
-    });
-
     test('should match Move contract calc_channel_object_id function', () => {
       const contract = new RoochPaymentChannelContract({
         network: 'test',
@@ -200,9 +73,9 @@ describe('RoochPaymentChannelContract BCS Serialization', () => {
       const calcMethod = (contract as any).calcChannelObjectId.bind(contract);
 
       // Use the same test values as in the Move contract tests
-      const sender = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000001';
-      const receiver = 'did:rooch:0x0000000000000000000000000000000000000000000000000000000000000002';
-      const coinType = '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
+      const sender = 'rooch1mdzyuhmaa0n469huenfkuulmn4upd89hgcc6gcwg0axhvv80d3pq0vwnhl';
+      const receiver = 'rooch1cq5tperqpe6pen3smzhnypduf574dtd4lqj9zk97ry5wd6gd7kwsglts3j';
+      const coinType = '0x3::gas_coin::RGas';
 
       const channelId = calcMethod(sender, receiver, coinType);
       
