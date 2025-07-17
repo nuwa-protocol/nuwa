@@ -1,6 +1,6 @@
 import axios from "axios";
 import yaml from "js-yaml";
-import { storeToSupabase, queryCIDFromSupabase } from './supabase';
+import { storeToSupabase, queryCIDFromSupabase } from './supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
 
 const IPFS_GATEWAY = process.env.IPFS_GATEWAY || 'https://ipfs.io/ipfs';

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { YamlData } from './eventHandle';
+import { YamlData } from './eventHandle.js';
 
 import { config } from 'dotenv';
 

@@ -5,7 +5,7 @@ import { DIDAuth, VDRRegistry, initRoochVDR } from "@nuwa-ai/identity-kit";
 import { create } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { Readable } from 'stream';
-import { queryCID, setupRoochEventListener } from './eventHandle';
+import { queryCID, setupRoochEventListener } from './eventHandle.js';
 
 // Load environment variables
 config();

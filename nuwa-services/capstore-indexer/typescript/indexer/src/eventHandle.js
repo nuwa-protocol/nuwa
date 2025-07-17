@@ -36,7 +36,11 @@ export async function processRoochRegisterEvent() {
         });
         for (const event of events.data) {
             try {
-                const cid = event.decoded_event_data.cid;
+                const data = event.decoded_event_data;
+                if (typeof data.cid !== 'string') {
+                    throw new Error('Event data does not contain a valid CID string');
+                }
+                const cid = data.cid;
                 const yamlData = await fetchAndParseYaml(cid);
                 await storeToSupabase(yamlData, cid);
                 console.log(`Processed CID: ${cid}`);
