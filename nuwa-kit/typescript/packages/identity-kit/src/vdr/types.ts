@@ -24,6 +24,9 @@ export interface DIDCreationRequest {
 
   // Additional verification methods
   additionalVerificationMethods?: any[];
+
+  // Custom session key scopes (for Rooch VDR)
+  customScopes?: string[];
 }
 
 /**
@@ -52,6 +55,9 @@ export interface CADOPCreationRequest {
   userDidKey: string;
   custodianServicePublicKey: string;
   custodianServiceVMType: string;
+  
+  // Custom session key scopes (for Rooch VDR)
+  customScopes?: string[];
 }
 
 /**

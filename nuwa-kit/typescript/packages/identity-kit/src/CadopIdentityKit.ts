@@ -93,7 +93,7 @@ export class CadopIdentityKit {
   async createDID(
     method: string,
     userDid: string,
-    options?: Record<string, any>
+    options?: Record<string, any> & { customScopes?: string[] }
   ): Promise<DIDCreationResult> {
     const custodianInfo = this.extractCustodianInfo();
 
@@ -124,6 +124,7 @@ export class CadopIdentityKit {
       userDidKey: userDid,
       custodianServicePublicKey: custodianPublicKey,
       custodianServiceVMType: custodianServiceVMType,
+      customScopes: options?.customScopes,
     };
 
     return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {

@@ -147,6 +147,7 @@ export class IdentityKit {
     relationships: VerificationRelationship[],
     options?: {
       keyId?: string;
+      scopes?: string[];
     }
   ): Promise<string> {
     // 1. Get signing key
@@ -180,6 +181,7 @@ export class IdentityKit {
       {
         signer: this.signer,
         keyId: signingKeyId,
+        scopes: options?.scopes,
       }
     );
 

@@ -35,6 +35,7 @@ import {
 } from './roochVDRTypes';
 import { DebugLogger } from '../utils/DebugLogger';
 import { parseDid, extractFragmentFromId } from '../utils/did';
+import { validateScopes, combineScopes } from '../utils/sessionScopes';
 
 export interface RoochClientConfig {
   url: string;
@@ -100,6 +101,12 @@ export interface RoochVDROperationOptions {
    * Key ID to use for this operation
    */
   keyId?: string;
+
+  /**
+   * Custom session key scopes (for authentication VM)
+   * Only used when adding a verification method with authentication relationship
+   */
+  scopes?: string[];
 
   /**
    * Advanced blockchain transaction options
@@ -200,13 +207,27 @@ export class RoochVDR extends AbstractVDR {
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
 
-      // Create transaction
+      // Always combine base scopes with custom scopes
+      const finalScopes = combineScopes(request.customScopes || []);
+      
+      // Validate all scopes
+      const scopeValidation = validateScopes(finalScopes);
+      if (!scopeValidation.valid) {
+        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+      }
+
+      // Always use the scopes version since we always have scopes (at minimum base scopes)
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.didContractAddress}::create_did_object_for_self_entry`,
-        args: [Args.string(request.publicKeyMultibase)],
+        target: `${this.didContractAddress}::create_did_object_for_self_with_custom_scopes_entry`,
+        args: [
+          Args.string(request.publicKeyMultibase),
+          Args.vec('string', finalScopes)
+        ],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
+      
+      this.debugLog('Creating DID with scopes:', finalScopes);
 
       this.debugLog('Creating DID Transaction:', transaction);
 
@@ -283,17 +304,30 @@ export class RoochVDR extends AbstractVDR {
 
       this.debugLog('Creating DID via CADOP with request:', request);
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
-      // Create transaction
+      
+      // Always combine base scopes with custom scopes
+      const finalScopes = combineScopes(request.customScopes || []);
+      
+      // Validate all scopes
+      const scopeValidation = validateScopes(finalScopes);
+      if (!scopeValidation.valid) {
+        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+      }
+
+      // Always use the scopes version since the contract will add base scopes
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.didContractAddress}::create_did_object_via_cadop_with_did_key_entry`,
+        target: `${this.didContractAddress}::create_did_object_via_cadop_with_did_key_and_scopes_entry`,
         args: [
           Args.string(request.userDidKey),
           Args.string(request.custodianServicePublicKey),
           Args.string(request.custodianServiceVMType),
+          Args.vec('string', finalScopes)
         ],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
+      
+      this.debugLog('Creating DID via CADOP with scopes:', finalScopes);
 
       this.debugLog('Creating DID via CADOP Transaction:', transaction);
 
@@ -341,37 +375,6 @@ export class RoochVDR extends AbstractVDR {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }
-
-  /**
-   * Extract verification relationships from DID Document for a specified verification method
-   */
-  private extractRelationshipsFromDocument(
-    didDocument: DIDDocument,
-    vmId: string
-  ): VerificationRelationship[] {
-    const relationships: VerificationRelationship[] = [];
-    const relationshipTypes: VerificationRelationship[] = [
-      'authentication',
-      'assertionMethod',
-      'keyAgreement',
-      'capabilityInvocation',
-      'capabilityDelegation',
-    ];
-
-    relationshipTypes.forEach(rel => {
-      const relationshipArray = didDocument[rel];
-      if (
-        relationshipArray &&
-        relationshipArray.some(item =>
-          typeof item === 'string' ? item === vmId : item.id === vmId
-        )
-      ) {
-        relationships.push(rel);
-      }
-    });
-
-    return relationships;
   }
 
   /**
@@ -498,26 +501,56 @@ export class RoochVDR extends AbstractVDR {
       // Convert verification relationships to u8 values
       const relationshipValues = this.convertVerificationRelationships(relationships || []);
 
+      // Check if we need to use scopes version for authentication relationship
+      const hasAuthentication = relationships?.includes('authentication');
+      
       // Create transaction
       const transaction = this.createTransaction();
-      transaction.callFunction({
-        target: `${this.didContractAddress}::add_verification_method_entry`,
-        args: [
-          Args.string(extractFragmentFromId(verificationMethod.id)),
-          Args.string(verificationMethod.type),
-          Args.string(verificationMethod.publicKeyMultibase),
-          Args.vec('u8', relationshipValues),
-        ],
-        maxGas: options?.advanced?.maxGas || 100000000,
-      });
+      
+      if (hasAuthentication) {
+        // When adding authentication VM, we need to handle scopes
+        const finalScopes = combineScopes(options?.scopes || []);
+        
+        // Validate all scopes
+        const scopeValidation = validateScopes(finalScopes);
+        if (!scopeValidation.valid) {
+          throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+        }
 
-      this.debugLog(`Executing transaction: add_verification_method_entry`);
-      this.debugLog(`Args:`, [
-        extractFragmentFromId(verificationMethod.id),
-        verificationMethod.type,
-        verificationMethod.publicKeyMultibase,
-        relationshipValues,
-      ]);
+        // Use the scopes version for authentication VM
+        transaction.callFunction({
+          target: `${this.didContractAddress}::add_verification_method_with_scopes_entry`,
+          args: [
+            Args.string(extractFragmentFromId(verificationMethod.id)),
+            Args.string(verificationMethod.type),
+            Args.string(verificationMethod.publicKeyMultibase),
+            Args.vec('u8', relationshipValues),
+            Args.vec('string', finalScopes),
+          ],
+          maxGas: options?.advanced?.maxGas || 100000000,
+        });
+        
+        this.debugLog('Using add_verification_method_with_scopes_entry with scopes:', finalScopes);
+      } else {
+        // Use regular version for non-authentication VM
+        transaction.callFunction({
+          target: `${this.didContractAddress}::add_verification_method_entry`,
+          args: [
+            Args.string(extractFragmentFromId(verificationMethod.id)),
+            Args.string(verificationMethod.type),
+            Args.string(verificationMethod.publicKeyMultibase),
+            Args.vec('u8', relationshipValues),
+          ],
+          maxGas: options?.advanced?.maxGas || 100000000,
+        });
+        
+        this.debugLog('Using regular add_verification_method_entry (no authentication relationship)');
+      }
+
+      this.debugLog(`Verification method transaction prepared`);
+      this.debugLog(`Fragment:`, extractFragmentFromId(verificationMethod.id));
+      this.debugLog(`Type:`, verificationMethod.type);
+      this.debugLog(`Relationships:`, relationshipValues);
 
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
