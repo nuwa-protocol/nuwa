@@ -763,6 +763,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   }
 
   /**
+   * TODO: migrate this function to rooch-sdk
    * Derive a FieldKey from a string VM ID fragment.
    * This follows Rooch's FieldKey::derive_from_string logic:
    * hash(bcs(MoveString) || canonical_type_tag_string)
@@ -777,7 +778,8 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const keyBytes = bcs.string().serialize(vmIdFragment).toBytes();
       
       // Get the canonical type tag string for String type
-      const stringTypeTag = "0x1::string::String";
+      // Must use full canonical address format (32-byte) as specified in Rust implementation
+      const stringTypeTag = "0x0000000000000000000000000000000000000000000000000000000000000001::string::String";
       const typeTagBytes = new TextEncoder().encode(stringTypeTag);
       
       // Concatenate: bcs(key) + canonical_type_tag_string

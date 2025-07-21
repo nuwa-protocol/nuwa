@@ -25,7 +25,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
   let payer: CreateSelfDidResult;
   let payee: CreateSelfDidResult;
   let testAsset: AssetInfo;
-  let channelId: string;
+  let channelId: string|undefined;
 
   beforeEach(async () => {
     if (!shouldRunIntegrationTests()) {
@@ -60,6 +60,8 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
       skipFunding: false
     });
+
+    channelId = undefined;
 
     // Define test asset (RGas)
     testAsset = {
@@ -108,7 +110,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       await openTestChannel();
 
       const statusParams: ChannelStatusParams = {
-        channelId,
+        channelId: channelId!,
       };
 
       const channelInfo = await contract.getChannelStatus(statusParams);
@@ -124,52 +126,29 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       console.log(`Channel status retrieved:`, channelInfo);
     });
 
-  //   it('should authorize a sub-channel', async () => {
-  //     if (!shouldRunIntegrationTests()) return;
+    it('should get sub-channel info', async () => {
+      if (!shouldRunIntegrationTests()) return;
 
-  //     // First open a channel
-  //     await openTestChannel();
+      // First open a channel and authorize sub-channel
+      await openTestChannel();
+      await authorizeTestSubChannel();
 
-  //     const authParams: AuthorizeSubChannelParams = {
-  //       channelId,
-  //       vmIdFragment,
-  //       signer: payer.signer,
-  //     };
+      const subChannelParams: SubChannelParams = {
+        channelId: channelId!,
+        vmIdFragment: payer.vmIdFragment,
+      };
 
-  //     const result = await contract.authorizeSubChannel(authParams);
+      const subChannelInfo = await contract.getSubChannel(subChannelParams);
       
-  //     expect(result).toBeDefined();
-  //     expect(result.txHash).toBeDefined();
-  //     expect(typeof result.txHash).toBe('string');
+      expect(subChannelInfo).toBeDefined();
+      expect(subChannelInfo.vmIdFragment).toBe(payer.vmIdFragment);
+      expect(subChannelInfo.publicKey).toBeDefined();
+      expect(subChannelInfo.methodType).toBe('EcdsaSecp256k1VerificationKey2019');
+      expect(typeof subChannelInfo.lastClaimedAmount).toBe('bigint');
+      expect(typeof subChannelInfo.lastConfirmedNonce).toBe('bigint');
 
-  //     console.log(`Sub-channel authorized:
-  //       VM ID Fragment: ${vmIdFragment}
-  //       TX Hash: ${result.txHash}`);
-  //   });
-
-  //   it('should get sub-channel info', async () => {
-  //     if (!shouldRunIntegrationTests()) return;
-
-  //     // First open a channel and authorize sub-channel
-  //     await openTestChannel();
-  //     await authorizeTestSubChannel();
-
-  //     const subChannelParams: SubChannelParams = {
-  //       channelId,
-  //       vmIdFragment: payer.vmIdFragment,
-  //     };
-
-  //     const subChannelInfo = await contract.getSubChannel(subChannelParams);
-      
-  //     expect(subChannelInfo).toBeDefined();
-  //     expect(subChannelInfo.vmIdFragment).toBe(payer.vmIdFragment);
-  //     expect(subChannelInfo.publicKey).toBeDefined();
-  //     expect(subChannelInfo.methodType).toBe('EcdsaSecp256k1VerificationKey2019');
-  //     expect(typeof subChannelInfo.lastClaimedAmount).toBe('bigint');
-  //     expect(typeof subChannelInfo.lastConfirmedNonce).toBe('bigint');
-
-  //     console.log(`Sub-channel info retrieved:`, subChannelInfo);
-  //   });
+      console.log(`Sub-channel info retrieved:`, subChannelInfo);
+    });
   });
 
   // Helper functions
@@ -201,7 +180,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
     }
 
     const authParams: AuthorizeSubChannelParams = {
-      channelId,
+      channelId: channelId!,
       vmIdFragment: payer.vmIdFragment,
       signer: payer.signer,
     };
