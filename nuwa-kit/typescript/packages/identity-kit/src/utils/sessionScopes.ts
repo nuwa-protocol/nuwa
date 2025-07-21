@@ -92,7 +92,7 @@ export function validateScopes(scopes: string[]): {
  * @param address - Address string to validate
  * @returns true if format appears valid
  */
-function isValidAddressFormat(address: string): boolean {
+export function isValidAddressFormat(address: string): boolean {
   // Hex address format (0x followed by hex characters)
   if (address.startsWith('0x')) {
     return /^0x[0-9a-fA-F]+$/.test(address);
