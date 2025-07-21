@@ -322,7 +322,7 @@ export class RoochVDR extends AbstractVDR {
           Args.string(request.userDidKey),
           Args.string(request.custodianServicePublicKey),
           Args.string(request.custodianServiceVMType),
-          Args.vec('string', finalScopes)
+          Args.vec('string', finalScopes),
         ],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
