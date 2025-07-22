@@ -12,7 +12,7 @@ export interface IdentityKitState {
 
 export interface IdentityKitHook {
   state: IdentityKitState;
-  connect: () => Promise<void>;
+  connect: (options?: { scopes?: string[] }) => Promise<void>;
   sign: (payload: any) => Promise<NIP1SignedObject>;
   verify: (sig: NIP1SignedObject) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -102,15 +102,8 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     return () => window.removeEventListener('message', handleMessage);
   }, [sdk]);
 
-  // Auto connect
-  useEffect(() => {
-    if (options.autoConnect && sdk && !state.isConnected && !state.isConnecting) {
-      connect();
-    }
-  }, [sdk, options.autoConnect, state.isConnected, state.isConnecting]);
-
   // Connect action
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (options?: { scopes?: string[] }) => {
     if (!sdk) {
       setState(prev => ({ ...prev, error: 'SDK not initialized' }));
       return;
@@ -119,7 +112,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      await sdk.connect();
+      await sdk.connect(options);
       // Actual connection result will be handled via postMessage in callback
       setState(prev => ({ ...prev, isConnecting: false }));
     } catch (error) {
@@ -132,6 +125,13 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
       });
     }
   }, [sdk]);
+
+  // Auto connect
+  useEffect(() => {
+    if (options.autoConnect && sdk && !state.isConnected && !state.isConnecting) {
+      connect();
+    }
+  }, [sdk, options.autoConnect, state.isConnected, state.isConnecting, connect]);
 
   // Sign operation
   const sign = useCallback(async (payload: any): Promise<NIP1SignedObject> => {

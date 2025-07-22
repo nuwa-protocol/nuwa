@@ -6,6 +6,7 @@ import {
   MultibaseCodec,
   KeyTypeInput,
   toKeyType,
+  validateScopes,
 } from '@nuwa-ai/identity-kit';
 import { LocalStorageKeyStore } from '../keystore';
 
@@ -16,6 +17,8 @@ export interface ConnectOptions {
   relationships?: VerificationRelationship[];  // Default: ['authentication']
   redirectPath?: string;     // Default: '/callback'
   agentDid?: string;         // Target Agent DID, optional
+  /** Custom session key scopes (for authentication VM) */
+  scopes?: string[];
 }
 
 export interface AuthResult {
@@ -69,6 +72,14 @@ export class DeepLinkManager {
     const relationships = opts.relationships || ['authentication'];
     const redirectPath = opts.redirectPath || '/callback';
 
+    // Validate scopes if provided
+    if (opts.scopes && opts.scopes.length > 0) {
+      const scopeValidation = validateScopes(opts.scopes);
+      if (!scopeValidation.valid) {
+        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+      }
+    }
+
     // Generate a random state to prevent CSRF
     const state = this.generateRandomState();
     
@@ -102,6 +113,10 @@ export class DeepLinkManager {
 
     if (opts.agentDid) {
       payload.agentDid = opts.agentDid;
+    }
+
+    if (opts.scopes && opts.scopes.length > 0) {
+      payload.scopes = opts.scopes;
     }
 
     const encodedPayload = MultibaseCodec.encodeBase64url(JSON.stringify(payload));

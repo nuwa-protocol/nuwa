@@ -33,6 +33,8 @@ export interface AddKeyRequestPayloadV1 {
   state: string;
   /** Target Agent DID, optional */
   agentDid?: string;
+  /** Custom session key scopes (for authentication VM) */
+  scopes?: string[];
 }
 
 /**

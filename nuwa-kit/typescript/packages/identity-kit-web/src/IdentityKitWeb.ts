@@ -117,12 +117,13 @@ export class IdentityKitWeb {
    * Connect to Cadop
    * This will open a new window with the Cadop add-key page
    */
-  async connect(): Promise<void> {
+  async connect(options?: { scopes?: string[] }): Promise<void> {
     const idFragment = this.generateIdFragment();
 
     const { url } = await this.deepLinkManager.buildAddKeyUrl({
       cadopDomain: this.cadopDomain,
       idFragment,
+      scopes: options?.scopes,
     });
     
     // Open the URL in a new window/tab
