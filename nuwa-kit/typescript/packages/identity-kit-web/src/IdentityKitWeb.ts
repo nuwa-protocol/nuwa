@@ -142,8 +142,14 @@ export class IdentityKitWeb {
       // Try to open popup first
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       
-      // Check if popup was blocked
-      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      // Add a small timeout to allow popup.closed to update
+      const isPopupBlocked = await new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(!popup || popup.closed || typeof popup.closed === 'undefined');
+        }, 100); // 100ms timeout
+      });
+      
+      if (isPopupBlocked) {
         // Popup was blocked, try fallback method
         const result = await this.handlePopupBlocked(url, options?.fallbackMethod);
         return options?.returnResult ? result : undefined;

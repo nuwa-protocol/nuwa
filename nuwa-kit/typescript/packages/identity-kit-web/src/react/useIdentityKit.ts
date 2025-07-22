@@ -149,9 +149,15 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      await sdk.connect(options); // Note: no returnResult flag, so returns void
-      // Actual connection result will be handled via postMessage in callback
-      setState(prev => ({ ...prev, isConnecting: false }));
+      const result = await sdk.connect({ ...options, returnResult: true });
+      if (result.success) {
+        setState(prev => ({ ...prev, isConnecting: false }));
+      } else if (options?.fallbackMethod) {
+        // Handle fallback method if connection fails
+        setState(prev => ({ ...prev, isConnecting: false, error: `Fallback method triggered: ${options.fallbackMethod}` }));
+      } else {
+        setState(prev => ({ ...prev, isConnecting: false, error: 'Connection failed without fallback' }));
+      }
     } catch (error) {
       setState({
         isConnected: false,
@@ -183,15 +189,24 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
       const result = await sdk.connect({
         ...options,
         returnResult: true // Request detailed result
-      }) as ConnectResult; // Type assertion since we know returnResult=true
+      });
       
-      // Only set connecting to false if action is not redirect
-      // (redirect will navigate away from current page)
-      if (result.action !== 'redirect') {
-        setState(prev => ({ ...prev, isConnecting: false }));
+      if (result && typeof result === 'object' && 'action' in result) {
+        // Only set connecting to false if action is not redirect
+        // (redirect will navigate away from current page)
+        if (result.action !== 'redirect') {
+          setState(prev => ({ ...prev, isConnecting: false }));
+        }
+        
+        return result as ConnectResult;
+      } else {
+        setState(prev => ({ ...prev, isConnecting: false, error: 'Unexpected response from SDK' }));
+        return {
+          action: 'manual',
+          success: false,
+          error: 'Unexpected response from SDK'
+        };
       }
-      
-      return result;
     } catch (error) {
       setState({
         isConnected: false,
