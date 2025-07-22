@@ -6,6 +6,8 @@ import { create } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { Readable } from 'stream';
 import { queryCID, setupRoochEventListener } from './eventHandle.js';
+import { fileTypeFromBuffer } from 'file-type';
+import {queryCIDFromSupabase} from "./supabase";
 
 // Load environment variables
 config();
@@ -86,10 +88,10 @@ const ipfsService = new FastMCP({
 // -----------------------------------------------------------------------------
 ipfsService.addTool({
   name: "queryCID",
-  description: "Query CID by name and ID",
+  description: "Query CID by name and ID. Both parameters are optional.",
   parameters: z.object({
-    name: z.string().describe("Resource name"),
-    id: z.string().describe("Resource identifier"),
+    name: z.string().optional().describe("Resource name (optional)"),
+    id: z.string().optional().describe("Resource identifier (optional)"),
   }),
   annotations: {
     readOnlyHint: true,
@@ -98,13 +100,16 @@ ipfsService.addTool({
   async execute(args) {
     try {
       const { name, id } = args;
-      const { success, cid } = await queryCID(name, id);
+      const result = await queryCIDFromSupabase(name, id);
 
-      if (!success) throw new Error('Record not found');
+      if (!result.success) {
+        throw new Error(result.error || 'Record not found');
+      }
 
+      // 返回单个CID或多个CIDs
       return JSON.stringify({
         success: true,
-        cid: cid
+        ...(result.cid ? { cid: result.cid } : {}),
       });
     } catch (error) {
       return JSON.stringify({
@@ -166,6 +171,76 @@ ipfsService.addTool({
     } catch (error) {
       console.error("File upload error:", error);
       throw new Error(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  },
+});
+
+ipfsService.addTool({
+  name: "downloadFile",
+  description: "Download a file from IPFS using its CID",
+  parameters: z.object({
+    cid: z.string().describe("Content Identifier (CID) of the file"),
+    dataFormat: z.enum(['base64', 'utf8']).optional().default('base64')
+      .describe("Output format for file data")
+  }),
+  async execute({ cid, dataFormat }, context) {
+    try {
+      // 认证检查
+      if (!context.session?.did) {
+        throw new Error("Authentication required");
+      }
+      const downloaderDid = context.session.did;
+      console.log(`📥 Download request from DID: ${downloaderDid}, CID: ${cid}`);
+
+      // 验证CID格式有效性
+      if (!/^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[A-Za-z0-9]{58}$/.test(cid)) {
+        throw new Error("Invalid CID format");
+      }
+
+      // 检查文件是否存在
+      let fileExists = false;
+      for await (const _ of ipfsClient.files.ls(`/ipfs/${cid}`)) {
+        fileExists = true;
+        break;
+      }
+      if (!fileExists) throw new Error("File not found on IPFS network");
+
+      const chunks = [];
+      let totalSize = 0;
+
+      for await (const chunk of ipfsClient.cat(cid)) {
+        chunks.push(chunk);
+        totalSize += chunk.length;
+      }
+
+      const fileBuffer = Buffer.concat(chunks, totalSize);
+
+      let formattedData;
+      if (dataFormat === 'base64') {
+        formattedData = fileBuffer.toString('base64');
+      } else {
+        formattedData = fileBuffer.toString('utf8');
+      }
+
+      const type = await fileTypeFromBuffer(fileBuffer);
+      const mimeType = type?.mime || 'application/octet-stream';
+
+      return {
+        success: true,
+        cid: cid,
+        size: totalSize,
+        mimeType,
+        data: formattedData,
+        dataFormat,
+        gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error(`Download error for CID ${cid}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown download error'
+      };
     }
   },
 });

@@ -10,15 +10,16 @@
   },
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.2.2",
+    "@roochnetwork/rooch-sdk": "0.3.6",
     "@supabase/supabase-js": "^2.50.5",
     "axios": "^1.10.0",
     "dotenv": "^17.0.0",
-    "zod": "^3.25.0",
-    "ipfs-http-client": "^60.0.1",
-    "multiformats": "^13.3.7",
-    "@roochnetwork/rooch-sdk": "0.3.6",
     "fastmcp": "^3.8.5",
-    "js-yaml": "^4.1.0"
+    "file-type": "^21.0.0",
+    "ipfs-http-client": "^60.0.1",
+    "js-yaml": "^4.1.0",
+    "multiformats": "^13.3.7",
+    "zod": "^3.25.0"
   },
   "engines": {
     "node": ">=20.0.0"
