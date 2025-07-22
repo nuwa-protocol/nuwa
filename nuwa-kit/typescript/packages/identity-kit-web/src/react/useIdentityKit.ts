@@ -10,13 +10,47 @@ export interface IdentityKitState {
   error: string | null;
 }
 
+export interface ConnectResult {
+  action: 'popup' | 'redirect' | 'copy' | 'manual';
+  url?: string;
+  success: boolean;
+  error?: string;
+}
+
 export interface IdentityKitHook {
   state: IdentityKitState;
-  connect: (options?: { scopes?: string[] }) => Promise<void>;
+  connect: (options?: { 
+    scopes?: string[];
+    fallbackMethod?: 'redirect' | 'copy' | 'manual';
+  }) => Promise<void>;
+  /** Enhanced connect method that returns detailed result for popup blocker handling */
+  connectWithResult: (options?: { 
+    scopes?: string[];
+    fallbackMethod?: 'redirect' | 'copy' | 'manual';
+  }) => Promise<ConnectResult>;
   sign: (payload: any) => Promise<NIP1SignedObject>;
   verify: (sig: NIP1SignedObject) => Promise<boolean>;
   logout: () => Promise<void>;
   sdk: IdentityKitWeb | null;
+}
+
+/**
+ * Enhanced hook that provides user-friendly popup blocker handling
+ */
+export interface IdentityKitHookWithFallbacks extends IdentityKitHook {
+  /** 
+   * Connect with automatic fallback handling and user notifications 
+   * Returns a promise that resolves with instructions for the user
+   */
+  connectWithFallbacks: (options?: { 
+    scopes?: string[];
+    /** Callback to show user notifications */
+    onPopupBlocked?: (result: ConnectResult) => void;
+    /** Callback to show clipboard success notification */
+    onUrlCopied?: (url: string) => void;
+    /** Callback to show manual URL handling */
+    onManualUrl?: (url: string) => void;
+  }) => Promise<ConnectResult>;
 }
 
 export interface UseIdentityKitOptions {
@@ -102,8 +136,11 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     return () => window.removeEventListener('message', handleMessage);
   }, [sdk]);
 
-  // Connect action
-  const connect = useCallback(async (options?: { scopes?: string[] }) => {
+  // Connect action (backward compatible)
+  const connect = useCallback(async (options?: { 
+    scopes?: string[];
+    fallbackMethod?: 'redirect' | 'copy' | 'manual';
+  }) => {
     if (!sdk) {
       setState(prev => ({ ...prev, error: 'SDK not initialized' }));
       return;
@@ -112,7 +149,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      await sdk.connect(options);
+      await sdk.connect(options); // Note: no returnResult flag, so returns void
       // Actual connection result will be handled via postMessage in callback
       setState(prev => ({ ...prev, isConnecting: false }));
     } catch (error) {
@@ -123,6 +160,52 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
         keyId: null,
         error: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
       });
+    }
+  }, [sdk]);
+
+  // Enhanced connect action with result
+  const connectWithResult = useCallback(async (options?: { 
+    scopes?: string[];
+    fallbackMethod?: 'redirect' | 'copy' | 'manual';
+  }): Promise<ConnectResult> => {
+    if (!sdk) {
+      setState(prev => ({ ...prev, error: 'SDK not initialized' }));
+      return {
+        action: 'manual',
+        success: false,
+        error: 'SDK not initialized'
+      };
+    }
+
+    setState(prev => ({ ...prev, isConnecting: true, error: null }));
+
+    try {
+      const result = await sdk.connect({
+        ...options,
+        returnResult: true // Request detailed result
+      }) as ConnectResult; // Type assertion since we know returnResult=true
+      
+      // Only set connecting to false if action is not redirect
+      // (redirect will navigate away from current page)
+      if (result.action !== 'redirect') {
+        setState(prev => ({ ...prev, isConnecting: false }));
+      }
+      
+      return result;
+    } catch (error) {
+      setState({
+        isConnected: false,
+        isConnecting: false,
+        agentDid: null,
+        keyId: null,
+        error: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      
+      return {
+        action: 'manual',
+        success: false,
+        error: `Connection failed: ${error instanceof Error ? error.message : String(error)}`
+      };
     }
   }, [sdk]);
 
@@ -159,5 +242,59 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     });
   }, [sdk]);
 
-  return { state, connect, sign, verify, logout, sdk };
+  return { state, connect, connectWithResult, sign, verify, logout, sdk };
+}
+
+/**
+ * Enhanced version of useIdentityKit with automatic popup blocker fallbacks
+ */
+export function useIdentityKitWithFallbacks(options: UseIdentityKitOptions = {}): IdentityKitHookWithFallbacks {
+  const baseHook = useIdentityKit(options);
+  
+  const connectWithFallbacks = useCallback(async (connectOptions?: { 
+    scopes?: string[];
+    onPopupBlocked?: (result: ConnectResult) => void;
+    onUrlCopied?: (url: string) => void;
+    onManualUrl?: (url: string) => void;
+  }): Promise<ConnectResult> => {
+    // Try popup with detailed result
+    const result = await baseHook.connectWithResult({
+      scopes: connectOptions?.scopes,
+      fallbackMethod: 'copy' // Default to copy fallback
+    });
+    
+    // Handle different scenarios
+    switch (result.action) {
+      case 'popup':
+        // Success, no additional handling needed
+        break;
+        
+      case 'redirect':
+        // Page will redirect, no notification needed
+        break;
+        
+      case 'copy':
+        if (result.success && result.url) {
+          connectOptions?.onUrlCopied?.(result.url);
+        } else {
+          // Copy failed, show manual URL
+          connectOptions?.onManualUrl?.(result.url || '');
+        }
+        break;
+        
+      case 'manual':
+        connectOptions?.onPopupBlocked?.(result);
+        if (result.url) {
+          connectOptions?.onManualUrl?.(result.url);
+        }
+        break;
+    }
+    
+    return result;
+  }, [baseHook.connectWithResult]);
+  
+  return {
+    ...baseHook,
+    connectWithFallbacks
+  };
 } 

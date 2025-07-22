@@ -116,8 +116,20 @@ export class IdentityKitWeb {
   /**
    * Connect to Cadop
    * This will open a new window with the Cadop add-key page
+   * For backward compatibility, returns void by default. Set returnResult=true to get detailed result.
    */
-  async connect(options?: { scopes?: string[] }): Promise<void> {
+  async connect(options?: { 
+    scopes?: string[];
+    /** Fallback method when popup is blocked */
+    fallbackMethod?: 'redirect' | 'copy' | 'manual';
+    /** Return detailed result instead of void (for popup blocker handling) */
+    returnResult?: boolean;
+  }): Promise<void | {
+    action: 'popup' | 'redirect' | 'copy' | 'manual';
+    url?: string;
+    success: boolean;
+    error?: string;
+  }> {
     const idFragment = this.generateIdFragment();
 
     const { url } = await this.deepLinkManager.buildAddKeyUrl({
@@ -126,8 +138,85 @@ export class IdentityKitWeb {
       scopes: options?.scopes,
     });
     
-    // Open the URL in a new window/tab
-    window.open(url, '_blank');
+    try {
+      // Try to open popup first
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      
+      // Check if popup was blocked
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        // Popup was blocked, try fallback method
+        const result = await this.handlePopupBlocked(url, options?.fallbackMethod);
+        return options?.returnResult ? result : undefined;
+      }
+      
+      // Popup opened successfully
+      const result = {
+        action: 'popup' as const,
+        url,
+        success: true
+      };
+      return options?.returnResult ? result : undefined;
+    } catch (error) {
+      // Error opening popup, try fallback method
+      const result = await this.handlePopupBlocked(url, options?.fallbackMethod, error instanceof Error ? error.message : String(error));
+      return options?.returnResult ? result : undefined;
+    }
+  }
+
+  /**
+   * Handle popup blocker scenarios with fallback methods
+   */
+  private async handlePopupBlocked(
+    url: string, 
+    fallbackMethod?: 'redirect' | 'copy' | 'manual',
+    originalError?: string
+  ): Promise<{
+    action: 'redirect' | 'copy' | 'manual';
+    url: string;
+    success: boolean;
+    error?: string;
+  }> {
+    const method = fallbackMethod || 'redirect'; // Default to redirect
+    
+    switch (method) {
+      case 'redirect':
+        // Redirect current page to CADOP
+        window.location.href = url;
+        return {
+          action: 'redirect',
+          url,
+          success: true
+        };
+        
+      case 'copy':
+        // Copy URL to clipboard and show user notification
+        try {
+          await navigator.clipboard.writeText(url);
+          return {
+            action: 'copy',
+            url,
+            success: true
+          };
+        } catch (clipboardError) {
+          // Fallback to manual if clipboard fails
+          return {
+            action: 'manual',
+            url,
+            success: false,
+            error: `Clipboard access failed: ${clipboardError instanceof Error ? clipboardError.message : String(clipboardError)}`
+          };
+        }
+        
+      case 'manual':
+      default:
+        // Return URL for manual handling by the application
+        return {
+          action: 'manual',
+          url,
+          success: false,
+          error: originalError ? `Popup blocked: ${originalError}` : 'Popup blocked by browser'
+        };
+    }
   }
 
   /**
