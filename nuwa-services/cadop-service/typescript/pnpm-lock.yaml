@@ -418,11 +418,11 @@ importers:
   packages/login-demo:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.8.3)
+        specifier: ^0.3.1
+        version: 0.3.1(typescript@5.8.3)
       '@nuwa-ai/identity-kit-web':
-        specifier: ^0.3.0
-        version: 0.3.0(react@18.3.1)(typescript@5.8.3)
+        specifier: ^0.3.1
+        version: 0.3.1(react@18.3.1)(typescript@5.8.3)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1395,8 +1395,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nuwa-ai/identity-kit-web@0.3.0':
-    resolution: {integrity: sha512-2nniQaifpgV/J8fFKtXcP51eXJlywl89Fg7q2euZ+lLJka34Ycqu6rWwgaPZ50ubu+1k64dFKr32bVuxkLmO5g==}
+  '@nuwa-ai/identity-kit-web@0.3.1':
+    resolution: {integrity: sha512-5GKcLzJfqRLPfB7ycRiyc8/cAWJbE9d75LZngSp+ZfuSByMobcfCiSuiN1PTjpIQ7D5UwNbgJlGQxY14LpNtVw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0
     peerDependenciesMeta:
@@ -1405,6 +1405,9 @@ packages:
 
   '@nuwa-ai/identity-kit@0.3.0':
     resolution: {integrity: sha512-14mcNSLxSyVmeLz20Udrly8rtnH50NGc4wtJCUs+4f7yF3yQKZ8MC2g6ivsp+8W6rM9Z0rlu1gzUkejXQlQcNg==}
+
+  '@nuwa-ai/identity-kit@0.3.1':
+    resolution: {integrity: sha512-8cGgKvR+lx/cjHSHL2n/OixHmn+JdLhU+e6BM4rPYqdZ83DWKgCxEo023kiv0DBi2iRx6DZ/X/pgWtQf26MyMw==}
 
   '@paralleldrive/cuid2@2.2.2':
     resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
@@ -6095,9 +6098,9 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@nuwa-ai/identity-kit-web@0.3.0(react@18.3.1)(typescript@5.8.3)':
+  '@nuwa-ai/identity-kit-web@0.3.1(react@18.3.1)(typescript@5.8.3)':
     dependencies:
-      '@nuwa-ai/identity-kit': 0.3.0(typescript@5.8.3)
+      '@nuwa-ai/identity-kit': 0.3.1(typescript@5.8.3)
     optionalDependencies:
       react: 18.3.1
     transitivePeerDependencies:
@@ -6115,6 +6118,16 @@ snapshots:
       - typescript
 
   '@nuwa-ai/identity-kit@0.3.0(typescript@5.8.3)':
+    dependencies:
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.3.1(typescript@5.8.3)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0

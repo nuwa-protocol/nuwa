@@ -163,7 +163,7 @@ export class DeepLinkManager {
     if (!tempKeyJson) {
       return {
         success: false,
-        error: 'No matching key found for the provided state'
+        error: `No matching key found for the provided state : ${state}`
       };
     }
 

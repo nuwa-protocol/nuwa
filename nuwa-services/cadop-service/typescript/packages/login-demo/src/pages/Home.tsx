@@ -103,7 +103,7 @@ export function Home() {
           </div>
           <div className="domain-hint">
             <small>
-              Use full URL（如 http://localhost:3000） or just domain（如 test-id.nuwa.dev）
+              Use full URL（such as http://localhost:3000） or just domain（such as test-id.nuwa.dev）
             </small>
           </div>
         </div>

@@ -1,5 +1,14 @@
 # @nuwa-ai/identity-kit-web
 
+## 0.3.1
+
+### Patch Changes
+
+- fix deep link bug
+
+- Updated dependencies []:
+  - @nuwa-ai/identity-kit@0.3.1
+
 ## 0.3.0
 
 ### Major Changes
