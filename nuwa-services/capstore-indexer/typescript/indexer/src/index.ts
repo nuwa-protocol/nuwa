@@ -39,7 +39,7 @@ let ipfsClient: any;
 // Initialize VDRRegistry (Identity Verification)
 // -----------------------------------------------------------------------------
 const registry = VDRRegistry.getInstance();
-initRoochVDR("test", undefined, registry);
+initRoochVDR("local", undefined, registry);
 
 // -----------------------------------------------------------------------------
 // Event Listener Initialization
@@ -105,26 +105,24 @@ ipfsService.addTool({
 
       if (!result.success) {
         return {
-          parts: [{
-            type: "query-error",
-            text: "CID query failed",
-            data: {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
               name,
               id,
               page,
               pageSize,
               error: result.error || 'No matching records found'
-            }
+            })
           }]
         };
       }
 
       // MCP standard response with pagination info
       return {
-        parts: [{
-          type: "cid-results",
-          text: `Found ${result.totalItems} matching CID(s)`,
-          data: {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
             totalItems: result.totalItems,
             page,
             pageSize,
@@ -134,17 +132,14 @@ ipfsService.addTool({
               id: item.id,
               cid: item.cid,
             }))
-          }
+          })
         }]
       };
     } catch (error) {
       return {
-        parts: [{
-          type: "system-error",
-          text: "System error during CID query",
-          data: {
-            error: (error as Error).message
-          }
+        content: [{
+          type: "text",
+          text: (error as Error).message || 'Unknown error occurred',
         }]
       };
     }
@@ -199,29 +194,29 @@ ipfsService.addTool({
 
       // MCP standard response format
       return {
-        parts: [{
-          type: "file-upload",
-          text: "File uploaded successfully",
-          data: {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            success: true,
             fileName,
             ipfsCid: ipfsCid.toString(),
             uploaderDid,
             timestamp: new Date().toISOString(),
             ipfsUrl: `ipfs://${ipfsCid.toString()}`,
             gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
-          }
+          })
         }]
       };
     } catch (error) {
       console.error("File upload error:", error);
       return {
-        parts: [{
-          type: "upload-error",
-          text: "File upload failed",
-          data: {
+        content: [{
+          type: "text",
+          success: false,
+          text: JSON.stringify({
             fileName,
             error: error instanceof Error ? error.message : String(error)
-          }
+          })
         }]
       };
     }
