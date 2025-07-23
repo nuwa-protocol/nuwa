@@ -40,7 +40,7 @@ export async function fetchAndParseYaml(cid: string): Promise<YamlData> {
 
 export async function processRoochRegisterEvent() {
   try {
-    const client = new RoochClient({url: 'https://test-seed.rooch.network'});
+    const client = new RoochClient({url: 'http://localhost:6767'});
     const events = await client.queryEvents({
       filter: {
         event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,

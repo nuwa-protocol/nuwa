@@ -109,11 +109,11 @@ ipfsService.addTool({
             type: "text",
             text: JSON.stringify({
               success: false,
-              name,
-              id,
-              page,
-              pageSize,
-              error: result.error || 'No matching records found'
+              code: 404,
+              data: {
+                error: result.error || 'No matching records found',
+                params: { name, id, page, pageSize }
+              }
             })
           }]
         };
@@ -124,16 +124,19 @@ ipfsService.addTool({
         content: [{
           type: "text",
           text: JSON.stringify({
-            success: false,
-            totalItems: result.totalItems,
-            page,
-            pageSize,
-            totalPages: Math.ceil(result.totalItems / pageSize),
-            items: result.items.map(item => ({
-              name: item.name,
-              id: item.id,
-              cid: item.cid,
-            }))
+            success: true,
+            code: 200,
+            data: {
+              totalItems: result.totalItems,
+              page,
+              pageSize,
+              totalPages: Math.ceil(result.totalItems / pageSize),
+              items: result.items.map(item => ({
+                name: item.name,
+                id: item.id,
+                cid: item.cid,
+              }))
+            }
           })
         }]
       };
@@ -141,7 +144,13 @@ ipfsService.addTool({
       return {
         content: [{
           type: "text",
-          text: (error as Error).message || 'Unknown error occurred',
+          text: JSON.stringify({
+            success: false,
+            code: 500,
+            data: {
+              error: (error as Error).message || 'Unknown error occurred'
+            }
+          })
         }]
       };
     }
@@ -164,10 +173,13 @@ ipfsService.addTool({
       // Authentication check
       if (!context.session?.did) {
         return {
-          parts: [{
-            type: "auth-error",
-            text: "Authentication required",
-            data: { code: 401 }
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              code: 401,
+              data: { error: "Authentication required" }
+            })
           }]
         };
       }
@@ -200,24 +212,29 @@ ipfsService.addTool({
           type: "text",
           text: JSON.stringify({
             success: true,
-            fileName,
-            ipfsCid: ipfsCid.toString(),
-            uploaderDid,
-            timestamp: new Date().toISOString(),
-            ipfsUrl: `ipfs://${ipfsCid.toString()}`,
-            gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
+            code: 200,
+            data: {
+              fileName,
+              ipfsCid: ipfsCid.toString(),
+              uploaderDid,
+              timestamp: new Date().toISOString(),
+              ipfsUrl: `ipfs://${ipfsCid.toString()}`,
+              gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
+            }
           })
         }]
       };
     } catch (error) {
-      console.error("File upload error:", error);
       return {
         content: [{
           type: "text",
-          success: false,
           text: JSON.stringify({
-            fileName,
-            error: error instanceof Error ? error.message : String(error)
+            success: false,
+            code: 500,
+            data: {
+              fileName,
+              error: error instanceof Error ? error.message : String(error)
+            }
           })
         }]
       };
@@ -242,8 +259,11 @@ ipfsService.addTool({
         return {
           content: [{
             type: "text",
-            text: "Authentication required",
-            data: { code: 401 }
+            text: JSON.stringify({
+              success: false,
+              code: 401,
+              data: { error: "Authentication required" }
+            })
           }]
         };
       }
@@ -254,10 +274,13 @@ ipfsService.addTool({
       // CID format validation
       if (!/^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[A-Za-z0-9]{58}$/.test(cid)) {
         return {
-          parts: [{
-            type: "validation-error",
-            text: "Invalid CID format",
-            data: { cid }
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              code: 500,
+              data: { error: "The CID format does not meet the requirements" }
+            })
           }]
         };
       }
@@ -302,23 +325,30 @@ ipfsService.addTool({
         content: [{
           type: "text",
           text: JSON.stringify({
-            cid,
-            size: totalSize,
-            format: formattedData,
-            dataFormat,
-            gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
-            timestamp: new Date().toISOString()
-          }),
+            success: true,
+            code: 200,
+            data: {
+              cid,
+              size: totalSize,
+              fileData: formattedData,  // 重命名字段
+              dataFormat,
+              gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
+              timestamp: new Date().toISOString()
+            }
+          })
         }]
       };
     } catch (error) {
-      console.error(`Download error for CID ${cid}:`, error);
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
-            cid,
-            error: error instanceof Error ? error.message : 'Unknown download error'
+            success: false,
+            code: 500,
+            data: {
+              cid,
+              error: error instanceof Error ? error.message : 'Download failed'
+            }
           })
         }]
       };
