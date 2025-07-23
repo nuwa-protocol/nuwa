@@ -64,8 +64,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.2
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.8.3)
+        specifier: ^0.3.1
+        version: 0.3.1(typescript@5.8.3)
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.6
         version: 0.3.6(typescript@5.8.3)
@@ -170,8 +170,8 @@ importers:
   packages/cadop-shared:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.8.3)
+        specifier: ^0.3.1
+        version: 0.3.1(typescript@5.8.3)
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.6
         version: 0.3.6(typescript@5.8.3)
@@ -237,8 +237,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.2
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@4.9.5)
+        specifier: ^0.3.1
+        version: 0.3.1(typescript@4.9.5)
       '@peculiar/asn1-schema':
         specifier: ^2.3.8
         version: 2.3.15
@@ -1402,9 +1402,6 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
-
-  '@nuwa-ai/identity-kit@0.3.0':
-    resolution: {integrity: sha512-14mcNSLxSyVmeLz20Udrly8rtnH50NGc4wtJCUs+4f7yF3yQKZ8MC2g6ivsp+8W6rM9Z0rlu1gzUkejXQlQcNg==}
 
   '@nuwa-ai/identity-kit@0.3.1':
     resolution: {integrity: sha512-8cGgKvR+lx/cjHSHL2n/OixHmn+JdLhU+e6BM4rPYqdZ83DWKgCxEo023kiv0DBi2iRx6DZ/X/pgWtQf26MyMw==}
@@ -6107,21 +6104,11 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/identity-kit@0.3.0(typescript@4.9.5)':
+  '@nuwa-ai/identity-kit@0.3.1(typescript@4.9.5)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@4.9.5)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
-  '@nuwa-ai/identity-kit@0.3.0(typescript@5.8.3)':
-    dependencies:
-      '@noble/curves': 1.9.2
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
       multiformats: 9.9.0
     transitivePeerDependencies:
       - supports-color
