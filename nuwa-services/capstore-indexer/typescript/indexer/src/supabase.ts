@@ -29,36 +29,69 @@ export async function storeToSupabase(data: YamlData, cid: string): Promise<void
 
 export async function queryCIDFromSupabase(
   name?: string | null,
-  id?: string | null
-): Promise<{ success: boolean; cid?: string[]; error?: string }> {
+  id?: string | null,
+  page: number = 0,
+  pageSize: number = 50
+): Promise<{
+  success: boolean;
+  items?: Array<{ cid: string; name: string; id: string}>;
+  totalItems?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
+  error?: string;
+}> {
   try {
+    // Validate page size (max 50 records per page)
+    const validatedPageSize = Math.min(pageSize, 50);
 
+    // Calculate pagination offset
+    const offset = page * validatedPageSize;
+
+    // Create base query
     let query = supabase
       .from('ipfs_data')
-      .select('cid, name, id');
+      .select('cid, name, id', { count: 'exact' });
 
-    if (name) query = query.ilike('name', name);
-    if (id) query = query.ilike('id', id);
+    // Add filtering conditions
+    if (name) query = query.ilike('name', `%${name}%`);
+    if (id) query = query.ilike('id', `%${id}%`);
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + validatedPageSize - 1);
 
+    // Execute query
+    const { data, count, error } = await query;
 
     if (error) throw error;
 
-
+    // Handle empty results
     if (!data || data.length === 0) {
       return {
         success: false,
+        page,
+        pageSize: validatedPageSize,
+        totalItems: 0,
+        totalPages: 0,
         error: 'No records found matching the criteria'
       };
     }
 
-
-    const cid = data.map(item => item.cid);
+    // Calculate total pages
+    const totalItems = count || data.length;
+    const totalPages = Math.ceil(totalItems / validatedPageSize);
 
     return {
       success: true,
-      cid: cid
+      items: data.map(item => ({
+        cid: item.cid,
+        name: item.name,
+        id: item.id,
+      })),
+      totalItems,
+      page,
+      pageSize: validatedPageSize,
+      totalPages
     };
   } catch (error) {
     return {

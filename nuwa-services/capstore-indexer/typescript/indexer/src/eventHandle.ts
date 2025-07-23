@@ -70,23 +70,6 @@ export async function processRoochRegisterEvent() {
   }
 }
 
-export async function queryCID(name: string, id: string) {
-  try {
-    if (!name || !id) throw new Error('Missing name or id parameter');
-
-    const result = await queryCIDFromSupabase(name, id);
-    return {
-      success: true,
-      cid: result.cid
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: (error as Error).message
-    };
-  }
-}
-
 export function setupRoochEventListener(interval = 30000) {
   setInterval(async () => {
     try {

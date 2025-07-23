@@ -26,9 +26,6 @@ importers:
       fastmcp:
         specifier: ^3.8.5
         version: 3.8.5
-      file-type:
-        specifier: ^21.0.0
-        version: 21.0.0
       ipfs-http-client:
         specifier: ^60.0.1
         version: 60.0.1(encoding@0.1.13)

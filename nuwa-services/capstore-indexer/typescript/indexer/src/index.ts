@@ -5,9 +5,8 @@ import { DIDAuth, VDRRegistry, initRoochVDR } from "@nuwa-ai/identity-kit";
 import { create } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { Readable } from 'stream';
-import { queryCID, setupRoochEventListener } from './eventHandle.js';
-import { fileTypeFromBuffer } from 'file-type';
-import {queryCIDFromSupabase} from "./supabase";
+import { setupRoochEventListener } from './eventHandle.js';
+import { queryCIDFromSupabase } from "./supabase";
 
 // Load environment variables
 config();
@@ -84,14 +83,16 @@ const ipfsService = new FastMCP({
 });
 
 // -----------------------------------------------------------------------------
-// CID Query Tool
+// CID Query Tool with Pagination Support
 // -----------------------------------------------------------------------------
 ipfsService.addTool({
   name: "queryCID",
-  description: "Query CID by name and ID. Both parameters are optional.",
+  description: "Query CIDs by name and ID with pagination support",
   parameters: z.object({
     name: z.string().optional().describe("Resource name (optional)"),
     id: z.string().optional().describe("Resource identifier (optional)"),
+    page: z.number().optional().default(0).describe("Page number starting from 0"),
+    pageSize: z.number().optional().default(50).describe("Number of records per page")
   }),
   annotations: {
     readOnlyHint: true,
@@ -99,23 +100,53 @@ ipfsService.addTool({
   },
   async execute(args) {
     try {
-      const { name, id } = args;
-      const result = await queryCIDFromSupabase(name, id);
+      const { name, id, page, pageSize } = args;
+      const result = await queryCIDFromSupabase(name, id, page, pageSize);
 
       if (!result.success) {
-        throw new Error(result.error || 'Record not found');
+        return {
+          parts: [{
+            type: "query-error",
+            text: "CID query failed",
+            data: {
+              name,
+              id,
+              page,
+              pageSize,
+              error: result.error || 'No matching records found'
+            }
+          }]
+        };
       }
 
-      // 返回单个CID或多个CIDs
-      return JSON.stringify({
-        success: true,
-        ...(result.cid ? { cid: result.cid } : {}),
-      });
+      // MCP standard response with pagination info
+      return {
+        parts: [{
+          type: "cid-results",
+          text: `Found ${result.totalItems} matching CID(s)`,
+          data: {
+            totalItems: result.totalItems,
+            page,
+            pageSize,
+            totalPages: Math.ceil(result.totalItems / pageSize),
+            items: result.items.map(item => ({
+              name: item.name,
+              id: item.id,
+              cid: item.cid,
+            }))
+          }
+        }]
+      };
     } catch (error) {
-      return JSON.stringify({
-        success: false,
-        error: (error as Error).message
-      });
+      return {
+        parts: [{
+          type: "system-error",
+          text: "System error during CID query",
+          data: {
+            error: (error as Error).message
+          }
+        }]
+      };
     }
   }
 });
@@ -135,7 +166,13 @@ ipfsService.addTool({
     try {
       // Authentication check
       if (!context.session?.did) {
-        throw new Error("Authentication required");
+        return {
+          parts: [{
+            type: "auth-error",
+            text: "Authentication required",
+            data: { code: 401 }
+          }]
+        };
       }
 
       const uploaderDid = context.session.did;
@@ -160,21 +197,40 @@ ipfsService.addTool({
         console.log(`📌 Pinned file: ${ipfsCid.toString()}`);
       }
 
+      // MCP standard response format
       return {
-        success: true,
-        ipfsCid: ipfsCid.toString(),
-        fileName: fileName,
-        uploaderDid: uploaderDid,
-        timestamp: new Date().toISOString(),
-        ipfsGatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
+        parts: [{
+          type: "file-upload",
+          text: "File uploaded successfully",
+          data: {
+            fileName,
+            ipfsCid: ipfsCid.toString(),
+            uploaderDid,
+            timestamp: new Date().toISOString(),
+            ipfsUrl: `ipfs://${ipfsCid.toString()}`,
+            gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
+          }
+        }]
       };
     } catch (error) {
       console.error("File upload error:", error);
-      throw new Error(`Upload failed: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        parts: [{
+          type: "upload-error",
+          text: "File upload failed",
+          data: {
+            fileName,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        }]
+      };
     }
   },
 });
 
+// -----------------------------------------------------------------------------
+// File Download Tool
+// -----------------------------------------------------------------------------
 ipfsService.addTool({
   name: "downloadFile",
   description: "Download a file from IPFS using its CID",
@@ -185,26 +241,47 @@ ipfsService.addTool({
   }),
   async execute({ cid, dataFormat }, context) {
     try {
-      // 认证检查
       if (!context.session?.did) {
-        throw new Error("Authentication required");
+        return {
+          parts: [{
+            type: "auth-error",
+            text: "Authentication required",
+            data: { code: 401 }
+          }]
+        };
       }
+
       const downloaderDid = context.session.did;
       console.log(`📥 Download request from DID: ${downloaderDid}, CID: ${cid}`);
 
-      // 验证CID格式有效性
+      // CID format validation
       if (!/^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[A-Za-z0-9]{58}$/.test(cid)) {
-        throw new Error("Invalid CID format");
+        return {
+          parts: [{
+            type: "validation-error",
+            text: "Invalid CID format",
+            data: { cid }
+          }]
+        };
       }
 
-      // 检查文件是否存在
+      // Check if file exists
       let fileExists = false;
       for await (const _ of ipfsClient.files.ls(`/ipfs/${cid}`)) {
         fileExists = true;
         break;
       }
-      if (!fileExists) throw new Error("File not found on IPFS network");
+      if (!fileExists) {
+        return {
+          parts: [{
+            type: "not-found-error",
+            text: "File not found",
+            data: { cid }
+          }]
+        };
+      }
 
+      // Download file
       const chunks = [];
       let totalSize = 0;
 
@@ -215,6 +292,7 @@ ipfsService.addTool({
 
       const fileBuffer = Buffer.concat(chunks, totalSize);
 
+      // Format data
       let formattedData;
       if (dataFormat === 'base64') {
         formattedData = fileBuffer.toString('base64');
@@ -222,71 +300,38 @@ ipfsService.addTool({
         formattedData = fileBuffer.toString('utf8');
       }
 
-      const type = await fileTypeFromBuffer(fileBuffer);
-      const mimeType = type?.mime || 'application/octet-stream';
 
+      // MCP standard response format
       return {
-        success: true,
-        cid: cid,
-        size: totalSize,
-        mimeType,
-        data: formattedData,
-        dataFormat,
-        gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
-        timestamp: new Date().toISOString()
+        parts: [{
+          type: "file-download",
+          text: "File downloaded successfully",
+          data: {
+            cid,
+            size: totalSize,
+            dataFormat,
+            gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
+            timestamp: new Date().toISOString()
+          },
+          content: formattedData
+        }]
       };
     } catch (error) {
       console.error(`Download error for CID ${cid}:`, error);
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown download error'
+        parts: [{
+          type: "download-error",
+          text: "File download failed",
+          data: {
+            cid,
+            error: error instanceof Error ? error.message : 'Unknown download error'
+          }
+        }]
       };
     }
   },
 });
 
-// -----------------------------------------------------------------------------
-// IPFS Resource Access Point
-// -----------------------------------------------------------------------------
-ipfsService.addResourceTemplate({
-  uriTemplate: "ipfs://{cid}",
-  name: "IPFS File Information",
-  mimeType: "application/json",
-  arguments: [
-    {
-      name: "cid",
-      description: "Content Identifier (CID) of the file",
-      required: true,
-    },
-  ],
-  async load(args) {
-    try {
-      // Retrieve file information from IPFS
-      const stats = await ipfsClient.files.stat(`/ipfs/${args.cid}`);
-      return {
-        blob: JSON.stringify({
-          cid: args.cid,
-          size: stats.size,
-          type: stats.type,
-          blocks: stats.blocks,
-          withLocality: stats.withLocality,
-          local: stats.local,
-          sizeLocal: stats.sizeLocal,
-          ipfsGatewayUrl: `https://ipfs.io/ipfs/${args.cid}`
-        }),
-        mimeType: "application/json"
-      };
-    } catch (error) {
-      return {
-        blob: JSON.stringify({
-          error: "File not found",
-          cid: args.cid
-        }),
-        mimeType: "application/json"
-      };
-    }
-  },
-});
 
 // -----------------------------------------------------------------------------
 // Start Service
@@ -301,5 +346,6 @@ ipfsService.start({
   console.log('✅ Nuwa IPFS Service running on port 3000');
   console.log('🔍 Use "queryCID" to find content');
   console.log('📤 Use "uploadFile" to upload content');
+  console.log('📥 Use "downloadFile" to retrieve content');
   console.log('🌐 Access IPFS content at: ipfs://{cid}');
 });
