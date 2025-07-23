@@ -108,6 +108,7 @@ ipfsService.addTool({
           content: [{
             type: "text",
             text: JSON.stringify({
+              success: false,
               name,
               id,
               page,
@@ -123,6 +124,7 @@ ipfsService.addTool({
         content: [{
           type: "text",
           text: JSON.stringify({
+            success: false,
             totalItems: result.totalItems,
             page,
             pageSize,
@@ -238,8 +240,8 @@ ipfsService.addTool({
     try {
       if (!context.session?.did) {
         return {
-          parts: [{
-            type: "auth-error",
+          content: [{
+            type: "text",
             text: "Authentication required",
             data: { code: 401 }
           }]
@@ -268,10 +270,9 @@ ipfsService.addTool({
       }
       if (!fileExists) {
         return {
-          parts: [{
-            type: "not-found-error",
-            text: "File not found",
-            data: { cid }
+          content: [{
+            type: "text",
+            text: `File not found: ${cid}`,
           }]
         };
       }
@@ -298,29 +299,27 @@ ipfsService.addTool({
 
       // MCP standard response format
       return {
-        parts: [{
-          type: "file-download",
-          text: "File downloaded successfully",
-          data: {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
             cid,
             size: totalSize,
+            format: formattedData,
             dataFormat,
             gatewayUrl: `https://ipfs.io/ipfs/${cid}`,
             timestamp: new Date().toISOString()
-          },
-          content: formattedData
+          }),
         }]
       };
     } catch (error) {
       console.error(`Download error for CID ${cid}:`, error);
       return {
-        parts: [{
-          type: "download-error",
-          text: "File download failed",
-          data: {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
             cid,
             error: error instanceof Error ? error.message : 'Unknown download error'
-          }
+          })
         }]
       };
     }
