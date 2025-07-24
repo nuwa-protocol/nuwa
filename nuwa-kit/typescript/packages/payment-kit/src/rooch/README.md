@@ -92,6 +92,22 @@ console.log(`100 RGas = $${totalValueUSD}`); // "100 RGas = $1"
 ### Supported Assets
 - **RGas** (`0x3::gas_coin::RGas`): Fixed price of 0.01 USD per RGas
 
+## Chain Information
+
+The contract provides access to chain-specific information:
+
+```typescript
+// Get current chain ID from the blockchain
+const chainId = await contract.getChainId();
+console.log(`Connected to chain: ${chainId}`);
+
+// Chain ID mapping:
+// 1 = Rooch Mainnet
+// 2 = Rooch Testnet  
+// 3 = Rooch Devnet
+// 4 = Rooch Local
+```
+
 ## Usage Example
 
 ```typescript
@@ -99,6 +115,9 @@ const contract = new RoochPaymentChannelContract({
   network: 'test',
   debug: true
 });
+
+// Get chain ID dynamically
+const chainId = await contract.getChainId();
 
 // Get channel status - no view functions needed!
 const status = await contract.getChannelStatus({ 

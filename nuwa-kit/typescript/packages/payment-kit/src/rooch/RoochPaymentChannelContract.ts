@@ -33,6 +33,7 @@ import type {
   ChannelInfo,
   SubChannelParams,
   SubChannelInfo,
+  DepositToHubParams,
 } from '../contracts/IPaymentChannelContract';
 import type { 
   AssetInfo,
@@ -240,7 +241,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       
       return {
         channelId,
-        txHash: (result as any).transaction_hash || '',
+        txHash: result.execution_info.tx_hash || '',
         blockHeight: BigInt(0), // TODO: Extract from result if available
         events: result.output?.events,
       };
@@ -281,7 +282,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       return {
-        txHash: (result as any).transaction_hash || '',
+        txHash: result.execution_info.tx_hash || '',
         blockHeight: BigInt(0),
         events: result.output?.events,
       };
@@ -329,7 +330,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const claimedAmount = this.parseClaimedAmountFromEvents(result.output?.events);
 
       return {
-        txHash: (result as any).transaction_hash || '',
+        txHash: result.execution_info.tx_hash || '',
         claimedAmount,
         blockHeight: BigInt(0),
         events: result.output?.events,
@@ -383,7 +384,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       return {
-        txHash: (result as any).transaction_hash || '',
+        txHash: result.execution_info.tx_hash || '',
         blockHeight: BigInt(0),
         events: result.output?.events,
       };
@@ -506,6 +507,67 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       throw new Error(`Unsupported asset type: ${assetId}`);
     } catch (error) {
       this.logger.error('Error getting asset price:', error);
+      throw error;
+    }
+  }
+
+  async getChainId(): Promise<bigint> {
+    try {
+      this.logger.debug('Getting chain ID');
+      
+      // Use RoochClient's getChainId method
+      const chainId = await this.client.getChainId();
+      return BigInt(chainId);
+    } catch (error) {
+      this.logger.error('Error getting chain ID:', error);
+      throw error;
+    }
+  }
+
+  async depositToHub(params: DepositToHubParams): Promise<TxResult> {
+    try {
+      this.logger.debug('Depositing to payment hub with params:', params);
+      
+      // Parse and validate target DID
+      const targetParsed = parseDid(params.targetDid);
+      if (targetParsed.method !== 'rooch') {
+        throw new Error(`Invalid target DID method: expected 'rooch', got '${targetParsed.method}'`);
+      }
+      
+      const signer = await this.convertSigner(params.signer);
+      
+      // Create transaction to deposit to hub
+      const transaction = this.createTransaction();
+      transaction.callFunction({
+        target: `${this.contractAddress}::deposit_to_hub_entry`,
+        typeArgs: [params.asset.assetId], // CoinType as type argument
+        args: [
+          Args.address(targetParsed.identifier),
+          Args.u256(params.amount),
+        ],
+        maxGas: 100000000,
+      });
+
+      this.logger.debug('Executing depositToHub transaction');
+      
+      // Execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        transaction,
+        signer,
+        option: { withOutput: true },
+      });
+
+      if (result.execution_info.status.type !== 'executed') {
+        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+      }
+
+      return {
+        txHash: result.execution_info.tx_hash || '',
+        blockHeight: BigInt(0),
+        events: result.output?.events,
+      };
+    } catch (error) {
+      this.logger.error('Error depositing to hub:', error);
       throw error;
     }
   }

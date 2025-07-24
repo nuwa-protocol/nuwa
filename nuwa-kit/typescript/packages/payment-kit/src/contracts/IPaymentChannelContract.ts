@@ -168,4 +168,28 @@ export interface IPaymentChannelContract {
    * @returns Price in pUSD (pico-USD, 1 USD = 1,000,000,000,000 pUSD)
    */
   getAssetPrice(assetId: string): Promise<bigint>;
+
+  /**
+   * Get the chain ID from the blockchain
+   * @returns Chain ID as bigint
+   */
+  getChainId(): Promise<bigint>;
+
+  /**
+   * Deposit funds to a payment hub for later use in payment channels
+   * @param params Deposit parameters including target address, asset, amount, and signer
+   * @returns Transaction result
+   */
+  depositToHub(params: DepositToHubParams): Promise<TxResult>;
+}
+
+export interface DepositToHubParams {
+  /** Target DID to receive the deposit */
+  targetDid: string;
+  /** Asset information */
+  asset: AssetInfo;
+  /** Amount to deposit (in smallest asset units) */
+  amount: bigint;
+  /** Signer for the transaction */
+  signer: SignerInterface;
 } 

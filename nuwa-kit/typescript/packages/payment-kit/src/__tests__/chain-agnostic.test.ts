@@ -76,6 +76,20 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     // Return mock price in pUSD (100 pUSD = 0.0001 USD)
     return BigInt('100');
   }
+
+  async getChainId(): Promise<bigint> {
+    // Return mock chain ID (test network)
+    return BigInt(2);
+  }
+
+  async depositToHub(params: any): Promise<any> {
+    // Mock deposit to hub - return success
+    return {
+      txHash: '0xmock_deposit_hash',
+      blockHeight: BigInt(100),
+      events: [],
+    };
+  }
 }
 
 // Mock SignerInterface - simplified for testing

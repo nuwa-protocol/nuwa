@@ -63,4 +63,33 @@ describe('RoochPaymentChannelContract', () => {
       expect(result1).not.toBe(result2);
     });
   });
+
+  describe('Chain Information', () => {
+    it('should have getChainId method', () => {
+      const contract = new RoochPaymentChannelContract({
+        network: 'test',
+        debug: false,
+      });
+
+      // Check that the method exists and is a function
+      expect(typeof contract.getChainId).toBe('function');
+    });
+
+    it('should call client getChainId method', async () => {
+      const contract = new RoochPaymentChannelContract({
+        network: 'test',
+        debug: false,
+      });
+
+      // Mock the client's getChainId method
+      const mockGetChainId = jest.fn().mockResolvedValue(2);
+      (contract as any).client.getChainId = mockGetChainId;
+
+      const chainId = await contract.getChainId();
+      
+      expect(mockGetChainId).toHaveBeenCalled();
+      expect(chainId).toBe(BigInt(2));
+      expect(typeof chainId).toBe('bigint');
+    });
+  });
 }); 
