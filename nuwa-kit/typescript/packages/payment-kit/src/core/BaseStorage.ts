@@ -3,7 +3,7 @@
  * Unified storage abstractions for both Payer and Payee workflows
  */
 
-import type { SignedSubRAV, SubChannelState, ChannelMetadata } from './types';
+import type { SignedSubRAV, SubChannelState, ChannelInfo } from './types';
 
 // ==================== Pagination and Filtering ====================
 
@@ -72,16 +72,22 @@ export interface RAVStore {
 // ==================== Channel State Storage Interfaces ====================
 
 /**
- * Channel state storage interface for Payer (客户端付款方)
- * Responsible for persistent storage of channel metadata and sub-channel state
- * This is a STORAGE layer (persistent, reliable) not a CACHE layer (temporary, lossy)
+ * Basic Channel State Storage interface
+ * 
+ * This minimal interface provides the essential caching operations needed for payment channels
  */
 export interface ChannelStateStorage {
-  /** Get channel metadata */
-  getChannelMetadata(channelId: string): Promise<ChannelMetadata | null>;
+  // -------- Channel Metadata Operations --------
   
-  /** Set channel metadata */
-  setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void>;
+  /**
+   * Get channel metadata by channel ID
+   */
+  getChannelMetadata(channelId: string): Promise<ChannelInfo | null>;
+  
+  /**
+   * Set/update channel metadata
+   */
+  setChannelMetadata(channelId: string, metadata: ChannelInfo): Promise<void>;
 
   /**
    * Get sub-channel state for nonce and amount tracking

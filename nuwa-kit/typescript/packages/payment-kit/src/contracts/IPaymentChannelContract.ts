@@ -1,4 +1,9 @@
-import { AssetInfo, SignedSubRAV } from '../core/types';
+import type { 
+  AssetInfo, 
+  SubRAV, 
+  SignedSubRAV,
+  ChannelInfo,
+} from '../core/types';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 /**
@@ -107,22 +112,6 @@ export interface SubChannelInfo {
   methodType: string;
   lastClaimedAmount: bigint;
   lastConfirmedNonce: bigint;
-}
-
-/**
- * Channel information and status
- */
-export interface ChannelInfo {
-  channelId: string;
-  payerDid: string;
-  payeeDid: string;
-  asset: AssetInfo;
-  epoch: bigint;
-  status: 'active' | 'closing' | 'closed';
-  // Note: Sub-channel list should be obtained from DID Document or local storage
-  // Use getSubChannel() method to query individual sub-channel dynamic states
-  // Aggregated values like totalCollateral and claimedAmount should be calculated
-  // separately by querying the payment hub and individual sub-channels as needed
 }
 
 /**

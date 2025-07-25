@@ -1,18 +1,17 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { RoochPaymentChannelContract } from '../RoochPaymentChannelContract';
-import { 
-  ChannelInfo, 
-  SubChannelInfo,
+import type {
   OpenChannelParams,
+  OpenChannelResult,
   OpenChannelWithSubChannelParams,
   AuthorizeSubChannelParams,
   ClaimParams,
-  CloseParams,
   ChannelStatusParams,
   SubChannelParams,
+  SubChannelInfo,
   DepositToHubParams,
 } from '../../contracts/IPaymentChannelContract';
-import { AssetInfo, SignedSubRAV, SubRAV } from '../../core/types';
+import type { ChannelInfo, AssetInfo, SignedSubRAV, SubRAV } from '../../core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, MultibaseCodec, parseDid } from '@nuwa-ai/identity-kit';
 import { SubRAVSigner, SUBRAV_VERSION_1 } from '../../core/subrav';

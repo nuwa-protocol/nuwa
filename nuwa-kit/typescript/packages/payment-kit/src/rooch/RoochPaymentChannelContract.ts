@@ -31,7 +31,6 @@ import type {
   ClaimResult,
   CloseParams,
   ChannelStatusParams,
-  ChannelInfo,
   SubChannelParams,
   SubChannelInfo,
   DepositToHubParams,
@@ -40,6 +39,7 @@ import type {
   AssetInfo,
   SignedSubRAV,
   SubRAV,
+  ChannelInfo,
 } from '../core/types';
 import { SubRAVCodec } from '../core/subrav';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';

@@ -5,21 +5,17 @@
  * from the Payee perspective, using the IPaymentChannelContract abstraction.
  */
 
-import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
-import type {
-  IPaymentChannelContract,
-  ClaimParams,
-  ClaimResult,
-  ChannelInfo,
-} from '../contracts/IPaymentChannelContract';
 import type {
   AssetInfo,
+  SubChannelState,
+  ChannelInfo,
   SignedSubRAV,
-  ChannelMetadata,
   SubRAV,
 } from '../core/types';
+import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
+import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
+import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
 import { SubRAVManager } from '../core/subrav';
-import { ChannelStateStorage, MemoryChannelStateStorage, StorageOptions } from '../core/ChannelStateStorage';
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
@@ -53,7 +49,6 @@ export interface GenerateSubRAVParams {
 }
 
 export interface ListChannelsOptions {
-  payeeDid?: string;
   status?: 'active' | 'closed' | 'closing';
   offset?: number;
   limit?: number;
@@ -201,7 +196,7 @@ export class PaymentChannelPayeeClient {
       // 1. Check if channel exists and get current state first
       let channelInfo: ChannelInfo;
       try {
-        channelInfo = await this.contract.getChannelStatus({ channelId: signedSubRAV.subRav.channelId });
+        channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
         result.details!.channelExists = true;
       } catch (error) {
         result.error = `Channel ${signedSubRAV.subRav.channelId} not found`;
@@ -288,7 +283,7 @@ export class PaymentChannelPayeeClient {
     }
 
     // Get channel info to reconstruct keyId
-    const channelInfo = await this.contract.getChannelStatus({ channelId: signedSubRAV.subRav.channelId });
+    const channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
     const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
 
     // Update sub-channel state
@@ -318,7 +313,7 @@ export class PaymentChannelPayeeClient {
     }
 
     // Submit claim to blockchain
-    const claimParams: ClaimParams = {
+    const claimParams = {
       signedSubRAV,
       signer: this.signer,
     };
@@ -392,10 +387,45 @@ export class PaymentChannelPayeeClient {
   }
 
   /**
+   * Get channel info with caching using ChannelStateStorage
+   * This checks local storage first, then falls back to chain if not found or stale
+   */
+  private async getChannelInfoCached(channelId: string, forceRefresh: boolean = false): Promise<ChannelInfo> {
+    // Try to get from local storage first (unless forced refresh)
+    if (!forceRefresh) {
+      const cachedMetadata = await this.stateStorage.getChannelMetadata(channelId);
+      if (cachedMetadata) {
+        // Convert ChannelMetadata to ChannelInfo
+        return cachedMetadata;
+      }
+    }
+    
+    // Fetch from chain and cache
+    try {
+      const channelInfo = await this.contract.getChannelStatus({ channelId });
+      
+      // Store in cache as ChannelMetadata
+      await this.stateStorage.setChannelMetadata(channelId, channelInfo);
+      
+      return channelInfo;
+    } catch (error) {
+      // If chain call fails and we have stale cache, use it
+      if (!forceRefresh) {
+        const staleMetadata = await this.stateStorage.getChannelMetadata(channelId);
+        if (staleMetadata) {
+          console.warn(`Chain call failed for channel ${channelId}, using stale cache`);
+          return staleMetadata;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
    * List active channels where this payee is involved
    */
   async listActiveChannels(options: ListChannelsOptions = {}): Promise<ChannelInfo[]> {
-    const payeeDid = options.payeeDid || await this.signer.getDid();
+    const payeeDid = await this.signer.getDid();
     
     // Get channels from storage first
     const storageResult = await this.stateStorage.listChannelMetadata(
@@ -424,23 +454,18 @@ export class PaymentChannelPayeeClient {
   }
 
   /**
-   * Sync channel metadata from blockchain to local storage
+   * Sync channel state from blockchain to local storage
+   * This force-refreshes the cached channel metadata
    */
-  async syncChannelState(channelId: string): Promise<ChannelMetadata> {
-    const channelInfo = await this.contract.getChannelStatus({ channelId });
-    
-    const metadata: ChannelMetadata = {
-      channelId: channelInfo.channelId,
-      payerDid: channelInfo.payerDid,
-      payeeDid: channelInfo.payeeDid,
-      asset: channelInfo.asset,
-      totalCollateral: BigInt(0), // TODO: Get from actual channel data
-      epoch: channelInfo.epoch,
-      status: channelInfo.status,
-    };
-
-    await this.stateStorage.setChannelMetadata(channelId, metadata);
-    return metadata;
+  async syncChannelState(channelId: string): Promise<void> {
+    try {
+      // Force refresh from chain and update cache
+      await this.getChannelInfoCached(channelId, true);
+      console.log(`Synced channel ${channelId} state from blockchain`);
+    } catch (error) {
+      console.error(`Failed to sync channel ${channelId}:`, error);
+      throw error;
+    }
   }
 
   // -------- Asset Information --------

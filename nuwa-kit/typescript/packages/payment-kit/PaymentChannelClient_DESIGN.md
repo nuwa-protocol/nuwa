@@ -39,6 +39,11 @@
 - `didResolver` 是必需参数，用于验证 SubRAV 签名
 - 所有接收到的 SignedSubRAV 都必须进行签名验证，确保支付授权的真实性
 
+**性能优化**：
+- 使用 `ChannelStateStorage` 缓存 ChannelInfo，避免重复链调用
+- `getChannelInfoCached()` 优先使用本地缓存，失败时回退到链查询
+- `syncChannelState()` 强制刷新缓存，确保状态同步
+
 ---
 
 ## 2. API Gateway 支付模式

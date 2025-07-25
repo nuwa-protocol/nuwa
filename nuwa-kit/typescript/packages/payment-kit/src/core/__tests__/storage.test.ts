@@ -11,18 +11,18 @@ import type {
   ChannelFilter, 
   PaginatedResult 
 } from '../BaseStorage';
-import type { ChannelMetadata, SubChannelState } from '../types';
+import type { ChannelInfo, SubChannelState } from '../types';
 
 // Mock implementation for testing the improved interfaces
 class MockChannelStateStorage implements ChannelStateStorage {
-  private channels = new Map<string, ChannelMetadata>();
+  private channels = new Map<string, ChannelInfo>();
   private subChannels = new Map<string, SubChannelState>();
 
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
+  async getChannelMetadata(channelId: string): Promise<ChannelInfo | null> {
     return this.channels.get(channelId) || null;
   }
 
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
+  async setChannelMetadata(channelId: string, metadata: ChannelInfo): Promise<void> {
     this.channels.set(channelId, metadata);
   }
 
@@ -56,7 +56,7 @@ class MockChannelStateStorage implements ChannelStateStorage {
   }
 
   // Extended interface methods (simplified for testing)
-  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>> {
     let channels = Array.from(this.channels.values());
     
     // Apply filters
@@ -119,12 +119,11 @@ describe('Improved Storage Interface', () => {
     beforeEach(async () => {
       // Setup test data
       for (let i = 0; i < 15; i++) {
-        const channel: ChannelMetadata = {
+        const channel: ChannelInfo = {
           channelId: `channel-${i}`,
           payerDid: `did:rooch:payer-${i % 3}`, // 3 different payers
-          payeeDid: `did:rooch:payee-${i}`,
+          payeeDid: `did:rooch:payee-${i % 2}`, // 2 different payees
           asset: { assetId: '0x3::gas_coin::RGas' },
-          totalCollateral: BigInt(1000000),
           epoch: BigInt(0),
           status: i % 5 === 0 ? 'closed' : 'active', // Some closed channels
         };
@@ -282,7 +281,6 @@ describe('Improved Storage Interface', () => {
         payerDid: 'did:rooch:payer',
         payeeDid: 'did:rooch:payee',
         asset: { assetId: '0x3::gas_coin::RGas' },
-        totalCollateral: BigInt(1000),
         epoch: BigInt(0),
         status: 'active',
       });

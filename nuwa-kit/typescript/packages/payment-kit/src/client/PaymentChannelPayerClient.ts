@@ -5,23 +5,35 @@
  * from the Payer perspective, using the IPaymentChannelContract abstraction.
  */
 
-import type { SignerInterface } from '@nuwa-ai/identity-kit';
-import type {
-  IPaymentChannelContract,
-  OpenChannelParams,
-  OpenChannelResult,
-  OpenChannelWithSubChannelParams,
-  ChannelInfo,
-} from '../contracts/IPaymentChannelContract';
 import type {
   AssetInfo,
+  SubChannelState,
+  ChannelInfo,
   SignedSubRAV,
   SubRAV,
-  ChannelMetadata,
-  SubChannelState,
 } from '../core/types';
+import type { 
+  IPaymentChannelContract, 
+  OpenChannelResult,
+  OpenChannelParams as ContractOpenChannelParams,
+  OpenChannelWithSubChannelParams as ContractOpenChannelWithSubChannelParams,
+} from '../contracts/IPaymentChannelContract';
+import type { SignerInterface } from '@nuwa-ai/identity-kit';
+import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
 import { SubRAVManager } from '../core/subrav';
-import { ChannelStateStorage, MemoryChannelStateStorage, StorageOptions } from '../core/ChannelStateStorage';
+
+export interface PayerOpenChannelParams {
+  payeeDid: string;
+  asset: AssetInfo;
+  collateral: bigint;
+}
+
+export interface PayerOpenChannelWithSubChannelParams {
+  payeeDid: string;
+  asset: AssetInfo;
+  collateral: bigint;
+  vmIdFragment?: string;
+}
 
 export interface PaymentChannelPayerClientOptions {
   contract: IPaymentChannelContract;
@@ -80,17 +92,13 @@ export class PaymentChannelPayerClient {
   /**
    * Open a new payment channel
    */
-  async openChannel(params: {
-    payeeDid: string;
-    asset: AssetInfo;
-    collateral: bigint;
-  }): Promise<ChannelMetadata> {
+  async openChannel(params: PayerOpenChannelParams): Promise<ChannelInfo> {
     const payerDid = await this.signer.getDid();
     
     // Convert SignerInterface to chain-specific signer
     const chainSigner = await this.convertToChainSigner();
     
-    const openParams: OpenChannelParams = {
+    const openParams: ContractOpenChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
@@ -100,40 +108,34 @@ export class PaymentChannelPayerClient {
 
     const result = await this.contract.openChannel(openParams);
 
-    const metadata: ChannelMetadata = {
+    const channelInfo: ChannelInfo = {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
-      totalCollateral: params.collateral,
       epoch: BigInt(0),
       status: 'active',
     };
 
     // Cache channel metadata using channelId as key
-    await this.stateStorage.setChannelMetadata(result.channelId, metadata);
+    await this.stateStorage.setChannelMetadata(result.channelId, channelInfo);
     
     // Set as active channel if no active channel is set
     if (!this.activeChannelId) {
       this.activeChannelId = result.channelId;
     }
     
-    return metadata;
+    return channelInfo;
   }
 
   /**
-   * Open a new payment channel and authorize a sub-channel in one transaction
+   * Open a payment channel with a sub-channel in one transaction
    */
-  async openChannelWithSubChannel(params: {
-    payeeDid: string;
-    asset: AssetInfo;
-    collateral: bigint;
-    vmIdFragment?: string;
-  }): Promise<OpenChannelResult> {
+  async openChannelWithSubChannel(params: PayerOpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
     const payerDid = await this.signer.getDid();
     const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
     
-    const openParams: OpenChannelWithSubChannelParams = {
+    const openParams: ContractOpenChannelWithSubChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
@@ -145,12 +147,11 @@ export class PaymentChannelPayerClient {
     const result = await this.contract.openChannelWithSubChannel(openParams);
 
     // Cache channel metadata
-    const metadata: ChannelMetadata = {
+    const metadata: ChannelInfo = {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
-      totalCollateral: params.collateral,
       epoch: BigInt(0),
       status: 'active',
     };
@@ -350,7 +351,7 @@ export class PaymentChannelPayerClient {
   /**
    * Get channels for the current payer
    */
-  async getChannelsByPayer(payerDid: string): Promise<ChannelMetadata[]> {
+  async getChannelsByPayer(payerDid: string): Promise<ChannelInfo[]> {
     const result = await this.stateStorage.listChannelMetadata({ payerDid });
     return result.items;
   }

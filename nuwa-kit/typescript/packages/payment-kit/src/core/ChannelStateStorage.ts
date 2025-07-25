@@ -5,7 +5,7 @@
  * like statistics, listing, and removal operations.
  */
 
-import type { ChannelMetadata, SubChannelState } from '../core/types';
+import type { ChannelInfo, SubChannelState } from '../core/types';
 import type { 
   ChannelStateStorage as BaseChannelStateStorage, 
   PaginationParams, 
@@ -40,7 +40,7 @@ export interface ChannelStateStorage extends BaseChannelStateStorage {
    * @param filter - Optional filter criteria
    * @param pagination - Optional pagination parameters
    */
-  listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>>;
+  listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>>;
 
   /**
    * Remove channel metadata
@@ -88,14 +88,14 @@ export interface CacheStats {
  * Memory-based implementation of Extended ChannelStateStorage
  */
 export class MemoryChannelStateStorage implements ChannelStateStorage {
-  private channelMetadata = new Map<string, ChannelMetadata>();
+  private channelMetadata = new Map<string, ChannelInfo>();
   private subChannelStates = new Map<string, SubChannelState>();
   private hitCount = 0;
   private missCount = 0;
 
   // -------- Base ChannelStateCache Implementation --------
 
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
+  async getChannelMetadata(channelId: string): Promise<ChannelInfo | null> {
     const result = this.channelMetadata.get(channelId) || null;
     if (result) {
       this.hitCount++;
@@ -105,7 +105,7 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
     return result;
   }
 
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
+  async setChannelMetadata(channelId: string, metadata: ChannelInfo): Promise<void> {
     this.channelMetadata.set(channelId, { ...metadata });
   }
 
@@ -162,7 +162,7 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
 
   // -------- Extended Operations --------
 
-  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>> {
     let channels = Array.from(this.channelMetadata.values());
     
     // Apply filters
@@ -268,7 +268,7 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
 
   // -------- Base ChannelStateCache Implementation --------
 
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
+  async getChannelMetadata(channelId: string): Promise<ChannelInfo | null> {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readonly');
     const store = tx.objectStore('channels');
@@ -280,7 +280,7 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
     });
   }
 
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
+  async setChannelMetadata(channelId: string, metadata: ChannelInfo): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readwrite');
     const store = tx.objectStore('channels');
@@ -360,12 +360,12 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
 
   // -------- Extended Operations --------
 
-  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>> {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readonly');
     const store = tx.objectStore('channels');
     
-    const allChannels = await new Promise<ChannelMetadata[]>((resolve, reject) => {
+    const allChannels = await new Promise<ChannelInfo[]>((resolve, reject) => {
       const request = store.getAll();
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -460,11 +460,11 @@ export class SQLChannelStateStorage implements ChannelStateStorage {
     // TODO: Initialize database connection
   }
 
-  async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
+  async getChannelMetadata(channelId: string): Promise<ChannelInfo | null> {
     throw new Error('TODO: Implement SQL storage for channel metadata');
   }
 
-  async setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void> {
+  async setChannelMetadata(channelId: string, metadata: ChannelInfo): Promise<void> {
     throw new Error('TODO: Implement SQL storage for channel metadata');
   }
 
@@ -480,7 +480,7 @@ export class SQLChannelStateStorage implements ChannelStateStorage {
     throw new Error('TODO: Implement SQL storage clear operation');
   }
 
-  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>> {
     throw new Error('TODO: Implement SQL storage for listing channels');
   }
 
