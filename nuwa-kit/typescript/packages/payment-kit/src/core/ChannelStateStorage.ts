@@ -6,7 +6,12 @@
  */
 
 import type { ChannelMetadata, SubChannelState } from '../core/types';
-import type { ChannelStateStorage as BaseChannelStateStorage } from './BaseStorage';
+import type { 
+  ChannelStateStorage as BaseChannelStateStorage, 
+  PaginationParams, 
+  ChannelFilter, 
+  PaginatedResult 
+} from './BaseStorage';
 
 /**
  * Storage options for different storage backends
@@ -31,9 +36,11 @@ export interface ChannelStateStorage extends BaseChannelStateStorage {
   // -------- Extended Channel Metadata Operations --------
   
   /**
-   * List all cached channel metadata
+   * List channel metadata with pagination and filtering
+   * @param filter - Optional filter criteria
+   * @param pagination - Optional pagination parameters
    */
-  listChannelMetadata(): Promise<ChannelMetadata[]>;
+  listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>>;
 
   /**
    * Remove channel metadata
@@ -44,13 +51,16 @@ export interface ChannelStateStorage extends BaseChannelStateStorage {
 
   /**
    * List all sub-channel states for a channel
+   * @param channelId - Channel ID to list sub-channels for
    */
   listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>>;
 
   /**
    * Remove sub-channel state
+   * @param channelId - Channel ID to ensure no cross-channel conflicts
+   * @param keyId - Complete DID key ID
    */
-  removeSubChannelState(keyId: string): Promise<void>;
+  removeSubChannelState(channelId: string, keyId: string): Promise<void>;
 
   // -------- Advanced Cache Management --------
 
@@ -99,8 +109,10 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
     this.channelMetadata.set(channelId, { ...metadata });
   }
 
-  async getSubChannelState(keyId: string): Promise<SubChannelState> {
-    const existing = this.subChannelStates.get(keyId);
+  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
+    // Create composite key to avoid cross-channel conflicts
+    const compositeKey = `${channelId}:${keyId}`;
+    const existing = this.subChannelStates.get(compositeKey);
     if (existing) {
       this.hitCount++;
       return { ...existing };
@@ -109,7 +121,7 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
     this.missCount++;
     // Return default state if not found
     const defaultState: SubChannelState = {
-      channelId: 'default',
+      channelId: channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
       nonce: BigInt(0),
@@ -117,21 +129,28 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
     };
     
     // Cache the default state
-    await this.updateSubChannelState(keyId, defaultState);
+    await this.updateSubChannelState(channelId, keyId, defaultState);
     return defaultState;
   }
 
-  async updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void> {
-    const existing = this.subChannelStates.get(keyId);
+  async updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void> {
+    const compositeKey = `${channelId}:${keyId}`;
+    const existing = this.subChannelStates.get(compositeKey);
+    
+    // Validate that channelId is not being changed if it exists in updates
+    if (updates.channelId && updates.channelId !== channelId) {
+      throw new Error(`Cannot change channelId in sub-channel state. Expected: ${channelId}, provided: ${updates.channelId}`);
+    }
+    
     const updated: SubChannelState = {
-      channelId: updates.channelId || existing?.channelId || 'default',
+      channelId: channelId, // Always use the provided channelId parameter, not from updates
       epoch: updates.epoch ?? existing?.epoch ?? BigInt(0),
       accumulatedAmount: updates.accumulatedAmount ?? existing?.accumulatedAmount ?? BigInt(0),
       nonce: updates.nonce ?? existing?.nonce ?? BigInt(0),
       lastUpdated: updates.lastUpdated || Date.now(),
     };
     
-    this.subChannelStates.set(keyId, updated);
+    this.subChannelStates.set(compositeKey, updated);
   }
 
   async clear(): Promise<void> {
@@ -143,8 +162,38 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
 
   // -------- Extended Operations --------
 
-  async listChannelMetadata(): Promise<ChannelMetadata[]> {
-    return Array.from(this.channelMetadata.values());
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
+    let channels = Array.from(this.channelMetadata.values());
+    
+    // Apply filters
+    if (filter) {
+      if (filter.payerDid) {
+        channels = channels.filter(ch => ch.payerDid === filter.payerDid);
+      }
+      if (filter.payeeDid) {
+        channels = channels.filter(ch => ch.payeeDid === filter.payeeDid);
+      }
+      if (filter.status) {
+        channels = channels.filter(ch => ch.status === filter.status);
+      }
+      if (filter.assetId) {
+        channels = channels.filter(ch => ch.asset.assetId === filter.assetId);
+      }
+      // Note: createdAfter/Before would need timestamps in ChannelMetadata
+    }
+
+    const totalCount = channels.length;
+    
+    // Apply pagination
+    const offset = pagination?.offset || 0;
+    const limit = pagination?.limit || 100; // Default limit
+    const paginatedChannels = channels.slice(offset, offset + limit);
+    
+    return {
+      items: paginatedChannels,
+      totalCount,
+      hasMore: offset + limit < totalCount,
+    };
   }
 
   async removeChannelMetadata(channelId: string): Promise<void> {
@@ -161,8 +210,9 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
     return result;
   }
 
-  async removeSubChannelState(keyId: string): Promise<void> {
-    this.subChannelStates.delete(keyId);
+  async removeSubChannelState(channelId: string, keyId: string): Promise<void> {
+    const compositeKey = `${channelId}:${keyId}`;
+    this.subChannelStates.delete(compositeKey);
   }
 
   async getStats(): Promise<CacheStats> {
@@ -242,19 +292,20 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
     });
   }
 
-  async getSubChannelState(keyId: string): Promise<SubChannelState> {
+  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
+    const compositeKey = `${channelId}:${keyId}`;
     const db = await this.getDB();
     const tx = db.transaction(['subChannels'], 'readonly');
     const store = tx.objectStore('subChannels');
     
     const result = await new Promise<SubChannelState | null>((resolve, reject) => {
-      const request = store.get(keyId);
+      const request = store.get(compositeKey);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
     
     return result || {
-      channelId: '',
+      channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
       nonce: BigInt(0),
@@ -262,13 +313,20 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
     };
   }
 
-  async updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void> {
-    const current = await this.getSubChannelState(keyId);
-    const updated = {
-      ...current,
-      ...updates,
-      keyId,
-      lastUpdated: Date.now(),
+  async updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void> {
+    const existing = await this.getSubChannelState(channelId, keyId);
+    
+    // Validate that channelId is not being changed if it exists in updates
+    if (updates.channelId && updates.channelId !== channelId) {
+      throw new Error(`Cannot change channelId in sub-channel state. Expected: ${channelId}, provided: ${updates.channelId}`);
+    }
+    
+    const updated: SubChannelState = {
+      channelId: channelId, // Always use the provided channelId parameter, not from updates
+      epoch: updates.epoch ?? existing?.epoch ?? BigInt(0),
+      accumulatedAmount: updates.accumulatedAmount ?? existing?.accumulatedAmount ?? BigInt(0),
+      nonce: updates.nonce ?? existing?.nonce ?? BigInt(0),
+      lastUpdated: updates.lastUpdated || Date.now(),
     };
     
     const db = await this.getDB();
@@ -302,16 +360,27 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
 
   // -------- Extended Operations --------
 
-  async listChannelMetadata(): Promise<ChannelMetadata[]> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readonly');
     const store = tx.objectStore('channels');
     
-    return new Promise((resolve, reject) => {
+    const allChannels = await new Promise<ChannelMetadata[]>((resolve, reject) => {
       const request = store.getAll();
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
+
+    // TODO: Implement proper filtering and pagination for IndexedDB
+    const offset = pagination?.offset || 0;
+    const limit = pagination?.limit || 100;
+    const items = allChannels.slice(offset, offset + limit);
+    
+    return {
+      items,
+      totalCount: allChannels.length,
+      hasMore: offset + limit < allChannels.length,
+    };
   }
 
   async removeChannelMetadata(channelId: string): Promise<void> {
@@ -374,7 +443,7 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
     });
     
     return {
-      channelCount: channels.length,
+      channelCount: channels.items.length,
       subChannelCount,
       hitRate: undefined, // IndexedDB doesn't track hit rates
       sizeBytes: undefined, // Difficult to estimate without additional metadata
@@ -403,7 +472,7 @@ export class SQLChannelStateStorage implements ChannelStateStorage {
     throw new Error('TODO: Implement SQL storage for sub-channel state');
   }
 
-  async updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void> {
+  async updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void> {
     throw new Error('TODO: Implement SQL storage for sub-channel state');
   }
 
@@ -411,7 +480,7 @@ export class SQLChannelStateStorage implements ChannelStateStorage {
     throw new Error('TODO: Implement SQL storage clear operation');
   }
 
-  async listChannelMetadata(): Promise<ChannelMetadata[]> {
+  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelMetadata>> {
     throw new Error('TODO: Implement SQL storage for listing channels');
   }
 

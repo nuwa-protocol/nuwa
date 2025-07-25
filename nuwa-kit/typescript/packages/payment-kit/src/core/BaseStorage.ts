@@ -5,6 +5,47 @@
 
 import type { SignedSubRAV, SubChannelState, ChannelMetadata } from './types';
 
+// ==================== Pagination and Filtering ====================
+
+/**
+ * Pagination parameters for listing operations
+ */
+export interface PaginationParams {
+  /** Offset for pagination (number of items to skip) */
+  offset?: number;
+  /** Maximum number of items to return */
+  limit?: number;
+}
+
+/**
+ * Filter parameters for channel listing
+ */
+export interface ChannelFilter {
+  /** Filter by payer DID */
+  payerDid?: string;
+  /** Filter by payee DID */
+  payeeDid?: string;
+  /** Filter by channel status */
+  status?: 'active' | 'closing' | 'closed';
+  /** Filter by asset ID */
+  assetId?: string;
+  /** Filter by creation time range */
+  createdAfter?: number;
+  createdBefore?: number;
+}
+
+/**
+ * Result with pagination information
+ */
+export interface PaginatedResult<T> {
+  /** The actual items */
+  items: T[];
+  /** Total number of items (for pagination UI) */
+  totalCount: number;
+  /** Whether there are more items */
+  hasMore: boolean;
+}
+
 // ==================== RAV Store Interfaces ====================
 
 /**
@@ -42,11 +83,20 @@ export interface ChannelStateStorage {
   /** Set channel metadata */
   setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void>;
 
-  /** Get sub-channel state for nonce and amount tracking */
-  getSubChannelState(keyId: string): Promise<SubChannelState>;
+  /**
+   * Get sub-channel state for nonce and amount tracking
+   * @param channelId - The channel ID to ensure no cross-channel key conflicts
+   * @param keyId - Complete DID key ID (e.g., "did:rooch:address#account-key")
+   */
+  getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState>;
   
-  /** Update sub-channel state */
-  updateSubChannelState(keyId: string, updates: Partial<SubChannelState>): Promise<void>;
+  /**
+   * Update sub-channel state
+   * @param channelId - The channel ID to ensure no cross-channel key conflicts
+   * @param keyId - Complete DID key ID (e.g., "did:rooch:address#account-key")
+   * @param updates - Partial updates to apply
+   */
+  updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void>;
 
   /** Clear all stored data */
   clear(): Promise<void>;

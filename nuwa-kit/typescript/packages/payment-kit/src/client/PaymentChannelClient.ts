@@ -35,29 +35,34 @@ export interface PaymentChannelClientOptions {
 /**
  * Chain-agnostic Payment Channel Client
  * 
- * Provides high-level APIs for payment channel operations, state management,
- * and SubRAV generation while abstracting away blockchain-specific details.
+ * Provides high-level APIs for payment channel operations including:
+ * - Opening channels and authorizing sub-channels
+ * - Generating and managing SubRAVs
+ * - Claiming payments from channels
+ * 
+ * Uses composite keys (channelId:keyId) to avoid conflicts between channels.
  */
 export class PaymentChannelClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
-  private defaultKeyId?: string;
-  private subravManager: SubRAVManager;
+  private keyId?: string;
   private stateStorage: ChannelStateStorage;
+  private ravManager: SubRAVManager;
+  private chainIdCache?: bigint;
 
   constructor(options: PaymentChannelClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
-    this.defaultKeyId = options.keyId;
-    this.subravManager = new SubRAVManager();
+    this.keyId = options.keyId;
     
-    // Initialize state storage
+    // Initialize storage
     if (options.storageOptions?.customStorage) {
       this.stateStorage = options.storageOptions.customStorage;
     } else {
-      // Default to memory storage
       this.stateStorage = new MemoryChannelStateStorage();
     }
+    
+    this.ravManager = new SubRAVManager();
   }
 
   // -------- Channel Management --------
@@ -102,152 +107,137 @@ export class PaymentChannelClient {
   }
 
   /**
-   * Open a new payment channel and authorize a sub-channel in one step
-   * This is more efficient than calling openChannel() and authorizeSubChannel() separately
+   * Open a new payment channel and authorize a sub-channel in one transaction
    */
   async openChannelWithSubChannel(params: {
     payeeDid: string;
     asset: AssetInfo;
     collateral: bigint;
     vmIdFragment?: string;
-    keyId?: string;
-  }): Promise<ChannelMetadata> {
+  }): Promise<OpenChannelResult> {
     const payerDid = await this.signer.getDid();
-    const useKeyId = params.keyId || this.defaultKeyId;
-    const vmIdFragment = params.vmIdFragment || (useKeyId ? this.extractFragment(useKeyId) : 'default');
-    
-    if (!useKeyId) {
-      throw new Error('No keyId specified and no default keyId set');
-    }
-    
-    // Convert SignerInterface to chain-specific signer
-    const chainSigner = await this.convertToChainSigner();
+    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
     
     const openParams: OpenChannelWithSubChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
       collateral: params.collateral,
-      vmIdFragment,
-      signer: chainSigner,
+      vmIdFragment: useFragment,
+      signer: this.signer,
     };
 
     const result = await this.contract.openChannelWithSubChannel(openParams);
-    
-    // Get channel epoch from the contract
-    const channelInfo = await this.contract.getChannelStatus({ channelId: result.channelId });
 
+    // Cache channel metadata
     const metadata: ChannelMetadata = {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
       totalCollateral: params.collateral,
-      epoch: channelInfo.epoch,
+      epoch: BigInt(0),
       status: 'active',
     };
 
-    // Cache channel metadata using channelId as key
     await this.stateStorage.setChannelMetadata(result.channelId, metadata);
-    
-    // Initialize sub-channel state for the authorized keyId
-    await this.stateStorage.updateSubChannelState(useKeyId, {
+
+    // Initialize sub-channel state for this key
+    const keyId = this.keyId || `${payerDid}#${useFragment}`;
+    await this.stateStorage.updateSubChannelState(result.channelId, keyId, {
       channelId: result.channelId,
-      epoch: channelInfo.epoch,
+      epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
       nonce: BigInt(0),
+      lastUpdated: Date.now(),
     });
-    
-    return metadata;
+
+    return result;
   }
 
   /**
-   * Authorize a sub-channel for multi-device support
+   * Authorize a sub-channel for an existing channel
    */
   async authorizeSubChannel(params: {
     channelId: string;
     vmIdFragment?: string;
-    keyId?: string;
-  }): Promise<{ txHash: string }> {
-    const useKeyId = params.keyId || this.defaultKeyId;
-    const vmIdFragment = params.vmIdFragment || (useKeyId ? this.extractFragment(useKeyId) : 'default');
+  }): Promise<void> {
+    const payerDid = await this.signer.getDid();
+    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
     
-    if (!useKeyId) {
-      throw new Error('No keyId specified and no default keyId set');
-    }
-    
-    const chainSigner = await this.convertToChainSigner();
-
-    const result = await this.contract.authorizeSubChannel({
+    await this.contract.authorizeSubChannel({
       channelId: params.channelId,
-      vmIdFragment,
-      signer: chainSigner,
+      vmIdFragment: useFragment,
+      signer: this.signer,
     });
 
-    // Get channel metadata for epoch information
-    const metadata = await this.stateStorage.getChannelMetadata(params.channelId);
-    const channelEpoch = metadata?.epoch || BigInt(0);
-    
-    // Initialize sub-channel state for the authorized keyId
-    await this.stateStorage.updateSubChannelState(useKeyId, {
+    // Initialize sub-channel state
+    const keyId = this.keyId || `${payerDid}#${useFragment}`;
+    await this.stateStorage.updateSubChannelState(params.channelId, keyId, {
       channelId: params.channelId,
-      epoch: channelEpoch,
+      epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
       nonce: BigInt(0),
+      lastUpdated: Date.now(),
     });
-
-    return { txHash: result.txHash };
   }
 
   /**
    * Generate next SubRAV for payment
    */
-  async nextSubRAV(deltaAmount: bigint, keyId?: string): Promise<SignedSubRAV> {
-    const useKeyId = keyId || this.defaultKeyId;
+  async nextSubRAV(amount: bigint, keyId?: string): Promise<SignedSubRAV> {
+    const useKeyId = keyId || this.keyId;
     if (!useKeyId) {
-      throw new Error('No keyId specified and no default keyId set');
+      throw new Error('Key ID is required for RAV generation');
     }
 
-    // Get current state from cache
-    const state = await this.stateStorage.getSubChannelState(useKeyId);
-    
-    if (!state.channelId || state.channelId === 'default') {
-      throw new Error(`No active channel found for keyId ${useKeyId}. Please open a channel and authorize the sub-channel first.`);
+    // Get current channel - we need a specific channel ID now
+    const channelId = await this.getActiveChannelId();
+    if (!channelId) {
+      throw new Error('No active payment channel found. Please open a channel first.');
     }
+
+    const state = await this.stateStorage.getSubChannelState(channelId, useKeyId);
+    const channelMeta = await this.stateStorage.getChannelMetadata(channelId);
     
-    const subRav: SubRAV = {
+    if (!channelMeta) {
+      throw new Error(`Channel metadata not found for channel ${channelId}`);
+    }
+
+    const chainId = await this.getChainId();
+    const newNonce = state.nonce + BigInt(1);
+    const newAmount = state.accumulatedAmount + amount;
+
+    const subRAV: SubRAV = {
       version: 1,
-      chainId: await this.getChainId(),
-      channelId: state.channelId,
+      chainId: BigInt(chainId),
+      channelId: channelId,
       channelEpoch: state.epoch,
-      vmIdFragment: this.extractFragment(useKeyId),
-      accumulatedAmount: state.accumulatedAmount + deltaAmount,
-      nonce: state.nonce + BigInt(1),
+      vmIdFragment: useKeyId.split('#')[1] || useKeyId,
+      accumulatedAmount: newAmount,
+      nonce: newNonce,
     };
 
-    const signed = await this.subravManager.sign(subRav, this.signer, useKeyId);
-    
-    // Update cache
-    await this.stateStorage.updateSubChannelState(useKeyId, {
-      accumulatedAmount: subRav.accumulatedAmount,
-      nonce: subRav.nonce,
+    const signedSubRAV = await this.ravManager.sign(subRAV, this.signer, useKeyId);
+
+    // Update local state
+    await this.stateStorage.updateSubChannelState(channelId, useKeyId, {
+      nonce: newNonce,
+      accumulatedAmount: newAmount,
+      lastUpdated: Date.now(),
     });
 
-    return signed;
+    return signedSubRAV;
   }
 
   /**
-   * Submit claim to blockchain
+   * Submit a claim to the blockchain
    */
   async submitClaim(signedSubRAV: SignedSubRAV): Promise<ClaimResult> {
-    const chainSigner = await this.convertToChainSigner();
-    
-    const claimParams: ClaimParams = {
+    return await this.contract.claimFromChannel({
       signedSubRAV,
-      signer: chainSigner,
-    };
-
-    return this.contract.claimFromChannel(claimParams);
+      signer: this.signer,
+    });
   }
 
   /**
@@ -280,12 +270,11 @@ export class PaymentChannelClient {
   }
 
   /**
-   * Find channels by payer DID (useful for listing user's channels)
+   * Get channels for the current payer
    */
-  async getChannelsByPayer(): Promise<ChannelMetadata[]> {
-    const payerDid = await this.signer.getDid();
-    const allChannels = await this.stateStorage.listChannelMetadata();
-    return allChannels.filter(channel => channel.payerDid === payerDid);
+  async getChannelsByPayer(payerDid: string): Promise<ChannelMetadata[]> {
+    const result = await this.stateStorage.listChannelMetadata({ payerDid });
+    return result.items;
   }
 
   // -------- Asset Information --------
@@ -313,15 +302,36 @@ export class PaymentChannelClient {
     return this.signer;
   }
 
+  /**
+   * Get cached chain ID or fetch from contract
+   */
   private async getChainId(): Promise<bigint> {
-    // Get chain ID from contract instead of hardcoding
-    return this.contract.getChainId();
+    if (this.chainIdCache === undefined) {
+      this.chainIdCache = await this.contract.getChainId();
+    }
+    return this.chainIdCache;
   }
 
+  /**
+   * Extract fragment from full key ID
+   */
   private extractFragment(keyId: string): string {
-    // Extract DID verification method fragment from keyId
     const parts = keyId.split('#');
     return parts[parts.length - 1] || keyId;
+  }
+
+  /**
+   * Get active channel ID (helper method to replace the old default channel concept)
+   */
+  private async getActiveChannelId(): Promise<string | null> {
+    // For now, get the first active channel
+    // In the future, this could be more sophisticated (last used, highest balance, etc.)
+    const result = await this.stateStorage.listChannelMetadata(
+      { status: 'active' }, 
+      { offset: 0, limit: 1 }
+    );
+    
+    return result.items.length > 0 ? result.items[0].channelId : null;
   }
 }
 
