@@ -2,7 +2,7 @@
  * SubRAV encoding, decoding, signing and verification utilities
  */
 
-import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
+import type { SignerInterface, DIDResolver, DIDDocument, KeyType } from '@nuwa-ai/identity-kit';
 import { CryptoUtils, MultibaseCodec } from '@nuwa-ai/identity-kit';
 import { bcs, type BcsType } from '@roochnetwork/rooch-sdk';
 import type { SubRAV, SignedSubRAV } from './types';
@@ -92,7 +92,7 @@ export class SubRAVCodec {
   static fromHex(hex: string): SubRAV {
     const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
     const bytes = new Uint8Array(
-      cleanHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+      cleanHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
     );
     return this.decode(bytes);
   }
@@ -116,54 +116,76 @@ export class SubRAVSigner {
   }
 
   /**
-   * Verify a signed SubRAV
+   * Verify a signed SubRAV using public key or DID document
    */
   static async verify(
     signedSubRAV: SignedSubRAV,
-    resolver: DIDResolver
+    verificationMethod: {
+      publicKey: Uint8Array;
+      keyType: KeyType;
+    } | {
+      didDocument: DIDDocument;
+    }
   ): Promise<boolean> {
     try {
       const bytes = SubRAVCodec.encode(signedSubRAV.subRav);
       
-      // Extract DID from channel ID or vmIdFragment
-      // For now, we'll assume the DID can be derived from the context
-      // TODO: Implement proper DID extraction logic
-      const did = await this.extractDidFromSubRAV(signedSubRAV.subRav);
-      const keyId = `${did}#${signedSubRAV.subRav.vmIdFragment}`;
-      
-      // Resolve DID document to get public key
-      const didDoc = await resolver.resolveDID(did);
-      if (!didDoc) return false;
-      
-      const vm = didDoc.verificationMethod?.find(vm => vm.id === keyId);
-      if (!vm) return false;
-      
-      // Get public key material
       let publicKey: Uint8Array;
-      if (vm.publicKeyMultibase) {
-        publicKey = MultibaseCodec.decodeBase58btc(vm.publicKeyMultibase);
+      let keyType: KeyType;
+
+      if ('publicKey' in verificationMethod) {
+        // Direct public key verification
+        publicKey = verificationMethod.publicKey;
+        keyType = verificationMethod.keyType;
       } else {
-        return false; // No supported key format
+        // DID document verification
+        const {didDocument}  = verificationMethod;
+        
+        // Construct keyId from didDocument.id and vmIdFragment from SubRAV
+        const keyId = `${didDocument.id}#${signedSubRAV.subRav.vmIdFragment}`;
+        
+        const vm = didDocument.verificationMethod?.find((vm: any) => vm.id === keyId);
+        if (!vm) return false;
+        
+        keyType = vm.type as KeyType;
+        
+        // Get public key material
+        if (vm.publicKeyMultibase) {
+          publicKey = MultibaseCodec.decodeBase58btc(vm.publicKeyMultibase);
+        } else if (vm.publicKeyJwk) {
+          // Handle JWK format - this would need proper JWK to raw key conversion
+          // For now, we don't support JWK format in this context
+          return false;
+        } else {
+          return false; // No supported key format
+        }
       }
       
       // Verify signature
-      return CryptoUtils.verify(bytes, signedSubRAV.signature, publicKey, vm.type);
+      return CryptoUtils.verify(bytes, signedSubRAV.signature, publicKey, keyType);
     } catch (error) {
       return false;
     }
   }
 
   /**
-   * Extract DID from SubRAV context
-   * TODO: Implement proper logic based on channel metadata or other context
+   * Verify a signed SubRAV using DID resolver (convenience method)
    */
-  private static async extractDidFromSubRAV(subRav: SubRAV): Promise<string> {
-    // For now, this is a placeholder
-    // In real implementation, we might need to:
-    // 1. Look up channel metadata to get payer DID
-    // 2. Parse channel ID to extract DID information
-    // 3. Use additional context provided by the application
-    throw new Error('extractDidFromSubRAV not implemented - requires channel context');
+  static async verifyWithResolver(
+    signedSubRAV: SignedSubRAV,
+    payerDid: string,
+    resolver: DIDResolver
+  ): Promise<boolean> {
+    try {
+      // Resolve DID document
+      const didDocument = await resolver.resolveDID(payerDid);
+      if (!didDocument) return false;
+      
+      // Use the flexible verify method
+      return this.verify(signedSubRAV, { didDocument });
+    } catch (error) {
+      return false;
+    }
   }
 }
 
@@ -277,13 +299,30 @@ export class SubRAVManager {
   }
 
   /**
-   * Verify a signed SubRAV
+   * Verify a signed SubRAV using public key or DID document
    */
   async verify(
     signedSubRAV: SignedSubRAV,
+    verificationMethod: {
+      publicKey: Uint8Array;
+      keyType: KeyType;
+    } | {
+      didDocument: DIDDocument;
+      payerDid: string;
+    }
+  ): Promise<boolean> {
+    return SubRAVSigner.verify(signedSubRAV, verificationMethod);
+  }
+
+  /**
+   * Verify a signed SubRAV using DID resolver
+   */
+  async verifyWithResolver(
+    signedSubRAV: SignedSubRAV,
+    payerDid: string,
     resolver: DIDResolver
   ): Promise<boolean> {
-    return SubRAVSigner.verify(signedSubRAV, resolver);
+    return SubRAVSigner.verifyWithResolver(signedSubRAV, payerDid, resolver);
   }
 
   /**
