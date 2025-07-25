@@ -1,4 +1,9 @@
-import { AssetInfo, SignedSubRAV } from '../core/types';
+import type { 
+  AssetInfo, 
+  SubRAV, 
+  SignedSubRAV,
+  ChannelInfo,
+} from '../core/types';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 /**
@@ -21,6 +26,18 @@ export interface OpenChannelParams {
   payeeDid: string;
   asset: AssetInfo;
   collateral: bigint;
+  signer: SignerInterface;
+}
+
+/**
+ * Parameters for opening a new payment channel with sub-channel in one step
+ */
+export interface OpenChannelWithSubChannelParams {
+  payerDid: string;
+  payeeDid: string;
+  asset: AssetInfo;
+  collateral: bigint;
+  vmIdFragment: string;
   signer: SignerInterface;
 }
 
@@ -98,22 +115,6 @@ export interface SubChannelInfo {
 }
 
 /**
- * Channel information and status
- */
-export interface ChannelInfo {
-  channelId: string;
-  payerDid: string;
-  payeeDid: string;
-  asset: AssetInfo;
-  epoch: bigint;
-  status: 'active' | 'closing' | 'closed';
-  // Note: Sub-channel list should be obtained from DID Document or local storage
-  // Use getSubChannel() method to query individual sub-channel dynamic states
-  // Aggregated values like totalCollateral and claimedAmount should be calculated
-  // separately by querying the payment hub and individual sub-channels as needed
-}
-
-/**
  * Chain-agnostic payment channel contract interface
  * 
  * This interface abstracts payment channel operations across different blockchains,
@@ -126,6 +127,12 @@ export interface IPaymentChannelContract {
    * Open a new payment channel between payer and payee
    */
   openChannel(params: OpenChannelParams): Promise<OpenChannelResult>;
+
+  /**
+   * Open a new payment channel and authorize a sub-channel in one transaction
+   * This is more efficient than calling openChannel() and authorizeSubChannel() separately
+   */
+  openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult>;
 
   /**
    * Authorize a sub-channel for multi-device support

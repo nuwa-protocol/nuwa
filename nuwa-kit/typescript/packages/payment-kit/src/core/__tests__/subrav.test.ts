@@ -1,16 +1,24 @@
 /**
- * Tests for SubRAV BCS serialization and utilities
+ * Tests for SubRAV BCS serialization, signing, and verification utilities
  */
 
-import { describe, test, expect } from '@jest/globals';
+import { describe, test, expect, beforeEach } from '@jest/globals';
 import { 
   SubRAVCodec, 
   SubRAVUtils, 
   SubRAVValidator, 
+  SubRAVSigner,
+  SubRAVManager,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1 
 } from '../subrav';
-import type { SubRAV } from '../types';
+import type { SubRAV, SignedSubRAV } from '../types';
+import type { DIDDocument } from '@nuwa-ai/identity-kit';
+import { 
+  TestSignerFactory, 
+  MockDIDResolver, 
+  createTestEnvironment 
+} from '../../test-helpers/mocks';
 
 describe('SubRAV BCS Serialization', () => {
   const sampleSubRAV: SubRAV = {
@@ -79,6 +87,145 @@ describe('SubRAV BCS Serialization', () => {
     const invalidBytes = new Uint8Array([1, 2, 3, 4, 5]);
 
     expect(() => SubRAVCodec.decode(invalidBytes)).toThrow('Failed to decode SubRAV');
+  });
+});
+
+describe('SubRAV Signing and Verification', () => {
+  const sampleSubRAV: SubRAV = {
+    version: SUBRAV_VERSION_1,
+    chainId: BigInt(4),
+    channelId: '0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c',
+    channelEpoch: BigInt(0),
+    vmIdFragment: 'account-key',
+    accumulatedAmount: BigInt(10000),
+    nonce: BigInt(1),
+  };
+
+  let testEnv: any;
+
+  beforeEach(async () => {
+    testEnv = await createTestEnvironment('subrav-test');
+  });
+
+  test('should sign SubRAV correctly', async () => {
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
+    expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
+    expect(signedSubRAV.signature.length).toBe(64);
+  });
+
+  test('should verify SubRAV with DID document', async () => {
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
+    const isValid = await SubRAVSigner.verify(signedSubRAV, {
+      didDocument: didDocument!,
+    });
+    
+    expect(isValid).toBe(true);
+  });
+
+  test('should verify SubRAV with DID resolver', async () => {
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const isValid = await SubRAVSigner.verifyWithResolver(
+      signedSubRAV,
+      testEnv.payerDid,
+      testEnv.didResolver
+    );
+    
+    expect(isValid).toBe(true);
+  });
+
+  test('should reject invalid signature', async () => {
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    // Modify signature to make it invalid
+    signedSubRAV.signature[0] = signedSubRAV.signature[0] ^ 0xFF;
+    
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
+    const isValid = await SubRAVSigner.verify(signedSubRAV, {
+      didDocument: didDocument!,
+    });
+    
+    expect(isValid).toBe(false);
+  });
+
+  test('should handle verification errors gracefully', async () => {
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const emptyDIDDoc: DIDDocument = {
+      '@context': ['https://www.w3.org/ns/did/v1'],
+      id: testEnv.payerDid,
+      verificationMethod: [] // Empty verification methods
+    };
+    
+    const isValid = await SubRAVSigner.verify(signedSubRAV, {
+      didDocument: emptyDIDDoc,
+    });
+    
+    expect(isValid).toBe(false);
+  });
+});
+
+describe('SubRAVManager', () => {
+  const sampleSubRAV: SubRAV = {
+    version: SUBRAV_VERSION_1,
+    chainId: BigInt(4),
+    channelId: '0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c',
+    channelEpoch: BigInt(0),
+    vmIdFragment: 'account-key',
+    accumulatedAmount: BigInt(10000),
+    nonce: BigInt(1),
+  };
+
+  let testEnv: any;
+
+  beforeEach(async () => {
+    testEnv = await createTestEnvironment('subrav-manager-test');
+  });
+
+  test('should sign through manager', async () => {
+    const manager = new SubRAVManager();
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
+    expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
+  });
+
+  test('should verify through manager with DID document', async () => {
+    const manager = new SubRAVManager();
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
+    const isValid = await manager.verify(signedSubRAV, {
+      didDocument: didDocument!,
+      payerDid: testEnv.payerDid,
+    });
+    
+    expect(isValid).toBe(true);
+  });
+
+  test('should verify through manager with resolver', async () => {
+    const manager = new SubRAVManager();
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const isValid = await manager.verifyWithResolver(
+      signedSubRAV,
+      testEnv.payerDid,
+      testEnv.didResolver
+    );
+    
+    expect(isValid).toBe(true);
+  });
+
+  test('should validate SubRAV business logic', async () => {
+    const manager = new SubRAVManager();
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
+    
+    const isValid = await manager.validate(signedSubRAV);
+    expect(isValid).toBe(true);
   });
 });
 

@@ -4,7 +4,6 @@
 
 // Re-export contract interface types for convenience
 export type {
-  IPaymentChannelContract,
   TxResult,
   OpenChannelParams,
   OpenChannelResult,
@@ -13,7 +12,6 @@ export type {
   ClaimResult,
   CloseParams,
   ChannelStatusParams,
-  ChannelInfo
 } from '../contracts/IPaymentChannelContract';
 
 /**
@@ -55,23 +53,19 @@ export interface AssetInfo {
 }
 
 /**
- * Payment channel metadata
+ * Payment channel information from blockchain
  */
-export interface ChannelMetadata {
-  /** Unique channel identifier */
+export interface ChannelInfo {
   channelId: string;
-  /** Payer's DID */
   payerDid: string;
-  /** Payee's DID */
   payeeDid: string;
-  /** Asset being transferred */
   asset: AssetInfo;
-  /** Total collateral locked in the channel */
-  totalCollateral: bigint;
-  /** Current channel epoch */
   epoch: bigint;
-  /** Channel status */
   status: 'active' | 'closing' | 'closed';
+  // Note: Sub-channel list should be obtained from DID Document or local storage
+  // Use getSubChannel() method to query individual sub-channel dynamic states
+  // Aggregated values like totalCollateral and claimedAmount should be calculated
+  // separately by querying the payment hub and individual sub-channels as needed
 }
 
 /**

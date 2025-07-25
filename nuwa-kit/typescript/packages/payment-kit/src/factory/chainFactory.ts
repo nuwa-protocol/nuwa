@@ -7,7 +7,7 @@
 
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../contracts/IPaymentChannelContract';
-import { PaymentChannelClient, type PaymentChannelClientOptions } from '../client/PaymentChannelClient';
+import { PaymentChannelPayerClient, type PaymentChannelPayerClientOptions } from '../client/PaymentChannelPayerClient';
 import { RoochPaymentChannelContract, type RoochContractOptions } from '../rooch/RoochPaymentChannelContract';
 
 /**
@@ -38,7 +38,7 @@ export interface PaymentChannelFactoryOptions {
   chainConfig: ChainConfig;
   signer: SignerInterface;
   keyId?: string;
-  storageOptions?: PaymentChannelClientOptions['storageOptions'];
+  storageOptions?: PaymentChannelPayerClientOptions['storageOptions'];
 }
 
 /**
@@ -66,10 +66,10 @@ export class PaymentChannelFactory {
   /**
    * Create a payment channel client with chain-specific contract
    */
-  static createClient(options: PaymentChannelFactoryOptions): PaymentChannelClient {
+  static createClient(options: PaymentChannelFactoryOptions): PaymentChannelPayerClient {
     const contract = this.createContract(options.chainConfig);
     
-    return new PaymentChannelClient({
+    return new PaymentChannelPayerClient({
       contract,
       signer: options.signer,
       keyId: options.keyId,
@@ -87,8 +87,8 @@ export class PaymentChannelFactory {
     network?: 'local' | 'dev' | 'test' | 'main';
     contractAddress?: string;
     debug?: boolean;
-    storageOptions?: PaymentChannelClientOptions['storageOptions'];
-  }): PaymentChannelClient {
+    storageOptions?: PaymentChannelPayerClientOptions['storageOptions'];
+  }): PaymentChannelPayerClient {
     return this.createClient({
       chainConfig: {
         chain: 'rooch',
@@ -107,7 +107,7 @@ export class PaymentChannelFactory {
 /**
  * Convenience function to create a payment channel client
  */
-export function createPaymentChannelClient(options: PaymentChannelFactoryOptions): PaymentChannelClient {
+export function createPaymentChannelClient(options: PaymentChannelFactoryOptions): PaymentChannelPayerClient {
   return PaymentChannelFactory.createClient(options);
 }
 
@@ -121,6 +121,6 @@ export function createRoochPaymentChannelClient(options: {
   network?: 'local' | 'dev' | 'test' | 'main';
   contractAddress?: string;
   debug?: boolean;
-}): PaymentChannelClient {
+}): PaymentChannelPayerClient {
   return PaymentChannelFactory.createRoochClient(options);
 } 
