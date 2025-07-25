@@ -15,7 +15,7 @@ import type {
 import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
-import { SubRAVManager } from '../core/subrav';
+import { SubRAVManager, SubRAVUtils } from '../core/subrav';
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
@@ -136,15 +136,14 @@ export class PaymentChannelPayeeClient {
 
     const chainId = await this.getChainId();
 
-    const subRAV: SubRAV = {
-      version: 1,
-      chainId: BigInt(chainId),
+    const subRAV: SubRAV = SubRAVUtils.create({
+      chainId: chainId,
       channelId: channelId,
       channelEpoch: channelInfo.epoch,
       vmIdFragment: vmIdFragment,
       accumulatedAmount: newAccumulatedAmount,
       nonce: newNonce,
-    };
+    });
 
     // Update local state optimistically
     // Note: This will be confirmed when we receive the signed SubRAV back

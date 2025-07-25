@@ -95,15 +95,12 @@ export class PaymentChannelPayerClient {
   async openChannel(params: PayerOpenChannelParams): Promise<ChannelInfo> {
     const payerDid = await this.signer.getDid();
     
-    // Convert SignerInterface to chain-specific signer
-    const chainSigner = await this.convertToChainSigner();
-    
     const openParams: ContractOpenChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
       collateral: params.collateral,
-      signer: chainSigner,
+      signer: this.signer,
     };
 
     const result = await this.contract.openChannel(openParams);
@@ -318,12 +315,10 @@ export class PaymentChannelPayerClient {
    * Close a payment channel
    */
   async closeChannel(channelId: string, cooperative: boolean = true): Promise<{ txHash: string }> {
-    const chainSigner = await this.convertToChainSigner();
-
     const result = await this.contract.closeChannel({
       channelId,
       cooperative,
-      signer: chainSigner,
+      signer: this.signer,
     });
 
     // Update cache to mark channel as closed
@@ -380,13 +375,6 @@ export class PaymentChannelPayerClient {
   }
 
   // -------- Private Helpers --------
-
-  private async convertToChainSigner(): Promise<SignerInterface> {
-    // The interface now uses SignerInterface directly, so no conversion needed
-    // Each chain implementation (like RoochPaymentChannelContract) handles 
-    // the conversion from SignerInterface to their specific signer type
-    return this.signer;
-  }
 
   /**
    * Get cached chain ID or fetch from contract
