@@ -101,8 +101,8 @@ export class PaymentChannelPayeeClient {
   async generateSubRAV(params: GenerateSubRAVParams): Promise<SubRAV> {
     const { channelId, payerKeyId, amount, description } = params;
 
-    // Get channel info to validate
-    const channelInfo = await this.contract.getChannelStatus({ channelId });
+    // Get channel info to validate (using cache to ensure local storage is updated)
+    const channelInfo = await this.getChannelInfoCached(channelId);
     
     // Get current sub-channel state or initialize if first time
     let subChannelState;
@@ -145,15 +145,9 @@ export class PaymentChannelPayeeClient {
       nonce: newNonce,
     });
 
-    // Update local state optimistically
-    // Note: This will be confirmed when we receive the signed SubRAV back
-    await this.stateStorage.updateSubChannelState(channelId, payerKeyId, {
-      ...subChannelState,
-      accumulatedAmount: newAccumulatedAmount,
-      nonce: newNonce,
-      lastUpdated: Date.now(),
-    });
-
+    // Note: We don't update local state here - it will be updated when we receive 
+    // the signed SubRAV back and verify it successfully
+    
     return subRAV;
   }
 
@@ -168,8 +162,18 @@ export class PaymentChannelPayeeClient {
       throw new Error(`Invalid signed SubRAV: ${verification.error}`);
     }
 
-    // The state should already be updated when we generated the SubRAV
-    // This is just a confirmation step
+    // Update local state now that we have a verified signed SubRAV
+    const channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
+    const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
+    
+    await this.stateStorage.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
+      channelId: signedSubRAV.subRav.channelId,
+      epoch: signedSubRAV.subRav.channelEpoch,
+      accumulatedAmount: signedSubRAV.subRav.accumulatedAmount,
+      nonce: signedSubRAV.subRav.nonce,
+      lastUpdated: Date.now(),
+    });
+
     console.log(`Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
   }
 
@@ -234,7 +238,13 @@ export class PaymentChannelPayeeClient {
       const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
       try {
         const prevState = await this.stateStorage.getSubChannelState(signedSubRAV.subRav.channelId, keyId);
-        const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce;
+        
+        // Allow same nonce if it's the exact same SubRAV (same amount and other fields)
+        const isSameSubRAV = signedSubRAV.subRav.nonce === prevState.nonce && 
+                            signedSubRAV.subRav.accumulatedAmount === prevState.accumulatedAmount &&
+                            signedSubRAV.subRav.channelEpoch === prevState.epoch;
+        
+        const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce || isSameSubRAV;
         result.details!.nonceProgression = nonceProgression;
         
         if (!nonceProgression) {
@@ -242,7 +252,7 @@ export class PaymentChannelPayeeClient {
           return result;
         }
 
-        // Verify amount is not decreasing
+        // Verify amount is not decreasing (unless it's the same SubRAV)
         const amountValid = signedSubRAV.subRav.accumulatedAmount >= prevState.accumulatedAmount;
         result.details!.amountValid = amountValid;
         
@@ -438,11 +448,11 @@ export class PaymentChannelPayeeClient {
       }
     );
 
-    // Get current on-chain status for each channel
+    // Get current status for each channel (using cache for efficiency)
     const channelInfos: ChannelInfo[] = [];
     for (const metadata of storageResult.items) {
       try {
-        const info = await this.contract.getChannelStatus({ channelId: metadata.channelId });
+        const info = await this.getChannelInfoCached(metadata.channelId);
         channelInfos.push(info);
       } catch (error) {
         console.warn(`Failed to get status for channel ${metadata.channelId}:`, error);

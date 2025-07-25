@@ -40,9 +40,14 @@
 - 所有接收到的 SignedSubRAV 都必须进行签名验证，确保支付授权的真实性
 
 **性能优化**：
-- 使用 `ChannelStateStorage` 缓存 ChannelInfo，避免重复链调用
+- 使用 `ChannelStateStorage` 直接缓存 `ChannelInfo`，避免重复链调用
 - `getChannelInfoCached()` 优先使用本地缓存，失败时回退到链查询
 - `syncChannelState()` 强制刷新缓存，确保状态同步
+
+**类型设计简化**：
+- 统一使用 `ChannelInfo` 类型，移除了冗余的 `ChannelMetadata`
+- 在当前支付模式中，资产不锁定在通道内，因此移除了 `totalCollateral` 字段
+- 简化了存储接口，直接使用 `ChannelInfo` 作为缓存对象
 
 ---
 

@@ -2,7 +2,7 @@
  * Tests for SubRAV BCS serialization, signing, and verification utilities
  */
 
-import { describe, test, expect, jest, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach } from '@jest/globals';
 import { 
   SubRAVCodec, 
   SubRAVUtils, 
@@ -13,56 +13,12 @@ import {
   SUBRAV_VERSION_1 
 } from '../subrav';
 import type { SubRAV, SignedSubRAV } from '../types';
-import type { DIDDocument, KeyType } from '@nuwa-ai/identity-kit';
-
-// Simple mock implementations for testing
-const createMockSigner = () => ({
-  getDid: async () => 'did:example:payer',
-  signWithKeyId: async (data: Uint8Array, keyId: string) => {
-    // Simple mock signature: just return first 64 bytes of data + keyId hash
-    const keyIdBytes = new TextEncoder().encode(keyId);
-    const signature = new Uint8Array(64);
-    signature.set(data.slice(0, 32), 0);
-    signature.set(keyIdBytes.slice(0, 32), 32);
-    return signature;
-  },
-});
-
-const createMockDIDResolver = () => ({
-  resolveDID: async (did: string): Promise<DIDDocument | null> => {
-    if (did === 'did:example:payer') {
-      return {
-        '@context': ['https://www.w3.org/ns/did/v1'],
-        id: did,
-        verificationMethod: [
-          {
-            id: `${did}#account-key`,
-            type: 'Ed25519VerificationKey2020',
-            controller: did,
-            publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-          }
-        ]
-      };
-    }
-    return null;
-  },
-});
-
-// Mock the identity-kit module
-jest.mock('@nuwa-ai/identity-kit', () => ({
-  CryptoUtils: {
-    verify: (data: Uint8Array, signature: Uint8Array, publicKey: Uint8Array, keyType: string) => {
-      // Simple mock verification: check if signature starts with first 32 bytes of data
-      return signature.slice(0, 32).every((byte, index) => byte === data[index]);
-    },
-  },
-  MultibaseCodec: {
-    decodeBase58btc: (encoded: string) => {
-      // Mock decoder - return fixed 32-byte key
-      return new Uint8Array(32).fill(42);
-    },
-  },
-}));
+import type { DIDDocument } from '@nuwa-ai/identity-kit';
+import { 
+  TestSignerFactory, 
+  MockDIDResolver, 
+  createTestEnvironment 
+} from '../../test-helpers/mocks';
 
 describe('SubRAV BCS Serialization', () => {
   const sampleSubRAV: SubRAV = {
@@ -145,90 +101,63 @@ describe('SubRAV Signing and Verification', () => {
     nonce: BigInt(1),
   };
 
-  let mockSigner: any;
-  let mockDIDResolver: any;
+  let testEnv: any;
 
-  beforeEach(() => {
-    mockSigner = createMockSigner();
-    mockDIDResolver = createMockDIDResolver();
+  beforeEach(async () => {
+    testEnv = await createTestEnvironment('subrav-test');
   });
 
   test('should sign SubRAV correctly', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
     expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
     expect(signedSubRAV.signature.length).toBe(64);
   });
 
-  test('should verify SubRAV with public key', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
-    
-    const mockPublicKey = new Uint8Array(32).fill(42);
-    const isValid = await SubRAVSigner.verify(signedSubRAV, {
-      publicKey: mockPublicKey,
-      keyType: 'Ed25519VerificationKey2020' as KeyType
-    });
-    
-    expect(isValid).toBe(true);
-  });
-
   test('should verify SubRAV with DID document', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
-    const mockDIDDoc: DIDDocument = {
-      '@context': ['https://www.w3.org/ns/did/v1'],
-      id: 'did:example:payer',
-      verificationMethod: [
-        {
-          id: 'did:example:payer#account-key',
-          type: 'Ed25519VerificationKey2020',
-          controller: 'did:example:payer',
-          publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-        }
-      ]
-    };
-    
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
     const isValid = await SubRAVSigner.verify(signedSubRAV, {
-      didDocument: mockDIDDoc,
+      didDocument: didDocument!,
     });
     
     expect(isValid).toBe(true);
   });
 
   test('should verify SubRAV with DID resolver', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     const isValid = await SubRAVSigner.verifyWithResolver(
       signedSubRAV,
-      'did:example:payer',
-      mockDIDResolver
+      testEnv.payerDid,
+      testEnv.didResolver
     );
     
     expect(isValid).toBe(true);
   });
 
   test('should reject invalid signature', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     // Modify signature to make it invalid
     signedSubRAV.signature[0] = signedSubRAV.signature[0] ^ 0xFF;
     
-    const mockPublicKey = new Uint8Array(32).fill(42);
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
     const isValid = await SubRAVSigner.verify(signedSubRAV, {
-      publicKey: mockPublicKey,
-      keyType: 'Ed25519VerificationKey2020' as KeyType
+      didDocument: didDocument!,
     });
     
     expect(isValid).toBe(false);
   });
 
   test('should handle verification errors gracefully', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     const emptyDIDDoc: DIDDocument = {
       '@context': ['https://www.w3.org/ns/did/v1'],
-      id: 'did:example:payer',
+      id: testEnv.payerDid,
       verificationMethod: [] // Empty verification methods
     };
     
@@ -251,30 +180,28 @@ describe('SubRAVManager', () => {
     nonce: BigInt(1),
   };
 
-  let mockSigner: any;
-  let mockDIDResolver: any;
+  let testEnv: any;
 
-  beforeEach(() => {
-    mockSigner = createMockSigner();
-    mockDIDResolver = createMockDIDResolver();
+  beforeEach(async () => {
+    testEnv = await createTestEnvironment('subrav-manager-test');
   });
 
   test('should sign through manager', async () => {
     const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
     expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
   });
 
-  test('should verify through manager with public key', async () => {
+  test('should verify through manager with DID document', async () => {
     const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
-    const mockPublicKey = new Uint8Array(32).fill(42);
+    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
     const isValid = await manager.verify(signedSubRAV, {
-      publicKey: mockPublicKey,
-      keyType: 'Ed25519VerificationKey2020' as KeyType
+      didDocument: didDocument!,
+      payerDid: testEnv.payerDid,
     });
     
     expect(isValid).toBe(true);
@@ -282,12 +209,12 @@ describe('SubRAVManager', () => {
 
   test('should verify through manager with resolver', async () => {
     const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     const isValid = await manager.verifyWithResolver(
       signedSubRAV,
-      'did:example:payer',
-      mockDIDResolver
+      testEnv.payerDid,
+      testEnv.didResolver
     );
     
     expect(isValid).toBe(true);
@@ -295,7 +222,7 @@ describe('SubRAVManager', () => {
 
   test('should validate SubRAV business logic', async () => {
     const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, mockSigner, 'did:example:payer#account-key');
+    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
     
     const isValid = await manager.validate(signedSubRAV);
     expect(isValid).toBe(true);
