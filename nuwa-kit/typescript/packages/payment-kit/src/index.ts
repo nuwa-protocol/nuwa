@@ -10,7 +10,7 @@ export * from './core/claim-scheduler';
 export * from './contracts/IPaymentChannelContract';
 
 // Chain-agnostic client
-export * from './client/PaymentChannelClient';
+export * from './client/PaymentChannelPayerClient';
 
 // Factory for creating clients
 export * from './factory/chainFactory';
@@ -43,11 +43,11 @@ export {
 export * from './rooch/RoochPaymentChannelContract';
 
 // Import after exports to avoid circular issue
-import { PaymentChannelClient } from './client/PaymentChannelClient';
+import { PaymentChannelPayerClient } from './client/PaymentChannelPayerClient';
 import { createRoochPaymentChannelClient as factoryCreateRoochClient } from './factory/chainFactory';
 
 /**
- * Helper to create a PaymentChannelClient for Rooch from an IdentityKit instance.
+ * Helper to create a PaymentChannelPayerClient for Rooch from an IdentityKit instance.
  * If `rpcUrl` is omitted, it will be inferred from the registered RoochVDR
  * that was configured during `IdentityKit.bootstrap()`.
  */
@@ -57,7 +57,7 @@ export async function createRoochPaymentChannelClient(opts: {
   contractAddress?: string;
   debug?: boolean;
   rpcUrl?: string;
-}): Promise<PaymentChannelClient> {
+}): Promise<PaymentChannelPayerClient> {
   const signer = opts.kit.getSigner();
 
   // Infer RPC URL from RoochVDR when not supplied

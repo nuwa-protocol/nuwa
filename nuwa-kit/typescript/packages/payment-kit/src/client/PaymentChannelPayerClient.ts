@@ -1,8 +1,8 @@
 /**
- * Chain-agnostic Payment Channel Client
+ * Chain-agnostic Payment Channel Payer Client
  * 
  * This client provides a unified interface for payment channel operations
- * across different blockchains, using the IPaymentChannelContract abstraction.
+ * from the Payer perspective, using the IPaymentChannelContract abstraction.
  */
 
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
@@ -11,8 +11,6 @@ import type {
   OpenChannelParams,
   OpenChannelResult,
   OpenChannelWithSubChannelParams,
-  ClaimParams,
-  ClaimResult,
   ChannelInfo,
 } from '../contracts/IPaymentChannelContract';
 import type {
@@ -25,32 +23,39 @@ import type {
 import { SubRAVManager } from '../core/subrav';
 import { ChannelStateStorage, MemoryChannelStateStorage, StorageOptions } from '../core/ChannelStateStorage';
 
-export interface PaymentChannelClientOptions {
+export interface PaymentChannelPayerClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   keyId?: string;
   storageOptions?: StorageOptions;
 }
 
+export interface NextSubRAVOptions {
+  channelId?: string;
+  keyId?: string;
+}
+
 /**
- * Chain-agnostic Payment Channel Client
+ * Chain-agnostic Payment Channel Payer Client
  * 
- * Provides high-level APIs for payment channel operations including:
+ * Provides high-level APIs for payment channel operations from the Payer perspective:
  * - Opening channels and authorizing sub-channels
  * - Generating and managing SubRAVs
- * - Claiming payments from channels
+ * - Multi-channel support with flexible switching
  * 
  * Uses composite keys (channelId:keyId) to avoid conflicts between channels.
+ * Supports both single-channel (auto-select first active) and multi-channel usage.
  */
-export class PaymentChannelClient {
+export class PaymentChannelPayerClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
   private keyId?: string;
   private stateStorage: ChannelStateStorage;
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
+  private activeChannelId?: string;
 
-  constructor(options: PaymentChannelClientOptions) {
+  constructor(options: PaymentChannelPayerClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
     this.keyId = options.keyId;
@@ -103,6 +108,11 @@ export class PaymentChannelClient {
     // Cache channel metadata using channelId as key
     await this.stateStorage.setChannelMetadata(result.channelId, metadata);
     
+    // Set as active channel if no active channel is set
+    if (!this.activeChannelId) {
+      this.activeChannelId = result.channelId;
+    }
+    
     return metadata;
   }
 
@@ -152,6 +162,11 @@ export class PaymentChannelClient {
       lastUpdated: Date.now(),
     });
 
+    // Set as active channel if no active channel is set
+    if (!this.activeChannelId) {
+      this.activeChannelId = result.channelId;
+    }
+
     return result;
   }
 
@@ -183,16 +198,38 @@ export class PaymentChannelClient {
   }
 
   /**
-   * Generate next SubRAV for payment
+   * Set the active channel for subsequent operations
+   * This is a convenience method for single-channel usage patterns
    */
-  async nextSubRAV(amount: bigint, keyId?: string): Promise<SignedSubRAV> {
-    const useKeyId = keyId || this.keyId;
+  async setActiveChannel(channelId: string): Promise<void> {
+    // Verify the channel exists and is active
+    const metadata = await this.stateStorage.getChannelMetadata(channelId);
+    if (!metadata) {
+      throw new Error(`Channel ${channelId} not found in local storage`);
+    }
+    if (metadata.status !== 'active') {
+      throw new Error(`Channel ${channelId} is not active (status: ${metadata.status})`);
+    }
+    
+    this.activeChannelId = channelId;
+  }
+
+  /**
+   * Generate next SubRAV for payment
+   * Supports both single-channel (auto-select) and multi-channel (explicit channelId) usage
+   */
+  async nextSubRAV(amount: bigint, options: NextSubRAVOptions = {}): Promise<SignedSubRAV> {
+    const useKeyId = options.keyId || this.keyId;
     if (!useKeyId) {
       throw new Error('Key ID is required for RAV generation');
     }
 
-    // Get current channel - we need a specific channel ID now
-    const channelId = await this.getActiveChannelId();
+    // Determine target channel: explicit > active > first active
+    let channelId = options.channelId;
+    if (!channelId) {
+      channelId = this.activeChannelId || (await this.getFirstActiveChannelId()) || undefined;
+    }
+    
     if (!channelId) {
       throw new Error('No active payment channel found. Please open a channel first.');
     }
@@ -231,16 +268,6 @@ export class PaymentChannelClient {
   }
 
   /**
-   * Submit a claim to the blockchain
-   */
-  async submitClaim(signedSubRAV: SignedSubRAV): Promise<ClaimResult> {
-    return await this.contract.claimFromChannel({
-      signedSubRAV,
-      signer: this.signer,
-    });
-  }
-
-  /**
    * Close a payment channel
    */
   async closeChannel(channelId: string, cooperative: boolean = true): Promise<{ txHash: string }> {
@@ -259,6 +286,11 @@ export class PaymentChannelClient {
       await this.stateStorage.setChannelMetadata(channelId, metadata);
     }
 
+    // Clear active channel if this was the active one
+    if (this.activeChannelId === channelId) {
+      this.activeChannelId = undefined;
+    }
+
     return { txHash: result.txHash };
   }
 
@@ -275,6 +307,13 @@ export class PaymentChannelClient {
   async getChannelsByPayer(payerDid: string): Promise<ChannelMetadata[]> {
     const result = await this.stateStorage.listChannelMetadata({ payerDid });
     return result.items;
+  }
+
+  /**
+   * Get the currently active channel ID
+   */
+  getActiveChannelId(): string | undefined {
+    return this.activeChannelId;
   }
 
   // -------- Asset Information --------
@@ -321,11 +360,9 @@ export class PaymentChannelClient {
   }
 
   /**
-   * Get active channel ID (helper method to replace the old default channel concept)
+   * Get first active channel ID (fallback for auto-selection)
    */
-  private async getActiveChannelId(): Promise<string | null> {
-    // For now, get the first active channel
-    // In the future, this could be more sophisticated (last used, highest balance, etc.)
+  private async getFirstActiveChannelId(): Promise<string | null> {
     const result = await this.stateStorage.listChannelMetadata(
       { status: 'active' }, 
       { offset: 0, limit: 1 }
@@ -334,5 +371,3 @@ export class PaymentChannelClient {
     return result.items.length > 0 ? result.items[0].channelId : null;
   }
 }
-
- 

@@ -14,7 +14,7 @@ import type {
   OpenChannelWithSubChannelParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo } from '../core/types';
-import { PaymentChannelClient } from '../client/PaymentChannelClient';
+import { PaymentChannelPayerClient } from '../client/PaymentChannelPayerClient';
 import { PaymentChannelFactory } from '../factory/chainFactory';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
@@ -112,11 +112,11 @@ const mockSigner = {
 
 describe('Chain-Agnostic Payment Channel Architecture', () => {
   let mockContract: MockPaymentChannelContract;
-  let client: PaymentChannelClient;
+  let client: PaymentChannelPayerClient;
 
   beforeEach(() => {
     mockContract = new MockPaymentChannelContract();
-    client = new PaymentChannelClient({
+    client = new PaymentChannelPayerClient({
       contract: mockContract,
       signer: mockSigner,
       keyId: 'test-key-1',
@@ -148,9 +148,9 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
     });
   });
 
-  describe('PaymentChannelClient', () => {
+  describe('PaymentChannelPayerClient', () => {
     it('should create client with mock contract', () => {
-      expect(client).toBeInstanceOf(PaymentChannelClient);
+      expect(client).toBeInstanceOf(PaymentChannelPayerClient);
     });
 
     it('should open channel through contract interface', async () => {
@@ -199,7 +199,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
         keyId: 'test-key',
       });
       
-      expect(factoryClient).toBeInstanceOf(PaymentChannelClient);
+      expect(factoryClient).toBeInstanceOf(PaymentChannelPayerClient);
     });
   });
 
@@ -224,14 +224,14 @@ describe('Chain Integration Examples', () => {
     
     // Mock Rooch implementation
     const roochContract = new MockPaymentChannelContract();
-    const roochClient = new PaymentChannelClient({
+    const roochClient = new PaymentChannelPayerClient({
       contract: roochContract,
       signer: mockSigner,
     });
 
     // Mock future EVM implementation (same interface)
     const evmContract = new MockPaymentChannelContract();
-    const evmClient = new PaymentChannelClient({
+    const evmClient = new PaymentChannelPayerClient({
       contract: evmContract,
       signer: mockSigner,
     });
