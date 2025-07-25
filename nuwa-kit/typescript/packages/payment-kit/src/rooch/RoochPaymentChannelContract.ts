@@ -24,6 +24,7 @@ import type {
   IPaymentChannelContract,
   OpenChannelParams,
   OpenChannelResult,
+  OpenChannelWithSubChannelParams,
   AuthorizeSubChannelParams,
   TxResult,
   ClaimParams,
@@ -247,6 +248,63 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error opening channel:', error);
+      throw error;
+    }
+  }
+
+  async openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
+    try {
+      this.logger.debug('Opening payment channel with sub-channel in one step:', params);
+      
+      // Parse and validate DIDs first
+      const payerParsed = parseDid(params.payerDid);
+      const payeeParsed = parseDid(params.payeeDid);
+      
+      if (payerParsed.method !== 'rooch') {
+        throw new Error(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
+      }
+      if (payeeParsed.method !== 'rooch') {
+        throw new Error(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
+      }
+      
+      const signer = await this.convertSigner(params.signer);
+      
+      // Create transaction to open channel with sub-channel
+      const transaction = this.createTransaction();
+      transaction.callFunction({
+        target: `${this.contractAddress}::open_channel_with_sub_channel_entry`,
+        typeArgs: [params.asset.assetId], // CoinType as type argument
+        args: [
+          Args.address(payeeParsed.identifier),
+          Args.string(params.vmIdFragment),
+        ],
+        maxGas: 100000000,
+      });
+
+      this.logger.debug('Executing openChannelWithSubChannel transaction');
+      
+      // Execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        transaction,
+        signer,
+        option: { withOutput: true },
+      });
+
+      if (result.execution_info.status.type !== 'executed') {
+        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+      }
+
+      // Calculate the expected channel ID deterministically
+      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.asset.assetId);
+      
+      return {
+        channelId,
+        txHash: result.execution_info.tx_hash || '',
+        blockHeight: BigInt(0), // TODO: Extract from result if available
+        events: result.output?.events,
+      };
+    } catch (error) {
+      this.logger.error('Error opening channel with sub-channel:', error);
       throw error;
     }
   }

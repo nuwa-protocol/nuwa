@@ -4,6 +4,7 @@ import {
   ChannelInfo, 
   SubChannelInfo,
   OpenChannelParams,
+  OpenChannelWithSubChannelParams,
   AuthorizeSubChannelParams,
   ClaimParams,
   CloseParams,
@@ -145,6 +146,131 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         Transaction Hash: ${depositResult.txHash}
         Amount: ${depositAmount} (${Number(depositAmount) / 100000000} RGas)
         Block Height: ${depositResult.blockHeight}`);
+    });
+
+    it('should open channel with sub-channel in one step', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // First fund the payer's hub
+      await fundPayerHub();
+
+      const openWithSubChannelParams: OpenChannelWithSubChannelParams = {
+        payerDid: payer.did,
+        payeeDid: payee.did,
+        asset: testAsset,
+        collateral: BigInt(50000000), // 0.5 RGas collateral
+        vmIdFragment: payer.vmIdFragment,
+        signer: payer.signer,
+      };
+
+      const result = await contract.openChannelWithSubChannel(openWithSubChannelParams);
+      
+      expect(result).toBeDefined();
+      expect(result.channelId).toBeDefined();
+      expect(result.txHash).toBeDefined();
+      expect(result.txHash.length).toBeGreaterThan(0);
+      
+      // Store the channel ID for potential use in other tests
+      const oneStepChannelId = result.channelId;
+
+      console.log(`Channel opened with sub-channel in one step:
+        Channel ID: ${oneStepChannelId}
+        Transaction Hash: ${result.txHash}`);
+
+      // Verify the channel was created correctly
+      const channelInfo = await contract.getChannelStatus({ channelId: oneStepChannelId });
+      expect(channelInfo.payerDid).toBe(payer.did);
+      expect(channelInfo.payeeDid).toBe(payee.did);
+      expect(channelInfo.status).toBe('active');
+      expect(channelInfo.asset.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+
+      // Verify the sub-channel was authorized
+      const subChannelInfo = await contract.getSubChannel({
+        channelId: oneStepChannelId,
+        vmIdFragment: payer.vmIdFragment,
+      });
+      expect(subChannelInfo.vmIdFragment).toBe(payer.vmIdFragment);
+      expect(subChannelInfo.publicKey).toBeDefined();
+      expect(subChannelInfo.methodType).toBe('EcdsaSecp256k1VerificationKey2019');
+      expect(subChannelInfo.lastClaimedAmount).toBe(BigInt(0));
+      expect(subChannelInfo.lastConfirmedNonce).toBe(BigInt(0));
+
+      console.log(`Sub-channel automatically authorized:
+        VM ID Fragment: ${subChannelInfo.vmIdFragment}
+        Public Key: ${subChannelInfo.publicKey}
+        Method Type: ${subChannelInfo.methodType}`);
+    });
+
+    it('should compare openChannelWithSubChannel vs separate operations', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // First fund the payer's hub
+      await fundPayerHub();
+
+      // Test 1: Use openChannelWithSubChannel (one transaction)
+      const oneStepParams: OpenChannelWithSubChannelParams = {
+        payerDid: payer.did,
+        payeeDid: payee.did,
+        asset: testAsset,
+        collateral: BigInt(50000000), // 0.5 RGas
+        vmIdFragment: payer.vmIdFragment,
+        signer: payer.signer,
+      };
+
+      const oneStepResult = await contract.openChannelWithSubChannel(oneStepParams);
+      const oneStepChannelId = oneStepResult.channelId;
+
+      // Test 2: Use separate openChannel + authorizeSubChannel (two transactions)
+      // Create a different payee to avoid channel collision
+      const payee2 = await createSelfDid(env, {
+        keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
+        skipFunding: false
+      });
+
+      const separateOpenParams: OpenChannelParams = {
+        payerDid: payer.did,
+        payeeDid: payee2.did,
+        asset: testAsset,
+        collateral: BigInt(50000000),
+        signer: payer.signer,
+      };
+
+      const separateOpenResult = await contract.openChannel(separateOpenParams);
+      const separateChannelId = separateOpenResult.channelId;
+
+      const authorizeParams: AuthorizeSubChannelParams = {
+        channelId: separateChannelId,
+        vmIdFragment: payer.vmIdFragment,
+        signer: payer.signer,
+      };
+
+      const authorizeResult = await contract.authorizeSubChannel(authorizeParams);
+
+      // Compare results: both should have created working channels with authorized sub-channels
+      const oneStepChannelInfo = await contract.getChannelStatus({ channelId: oneStepChannelId });
+      const separateChannelInfo = await contract.getChannelStatus({ channelId: separateChannelId });
+
+      // Both channels should be active
+      expect(oneStepChannelInfo.status).toBe('active');
+      expect(separateChannelInfo.status).toBe('active');
+
+      // Both should have authorized sub-channels
+      const oneStepSubChannel = await contract.getSubChannel({
+        channelId: oneStepChannelId,
+        vmIdFragment: payer.vmIdFragment,
+      });
+      const separateSubChannel = await contract.getSubChannel({
+        channelId: separateChannelId,
+        vmIdFragment: payer.vmIdFragment,
+      });
+
+      expect(oneStepSubChannel.methodType).toBe('EcdsaSecp256k1VerificationKey2019');
+      expect(separateSubChannel.methodType).toBe('EcdsaSecp256k1VerificationKey2019');
+
+      console.log(`Comparison results:
+        One-step method: 1 transaction (${oneStepResult.txHash})
+        Separate method: 2 transactions (${separateOpenResult.txHash}, ${authorizeResult.txHash})
+        Both achieve the same end result: active channel with authorized sub-channel`);
     });
 
     it('should get channel status', async () => {

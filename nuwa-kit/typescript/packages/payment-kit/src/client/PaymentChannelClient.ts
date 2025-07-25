@@ -10,9 +10,12 @@ import type {
   IPaymentChannelContract,
   OpenChannelParams,
   OpenChannelResult,
+  OpenChannelWithSubChannelParams,
   ClaimParams,
   ClaimResult,
   ChannelInfo,
+} from '../contracts/IPaymentChannelContract';
+import type {
   AssetInfo,
   SignedSubRAV,
   SubRAV,
@@ -92,8 +95,68 @@ export class PaymentChannelClient {
       status: 'active',
     };
 
-    // Cache channel metadata
+    // Cache channel metadata using channelId as key
     await this.stateStorage.setChannelMetadata(result.channelId, metadata);
+    
+    return metadata;
+  }
+
+  /**
+   * Open a new payment channel and authorize a sub-channel in one step
+   * This is more efficient than calling openChannel() and authorizeSubChannel() separately
+   */
+  async openChannelWithSubChannel(params: {
+    payeeDid: string;
+    asset: AssetInfo;
+    collateral: bigint;
+    vmIdFragment?: string;
+    keyId?: string;
+  }): Promise<ChannelMetadata> {
+    const payerDid = await this.signer.getDid();
+    const useKeyId = params.keyId || this.defaultKeyId;
+    const vmIdFragment = params.vmIdFragment || (useKeyId ? this.extractFragment(useKeyId) : 'default');
+    
+    if (!useKeyId) {
+      throw new Error('No keyId specified and no default keyId set');
+    }
+    
+    // Convert SignerInterface to chain-specific signer
+    const chainSigner = await this.convertToChainSigner();
+    
+    const openParams: OpenChannelWithSubChannelParams = {
+      payerDid,
+      payeeDid: params.payeeDid,
+      asset: params.asset,
+      collateral: params.collateral,
+      vmIdFragment,
+      signer: chainSigner,
+    };
+
+    const result = await this.contract.openChannelWithSubChannel(openParams);
+    
+    // Get channel epoch from the contract
+    const channelInfo = await this.contract.getChannelStatus({ channelId: result.channelId });
+
+    const metadata: ChannelMetadata = {
+      channelId: result.channelId,
+      payerDid,
+      payeeDid: params.payeeDid,
+      asset: params.asset,
+      totalCollateral: params.collateral,
+      epoch: channelInfo.epoch,
+      status: 'active',
+    };
+
+    // Cache channel metadata using channelId as key
+    await this.stateStorage.setChannelMetadata(result.channelId, metadata);
+    
+    // Initialize sub-channel state for the authorized keyId
+    await this.stateStorage.updateSubChannelState(useKeyId, {
+      channelId: result.channelId,
+      epoch: channelInfo.epoch,
+      accumulatedAmount: BigInt(0),
+      nonce: BigInt(0),
+    });
     
     return metadata;
   }
@@ -102,16 +165,35 @@ export class PaymentChannelClient {
    * Authorize a sub-channel for multi-device support
    */
   async authorizeSubChannel(params: {
-    channelId?: string;
-    vmIdFragment: string;
+    channelId: string;
+    vmIdFragment?: string;
+    keyId?: string;
   }): Promise<{ txHash: string }> {
-    const channelId = params.channelId || await this.getDefaultChannelId();
+    const useKeyId = params.keyId || this.defaultKeyId;
+    const vmIdFragment = params.vmIdFragment || (useKeyId ? this.extractFragment(useKeyId) : 'default');
+    
+    if (!useKeyId) {
+      throw new Error('No keyId specified and no default keyId set');
+    }
+    
     const chainSigner = await this.convertToChainSigner();
 
     const result = await this.contract.authorizeSubChannel({
-      channelId,
-      vmIdFragment: params.vmIdFragment,
+      channelId: params.channelId,
+      vmIdFragment,
       signer: chainSigner,
+    });
+
+    // Get channel metadata for epoch information
+    const metadata = await this.stateStorage.getChannelMetadata(params.channelId);
+    const channelEpoch = metadata?.epoch || BigInt(0);
+    
+    // Initialize sub-channel state for the authorized keyId
+    await this.stateStorage.updateSubChannelState(useKeyId, {
+      channelId: params.channelId,
+      epoch: channelEpoch,
+      accumulatedAmount: BigInt(0),
+      nonce: BigInt(0),
     });
 
     return { txHash: result.txHash };
@@ -128,6 +210,10 @@ export class PaymentChannelClient {
 
     // Get current state from cache
     const state = await this.stateStorage.getSubChannelState(useKeyId);
+    
+    if (!state.channelId || state.channelId === 'default') {
+      throw new Error(`No active channel found for keyId ${useKeyId}. Please open a channel and authorize the sub-channel first.`);
+    }
     
     const subRav: SubRAV = {
       version: 1,
@@ -167,21 +253,20 @@ export class PaymentChannelClient {
   /**
    * Close a payment channel
    */
-  async closeChannel(channelId?: string, cooperative: boolean = true): Promise<{ txHash: string }> {
-    const useChannelId = channelId || await this.getDefaultChannelId();
+  async closeChannel(channelId: string, cooperative: boolean = true): Promise<{ txHash: string }> {
     const chainSigner = await this.convertToChainSigner();
 
     const result = await this.contract.closeChannel({
-      channelId: useChannelId,
+      channelId,
       cooperative,
       signer: chainSigner,
     });
 
     // Update cache to mark channel as closed
-    const metadata = await this.stateStorage.getChannelMetadata(useChannelId);
+    const metadata = await this.stateStorage.getChannelMetadata(channelId);
     if (metadata) {
       metadata.status = 'closed';
-      await this.stateStorage.setChannelMetadata(useChannelId, metadata);
+      await this.stateStorage.setChannelMetadata(channelId, metadata);
     }
 
     return { txHash: result.txHash };
@@ -190,9 +275,17 @@ export class PaymentChannelClient {
   /**
    * Get channel information
    */
-  async getChannelInfo(channelId?: string): Promise<ChannelInfo> {
-    const useChannelId = channelId || await this.getDefaultChannelId();
-    return this.contract.getChannelStatus({ channelId: useChannelId });
+  async getChannelInfo(channelId: string): Promise<ChannelInfo> {
+    return this.contract.getChannelStatus({ channelId });
+  }
+
+  /**
+   * Find channels by payer DID (useful for listing user's channels)
+   */
+  async getChannelsByPayer(): Promise<ChannelMetadata[]> {
+    const payerDid = await this.signer.getDid();
+    const allChannels = await this.stateStorage.listChannelMetadata();
+    return allChannels.filter(channel => channel.payerDid === payerDid);
   }
 
   // -------- Asset Information --------
@@ -221,19 +314,8 @@ export class PaymentChannelClient {
   }
 
   private async getChainId(): Promise<bigint> {
-    // TODO: Get chain ID from contract or configuration
-    // For now, hardcode Rooch testnet
-    return BigInt(4);
-  }
-
-  private async getDefaultChannelId(): Promise<string> {
-    // Get the most recent channel ID from cache
-    // This is a simplified implementation
-    const metadata = await this.stateStorage.getChannelMetadata('default');
-    if (!metadata) {
-      throw new Error('No default channel found. Please open a channel first.');
-    }
-    return metadata.channelId;
+    // Get chain ID from contract instead of hardcoding
+    return this.contract.getChainId();
   }
 
   private extractFragment(keyId: string): string {

@@ -25,6 +25,18 @@ export interface OpenChannelParams {
 }
 
 /**
+ * Parameters for opening a new payment channel with sub-channel in one step
+ */
+export interface OpenChannelWithSubChannelParams {
+  payerDid: string;
+  payeeDid: string;
+  asset: AssetInfo;
+  collateral: bigint;
+  vmIdFragment: string;
+  signer: SignerInterface;
+}
+
+/**
  * Result of opening a payment channel
  */
 export interface OpenChannelResult {
@@ -126,6 +138,12 @@ export interface IPaymentChannelContract {
    * Open a new payment channel between payer and payee
    */
   openChannel(params: OpenChannelParams): Promise<OpenChannelResult>;
+
+  /**
+   * Open a new payment channel and authorize a sub-channel in one transaction
+   * This is more efficient than calling openChannel() and authorizeSubChannel() separately
+   */
+  openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult>;
 
   /**
    * Authorize a sub-channel for multi-device support

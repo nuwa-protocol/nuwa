@@ -11,6 +11,7 @@ import type {
   ClaimResult,
   SubChannelInfo,
   SubChannelParams,
+  OpenChannelWithSubChannelParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo } from '../core/types';
 import { PaymentChannelClient } from '../client/PaymentChannelClient';
@@ -32,6 +33,14 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     return {
       channelId: '0x1234567890abcdef1234567890abcdef12345678',
       txHash: '0xabcdef1234567890abcdef1234567890abcdef12',
+      blockHeight: BigInt(12345),
+    };
+  }
+
+  async openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
+    return {
+      channelId: '0x1234567890abcdef1234567890abcdef12345678',
+      txHash: '0xonestep1234567890abcdef1234567890abcdef',
       blockHeight: BigInt(12345),
     };
   }
