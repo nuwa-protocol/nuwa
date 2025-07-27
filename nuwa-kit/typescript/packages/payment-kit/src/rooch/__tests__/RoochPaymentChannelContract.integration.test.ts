@@ -181,7 +181,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       expect(channelInfo.payerDid).toBe(payer.did);
       expect(channelInfo.payeeDid).toBe(payee.did);
       expect(channelInfo.status).toBe('active');
-      expect(channelInfo.asset.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+      expect(channelInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
 
       // Verify the sub-channel was authorized
       const subChannelInfo = await contract.getSubChannel({
@@ -289,7 +289,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       expect(channelInfo.channelId).toBe(channelId);
       expect(channelInfo.payerDid).toBe(payer.did);
       expect(channelInfo.payeeDid).toBe(payee.did);
-      expect(channelInfo.asset.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+      expect(channelInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
       expect(channelInfo.status).toBe('active');
       expect(typeof channelInfo.epoch).toBe('bigint');
 

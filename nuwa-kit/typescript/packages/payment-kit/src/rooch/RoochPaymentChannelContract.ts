@@ -219,7 +219,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::open_channel_entry`,
-        typeArgs: [params.asset.assetId], // CoinType as type argument
+        typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier)],
         maxGas: 100000000,
       });
@@ -238,7 +238,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.asset.assetId);
+      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
       
       return {
         channelId,
@@ -273,7 +273,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::open_channel_with_sub_channel_entry`,
-        typeArgs: [params.asset.assetId], // CoinType as type argument
+        typeArgs: [params.assetId], // CoinType as type argument
         args: [
           Args.address(payeeParsed.identifier),
           Args.string(params.vmIdFragment),
@@ -295,7 +295,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.asset.assetId);
+      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
       
       return {
         channelId,
@@ -479,7 +479,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         channelId: params.channelId,
         payerDid: `did:rooch:${channel_sender.toBech32Address()}`,
         payeeDid: `did:rooch:${channel_receiver.toBech32Address()}`,
-        asset: { assetId: channelData.coin_type },
+        assetId: channelData.coin_type,
         epoch: channelData.channel_epoch,
         status: statusString,
       };
@@ -528,19 +528,18 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   }
 
   async getAssetInfo(assetId: string): Promise<AssetInfo> {
-    try {
-      this.logger.debug('Getting asset info for:', assetId);
-      
-      // For now, return basic asset info
-      // TODO: Implement proper asset metadata retrieval from chain
-      return {
-        assetId,
+    this.logger.debug('Getting asset info for:', assetId);
+    let canonicalAssetId = this.normalizeAssetId(assetId);
+    // TODO: Add support for other assets
+    if (canonicalAssetId === RGAS_CANONICAL_TAG) {
+      let assetInfo: AssetInfo = {
+        assetId: canonicalAssetId,
         symbol: this.parseAssetSymbol(assetId),
+        decimals: 8,
       };
-    } catch (error) {
-      this.logger.error('Error getting asset info:', error);
-      throw error;
+      return assetInfo;
     }
+    throw new Error(`Unsupported asset type: ${assetId}`);
   }
 
   async getAssetPrice(assetId: string): Promise<bigint> {
@@ -598,7 +597,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::deposit_to_hub_entry`,
-        typeArgs: [params.asset.assetId], // CoinType as type argument
+        typeArgs: [params.assetId], // CoinType as type argument
         args: [
           Args.address(targetParsed.identifier),
           Args.u256(params.amount),

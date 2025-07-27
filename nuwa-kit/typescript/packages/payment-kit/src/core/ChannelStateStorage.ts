@@ -177,7 +177,7 @@ export class MemoryChannelStateStorage implements ChannelStateStorage {
         channels = channels.filter(ch => ch.status === filter.status);
       }
       if (filter.assetId) {
-        channels = channels.filter(ch => ch.asset.assetId === filter.assetId);
+        channels = channels.filter(ch => ch.assetId === filter.assetId);
       }
       // Note: createdAfter/Before would need timestamps in ChannelMetadata
     }

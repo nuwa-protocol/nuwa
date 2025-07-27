@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { UsdBillingEngine, DEFAULT_ASSET_DECIMALS } from '../usd-engine';
 import { FileConfigLoader } from '../config/fileLoader';
-import { RateProvider, RateProviderError, AssetInfo } from '../rate/types';
+import { RateProvider, RateProviderError } from '../rate/types';
+import { AssetInfo } from '../../core/types';
 import { BillingContext } from '../types';
 import * as fs from 'fs/promises';
 import * as path from 'path';

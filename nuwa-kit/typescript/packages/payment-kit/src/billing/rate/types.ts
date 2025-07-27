@@ -1,5 +1,6 @@
 import type { RoochClient } from '@roochnetwork/rooch-sdk';
 import { Args } from '@roochnetwork/rooch-sdk';
+import { AssetInfo } from '../../core/types';
 
 /**
  * Rate provider types for USD pricing and multi-asset settlement
@@ -35,24 +36,6 @@ export interface RateProvider {
    * @param assetId - Asset identifier, or undefined to clear all
    */
   clearCache(assetId?: string): void;
-}
-
-/**
- * Asset information including on-chain metadata
- */
-export interface AssetInfo {
-  /** Asset identifier */
-  assetId: string;
-  /** Number of decimal places for this asset */
-  decimals: number;
-  /** Symbol for display (optional) */
-  symbol?: string;
-  /** Name for display (optional) */
-  name?: string;
-  /** External price feed identifier (e.g., coingecko id) */
-  priceId?: string;
-  /** Price multiplier for low-value assets */
-  priceMultiplier?: number;
 }
 
 /**

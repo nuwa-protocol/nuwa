@@ -43,23 +43,13 @@ export interface SignedSubRAV {
 }
 
 /**
- * Asset information for payment channels
- */
-export interface AssetInfo {
-  /** Unique asset identifier on its origin chain (e.g., '0x3::gas_coin::RGas' or ObjectID) */
-  assetId: string;
-  /** Display symbol for UI purposes, optional */
-  symbol?: string;
-}
-
-/**
  * Payment channel information from blockchain
  */
 export interface ChannelInfo {
   channelId: string;
   payerDid: string;
   payeeDid: string;
-  asset: AssetInfo;
+  assetId: string;
   epoch: bigint;
   status: 'active' | 'closing' | 'closed';
   // Note: Sub-channel list should be obtained from DID Document or local storage
@@ -138,3 +128,21 @@ export interface HttpResponsePayload {
   /** Human-readable message */
   message?: string;
 } 
+
+/**
+ * Asset information including on-chain metadata
+ */
+export interface AssetInfo {
+  /** Asset identifier */
+  assetId: string;
+  /** Number of decimal places for this asset */
+  decimals: number;
+  /** Symbol for display (optional) */
+  symbol?: string;
+  /** Name for display (optional) */
+  name?: string;
+  /** External price feed identifier (e.g., coingecko id) */
+  priceId?: string;
+  /** Price multiplier for low-value assets */
+  priceMultiplier?: number;
+}

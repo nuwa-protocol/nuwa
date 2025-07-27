@@ -1,5 +1,5 @@
 import type { 
-  AssetInfo, 
+  AssetInfo,
   SubRAV, 
   SignedSubRAV,
   ChannelInfo,
@@ -24,7 +24,7 @@ export interface TxResult {
 export interface OpenChannelParams {
   payerDid: string;
   payeeDid: string;
-  asset: AssetInfo;
+  assetId: string;
   collateral: bigint;
   signer: SignerInterface;
 }
@@ -35,7 +35,7 @@ export interface OpenChannelParams {
 export interface OpenChannelWithSubChannelParams {
   payerDid: string;
   payeeDid: string;
-  asset: AssetInfo;
+  assetId: string;
   collateral: bigint;
   vmIdFragment: string;
   signer: SignerInterface;
@@ -194,7 +194,7 @@ export interface DepositToHubParams {
   /** Target DID to receive the deposit */
   targetDid: string;
   /** Asset information */
-  asset: AssetInfo;
+  assetId: string;
   /** Amount to deposit (in smallest asset units) */
   amount: bigint;
   /** Signer for the transaction */

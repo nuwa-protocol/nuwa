@@ -1,5 +1,6 @@
 import type { RoochClient } from '@roochnetwork/rooch-sdk';
-import { BaseRateProvider, AssetInfo, RateProviderError, RateNotFoundError } from './types';
+import { BaseRateProvider, RateProviderError, RateNotFoundError } from './types';
+import { AssetInfo } from '../../core/types';
 
 /**
  * CoinGecko rate provider with chain integration support

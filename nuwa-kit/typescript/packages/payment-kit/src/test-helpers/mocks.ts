@@ -42,7 +42,7 @@ export class MockContract implements IPaymentChannelContract {
       channelId,
       payerDid: params.payerDid,
       payeeDid: params.payeeDid,
-      asset: params.asset,
+      assetId: params.asset,
       epoch: BigInt(0),
       status: 'active',
     };
@@ -118,6 +118,7 @@ export class MockContract implements IPaymentChannelContract {
     return {
       assetId,
       symbol: 'RGas',
+      decimals: 8,
     };
   }
 
@@ -292,6 +293,7 @@ export class TestSignerFactory {
 export const TEST_ASSET: AssetInfo = {
   assetId: '0x3::gas_coin::RGas',
   symbol: 'RGas',
+  decimals: 8,
 };
 
 /**

@@ -24,13 +24,13 @@ import { SubRAVManager } from '../core/subrav';
 
 export interface PayerOpenChannelParams {
   payeeDid: string;
-  asset: AssetInfo;
+  assetId: string;
   collateral: bigint;
 }
 
 export interface PayerOpenChannelWithSubChannelParams {
   payeeDid: string;
-  asset: AssetInfo;
+  assetId: string;
   collateral: bigint;
   vmIdFragment?: string;
 }
@@ -98,7 +98,7 @@ export class PaymentChannelPayerClient {
     const openParams: ContractOpenChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
-      asset: params.asset,
+      assetId: params.assetId,
       collateral: params.collateral,
       signer: this.signer,
     };
@@ -109,7 +109,7 @@ export class PaymentChannelPayerClient {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
-      asset: params.asset,
+      assetId: params.assetId,
       epoch: BigInt(0),
       status: 'active',
     };
@@ -135,7 +135,7 @@ export class PaymentChannelPayerClient {
     const openParams: ContractOpenChannelWithSubChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
-      asset: params.asset,
+      assetId: params.assetId,
       collateral: params.collateral,
       vmIdFragment: useFragment,
       signer: this.signer,
@@ -148,7 +148,7 @@ export class PaymentChannelPayerClient {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
-      asset: params.asset,
+      assetId: params.assetId,
       epoch: BigInt(0),
       status: 'active',
     };
