@@ -1,12 +1,12 @@
-import express, { Request, Response } from 'express';
-import { HttpBillingMiddleware } from '../../core/http-billing-middleware';
-import { HttpHeaderCodec } from '../../core/http-header';
+import express, { Request, Response, NextFunction } from 'express';
+import { HttpBillingMiddleware } from '../../../src/core/http-billing-middleware';
+import { HttpHeaderCodec } from '../../../src/core/http-header';
 import type { 
   HttpRequestPayload, 
   HttpResponsePayload, 
   SubRAV 
-} from '../../core/types';
-import type { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
+} from '../../../src/core/types';
+import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -80,6 +80,8 @@ rules:
         return BigInt('1000000'); // 0.001 RGas
       } else if (operation === 'post:/v1/process') {
         return BigInt('10000000'); // 0.01 RGas
+      } else if (operation === 'get:/health' || operation === 'get:/admin/claims') {
+        return BigInt('0'); // Health check and admin routes are free
       }
       
       return BigInt('500000'); // 默认 0.0005 RGas
@@ -98,8 +100,20 @@ rules:
     debug
   });
 
-  // 4. 应用支付中间件到所有路由
-  app.use(paymentMiddleware.createExpressMiddleware());
+  // 4. 应用支付中间件到所有路由，但跳过管理和健康检查路由
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    // Skip payment middleware for admin and health routes
+    if (req.path.startsWith('/admin') || req.path === '/health') {
+      return next();
+    }
+    
+    try {
+      await (paymentMiddleware.createExpressMiddleware() as any)(req, res, next);
+    } catch (error) {
+      console.error('🚨 Payment middleware error:', error);
+      res.status(500).json({ error: 'Payment processing failed', details: error instanceof Error ? error.message : String(error) });
+    }
+  });
 
   // 5. 业务路由（支付验证后才会执行）
   app.get('/v1/echo', (req: Request, res: Response) => {
@@ -126,9 +140,28 @@ rules:
   app.get('/admin/claims', (req: Request, res: Response) => {
     const claimsStats = paymentMiddleware.getPendingClaimsStats();
     const subRAVsStats = paymentMiddleware.getPendingSubRAVsStats();
+    
+    // Convert BigInt values to strings for JSON serialization
+    const serializedClaimsStats: Record<string, { count: number; totalAmount: string }> = {};
+    for (const [key, value] of Object.entries(claimsStats)) {
+      serializedClaimsStats[key] = {
+        count: value.count,
+        totalAmount: value.totalAmount.toString()
+      };
+    }
+    
+    const serializedSubRAVsStats: Record<string, { channelId: string; nonce: string; amount: string }> = {};
+    for (const [key, value] of Object.entries(subRAVsStats)) {
+      serializedSubRAVsStats[key] = {
+        channelId: value.channelId,
+        nonce: value.nonce.toString(),
+        amount: value.amount.toString()
+      };
+    }
+    
     res.json({ 
-      pendingClaims: claimsStats,
-      pendingSubRAVs: subRAVsStats,
+      pendingClaims: serializedClaimsStats,
+      pendingSubRAVs: serializedSubRAVsStats,
       timestamp: new Date().toISOString()
     });
   });
@@ -187,12 +220,13 @@ rules:
 // 客户端调用示例（延迟支付模式）
 export function createTestClient(payerClient: any, baseURL: string, channelId: string) {
   let pendingSubRAV: SubRAV | null = null; // 缓存上一次的 SubRAV
+  let payerKeyId: string | null = null; // 缓存 payer 的 key ID
 
   return {
     async callEcho(query: string) {
       let headers: Record<string, string> = {};
       
-      // 1. 如果有上一次的 SubRAV，签名并放入请求头
+      // 1. 总是提供 channelId，如果有上一次的 SubRAV，也签名并放入请求头
       if (pendingSubRAV) {
         const signedRav = await payerClient.signSubRAV(pendingSubRAV);
         
@@ -204,6 +238,16 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         };
 
         headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
+      } else {
+        // 首次请求，需要获取 payer 的 key ID
+        if (!payerKeyId) {
+          const keyIds = await payerClient.signer.listKeyIds();
+          payerKeyId = keyIds[0]; // 使用第一个 key ID
+        }
+        
+        // 首次请求，提供 channelId 和 payerKeyId（用于生成 SubRAV 提案）
+        headers['X-Payment-Channel-ID'] = channelId;
+        headers['X-Payment-Payer-Key-ID'] = payerKeyId!;
       }
       
       // 2. 发送请求
@@ -247,11 +291,24 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         };
 
         headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
+      } else {
+        // 首次请求，需要获取 payer 的 key ID
+        if (!payerKeyId) {
+          const keyIds = await payerClient.signer.listKeyIds();
+          payerKeyId = keyIds[0]; // 使用第一个 key ID
+        }
+        
+        // 首次请求，提供 channelId 和 payerKeyId（用于生成 SubRAV 提案）
+        headers['X-Payment-Channel-ID'] = channelId;
+        headers['X-Payment-Payer-Key-ID'] = payerKeyId!;
       }
       
       const response = await fetch(`${baseURL}/v1/process`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
         body: JSON.stringify(data)
       });
 
@@ -287,7 +344,20 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
     // 获取管理信息
     async getAdminClaims() {
       const response = await fetch(`${baseURL}/admin/claims`);
-      return await response.json();
+      const text = await response.text();
+      
+      if (!response.ok) {
+        console.error(`❌ Admin claims request failed: ${response.status} ${response.statusText}`);
+        console.error(`Response: ${text.substring(0, 200)}...`);
+        throw new Error(`Admin claims request failed: ${response.status} - ${text.substring(0, 100)}`);
+      }
+      
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        console.error(`❌ Failed to parse admin claims response as JSON: ${text.substring(0, 200)}...`);
+        throw new Error(`Expected JSON but got: ${text.substring(0, 100)}`);
+      }
     },
 
     async triggerClaim(channelId: string) {

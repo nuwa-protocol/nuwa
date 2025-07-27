@@ -9,12 +9,12 @@
  */
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { PaymentChannelPayerClient } from '../client/PaymentChannelPayerClient';
-import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
-import { RoochPaymentChannelContract } from '../rooch/RoochPaymentChannelContract';
+import { PaymentChannelPayerClient } from '../../src/client/PaymentChannelPayerClient';
+import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeClient';
+import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import { RoochVDR, VDRRegistry } from '@nuwa-ai/identity-kit';
-import type { AssetInfo } from '../core/types';
-import { MemoryChannelStateStorage } from '../core/ChannelStateStorage';
+import type { AssetInfo } from '../../src/core/types';
+import { MemoryChannelStateStorage } from '../../src/core/ChannelStateStorage';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { createBillingServer, createTestClient } from './server';
@@ -43,26 +43,26 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     }
 
     console.log('🚀 Starting HTTP Payment Kit E2E Tests');
-    DebugLogger.setGlobalLevel('info'); // Reduce noise in E2E tests
+    DebugLogger.setGlobalLevel('debug'); // Reduce noise in E2E tests
 
     // Bootstrap test environment with real Rooch node
     env = await TestEnv.bootstrap({
       rpcUrl: process.env.ROOCH_NODE_URL || 'http://localhost:6767',
-      network: 'test',
+      network: 'local',
       debug: false, // Reduce debug noise
     });
 
     // Initialize real contract
     contract = new RoochPaymentChannelContract({
       rpcUrl: env.rpcUrl,
-      network: 'test', 
+      network: 'local', 
       debug: false,
     });
 
     // Initialize DID resolver
     const roochVDR = new RoochVDR({
       rpcUrl: env.rpcUrl,
-      network: 'test',
+      network: 'local',
     });
     
     const vdrRegistry = VDRRegistry.getInstance();
@@ -82,6 +82,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Define test asset
     testAsset = {
       assetId: '0x3::gas_coin::RGas',
+      decimals: 8, // RGas has 8 decimal places
     };
 
     // Initialize payment clients
@@ -160,7 +161,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     const depositResult = await contract.depositToHub({
       targetDid: payer.did,
-      asset: testAsset,
+      assetId: testAsset.assetId,
       amount: fundAmount,
       signer: payer.signer,
     });
@@ -170,7 +171,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Open channel with sub-channel
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid: payee.did,
-      asset: testAsset,
+      assetId: testAsset.assetId,
       collateral: BigInt('100000000'), // 1 RGas
       vmIdFragment: payer.vmIdFragment,
     });
@@ -340,7 +341,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🔄 Testing channel state consistency between client and blockchain');
 
     // Get channel info from blockchain
-    const blockchainChannelInfo = await contract.getChannelInfo(channelId);
+    const blockchainChannelInfo = await contract.getChannelStatus({
+      channelId: channelId,
+    });
     const blockchainSubChannelInfo = await contract.getSubChannel({
       channelId,
       vmIdFragment: payer.vmIdFragment,

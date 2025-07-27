@@ -68,6 +68,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
     // Define test asset (RGas)
     testAsset = {
       assetId: '0x3::gas_coin::RGas',
+      decimals: 8,
     };
 
 
@@ -85,7 +86,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const assetInfo = await contract.getAssetInfo(testAsset.assetId);
       
       expect(assetInfo).toBeDefined();
-      expect(assetInfo.assetId).toBe(testAsset.assetId);
+      expect(assetInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
       expect(assetInfo.symbol).toBe('RGas');
     });
 
@@ -129,7 +130,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       const depositParams: DepositToHubParams = {
         targetDid: payer.did,
-        asset: testAsset,
+        assetId: testAsset.assetId,
         amount: depositAmount,
         signer: payer.signer,
       };
@@ -156,7 +157,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const openWithSubChannelParams: OpenChannelWithSubChannelParams = {
         payerDid: payer.did,
         payeeDid: payee.did,
-        asset: testAsset,
+        assetId: testAsset.assetId,
         collateral: BigInt(50000000), // 0.5 RGas collateral
         vmIdFragment: payer.vmIdFragment,
         signer: payer.signer,
@@ -210,7 +211,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const oneStepParams: OpenChannelWithSubChannelParams = {
         payerDid: payer.did,
         payeeDid: payee.did,
-        asset: testAsset,
+        assetId: testAsset.assetId,
         collateral: BigInt(50000000), // 0.5 RGas
         vmIdFragment: payer.vmIdFragment,
         signer: payer.signer,
@@ -229,7 +230,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const separateOpenParams: OpenChannelParams = {
         payerDid: payer.did,
         payeeDid: payee2.did,
-        asset: testAsset,
+        assetId: testAsset.assetId,
         collateral: BigInt(50000000),
         signer: payer.signer,
       };
@@ -395,7 +396,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
     const depositParams: DepositToHubParams = {
       targetDid: payer.did,
-      asset: testAsset,
+      assetId: testAsset.assetId,
       amount: depositAmount,
       signer: payer.signer,
     };
@@ -412,7 +413,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
     const openParams: OpenChannelParams = {
       payerDid: payer.did,
       payeeDid: payee.did,
-      asset: testAsset,
+      assetId: testAsset.assetId,
       collateral: BigInt(1000000),
       signer: payer.signer,
     };

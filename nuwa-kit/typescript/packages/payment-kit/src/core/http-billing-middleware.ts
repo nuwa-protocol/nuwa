@@ -99,6 +99,8 @@ export interface PaymentProcessingResult {
   autoClaimTriggered?: boolean;
   /** Error message if failed */
   error?: string;
+  /** Payer key ID (DID#fragment) extracted from payment verification */
+  payerKeyId?: string;
 }
 
 /**
@@ -119,6 +121,7 @@ export class HttpBillingMiddleware {
   createExpressMiddleware() {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
+        console.log('🔍 Payment middleware processing request:', req.method, req.path);
         const result = await this.processPayment(req, res);
         
         if (!result.success) {
@@ -149,10 +152,13 @@ export class HttpBillingMiddleware {
         
         next();
       } catch (error) {
+        console.error('🚨 Payment middleware error:', error);
         this.log('Payment processing error:', error);
         res.status(500).json({ 
           error: 'Payment processing failed',
-          code: 'PAYMENT_ERROR'
+          code: 'PAYMENT_ERROR',
+          details: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
         });
       }
     };
@@ -165,10 +171,11 @@ export class HttpBillingMiddleware {
     // Step 1: Process any payment from previous request
     const paymentData = this.extractPaymentData(req.headers as Record<string, string>);
     let autoClaimTriggered = false;
+    let verificationResult: PaymentProcessingResult | null = null;
     
     if (paymentData) {
       // Verify and process payment for previous request
-      const verificationResult = await this.verifyDeferredPayment(paymentData);
+      verificationResult = await this.verifyDeferredPayment(paymentData);
       if (!verificationResult.success) {
         // SECURITY: Payment verification failed - reject the request immediately
         this.log('Payment verification failed for previous request:', verificationResult.error);
@@ -187,8 +194,8 @@ export class HttpBillingMiddleware {
     const billingContext = this.buildBillingContext(req);
     const cost = await this.calculateCost(billingContext);
     
-    if (cost === 0n && !this.config.requirePayment) {
-      // Free request, no payment needed
+    if (cost === 0n) {
+      // Free request, no payment needed (regardless of requirePayment setting)
       return {
         success: true,
         cost: 0n,
@@ -198,6 +205,14 @@ export class HttpBillingMiddleware {
     }
 
     // Step 3: Generate unsigned SubRAV for current request
+    // If we have payment data, use the channel ID and payer key ID from the payment verification
+    if (paymentData && paymentData.channelId) {
+      billingContext.meta.channelId = paymentData.channelId;
+    }
+    // If we have verified payment data with payer key ID, use it
+    if (verificationResult && verificationResult.success && verificationResult.payerKeyId) {
+      billingContext.meta.payerKeyId = verificationResult.payerKeyId;
+    }
     const subRav = await this.generateSubRAVProposal(billingContext, cost);
     
     // Store the unsigned SubRAV for later verification using channelId:nonce as key
@@ -246,12 +261,19 @@ export class HttpBillingMiddleware {
    * Build billing context from request
    */
   private buildBillingContext(req: Request): BillingContext {
+    // Extract channel ID and payer key ID from headers if provided (for first-time requests)
+    const channelIdHeader = req.headers['x-payment-channel-id'] as string;
+    const payerKeyIdHeader = req.headers['x-payment-payer-key-id'] as string;
+    
     const meta: BillingRequestContext = {
       path: req.path,
       method: req.method,
       // Extract additional metadata from query/body
       ...req.query,
-      ...(req.body && typeof req.body === 'object' ? req.body : {})
+      ...(req.body && typeof req.body === 'object' ? req.body : {}),
+      // Include channel ID and payer key ID if provided in headers
+      ...(channelIdHeader ? { channelId: channelIdHeader } : {}),
+      ...(payerKeyIdHeader ? { payerKeyId: payerKeyIdHeader } : {})
     };
 
     return {
@@ -359,10 +381,15 @@ export class HttpBillingMiddleware {
       // Payment verified successfully, remove from pending list
       this.pendingSubRAVs.delete(subRAVKey);
       
+      // Get channel info to extract payer DID for constructing payerKeyId
+      const channelInfo = await this.config.payeeClient.getChannelInfo(signedSubRAV.subRav.channelId);
+      const payerKeyId = `${channelInfo.payerDid}#${signedSubRAV.subRav.vmIdFragment}`;
+      
       return {
         success: true,
         cost: signedSubRAV.subRav.accumulatedAmount,
         assetId: signedSubRAV.subRav.channelId,
+        payerKeyId, // Include the payer key ID for later use
         signedSubRav: signedSubRAV
       };
     } catch (error) {
