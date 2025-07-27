@@ -443,7 +443,7 @@ export class IndexedDBChannelStateStorage implements ChannelStateStorage {
     });
     
     return {
-      channelCount: channels.items.length,
+      channelCount: channels.totalCount,
       subChannelCount,
       hitRate: undefined, // IndexedDB doesn't track hit rates
       sizeBytes: undefined, // Difficult to estimate without additional metadata
