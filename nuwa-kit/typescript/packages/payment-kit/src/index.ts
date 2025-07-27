@@ -98,8 +98,26 @@ export {
 // HTTP Header codec for Gateway Profile implementation
 export { HttpHeaderCodec, HttpPaymentMiddleware } from './core/http-header';
 
-// Billing system
-export * from './billing';
+// HTTP Billing middleware for deferred payment model
+export { HttpBillingMiddleware } from './core/http-billing-middleware';
+
+// Billing system (excluding conflicting types)
+export { 
+  BillingEngine,
+  StrategyFactory,
+  UsdBillingEngine,
+  DEFAULT_ASSET_DECIMALS
+} from './billing';
+export type { 
+  BillingContext,
+  CostCalculator,
+  Strategy,
+  ConfigLoader,
+  RateProvider,
+  RateProviderError,
+  RateNotFoundError
+} from './billing';
+// Note: AssetInfo from billing conflicts with core AssetInfo, use billing/rate/types for billing-specific AssetInfo
 
 // Utility functions
 export { 

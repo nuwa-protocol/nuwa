@@ -20,13 +20,14 @@
     }
   },
   "include": [
-    "src/**/*",
-    "test/**/*",
-    "__tests__/**/*",
-    "../identity-kit/src/testHelpers/**/*"
+    "src/**/*"
   ],
   "exclude": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "test/**/*",
+    "__tests__/**/*",
+    "**/*.test.ts",
+    "**/*.e2e.test.ts"
   ]
 } 
