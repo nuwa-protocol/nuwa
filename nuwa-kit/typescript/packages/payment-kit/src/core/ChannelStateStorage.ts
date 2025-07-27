@@ -468,7 +468,7 @@ export class SQLChannelStateStorage implements ChannelStateStorage {
     throw new Error('TODO: Implement SQL storage for channel metadata');
   }
 
-  async getSubChannelState(keyId: string): Promise<SubChannelState> {
+  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
     throw new Error('TODO: Implement SQL storage for sub-channel state');
   }
 

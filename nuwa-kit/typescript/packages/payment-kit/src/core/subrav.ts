@@ -92,7 +92,7 @@ export class SubRAVCodec {
   static fromHex(hex: string): SubRAV {
     const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
     const bytes = new Uint8Array(
-      cleanHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+      cleanHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
     );
     return this.decode(bytes);
   }
@@ -139,12 +139,12 @@ export class SubRAVSigner {
         keyType = verificationMethod.keyType;
       } else {
         // DID document verification
-        const {didDocument}  = verificationMethod;
+        const {didDocument} = verificationMethod;
         
         // Construct keyId from didDocument.id and vmIdFragment from SubRAV
         const keyId = `${didDocument.id}#${signedSubRAV.subRav.vmIdFragment}`;
         
-        const vm = didDocument.verificationMethod?.find((vm: any) => vm.id === keyId);
+        const vm = didDocument.verificationMethod?.find((vm: VerificationMethod) => vm.id === keyId);
         if (!vm) return false;
         
         keyType = vm.type as KeyType;
