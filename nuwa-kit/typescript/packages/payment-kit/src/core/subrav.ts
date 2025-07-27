@@ -2,7 +2,7 @@
  * SubRAV encoding, decoding, signing and verification utilities
  */
 
-import type { SignerInterface, DIDResolver, DIDDocument, KeyType } from '@nuwa-ai/identity-kit';
+import type { SignerInterface, DIDResolver, DIDDocument, KeyType, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { CryptoUtils, MultibaseCodec } from '@nuwa-ai/identity-kit';
 import { bcs, type BcsType } from '@roochnetwork/rooch-sdk';
 import type { SubRAV, SignedSubRAV } from './types';

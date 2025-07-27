@@ -96,7 +96,10 @@ export {
 } from './core/subrav';
 
 // HTTP Header codec for Gateway Profile implementation
-export { HttpHeaderCodec } from './core/http-header';
+export { HttpHeaderCodec, HttpPaymentMiddleware } from './core/http-header';
+
+// Billing system
+export * from './billing';
 
 // Utility functions
 export { 

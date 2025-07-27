@@ -61,7 +61,7 @@ export class HttpHeaderCodec {
    */
   static buildResponseHeader(payload: HttpResponsePayload): string {
     const serializable = {
-      signedSubRav: this.serializeSignedSubRAV(payload.signedSubRav),
+      subRav: this.serializeSubRAV(payload.subRav),
       amountDebited: payload.amountDebited.toString(),
       serviceTxRef: payload.serviceTxRef,
       errorCode: payload.errorCode,
@@ -81,7 +81,7 @@ export class HttpHeaderCodec {
       const data = JSON.parse(json);
 
       return {
-        signedSubRav: this.deserializeSignedSubRAV(data.signedSubRav),
+        subRav: this.deserializeSubRAV(data.subRav),
         amountDebited: BigInt(data.amountDebited),
         serviceTxRef: data.serviceTxRef,
         errorCode: data.errorCode,

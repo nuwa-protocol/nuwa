@@ -127,8 +127,8 @@ export interface HttpRequestPayload {
  * HTTP response header payload
  */
 export interface HttpResponsePayload {
-  /** Service-proposed next SubRAV */
-  signedSubRav: SignedSubRAV;
+  /** Service-proposed next SubRAV (unsigned, client will sign) */
+  subRav: SubRAV;
   /** Amount debited for this transaction */
   amountDebited: bigint;
   /** Service transaction reference */

@@ -81,9 +81,18 @@ const meta = await client.openChannelWithSubChannel({
 });
 expect(meta.status).toBe('active');
 
-// 5. 生成并提交 RAV（现在自动使用正确的 channelId 和 epoch）
-const signedRav = await client.nextSubRAV(500_0000n); // 0.05 RGas
-const claimRes = await payeeClient.submitClaim(signedRav);
+// 5. 生成、签名并提交 RAV（由 *payee* 生成，*payer* 签名）
+const subRav = await payeeClient.generateSubRAV({
+  channelId: meta.channelId,
+  payerKeyId: payer.keyIds[0],
+  amount: 500_0000n,          // 0.05 RGas
+});
+const signedRav = await client.signSubRAV(subRav);
+
+await payeeClient.processSignedSubRAV(signedRav);          // 本地记账
+const claimRes = await payeeClient.claimFromChannel({      // 链上索赔
+  signedSubRAV: signedRav,
+});
 expect(claimRes.claimedAmount).toBe(500_0000n);
 
 // 6. 关闭通道（现在需要明确传入 channelId）
@@ -112,21 +121,34 @@ npm run test -- --config jest.config.e2e.ts --runInBand
 
 | 角色 | 功能 | 主要依赖 |
 | ---- | ---- | -------- |
-| **Billing Server** | 提供示例 REST API（如 `/v1/echo`）。<br/>• 使用 `payment-kit` 的 `HttpHeaderCodec` & `SubRAVValidator` 对每个请求中的 `x-rav` 头进行校验、记账。<br/>• 当累计消费达到阈值（如 1 RGas）或 `nonce` 达到 10 时，自动调用 `claimFromChannel()`。 | Express/Koa 任意框架 |
+| **Billing Server** | 提供示例 REST API（如 `/v1/echo`）。<br/>• 使用 `payment-kit` 的 **`HttpPaymentMiddleware`**（内部封装 `HttpHeaderCodec` 与 `SubRAVValidator`）对请求头 `X-Payment-Channel-Data` 做校验与记账。<br/>• 当累计消费 ≥1 RGas 或 `nonce` ≥10 时，自动调用 `claimFromChannel()`。 | Express / Koa |
 | **Client Tester** | 通过 `PaymentChannelClient` 生成 `SignedSubRAV`，放入请求头 `x-rav` 调用 Billing Server。 | supertest/axios |
 | **Rooch 节点** | 链上结算，复用 `TestEnv.bootstrap()` 本地节点或远程 testnet。 | |
 
-### 4.2 流程概述
+### 4.2 流程概述（延迟支付模式）
 
 1. **启动阶段**：初始化 Rooch 节点；创建 `payer` / `payee` DID；启动 Billing Server。  
 2. **链上准备**：执行 `deposit → openChannel → authorizeSubChannel`（步骤同第 3 节）。  
-3. **业务调用**：循环 20 次调用 `/v1/echo`，每次扣费 0.01 RGas，并附带新的 `x-rav`。  
-4. **服务器结算**：Billing Server 校验 RAV 并记账；当累计 ≥1 RGas 或 `nonce` ≥10 时触发链上 `claimFromChannel`；成功后重置本地累计额。  
+3. **延迟支付调用**：
+   - **首次请求**：客户端调用 `/v1/echo` → 服务器返回业务数据 + 未签名的 SubRAV 提案
+   - **后续请求**：客户端签名上次的 SubRAV，放入请求头 → 服务器验证上次支付 + 返回本次 SubRAV 提案
+   - 循环 20 次，每次扣费 0.01 RGas
+4. **服务器结算**：Billing Server 异步验证 RAV 并记账；当累计 ≥1 RGas 或 `nonce` ≥10 时触发链上 `claimFromChannel`。  
 5. **断言**：
    * API 成功返回 20 次；
    * 服务端至少触发一次 `claimFromChannel`；
    * 链上 `SubChannel.last_claimed_amount` ≥ 0.2 RGas；
    * 关闭通道后 `status === 'closed'`。
+
+**延迟支付模式的优势**：
+- 减少客户端等待时间（不需要等待支付验证）
+- 提高服务响应速度（业务逻辑和支付验证并行）
+- 更好的用户体验（首次使用无需支付）
+
+**安全保护机制**：
+- 严格验证上一次支付，失败则立即拒绝服务
+- 防止客户端通过无效支付攻击服务
+- 支持率限制和可疑活动监控
 
 ### 4.3 示例目录结构
 
@@ -144,6 +166,216 @@ packages/payment-kit/
 ```bash
 ROOCH_NODE_URL=http://localhost:6767 PAYMENT_E2E=1 \
 npm run test -- --config jest.config.e2e.ts --runInBand
+```
+
+### 4.5 Billing Server 中间件示例
+
+```ts
+// packages/payment-kit/src/e2e/server/index.ts
+import express, { Request, Response } from 'express';
+import {
+  HttpBillingMiddleware,
+  HttpHeaderCodec,
+  HttpRequestPayload,
+  PaymentChannelPayeeClient,
+  FileConfigLoader,
+  BillingEngine,
+  createBasicBillingConfig
+} from '@nuwa-ai/payment-kit';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+export async function createServer(payeeClient: PaymentChannelPayeeClient, port = 3000) {
+  const app = express();
+  app.use(express.json());
+
+  // 1. 设置计费配置
+  const configDir = path.join(__dirname, 'billing-config');
+  await fs.mkdir(configDir, { recursive: true });
+  
+  // 创建计费配置文件
+  await fs.writeFile(
+    path.join(configDir, 'echo-service.yaml'),
+    `
+version: 1
+serviceId: echo-service
+rules:
+  - id: echo-pricing
+    when:
+      path: "/v1/echo"
+      method: "GET"
+    strategy:
+      type: PerRequest
+      price: "500000"  # 0.0005 RGas per echo
+  - id: expensive-operation
+    when:
+      path: "/v1/process"
+      method: "POST"
+    strategy:
+      type: PerRequest
+      price: "5000000"  # 0.05 RGas per process
+  - id: default-pricing
+    default: true
+    strategy:
+      type: PerRequest
+      price: "1000000"  # 0.001 RGas default
+`,
+    'utf-8'
+  );
+
+  // 2. 创建计费引擎
+  const configLoader = new FileConfigLoader(configDir);
+  const billingEngine = new BillingEngine(configLoader);
+
+  // 3. 创建支付中间件
+  const paymentMiddleware = HttpBillingMiddleware.createWithStandardBilling(
+    payeeClient,
+    configLoader,
+    'echo-service',
+    {
+      defaultAssetId: '0x3::gas_coin::RGas',
+      requirePayment: true,
+      autoClaimThreshold: BigInt('100000000'), // 自动 claim 阈值: 1 RGas
+      autoClaimNonceThreshold: 10, // 10 个交易后自动 claim
+      debug: true
+    }
+  );
+
+  // 4. 应用支付中间件到所有路由
+  app.use(paymentMiddleware.createExpressMiddleware());
+
+  // 5. 业务路由（支付验证后才会执行）
+  app.get('/v1/echo', (req: Request, res: Response) => {
+    const paymentResult = (req as any).paymentResult;
+    res.json({ 
+      echo: req.query.q || 'hello',
+      cost: paymentResult?.cost?.toString(),
+      nonce: paymentResult?.signedSubRav?.subRav.nonce?.toString()
+    });
+  });
+
+  app.post('/v1/process', (req: Request, res: Response) => {
+    const paymentResult = (req as any).paymentResult;
+    res.json({ 
+      processed: req.body,
+      timestamp: Date.now(),
+      cost: paymentResult?.cost?.toString()
+    });
+  });
+
+  // 6. 管理接口
+  app.get('/admin/claims', (req: Request, res: Response) => {
+    const claimsStats = paymentMiddleware.getPendingClaimsStats();
+    const subRAVsStats = paymentMiddleware.getPendingSubRAVsStats();
+    res.json({ 
+      pendingClaims: claimsStats,
+      pendingSubRAVs: subRAVsStats
+    });
+  });
+
+  app.post('/admin/claim/:channelId', async (req: Request, res: Response) => {
+    try {
+      const success = await paymentMiddleware.manualClaim(req.params.channelId);
+      res.json({ success, channelId: req.params.channelId });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/admin/subrav/:channelId/:nonce', (req: Request, res: Response) => {
+    const { channelId, nonce } = req.params;
+    const subRAV = paymentMiddleware.findPendingSubRAV(channelId, BigInt(nonce));
+    if (subRAV) {
+      res.json(subRAV);
+    } else {
+      res.status(404).json({ error: 'SubRAV not found' });
+    }
+  });
+
+  app.delete('/admin/cleanup', (req: Request, res: Response) => {
+    const maxAge = parseInt(req.query.maxAge as string) || 30;
+    const clearedCount = paymentMiddleware.clearExpiredPendingSubRAVs(maxAge);
+    res.json({ clearedCount, maxAgeMinutes: maxAge });
+  });
+
+  app.get('/admin/security', (req: Request, res: Response) => {
+    const suspiciousActivity = paymentMiddleware.getSuspiciousActivityStats();
+    res.json({
+      suspiciousActivity,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  const server = app.listen(port);
+  
+  return {
+    app,
+    server,
+    middleware: paymentMiddleware,
+    async shutdown() {
+      server.close();
+      await fs.rm(configDir, { recursive: true, force: true });
+    }
+  };
+}
+
+// 客户端调用示例（延迟支付模式）
+export async function createTestClient(payerClient: any, baseURL: string, channelId: string) {
+  let pendingSubRAV: SubRAV | null = null; // 缓存上一次的 SubRAV
+
+  return {
+    async callEcho(query: string) {
+      let headers: Record<string, string> = {};
+      
+      // 1. 如果有上一次的 SubRAV，签名并放入请求头
+      if (pendingSubRAV) {
+        const signedRav = await payerClient.signSubRAV(pendingSubRAV);
+        
+        const requestPayload: HttpRequestPayload = {
+          channelId,
+          signedSubRav: signedRav,
+          maxAmount: BigInt('10000000'), // 最大接受 0.01 RGas
+          clientTxRef: `client_${Date.now()}`
+        };
+
+        headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
+      }
+      
+      // 2. 发送请求
+      const response = await fetch(`${baseURL}/v1/echo?q=${encodeURIComponent(query)}`, {
+        headers
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+             // 3. 处理响应，提取下一次的 SubRAV 提案
+       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
+       if (paymentHeader) {
+         try {
+           const responsePayload = HttpHeaderCodec.parseResponseHeader(paymentHeader);
+           // 缓存未签名的 SubRAV 用于下次请求
+           pendingSubRAV = responsePayload.subRav;
+         } catch (error) {
+           console.warn('Failed to parse payment header:', error);
+         }
+       }
+
+      return await response.json();
+    },
+
+    // 获取当前待支付的 SubRAV
+    getPendingSubRAV() {
+      return pendingSubRAV;
+    },
+
+    // 清除待支付的 SubRAV（用于测试）
+    clearPendingSubRAV() {
+      pendingSubRAV = null;
+    }
+  };
+}
 ```
 
 > **提示**：在 `beforeAll`/`afterAll` 钩子中启动与关闭 Billing Server，确保测试生命周期内端口可用。
