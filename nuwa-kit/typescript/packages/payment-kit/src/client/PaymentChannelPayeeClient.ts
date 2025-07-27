@@ -352,14 +352,7 @@ export class PaymentChannelPayeeClient {
       } catch (error) {
         // Continue with other claims even if one fails
         console.warn(`Failed to claim SubRAV for channel ${signedSubRAV.subRav.channelId}:`, error);
-        // Note: Creating a simplified error result since ClaimResult interface is complex
-        const errorResult = {
-          txHash: '',
-          claimedAmount: BigInt(0),
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        } as ClaimResult;
-        results.push(errorResult);
+        throw error;
       }
     }
 
