@@ -507,7 +507,7 @@ export class HttpBillingMiddleware {
    * Generate transaction reference
    */
   private generateTxRef(): string {
-    return `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `tx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
