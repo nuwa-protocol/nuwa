@@ -21,7 +21,7 @@ import type {
 } from '../../core/types';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import type { CostCalculator } from '../../billing/types';
-import type { PendingSubRAVStore } from '../../core/PendingSubRAVStore';
+import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/claim-scheduler';
 
 // Express types (optional dependency)
@@ -58,7 +58,7 @@ export interface HttpBillingMiddlewareConfig {
   /** Debug logging */
   debug?: boolean;
   /** Store for pending unsigned SubRAV proposals */
-  pendingSubRAVStore?: PendingSubRAVStore;
+  pendingSubRAVStore?: PendingSubRAVRepository;
   /** Optional claim scheduler for automated claiming */
   claimScheduler?: ClaimScheduler;
 }

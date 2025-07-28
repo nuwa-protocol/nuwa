@@ -539,21 +539,3 @@ describe('Factory Functions and Multi-Backend Support', () => {
     });
   });
 });
-
-describe('Migration from Old Interface - Deprecated Features', () => {
-  it('should document removed old interfaces', () => {
-    // 旧接口问题记录:
-    // 1. ChannelStateStorage.listChannelMetadata() 没有分页支持
-    // 2. ChannelStateStorage.getSubChannelState(keyId) 缺少 channelId 参数，存在键冲突
-    // 3. BaseStorage 混合了接口和实现
-    // 4. 没有统一的工厂函数支持多后端
-    
-    // 新接口改进:
-    // 1. ChannelRepository.listChannelMetadata(filter?, pagination?) 支持分页和过滤
-    // 2. ChannelRepository.getSubChannelState(channelId, keyId) 避免键冲突
-    // 3. 接口和实现完全分离
-    // 4. 统一的工厂函数支持 memory, indexeddb, sql 多后端
-    
-    expect(true).toBe(true); // This test documents the migration
-  });
-}); 

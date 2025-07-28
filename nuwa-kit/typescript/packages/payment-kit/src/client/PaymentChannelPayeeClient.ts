@@ -454,7 +454,7 @@ export class PaymentChannelPayeeClient {
   }
 
   /**
-   * Get channel info with caching using ChannelStateStorage
+   * Get channel info with caching using ChannelRepository
    * This checks local storage first, then falls back to chain if not found or stale
    */
   private async getChannelInfoCached(channelId: string, forceRefresh: boolean = false): Promise<ChannelInfo> {

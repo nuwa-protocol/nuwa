@@ -1,16 +1,16 @@
 /**
- * Unit tests for PendingSubRAVStore implementations
+ * Unit tests for PendingSubRAVRepository implementations
  */
 
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { MemoryPendingSubRAVStore } from '../PendingSubRAVStore';
+import { MemoryPendingSubRAVRepository } from '../../storage/memory/pendingSubRav.memory';
 import type { SubRAV } from '../types';
 
-describe('PendingSubRAVStore Memory Implementation', () => {
-  let store: MemoryPendingSubRAVStore;
+describe('PendingSubRAVRepository Memory Implementation', () => {
+  let store: MemoryPendingSubRAVRepository;
 
   beforeEach(() => {
-    store = new MemoryPendingSubRAVStore();
+    store = new MemoryPendingSubRAVRepository();
   });
 
   test('should save and find pending SubRAV', async () => {

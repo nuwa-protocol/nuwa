@@ -8,8 +8,8 @@ import type {
   BillingContext,
   CostCalculator
 } from '../billing/types';
-import type { PendingSubRAVStore } from './PendingSubRAVStore';
-import { MemoryPendingSubRAVStore } from './PendingSubRAVStore';
+import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
+import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import type { ClaimScheduler } from './claim-scheduler';
 import { PaymentUtils } from './PaymentUtils';
 import { BillingContextBuilder } from './BillingContextBuilder';
@@ -31,7 +31,7 @@ import { BillingContextBuilder } from './BillingContextBuilder';
     defaultAssetId?: string;
     
     /** Store for pending unsigned SubRAV proposals */
-    pendingSubRAVStore?: PendingSubRAVStore;
+    pendingSubRAVStore?: PendingSubRAVRepository;
     
     /** Optional claim scheduler for automated claiming */
     claimScheduler?: ClaimScheduler;
@@ -124,12 +124,12 @@ export interface PaymentVerificationResult extends VerificationResult {
    */
   export class PaymentProcessor {
     private config: PaymentProcessorConfig;
-    private pendingSubRAVStore: PendingSubRAVStore;
+    private pendingSubRAVStore: PendingSubRAVRepository;
     private stats: PaymentProcessingStats;
   
     constructor(config: PaymentProcessorConfig) {
       this.config = config;
-      this.pendingSubRAVStore = config.pendingSubRAVStore || new MemoryPendingSubRAVStore();
+      this.pendingSubRAVStore = config.pendingSubRAVStore || createPendingSubRAVRepo({ backend: 'memory' });
       this.stats = {
         totalRequests: 0,
         successfulPayments: 0,

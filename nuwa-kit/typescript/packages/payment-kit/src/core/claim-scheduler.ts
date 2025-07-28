@@ -4,7 +4,7 @@
  */
 
 import type { SignedSubRAV } from './types';
-import type { RAVStore } from './BaseStorage';
+import type { RAVRepository } from '../storage/interfaces/RAVRepository';
 import type { IPaymentChannelContract } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
@@ -28,7 +28,7 @@ export interface ClaimPolicy {
 
 export interface ClaimSchedulerOptions {
   /** RAV storage instance */
-  store: RAVStore;
+  store: RAVRepository;
   
   /** Payment channel contract instance */
   contract: IPaymentChannelContract;
@@ -74,7 +74,7 @@ export interface ClaimAttempt {
  * 5. Prevent concurrent claims for same sub-channel
  */
 export class ClaimScheduler {
-  private store: RAVStore;
+  private store: RAVRepository;
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
   private policy: ClaimPolicy;
