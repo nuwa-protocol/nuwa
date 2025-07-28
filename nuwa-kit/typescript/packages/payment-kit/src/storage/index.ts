@@ -51,19 +51,27 @@ export { IndexedDBChannelRepository } from './indexeddb/channel.indexeddb';
 export { IndexedDBRAVRepository } from './indexeddb/rav.indexeddb';
 export { IndexedDBPendingSubRAVRepository } from './indexeddb/pendingSubRav.indexeddb';
 
-// SQL implementations (temporarily commented out)
-// export { 
-//   SqlChannelRepository,
-//   type SqlChannelRepositoryOptions,
-// } from './sql/channel.sql';
-// export { 
-//   SqlRAVRepository,
-//   type SqlRAVRepositoryOptions,
-// } from './sql/rav.sql';
-// export { 
-//   SqlPendingSubRAVRepository,
-//   type SqlPendingSubRAVRepositoryOptions,
-// } from './sql/pendingSubRav.sql';
+// SQL implementations
+export { 
+  SqlChannelRepository,
+  type SqlChannelRepositoryOptions,
+} from './sql/channel.sql';
+export { 
+  SqlRAVRepository,
+  type SqlRAVRepositoryOptions,
+} from './sql/rav.sql';
+export { 
+  SqlPendingSubRAVRepository,
+  type SqlPendingSubRAVRepositoryOptions,
+} from './sql/pendingSubRav.sql';
+
+// SQL serialization utilities
+export {
+  encodeSignedSubRAV,
+  decodeSignedSubRAV,
+  encodeSubRAVBCS,
+  getSubRAVHex,
+} from './sql/serialization';
 
 // ==================== Convenience Functions ====================
 

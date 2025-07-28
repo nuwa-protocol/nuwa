@@ -1,12 +1,12 @@
 /**
- * Factory function for creating RAVRepository instances
+ * Factory function for creating RAV repositories
  */
 
 import type { Pool } from 'pg';
 import type { RAVRepository } from '../interfaces/RAVRepository';
 import { MemoryRAVRepository } from '../memory/rav.memory';
 import { IndexedDBRAVRepository } from '../indexeddb/rav.indexeddb';
-// import { SqlRAVRepository } from '../sql/rav.sql'; // Temporarily commented out
+import { SqlRAVRepository, type SqlRAVRepositoryOptions } from '../sql/rav.sql';
 
 export interface RAVRepositoryOptions {
   /** Backend type to use */
@@ -19,10 +19,12 @@ export interface RAVRepositoryOptions {
   tablePrefix?: string;
   /** Auto-create tables if they don't exist */
   autoMigrate?: boolean;
+  /** Allow unsafe auto-migration in production */
+  allowUnsafeAutoMigrateInProd?: boolean;
 }
 
 /**
- * Create a RAVRepository instance based on the specified backend
+ * Create a RAV repository instance based on the specified backend
  */
 export function createRAVRepo(options: RAVRepositoryOptions = {}): RAVRepository {
   const { backend = 'memory' } = options;
@@ -38,9 +40,19 @@ export function createRAVRepo(options: RAVRepositoryOptions = {}): RAVRepository
       return new IndexedDBRAVRepository();
 
     case 'sql':
-      // Temporarily disabled
-      throw new Error('SQL backend is temporarily disabled');
-
+      if (!options.pool) {
+        throw new Error('SQL backend requires a PostgreSQL connection pool');
+      }
+      
+      const sqlOptions: SqlRAVRepositoryOptions = {
+        pool: options.pool,
+        tablePrefix: options.tablePrefix,
+        autoMigrate: options.autoMigrate,
+        allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
+      };
+      
+      return new SqlRAVRepository(sqlOptions);
+      
     default:
       throw new Error(`Unknown backend type: ${backend}`);
   }
@@ -62,4 +74,4 @@ export function createRAVRepoAuto(options: Omit<RAVRepositoryOptions, 'backend'>
 
   // Fallback to memory
   return createRAVRepo({ ...options, backend: 'memory' });
-} 
+}

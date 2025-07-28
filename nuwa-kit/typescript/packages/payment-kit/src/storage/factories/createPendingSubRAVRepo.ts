@@ -6,7 +6,7 @@ import type { Pool } from 'pg';
 import type { PendingSubRAVRepository } from '../interfaces/PendingSubRAVRepository';
 import { MemoryPendingSubRAVRepository } from '../memory/pendingSubRav.memory';
 import { IndexedDBPendingSubRAVRepository } from '../indexeddb/pendingSubRav.indexeddb';
-// import { SqlPendingSubRAVRepository } from '../sql/pendingSubRav.sql'; // Temporarily commented out
+import { SqlPendingSubRAVRepository, type SqlPendingSubRAVRepositoryOptions } from '../sql/pendingSubRav.sql';
 
 export interface PendingSubRAVRepositoryOptions {
   /** Backend type to use */
@@ -19,6 +19,8 @@ export interface PendingSubRAVRepositoryOptions {
   tablePrefix?: string;
   /** Auto-create tables if they don't exist */
   autoMigrate?: boolean;
+  /** Allow unsafe auto-migration in production */
+  allowUnsafeAutoMigrateInProd?: boolean;
 }
 
 /**
@@ -38,8 +40,18 @@ export function createPendingSubRAVRepo(options: PendingSubRAVRepositoryOptions 
       return new IndexedDBPendingSubRAVRepository();
 
     case 'sql':
-      // Temporarily disabled
-      throw new Error('SQL backend is temporarily disabled');
+      if (!options.pool) {
+        throw new Error('SQL backend requires a PostgreSQL connection pool');
+      }
+      
+      const sqlOptions: SqlPendingSubRAVRepositoryOptions = {
+        pool: options.pool,
+        tablePrefix: options.tablePrefix,
+        autoMigrate: options.autoMigrate,
+        allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
+      };
+      
+      return new SqlPendingSubRAVRepository(sqlOptions);
 
     default:
       throw new Error(`Unknown backend type: ${backend}`);

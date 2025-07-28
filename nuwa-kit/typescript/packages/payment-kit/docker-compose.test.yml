@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: nuwa-payment-kit-test-db
+    environment:
+      POSTGRES_DB: nuwa_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./src/storage/sql/schemas:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d nuwa_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+
+  # Optional: Redis for future caching tests
+  redis-test:
+    image: redis:7-alpine
+    container_name: nuwa-payment-kit-test-redis
+    ports:
+      - "6380:6379"
+    command: redis-server --save "" --appendonly no
+
+volumes:
+  postgres_test_data: 

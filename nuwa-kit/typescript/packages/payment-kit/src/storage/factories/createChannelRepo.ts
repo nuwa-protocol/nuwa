@@ -6,7 +6,7 @@ import type { Pool } from 'pg';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
 import { MemoryChannelRepository } from '../memory/channel.memory';
 import { IndexedDBChannelRepository } from '../indexeddb/channel.indexeddb';
-// import { SqlChannelRepository } from '../sql/channel.sql'; // Temporarily commented out
+import { SqlChannelRepository, type SqlChannelRepositoryOptions } from '../sql/channel.sql';
 
 export interface ChannelRepositoryOptions {
   /** Backend type to use */
@@ -19,6 +19,8 @@ export interface ChannelRepositoryOptions {
   tablePrefix?: string;
   /** Auto-create tables if they don't exist */
   autoMigrate?: boolean;
+  /** Allow unsafe auto-migration in production */
+  allowUnsafeAutoMigrateInProd?: boolean;
 }
 
 /**
@@ -38,8 +40,18 @@ export function createChannelRepo(options: ChannelRepositoryOptions = {}): Chann
       return new IndexedDBChannelRepository();
 
     case 'sql':
-      // Temporarily disabled
-      throw new Error('SQL backend is temporarily disabled');
+      if (!options.pool) {
+        throw new Error('SQL backend requires a PostgreSQL connection pool');
+      }
+      
+      const sqlOptions: SqlChannelRepositoryOptions = {
+        pool: options.pool,
+        tablePrefix: options.tablePrefix,
+        autoMigrate: options.autoMigrate,
+        allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
+      };
+      
+      return new SqlChannelRepository(sqlOptions);
 
     default:
       throw new Error(`Unknown backend type: ${backend}`);

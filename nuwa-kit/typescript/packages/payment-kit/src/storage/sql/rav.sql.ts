@@ -4,7 +4,7 @@
 
 // Note: 'pg' is an optional dependency. Install with: npm install pg @types/pg
 import type { Pool, PoolClient } from 'pg';
-import { MultibaseCodec } from '@nuwa-ai/identity-kit';
+import { encodeSignedSubRAV, decodeSignedSubRAV } from './serialization';
 import type { RAVRepository } from '../interfaces/RAVRepository';
 import type { SignedSubRAV } from '../../core/types';
 
@@ -15,6 +15,8 @@ export interface SqlRAVRepositoryOptions {
   tablePrefix?: string;
   /** Auto-create tables if they don't exist */
   autoMigrate?: boolean;
+  /** Allow unsafe auto-migration in production */
+  allowUnsafeAutoMigrateInProd?: boolean;
 }
 
 /**
@@ -27,13 +29,16 @@ export class SqlRAVRepository implements RAVRepository {
   private pool: Pool;
   private tablePrefix: string;
   private autoMigrate: boolean;
+  private allowUnsafeAutoMigrateInProd: boolean;
 
   constructor(options: SqlRAVRepositoryOptions) {
     this.pool = options.pool;
     this.tablePrefix = options.tablePrefix || 'nuwa_';
     this.autoMigrate = options.autoMigrate ?? true;
+    this.allowUnsafeAutoMigrateInProd = options.allowUnsafeAutoMigrateInProd ?? false;
     
-    if (this.autoMigrate) {
+    // Only auto-migrate in development or when explicitly allowed in production
+    if (this.autoMigrate && (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)) {
       this.initialize().catch(console.error);
     }
   }
@@ -97,8 +102,8 @@ export class SqlRAVRepository implements RAVRepository {
   async save(rav: SignedSubRAV): Promise<void> {
     const client = await this.pool.connect();
     try {
-      // Encode RAV data as base64url for safe storage
-      const ravDataEncoded = MultibaseCodec.encodeBase64url(JSON.stringify(rav));
+      // Encode RAV data using our serialization utility
+      const ravDataBuffer = encodeSignedSubRAV(rav);
       
       await client.query(`
         INSERT INTO ${this.ravsTable} 
@@ -111,7 +116,7 @@ export class SqlRAVRepository implements RAVRepository {
         rav.subRav.vmIdFragment,
         rav.subRav.nonce.toString(),
         rav.subRav.accumulatedAmount.toString(),
-        ravDataEncoded
+        ravDataBuffer
       ]);
     } finally {
       client.release();
@@ -133,10 +138,8 @@ export class SqlRAVRepository implements RAVRepository {
         return null;
       }
 
-      const ravDataBuffer = result.rows[0].rav_data;
-      const ravDataStr = ravDataBuffer instanceof Buffer ? ravDataBuffer.toString() : ravDataBuffer;
-      const ravDataDecoded = MultibaseCodec.decodeBase64url(ravDataStr);
-      return JSON.parse(ravDataDecoded);
+      const ravDataBuffer = result.rows[0].rav_data as Buffer;
+      return decodeSignedSubRAV(ravDataBuffer);
     } finally {
       client.release();
     }
@@ -153,8 +156,8 @@ export class SqlRAVRepository implements RAVRepository {
       `, [channelId]);
 
       for (const row of result.rows) {
-        const ravBytes = row.rav_data;
-        yield MultibaseCodec.decode(ravBytes) as SignedSubRAV;
+        const ravDataBuffer = row.rav_data as Buffer;
+        yield decodeSignedSubRAV(ravDataBuffer);
       }
     } finally {
       client.release();
@@ -179,8 +182,8 @@ export class SqlRAVRepository implements RAVRepository {
       const unclaimedRAVs = new Map<string, SignedSubRAV>();
       
       for (const row of result.rows) {
-        const ravBytes = row.rav_data;
-        const rav = MultibaseCodec.decode(ravBytes) as SignedSubRAV;
+        const ravDataBuffer = row.rav_data as Buffer;
+        const rav = decodeSignedSubRAV(ravDataBuffer);
         unclaimedRAVs.set(row.vm_id_fragment, rav);
       }
 
