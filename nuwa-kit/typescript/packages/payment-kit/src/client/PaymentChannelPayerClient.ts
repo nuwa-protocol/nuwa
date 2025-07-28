@@ -298,9 +298,14 @@ export class PaymentChannelPayerClient {
         throw new Error(`Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`);
       }
     } catch (error) {
-      // No previous state - this should be the first SubRAV (nonce = 1)
-      if (subRAV.nonce !== BigInt(1)) {
-        throw new Error(`First SubRAV must have nonce 1, got ${subRAV.nonce}`);
+      // No previous state - this could be handshake (nonce = 0) or first payment (nonce = 1)
+      if (subRAV.nonce !== BigInt(0) && subRAV.nonce !== BigInt(1)) {
+        throw new Error(`First SubRAV must have nonce 0 (handshake) or 1 (first payment), got ${subRAV.nonce}`);
+      }
+      
+      // Additional validation for handshake
+      if (subRAV.nonce === BigInt(0) && subRAV.accumulatedAmount !== BigInt(0)) {
+        throw new Error(`Handshake SubRAV (nonce=0) must have zero amount, got ${subRAV.accumulatedAmount}`);
       }
     }
 

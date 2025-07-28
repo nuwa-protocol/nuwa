@@ -78,6 +78,7 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     return {
       assetId,
       symbol: 'RGAS',
+      decimals: 8,
     };
   }
 
@@ -139,6 +140,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
       expect(assetInfo).toEqual({
         assetId: '0x3::gas_coin::RGas',
         symbol: 'RGAS',
+        decimals: 8,
       });
     });
 

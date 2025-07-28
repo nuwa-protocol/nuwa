@@ -166,6 +166,10 @@ export class PaymentChannelPayeeClient {
     const channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
     const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
     
+    // Special handling for handshake reset (nonce=0, amount=0)
+    const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
+                           signedSubRAV.subRav.accumulatedAmount === BigInt(0);
+    
     await this.stateStorage.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
       channelId: signedSubRAV.subRav.channelId,
       epoch: signedSubRAV.subRav.channelEpoch,
@@ -174,7 +178,11 @@ export class PaymentChannelPayeeClient {
       lastUpdated: Date.now(),
     });
 
-    console.log(`Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
+    if (isHandshakeReset) {
+      console.log(`Successfully processed handshake reset for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
+    } else {
+      console.log(`Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
+    }
   }
 
   // -------- SubRAV Verification --------
@@ -244,7 +252,11 @@ export class PaymentChannelPayeeClient {
                             signedSubRAV.subRav.accumulatedAmount === prevState.accumulatedAmount &&
                             signedSubRAV.subRav.channelEpoch === prevState.epoch;
         
-        const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce || isSameSubRAV;
+        // Allow handshake reset: nonce 0 with amount 0 is always valid as a reset
+        const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
+                               signedSubRAV.subRav.accumulatedAmount === BigInt(0);
+        
+        const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce || isSameSubRAV || isHandshakeReset;
         result.details!.nonceProgression = nonceProgression;
         
         if (!nonceProgression) {
@@ -252,8 +264,8 @@ export class PaymentChannelPayeeClient {
           return result;
         }
 
-        // Verify amount is not decreasing (unless it's the same SubRAV)
-        const amountValid = signedSubRAV.subRav.accumulatedAmount >= prevState.accumulatedAmount;
+        // Verify amount is not decreasing (unless it's the same SubRAV or handshake reset)
+        const amountValid = signedSubRAV.subRav.accumulatedAmount >= prevState.accumulatedAmount || isHandshakeReset;
         result.details!.amountValid = amountValid;
         
         if (!amountValid) {
@@ -262,11 +274,20 @@ export class PaymentChannelPayeeClient {
         }
       } catch (error) {
         // No previous state found - this is the first SubRAV for this sub-channel
-        result.details!.nonceProgression = signedSubRAV.subRav.nonce === BigInt(1);
-        result.details!.amountValid = signedSubRAV.subRav.accumulatedAmount > BigInt(0);
+        // Allow nonce 0 (handshake) or nonce 1 (first payment)
+        const isHandshake = signedSubRAV.subRav.nonce === BigInt(0) && signedSubRAV.subRav.accumulatedAmount === BigInt(0);
+        const isFirstPayment = signedSubRAV.subRav.nonce === BigInt(1) && signedSubRAV.subRav.accumulatedAmount > BigInt(0);
+        
+        result.details!.nonceProgression = isHandshake || isFirstPayment;
+        result.details!.amountValid = isHandshake || signedSubRAV.subRav.accumulatedAmount > BigInt(0);
         
         if (!result.details!.nonceProgression) {
-          result.error = `First nonce must be 1, got ${signedSubRAV.subRav.nonce}`;
+          result.error = `First SubRAV must have nonce 0 (handshake) or nonce 1 (first payment), got ${signedSubRAV.subRav.nonce}`;
+          return result;
+        }
+        
+        if (!result.details!.amountValid) {
+          result.error = `First payment SubRAV must have positive amount, got ${signedSubRAV.subRav.accumulatedAmount}`;
           return result;
         }
       }

@@ -18,7 +18,6 @@ export class HttpHeaderCodec {
   static buildRequestHeader(payload: HttpRequestPayload): string {
     // Convert payload to serializable format
     const serializable = {
-      channelId: payload.channelId,
       signedSubRav: this.serializeSignedSubRAV(payload.signedSubRav),
       maxAmount: payload.maxAmount?.toString(),
       clientTxRef: payload.clientTxRef,
@@ -42,7 +41,6 @@ export class HttpHeaderCodec {
       const data = JSON.parse(json);
 
       return {
-        channelId: data.channelId,
         signedSubRav: this.deserializeSignedSubRAV(data.signedSubRav),
         maxAmount: data.maxAmount ? BigInt(data.maxAmount) : undefined,
         clientTxRef: data.clientTxRef,

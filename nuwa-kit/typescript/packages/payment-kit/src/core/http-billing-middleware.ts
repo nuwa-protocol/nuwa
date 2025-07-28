@@ -168,34 +168,50 @@ export class HttpBillingMiddleware {
    * Process payment for a request using deferred payment model
    */
   async processPayment(req: Request, res: Response): Promise<PaymentProcessingResult> {
-    // Step 1: Process any payment from previous request
+    // Step 1: Extract and validate payment data (now always required)
     const paymentData = this.extractPaymentData(req.headers as Record<string, string>);
+    
+    if (!paymentData) {
+      return {
+        success: false,
+        cost: 0n,
+        assetId: this.config.defaultAssetId || 'unknown',
+        error: 'Payment header required (X-Payment-Channel-Data with signed SubRAV)'
+      };
+    }
+
+    // Step 2: Check if this is a handshake request (nonce=0, amount=0)
+    const isHandshake = paymentData.signedSubRav.subRav.nonce === 0n && 
+                       paymentData.signedSubRav.subRav.accumulatedAmount === 0n;
+    
     let autoClaimTriggered = false;
     let verificationResult: PaymentProcessingResult | null = null;
-    
-    if (paymentData) {
-      // Verify and process payment for previous request
+
+    if (isHandshake) {
+      // Handshake: verify signature but don't process as payment
+      verificationResult = await this.verifyHandshakeRequest(paymentData);
+      if (!verificationResult.success) {
+        this.log('Handshake verification failed:', verificationResult.error);
+        return verificationResult;
+      }
+      this.log('Handshake verified successfully for channel:', paymentData.signedSubRav.subRav.channelId);
+    } else {
+      // Regular payment: verify and process payment for previous request
       verificationResult = await this.verifyDeferredPayment(paymentData);
       if (!verificationResult.success) {
-        // SECURITY: Payment verification failed - reject the request immediately
         this.log('Payment verification failed for previous request:', verificationResult.error);
-        return {
-          success: false,
-          cost: 0n,
-          assetId: verificationResult.assetId,
-          error: `Payment verification failed: ${verificationResult.error}`
-        };
+        return verificationResult;
       } else {
         autoClaimTriggered = await this.processVerifiedPayment(paymentData);
       }
     }
 
-    // Step 2: Calculate cost for current request
-    const billingContext = this.buildBillingContext(req);
+    // Step 3: Calculate cost for current request
+    const billingContext = this.buildBillingContext(req, paymentData);
     const cost = await this.calculateCost(billingContext);
     
     if (cost === 0n) {
-      // Free request, no payment needed (regardless of requirePayment setting)
+      // Free request, no payment needed
       return {
         success: true,
         cost: 0n,
@@ -204,28 +220,20 @@ export class HttpBillingMiddleware {
       };
     }
 
-    // Step 3: Generate unsigned SubRAV for current request
-    // If we have payment data, use the channel ID and payer key ID from the payment verification
-    if (paymentData && paymentData.channelId) {
-      billingContext.meta.channelId = paymentData.channelId;
-    }
-    // If we have verified payment data with payer key ID, use it
-    if (verificationResult && verificationResult.success && verificationResult.payerKeyId) {
-      billingContext.meta.payerKeyId = verificationResult.payerKeyId;
-    }
+    // Step 4: Generate unsigned SubRAV proposal for next request
     const subRav = await this.generateSubRAVProposal(billingContext, cost);
     
     // Store the unsigned SubRAV for later verification using channelId:nonce as key
     const subRAVKey = `${subRav.channelId}:${subRav.nonce}`;
     this.pendingSubRAVs.set(subRAVKey, subRav);
     
-    // Step 4: Add SubRAV to response (client will sign and send in next request)
+    // Step 5: Add SubRAV to response (client will sign and send in next request)
     const responsePayload: HttpResponsePayload = {
       subRav, // Unsigned SubRAV for client to sign
       amountDebited: cost,
       serviceTxRef: this.generateTxRef(),
       errorCode: 0, // Success
-      message: 'Payment proposal for next request'
+      message: isHandshake ? 'Handshake successful, payment proposal for next request' : 'Payment proposal for next request'
     };
 
     this.addPaymentDataToResponse(res, responsePayload);
@@ -260,10 +268,10 @@ export class HttpBillingMiddleware {
   /**
    * Build billing context from request
    */
-  private buildBillingContext(req: Request): BillingContext {
-    // Extract channel ID and payer key ID from headers if provided (for first-time requests)
-    const channelIdHeader = req.headers['x-payment-channel-id'] as string;
-    const payerKeyIdHeader = req.headers['x-payment-payer-key-id'] as string;
+  private buildBillingContext(req: Request, paymentData: HttpRequestPayload): BillingContext {
+    // Extract channel ID and payer key ID from the signed SubRAV
+    const channelId = paymentData.signedSubRav.subRav.channelId;
+    const vmIdFragment = paymentData.signedSubRav.subRav.vmIdFragment;
     
     const meta: BillingRequestContext = {
       path: req.path,
@@ -271,9 +279,9 @@ export class HttpBillingMiddleware {
       // Extract additional metadata from query/body
       ...req.query,
       ...(req.body && typeof req.body === 'object' ? req.body : {}),
-      // Include channel ID and payer key ID if provided in headers
-      ...(channelIdHeader ? { channelId: channelIdHeader } : {}),
-      ...(payerKeyIdHeader ? { payerKeyId: payerKeyIdHeader } : {})
+      // Include channel ID and vm ID fragment from SubRAV
+      channelId,
+      vmIdFragment
     };
 
     return {
@@ -307,10 +315,16 @@ export class HttpBillingMiddleware {
       throw new Error('assetId is required for SubRAV generation');
     }
 
-    // For proposal, we need to determine the channel and payer
-    // This might need to be enhanced based on how channel discovery works
-    const channelId = context.meta.channelId || 'pending'; // Placeholder
-    const payerKeyId = context.meta.payerKeyId || 'unknown'; // Placeholder
+    const channelId = context.meta.channelId;
+    const vmIdFragment = context.meta.vmIdFragment;
+    
+    if (!channelId || !vmIdFragment) {
+      throw new Error('channelId and vmIdFragment are required for SubRAV generation');
+    }
+
+    // Get channel info to construct proper payer key ID
+    const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
+    const payerKeyId = `${channelInfo.payerDid}#${vmIdFragment}`;
 
     return await this.config.payeeClient.generateSubRAV({
       channelId,
@@ -333,6 +347,51 @@ export class HttpBillingMiddleware {
       subRAV1.accumulatedAmount === subRAV2.accumulatedAmount &&
       subRAV1.nonce === subRAV2.nonce
     );
+  }
+
+  /**
+   * Verify handshake request (nonce=0, amount=0)
+   */
+  private async verifyHandshakeRequest(
+    paymentData: HttpRequestPayload
+  ): Promise<PaymentProcessingResult> {
+    try {
+      const signedSubRAV = paymentData.signedSubRav;
+      
+      // Verify SubRAV signature and structure
+      const verification = await this.config.payeeClient.verifySubRAV(signedSubRAV);
+      
+      if (!verification.isValid) {
+        return {
+          success: false,
+          cost: 0n,
+          assetId: signedSubRAV.subRav.channelId,
+          error: `Invalid handshake SubRAV signature: ${verification.error}`
+        };
+      }
+
+      // Get channel info to extract payer DID for constructing payerKeyId
+      const channelInfo = await this.config.payeeClient.getChannelInfo(signedSubRAV.subRav.channelId);
+      const payerKeyId = `${channelInfo.payerDid}#${signedSubRAV.subRav.vmIdFragment}`;
+      
+      // Process the handshake SubRAV to update PayeeClient state
+      await this.config.payeeClient.processSignedSubRAV(signedSubRAV);
+      
+      return {
+        success: true,
+        cost: 0n,
+        assetId: signedSubRAV.subRav.channelId,
+        payerKeyId,
+        signedSubRav: signedSubRAV
+      };
+    } catch (error) {
+      return {
+        success: false,
+        cost: 0n,
+        assetId: 'unknown',
+        error: `Handshake verification failed: ${error}`
+      };
+    }
   }
 
   /**
@@ -410,7 +469,7 @@ export class HttpBillingMiddleware {
       // Process the signed SubRAV
       await this.config.payeeClient.processSignedSubRAV(paymentData.signedSubRav);
 
-      const channelId = paymentData.channelId;
+      const channelId = paymentData.signedSubRav.subRav.channelId;
       
       // Add to pending claims
       if (!this.pendingClaims.has(channelId)) {

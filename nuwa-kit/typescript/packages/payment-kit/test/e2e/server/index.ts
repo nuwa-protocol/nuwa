@@ -220,35 +220,47 @@ rules:
 // 客户端调用示例（延迟支付模式）
 export function createTestClient(payerClient: any, baseURL: string, channelId: string) {
   let pendingSubRAV: SubRAV | null = null; // 缓存上一次的 SubRAV
-  let payerKeyId: string | null = null; // 缓存 payer 的 key ID
+  let isFirstRequest = true; // 标记是否为首次请求
 
   return {
     async callEcho(query: string) {
       let headers: Record<string, string> = {};
       
-      // 1. 总是提供 channelId，如果有上一次的 SubRAV，也签名并放入请求头
+      // 1. 总是生成签名的 SubRAV
+      let signedSubRAV: any;
+      
       if (pendingSubRAV) {
-        const signedRav = await payerClient.signSubRAV(pendingSubRAV);
+        // 使用服务器提案的 SubRAV
+        signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
+      } else if (isFirstRequest) {
+        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        const channelInfo = await payerClient.getChannelInfo(channelId);
+        const keyIds = await payerClient.signer.listKeyIds();
+        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
         
-        const requestPayload: HttpRequestPayload = {
+        const handshakeSubRAV: SubRAV = {
+          version: 1,
+          chainId: BigInt(4), // 根据网络配置
           channelId,
-          signedSubRav: signedRav,
-          maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
-          clientTxRef: `client_${Date.now()}`
+          channelEpoch: channelInfo.epoch,
+          vmIdFragment,
+          accumulatedAmount: 0n,
+          nonce: 0n
         };
-
-        headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
-      } else {
-        // 首次请求，需要获取 payer 的 key ID
-        if (!payerKeyId) {
-          const keyIds = await payerClient.signer.listKeyIds();
-          payerKeyId = keyIds[0]; // 使用第一个 key ID
-        }
         
-        // 首次请求，提供 channelId 和 payerKeyId（用于生成 SubRAV 提案）
-        headers['X-Payment-Channel-ID'] = channelId;
-        headers['X-Payment-Payer-Key-ID'] = payerKeyId!;
+        signedSubRAV = await payerClient.signSubRAV(handshakeSubRAV);
+        isFirstRequest = false;
+      } else {
+        throw new Error('No pending SubRAV available for non-first request');
       }
+
+      const requestPayload: HttpRequestPayload = {
+        signedSubRav: signedSubRAV,
+        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        clientTxRef: `client_${Date.now()}`
+      };
+
+      headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
       
       // 2. 发送请求
       const url = `${baseURL}/v1/echo?q=${encodeURIComponent(query)}`;
@@ -279,29 +291,41 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         'Content-Type': 'application/json'
       };
       
-      // 如果有上一次的 SubRAV，签名并放入请求头
+      // 生成签名的 SubRAV
+      let signedSubRAV: any;
+      
       if (pendingSubRAV) {
-        const signedRav = await payerClient.signSubRAV(pendingSubRAV);
+        // 使用服务器提案的 SubRAV
+        signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
+      } else if (isFirstRequest) {
+        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        const channelInfo = await payerClient.getChannelInfo(channelId);
+        const keyIds = await payerClient.signer.listKeyIds();
+        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
         
-        const requestPayload: HttpRequestPayload = {
+        const handshakeSubRAV: SubRAV = {
+          version: 1,
+          chainId: BigInt(4), // 根据网络配置
           channelId,
-          signedSubRav: signedRav,
-          maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
-          clientTxRef: `client_${Date.now()}`
+          channelEpoch: channelInfo.epoch,
+          vmIdFragment,
+          accumulatedAmount: 0n,
+          nonce: 0n
         };
-
-        headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
-      } else {
-        // 首次请求，需要获取 payer 的 key ID
-        if (!payerKeyId) {
-          const keyIds = await payerClient.signer.listKeyIds();
-          payerKeyId = keyIds[0]; // 使用第一个 key ID
-        }
         
-        // 首次请求，提供 channelId 和 payerKeyId（用于生成 SubRAV 提案）
-        headers['X-Payment-Channel-ID'] = channelId;
-        headers['X-Payment-Payer-Key-ID'] = payerKeyId!;
+        signedSubRAV = await payerClient.signSubRAV(handshakeSubRAV);
+        isFirstRequest = false;
+      } else {
+        throw new Error('No pending SubRAV available for non-first request');
       }
+
+      const requestPayload: HttpRequestPayload = {
+        signedSubRav: signedSubRAV,
+        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        clientTxRef: `client_${Date.now()}`
+      };
+
+      headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
       
       const response = await fetch(`${baseURL}/v1/process`, {
         method: 'POST',
@@ -339,6 +363,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
     // 清除待支付的 SubRAV（用于测试）
     clearPendingSubRAV() {
       pendingSubRAV = null;
+      isFirstRequest = true; // 重置为首次请求状态
     },
 
     // 获取管理信息

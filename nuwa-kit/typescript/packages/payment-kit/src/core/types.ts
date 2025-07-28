@@ -98,9 +98,7 @@ export interface TransactionResult {
  * HTTP request header payload
  */
 export interface HttpRequestPayload {
-  /** Target channel ID */
-  channelId: string;
-  /** Latest signed SubRAV from client */
+  /** Signed SubRAV from client (required, including handshake with nonce=0, amount=0) */
   signedSubRav: SignedSubRAV;
   /** Maximum amount client willing to pay for this request */
   maxAmount?: bigint;
