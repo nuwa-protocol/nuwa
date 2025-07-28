@@ -9,8 +9,9 @@ export * from './core/claim-scheduler';
 // Contract interfaces
 export * from './contracts/IPaymentChannelContract';
 
-// Chain-agnostic client
+// Chain-agnostic clients
 export * from './client/PaymentChannelPayerClient';
+export * from './client/PaymentChannelPayeeClient';
 
 // Factory for creating clients
 export * from './factory/chainFactory';
@@ -27,6 +28,17 @@ export {
   MemoryChannelStateCache 
 } from './core/BaseStorage';
 
+// Pending SubRAV storage
+export type {
+  PendingSubRAVStore,
+  PendingSubRAVStats
+} from './core/PendingSubRAVStore';
+export {
+  MemoryPendingSubRAVStore,
+  SqlPendingSubRAVStore,
+  createPendingSubRAVStore
+} from './core/PendingSubRAVStore';
+
 // Extended storage implementations with advanced features  
 export type { 
   ChannelStateStorage, 
@@ -38,6 +50,9 @@ export {
   IndexedDBChannelStateStorage,
   SQLChannelStateStorage
 } from './core/ChannelStateStorage';
+
+// HTTP billing middleware
+export * from './core/http-billing-middleware';
 
 // Rooch implementation
 export * from './rooch/RoochPaymentChannelContract';

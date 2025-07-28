@@ -23,6 +23,8 @@ import type {
 } from '../billing/types';
 import { BillingEngine } from '../billing/engine';
 import { UsdBillingEngine } from '../billing/usd-engine';
+import type { PendingSubRAVStore } from './PendingSubRAVStore';
+import { MemoryPendingSubRAVStore } from './PendingSubRAVStore';
 
 // Express types (optional dependency)
 interface Request {
@@ -63,6 +65,8 @@ export interface HttpPaymentMiddlewareConfig {
   autoClaimNonceThreshold?: number;
   /** Debug logging */
   debug?: boolean;
+  /** Store for pending unsigned SubRAV proposals */
+  pendingSubRAVStore?: PendingSubRAVStore;
 }
 
 /**
@@ -109,10 +113,12 @@ export interface PaymentProcessingResult {
 export class HttpBillingMiddleware {
   private config: HttpPaymentMiddlewareConfig;
   private pendingClaims = new Map<string, SignedSubRAV[]>(); // channelId -> pending SubRAVs
-  private pendingSubRAVs = new Map<string, SubRAV>(); // "channelId:nonce" -> pending unsigned SubRAV
+  private pendingSubRAVStore: PendingSubRAVStore;
 
   constructor(config: HttpPaymentMiddlewareConfig) {
     this.config = config;
+    // Initialize PendingSubRAVStore with memory implementation as default
+    this.pendingSubRAVStore = config.pendingSubRAVStore || new MemoryPendingSubRAVStore();
   }
 
   /**
@@ -223,9 +229,8 @@ export class HttpBillingMiddleware {
     // Step 4: Generate unsigned SubRAV proposal for next request
     const subRav = await this.generateSubRAVProposal(billingContext, cost);
     
-    // Store the unsigned SubRAV for later verification using channelId:nonce as key
-    const subRAVKey = `${subRav.channelId}:${subRav.nonce}`;
-    this.pendingSubRAVs.set(subRAVKey, subRav);
+    // Store the unsigned SubRAV for later verification
+    await this.pendingSubRAVStore.save(subRav);
     
     // Step 5: Add SubRAV to response (client will sign and send in next request)
     const responsePayload: HttpResponsePayload = {
@@ -402,16 +407,18 @@ export class HttpBillingMiddleware {
   ): Promise<PaymentProcessingResult> {
     try {
       const signedSubRAV = paymentData.signedSubRav;
-      const subRAVKey = `${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`;
       
       // Check if this SubRAV matches one we previously sent
-      const pendingSubRAV = this.pendingSubRAVs.get(subRAVKey);
+      const pendingSubRAV = await this.pendingSubRAVStore.find(
+        signedSubRAV.subRav.channelId,
+        signedSubRAV.subRav.nonce
+      );
       if (!pendingSubRAV) {
         return {
           success: false,
           cost: 0n,
           assetId: signedSubRAV.subRav.channelId,
-          error: `SubRAV not found in pending list: ${subRAVKey}`
+          error: `SubRAV not found in pending list: ${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`
         };
       }
 
@@ -421,7 +428,7 @@ export class HttpBillingMiddleware {
           success: false,
           cost: 0n,
           assetId: signedSubRAV.subRav.channelId,
-          error: `Signed SubRAV does not match pending SubRAV: ${subRAVKey}`
+          error: `Signed SubRAV does not match pending SubRAV: ${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`
         };
       }
 
@@ -438,7 +445,7 @@ export class HttpBillingMiddleware {
       }
 
       // Payment verified successfully, remove from pending list
-      this.pendingSubRAVs.delete(subRAVKey);
+      await this.pendingSubRAVStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.nonce);
       
       // Get channel info to extract payer DID for constructing payerKeyId
       const channelInfo = await this.config.payeeClient.getChannelInfo(signedSubRAV.subRav.channelId);
@@ -677,14 +684,17 @@ export class HttpBillingMiddleware {
   /**
    * Get pending SubRAVs statistics
    */
-  getPendingSubRAVsStats(): Record<string, { channelId: string; nonce: bigint; amount: bigint }> {
+  async getPendingSubRAVsStats(): Promise<Record<string, { channelId: string; nonce: bigint; amount: bigint }>> {
+    const storeStats = await this.pendingSubRAVStore.getStats();
     const stats: Record<string, { channelId: string; nonce: bigint; amount: bigint }> = {};
     
-    for (const [key, subRAV] of this.pendingSubRAVs.entries()) {
-      stats[key] = {
-        channelId: subRAV.channelId,
-        nonce: subRAV.nonce,
-        amount: subRAV.accumulatedAmount
+    // Note: This method now returns aggregate stats rather than individual SubRAV details
+    // For detailed SubRAV info, use pendingSubRAVStore.find() directly
+    for (const [channelId, count] of Object.entries(storeStats.byChannel)) {
+      stats[channelId] = {
+        channelId,
+        nonce: 0n, // Not available in aggregate stats
+        amount: 0n // Not available in aggregate stats
       };
     }
     
@@ -694,13 +704,10 @@ export class HttpBillingMiddleware {
   /**
    * Clear expired pending SubRAVs (older than specified minutes)
    */
-  clearExpiredPendingSubRAVs(maxAgeMinutes: number = 30): number {
-    const now = Date.now();
+  async clearExpiredPendingSubRAVs(maxAgeMinutes: number = 30): Promise<number> {
     const maxAge = maxAgeMinutes * 60 * 1000; // Convert to milliseconds
-    let clearedCount = 0;
-
-    // Note: In a real implementation, you'd want to store timestamps with SubRAVs
-    // For now, we'll just provide the interface
+    const clearedCount = await this.pendingSubRAVStore.cleanup(maxAge);
+    
     this.log(`Cleared ${clearedCount} expired pending SubRAVs (older than ${maxAgeMinutes} minutes)`);
     return clearedCount;
   }
@@ -734,9 +741,8 @@ export class HttpBillingMiddleware {
   /**
    * Find pending SubRAV by channel and nonce
    */
-  findPendingSubRAV(channelId: string, nonce: bigint): SubRAV | null {
-    const key = `${channelId}:${nonce}`;
-    return this.pendingSubRAVs.get(key) || null;
+  async findPendingSubRAV(channelId: string, nonce: bigint): Promise<SubRAV | null> {
+    return await this.pendingSubRAVStore.find(channelId, nonce);
   }
 }
 

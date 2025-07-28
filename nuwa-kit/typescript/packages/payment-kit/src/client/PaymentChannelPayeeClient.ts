@@ -16,12 +16,15 @@ import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPayment
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
 import { SubRAVManager, SubRAVUtils } from '../core/subrav';
+import type { RAVStore } from '../core/BaseStorage';
+import { MemoryRAVStore } from '../core/BaseStorage';
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   didResolver: DIDResolver; // Required for signature verification
   storageOptions?: StorageOptions;
+  ravStore?: RAVStore; // Optional for persisting signed SubRAVs (defaults to MemoryRAVStore)
 }
 
 export interface VerificationResult {
@@ -73,6 +76,7 @@ export class PaymentChannelPayeeClient {
   private signer: SignerInterface;
   private didResolver: DIDResolver;
   private stateStorage: ChannelStateStorage;
+  private ravStore: RAVStore;
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
 
@@ -80,6 +84,7 @@ export class PaymentChannelPayeeClient {
     this.contract = options.contract;
     this.signer = options.signer;
     this.didResolver = options.didResolver; // Now required
+    this.ravStore = options.ravStore || new MemoryRAVStore(); // Default to MemoryRAVStore if not provided
     
     // Initialize storage
     if (options.storageOptions?.customStorage) {
@@ -177,6 +182,9 @@ export class PaymentChannelPayeeClient {
       nonce: signedSubRAV.subRav.nonce,
       lastUpdated: Date.now(),
     });
+
+    // Persist the signed SubRAV to RAVStore for ClaimScheduler and persistence
+    await this.ravStore.save(signedSubRAV);
 
     if (isHandshakeReset) {
       console.log(`Successfully processed handshake reset for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);

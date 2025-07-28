@@ -137,33 +137,37 @@ rules:
   });
 
   // 6. 管理接口
-  app.get('/admin/claims', (req: Request, res: Response) => {
-    const claimsStats = paymentMiddleware.getPendingClaimsStats();
-    const subRAVsStats = paymentMiddleware.getPendingSubRAVsStats();
-    
-    // Convert BigInt values to strings for JSON serialization
-    const serializedClaimsStats: Record<string, { count: number; totalAmount: string }> = {};
-    for (const [key, value] of Object.entries(claimsStats)) {
-      serializedClaimsStats[key] = {
-        count: value.count,
-        totalAmount: value.totalAmount.toString()
-      };
+  app.get('/admin/claims', async (req: Request, res: Response) => {
+    try {
+      const claimsStats = paymentMiddleware.getPendingClaimsStats();
+      const subRAVsStats = await paymentMiddleware.getPendingSubRAVsStats();
+      
+      // Convert BigInt values to strings for JSON serialization
+      const serializedClaimsStats: Record<string, { count: number; totalAmount: string }> = {};
+      for (const [key, value] of Object.entries(claimsStats)) {
+        serializedClaimsStats[key] = {
+          count: value.count,
+          totalAmount: value.totalAmount.toString()
+        };
+      }
+      
+      const serializedSubRAVsStats: Record<string, { channelId: string; nonce: string; amount: string }> = {};
+      for (const [key, value] of Object.entries(subRAVsStats)) {
+        serializedSubRAVsStats[key] = {
+          channelId: value.channelId,
+          nonce: value.nonce.toString(),
+          amount: value.amount.toString()
+        };
+      }
+      
+      res.json({ 
+        pendingClaims: serializedClaimsStats,
+        pendingSubRAVs: serializedSubRAVsStats,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
-    
-    const serializedSubRAVsStats: Record<string, { channelId: string; nonce: string; amount: string }> = {};
-    for (const [key, value] of Object.entries(subRAVsStats)) {
-      serializedSubRAVsStats[key] = {
-        channelId: value.channelId,
-        nonce: value.nonce.toString(),
-        amount: value.amount.toString()
-      };
-    }
-    
-    res.json({ 
-      pendingClaims: serializedClaimsStats,
-      pendingSubRAVs: serializedSubRAVsStats,
-      timestamp: new Date().toISOString()
-    });
   });
 
   app.post('/admin/claim/:channelId', async (req: Request, res: Response) => {
@@ -175,20 +179,28 @@ rules:
     }
   });
 
-  app.get('/admin/subrav/:channelId/:nonce', (req: Request, res: Response) => {
-    const { channelId, nonce } = req.params;
-    const subRAV = paymentMiddleware.findPendingSubRAV(channelId, BigInt(nonce));
-    if (subRAV) {
-      res.json(subRAV);
-    } else {
-      res.status(404).json({ error: 'SubRAV not found' });
+  app.get('/admin/subrav/:channelId/:nonce', async (req: Request, res: Response) => {
+    try {
+      const { channelId, nonce } = req.params;
+      const subRAV = await paymentMiddleware.findPendingSubRAV(channelId, BigInt(nonce));
+      if (subRAV) {
+        res.json(subRAV);
+      } else {
+        res.status(404).json({ error: 'SubRAV not found' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete('/admin/cleanup', (req: Request, res: Response) => {
-    const maxAge = parseInt(req.query.maxAge as string) || 30;
-    const clearedCount = paymentMiddleware.clearExpiredPendingSubRAVs(maxAge);
-    res.json({ clearedCount, maxAgeMinutes: maxAge });
+  app.delete('/admin/cleanup', async (req: Request, res: Response) => {
+    try {
+      const maxAge = parseInt(req.query.maxAge as string) || 30;
+      const clearedCount = await paymentMiddleware.clearExpiredPendingSubRAVs(maxAge);
+      res.json({ clearedCount, maxAgeMinutes: maxAge });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.get('/admin/security', (req: Request, res: Response) => {
