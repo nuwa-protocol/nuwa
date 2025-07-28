@@ -14,7 +14,7 @@ import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeC
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import { RoochVDR, VDRRegistry } from '@nuwa-ai/identity-kit';
 import type { AssetInfo } from '../../src/core/types';
-import { MemoryChannelStateStorage } from '../../src/core/ChannelStateStorage';
+import { MemoryChannelRepository } from '../../src/storage';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { createBillingServer, createTestClient } from './server';
@@ -91,7 +91,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       signer: payer.keyManager,
       keyId: `${payer.did}#${payer.vmIdFragment}`,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 
@@ -100,7 +100,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       signer: payee.keyManager,
       didResolver: vdrRegistry,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 

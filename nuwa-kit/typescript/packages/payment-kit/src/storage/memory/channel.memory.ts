@@ -161,15 +161,22 @@ export class MemoryChannelRepository implements ChannelRepository {
   }
 
   private estimateSize(): number {
-    // Rough estimation of memory usage
+    // Rough estimation of memory usage (avoiding BigInt serialization issues)
     let size = 0;
     
     for (const channel of this.channelMetadata.values()) {
-      size += JSON.stringify(channel).length * 2; // Rough estimate
+      // Simple estimation without JSON.stringify to avoid BigInt issues
+      size += channel.channelId.length * 2;
+      size += channel.payerDid.length * 2;
+      size += channel.payeeDid.length * 2;
+      size += channel.assetId.length * 2;
+      size += 100; // Rough estimate for bigint and other fields
     }
     
     for (const state of this.subChannelStates.values()) {
-      size += JSON.stringify(state).length * 2; // Rough estimate
+      // Simple estimation without JSON.stringify to avoid BigInt issues
+      size += state.channelId.length * 2;
+      size += 200; // Rough estimate for bigint fields and numbers
     }
     
     return size;
