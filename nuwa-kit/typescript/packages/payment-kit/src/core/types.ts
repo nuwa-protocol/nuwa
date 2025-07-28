@@ -104,11 +104,6 @@ export interface HttpRequestPayload {
   maxAmount?: bigint;
   /** Client transaction reference for idempotency */
   clientTxRef?: string;
-  /** Client confirmation of previous service proposal */
-  confirmationData?: {
-    subRav: SubRAV;
-    signatureConfirmer: Uint8Array;
-  };
 }
 
 /**
