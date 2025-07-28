@@ -3,6 +3,7 @@
  */
 
 import type { Pool, PoolClient } from 'pg';
+import { encodeSubRAV, decodeSubRAV } from './serialization';
 import type { PendingSubRAVRepository } from '../interfaces/PendingSubRAVRepository';
 import type { SubRAV } from '../../core/types';
 import type { PendingSubRAVStats } from '../types/pagination';
@@ -54,7 +55,7 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
         CREATE TABLE IF NOT EXISTS ${this.pendingSubRAVsTable} (
           channel_id        TEXT NOT NULL,
           nonce            NUMERIC(78,0) NOT NULL,
-          sub_rav_data     JSONB NOT NULL,
+          sub_rav_bcs      BYTEA NOT NULL,
           created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           PRIMARY KEY(channel_id, nonce)
         )
@@ -74,20 +75,21 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
   async save(subRAV: SubRAV): Promise<void> {
     const client = await this.pool.connect();
     try {
+      // Encode SubRAV using BCS serialization
+      const subRavBcs = encodeSubRAV(subRAV);
+      
       await client.query(`
         INSERT INTO ${this.pendingSubRAVsTable} 
-        (channel_id, nonce, sub_rav_data)
+        (channel_id, nonce, sub_rav_bcs)
         VALUES ($1, $2, $3)
         ON CONFLICT (channel_id, nonce) 
         DO UPDATE SET 
-          sub_rav_data = EXCLUDED.sub_rav_data,
+          sub_rav_bcs = EXCLUDED.sub_rav_bcs,
           created_at = NOW()
       `, [
         subRAV.channelId,
         subRAV.nonce.toString(),
-        JSON.stringify(subRAV, (key, value) => 
-          typeof value === 'bigint' ? value.toString() : value
-        )
+        subRavBcs
       ]);
     } finally {
       client.release();
@@ -98,7 +100,7 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT sub_rav_data 
+        SELECT sub_rav_bcs 
         FROM ${this.pendingSubRAVsTable}
         WHERE channel_id = $1 AND nonce = $2
       `, [channelId, nonce.toString()]);
@@ -107,21 +109,8 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
         return null;
       }
 
-      const data = result.rows[0].sub_rav_data;
-      // Handle both string and object formats
-      if (typeof data === 'string') {
-        return JSON.parse(data);
-      } else {
-        // If it's already an object, convert BigInt strings back to BigInt
-        const parsed = data as any;
-        return {
-          ...parsed,
-          chainId: BigInt(parsed.chainId),
-          channelEpoch: BigInt(parsed.channelEpoch),
-          accumulatedAmount: BigInt(parsed.accumulatedAmount),
-          nonce: BigInt(parsed.nonce),
-        };
-      }
+      const subRavBcs = result.rows[0].sub_rav_bcs as Buffer;
+      return decodeSubRAV(subRavBcs);
     } finally {
       client.release();
     }

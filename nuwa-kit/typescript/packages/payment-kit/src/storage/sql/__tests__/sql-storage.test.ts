@@ -69,6 +69,9 @@ describe('SQL Storage Repositories', () => {
   let channelRepo: SqlChannelRepository;
   let pendingRepo: SqlPendingSubRAVRepository;
 
+  // Test data constants - use 32-byte addresses for ObjectId compatibility
+  const TEST_CHANNEL_ID = '0x0000000000000000000000001234567890abcdef1234567890abcdef12345678';
+
   // Increase timeout for database operations
   jest.setTimeout(30000);
 
@@ -141,7 +144,7 @@ describe('SQL Storage Repositories', () => {
 
       const subRav = SubRAVUtils.create({
         chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef12345678',
+        channelId: TEST_CHANNEL_ID,
         channelEpoch: BigInt(1),
         vmIdFragment: 'key-1',
         accumulatedAmount: BigInt(1000000),
@@ -287,7 +290,7 @@ describe('SQL Storage Repositories', () => {
       if (!channelRepo) return;
 
       testChannel = {
-        channelId: '0x1234567890abcdef1234567890abcdef12345678',
+        channelId: TEST_CHANNEL_ID,
         payerDid: 'did:rooch:0x123',
         payeeDid: 'did:rooch:0x456',
         assetId: '0x3::gas_coin::RGas',
@@ -393,7 +396,7 @@ describe('SQL Storage Repositories', () => {
 
       testSubRAV = SubRAVUtils.create({
         chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef12345678',
+        channelId: TEST_CHANNEL_ID,
         channelEpoch: BigInt(1),
         vmIdFragment: 'key-1',
         accumulatedAmount: BigInt(1000000),
@@ -473,7 +476,7 @@ describe('SQL Storage Repositories', () => {
       // Create a test RAV for this error test
       const subRav = SubRAVUtils.create({
         chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef12345678',
+        channelId: TEST_CHANNEL_ID,
         channelEpoch: BigInt(1),
         vmIdFragment: 'key-1',
         accumulatedAmount: BigInt(1000000),

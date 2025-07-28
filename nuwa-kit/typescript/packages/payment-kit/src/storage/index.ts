@@ -67,9 +67,8 @@ export {
 
 // SQL serialization utilities
 export {
-  encodeSignedSubRAV,
-  decodeSignedSubRAV,
-  encodeSubRAVBCS,
+  encodeSubRAV,
+  decodeSubRAV,
   getSubRAVHex,
 } from './sql/serialization';
 

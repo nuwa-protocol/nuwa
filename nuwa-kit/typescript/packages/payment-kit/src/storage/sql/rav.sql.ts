@@ -4,7 +4,7 @@
 
 // Note: 'pg' is an optional dependency. Install with: npm install pg @types/pg
 import type { Pool, PoolClient } from 'pg';
-import { encodeSignedSubRAV, decodeSignedSubRAV } from './serialization';
+import { encodeSubRAV, decodeSubRAV } from './serialization';
 import type { RAVRepository } from '../interfaces/RAVRepository';
 import type { SignedSubRAV } from '../../core/types';
 
@@ -65,7 +65,8 @@ export class SqlRAVRepository implements RAVRepository {
           vm_id_fragment    TEXT NOT NULL,
           nonce             NUMERIC(78,0) NOT NULL,
           accumulated_amount NUMERIC(78,0) NOT NULL,
-          rav_data          BYTEA NOT NULL,
+          sub_rav_bcs       BYTEA NOT NULL,
+          signature         BYTEA NOT NULL,
           created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           UNIQUE(channel_id, vm_id_fragment, nonce)
         )
@@ -102,13 +103,14 @@ export class SqlRAVRepository implements RAVRepository {
   async save(rav: SignedSubRAV): Promise<void> {
     const client = await this.pool.connect();
     try {
-      // Encode RAV data using our serialization utility
-      const ravDataBuffer = encodeSignedSubRAV(rav);
+      // Encode SubRAV using BCS serialization
+      const subRavBcs = encodeSubRAV(rav.subRav);
+      const signature = Buffer.from(rav.signature);
       
       await client.query(`
         INSERT INTO ${this.ravsTable} 
-        (channel_id, vm_id_fragment, nonce, accumulated_amount, rav_data)
-        VALUES ($1, $2, $3, $4, $5)
+        (channel_id, vm_id_fragment, nonce, accumulated_amount, sub_rav_bcs, signature)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (channel_id, vm_id_fragment, nonce) 
         DO NOTHING
       `, [
@@ -116,7 +118,8 @@ export class SqlRAVRepository implements RAVRepository {
         rav.subRav.vmIdFragment,
         rav.subRav.nonce.toString(),
         rav.subRav.accumulatedAmount.toString(),
-        ravDataBuffer
+        subRavBcs,
+        signature
       ]);
     } finally {
       client.release();
@@ -127,7 +130,7 @@ export class SqlRAVRepository implements RAVRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT rav_data 
+        SELECT sub_rav_bcs, signature 
         FROM ${this.ravsTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2
         ORDER BY nonce DESC
@@ -138,8 +141,14 @@ export class SqlRAVRepository implements RAVRepository {
         return null;
       }
 
-      const ravDataBuffer = result.rows[0].rav_data as Buffer;
-      return decodeSignedSubRAV(ravDataBuffer);
+      const subRavBcs = result.rows[0].sub_rav_bcs as Buffer;
+      const signature = result.rows[0].signature as Buffer;
+      
+      const subRav = decodeSubRAV(subRavBcs);
+      return {
+        subRav,
+        signature: new Uint8Array(signature),
+      };
     } finally {
       client.release();
     }
@@ -149,15 +158,21 @@ export class SqlRAVRepository implements RAVRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT rav_data
+        SELECT sub_rav_bcs, signature
         FROM ${this.ravsTable}
         WHERE channel_id = $1
         ORDER BY vm_id_fragment, nonce
       `, [channelId]);
 
       for (const row of result.rows) {
-        const ravDataBuffer = row.rav_data as Buffer;
-        yield decodeSignedSubRAV(ravDataBuffer);
+        const subRavBcs = row.sub_rav_bcs as Buffer;
+        const signature = row.signature as Buffer;
+        
+        const subRav = decodeSubRAV(subRavBcs);
+        yield {
+          subRav,
+          signature: new Uint8Array(signature),
+        };
       }
     } finally {
       client.release();
@@ -169,7 +184,7 @@ export class SqlRAVRepository implements RAVRepository {
     try {
       const result = await client.query(`
         SELECT DISTINCT ON (r.vm_id_fragment) 
-               r.vm_id_fragment, r.rav_data
+               r.vm_id_fragment, r.sub_rav_bcs, r.signature
         FROM ${this.ravsTable} r
         LEFT JOIN ${this.claimsTable} c 
           ON r.channel_id = c.channel_id 
@@ -182,9 +197,16 @@ export class SqlRAVRepository implements RAVRepository {
       const unclaimedRAVs = new Map<string, SignedSubRAV>();
       
       for (const row of result.rows) {
-        const ravDataBuffer = row.rav_data as Buffer;
-        const rav = decodeSignedSubRAV(ravDataBuffer);
-        unclaimedRAVs.set(row.vm_id_fragment, rav);
+        const subRavBcs = row.sub_rav_bcs as Buffer;
+        const signature = row.signature as Buffer;
+        
+        const subRav = decodeSubRAV(subRavBcs);
+        const signedSubRAV = {
+          subRav,
+          signature: new Uint8Array(signature),
+        };
+        
+        unclaimedRAVs.set(row.vm_id_fragment, signedSubRAV);
       }
 
       return unclaimedRAVs;
