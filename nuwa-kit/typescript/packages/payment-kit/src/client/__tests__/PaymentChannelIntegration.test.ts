@@ -15,7 +15,7 @@ import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelCont
 import { RoochVDR, VDRRegistry } from '@nuwa-ai/identity-kit';
 import type { SubRAV, SignedSubRAV, AssetInfo, ChannelInfo } from '../../core/types';
 import type { DIDResolver } from '@nuwa-ai/identity-kit';
-import { MemoryChannelStateStorage } from '../../core/ChannelStateStorage';
+import { MemoryChannelRepository } from '../../storage';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
@@ -90,7 +90,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
       signer: payer.keyManager,
       keyId: `${payer.did}#${payer.vmIdFragment}`,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 
@@ -99,7 +99,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
       signer: payee.keyManager,
       didResolver,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 

@@ -19,7 +19,8 @@ import type {
   OpenChannelWithSubChannelParams as ContractOpenChannelWithSubChannelParams,
 } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
-import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
+import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
+import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
 import { SubRAVManager } from '../core/subrav';
 
 export interface PayerOpenChannelParams {
@@ -35,11 +36,25 @@ export interface PayerOpenChannelWithSubChannelParams {
   vmIdFragment?: string;
 }
 
+/**
+ * Storage options for PaymentChannelPayerClient
+ */
+export interface PayerStorageOptions {
+  /** Storage type selection */
+  backend?: 'memory' | 'indexeddb' | 'sql';
+  /** Custom storage implementation */
+  customChannelRepo?: ChannelRepository;
+  /** PostgreSQL connection pool for SQL backend */
+  pool?: any;
+  /** Table name prefix for SQL backends */
+  tablePrefix?: string;
+}
+
 export interface PaymentChannelPayerClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   keyId?: string;
-  storageOptions?: StorageOptions;
+  storageOptions?: PayerStorageOptions;
 }
 
 export interface NextSubRAVOptions {
@@ -67,7 +82,7 @@ export class PaymentChannelPayerClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
   private keyId?: string;
-  private stateStorage: ChannelStateStorage;
+  private channelRepo: ChannelRepository;
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
   private activeChannelId?: string;
@@ -78,10 +93,13 @@ export class PaymentChannelPayerClient {
     this.keyId = options.keyId;
     
     // Initialize storage
-    if (options.storageOptions?.customStorage) {
-      this.stateStorage = options.storageOptions.customStorage;
+    if (options.storageOptions?.customChannelRepo) {
+      this.channelRepo = options.storageOptions.customChannelRepo;
     } else {
-      this.stateStorage = new MemoryChannelStateStorage();
+      this.channelRepo = createChannelRepoAuto({
+        pool: options.storageOptions?.pool,
+        tablePrefix: options.storageOptions?.tablePrefix,
+      });
     }
     
     this.ravManager = new SubRAVManager();
@@ -115,7 +133,7 @@ export class PaymentChannelPayerClient {
     };
 
     // Cache channel metadata using channelId as key
-    await this.stateStorage.setChannelMetadata(result.channelId, channelInfo);
+    await this.channelRepo.setChannelMetadata(result.channelId, channelInfo);
     
     // Set as active channel if no active channel is set
     if (!this.activeChannelId) {
@@ -153,11 +171,11 @@ export class PaymentChannelPayerClient {
       status: 'active',
     };
 
-    await this.stateStorage.setChannelMetadata(result.channelId, metadata);
+    await this.channelRepo.setChannelMetadata(result.channelId, metadata);
 
     // Initialize sub-channel state for this key
     const keyId = this.keyId || `${payerDid}#${useFragment}`;
-    await this.stateStorage.updateSubChannelState(result.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(result.channelId, keyId, {
       channelId: result.channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
@@ -191,7 +209,7 @@ export class PaymentChannelPayerClient {
 
     // Initialize sub-channel state
     const keyId = this.keyId || `${payerDid}#${useFragment}`;
-    await this.stateStorage.updateSubChannelState(params.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(params.channelId, keyId, {
       channelId: params.channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
@@ -206,7 +224,7 @@ export class PaymentChannelPayerClient {
    */
   async setActiveChannel(channelId: string): Promise<void> {
     // Verify the channel exists and is active
-    const metadata = await this.stateStorage.getChannelMetadata(channelId);
+    const metadata = await this.channelRepo.getChannelMetadata(channelId);
     if (!metadata) {
       throw new Error(`Channel ${channelId} not found in local storage`);
     }
@@ -248,7 +266,7 @@ export class PaymentChannelPayerClient {
     const signedSubRAV = await this.ravManager.sign(subRAV, this.signer, useKeyId);
 
     // Update local state to track this payment
-    await this.stateStorage.updateSubChannelState(subRAV.channelId, useKeyId, {
+    await this.channelRepo.updateSubChannelState(subRAV.channelId, useKeyId, {
       channelId: subRAV.channelId,
       epoch: subRAV.channelEpoch,
       accumulatedAmount: subRAV.accumulatedAmount,
@@ -285,7 +303,7 @@ export class PaymentChannelPayerClient {
     const keyId = `${payerDid}#${subRAV.vmIdFragment}`;
     
     try {
-      const prevState = await this.stateStorage.getSubChannelState(subRAV.channelId, keyId);
+      const prevState = await this.channelRepo.getSubChannelState(subRAV.channelId, keyId);
       
       // Verify nonce increments by 1
       const expectedNonce = prevState.nonce + BigInt(1);
@@ -327,10 +345,10 @@ export class PaymentChannelPayerClient {
     });
 
     // Update cache to mark channel as closed
-    const metadata = await this.stateStorage.getChannelMetadata(channelId);
+    const metadata = await this.channelRepo.getChannelMetadata(channelId);
     if (metadata) {
       metadata.status = 'closed';
-      await this.stateStorage.setChannelMetadata(channelId, metadata);
+      await this.channelRepo.setChannelMetadata(channelId, metadata);
     }
 
     // Clear active channel if this was the active one
@@ -352,7 +370,7 @@ export class PaymentChannelPayerClient {
    * Get channels for the current payer
    */
   async getChannelsByPayer(payerDid: string): Promise<ChannelInfo[]> {
-    const result = await this.stateStorage.listChannelMetadata({ payerDid });
+    const result = await this.channelRepo.listChannelMetadata({ payerDid });
     return result.items;
   }
 
@@ -403,7 +421,7 @@ export class PaymentChannelPayerClient {
    * Get first active channel ID (fallback for auto-selection)
    */
   private async getFirstActiveChannelId(): Promise<string | null> {
-    const result = await this.stateStorage.listChannelMetadata(
+    const result = await this.channelRepo.listChannelMetadata(
       { status: 'active' }, 
       { offset: 0, limit: 1 }
     );

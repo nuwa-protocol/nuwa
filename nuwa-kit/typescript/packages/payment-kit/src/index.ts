@@ -24,7 +24,8 @@ export * from './client/PaymentChannelPayeeClient';
 // Factory for creating clients
 export * from './factory/chainFactory';
 
-// Storage layer - unified storage abstractions
+// Legacy storage layer (deprecated - use new storage layer)
+// These exports are kept for backward compatibility but will be removed in future versions
 export type { 
   RAVStore, 
   ChannelStateStorage as BaseChannelStateStorage,
@@ -36,7 +37,7 @@ export {
   MemoryChannelStateCache 
 } from './core/BaseStorage';
 
-// Pending SubRAV storage
+// Legacy Pending SubRAV storage (deprecated)
 export type {
   PendingSubRAVStore,
   PendingSubRAVStats
@@ -47,7 +48,10 @@ export {
   createPendingSubRAVStore
 } from './core/PendingSubRAVStore';
 
-// Extended storage implementations with advanced features  
+// New storage layer - refactored architecture
+export * from './storage';
+
+// Legacy extended storage implementations (deprecated)
 export type { 
   ChannelStateStorage, 
   CacheStats, 

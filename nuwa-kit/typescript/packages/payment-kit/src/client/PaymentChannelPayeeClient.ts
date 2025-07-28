@@ -14,19 +14,32 @@ import type {
 } from '../core/types';
 import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
-import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } from '../core/ChannelStateStorage';
+import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
+import { createChannelRepoAuto, createRAVRepoAuto, createPendingSubRAVRepoAuto } from '../storage';
 import { SubRAVManager, SubRAVUtils } from '../core/subrav';
-import type { RAVStore } from '../core/BaseStorage';
-import { MemoryRAVStore } from '../core/BaseStorage';
-import type { PendingSubRAVStore } from '../core/PendingSubRAVStore';
 import { PaymentUtils } from '../core/PaymentUtils';
+
+/**
+ * Storage options for PaymentChannelPayeeClient
+ */
+export interface PayeeStorageOptions {
+  /** Storage backend type */
+  backend?: 'memory' | 'indexeddb' | 'sql';
+  /** Custom repository implementations */
+  customChannelRepo?: ChannelRepository;
+  customRAVRepo?: RAVRepository;
+  customPendingSubRAVRepo?: PendingSubRAVRepository;
+  /** PostgreSQL connection pool for SQL backend */
+  pool?: any;
+  /** Table name prefix for SQL backends */
+  tablePrefix?: string;
+}
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   didResolver: DIDResolver; // Required for signature verification
-  storageOptions?: StorageOptions;
-  ravStore?: RAVStore; // Optional for persisting signed SubRAVs (defaults to MemoryRAVStore)
+  storageOptions?: PayeeStorageOptions;
 }
 
 export interface VerificationResult {
@@ -77,22 +90,43 @@ export class PaymentChannelPayeeClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
   private didResolver: DIDResolver;
-  private stateStorage: ChannelStateStorage;
-  private ravStore: RAVStore;
+  private channelRepo: ChannelRepository;
+  private ravRepo: RAVRepository;
+  private pendingSubRAVRepo: PendingSubRAVRepository;
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
 
   constructor(options: PaymentChannelPayeeClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
-    this.didResolver = options.didResolver; // Now required
-    this.ravStore = options.ravStore || new MemoryRAVStore(); // Default to MemoryRAVStore if not provided
+    this.didResolver = options.didResolver;
     
-    // Initialize storage
-    if (options.storageOptions?.customStorage) {
-      this.stateStorage = options.storageOptions.customStorage;
+    // Initialize repositories
+    if (options.storageOptions?.customChannelRepo) {
+      this.channelRepo = options.storageOptions.customChannelRepo;
     } else {
-      this.stateStorage = new MemoryChannelStateStorage();
+      this.channelRepo = createChannelRepoAuto({
+        pool: options.storageOptions?.pool,
+        tablePrefix: options.storageOptions?.tablePrefix,
+      });
+    }
+    
+    if (options.storageOptions?.customRAVRepo) {
+      this.ravRepo = options.storageOptions.customRAVRepo;
+    } else {
+      this.ravRepo = createRAVRepoAuto({
+        pool: options.storageOptions?.pool,
+        tablePrefix: options.storageOptions?.tablePrefix,
+      });
+    }
+    
+    if (options.storageOptions?.customPendingSubRAVRepo) {
+      this.pendingSubRAVRepo = options.storageOptions.customPendingSubRAVRepo;
+    } else {
+      this.pendingSubRAVRepo = createPendingSubRAVRepoAuto({
+        pool: options.storageOptions?.pool,
+        tablePrefix: options.storageOptions?.tablePrefix,
+      });
     }
     
     this.ravManager = new SubRAVManager();
@@ -114,7 +148,7 @@ export class PaymentChannelPayeeClient {
     // Get current sub-channel state or initialize if first time
     let subChannelState;
     try {
-      subChannelState = await this.stateStorage.getSubChannelState(channelId, payerKeyId);
+      subChannelState = await this.channelRepo.getSubChannelState(channelId, payerKeyId);
     } catch (error) {
       // First SubRAV for this sub-channel, initialize state
       subChannelState = {
@@ -126,7 +160,7 @@ export class PaymentChannelPayeeClient {
       };
       
       // Store initial state
-      await this.stateStorage.updateSubChannelState(channelId, payerKeyId, subChannelState);
+      await this.channelRepo.updateSubChannelState(channelId, payerKeyId, subChannelState);
     }
 
     // Validate that epoch matches
@@ -177,7 +211,7 @@ export class PaymentChannelPayeeClient {
     const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
                            signedSubRAV.subRav.accumulatedAmount === BigInt(0);
     
-    await this.stateStorage.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
       channelId: signedSubRAV.subRav.channelId,
       epoch: signedSubRAV.subRav.channelEpoch,
       accumulatedAmount: signedSubRAV.subRav.accumulatedAmount,
@@ -186,7 +220,7 @@ export class PaymentChannelPayeeClient {
     });
 
     // Persist the signed SubRAV to RAVStore for ClaimScheduler and persistence
-    await this.ravStore.save(signedSubRAV);
+    await this.ravRepo.save(signedSubRAV);
 
     if (isHandshakeReset) {
       console.log(`Successfully processed handshake reset for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
@@ -255,7 +289,7 @@ export class PaymentChannelPayeeClient {
       // 4. Verify nonce progression (if we have previous state)
       const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
       try {
-        const prevState = await this.stateStorage.getSubChannelState(signedSubRAV.subRav.channelId, keyId);
+        const prevState = await this.channelRepo.getSubChannelState(signedSubRAV.subRav.channelId, keyId);
         
         // Allow same nonce if it's the exact same SubRAV (same amount and other fields)
         const isSameSubRAV = signedSubRAV.subRav.nonce === prevState.nonce && 
@@ -327,7 +361,7 @@ export class PaymentChannelPayeeClient {
     const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
 
     // Update sub-channel state
-    await this.stateStorage.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
       channelId: signedSubRAV.subRav.channelId,
       epoch: signedSubRAV.subRav.channelEpoch,
       accumulatedAmount: signedSubRAV.subRav.accumulatedAmount,
@@ -403,10 +437,10 @@ export class PaymentChannelPayeeClient {
     });
 
     // Update local cache to mark channel as closed
-    const metadata = await this.stateStorage.getChannelMetadata(channelId);
+    const metadata = await this.channelRepo.getChannelMetadata(channelId);
     if (metadata) {
       metadata.status = 'closed';
-      await this.stateStorage.setChannelMetadata(channelId, metadata);
+      await this.channelRepo.setChannelMetadata(channelId, metadata);
     }
 
     return { txHash: result.txHash };
@@ -426,7 +460,7 @@ export class PaymentChannelPayeeClient {
   private async getChannelInfoCached(channelId: string, forceRefresh: boolean = false): Promise<ChannelInfo> {
     // Try to get from local storage first (unless forced refresh)
     if (!forceRefresh) {
-      const cachedMetadata = await this.stateStorage.getChannelMetadata(channelId);
+      const cachedMetadata = await this.channelRepo.getChannelMetadata(channelId);
       if (cachedMetadata) {
         // Convert ChannelMetadata to ChannelInfo
         return cachedMetadata;
@@ -438,13 +472,13 @@ export class PaymentChannelPayeeClient {
       const channelInfo = await this.contract.getChannelStatus({ channelId });
       
       // Store in cache as ChannelMetadata
-      await this.stateStorage.setChannelMetadata(channelId, channelInfo);
+      await this.channelRepo.setChannelMetadata(channelId, channelInfo);
       
       return channelInfo;
     } catch (error) {
       // If chain call fails and we have stale cache, use it
       if (!forceRefresh) {
-        const staleMetadata = await this.stateStorage.getChannelMetadata(channelId);
+        const staleMetadata = await this.channelRepo.getChannelMetadata(channelId);
         if (staleMetadata) {
           console.warn(`Chain call failed for channel ${channelId}, using stale cache`);
           return staleMetadata;
@@ -461,7 +495,7 @@ export class PaymentChannelPayeeClient {
     const payeeDid = await this.signer.getDid();
     
     // Get channels from storage first
-    const storageResult = await this.stateStorage.listChannelMetadata(
+    const storageResult = await this.channelRepo.listChannelMetadata(
       { 
         payeeDid, 
         status: options.status || 'active' 
@@ -579,7 +613,7 @@ export class PaymentChannelPayeeClient {
    */
   async confirmSignedProposal(
     signedSubRAV: SignedSubRAV,
-    pendingStore: PendingSubRAVStore
+    pendingStore: PendingSubRAVRepository
   ): Promise<VerificationResult> {
     try {
       // Check if this SubRAV matches one we previously sent

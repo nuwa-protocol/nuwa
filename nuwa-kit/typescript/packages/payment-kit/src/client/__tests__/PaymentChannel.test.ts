@@ -13,7 +13,7 @@ import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globa
 import { PaymentChannelPayerClient } from '../PaymentChannelPayerClient';
 import { PaymentChannelPayeeClient } from '../PaymentChannelPayeeClient';
 import type { SubRAV, SignedSubRAV, AssetInfo } from '../../core/types';
-import { MemoryChannelStateStorage } from '../../core/ChannelStateStorage';
+import { MemoryChannelRepository } from '../../storage';
 import { SubRAVManager } from '../../core/subrav';
 import { KeyStoreSigner } from '@nuwa-ai/identity-kit';
 import { 
@@ -64,7 +64,7 @@ describe('PaymentChannelIntegration', () => {
       signer: payerSigner,
       keyId: payerKeyId,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 
@@ -73,7 +73,7 @@ describe('PaymentChannelIntegration', () => {
       signer: payeeSigner,
       didResolver,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
   });
@@ -266,7 +266,7 @@ describe('PaymentChannelIntegration', () => {
       signer: validationTestEnv.payerSigner,
       keyId: validationTestEnv.payerKeyId,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 
@@ -275,7 +275,7 @@ describe('PaymentChannelIntegration', () => {
       signer: validationTestEnv.payeeSigner,
       didResolver: validationTestEnv.didResolver,
       storageOptions: {
-        customStorage: new MemoryChannelStateStorage(),
+        customChannelRepo: new MemoryChannelRepository(),
       },
     });
 
