@@ -156,7 +156,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
     it('should open channel through contract interface', async () => {
       const channelMeta = await client.openChannel({
         payeeDid: 'did:test:0x456',
-        assetId: { assetId: '0x3::gas_coin::RGas', symbol: 'RGAS' },
+        assetId: '0x3::gas_coin::RGas',
         collateral: BigInt('1000000000000000000'),
       });
 
