@@ -8,7 +8,7 @@
       "tsconfig": "tsconfig.json"
     }]
   },
-  "testMatch": ["**/__tests__/**/*.ts", "**/test/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "testMatch": ["**/__tests__/**/*.ts", "**/test/**/*.test.ts", "**/?(*.)+(spec|test).ts"],
   "moduleFileExtensions": ["ts", "js", "json"],
   "verbose": false,
   "collectCoverage": false,
