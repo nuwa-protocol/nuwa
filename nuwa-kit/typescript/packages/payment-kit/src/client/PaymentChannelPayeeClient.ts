@@ -18,6 +18,8 @@ import { ChannelStateStorage, MemoryChannelStateStorage, type StorageOptions } f
 import { SubRAVManager, SubRAVUtils } from '../core/subrav';
 import type { RAVStore } from '../core/BaseStorage';
 import { MemoryRAVStore } from '../core/BaseStorage';
+import type { PendingSubRAVStore } from '../core/PendingSubRAVStore';
+import { PaymentUtils } from '../core/PaymentUtils';
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
@@ -543,5 +545,214 @@ export class PaymentChannelPayeeClient {
       this.chainIdCache = await this.contract.getChainId();
     }
     return this.chainIdCache;
+  }
+
+  // -------- Enhanced Methods for PaymentProcessor --------
+
+  /**
+   * Verify handshake request (specialized method for nonce=0, amount=0)
+   */
+  async verifyHandshake(signedSubRAV: SignedSubRAV): Promise<VerificationResult> {
+    // Verify this is actually a handshake
+    if (!PaymentUtils.isHandshake(signedSubRAV.subRav)) {
+      return {
+        isValid: false,
+        error: `Not a handshake SubRAV: nonce=${signedSubRAV.subRav.nonce}, amount=${signedSubRAV.subRav.accumulatedAmount}`
+      };
+    }
+
+    // Use standard verification but optimized for handshake case
+    const result = await this.verifySubRAV(signedSubRAV);
+    
+    if (result.isValid) {
+      console.log(`✅ Handshake verified for channel ${signedSubRAV.subRav.channelId}`);
+    } else {
+      console.log(`❌ Handshake verification failed: ${result.error}`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Confirm signed proposal from pending store
+   * Integrates pending store validation with signature verification
+   */
+  async confirmSignedProposal(
+    signedSubRAV: SignedSubRAV,
+    pendingStore: PendingSubRAVStore
+  ): Promise<VerificationResult> {
+    try {
+      // Check if this SubRAV matches one we previously sent
+      const pendingSubRAV = await pendingStore.find(
+        signedSubRAV.subRav.channelId,
+        signedSubRAV.subRav.nonce
+      );
+      
+      if (!pendingSubRAV) {
+        return {
+          isValid: false,
+          error: `SubRAV not found in pending list: ${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`
+        };
+      }
+
+      // Verify that the signed SubRAV matches our pending unsigned SubRAV
+      if (!PaymentUtils.subRAVsMatch(pendingSubRAV, signedSubRAV.subRav)) {
+        return {
+          isValid: false,
+          error: `Signed SubRAV does not match pending SubRAV: ${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`
+        };
+      }
+
+      // Use standard verification for signature and other checks
+      const result = await this.verifySubRAV(signedSubRAV);
+      
+      if (result.isValid) {
+        // Remove from pending list on successful verification
+        await pendingStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.nonce);
+        console.log(`✅ Confirmed signed proposal for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
+      } else {
+        console.log(`❌ Signed proposal verification failed: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        isValid: false,
+        error: `Proposal confirmation failed: ${error}`
+      };
+    }
+  }
+
+  /**
+   * Generate proposal with enhanced parameters
+   * High-level method that automatically handles payer key ID construction
+   */
+  async generateProposal(params: {
+    channelId: string;
+    vmIdFragment: string;
+    amount: bigint;
+    description?: string;
+  }): Promise<SubRAV> {
+    // Get channel info to construct proper payer key ID
+    const channelInfo = await this.getChannelInfoCached(params.channelId);
+    const payerKeyId = `${channelInfo.payerDid}#${params.vmIdFragment}`;
+
+    return await this.generateSubRAV({
+      channelId: params.channelId,
+      payerKeyId,
+      amount: params.amount,
+      description: params.description || `Payment proposal for ${params.channelId}`
+    });
+  }
+
+  /**
+   * Batch verify multiple SubRAVs efficiently
+   */
+  async batchVerifySubRAVs(signedSubRAVs: SignedSubRAV[]): Promise<VerificationResult[]> {
+    const results: VerificationResult[] = [];
+    
+    // Group by channel for efficient channel info fetching
+    const channelGroups = new Map<string, SignedSubRAV[]>();
+    for (const subRAV of signedSubRAVs) {
+      const channelId = subRAV.subRav.channelId;
+      if (!channelGroups.has(channelId)) {
+        channelGroups.set(channelId, []);
+      }
+      channelGroups.get(channelId)!.push(subRAV);
+    }
+
+    // Verify each group
+    for (const [channelId, subRAVs] of channelGroups) {
+      try {
+        // Pre-fetch channel info once per channel
+        await this.getChannelInfoCached(channelId);
+        
+        // Verify each SubRAV in the group
+        for (const subRAV of subRAVs) {
+          const result = await this.verifySubRAV(subRAV);
+          results.push(result);
+        }
+      } catch (error) {
+        // If channel info fetch fails, mark all SubRAVs in this channel as invalid
+        for (const _ of subRAVs) {
+          results.push({
+            isValid: false,
+            error: `Channel verification failed: ${error}`
+          });
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get verification statistics for monitoring
+   */
+  getVerificationStats(): {
+    totalVerifications: number;
+    successfulVerifications: number;
+    failedVerifications: number;
+    commonErrors: Record<string, number>;
+  } {
+    // In production, you'd track these metrics
+    // For now, return placeholder stats
+    return {
+      totalVerifications: 0,
+      successfulVerifications: 0,
+      failedVerifications: 0,
+      commonErrors: {}
+    };
+  }
+
+  /**
+   * Pre-validate SubRAV structure before signature verification
+   * Useful for quick validation without expensive signature operations
+   */
+  validateSubRAVStructure(subRAV: SubRAV): { isValid: boolean; error?: string } {
+    return PaymentUtils.validateSubRAV(subRAV);
+  }
+
+  /**
+   * Get channel health metrics
+   */
+  async getChannelHealth(channelId: string): Promise<{
+    isHealthy: boolean;
+    issues: string[];
+    lastActivity?: Date;
+    pendingClaims: number;
+  }> {
+    const issues: string[] = [];
+    
+    try {
+      const channelInfo = await this.getChannelInfoCached(channelId);
+      
+      // Check if channel is closed
+      if (channelInfo.status === 'closed') {
+        issues.push('Channel is closed');
+      }
+      
+      // Check if channel is closing
+      if (channelInfo.status === 'closing') {
+        issues.push('Channel is in closing state');
+      }
+      
+      // In production, add more health checks like:
+      // - Check for stuck transactions
+      // - Monitor claim success rates
+      // - Check for unusual nonce gaps
+      
+      return {
+        isHealthy: issues.length === 0,
+        issues,
+        pendingClaims: 0 // Would query from contract/storage
+      };
+    } catch (error) {
+      return {
+        isHealthy: false,
+        issues: [`Channel access failed: ${error}`],
+        pendingClaims: 0
+      };
+    }
   }
 } 

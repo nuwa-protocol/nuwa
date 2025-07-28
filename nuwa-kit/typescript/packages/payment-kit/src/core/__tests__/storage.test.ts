@@ -123,7 +123,7 @@ describe('Improved Storage Interface', () => {
           channelId: `channel-${i}`,
           payerDid: `did:rooch:payer-${i % 3}`, // 3 different payers
           payeeDid: `did:rooch:payee-${i % 2}`, // 2 different payees
-          asset: { assetId: '0x3::gas_coin::RGas' },
+          assetId: '0x3::gas_coin::RGas',
           epoch: BigInt(0),
           status: i % 5 === 0 ? 'closed' : 'active', // Some closed channels
         };
@@ -280,7 +280,7 @@ describe('Improved Storage Interface', () => {
         channelId: 'ch1',
         payerDid: 'did:rooch:payer',
         payeeDid: 'did:rooch:payee',
-        asset: { assetId: '0x3::gas_coin::RGas' },
+        assetId: '0x3::gas_coin::RGas',
         epoch: BigInt(0),
         status: 'active',
       });

@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { HttpBillingMiddleware } from '../../../src/core/http-billing-middleware';
+import { HttpBillingMiddleware } from '../../../src/middlewares/http/HttpBillingMiddleware';
 import { HttpHeaderCodec } from '../../../src/core/http-header';
 import type { 
   HttpRequestPayload, 
@@ -90,7 +90,6 @@ rules:
     billingEngine: simpleBillingEngine,
     serviceId,
     defaultAssetId,
-    requirePayment: true,
     debug
   });
 
@@ -134,23 +133,11 @@ rules:
   app.get('/admin/claims', async (req: Request, res: Response) => {
     try {
       const claimsStatus = paymentMiddleware.getClaimStatus();
-      const subRAVsStats = await paymentMiddleware.getPendingSubRAVsStats();
-      
-      // Convert BigInt values to strings for JSON serialization (for subRAVs stats)
-      const serializedClaimsStatus = claimsStatus;
-      
-      const serializedSubRAVsStats: Record<string, { channelId: string; nonce: string; amount: string }> = {};
-      for (const [key, value] of Object.entries(subRAVsStats)) {
-        serializedSubRAVsStats[key] = {
-          channelId: value.channelId,
-          nonce: value.nonce.toString(),
-          amount: value.amount.toString()
-        };
-      }
+      const processingStats = paymentMiddleware.getProcessingStats();
       
       res.json({ 
-        claimsStatus: serializedClaimsStatus,
-        pendingSubRAVs: serializedSubRAVsStats,
+        claimsStatus,
+        processingStats,
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
@@ -170,7 +157,7 @@ rules:
   app.get('/admin/subrav/:channelId/:nonce', async (req: Request, res: Response) => {
     try {
       const { channelId, nonce } = req.params;
-      const subRAV = await paymentMiddleware.findPendingSubRAV(channelId, BigInt(nonce));
+      const subRAV = await paymentMiddleware.findPendingProposal(channelId, BigInt(nonce));
       if (subRAV) {
         res.json(subRAV);
       } else {
@@ -184,7 +171,7 @@ rules:
   app.delete('/admin/cleanup', async (req: Request, res: Response) => {
     try {
       const maxAge = parseInt(req.query.maxAge as string) || 30;
-      const clearedCount = await paymentMiddleware.clearExpiredPendingSubRAVs(maxAge);
+      const clearedCount = await paymentMiddleware.clearExpiredProposals(maxAge);
       res.json({ clearedCount, maxAgeMinutes: maxAge });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -192,9 +179,9 @@ rules:
   });
 
   app.get('/admin/security', (req: Request, res: Response) => {
-    const suspiciousActivity = paymentMiddleware.getSuspiciousActivityStats();
+    // Security metrics are no longer tracked in the new architecture
     res.json({
-      suspiciousActivity,
+      message: 'Security metrics not available in refactored architecture',
       timestamp: new Date().toISOString()
     });
   });

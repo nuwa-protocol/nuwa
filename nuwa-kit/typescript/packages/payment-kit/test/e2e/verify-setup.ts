@@ -3,10 +3,10 @@
  * Run this to verify all dependencies are properly configured
  */
 
-import { HttpBillingMiddleware } from '../core/http-billing-middleware';
-import { HttpHeaderCodec } from '../core/http-header';
-import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
-import { RoochPaymentChannelContract } from '../rooch/RoochPaymentChannelContract';
+import { HttpBillingMiddleware } from '../../src/middlewares/http/HttpBillingMiddleware';
+import { HttpHeaderCodec } from '../../src/core/http-header';
+import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeClient';
+import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import { TestEnv } from '@nuwa-ai/identity-kit/testHelpers';
 
 async function verifySetup() {
