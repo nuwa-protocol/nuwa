@@ -4,7 +4,7 @@
  * This test suite tests the complete HTTP payment workflow against a real Rooch node:
  * 1. Uses real blockchain connection and payment channels
  * 2. Tests the deferred payment model with HTTP middleware
- * 3. Covers the complete API billing scenario with auto-claim
+ * 3. Covers the complete API billing scenario
  * 4. Tests multi-request payment sequences
  */
 
@@ -120,8 +120,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       port: 3001, // Use different port to avoid conflicts
       serviceId: 'e2e-test-service',
       defaultAssetId: testAsset.assetId,
-      autoClaimThreshold: BigInt('50000000'), // 0.5 RGas for faster testing
-      autoClaimNonceThreshold: 5, // Trigger claim after 5 requests
       debug: false
     });
 
@@ -219,8 +217,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     console.log(`✅ Second request successful, payment processed (nonce: ${pendingSubRAV2.nonce})`);
 
-    // Test 3: Multiple requests to trigger auto-claim
-    console.log('📞 Requests 3-6: Multiple calls to trigger auto-claim');
+    // Test 3: Multiple requests to verify consistent payment processing
+    console.log('📞 Requests 3-6: Multiple calls to verify payment consistency');
     
     for (let i = 3; i <= 6; i++) {
       const response = await testClient.callEcho(`call ${i}`);
@@ -229,7 +227,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       console.log(`✅ Request ${i} successful (nonce: ${response.nonce || 'unknown'})`);
     }
 
-    // Check if auto-claim was triggered
+    // Check admin stats for payment tracking
     const adminStats = await testClient.getAdminClaims();
     console.log('📊 Admin stats after multiple requests:', JSON.stringify(adminStats, null, 2));
 
@@ -268,50 +266,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 Mixed request types test successful!');
   }, 120000);
 
-  test('Auto-claim threshold behavior', async () => {
-    if (!shouldRunE2ETests()) return;
 
-    console.log('🔄 Testing auto-claim threshold behavior');
-
-    // Reset client state
-    testClient.clearPendingSubRAV();
-
-    // Get initial channel state
-    const initialChannelInfo = await contract.getSubChannel({
-      channelId,
-      vmIdFragment: payer.vmIdFragment,
-    });
-    const initialClaimedAmount = initialChannelInfo.lastClaimedAmount;
-
-    console.log(`📊 Initial claimed amount: ${initialClaimedAmount}`);
-
-    // Make requests to accumulate enough cost to trigger auto-claim
-    // We need at least 0.5 RGas (50000000) based on our threshold
-    // Process requests cost 0.01 RGas (10000000) each, so we need 5+ requests
-    console.log('📞 Making requests to trigger auto-claim...');
-    
-    for (let i = 1; i <= 6; i++) {
-      await testClient.callProcess({ requestNumber: i });
-      console.log(`✅ Process request ${i} completed`);
-    }
-
-    // Wait a moment for async claim processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Check if claim was triggered
-    const finalChannelInfo = await contract.getSubChannel({
-      channelId,
-      vmIdFragment: payer.vmIdFragment,
-    });
-    const finalClaimedAmount = finalChannelInfo.lastClaimedAmount;
-
-    console.log(`📊 Final claimed amount: ${finalClaimedAmount}`);
-    
-    // Should have claimed some amount
-    expect(finalClaimedAmount).toBeGreaterThan(initialClaimedAmount);
-
-    console.log('🎉 Auto-claim threshold behavior test successful!');
-  }, 120000);
 
   test('Error handling in deferred payment', async () => {
     if (!shouldRunE2ETests()) return;

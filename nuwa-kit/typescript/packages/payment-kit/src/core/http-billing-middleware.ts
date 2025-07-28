@@ -25,6 +25,7 @@ import { BillingEngine } from '../billing/engine';
 import { UsdBillingEngine } from '../billing/usd-engine';
 import type { PendingSubRAVStore } from './PendingSubRAVStore';
 import { MemoryPendingSubRAVStore } from './PendingSubRAVStore';
+import type { ClaimScheduler } from './claim-scheduler';
 
 // Express types (optional dependency)
 interface Request {
@@ -59,14 +60,12 @@ export interface HttpPaymentMiddlewareConfig {
   defaultAssetId?: string;
   /** Whether to require payment for all requests */
   requirePayment?: boolean;
-  /** Minimum amount threshold for automatic claims (in asset units) */
-  autoClaimThreshold?: bigint;
-  /** Maximum nonce difference before auto-claim */
-  autoClaimNonceThreshold?: number;
   /** Debug logging */
   debug?: boolean;
   /** Store for pending unsigned SubRAV proposals */
   pendingSubRAVStore?: PendingSubRAVStore;
+  /** Optional claim scheduler for automated claiming */
+  claimScheduler?: ClaimScheduler;
 }
 
 /**
@@ -112,7 +111,6 @@ export interface PaymentProcessingResult {
  */
 export class HttpBillingMiddleware {
   private config: HttpPaymentMiddlewareConfig;
-  private pendingClaims = new Map<string, SignedSubRAV[]>(); // channelId -> pending SubRAVs
   private pendingSubRAVStore: PendingSubRAVStore;
 
   constructor(config: HttpPaymentMiddlewareConfig) {
@@ -469,88 +467,38 @@ export class HttpBillingMiddleware {
   } 
 
   /**
-   * Process verified payment and handle auto-claim logic
+   * Process verified payment and optionally trigger claim via ClaimScheduler
    */
   private async processVerifiedPayment(paymentData: HttpRequestPayload): Promise<boolean> {
     try {
-      // Process the signed SubRAV
+      // Process the signed SubRAV - this now persists to RAVStore automatically
       await this.config.payeeClient.processSignedSubRAV(paymentData.signedSubRav);
 
       const channelId = paymentData.signedSubRav.subRav.channelId;
+      const vmIdFragment = paymentData.signedSubRav.subRav.vmIdFragment;
       
-      // Add to pending claims
-      if (!this.pendingClaims.has(channelId)) {
-        this.pendingClaims.set(channelId, []);
-      }
-      this.pendingClaims.get(channelId)!.push(paymentData.signedSubRav);
+             // If ClaimScheduler is configured, optionally trigger immediate claim
+       if (this.config.claimScheduler) {
+         try {
+           const results = await this.config.claimScheduler.triggerClaim(channelId, vmIdFragment);
+           if (results.length > 0) {
+             this.log(`ClaimScheduler processed ${results.length} claims for channel ${channelId}`);
+             return true;
+           }
+         } catch (error) {
+           this.log('ClaimScheduler trigger failed (non-fatal):', error);
+           // Continue - this is not a critical error
+         }
+       }
 
-      // Check auto-claim conditions
-      return await this.checkAndTriggerAutoClaim(channelId);
+      return false;
     } catch (error) {
       this.log('Payment processing error:', error);
       throw error;
     }
   }
 
-  /**
-   * Check and trigger automatic claims based on thresholds
-   */
-  private async checkAndTriggerAutoClaim(channelId: string): Promise<boolean> {
-    const pendingSubRAVs = this.pendingClaims.get(channelId) || [];
-    
-    if (pendingSubRAVs.length === 0) {
-      return false;
-    }
 
-    const shouldClaim = this.shouldTriggerAutoClaim(pendingSubRAVs);
-    
-    if (shouldClaim) {
-      try {
-        // Claim the latest (highest) SubRAV
-        const latestSubRAV = this.getLatestSubRAV(pendingSubRAVs);
-        await this.config.payeeClient.claimFromChannel({ 
-          signedSubRAV: latestSubRAV,
-          validateBeforeClaim: false // Already validated
-        });
-
-        // Clear pending claims for this channel
-        this.pendingClaims.delete(channelId);
-        
-        this.log(`Auto-claim triggered for channel ${channelId}`);
-        return true;
-      } catch (error) {
-        this.log('Auto-claim failed:', error);
-        // Don't clear pending claims on failure, retry later
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Determine if auto-claim should be triggered
-   */
-  private shouldTriggerAutoClaim(pendingSubRAVs: SignedSubRAV[]): boolean {
-    if (pendingSubRAVs.length === 0) {
-      return false;
-    }
-
-    const latest = this.getLatestSubRAV(pendingSubRAVs);
-    
-    // Check nonce threshold
-    if (this.config.autoClaimNonceThreshold && 
-        pendingSubRAVs.length >= this.config.autoClaimNonceThreshold) {
-      return true;
-    }
-
-    // Check amount threshold
-    if (this.config.autoClaimThreshold && 
-        latest.subRav.accumulatedAmount >= this.config.autoClaimThreshold) {
-      return true;
-    }
-
-    return false;
-  }
 
   /**
    * Get the latest SubRAV (highest nonce)
@@ -647,38 +595,27 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Get pending claims statistics
+   * Get claim status - delegates to ClaimScheduler if available
    */
-  getPendingClaimsStats(): Record<string, { count: number; totalAmount: bigint }> {
-    const stats: Record<string, { count: number; totalAmount: bigint }> = {};
-    
-    for (const [channelId, subRAVs] of this.pendingClaims.entries()) {
-      const latest = subRAVs.length > 0 ? this.getLatestSubRAV(subRAVs) : null;
-      stats[channelId] = {
-        count: subRAVs.length,
-        totalAmount: latest?.subRav.accumulatedAmount || 0n
-      };
+  getClaimStatus(): any {
+    if (this.config.claimScheduler) {
+      return this.config.claimScheduler.getStatus();
     }
     
-    return stats;
+    return { isRunning: false, activeClaims: 0, failedAttempts: 0 };
   }
 
   /**
-   * Manually trigger claims for a channel
+   * Manually trigger claims for a channel - delegates to ClaimScheduler
    */
   async manualClaim(channelId: string): Promise<boolean> {
-    return await this.checkAndTriggerAutoClaim(channelId);
-  }
-
-  /**
-   * Clear pending claims for a channel (useful for cleanup)
-   */
-  clearPendingClaims(channelId?: string): void {
-    if (channelId) {
-      this.pendingClaims.delete(channelId);
-    } else {
-      this.pendingClaims.clear();
+    if (this.config.claimScheduler) {
+      const results = await this.config.claimScheduler.triggerClaim(channelId);
+      return results.length > 0;
     }
+    
+    this.log('No ClaimScheduler configured - manual claim not available');
+    return false;
   }
 
   /**

@@ -15,8 +15,6 @@ export interface BillingServerConfig {
   port?: number;
   serviceId?: string;
   defaultAssetId?: string;
-  autoClaimThreshold?: bigint;
-  autoClaimNonceThreshold?: number;
   debug?: boolean;
 }
 
@@ -26,8 +24,6 @@ export async function createBillingServer(config: BillingServerConfig) {
     port = 3000,
     serviceId = 'echo-service',
     defaultAssetId = '0x3::gas_coin::RGas',
-    autoClaimThreshold = BigInt('100000000'), // 1 RGas
-    autoClaimNonceThreshold = 10,
     debug = true
   } = config;
 
@@ -95,8 +91,6 @@ rules:
     serviceId,
     defaultAssetId,
     requirePayment: true,
-    autoClaimThreshold,
-    autoClaimNonceThreshold,
     debug
   });
 
@@ -139,17 +133,11 @@ rules:
   // 6. 管理接口
   app.get('/admin/claims', async (req: Request, res: Response) => {
     try {
-      const claimsStats = paymentMiddleware.getPendingClaimsStats();
+      const claimsStatus = paymentMiddleware.getClaimStatus();
       const subRAVsStats = await paymentMiddleware.getPendingSubRAVsStats();
       
-      // Convert BigInt values to strings for JSON serialization
-      const serializedClaimsStats: Record<string, { count: number; totalAmount: string }> = {};
-      for (const [key, value] of Object.entries(claimsStats)) {
-        serializedClaimsStats[key] = {
-          count: value.count,
-          totalAmount: value.totalAmount.toString()
-        };
-      }
+      // Convert BigInt values to strings for JSON serialization (for subRAVs stats)
+      const serializedClaimsStatus = claimsStatus;
       
       const serializedSubRAVsStats: Record<string, { channelId: string; nonce: string; amount: string }> = {};
       for (const [key, value] of Object.entries(subRAVsStats)) {
@@ -161,7 +149,7 @@ rules:
       }
       
       res.json({ 
-        pendingClaims: serializedClaimsStats,
+        claimsStatus: serializedClaimsStatus,
         pendingSubRAVs: serializedSubRAVsStats,
         timestamp: new Date().toISOString()
       });
