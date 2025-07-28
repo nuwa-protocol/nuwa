@@ -12,7 +12,7 @@ import type {
   RequestMetadata,
   ProcessorPaymentResult
 } from '../../core/PaymentProcessor';
-// import { BillingContextBuilder } from '../../core/BillingContextBuilder';
+import { BillingContextBuilder } from '../../core/BillingContextBuilder';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 

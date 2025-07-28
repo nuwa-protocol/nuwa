@@ -8,8 +8,8 @@ export * from './core/claim-scheduler';
 
 // Payment processor architecture
 export * from './core/PaymentProcessor';
-// export * from './core/PaymentUtils';
-// export * from './core/BillingContextBuilder';
+export * from './core/PaymentUtils';
+export * from './core/BillingContextBuilder';
 
 // Payment codecs
 // export * from './codecs/PaymentCodec';

@@ -11,9 +11,8 @@ import type {
 import type { PendingSubRAVStore } from './PendingSubRAVStore';
 import { MemoryPendingSubRAVStore } from './PendingSubRAVStore';
 import type { ClaimScheduler } from './claim-scheduler';
-// Import PaymentUtils and BillingContextBuilder (remove if files don't exist yet)
-// import { PaymentUtils } from './PaymentUtils';
-// import { BillingContextBuilder } from './BillingContextBuilder';
+import { PaymentUtils } from './PaymentUtils';
+import { BillingContextBuilder } from './BillingContextBuilder';
   
   /**
    * Configuration for PaymentProcessor
@@ -165,7 +164,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         }
   
               // Step 2: Check if this is a handshake request
-      const isHandshake = signedSubRAV.subRav.nonce === 0n && signedSubRAV.subRav.accumulatedAmount === 0n;
+        const isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
       let autoClaimTriggered = false;
       let verificationResult: PaymentVerificationResult;
   
@@ -205,19 +204,18 @@ export interface PaymentVerificationResult extends VerificationResult {
           this.stats.successfulPayments++;
         }
   
-        // Step 3: Build billing context with channel info from signed SubRAV
+        // Step 3: Build billing context using BillingContextBuilder
         const enhancedMeta = {
           ...requestMeta,
           channelId: signedSubRAV.subRav.channelId,
           vmIdFragment: signedSubRAV.subRav.vmIdFragment
         };
         
-              const billingContext = {
-        serviceId: this.config.serviceId,
-        operation: enhancedMeta.operation,
-        assetId: enhancedMeta.assetId || this.config.defaultAssetId,
-        meta: enhancedMeta
-      };
+        const billingContext = BillingContextBuilder.build(
+          this.config.serviceId,
+          enhancedMeta,
+          this.config.defaultAssetId
+        );
   
         // Step 4: Calculate cost for current request
         const cost = await this.calculateCost(billingContext);
@@ -250,7 +248,7 @@ export interface PaymentVerificationResult extends VerificationResult {
           autoClaimTriggered,
           isHandshake,
           payerKeyId: verificationResult.payerKeyId,
-          serviceTxRef: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+          serviceTxRef: PaymentUtils.generateTxRef()
         };
   
       } catch (error) {
@@ -319,17 +317,8 @@ export interface PaymentVerificationResult extends VerificationResult {
           };
         }
   
-              // Verify that the signed SubRAV matches our pending unsigned SubRAV
-      const subRAVsMatch = (
-        pendingSubRAV.version === signedSubRAV.subRav.version &&
-        pendingSubRAV.chainId === signedSubRAV.subRav.chainId &&
-        pendingSubRAV.channelId === signedSubRAV.subRav.channelId &&
-        pendingSubRAV.channelEpoch === signedSubRAV.subRav.channelEpoch &&
-        pendingSubRAV.vmIdFragment === signedSubRAV.subRav.vmIdFragment &&
-        pendingSubRAV.accumulatedAmount === signedSubRAV.subRav.accumulatedAmount &&
-        pendingSubRAV.nonce === signedSubRAV.subRav.nonce
-      );
-      if (!subRAVsMatch) {
+        // Verify that the signed SubRAV matches our pending unsigned SubRAV
+        if (!PaymentUtils.subRAVsMatch(pendingSubRAV, signedSubRAV.subRav)) {
           return {
             isValid: false,
             error: `Signed SubRAV does not match pending SubRAV: ${signedSubRAV.subRav.channelId}:${signedSubRAV.subRav.nonce}`
@@ -441,18 +430,7 @@ export interface PaymentVerificationResult extends VerificationResult {
      * Extract error code from error message
      */
     private extractErrorCode(error: string): string {
-      if (error.includes('not found in pending list')) {
-        return 'UNKNOWN_SUBRAV';
-      } else if (error.includes('does not match')) {
-        return 'TAMPERED_SUBRAV';
-      } else if (error.includes('Invalid') && error.includes('signature')) {
-        return 'INVALID_PAYMENT';
-      } else if (error.includes('Channel')) {
-        return 'CHANNEL_CLOSED';
-      } else if (error.includes('Epoch')) {
-        return 'EPOCH_MISMATCH';
-      }
-      return 'PAYMENT_ERROR';
+      return PaymentUtils.extractErrorCode(error);
     }
   
     /**
