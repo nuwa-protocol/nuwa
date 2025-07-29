@@ -1,3 +1,3 @@
 // Express integration exports
 export * from './BillableRouter';
-export * from './ExpressBillingKit'; 
+export * from './ExpressPaymentKit'; 

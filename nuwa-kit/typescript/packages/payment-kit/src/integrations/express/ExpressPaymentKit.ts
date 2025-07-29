@@ -13,9 +13,9 @@ import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 
 /**
- * Configuration for creating ExpressBillingKit
+ * Configuration for creating ExpressPaymentKit
  */
-export interface ExpressBillingKitOptions {
+export interface ExpressPaymentKitOptions {
   /** Service identifier */
   serviceId: string;
   /** Service private key (or KMS Signer) */
@@ -36,9 +36,9 @@ export interface ExpressBillingKitOptions {
 }
 
 /**
- * Express Billing Kit interface
+ * Express Payment Kit interface
  */
-export interface ExpressBillingKit {
+export interface ExpressPaymentKit {
   /** Express Router to mount in your app */
   readonly router: Router;
   
@@ -60,17 +60,17 @@ export interface ExpressBillingKit {
 }
 
 /**
- * Implementation of ExpressBillingKit
+ * Implementation of ExpressPaymentKit
  */
-class ExpressBillingKitImpl implements ExpressBillingKit {
+class ExpressPaymentKitImpl implements ExpressPaymentKit {
   public readonly router: Router;
   private readonly billableRouter: BillableRouter;
   private readonly middleware: HttpBillingMiddleware;
-  private readonly config: ExpressBillingKitOptions;
+  private readonly config: ExpressPaymentKitOptions;
   private readonly payeeClient: PaymentChannelPayeeClient;
 
   constructor(
-    config: ExpressBillingKitOptions,
+    config: ExpressPaymentKitOptions,
     payeeClient: PaymentChannelPayeeClient,
     rateProvider: RateProvider
   ) {
@@ -344,9 +344,9 @@ class ExpressBillingKitImpl implements ExpressBillingKit {
 }
 
 /**
- * Create an ExpressBillingKit instance
+ * Create an ExpressPaymentKit instance
  */
-export async function createExpressBillingKit(config: ExpressBillingKitOptions): Promise<ExpressBillingKit> {
+export async function createExpressPaymentKit(config: ExpressPaymentKitOptions): Promise<ExpressPaymentKit> {
   // Validate configuration
   if (!config.signer) {
     throw new Error('Service private key (signer) is required');
@@ -385,7 +385,7 @@ export async function createExpressBillingKit(config: ExpressBillingKitOptions):
   // Create default ContractRateProvider
   const rateProvider = new ContractRateProvider(contract, 30_000);
 
-  return new ExpressBillingKitImpl(config, payeeClient, rateProvider);
+  return new ExpressPaymentKitImpl(config, payeeClient, rateProvider);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { createExpressBillingKit } from '../../../src/integrations/express/ExpressBillingKit';
+import { createExpressPaymentKit } from '../../../src/integrations/express/ExpressPaymentKit';
 import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 
@@ -44,11 +44,10 @@ export async function createBillingServer(config: BillingServerConfig) {
   const app = express();
   app.use(express.json());
 
-  // 1. Create ExpressBillingKit integration for billing functionality
-  const billing = await createExpressBillingKit({
+  // 1. Create ExpressPaymentKit integration for billing functionality
+  const billing = await createExpressPaymentKit({
     serviceId,
     signer: signer!,
-    did,
     rpcUrl,
     network,
     defaultAssetId,
@@ -93,7 +92,7 @@ export async function createBillingServer(config: BillingServerConfig) {
       total_tokens: 150
     };
     
-    // Set usage to res.locals (ExpressBillingKit will read this)
+    // Set usage to res.locals (ExpressPaymentKit will read this)
     res.locals.usage = mockUsage;
     
     res.json({
@@ -134,7 +133,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   return {
     app,
     server,
-    billing, // ExpressBillingKit instance
+    billing, // ExpressPaymentKit instance
     baseURL: `http://localhost:${port}`,
     async shutdown() {
       server.close();

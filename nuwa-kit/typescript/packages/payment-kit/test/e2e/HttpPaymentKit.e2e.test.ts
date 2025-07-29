@@ -105,7 +105,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Fund and setup payment channel
     await setupPaymentChannel();
 
-    // Start billing server using new ExpressBillingKitOptions API
+    // Start billing server using new ExpressPaymentKitOptions API
     billingServerInstance = await createBillingServer({
       signer: payee.keyManager,
       did: payee.did,

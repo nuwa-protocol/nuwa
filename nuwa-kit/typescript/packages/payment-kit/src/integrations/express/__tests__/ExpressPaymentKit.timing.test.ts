@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { BillableRouter } from '../BillableRouter';
 
-describe('ExpressBillingKit Timing Fix Verification', () => {
+describe('ExpressPaymentKit Timing Fix Verification', () => {
   describe('Rule registration timing', () => {
     it('should demonstrate the timing fix with BillableRouter', () => {
       console.log('\n🔧 Verifying timing fix...');
       
-      // Step 1: Create BillableRouter (simulating ExpressBillingKit constructor)
+      // Step 1: Create BillableRouter (simulating ExpressPaymentKit constructor)
       const router = new BillableRouter({
         serviceId: 'test-service',
         defaultPricePicoUSD: '500000000' // 0.0005 USD
