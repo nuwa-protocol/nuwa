@@ -66,6 +66,20 @@ jobs:
           cd nuwa-kit/typescript
           pnpm install
       
+      - name: Build dependencies
+        run: |
+          cd nuwa-kit/typescript
+          # Build identity-kit first since other packages depend on it
+          if [[ "${{ matrix.package }}" == "payment-kit" || "${{ matrix.package }}" == "identity-kit-web" ]]; then
+            pnpm --filter @nuwa-ai/identity-kit build
+          fi
+      
+      - name: Verify workspace setup
+        run: |
+          cd nuwa-kit/typescript
+          # Ensure workspace dependencies are properly linked
+          pnpm list --depth=0
+      
       - name: Run tests for ${{ matrix.package }}
         env:
           NODE_OPTIONS: --experimental-global-webcrypto
@@ -81,5 +95,7 @@ jobs:
           
           if [[ -n "$PACKAGE_PATH" ]]; then
             cd $PACKAGE_PATH
+            # Ensure the built identity-kit is available for TypeScript resolution
+            ls -la ../identity-kit/dist/ || echo "identity-kit dist not found"
             pnpm test
           fi 
