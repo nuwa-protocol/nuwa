@@ -14,7 +14,7 @@ import { PaymentChannelPayerClient } from '../PaymentChannelPayerClient';
 import { PaymentChannelPayeeClient } from '../PaymentChannelPayeeClient';
 import type { SubRAV, SignedSubRAV, AssetInfo } from '../../core/types';
 import { MemoryChannelRepository } from '../../storage';
-import { SubRAVManager } from '../../core/subrav';
+import { SubRAVManager } from '../../core/SubRav';
 import { KeyStoreSigner } from '@nuwa-ai/identity-kit';
 import { 
   MockContract, 

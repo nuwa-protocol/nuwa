@@ -22,7 +22,7 @@ import type {
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import type { CostCalculator } from '../../billing/types';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
-import type { ClaimScheduler } from '../../core/claim-scheduler';
+import type { ClaimScheduler } from '../../core/ClaimScheduler';
 
 // Express types (optional dependency)
 interface Request {

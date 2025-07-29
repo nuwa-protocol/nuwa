@@ -10,7 +10,7 @@ import type {
 } from '../billing/types';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
-import type { ClaimScheduler } from './claim-scheduler';
+import type { ClaimScheduler } from './ClaimScheduler';
 import { PaymentUtils } from './PaymentUtils';
 import { BillingContextBuilder } from './BillingContextBuilder';
   

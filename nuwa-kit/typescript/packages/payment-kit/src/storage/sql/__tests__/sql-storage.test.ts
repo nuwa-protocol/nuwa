@@ -10,7 +10,7 @@ import { Pool } from 'pg';
 import { SqlRAVRepository, type SqlRAVRepositoryOptions } from '../rav.sql';
 import { SqlChannelRepository, type SqlChannelRepositoryOptions } from '../channel.sql';
 import { SqlPendingSubRAVRepository, type SqlPendingSubRAVRepositoryOptions } from '../pendingSubRav.sql';
-import { SubRAVUtils } from '../../../core/subrav';
+import { SubRAVUtils } from '../../../core/SubRav';
 import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../../core/types';
 
 // Test configuration

@@ -16,7 +16,7 @@ import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPayment
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
 import { createChannelRepoAuto, createRAVRepoAuto, createPendingSubRAVRepoAuto } from '../storage';
-import { SubRAVManager, SubRAVUtils } from '../core/subrav';
+import { SubRAVManager, SubRAVUtils } from '../core/SubRav';
 import { PaymentUtils } from '../core/PaymentUtils';
 
 /**

@@ -3,7 +3,7 @@
  * Uses SubRAVCodec to ensure consistency with Move contracts
  */
 
-import { SubRAVCodec } from '../../core/subrav';
+import { SubRAVCodec } from '../../core/SubRav';
 import type { SubRAV } from '../../core/types';
 
 /**

@@ -11,7 +11,7 @@ import {
   SubRAVManager,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1 
-} from '../subrav';
+} from '../SubRav';
 import type { SubRAV, SignedSubRAV } from '../types';
 import type { DIDDocument } from '@nuwa-ai/identity-kit';
 import { 

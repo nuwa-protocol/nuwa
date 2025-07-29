@@ -21,7 +21,7 @@ import type {
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
-import { SubRAVManager } from '../core/subrav';
+import { SubRAVManager } from '../core/SubRav';
 
 export interface PayerOpenChannelParams {
   payeeDid: string;

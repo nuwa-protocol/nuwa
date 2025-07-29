@@ -41,7 +41,7 @@ import type {
   SubRAV,
   ChannelInfo,
 } from '../core/types';
-import { SubRAVCodec } from '../core/subrav';
+import { SubRAVCodec } from '../core/SubRav';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
 
 export interface RoochContractOptions {

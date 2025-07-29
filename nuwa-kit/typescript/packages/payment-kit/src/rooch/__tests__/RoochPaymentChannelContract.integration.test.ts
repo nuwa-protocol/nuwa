@@ -14,7 +14,7 @@ import type {
 import type { ChannelInfo, AssetInfo, SignedSubRAV, SubRAV } from '../../core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, MultibaseCodec, parseDid } from '@nuwa-ai/identity-kit';
-import { SubRAVSigner, SUBRAV_VERSION_1 } from '../../core/subrav';
+import { SubRAVSigner, SUBRAV_VERSION_1 } from '../../core/SubRav';
 
 // Check if we should run integration tests
 const shouldRunIntegrationTests = () => {

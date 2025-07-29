@@ -8,7 +8,7 @@ import * as path from 'path';
 import { describe, it, expect } from '@jest/globals';
 import { HttpPaymentCodec } from '../../src/middlewares/http/HttpPaymentCodec';
 import { HttpBillingMiddleware } from '../../src/middlewares/http/HttpBillingMiddleware';
-import { SubRAVUtils } from '../../src/core/subrav';
+import { SubRAVUtils } from '../../src/core/SubRav';
 import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import { TestEnv } from '@nuwa-ai/identity-kit/testHelpers';
