@@ -108,3 +108,4 @@ export {
 } from './utils';
 
 export * from './integrations/express/BillableRouter';
+export * from './integrations/express/ExpressBillingKit';

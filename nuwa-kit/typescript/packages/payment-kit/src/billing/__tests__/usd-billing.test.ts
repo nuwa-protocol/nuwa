@@ -86,10 +86,7 @@ describe('USD Billing with Token Settlement', () => {
     
     engine = new UsdBillingEngine(
       new MockConfigLoader(),
-      rateProvider,
-      {
-        '0x3::gas_coin::RGas': { decimals: 8 }
-      }
+      rateProvider
     );
   });
 

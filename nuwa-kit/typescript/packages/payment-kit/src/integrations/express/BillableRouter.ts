@@ -1,5 +1,5 @@
 import express, { Router, RequestHandler } from 'express';
-import type { BillingRule, BillingConfig, ConfigLoader } from '../../billing/types';
+import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig } from '../../billing/types';
 
 /**
  * Options when creating a BillableRouter
@@ -52,24 +52,24 @@ export class BillableRouter {
   // Public helpers for HTTP verbs
   // ---------------------------------------------------------------------
 
-  get(path: string, price: bigint | string, handler: RequestHandler, id?: string) {
-    return this.register('get', path, price, handler, id);
+  get(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    return this.register('get', path, pricing, handler, id);
   }
 
-  post(path: string, price: bigint | string, handler: RequestHandler, id?: string) {
-    return this.register('post', path, price, handler, id);
+  post(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    return this.register('post', path, pricing, handler, id);
   }
 
-  put(path: string, price: bigint | string, handler: RequestHandler, id?: string) {
-    return this.register('put', path, price, handler, id);
+  put(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    return this.register('put', path, pricing, handler, id);
   }
 
-  delete(path: string, price: bigint | string, handler: RequestHandler, id?: string) {
-    return this.register('delete', path, price, handler, id);
+  delete(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    return this.register('delete', path, pricing, handler, id);
   }
 
-  patch(path: string, price: bigint | string, handler: RequestHandler, id?: string) {
-    return this.register('patch', path, price, handler, id);
+  patch(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    return this.register('patch', path, pricing, handler, id);
   }
 
   /**
@@ -101,7 +101,20 @@ export class BillableRouter {
   // ---------------------------------------------------------------------
   // Internal helper to collect rule + register to Express
   // ---------------------------------------------------------------------
-  private register(method: string, path: string, price: bigint | string, handler: RequestHandler, id?: string) {
+  private register(method: string, path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    // Determine strategy config
+    let strategy: StrategyConfig;
+    if (typeof pricing === 'object' && 'type' in pricing) {
+      // It's already a strategy config
+      strategy = pricing;
+    } else {
+      // It's a fixed price, create PerRequest strategy
+      strategy = {
+        type: 'PerRequest',
+        price: pricing.toString()
+      };
+    }
+
     // Collect billing rule
     const rule: BillingRule = {
       id: id || `${method}:${path}`,
@@ -109,10 +122,7 @@ export class BillableRouter {
         path,
         method: method.toUpperCase()
       },
-      strategy: {
-        type: 'PerRequest',
-        price: price.toString()
-      }
+      strategy
     };
     // Insert rule so that default rules are evaluated last.
     // Specific rules (non-default) should take precedence over the catch-all default rule.

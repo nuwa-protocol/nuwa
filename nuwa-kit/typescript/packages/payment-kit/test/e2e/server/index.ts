@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { HttpBillingMiddleware } from '../../../src/middlewares/http/HttpBillingMiddleware';
+import { createExpressBillingKit } from '../../../src/integrations/express/ExpressBillingKit';
 import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 
@@ -7,9 +7,6 @@ import type {
   SubRAV 
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
-import { UsdBillingEngine } from '../../../src/billing';
-import { ContractRateProvider } from '../../../src/billing/rate';
-import { BillableRouter } from '../../../src';
 
 export interface BillingServerConfig {
   payeeClient: PaymentChannelPayeeClient;
@@ -33,13 +30,18 @@ export async function createBillingServer(config: BillingServerConfig) {
   const app = express();
   app.use(express.json());
 
-  // 1. 使用 BillableRouter 声明路由并同步计费规则
-  const billRouter = new BillableRouter({
+  // 1. 创建 ExpressBillingKit 集成计费功能
+  const billing = await createExpressBillingKit({
     serviceId,
-    defaultPricePicoUSD: '500000000' // 0.0005 USD
+    payeeClient,
+    defaultAssetId,
+    defaultPricePicoUSD: '500000000', // 0.0005 USD
+    didAuth: { enabled: false }, // 测试环境暂时关闭 DID 认证
+    debug
   });
 
-  billRouter.get('/v1/echo', '1000000000', (req: Request, res: Response) => {
+  // 2. 声明路由 & 计价策略
+  billing.get('/v1/echo', '1000000000', (req: Request, res: Response) => {
     const paymentResult = (req as any).paymentResult;
     res.json({
       echo: req.query.q || 'hello',
@@ -49,7 +51,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     });
   });
 
-  billRouter.post('/v1/process', '10000000000', (req: Request, res: Response) => {
+  billing.post('/v1/process', '10000000000', (req: Request, res: Response) => {
     const paymentResult = (req as any).paymentResult;
     res.json({
       processed: req.body,
@@ -59,110 +61,52 @@ export async function createBillingServer(config: BillingServerConfig) {
     });
   });
 
-  // 2. 创建 USD 计费引擎（USD 定价，Token 结算）
-  const configLoader = billRouter.getConfigLoader();
-  
-  // Get contract instance from payeeClient for price queries
-  const contract = (payeeClient as any).contract; // Access the underlying contract
-  if (!contract) {
-    throw new Error('PayeeClient contract is required for ContractRateProvider');
-  }
-  
-  const rateProvider = new ContractRateProvider(
-    contract,
-    30_000 // 30 seconds cache for on-chain data
-  );
-  
-  const usdBillingEngine = new UsdBillingEngine(
-    configLoader,
-    rateProvider
-  );
-
-  // 3. 创建支付中间件
-  const paymentMiddleware = new HttpBillingMiddleware({
-    payeeClient,
-    billingEngine: usdBillingEngine,
-    serviceId,
-    defaultAssetId,
-    debug
-  });
-
-  // 4. 应用支付中间件到所有路由，但跳过管理和健康检查路由
-  app.use(async (req: Request, res: Response, next: NextFunction) => {
-    // Skip payment middleware for admin and health routes
-    if (req.path.startsWith('/admin') || req.path === '/health') {
-      return next();
-    }
+  // 测试 PerToken 策略的新路由
+  billing.post('/v1/chat/completions', {
+    type: 'PerToken',
+    unitPricePicoUSD: '20000', // 0.00002 USD per token
+    usageKey: 'usage.total_tokens'
+  }, (req: Request, res: Response) => {
+    const paymentResult = (req as any).paymentResult;
     
-    try {
-      await (paymentMiddleware.createExpressMiddleware() as any)(req, res, next);
-    } catch (error) {
-      console.error('🚨 Payment middleware error:', error);
-      res.status(500).json({ error: 'Payment processing failed', details: error instanceof Error ? error.message : String(error) });
-    }
+    // 模拟 LLM 响应和使用情况
+    const mockUsage = {
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      total_tokens: 150
+    };
+    
+    // 设置使用情况到 res.locals（ExpressBillingKit 会读取这个）
+    res.locals.usage = mockUsage;
+    
+    res.json({
+      id: 'chatcmpl-test',
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: 'gpt-3.5-turbo',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: `Echo: ${JSON.stringify(req.body)}`
+        },
+        finish_reason: 'stop'
+      }],
+      usage: mockUsage,
+      // 计费信息
+      cost: paymentResult?.cost?.toString(),
+      nonce: paymentResult?.subRav?.nonce?.toString()
+    });
   });
 
-  // 5. 挂载业务路由（支付验证后才会执行）
-  app.use(billRouter.router);
+  // 3. 挂载计费路由
+  app.use(billing.router);
 
   // 原业务路由已迁移到 BillableRouter 中
 
-  // 6. 管理接口
-  app.get('/admin/claims', async (req: Request, res: Response) => {
-    try {
-      const claimsStatus = paymentMiddleware.getClaimStatus();
-      const processingStats = paymentMiddleware.getProcessingStats();
-      
-      res.json({ 
-        claimsStatus,
-        processingStats,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/admin/claim/:channelId', async (req: Request, res: Response) => {
-    try {
-      const success = await paymentMiddleware.manualClaim(req.params.channelId);
-      res.json({ success, channelId: req.params.channelId });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get('/admin/subrav/:channelId/:nonce', async (req: Request, res: Response) => {
-    try {
-      const { channelId, nonce } = req.params;
-      const subRAV = await paymentMiddleware.findPendingProposal(channelId, BigInt(nonce));
-      if (subRAV) {
-        res.json(subRAV);
-      } else {
-        res.status(404).json({ error: 'SubRAV not found' });
-      }
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.delete('/admin/cleanup', async (req: Request, res: Response) => {
-    try {
-      const maxAge = parseInt(req.query.maxAge as string) || 30;
-      const clearedCount = await paymentMiddleware.clearExpiredProposals(maxAge);
-      res.json({ clearedCount, maxAgeMinutes: maxAge });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get('/admin/security', (req: Request, res: Response) => {
-    // Security metrics are no longer tracked in the new architecture
-    res.json({
-      message: 'Security metrics not available in refactored architecture',
-      timestamp: new Date().toISOString()
-    });
-  });
+  // 4. 挂载管理和恢复路由
+  app.use('/admin', billing.adminRouter()); // 管理接口
+  app.use('/payment', billing.recoveryRouter()); // 客户端恢复接口
 
   app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -173,7 +117,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   return {
     app,
     server,
-    middleware: paymentMiddleware,
+    billing, // ExpressBillingKit instance
     baseURL: `http://localhost:${port}`,
     async shutdown() {
       server.close();
@@ -353,6 +297,76 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       const response = await fetch(`${baseURL}/admin/claim/${channelId}`, {
         method: 'POST'
       });
+      return await response.json();
+    },
+
+    async callChatCompletions(messages: any[]) {
+      let headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // 生成签名的 SubRAV
+      let signedSubRAV: any;
+      
+      if (pendingSubRAV) {
+        // 使用服务器提案的 SubRAV
+        signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
+      } else if (isFirstRequest) {
+        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        const channelInfo = await payerClient.getChannelInfo(channelId);
+        const keyIds = await payerClient.signer.listKeyIds();
+        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
+        
+        const handshakeSubRAV: SubRAV = {
+          version: 1,
+          chainId: BigInt(4), // 根据网络配置
+          channelId,
+          channelEpoch: channelInfo.epoch,
+          vmIdFragment,
+          accumulatedAmount: 0n,
+          nonce: 0n
+        };
+        
+        signedSubRAV = await payerClient.signSubRAV(handshakeSubRAV);
+        isFirstRequest = false;
+      } else {
+        throw new Error('No pending SubRAV available for non-first request');
+      }
+
+      const requestPayload: HttpRequestPayload = {
+        signedSubRav: signedSubRAV,
+        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        clientTxRef: `client_${Date.now()}`
+      };
+
+      headers['X-Payment-Channel-Data'] = HttpPaymentCodec.buildRequestHeader(requestPayload);
+      
+      const response = await fetch(`${baseURL}/v1/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages,
+          max_tokens: 100
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Request failed: ${response.status} - ${errorData.error || response.statusText}`);
+      }
+
+      // 处理响应，提取下一次的 SubRAV 提案
+      const paymentHeader = response.headers.get('X-Payment-Channel-Data');
+      if (paymentHeader) {
+        try {
+          const responsePayload: HttpResponsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
+          pendingSubRAV = responsePayload.subRav;
+        } catch (error) {
+          console.warn('Failed to parse payment header:', error);
+        }
+      }
+
       return await response.json();
     }
   };

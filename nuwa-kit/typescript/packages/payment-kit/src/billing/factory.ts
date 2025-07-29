@@ -1,5 +1,5 @@
 import { Strategy, StrategyConfig, BillingConfig, BillingRule } from './types';
-import { PerRequestStrategy, PerRequestConfig } from './strategies';
+import { PerRequestStrategy, PerRequestConfig, PerTokenStrategy, PerTokenConfig } from './strategies';
 
 /**
  * Factory for creating billing strategies from configuration
@@ -14,6 +14,9 @@ export class StrategyFactory {
     switch (config.type) {
       case 'PerRequest':
         return new PerRequestStrategy(config as unknown as PerRequestConfig);
+      
+      case 'PerToken':
+        return new PerTokenStrategy(config as unknown as PerTokenConfig);
       
       default:
         throw new Error(`Unknown strategy type: ${config.type}`);
