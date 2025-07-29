@@ -1,16 +1,18 @@
-import type { SignedSubRAV } from '../../core/types';
+import { MultibaseCodec } from '@nuwa-ai/identity-kit';
+import type { SignedSubRAV, SubRAV } from '../../core/types';
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
 import { EncodingError, DecodingError } from '../../codecs/PaymentCodec';
-import { HttpHeaderCodec } from '../../core/http-header';
 import type { HttpRequestPayload, HttpResponsePayload } from '../../core/types';
 
 /**
  * HTTP-specific payment codec
  * 
  * Handles encoding/decoding of payment data for HTTP protocol
- * using the existing HttpHeaderCodec
+ * using X-Payment-Channel-Data header format
  */
 export class HttpPaymentCodec implements PaymentCodec {
+  private static readonly HEADER_NAME = 'X-Payment-Channel-Data';
+
   /**
    * Encode signed SubRAV for HTTP request header
    */
@@ -21,7 +23,7 @@ export class HttpPaymentCodec implements PaymentCodec {
         ...metadata
       };
       
-      return HttpHeaderCodec.buildRequestHeader(payload);
+      return HttpPaymentCodec.buildRequestHeader(payload);
     } catch (error) {
       throw new EncodingError(
         'Failed to encode HTTP payment data',
@@ -35,15 +37,12 @@ export class HttpPaymentCodec implements PaymentCodec {
    */
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     try {
-      const payload = HttpHeaderCodec.parseRequestHeader(encoded);
+      const payload = HttpPaymentCodec.parseRequestHeader(encoded);
       
+      const { signedSubRav, ...metadata } = payload;
       return {
-        signedSubRAV: payload.signedSubRav,
-        metadata: {
-          // Include any additional fields from the payload
-          // that are not part of the signed SubRAV
-          ...(payload as any)
-        }
+        signedSubRAV: signedSubRav,
+        metadata
       };
     } catch (error) {
       throw new DecodingError(
@@ -57,7 +56,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Encode SubRAV proposal for HTTP response header
    */
   encodeResponse(
-    subRAV: any, // SubRAV type
+    subRAV: SubRAV,
     cost: bigint,
     serviceTxRef: string,
     metadata?: any
@@ -72,7 +71,7 @@ export class HttpPaymentCodec implements PaymentCodec {
         ...metadata
       };
       
-      return HttpHeaderCodec.buildResponseHeader(payload);
+      return HttpPaymentCodec.buildResponseHeader(payload);
     } catch (error) {
       throw new EncodingError(
         'Failed to encode HTTP response payment data',
@@ -85,13 +84,13 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Decode HTTP response header to SubRAV proposal
    */
   decodeResponse(encoded: string): {
-    subRAV: any;
+    subRAV: SubRAV;
     cost: bigint;
     serviceTxRef?: string;
     metadata?: any;
   } {
     try {
-      const payload = HttpHeaderCodec.parseResponseHeader(encoded);
+      const payload = HttpPaymentCodec.parseResponseHeader(encoded);
       
       return {
         subRAV: payload.subRav,
@@ -99,9 +98,7 @@ export class HttpPaymentCodec implements PaymentCodec {
         serviceTxRef: payload.serviceTxRef,
         metadata: {
           errorCode: payload.errorCode,
-          message: payload.message,
-          // Include any additional fields
-          ...(payload as any)
+          message: payload.message
         }
       };
     } catch (error) {
@@ -112,18 +109,92 @@ export class HttpPaymentCodec implements PaymentCodec {
     }
   }
 
+  // ============================================================================
+  // Static HTTP Header Building Methods
+  // ============================================================================
+
+  /**
+   * Build HTTP request header value
+   */
+  static buildRequestHeader(payload: HttpRequestPayload): string {
+    // Convert payload to serializable format
+    const serializable = {
+      signedSubRav: this.serializeSignedSubRAV(payload.signedSubRav),
+      maxAmount: payload.maxAmount?.toString(),
+      clientTxRef: payload.clientTxRef,
+    };
+
+    // Convert to JSON and encode
+    const json = JSON.stringify(serializable);
+    return MultibaseCodec.encodeBase64url(json);
+  }
+
+  /**
+   * Parse HTTP request header value
+   */
+  static parseRequestHeader(headerValue: string): HttpRequestPayload {
+    try {
+      const json = MultibaseCodec.decodeBase64urlToString(headerValue);
+      const data = JSON.parse(json);
+
+      return {
+        signedSubRav: this.deserializeSignedSubRAV(data.signedSubRav),
+        maxAmount: data.maxAmount ? BigInt(data.maxAmount) : undefined,
+        clientTxRef: data.clientTxRef,
+      };
+    } catch (error) {
+      throw new Error(`Failed to parse request header: ${error}`);
+    }
+  }
+
+  /**
+   * Build HTTP response header value
+   */
+  static buildResponseHeader(payload: HttpResponsePayload): string {
+    const serializable = {
+      subRav: this.serializeSubRAV(payload.subRav),
+      amountDebited: payload.amountDebited.toString(),
+      serviceTxRef: payload.serviceTxRef,
+      errorCode: payload.errorCode,
+      message: payload.message
+    };
+
+    const json = JSON.stringify(serializable);
+    return MultibaseCodec.encodeBase64url(json);
+  }
+
+  /**
+   * Parse HTTP response header value
+   */
+  static parseResponseHeader(headerValue: string): HttpResponsePayload {
+    try {
+      const json = MultibaseCodec.decodeBase64urlToString(headerValue);
+      const data = JSON.parse(json);
+
+      return {
+        subRav: this.deserializeSubRAV(data.subRav),
+        amountDebited: BigInt(data.amountDebited),
+        serviceTxRef: data.serviceTxRef,
+        errorCode: data.errorCode,
+        message: data.message
+      };
+    } catch (error) {
+      throw new Error(`Failed to parse response header: ${error}`);
+    }
+  }
+
   /**
    * Get HTTP header name for payment data
    */
   static getHeaderName(): string {
-    return HttpHeaderCodec.getHeaderName();
+    return this.HEADER_NAME;
   }
 
   /**
    * Check if request contains payment data
    */
   static hasPaymentData(headers: Record<string, string | string[]>): boolean {
-    const headerName = HttpHeaderCodec.getHeaderName();
+    const headerName = this.getHeaderName();
     return !!(
       headers[headerName.toLowerCase()] || 
       headers[headerName]
@@ -134,7 +205,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Extract payment header value from request headers
    */
   static extractPaymentHeader(headers: Record<string, string | string[]>): string | null {
-    const headerName = HttpHeaderCodec.getHeaderName();
+    const headerName = this.getHeaderName();
     const headerValue = headers[headerName.toLowerCase()] || headers[headerName];
     
     if (Array.isArray(headerValue)) {
@@ -142,5 +213,142 @@ export class HttpPaymentCodec implements PaymentCodec {
     }
     
     return headerValue || null;
+  }
+
+  /**
+   * Extract payment data from request headers
+   */
+  static extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
+    const headerValue = headers[this.getHeaderName().toLowerCase()] || 
+                       headers[this.getHeaderName()];
+    
+    if (!headerValue) {
+      return null;
+    }
+
+    try {
+      return this.parseRequestHeader(headerValue);
+    } catch (error) {
+      throw new Error(`Invalid payment channel header: ${error}`);
+    }
+  }
+
+  /**
+   * Add payment data to response headers
+   */
+  static addPaymentData(
+    headers: Record<string, string>, 
+    payload: HttpResponsePayload
+  ): Record<string, string> {
+    const headerValue = this.buildResponseHeader(payload);
+    return {
+      ...headers,
+      [this.getHeaderName()]: headerValue
+    };
+  }
+
+  /**
+   * Validate payment requirements for a request
+   */
+  static validatePaymentRequirement(
+    paymentData: HttpRequestPayload | null,
+    requiredAmount: bigint
+  ): { valid: boolean; error?: string } {
+    if (!paymentData) {
+      return { valid: false, error: 'Payment required' };
+    }
+
+    if (paymentData.maxAmount && paymentData.maxAmount < requiredAmount) {
+      return { valid: false, error: 'Insufficient payment allowance' };
+    }
+
+    return { valid: true };
+  }
+
+  // ============================================================================
+  // Private Serialization Helpers
+  // ============================================================================
+
+  /**
+   * Helper: Serialize SubRAV for JSON transport
+   */
+  private static serializeSubRAV(subRav: SubRAV): Record<string, string> {
+    return {
+      version: subRav.version.toString(),
+      chainId: subRav.chainId.toString(),
+      channelId: subRav.channelId,
+      channelEpoch: subRav.channelEpoch.toString(),
+      vmIdFragment: subRav.vmIdFragment,
+      accumulatedAmount: subRav.accumulatedAmount.toString(),
+      nonce: subRav.nonce.toString()
+    };
+  }
+
+  /**
+   * Helper: Deserialize SubRAV from JSON transport
+   */
+  private static deserializeSubRAV(data: Record<string, string>): SubRAV {
+    return {
+      version: parseInt(data.version),
+      chainId: BigInt(data.chainId),
+      channelId: data.channelId,
+      channelEpoch: BigInt(data.channelEpoch),
+      vmIdFragment: data.vmIdFragment,
+      accumulatedAmount: BigInt(data.accumulatedAmount),
+      nonce: BigInt(data.nonce)
+    };
+  }
+
+  /**
+   * Helper: Serialize SignedSubRAV for JSON transport
+   */
+  private static serializeSignedSubRAV(signedSubRav: SignedSubRAV): Record<string, any> {
+    return {
+      subRav: this.serializeSubRAV(signedSubRav.subRav),
+      signature: MultibaseCodec.encodeBase64url(signedSubRav.signature)
+    };
+  }
+
+  /**
+   * Helper: Deserialize SignedSubRAV from JSON transport
+   */
+  private static deserializeSignedSubRAV(data: Record<string, any>): SignedSubRAV {
+    return {
+      subRav: this.deserializeSubRAV(data.subRav),
+      signature: MultibaseCodec.decodeBase64url(data.signature)
+    };
+  }
+}
+
+/**
+ * HTTP middleware utilities for payment channel integration
+ * @deprecated Use HttpPaymentCodec static methods directly
+ */
+export class HttpPaymentMiddleware {
+  /**
+   * Extract payment data from request headers
+   */
+  static extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
+    return HttpPaymentCodec.extractPaymentData(headers);
+  }
+
+  /**
+   * Add payment data to response headers
+   */
+  static addPaymentData(
+    headers: Record<string, string>, 
+    payload: HttpResponsePayload
+  ): Record<string, string> {
+    return HttpPaymentCodec.addPaymentData(headers, payload);
+  }
+
+  /**
+   * Validate payment requirements for a request
+   */
+  static validatePaymentRequirement(
+    paymentData: HttpRequestPayload | null,
+    requiredAmount: bigint
+  ): { valid: boolean; error?: string } {
+    return HttpPaymentCodec.validatePaymentRequirement(paymentData, requiredAmount);
   }
 } 

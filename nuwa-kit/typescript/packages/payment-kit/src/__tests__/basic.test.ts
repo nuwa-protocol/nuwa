@@ -1,18 +1,25 @@
 /**
- * Basic tests for payment-kit core functionality
+ * Basic functionality tests for Payment Kit
+ * 
+ * These tests verify core functionality without requiring external dependencies
+ * like databases or blockchain connections.
  */
 
 import { describe, it, expect } from '@jest/globals';
 import { 
   SubRAVCodec, 
   SubRAVValidator,
-  HttpHeaderCodec,
+  HttpPaymentCodec as HttpHeaderCodec,
   generateNonce,
   extractFragment,
   isValidHex,
   formatAmount,
-  SUBRAV_VERSION_1
+  SUBRAV_VERSION_1,
+  PaymentChannelPayerClient,
+  PaymentChannelPayeeClient,
+  createStorageRepositories,
 } from '../index';
+import { createTestEnvironment } from '../test-helpers/mocks';
 import type { SubRAV, SignedSubRAV } from '../core/types';
 
 describe('Payment Kit Basic Tests', () => {

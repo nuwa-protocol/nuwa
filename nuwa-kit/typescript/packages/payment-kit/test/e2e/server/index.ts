@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { HttpBillingMiddleware } from '../../../src/middlewares/http/HttpBillingMiddleware';
-import { HttpHeaderCodec } from '../../../src/core/http-header';
+import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 
   HttpResponsePayload, 
@@ -247,7 +247,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         clientTxRef: `client_${Date.now()}`
       };
 
-      headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
+      headers['X-Payment-Channel-Data'] = HttpPaymentCodec.buildRequestHeader(requestPayload);
       
       // 2. 发送请求
       const url = `${baseURL}/v1/echo?q=${encodeURIComponent(query)}`;
@@ -262,7 +262,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
       if (paymentHeader) {
         try {
-          const responsePayload: HttpResponsePayload = HttpHeaderCodec.parseResponseHeader(paymentHeader);
+          const responsePayload: HttpResponsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
           // 缓存未签名的 SubRAV 用于下次请求
           pendingSubRAV = responsePayload.subRav;
         } catch (error) {
@@ -312,7 +312,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         clientTxRef: `client_${Date.now()}`
       };
 
-      headers['X-Payment-Channel-Data'] = HttpHeaderCodec.buildRequestHeader(requestPayload);
+      headers['X-Payment-Channel-Data'] = HttpPaymentCodec.buildRequestHeader(requestPayload);
       
       const response = await fetch(`${baseURL}/v1/process`, {
         method: 'POST',
@@ -332,7 +332,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
       if (paymentHeader) {
         try {
-          const responsePayload: HttpResponsePayload = HttpHeaderCodec.parseResponseHeader(paymentHeader);
+          const responsePayload: HttpResponsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
           pendingSubRAV = responsePayload.subRav;
         } catch (error) {
           console.warn('Failed to parse payment header:', error);
@@ -379,4 +379,4 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       return await response.json();
     }
   };
-} 
+}

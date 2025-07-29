@@ -3,8 +3,12 @@
  * Run this to verify all dependencies are properly configured
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import { describe, it, expect } from '@jest/globals';
+import { HttpPaymentCodec } from '../../src/middlewares/http/HttpPaymentCodec';
 import { HttpBillingMiddleware } from '../../src/middlewares/http/HttpBillingMiddleware';
-import { HttpHeaderCodec } from '../../src/core/http-header';
+import { SubRAVUtils } from '../../src/core/subrav';
 import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import { TestEnv } from '@nuwa-ai/identity-kit/testHelpers';
@@ -26,7 +30,7 @@ async function verifySetup() {
     // Verify imports
     console.log('📦 Import verification:');
     console.log(`  HttpBillingMiddleware: ${typeof HttpBillingMiddleware}`);
-    console.log(`  HttpHeaderCodec: ${typeof HttpHeaderCodec}`);
+    console.log(`  HttpPaymentCodec: ${typeof HttpPaymentCodec}`);
     console.log(`  PaymentChannelPayeeClient: ${typeof PaymentChannelPayeeClient}`);
     console.log(`  RoochPaymentChannelContract: ${typeof RoochPaymentChannelContract}`);
 
@@ -48,8 +52,8 @@ async function verifySetup() {
       message: 'Test message'
     };
 
-    const encoded = HttpHeaderCodec.buildResponseHeader(testPayload);
-    const decoded = HttpHeaderCodec.parseResponseHeader(encoded);
+    const encoded = HttpPaymentCodec.buildResponseHeader(testPayload);
+    const decoded = HttpPaymentCodec.parseResponseHeader(encoded);
     
     console.log(`  Encode/decode test: ${decoded.message === 'Test message' ? '✅ PASS' : '❌ FAIL'}`);
 

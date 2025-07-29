@@ -86,8 +86,8 @@ export {
   SUBRAV_VERSION_1 
 } from './core/subrav';
 
-// HTTP Header codec for Gateway Profile implementation
-export { HttpHeaderCodec, HttpPaymentMiddleware } from './core/http-header';
+// HTTP Transport
+export { HttpPaymentCodec, HttpPaymentMiddleware } from './middlewares/http/HttpPaymentCodec';
 
 // HTTP Billing middleware for deferred payment model (refactored)
 export { HttpBillingMiddleware } from './middlewares/http/HttpBillingMiddleware';
