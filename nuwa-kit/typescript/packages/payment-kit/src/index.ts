@@ -106,3 +106,5 @@ export {
   stringToBigint,
   DebugLogger 
 } from './utils';
+
+export * from './integrations/express/BillableRouter';

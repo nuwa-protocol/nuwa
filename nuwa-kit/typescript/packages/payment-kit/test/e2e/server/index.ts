@@ -7,10 +7,9 @@ import type {
   SubRAV 
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
-import { UsdBillingEngine, FileConfigLoader } from '../../../src/billing';
+import { UsdBillingEngine } from '../../../src/billing';
 import { ContractRateProvider } from '../../../src/billing/rate';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { BillableRouter } from '../../../src';
 
 export interface BillingServerConfig {
   payeeClient: PaymentChannelPayeeClient;
@@ -34,44 +33,34 @@ export async function createBillingServer(config: BillingServerConfig) {
   const app = express();
   app.use(express.json());
 
-  // 1. 设置计费配置
-  const configDir = path.join(__dirname, 'billing-config');
-  await fs.mkdir(configDir, { recursive: true });
-  
-  // 创建计费配置文件 (USD pricing in picoUSD units)
-  const billingConfigContent = `
-version: 1
-serviceId: ${serviceId}
-rules:
-  - id: echo-pricing
-    when:
-      path: "/v1/echo"
-      method: "GET"
-    strategy:
-      type: PerRequest
-      price: "1000000000"  # 0.001 USD (1,000,000,000 picoUSD) per echo
-  - id: expensive-operation
-    when:
-      path: "/v1/process"
-      method: "POST"
-    strategy:
-      type: PerRequest
-      price: "10000000000"  # 0.01 USD (10,000,000,000 picoUSD) per process
-  - id: default-pricing
-    default: true
-    strategy:
-      type: PerRequest
-      price: "500000000"  # 0.0005 USD (500,000,000 picoUSD) default
-`;
+  // 1. 使用 BillableRouter 声明路由并同步计费规则
+  const billRouter = new BillableRouter({
+    serviceId,
+    defaultPricePicoUSD: '500000000' // 0.0005 USD
+  });
 
-  await fs.writeFile(
-    path.join(configDir, `${serviceId}.yaml`),
-    billingConfigContent,
-    'utf-8'
-  );
+  billRouter.get('/v1/echo', '1000000000', (req: Request, res: Response) => {
+    const paymentResult = (req as any).paymentResult;
+    res.json({
+      echo: req.query.q || 'hello',
+      cost: paymentResult?.cost?.toString(),
+      nonce: paymentResult?.subRav?.nonce?.toString(),
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  billRouter.post('/v1/process', '10000000000', (req: Request, res: Response) => {
+    const paymentResult = (req as any).paymentResult;
+    res.json({
+      processed: req.body,
+      timestamp: Date.now(),
+      cost: paymentResult?.cost?.toString(),
+      nonce: paymentResult?.subRav?.nonce?.toString()
+    });
+  });
 
   // 2. 创建 USD 计费引擎（USD 定价，Token 结算）
-  const configLoader = new FileConfigLoader(configDir);
+  const configLoader = billRouter.getConfigLoader();
   
   // Get contract instance from payeeClient for price queries
   const contract = (payeeClient as any).contract; // Access the underlying contract
@@ -86,13 +75,7 @@ rules:
   
   const usdBillingEngine = new UsdBillingEngine(
     configLoader,
-    rateProvider,
-    {
-      [defaultAssetId]: { decimals: 8 }, // RGas has 8 decimals
-      'ethereum': { decimals: 18 },
-      'usd-coin': { decimals: 6 },
-      'bitcoin': { decimals: 8 }
-    }
+    rateProvider
   );
 
   // 3. 创建支付中间件
@@ -119,26 +102,10 @@ rules:
     }
   });
 
-  // 5. 业务路由（支付验证后才会执行）
-  app.get('/v1/echo', (req: Request, res: Response) => {
-    const paymentResult = (req as any).paymentResult;
-    res.json({ 
-      echo: req.query.q || 'hello',
-      cost: paymentResult?.cost?.toString(),
-      nonce: paymentResult?.subRav?.nonce?.toString(),
-      timestamp: new Date().toISOString()
-    });
-  });
+  // 5. 挂载业务路由（支付验证后才会执行）
+  app.use(billRouter.router);
 
-  app.post('/v1/process', (req: Request, res: Response) => {
-    const paymentResult = (req as any).paymentResult;
-    res.json({ 
-      processed: req.body,
-      timestamp: Date.now(),
-      cost: paymentResult?.cost?.toString(),
-      nonce: paymentResult?.subRav?.nonce?.toString()
-    });
-  });
+  // 原业务路由已迁移到 BillableRouter 中
 
   // 6. 管理接口
   app.get('/admin/claims', async (req: Request, res: Response) => {
@@ -210,7 +177,6 @@ rules:
     baseURL: `http://localhost:${port}`,
     async shutdown() {
       server.close();
-      await fs.rm(configDir, { recursive: true, force: true });
     }
   };
 }

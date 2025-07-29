@@ -11,7 +11,6 @@ export class UsdBillingEngine implements CostCalculator {
   constructor(
     private readonly configLoader: ConfigLoader,
     private readonly rateProvider: RateProvider,
-    private readonly defaultAssetConfigs: Record<string, { decimals: number }> = {}
   ) {}
 
   /**
@@ -121,11 +120,4 @@ export class UsdBillingEngine implements CostCalculator {
     return Array.from(this.strategyCache.keys());
   }
 
-  /**
-   * Set asset configuration for fallback
-   * @deprecated Use RateProvider.getAssetInfo() instead
-   */
-  setAssetConfig(assetId: string, config: { decimals: number }): void {
-    this.defaultAssetConfigs[assetId] = config;
-  }
 }
