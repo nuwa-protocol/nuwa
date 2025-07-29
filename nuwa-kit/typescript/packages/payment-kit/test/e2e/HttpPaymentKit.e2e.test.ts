@@ -95,15 +95,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       },
     });
 
-    payeeClient = new PaymentChannelPayeeClient({
-      contract,
-      signer: payee.keyManager,
-      didResolver: vdrRegistry,
-      storageOptions: {
-        customChannelRepo: new MemoryChannelRepository(),
-      },
-    });
-
     console.log(`✅ Test setup completed:
       Payer DID: ${payer.did}
       Payee DID: ${payee.did}
@@ -114,14 +105,20 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Fund and setup payment channel
     await setupPaymentChannel();
 
-    // Start billing server
+    // Start billing server using new ExpressBillingKitOptions API
     billingServerInstance = await createBillingServer({
-      payeeClient,
+      signer: payee.keyManager,
+      did: payee.did,
+      rpcUrl: env.rpcUrl,
+      network: 'local',
       port: 3001, // Use different port to avoid conflicts
       serviceId: 'e2e-test-service',
       defaultAssetId: testAsset.assetId,
       debug: false
     });
+
+    // Get the created payeeClient from billing server for other operations
+    payeeClient = billingServerInstance.billing.getPayeeClient();
 
     // Create test client
     testClient = createTestClient(payerClient, billingServerInstance.baseURL, channelId);

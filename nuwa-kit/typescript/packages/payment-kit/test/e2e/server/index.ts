@@ -7,40 +7,57 @@ import type {
   SubRAV 
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
+import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 export interface BillingServerConfig {
-  payeeClient: PaymentChannelPayeeClient;
+  // Use new simplified configuration
+  signer?: SignerInterface;
+  did?: string;
+  // Alternative: still allow pre-created payeeClient for backward compatibility
+  payeeClient?: PaymentChannelPayeeClient;
   port?: number;
   serviceId?: string;
   defaultAssetId?: string;
   debug?: boolean;
-  rpcUrl?: string; // For RateProvider to query chain info
+  rpcUrl?: string; // For blockchain connection
+  network?: 'local' | 'dev' | 'test' | 'main';
 }
 
 export async function createBillingServer(config: BillingServerConfig) {
   const {
+    signer,
+    did,
     payeeClient,
     port = 3000,
     serviceId = 'echo-service',
     defaultAssetId = '0x3::gas_coin::RGas',
     debug = true,
-    rpcUrl
+    rpcUrl,
+    network = 'local'
   } = config;
+
+  // Validate configuration
+  if (!signer && !payeeClient) {
+    throw new Error('Either signer or payeeClient must be provided');
+  }
 
   const app = express();
   app.use(express.json());
 
-  // 1. 创建 ExpressBillingKit 集成计费功能
+  // 1. Create ExpressBillingKit integration for billing functionality
   const billing = await createExpressBillingKit({
     serviceId,
-    payeeClient,
+    signer: signer!,
+    did,
+    rpcUrl,
+    network,
     defaultAssetId,
     defaultPricePicoUSD: '500000000', // 0.0005 USD
-    didAuth: { enabled: false }, // 测试环境暂时关闭 DID 认证
+    didAuth: false, // Temporarily disable DID authentication in test environment
     debug
   });
 
-  // 2. 声明路由 & 计价策略
+  // 2. Declare routes & pricing strategies
   billing.get('/v1/echo', '1000000000', (req: Request, res: Response) => {
     const paymentResult = (req as any).paymentResult;
     res.json({
@@ -61,7 +78,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     });
   });
 
-  // 测试 PerToken 策略的新路由
+  // Test new route with PerToken strategy
   billing.post('/v1/chat/completions', {
     type: 'PerToken',
     unitPricePicoUSD: '20000', // 0.00002 USD per token
@@ -69,14 +86,14 @@ export async function createBillingServer(config: BillingServerConfig) {
   }, (req: Request, res: Response) => {
     const paymentResult = (req as any).paymentResult;
     
-    // 模拟 LLM 响应和使用情况
+    // Mock LLM response and usage
     const mockUsage = {
       prompt_tokens: 100,
       completion_tokens: 50,
       total_tokens: 150
     };
     
-    // 设置使用情况到 res.locals（ExpressBillingKit 会读取这个）
+    // Set usage to res.locals (ExpressBillingKit will read this)
     res.locals.usage = mockUsage;
     
     res.json({
@@ -93,20 +110,20 @@ export async function createBillingServer(config: BillingServerConfig) {
         finish_reason: 'stop'
       }],
       usage: mockUsage,
-      // 计费信息
+      // Billing information
       cost: paymentResult?.cost?.toString(),
       nonce: paymentResult?.subRav?.nonce?.toString()
     });
   });
 
-  // 3. 挂载计费路由
+  // 3. Mount billing routes
   app.use(billing.router);
 
-  // 原业务路由已迁移到 BillableRouter 中
+  // Original business routes have been migrated to BillableRouter
 
-  // 4. 挂载管理和恢复路由
-  app.use('/admin', billing.adminRouter()); // 管理接口
-  app.use('/payment', billing.recoveryRouter()); // 客户端恢复接口
+  // 4. Mount admin and recovery routes
+  app.use('/admin', billing.adminRouter()); // Admin interface
+  app.use('/payment', billing.recoveryRouter()); // Client recovery interface
 
   app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -125,30 +142,30 @@ export async function createBillingServer(config: BillingServerConfig) {
   };
 }
 
-// 客户端调用示例（延迟支付模式）
+// Client call example (deferred payment mode)
 export function createTestClient(payerClient: any, baseURL: string, channelId: string) {
-  let pendingSubRAV: SubRAV | null = null; // 缓存上一次的 SubRAV
-  let isFirstRequest = true; // 标记是否为首次请求
+  let pendingSubRAV: SubRAV | null = null; // Cache the previous SubRAV
+  let isFirstRequest = true; // Flag to mark if it's the first request
 
   return {
     async callEcho(query: string) {
       let headers: Record<string, string> = {};
       
-      // 1. 总是生成签名的 SubRAV
+      // 1. Always generate signed SubRAV
       let signedSubRAV: any;
       
       if (pendingSubRAV) {
-        // 使用服务器提案的 SubRAV
+        // Use server-proposed SubRAV
         signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
       } else if (isFirstRequest) {
-        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        // First request: generate handshake SubRAV (nonce=0, amount=0)
         const channelInfo = await payerClient.getChannelInfo(channelId);
         const keyIds = await payerClient.signer.listKeyIds();
-        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
+        const vmIdFragment = keyIds[0].split('#')[1]; // Extract fragment part
         
         const handshakeSubRAV: SubRAV = {
           version: 1,
-          chainId: BigInt(4), // 根据网络配置
+          chainId: BigInt(4), // Based on network configuration
           channelId,
           channelEpoch: channelInfo.epoch,
           vmIdFragment,
@@ -164,13 +181,13 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
 
       const requestPayload: HttpRequestPayload = {
         signedSubRav: signedSubRAV,
-        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        maxAmount: BigInt('50000000'), // Maximum accept 0.05 RGas
         clientTxRef: `client_${Date.now()}`
       };
 
       headers['X-Payment-Channel-Data'] = HttpPaymentCodec.buildRequestHeader(requestPayload);
       
-      // 2. 发送请求
+      // 2. Send request
       const url = `${baseURL}/v1/echo?q=${encodeURIComponent(query)}`;
       const response = await fetch(url, { headers });
 
@@ -179,12 +196,12 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         throw new Error(`Request failed: ${response.status} - ${errorData.error || response.statusText}`);
       }
 
-      // 3. 处理响应，提取下一次的 SubRAV 提案
+      // 3. Process response, extract next SubRAV proposal
       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
       if (paymentHeader) {
         try {
           const responsePayload: HttpResponsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
-          // 缓存未签名的 SubRAV 用于下次请求
+          // Cache unsigned SubRAV for next request
           pendingSubRAV = responsePayload.subRav;
         } catch (error) {
           console.warn('Failed to parse payment header:', error);
@@ -199,21 +216,21 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         'Content-Type': 'application/json'
       };
       
-      // 生成签名的 SubRAV
+      // Generate signed SubRAV
       let signedSubRAV: any;
       
       if (pendingSubRAV) {
-        // 使用服务器提案的 SubRAV
+        // Use server-proposed SubRAV
         signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
       } else if (isFirstRequest) {
-        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        // First request: generate handshake SubRAV (nonce=0, amount=0)
         const channelInfo = await payerClient.getChannelInfo(channelId);
         const keyIds = await payerClient.signer.listKeyIds();
-        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
+        const vmIdFragment = keyIds[0].split('#')[1]; // Extract fragment part
         
         const handshakeSubRAV: SubRAV = {
           version: 1,
-          chainId: BigInt(4), // 根据网络配置
+          chainId: BigInt(4), // Based on network configuration
           channelId,
           channelEpoch: channelInfo.epoch,
           vmIdFragment,
@@ -229,7 +246,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
 
       const requestPayload: HttpRequestPayload = {
         signedSubRav: signedSubRAV,
-        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        maxAmount: BigInt('50000000'), // Maximum accept 0.05 RGas
         clientTxRef: `client_${Date.now()}`
       };
 
@@ -249,7 +266,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         throw new Error(`Request failed: ${response.status} - ${errorData.error || response.statusText}`);
       }
 
-      // 处理响应，提取下一次的 SubRAV 提案
+      // Process response, extract next SubRAV proposal
       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
       if (paymentHeader) {
         try {
@@ -263,18 +280,18 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       return await response.json();
     },
 
-    // 获取当前待支付的 SubRAV
+    // Get current pending SubRAV for payment
     getPendingSubRAV() {
       return pendingSubRAV;
     },
 
-    // 清除待支付的 SubRAV（用于测试）
+    // Clear pending SubRAV (for testing)
     clearPendingSubRAV() {
       pendingSubRAV = null;
-      isFirstRequest = true; // 重置为首次请求状态
+      isFirstRequest = true; // Reset to first request state
     },
 
-    // 获取管理信息
+    // Get admin information
     async getAdminClaims() {
       const response = await fetch(`${baseURL}/admin/claims`);
       const text = await response.text();
@@ -305,21 +322,21 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         'Content-Type': 'application/json'
       };
       
-      // 生成签名的 SubRAV
+      // Generate signed SubRAV
       let signedSubRAV: any;
       
       if (pendingSubRAV) {
-        // 使用服务器提案的 SubRAV
+        // Use server-proposed SubRAV
         signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
       } else if (isFirstRequest) {
-        // 首次请求：生成握手 SubRAV (nonce=0, amount=0)
+        // First request: generate handshake SubRAV (nonce=0, amount=0)
         const channelInfo = await payerClient.getChannelInfo(channelId);
         const keyIds = await payerClient.signer.listKeyIds();
-        const vmIdFragment = keyIds[0].split('#')[1]; // 提取 fragment 部分
+        const vmIdFragment = keyIds[0].split('#')[1]; // Extract fragment part
         
         const handshakeSubRAV: SubRAV = {
           version: 1,
-          chainId: BigInt(4), // 根据网络配置
+          chainId: BigInt(4), // Based on network configuration
           channelId,
           channelEpoch: channelInfo.epoch,
           vmIdFragment,
@@ -335,7 +352,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
 
       const requestPayload: HttpRequestPayload = {
         signedSubRav: signedSubRAV,
-        maxAmount: BigInt('50000000'), // 最大接受 0.05 RGas
+        maxAmount: BigInt('50000000'), // Maximum accept 0.05 RGas
         clientTxRef: `client_${Date.now()}`
       };
 
@@ -356,7 +373,7 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
         throw new Error(`Request failed: ${response.status} - ${errorData.error || response.statusText}`);
       }
 
-      // 处理响应，提取下一次的 SubRAV 提案
+      // Process response, extract next SubRAV proposal
       const paymentHeader = response.headers.get('X-Payment-Channel-Data');
       if (paymentHeader) {
         try {

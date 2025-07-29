@@ -102,6 +102,8 @@ export class BillableRouter {
   // Internal helper to collect rule + register to Express
   // ---------------------------------------------------------------------
   private register(method: string, path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+    console.log(`🔧 Registering route: ${method.toUpperCase()} ${path} with pricing:`, pricing);
+    
     // Determine strategy config
     let strategy: StrategyConfig;
     if (typeof pricing === 'object' && 'type' in pricing) {
@@ -124,15 +126,31 @@ export class BillableRouter {
       },
       strategy
     };
-    // Insert rule so that default rules are evaluated last.
-    // Specific rules (non-default) should take precedence over the catch-all default rule.
+    
+    console.log(`📝 Created rule:`, rule);
+    
+    // Insert rule with proper ordering:
+    // 1. Specific rules (non-default) should be added in registration order
+    // 2. Default rules should always be at the end
     if (rule.default) {
       // Keep default pricing rule at the end
+      console.log(`📌 Adding default rule to end:`, rule.id);
       this.rules.push(rule);
     } else {
-      // Place specific rules before default so they match first
-      this.rules.unshift(rule);
+      // Find the position to insert: before the first default rule, or at the end
+      const firstDefaultIndex = this.rules.findIndex(r => r.default);
+      if (firstDefaultIndex >= 0) {
+        // Insert before the first default rule
+        console.log(`📌 Adding specific rule before default rules:`, rule.id);
+        this.rules.splice(firstDefaultIndex, 0, rule);
+      } else {
+        // No default rules yet, add to the end
+        console.log(`📌 Adding specific rule to end:`, rule.id);
+        this.rules.push(rule);
+      }
     }
+
+    console.log(`📋 Total rules after registration: ${this.rules.length}`, this.rules.map(r => r.id));
 
     // Delegate to Express Router
     (this.router as any)[method](path, handler);

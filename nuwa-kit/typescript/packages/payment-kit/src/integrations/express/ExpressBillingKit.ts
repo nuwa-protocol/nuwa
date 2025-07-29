@@ -4,59 +4,33 @@ import { HttpBillingMiddleware } from '../../middlewares/http/HttpBillingMiddlew
 import { UsdBillingEngine } from '../../billing/usd-engine';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
-import { DIDAuth, VDRRegistry } from '@nuwa-ai/identity-kit';
+import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
+import { MemoryChannelRepository } from '../../storage';
+import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import type { StrategyConfig } from '../../billing/types';
 import type { RateProvider } from '../../billing/rate/types';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 
 /**
- * Simple payee configuration for auto-creating PayeeClient
- */
-export interface SimplePayeeConfig {
-  /** Payee DID */
-  did: string;
-  /** Key manager implementing SignerInterface */
-  keyManager: SignerInterface;
-  /** Optional RPC URL (defaults to env.ROOCH_NODE_URL) */
-  rpcUrl?: string;
-  /** Optional contract address */
-  contractAddress?: string;
-}
-
-/**
- * DID authentication configuration
- */
-export interface DIDAuthConfig {
-  /** Enable DID authentication (default: true) */
-  enabled?: boolean;
-}
-
-/**
  * Configuration for creating ExpressBillingKit
  */
-export interface ExpressBillingKitConfig {
+export interface ExpressBillingKitOptions {
   /** Service identifier */
   serviceId: string;
-  
-  /** Simple payee configuration (auto-creates PayeeClient) */
-  payee?: SimplePayeeConfig;
-  
-  /** Pre-configured PayeeClient (alternative to payee) */
-  payeeClient?: PaymentChannelPayeeClient;
-  
-  /** Custom rate provider (optional) */
-  rateProvider?: RateProvider;
-  
+  /** Service private key (or KMS Signer) */
+  signer: SignerInterface;
+
+  /** Optional RPC URL (defaults to env.ROOCH_NODE_URL) */
+  rpcUrl?: string;
+  /** Optional network (defaults to 'local') */
+  network?: 'local' | 'dev' | 'test' | 'main';
   /** Default asset ID for settlement */
   defaultAssetId?: string;
-  
   /** Default price in picoUSD when no rule matches */
   defaultPricePicoUSD?: string | bigint;
-  
-  /** DID authentication configuration */
-  didAuth?: DIDAuthConfig;
-  
+  /** Enable DID authentication (default: true) */
+  didAuth?: boolean;
   /** Debug logging */
   debug?: boolean;
 }
@@ -80,6 +54,9 @@ export interface ExpressBillingKit {
   
   /** Get admin router for operations management */
   adminRouter(options?: { auth?: RequestHandler }): Router;
+  
+  /** Get the underlying PayeeClient for advanced operations */
+  getPayeeClient(): PaymentChannelPayeeClient;
 }
 
 /**
@@ -89,14 +66,16 @@ class ExpressBillingKitImpl implements ExpressBillingKit {
   public readonly router: Router;
   private readonly billableRouter: BillableRouter;
   private readonly middleware: HttpBillingMiddleware;
-  private readonly config: ExpressBillingKitConfig;
+  private readonly config: ExpressBillingKitOptions;
+  private readonly payeeClient: PaymentChannelPayeeClient;
 
   constructor(
-    config: ExpressBillingKitConfig,
+    config: ExpressBillingKitOptions,
     payeeClient: PaymentChannelPayeeClient,
     rateProvider: RateProvider
   ) {
     this.config = config;
+    this.payeeClient = payeeClient;
     
     // Create billable router
     this.billableRouter = new BillableRouter({
@@ -139,7 +118,7 @@ class ExpressBillingKitImpl implements ExpressBillingKit {
 
       try {
         // Step 1: DID Authentication (if enabled)
-        if (this.config.didAuth?.enabled !== false) {
+        if (this.config.didAuth !== false) {
           await this.performDIDAuth(req as express.Request, res as express.Response);
         }
 
@@ -355,58 +334,58 @@ class ExpressBillingKitImpl implements ExpressBillingKit {
 
     return router;
   }
+
+  /**
+   * Get the underlying PayeeClient for advanced operations
+   */
+  getPayeeClient(): PaymentChannelPayeeClient {
+    return this.payeeClient;
+  }
 }
 
 /**
  * Create an ExpressBillingKit instance
  */
-export async function createExpressBillingKit(config: ExpressBillingKitConfig): Promise<ExpressBillingKit> {
+export async function createExpressBillingKit(config: ExpressBillingKitOptions): Promise<ExpressBillingKit> {
   // Validate configuration
-  if (!config.payee && !config.payeeClient) {
-    throw new Error('Either payee or payeeClient must be provided');
+  if (!config.signer) {
+    throw new Error('Service private key (signer) is required');
   }
 
-  if (config.payee && config.payeeClient) {
-    console.warn('Both payee and payeeClient provided, using payeeClient');
-  }
+  // Set up blockchain connection
+  const rpcUrl = config.rpcUrl || process.env.ROOCH_NODE_URL || 'http://localhost:6767';
+  const network = config.network || 'local';
+  
+  // Initialize contract
+  const contract = new RoochPaymentChannelContract({
+    rpcUrl,
+    network,
+    debug: config.debug || false,
+  });
 
-  // Get or create PayeeClient
-  let payeeClient: PaymentChannelPayeeClient;
-  if (config.payeeClient) {
-    payeeClient = config.payeeClient;
-  } else if (config.payee) {
-    payeeClient = await createPayeeClientFromConfig(config.payee);
-  } else {
-    throw new Error('Invalid configuration: neither payee nor payeeClient provided');
-  }
+  // Set up DID resolver with VDRRegistry
+  const roochVDR = new RoochVDR({
+    rpcUrl,
+    network,
+  });
+  
+  const vdrRegistry = VDRRegistry.getInstance();
+  vdrRegistry.registerVDR(roochVDR);
 
-  // Get or create RateProvider
-  let rateProvider: RateProvider;
-  if (config.rateProvider) {
-    rateProvider = config.rateProvider;
-  } else {
-    // Create default ContractRateProvider
-    const contract = (payeeClient as any).contract;
-    if (!contract) {
-      throw new Error('PayeeClient contract is required for default ContractRateProvider');
-    }
-    rateProvider = new ContractRateProvider(contract, 30_000);
-  }
+  // Create PayeeClient
+  const payeeClient = new PaymentChannelPayeeClient({
+    contract,
+    signer: config.signer,
+    didResolver: vdrRegistry,
+    storageOptions: {
+      customChannelRepo: new MemoryChannelRepository(),
+    },
+  });
+
+  // Create default ContractRateProvider
+  const rateProvider = new ContractRateProvider(contract, 30_000);
 
   return new ExpressBillingKitImpl(config, payeeClient, rateProvider);
-}
-
-/**
- * Create PayeeClient from simple configuration
- */
-async function createPayeeClientFromConfig(payeeConfig: SimplePayeeConfig): Promise<PaymentChannelPayeeClient> {
-  // This is a simplified implementation
-  // In a real implementation, you would:
-  // 1. Create the appropriate contract instance based on the chain
-  // 2. Set up proper DID resolver
-  // 3. Configure storage options
-  
-  throw new Error('Auto-creation of PayeeClient from simple config not yet implemented. Please provide a pre-configured payeeClient.');
 }
 
 // ---------------------------------------------------------------------------

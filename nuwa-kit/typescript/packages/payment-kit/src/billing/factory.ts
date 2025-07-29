@@ -44,6 +44,21 @@ class RuleMatcherStrategy implements Strategy {
   }
 
   async evaluate(ctx: any): Promise<bigint> {
+    // Debug: show all available rules
+    console.log(`🔍 Evaluating rules for context:`, {
+      serviceId: ctx.serviceId,
+      operation: ctx.operation,
+      path: ctx.meta?.path,
+      method: ctx.meta?.method,
+      assetId: ctx.assetId
+    });
+    console.log(`📋 Available rules (${this.rules.length}):`, this.rules.map(r => ({
+      id: r.id,
+      isDefault: r.default,
+      when: r.when,
+      strategyType: r.strategy.type
+    })));
+
     // Find the first matching rule
     for (const rule of this.rules) {
       if (this.matchesRule(ctx, rule)) {
@@ -67,6 +82,7 @@ class RuleMatcherStrategy implements Strategy {
   private matchesRule(ctx: any, rule: BillingRule): boolean {
     // If rule is marked as default, it matches everything
     if (rule.default) {
+      console.log(`✅ Rule ${rule.id} matched as default`);
       return true;
     }
 
@@ -79,6 +95,7 @@ class RuleMatcherStrategy implements Strategy {
 
     // Check path matching
     if (when.path && ctx.meta.path !== when.path) {
+      console.log(`❌ Rule ${rule.id} path mismatch: expected ${when.path}, got ${ctx.meta.path}`);
       return false;
     }
 
@@ -97,6 +114,7 @@ class RuleMatcherStrategy implements Strategy {
 
     // Check method matching
     if (when.method && ctx.meta.method !== when.method) {
+      console.log(`❌ Rule ${rule.id} method mismatch: expected ${when.method}, got ${ctx.meta.method}`);
       return false;
     }
 
@@ -117,6 +135,7 @@ class RuleMatcherStrategy implements Strategy {
       }
     }
 
+    console.log(`✅ Rule ${rule.id} matched successfully`);
     return true;
   }
 } 

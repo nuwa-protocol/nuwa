@@ -2,7 +2,7 @@
 
 > ⚠️  当前 `@nuwa-ai/payment-kit` 尚未正式发布，API 仍可能调整。
 >
-> 本文档介绍 **ExpressBillingKit** —— 将 `BillableRouter` 与 `HttpBillingMiddleware` 封装到一起，提供“三行代码”即可完成计费／支付接入的高阶封装。
+> 本文档介绍 **ExpressBillingKit** —— 将 `BillableRouter` 与 `HttpBillingMiddleware` 封装到一起，提供"三行代码"即可完成计费／支付接入的高阶封装。
 
 ---
 
@@ -17,8 +17,8 @@
 
 这造成了**样板代码多、容易出错**。`ExpressBillingKit` 的目标是：
 
-* **一步可用**——最小化“胶水”代码；
-* **灵活可插拔**——高级用户仍能替换 RateProvider、策略、存储等实现；
+* **一步可用**——最小化"胶水"代码；
+* **灵活可插拔**——高级用户仍能替换策略、存储等实现；
 * **按需生效**——只对通过 Kit 注册的路由做计费，不影响其它中间件。
 
 ---
@@ -28,41 +28,26 @@
 ```ts
 import express from 'express';
 import { createExpressBillingKit } from '@nuwa-ai/payment-kit/express';
+import { KeyManager } from '@nuwa-ai/identity-kit';
 import OpenAIProxy from './handlers/openai.js';
 
 const app = express();
 app.use(express.json());
 
-// 1. 创建 BillingKit
+// 1. 创建 BillingKit（最小配置）
 const billing = await createExpressBillingKit({
-  serviceId: 'llm-gateway',          // 服务标识
-
-  /**
-   * 最低配置：只需提供「收款方 DID」以及其签名能力，
-   * BillingKit 会自动创建 PaymentChannelPayeeClient 并连接 Rooch 节点。
-   */
-  payee: {
-    did: process.env.PAYEE_DID!,                 // 例如 "did:key:z6Mk..."
-    keyManager: myKeyManagerInstance,            // 实现了 SignerInterface
-    rpcUrl: 'https://rooch.dev.node',            // 可选：默认取 env.ROOCH_NODE_URL
-    contractAddress: '0x123::payment::Contract'  // 可选
-  },
-
-  /** 进阶：也可以手动传入一个已经初始化好的 payeeClient */
-  // payeeClient,
-
-  defaultAssetId: '0x3::gas_coin::RGas',
-  defaultPricePicoUSD: '500000000',  // 未匹配规则时的兜底价
-  // didAuth 默认开启，可通过 didAuth.enabled=false 关闭
-  debug: true
+  serviceId: 'llm-gateway',                                  // 服务标识
+  signer: KeyManager.fromPrivateKey(process.env.SERVICE_PRIVATE_KEY!), // 服务私钥
+  did: process.env.SERVICE_DID,                              // 可选：如果 signer 不含 DID
+  
+  // 可选配置
+  rpcUrl: 'https://rooch.dev.node',                          // 默认取 env.ROOCH_NODE_URL
+  network: 'dev',                                            // 默认 'local'
+  defaultAssetId: '0x3::gas_coin::RGas',                     // 默认结算资产
+  defaultPricePicoUSD: '500000000',                          // 未匹配规则时的兜底价
+  didAuth: true,                                             // 默认开启 DID 认证
+  debug: true                                                // 调试日志
 });
-
-// 如果只拿到十六进制私钥，也可以直接：
-// import { KeyManager } from '@nuwa-ai/identity-kit';
-// payee: {
-//   did: process.env.PAYEE_DID!,
-//   keyManager: KeyManager.fromPrivateKey(process.env.SERVICE_PRIVATE_KEY!)
-// }
 
 // 2. 声明路由 & 计价策略
 billing.post('/chat/completions',
@@ -94,23 +79,17 @@ app.listen(3000, () => console.log('🚀 Server ready on :3000'));
 |------|-----------|
 | **本地开发** | 用脚本一次性生成 DID + 私钥，保存到 `.env` 或 `.dev-secrets/service.json`；在代码里 `KeyManager.fromPrivateKey()` 读取即可。 |
 | **CI / 演示环境** | 在 Cadop 控制台（或其它 DID 平台）预先创建 Agent，拿到私钥后存入云端 Secret Manager；启动时通过 `process.env` 注入。 |
-| **生产环境** | 同上，但私钥应托管在云 KMS / HSM。编写一个 `KmsSigner` 适配 `SignerInterface`，注入到 `payee.keyManager`。私钥不可导出，满足合规与审计要求。 |
+| **生产环境** | 同上，但私钥应托管在云 KMS / HSM。编写一个 `KmsSigner` 适配 `SignerInterface`，注入到 `signer` 参数。私钥不可导出，满足合规与审计要求。 |
 
-### Option 2：服务启动自动生成 DID？
-
-可行但**不推荐**在线上环境，因为会出现“窗口期”——密钥未登记到链上/控制台前服务无法收款；同时重新部署会导致身份变更。若确需自动生成，请将生成的密钥持久化到卷或 Secret 后台。
-
-### 最小代码示例（env 私钥）
+### 最小代码示例
 
 ```ts
 import { KeyManager } from '@nuwa-ai/identity-kit';
 
 const billing = await createExpressBillingKit({
   serviceId: 'echo-service',
-  payee: {
-    did: process.env.SERVICE_DID!,
-    keyManager: KeyManager.fromPrivateKey(process.env.SERVICE_PRIVATE_KEY!)
-  }
+  signer: KeyManager.fromPrivateKey(process.env.SERVICE_PRIVATE_KEY!),
+  did: process.env.SERVICE_DID  // 如果 signer 能自报 DID，此项可省略
 });
 ```
 
@@ -120,18 +99,17 @@ const billing = await createExpressBillingKit({
 
 ### `createExpressBillingKit(options)`
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `serviceId` | `string` | 服务标识，用于链上计费配置 |
-| `payee` | `{ did, keyManager, rpcUrl?, contractAddress? }` | **简易模式**，自动创建 PayeeClient |
-| `payeeClient` | `PaymentChannelPayeeClient` | 手动模式（二选一） |
-| `rateProvider` | `RateProvider` | 可选，默认内置合约报价器 |
-| `defaultAssetId` | `string` | 默认结算资产 ID |
-| `defaultPricePicoUSD` | `string \| bigint` | 未命中规则的默认价 |
-| `didAuth` | `{ enabled?: boolean, headerScheme?: string }` | DID 身份认证配置，默认 `enabled=true` |
-| `debug` | `boolean` | 打印调试日志 |
-
-> `payee` 与 `payeeClient` 二选一。若两者都提供，以 `payeeClient` 为准。
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `serviceId` | `string` | ✅ | 服务标识，用于链上计费配置 |
+| `signer` | `SignerInterface` | ✅ | 服务私钥（或 KMS Signer） |
+| `did` | `string` | ⬜ | 可选：若 Signer 无法自报 DID，可手动指定 |
+| `rpcUrl` | `string` | ⬜ | RPC 地址，默认取 `env.ROOCH_NODE_URL` |
+| `network` | `'local' \| 'dev' \| 'test' \| 'main'` | ⬜ | 网络，默认 `'local'` |
+| `defaultAssetId` | `string` | ⬜ | 默认结算资产 ID |
+| `defaultPricePicoUSD` | `string \| bigint` | ⬜ | 未命中规则的默认价 |
+| `didAuth` | `boolean` | ⬜ | DID 身份认证开关，默认 `true` |
+| `debug` | `boolean` | ⬜ | 打印调试日志 |
 
 返回对象：
 
@@ -186,15 +164,12 @@ interface ExpressBillingKit {
 ```ts
 const billing = await createExpressBillingKit({
   serviceId: 'svc',
-  payee: {...},
-  didAuth: {
-    enabled: true,               // 显式开启/关闭
-    headerScheme: 'DIDAuthV1'    // 或自定义 Bearer
-  }
+  signer: myKeyManager,
+  didAuth: false  // 关闭 DID 认证（不推荐生产环境）
 });
 ```
 
-若 `didAuth.enabled=false`，Kit 只做延迟支付校验，不做身份鉴权（不推荐于生产环境）。
+若 `didAuth=false`，Kit 只做延迟支付校验，不做身份鉴权。
 
 ---
 
@@ -209,9 +184,6 @@ billing.post('/high-memory-task', {
 }, handler);
 ```
 在 `StrategyFactory` 中注册你的 `PerByteStrategy` 即可。
-
-### 手动组合（流式极端场景）
-仍可直接使用 `HttpBillingMiddleware.createExpressMiddleware()` + `createPostResponseMiddleware()` 自行控制。
 
 ### 内置运维 & 恢复接口
 
