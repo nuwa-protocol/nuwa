@@ -128,14 +128,25 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     }
   }
 
+  /**
+   * Clean up expired pending SubRAVs
+   * 
+   * Note: This method uses database server time (NOW()) instead of client time
+   * to avoid issues with time drift between client and database server.
+   * This ensures that cleanup works correctly even when client and server
+   * clocks are not perfectly synchronized.
+   * 
+   * @param maxAgeMs Maximum age in milliseconds (default: 30 minutes)
+   * @returns Number of records deleted
+   */
   async cleanup(maxAgeMs: number = 30 * 60 * 1000): Promise<number> {
     const client = await this.pool.connect();
     try {
-      const cutoffTime = new Date(Date.now() - maxAgeMs);
+      // Use database server time to avoid client-server time drift issues
       const result = await client.query(`
         DELETE FROM ${this.pendingSubRAVsTable} 
-        WHERE created_at < $1
-      `, [cutoffTime]);
+        WHERE created_at < NOW() - INTERVAL '${maxAgeMs} milliseconds'
+      `);
 
       return result.rowCount || 0;
     } finally {

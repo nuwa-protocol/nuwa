@@ -203,7 +203,11 @@ export class HttpBillingMiddleware {
       channelId: paymentData?.signedSubRav.subRav.channelId,
       vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment,
       
-      // HTTP-specific metadata
+      // HTTP-specific metadata for billing rules
+      method: req.method,
+      path: req.path,
+      
+      // Also keep HTTP-prefixed versions for other uses
       httpMethod: req.method,
       httpPath: req.path,
       httpQuery: req.query,

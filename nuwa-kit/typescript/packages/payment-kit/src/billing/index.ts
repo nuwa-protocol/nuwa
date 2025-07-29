@@ -15,4 +15,4 @@ export * from './config';
 
 // Rate providers and USD conversion
 export * from './rate';
-export { UsdBillingEngine, DEFAULT_ASSET_DECIMALS } from './usd-engine'; 
+export { UsdBillingEngine } from './usd-engine'; 

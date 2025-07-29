@@ -8,6 +8,8 @@ import type {
   BillingContext,
   CostCalculator
 } from '../billing/types';
+import type { ConversionResult } from '../billing/rate/types';
+import { UsdBillingEngine } from '../billing/usd-engine';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import type { ClaimScheduler } from './ClaimScheduler';
@@ -95,6 +97,9 @@ export interface ProcessorPaymentResult {
     
     /** Service transaction reference */
     serviceTxRef?: string;
+    
+    /** USD billing conversion details (for auditing) */
+    conversion?: ConversionResult;
   }
   
   /**
@@ -217,9 +222,10 @@ export interface PaymentVerificationResult extends VerificationResult {
           this.config.defaultAssetId
         );
   
-        // Step 4: Calculate cost for current request
-        const cost = await this.calculateCost(billingContext);
-  
+                // Step 4: Calculate cost for current request with conversion details
+        const costResult = await this.calculateCostWithDetails(billingContext);
+        const { cost, conversion } = costResult;
+
         if (cost === 0n) {
           // Free request, no payment needed
           return {
@@ -229,16 +235,17 @@ export interface PaymentVerificationResult extends VerificationResult {
             autoClaimTriggered,
             isHandshake,
             payerKeyId: verificationResult.payerKeyId,
-            signedSubRAV
+            signedSubRAV,
+            conversion
           };
         }
-  
+
         // Step 5: Generate unsigned SubRAV proposal for next request
         const unsignedSubRAV = await this.generateProposal(billingContext, cost);
         
         // Store the unsigned SubRAV for later verification
         await this.pendingSubRAVStore.save(unsignedSubRAV);
-  
+
         return {
           success: true,
           cost,
@@ -248,7 +255,8 @@ export interface PaymentVerificationResult extends VerificationResult {
           autoClaimTriggered,
           isHandshake,
           payerKeyId: verificationResult.payerKeyId,
-          serviceTxRef: PaymentUtils.generateTxRef()
+          serviceTxRef: PaymentUtils.generateTxRef(),
+          conversion
         };
   
       } catch (error) {
@@ -414,12 +422,24 @@ export interface PaymentVerificationResult extends VerificationResult {
       }
     }
   
+
     /**
-     * Calculate cost using billing engine
+     * Calculate cost with conversion details (USD billing)
      */
-    private async calculateCost(context: BillingContext): Promise<bigint> {
+    private async calculateCostWithDetails(context: BillingContext): Promise<{cost: bigint, conversion?: ConversionResult}> {
       try {
-        return await this.config.billingEngine.calcCost(context);
+        // Check if billing engine supports detailed conversion
+        if (this.config.billingEngine instanceof UsdBillingEngine) {
+          const conversion = await this.config.billingEngine.calcCostWithDetails(context);
+          return {
+            cost: conversion.assetCost,
+            conversion
+          };
+        } else {
+          // Fallback to simple cost calculation
+          const cost = await this.config.billingEngine.calcCost(context);
+          return { cost };
+        }
       } catch (error) {
         this.log('Billing calculation error:', error);
         throw new Error(`Failed to calculate cost: ${error}`);

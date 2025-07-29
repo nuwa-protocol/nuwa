@@ -7,6 +7,8 @@ import type {
   SubRAV 
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
+import { UsdBillingEngine, FileConfigLoader } from '../../../src/billing';
+import { ContractRateProvider } from '../../../src/billing/rate';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -16,6 +18,7 @@ export interface BillingServerConfig {
   serviceId?: string;
   defaultAssetId?: string;
   debug?: boolean;
+  rpcUrl?: string; // For RateProvider to query chain info
 }
 
 export async function createBillingServer(config: BillingServerConfig) {
@@ -24,7 +27,8 @@ export async function createBillingServer(config: BillingServerConfig) {
     port = 3000,
     serviceId = 'echo-service',
     defaultAssetId = '0x3::gas_coin::RGas',
-    debug = true
+    debug = true,
+    rpcUrl
   } = config;
 
   const app = express();
@@ -34,7 +38,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   const configDir = path.join(__dirname, 'billing-config');
   await fs.mkdir(configDir, { recursive: true });
   
-  // 创建计费配置文件
+  // 创建计费配置文件 (USD pricing in picoUSD units)
   const billingConfigContent = `
 version: 1
 serviceId: ${serviceId}
@@ -45,19 +49,19 @@ rules:
       method: "GET"
     strategy:
       type: PerRequest
-      price: "1000000"  # 0.001 RGas per echo
+      price: "1000000000"  # 0.001 USD (1,000,000,000 picoUSD) per echo
   - id: expensive-operation
     when:
       path: "/v1/process"
       method: "POST"
     strategy:
       type: PerRequest
-      price: "10000000"  # 0.01 RGas per process
+      price: "10000000000"  # 0.01 USD (10,000,000,000 picoUSD) per process
   - id: default-pricing
     default: true
     strategy:
       type: PerRequest
-      price: "500000"  # 0.0005 RGas default
+      price: "500000000"  # 0.0005 USD (500,000,000 picoUSD) default
 `;
 
   await fs.writeFile(
@@ -66,28 +70,35 @@ rules:
     'utf-8'
   );
 
-  // 2. 创建简单的计费引擎（用于测试）
-  const simpleBillingEngine = {
-    async calcCost(context: any): Promise<bigint> {
-      const { operation, meta } = context;
-      
-      // 根据路径和方法计算费用
-      if (operation === 'get:/v1/echo') {
-        return BigInt('1000000'); // 0.001 RGas
-      } else if (operation === 'post:/v1/process') {
-        return BigInt('10000000'); // 0.01 RGas
-      } else if (operation === 'get:/health' || operation === 'get:/admin/claims') {
-        return BigInt('0'); // Health check and admin routes are free
-      }
-      
-      return BigInt('500000'); // 默认 0.0005 RGas
+  // 2. 创建 USD 计费引擎（USD 定价，Token 结算）
+  const configLoader = new FileConfigLoader(configDir);
+  
+  // Get contract instance from payeeClient for price queries
+  const contract = (payeeClient as any).contract; // Access the underlying contract
+  if (!contract) {
+    throw new Error('PayeeClient contract is required for ContractRateProvider');
+  }
+  
+  const rateProvider = new ContractRateProvider(
+    contract,
+    30_000 // 30 seconds cache for on-chain data
+  );
+  
+  const usdBillingEngine = new UsdBillingEngine(
+    configLoader,
+    rateProvider,
+    {
+      [defaultAssetId]: { decimals: 8 }, // RGas has 8 decimals
+      'ethereum': { decimals: 18 },
+      'usd-coin': { decimals: 6 },
+      'bitcoin': { decimals: 8 }
     }
-  };
+  );
 
   // 3. 创建支付中间件
   const paymentMiddleware = new HttpBillingMiddleware({
     payeeClient,
-    billingEngine: simpleBillingEngine,
+    billingEngine: usdBillingEngine,
     serviceId,
     defaultAssetId,
     debug

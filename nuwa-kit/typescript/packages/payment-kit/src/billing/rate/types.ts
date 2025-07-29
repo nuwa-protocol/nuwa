@@ -1,5 +1,3 @@
-import type { RoochClient } from '@roochnetwork/rooch-sdk';
-import { Args } from '@roochnetwork/rooch-sdk';
 import { AssetInfo } from '../../core/types';
 
 /**
@@ -48,43 +46,16 @@ export abstract class BaseRateProvider implements RateProvider {
     assetInfo?: AssetInfo;
   }>();
   protected cacheTimeout: number;
-  protected roochClient?: RoochClient;
 
   constructor(
     cacheTimeoutMs = 60000, // 1 minute default
-    roochClient?: RoochClient
   ) {
     this.cacheTimeout = cacheTimeoutMs;
-    this.roochClient = roochClient;
   }
 
   abstract getPricePicoUSD(assetId: string): Promise<bigint>;
 
-  async getAssetInfo(assetId: string): Promise<AssetInfo | null> {
-    // Check cache first
-    const cached = this.cache.get(assetId);
-    if (cached?.assetInfo) {
-      return cached.assetInfo;
-    }
-
-    try {
-      // Try to get from chain first (for Rooch assets)
-      if (this.roochClient && this.isRoochAsset(assetId)) {
-        const info = await this.getAssetInfoFromChain(assetId);
-        if (info) {
-          // Cache the result
-          this.updateCache(assetId, cached?.price || 0n, info);
-          return info;
-        }
-      }
-
-      // Fallback to static configuration
-      return this.getAssetInfoFromConfig(assetId);
-    } catch (error) {
-      console.warn(`Failed to get asset info for ${assetId}:`, error);
-      return this.getAssetInfoFromConfig(assetId);
-    }
-  }
+  abstract getAssetInfo(assetId: string): Promise<AssetInfo | null>;
 
   getLastUpdated(assetId: string): number | null {
     const cached = this.cache.get(assetId);
@@ -119,66 +90,6 @@ export abstract class BaseRateProvider implements RateProvider {
     return cached.price;
   }
 
-  /**
-   * Check if an asset is a Rooch asset (can be queried from chain)
-   */
-  protected isRoochAsset(assetId: string): boolean {
-    return assetId.includes('::') || assetId.startsWith('0x');
-  }
-
-  /**
-   * Get asset info from Rooch chain
-   */
-  private async getAssetInfoFromChain(assetId: string): Promise<AssetInfo | null> {
-    if (!this.roochClient) return null;
-
-    try {
-      // For Rooch coin types, we can get the decimals from the chain
-      // Use the coin metadata registry
-      const result = await this.roochClient.executeViewFunction({
-        target: '0x3::coin::decimals_by_type_name',
-        args: [Args.string(assetId)],
-        typeArgs: [],
-      });
-
-      if (result.vm_status === 'Executed' && result.return_values?.[0]) {
-        const decimals = Number(result.return_values[0].decoded_value);
-        
-        // Also try to get symbol and name
-        const [symbolResult, nameResult] = await Promise.all([
-          this.roochClient.executeViewFunction({
-            target: '0x3::coin::symbol_by_type_name',
-            args: [Args.string(assetId)],
-            typeArgs: [],
-          }).catch(() => null),
-          this.roochClient.executeViewFunction({
-            target: '0x3::coin::name_by_type_name',
-            args: [Args.string(assetId)],
-            typeArgs: [],
-          }).catch(() => null),
-        ]);
-
-        const symbol = symbolResult?.return_values?.[0]?.decoded_value as string;
-        const name = nameResult?.return_values?.[0]?.decoded_value as string;
-
-        return {
-          assetId,
-          decimals,
-          symbol,
-          name,
-        };
-      }
-    } catch (error) {
-      console.warn(`Failed to get chain info for ${assetId}:`, error);
-    }
-
-    return null;
-  }
-
-  /**
-   * Get asset info from static configuration (fallback)
-   */
-  protected abstract getAssetInfoFromConfig(assetId: string): AssetInfo | null;
 }
 
 /**
@@ -193,20 +104,6 @@ export interface RateResult {
   provider: string;
   /** Asset identifier */
   assetId: string;
-}
-
-/**
- * Rate provider configuration
- */
-export interface RateProviderConfig {
-  /** Cache TTL in milliseconds */
-  cacheTtlMs?: number;
-  /** Request timeout in milliseconds */
-  timeoutMs?: number;
-  /** Whether to enable debug logging */
-  debug?: boolean;
-  /** Asset configurations */
-  assets?: Record<string, AssetInfo>;
 }
 
 /**

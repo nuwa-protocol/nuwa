@@ -193,7 +193,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response1 = await testClient.callEcho('hello world');
     
     expect(response1.echo).toBe('hello world');
-    expect(response1.cost).toBe('1000000'); // 0.001 RGas
+    expect(response1.cost).toBe('10000000'); // 0.001 USD = 10,000,000 RGAS units (0.1 RGAS)
     expect(response1.timestamp).toBeTruthy();
     
     // Should have received a SubRAV proposal for next request
@@ -209,7 +209,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response2 = await testClient.callEcho('second call');
     
     expect(response2.echo).toBe('second call');
-    expect(response2.cost).toBe('1000000');
+    expect(response2.cost).toBe('10000000');
     
     const pendingSubRAV2 = testClient.getPendingSubRAV();
     expect(pendingSubRAV2).toBeTruthy();
@@ -223,7 +223,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     for (let i = 3; i <= 6; i++) {
       const response = await testClient.callEcho(`call ${i}`);
       expect(response.echo).toBe(`call ${i}`);
-      expect(response.cost).toBe('1000000');
+      expect(response.cost).toBe('10000000');
       console.log(`✅ Request ${i} successful (nonce: ${response.nonce || 'unknown'})`);
     }
 
@@ -243,19 +243,19 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     testClient.clearPendingSubRAV();
 
     // Test echo requests (cheaper)
-    console.log('📞 Echo requests (0.001 RGas each)');
+    console.log('📞 Echo requests (0.001 USD each)');
     await testClient.callEcho('test echo 1');
     await testClient.callEcho('test echo 2');
 
     // Test process requests (more expensive)
-    console.log('📞 Process requests (0.01 RGas each)');
+    console.log('📞 Process requests (0.01 USD each)');
     const processResponse1 = await testClient.callProcess({ data: 'test data 1' });
     expect(processResponse1.processed.data).toBe('test data 1');
-    expect(processResponse1.cost).toBe('10000000'); // 0.01 RGas
+    expect(processResponse1.cost).toBe('100000000'); // 0.01 USD = 100,000,000 RGAS units (1.0 RGAS)
 
     const processResponse2 = await testClient.callProcess({ operation: 'complex task' });
     expect(processResponse2.processed.operation).toBe('complex task');
-    expect(processResponse2.cost).toBe('10000000');
+    expect(processResponse2.cost).toBe('100000000');
 
     console.log('✅ Mixed request types processed successfully');
 

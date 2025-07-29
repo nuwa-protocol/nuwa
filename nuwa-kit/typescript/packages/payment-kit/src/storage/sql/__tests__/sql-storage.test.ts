@@ -460,7 +460,7 @@ describe('SQL Storage Repositories', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Cleanup with very short max age (everything should be cleaned)
-      const deletedCount = await pendingRepo.cleanup(50); // 50ms max age
+      const deletedCount = await pendingRepo.cleanup(1); // 1ms max age
       expect(deletedCount).toBe(1);
 
       // Verify it's gone
