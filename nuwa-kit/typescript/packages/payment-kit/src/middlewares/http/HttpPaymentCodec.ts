@@ -319,36 +319,3 @@ export class HttpPaymentCodec implements PaymentCodec {
     };
   }
 }
-
-/**
- * HTTP middleware utilities for payment channel integration
- * @deprecated Use HttpPaymentCodec static methods directly
- */
-export class HttpPaymentMiddleware {
-  /**
-   * Extract payment data from request headers
-   */
-  static extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
-    return HttpPaymentCodec.extractPaymentData(headers);
-  }
-
-  /**
-   * Add payment data to response headers
-   */
-  static addPaymentData(
-    headers: Record<string, string>, 
-    payload: HttpResponsePayload
-  ): Record<string, string> {
-    return HttpPaymentCodec.addPaymentData(headers, payload);
-  }
-
-  /**
-   * Validate payment requirements for a request
-   */
-  static validatePaymentRequirement(
-    paymentData: HttpRequestPayload | null,
-    requiredAmount: bigint
-  ): { valid: boolean; error?: string } {
-    return HttpPaymentCodec.validatePaymentRequirement(paymentData, requiredAmount);
-  }
-} 

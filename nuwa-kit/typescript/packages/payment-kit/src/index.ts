@@ -87,7 +87,7 @@ export {
 } from './core/subrav';
 
 // HTTP Transport
-export { HttpPaymentCodec, HttpPaymentMiddleware } from './middlewares/http/HttpPaymentCodec';
+export { HttpPaymentCodec } from './middlewares/http/HttpPaymentCodec';
 
 // HTTP Billing middleware for deferred payment model (refactored)
 export { HttpBillingMiddleware } from './middlewares/http/HttpBillingMiddleware';

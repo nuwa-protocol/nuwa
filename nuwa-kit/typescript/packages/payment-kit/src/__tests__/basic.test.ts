@@ -9,7 +9,7 @@ import { describe, it, expect } from '@jest/globals';
 import { 
   SubRAVCodec, 
   SubRAVValidator,
-  HttpPaymentCodec as HttpHeaderCodec,
+  HttpPaymentCodec,
   generateNonce,
   extractFragment,
   isValidHex,
@@ -107,7 +107,7 @@ describe('Payment Kit Basic Tests', () => {
 
   describe('HTTP Header Codec', () => {
     it('should get header name', () => {
-      const headerName = HttpHeaderCodec.getHeaderName();
+      const headerName = HttpPaymentCodec.getHeaderName();
       expect(headerName).toBe('X-Payment-Channel-Data');
     });
 
