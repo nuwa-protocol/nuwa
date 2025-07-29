@@ -38,7 +38,18 @@ export class SqlRAVRepository implements RAVRepository {
     this.allowUnsafeAutoMigrateInProd = options.allowUnsafeAutoMigrateInProd ?? false;
     
     // Only auto-migrate in development or when explicitly allowed in production
-    if (this.autoMigrate && (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)) {
+    if (this.autoMigrate) {
+      if (process.env.NODE_ENV === 'production' && this.allowUnsafeAutoMigrateInProd) {
+        console.warn(
+          "WARNING: Unsafe auto-migration is enabled in production. This may lead to data loss or schema conflicts. " +
+          "Ensure you understand the risks before proceeding."
+        );
+      } else if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          "Auto-migration is disabled in production by default. To enable it, set 'allowUnsafeAutoMigrateInProd' to true " +
+          "and acknowledge the risks."
+        );
+      }
       this.initialize().catch(console.error);
     }
   }
