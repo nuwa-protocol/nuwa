@@ -4,6 +4,7 @@ import { HttpBillingMiddleware } from '../../middlewares/http/HttpBillingMiddlew
 import { UsdBillingEngine } from '../../billing/usd-engine';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
+import { DIDAuth, VDRRegistry } from '@nuwa-ai/identity-kit';
 import type { StrategyConfig } from '../../billing/types';
 import type { RateProvider } from '../../billing/rate/types';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
@@ -29,8 +30,6 @@ export interface SimplePayeeConfig {
 export interface DIDAuthConfig {
   /** Enable DID authentication (default: true) */
   enabled?: boolean;
-  /** Header scheme for DID auth (default: 'DIDAuthV1') */
-  headerScheme?: string;
 }
 
 /**
@@ -165,29 +164,38 @@ class ExpressBillingKitImpl implements ExpressBillingKit {
   }
 
   /**
-   * Perform DID authentication (simplified implementation)
+   * Perform DID authentication using DIDAuthV1 scheme
    */
   private async performDIDAuth(req: express.Request, res: express.Response): Promise<void> {
-    // TODO: Implement actual DID authentication
-    // For now, just check if Authorization header exists
-    const authHeader = req.headers.authorization;
-    const scheme = this.config.didAuth?.headerScheme || 'DIDAuthV1';
+    const AUTH_SCHEME = "DIDAuthV1";
+    const HEADER_PREFIX = `${AUTH_SCHEME} `;
     
-    if (!authHeader || !authHeader.startsWith(scheme)) {
-      // For development, we'll allow requests without proper DID auth
-      // In production, this should throw an error
-      if (this.config.debug) {
-        console.warn('⚠️ DID authentication skipped (debug mode)');
+    try {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith(HEADER_PREFIX)) {
+        throw new Error("Missing or invalid Authorization header");
       }
-      return;
-    }
 
-    // Extract and validate DID auth token
-    // This is a placeholder - real implementation would:
-    // 1. Parse the auth token
-    // 2. Verify the signature
-    // 3. Set req.didInfo with verified information
-    console.log('🔐 DID authentication placeholder');
+      // Perform cryptographic verification via Nuwa Identity Kit
+      const verifyResult = await DIDAuth.v1.verifyAuthHeader(
+        authHeader,
+        VDRRegistry.getInstance()
+      );
+
+      if (!verifyResult.ok) {
+        throw new Error(verifyResult.error);
+      }
+
+      // Success path: extract signer DID and set it on the request
+      (req as any).didInfo = { 
+        did: verifyResult.signedObject.signature.signer_did 
+      };
+
+    } catch (error) {
+      console.error('🚨 DID authentication failed:', error);
+      throw new Error(`DID authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   // HTTP verb methods
@@ -399,4 +407,18 @@ async function createPayeeClientFromConfig(payeeConfig: SimplePayeeConfig): Prom
   // 3. Configure storage options
   
   throw new Error('Auto-creation of PayeeClient from simple config not yet implemented. Please provide a pre-configured payeeClient.');
+}
+
+// ---------------------------------------------------------------------------
+// Express augmentation to include `didInfo`
+// ---------------------------------------------------------------------------
+
+declare global {
+  namespace Express {
+    interface Request {
+      didInfo?: {
+        did: string;
+      };
+    }
+  }
 } 
