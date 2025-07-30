@@ -256,6 +256,16 @@ export class KeyManager implements SignerInterface {
       throw new Error(`Key ID ${keyId} already exists in store`);
     }
 
+    // Validate key pair consistency for security
+    const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+      keyPair.privateKey, 
+      keyPair.publicKey, 
+      type
+    );
+    if (!isConsistent) {
+      throw new Error('Key pair validation failed: private and public keys are inconsistent');
+    }
+
     await this.importKey({
       keyId,
       keyType: type,
@@ -299,7 +309,7 @@ export class KeyManager implements SignerInterface {
    * @returns The imported StoredKey
    */
   async importKeyFromString(serialized: string): Promise<StoredKey> {
-    const key = StoredKeyCodec.decode(serialized);
+    const key = await StoredKeyCodec.decode(serialized);
     await this.importKey(key);
     return key;
   }
@@ -314,7 +324,7 @@ export class KeyManager implements SignerInterface {
     serialized: string,
     store: KeyStore = new MemoryKeyStore()
   ): Promise<KeyManager> {
-    const key = StoredKeyCodec.decode(serialized);
+    const key = await StoredKeyCodec.decode(serialized);
     const km = KeyManager.createEmpty(getDidWithoutFragment(key.keyId), store);
     await km.importKey(key);
     return km;

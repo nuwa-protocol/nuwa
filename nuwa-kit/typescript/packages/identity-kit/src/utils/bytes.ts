@@ -20,9 +20,27 @@ export function bytesToString(bytes: Uint8Array): string {
   throw new Error('No TextDecoder or Buffer available in this environment.');
 }
 
+export function base64urlToBytes(base64url: string): Uint8Array {
+  // Add padding if needed
+  const padding = base64url.length % 4;
+  const paddedBase64url = base64url + '='.repeat(padding === 0 ? 0 : 4 - padding);
+  
+  // Convert base64url to base64
+  const base64 = paddedBase64url.replace(/-/g, '+').replace(/_/g, '/');
+  
+  // Decode to bytes
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export const Bytes = {
   stringToBytes,
   bytesToString,
+  base64urlToBytes,
 };
 
 export default Bytes;

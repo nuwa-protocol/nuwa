@@ -38,4 +38,8 @@ export class Secp256k1Provider implements CryptoProvider {
   getKeyType(): KeyType {
     return KEY_TYPE.SECP256K1;
   }
+
+  async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
+    return secp256k1.getPublicKey(privateKey, true); // compressed format
+  }
 }

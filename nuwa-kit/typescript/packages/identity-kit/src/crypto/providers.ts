@@ -35,6 +35,13 @@ export interface CryptoProvider {
    * Get the key type supported by this provider
    */
   getKeyType(): KeyType;
+
+  /**
+   * Derive public key from private key
+   * @param privateKey The private key bytes
+   * @returns The corresponding public key bytes
+   */
+  derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array>;
 }
 
 /**

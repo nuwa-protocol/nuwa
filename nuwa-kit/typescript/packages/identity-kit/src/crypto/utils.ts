@@ -54,4 +54,54 @@ export class CryptoUtils {
     const provider = defaultCryptoProviderFactory.createProvider(keyType);
     return provider.verify(data, signature, publicKey);
   }
+
+  /**
+   * Derive public key from private key
+   * @param privateKey The private key bytes
+   * @param keyType The key type
+   * @returns The corresponding public key bytes
+   */
+  static async derivePublicKey(privateKey: Uint8Array, keyType: KeyTypeInput): Promise<Uint8Array> {
+    const type = typeof keyType === 'string' ? toKeyType(keyType) : keyType;
+    const provider = defaultCryptoProviderFactory.createProvider(type);
+    return provider.derivePublicKey(privateKey);
+  }
+
+  /**
+   * Validate the consistency between a private key and public key pair
+   * @param privateKey The private key bytes
+   * @param publicKey The public key bytes
+   * @param keyType The key type
+   * @returns true if the keys are consistent, false otherwise
+   */
+  static async validateKeyPairConsistency(
+    privateKey: Uint8Array, 
+    publicKey: Uint8Array, 
+    keyType: KeyTypeInput
+  ): Promise<boolean> {
+    try {
+      // Derive public key from private key
+      const derivedPublicKey = await this.derivePublicKey(privateKey, keyType);
+      
+      // Compare if public keys match
+      return this.areUint8ArraysEqual(derivedPublicKey, publicKey);
+    } catch (error) {
+      console.warn('Key pair consistency validation failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Compare two Uint8Array for equality
+   * @param a First array
+   * @param b Second array
+   * @returns true if arrays are equal, false otherwise
+   */
+  private static areUint8ArraysEqual(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
 }

@@ -143,4 +143,72 @@ describe('CryptoUtils', () => {
       expect(isValidEnum).toBe(true);
     });
   });
+
+  describe('validateKeyPairConsistency', () => {
+    it('should validate consistent Ed25519 key pairs', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        keyPair.privateKey,
+        keyPair.publicKey,
+        KeyType.ED25519
+      );
+      expect(isConsistent).toBe(true);
+    });
+
+    it('should validate consistent Secp256k1 key pairs', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.SECP256K1);
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        keyPair.privateKey,
+        keyPair.publicKey,
+        KeyType.SECP256K1
+      );
+      expect(isConsistent).toBe(true);
+    });
+
+    it('should validate consistent EcdsaR1 key pairs', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.ECDSAR1);
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        keyPair.privateKey,
+        keyPair.publicKey,
+        KeyType.ECDSAR1
+      );
+      expect(isConsistent).toBe(true);
+    });
+
+    it('should detect inconsistent key pairs', async () => {
+      const keyPair1 = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      const keyPair2 = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      
+      // Mix private key from one pair with public key from another
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        keyPair1.privateKey,
+        keyPair2.publicKey,
+        KeyType.ED25519
+      );
+      expect(isConsistent).toBe(false);
+    });
+
+    it('should work with different key types using string format', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.SECP256K1);
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        keyPair.privateKey,
+        keyPair.publicKey,
+        'EcdsaSecp256k1VerificationKey2019'
+      );
+      expect(isConsistent).toBe(true);
+    });
+
+    it('should handle validation errors gracefully', async () => {
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.ED25519);
+      // Create an invalid private key (wrong length)
+      const invalidPrivateKey = new Uint8Array(10);
+      
+      const isConsistent = await CryptoUtils.validateKeyPairConsistency(
+        invalidPrivateKey,
+        keyPair.publicKey,
+        KeyType.ED25519
+      );
+      expect(isConsistent).toBe(false);
+    });
+  });
 });

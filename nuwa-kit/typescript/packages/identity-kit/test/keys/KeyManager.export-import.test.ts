@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { KeyManager } from '../../src/keys/KeyManager';
 import { MemoryKeyStore } from '../../src/keys/KeyStore';
 import { KeyType } from '../../src/types/crypto';
+import { CryptoUtils } from '../../src/crypto/utils';
+import { KeyMultibaseCodec } from '../../src/multibase';
 
 describe('KeyManager Export/Import', () => {
   let keyManager: KeyManager;
@@ -186,6 +188,85 @@ describe('KeyManager Export/Import', () => {
       
       const importedKey = await newKeyManager.getStoredKey(testKeyId);
       expect(importedKey?.meta).toEqual(originalKey.meta);
+    });
+  });
+
+  describe('import with automatic validation', () => {
+    it('should successfully import consistent keys', async () => {
+      const { keyManager, keyId } = await KeyManager.createWithDidKey();
+      
+      // Export the key
+      const exportedString = await keyManager.exportKeyToString(keyId);
+      
+      // Import - should succeed with automatic validation
+      const newKeyManager = await KeyManager.fromSerializedKey(exportedString);
+      const importedKey = await newKeyManager.getStoredKey(keyId);
+      
+      expect(importedKey).toBeDefined();
+      expect(importedKey?.keyId).toBe(keyId);
+    });
+
+    it('should import consistent keys to existing KeyManager', async () => {
+      // Create KeyManager with Secp256k1 key manually
+      const keyPair = await CryptoUtils.generateKeyPair(KeyType.SECP256K1);
+      const publicKeyMultibase = KeyMultibaseCodec.encodeWithType(keyPair.publicKey, KeyType.SECP256K1);
+      const didKey = `did:key:${publicKeyMultibase}`;
+      const keyManager = KeyManager.createEmpty(didKey);
+      const keyId = await keyManager.importKeyPair('test-key', keyPair, KeyType.SECP256K1);
+      
+      // Export the key
+      const exportedString = await keyManager.exportKeyToString(keyId);
+      
+      // Create a new KeyManager with automatic validation
+      const newKeyManager = await KeyManager.fromSerializedKey(exportedString);
+      
+      // Verify it's correctly imported
+      const retrievedKey = await newKeyManager.getStoredKey(keyId);
+      expect(retrievedKey).toBeDefined();
+      expect(retrievedKey?.keyId).toBe(keyId);
+      expect(retrievedKey?.keyType).toBe(KeyType.SECP256K1);
+    });
+
+    it('should test automatic validation with different key types', async () => {
+      const keyTypes = [KeyType.ED25519, KeyType.SECP256K1, KeyType.ECDSAR1];
+      
+      for (const keyType of keyTypes) {
+        // Create KeyManager with specific key type manually
+        const keyPair = await CryptoUtils.generateKeyPair(keyType);
+        const publicKeyMultibase = KeyMultibaseCodec.encodeWithType(keyPair.publicKey, keyType);
+        const didKey = `did:key:${publicKeyMultibase}`;
+        const keyManager = KeyManager.createEmpty(didKey);
+        const keyId = await keyManager.importKeyPair('test-key', keyPair, keyType);
+        
+        const exportedString = await keyManager.exportKeyToString(keyId);
+        
+        // Should succeed validation for all key types
+        const newKeyManager = await KeyManager.fromSerializedKey(exportedString);
+        const importedKey = await newKeyManager.getStoredKey(keyId);
+        
+        expect(importedKey?.keyType).toBe(keyType);
+      }
+    });
+
+    it('should handle keys without private key during validation', async () => {
+      const { keyManager, keyId } = await KeyManager.createWithDidKey();
+      const storedKey = await keyManager.getStoredKey(keyId);
+      
+      // Create a copy without private key
+      const publicKeyOnly = {
+        ...storedKey!,
+        privateKeyMultibase: undefined
+      };
+      
+      // Update the key in store
+      await keyManager.importKey(publicKeyOnly);
+      
+      // Export and validate - should skip validation and succeed
+      const exportedString = await keyManager.exportKeyToString(keyId);
+      const newKeyManager = await KeyManager.fromSerializedKey(exportedString);
+      const importedKey = await newKeyManager.getStoredKey(keyId);
+      
+      expect(importedKey?.privateKeyMultibase).toBeUndefined();
     });
   });
 }); 

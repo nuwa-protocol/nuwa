@@ -1,5 +1,6 @@
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
+import { base64urlToBytes } from '../../utils/bytes';
 
 // Universal helper to obtain a Web Crypto implementation in both browser and Node.js environments.
 // 1. In browsers (and newer versions of Node.js that expose `globalThis.crypto`) we return the global object.
@@ -99,4 +100,29 @@ export class Ed25519Provider implements CryptoProvider {
   getKeyType(): KeyType {
     return KEY_TYPE.ED25519;
   }
+
+  async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
+    // Import private key as exportable
+    const cryptoKey = await this.crypto.subtle.importKey(
+      'pkcs8',
+      privateKey,
+      { name: 'Ed25519', namedCurve: 'Ed25519' },
+      true,
+      ['sign']
+    );
+    
+    // Generate a temporary key pair and use the same private key to get corresponding public key
+    // This is a workaround since Web Crypto API doesn't allow direct derivation
+    // We'll export as JWK and extract the public key coordinates
+    const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
+    if (!jwk.x) {
+      throw new Error('Failed to derive public key from private key');
+    }
+    
+    // Convert base64url public key to raw bytes
+    const publicKeyBytes = base64urlToBytes(jwk.x);
+    return publicKeyBytes;
+  }
+
+
 }

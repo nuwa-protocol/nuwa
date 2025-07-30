@@ -2,6 +2,7 @@ import { p256 } from '@noble/curves/p256';
 import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils';
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
+import { base64urlToBytes } from '../../utils/bytes';
 
 // Universal helper to obtain a Web Crypto implementation in both browser and Node.js environments.
 function getCrypto(): Crypto {
@@ -190,4 +191,36 @@ export class EcdsaR1Provider implements CryptoProvider {
   getKeyType(): KeyType {
     return KEY_TYPE.ECDSAR1;
   }
+
+  async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
+    // Import private key
+    const cryptoKey = await this.crypto.subtle.importKey(
+      'pkcs8',
+      privateKey,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign']
+    );
+    
+    // Export as JWK to get public key coordinates
+    const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
+    if (!jwk.x || !jwk.y) {
+      throw new Error('Failed to derive public key from private key');
+    }
+    
+    // Convert base64url coordinates to raw bytes
+    const x = base64urlToBytes(jwk.x);
+    const y = base64urlToBytes(jwk.y);
+    
+    // Reconstruct uncompressed public key (0x04 + x + y)
+    const uncompressed = new Uint8Array(65);
+    uncompressed[0] = 0x04;
+    uncompressed.set(x, 1);
+    uncompressed.set(y, 33);
+    
+    // Compress the public key to match our standard format
+    return this.compressPublicKey(uncompressed);
+  }
+
+
 }
