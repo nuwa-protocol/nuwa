@@ -477,6 +477,13 @@ export interface PaymentVerificationResult extends VerificationResult {
     async findPendingProposal(channelId: string, nonce: bigint): Promise<SubRAV | null> {
       return await this.pendingSubRAVStore.find(channelId, nonce);
     }
+
+    /**
+     * Find the latest pending SubRAV proposal for a channel (for recovery scenarios)
+     */
+    async findLatestPendingProposal(channelId: string): Promise<SubRAV | null> {
+      return await this.pendingSubRAVStore.findLatestByChannel(channelId);
+    }
   
     /**
      * Debug logging

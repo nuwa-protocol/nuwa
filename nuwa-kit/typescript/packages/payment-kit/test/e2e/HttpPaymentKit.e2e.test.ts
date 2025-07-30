@@ -114,14 +114,15 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       port: 3001, // Use different port to avoid conflicts
       serviceId: 'e2e-test-service',
       defaultAssetId: testAsset.assetId,
+      adminDid: [payee.did, payer.did], // Allow both payee and payer as admins for testing
       debug: false
     });
 
     // Get the created payeeClient from billing server for other operations
     payeeClient = billingServerInstance.billing.getPayeeClient();
 
-    // Create test client
-    testClient = createTestClient(payerClient, billingServerInstance.baseURL, channelId);
+    // Create test client with DID authentication
+    testClient = createTestClient(payerClient, billingServerInstance.baseURL, channelId, payer.did, payer.keyManager);
 
     console.log(`✅ Billing server started on ${billingServerInstance.baseURL}`);
   }, 180000); // 3 minutes timeout for setup

@@ -15,6 +15,7 @@ import type { ChannelInfo, AssetInfo, SignedSubRAV, SubRAV } from '../../core/ty
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, MultibaseCodec, parseDid } from '@nuwa-ai/identity-kit';
 import { SubRAVSigner, SUBRAV_VERSION_1 } from '../../core/SubRav';
+import { normalizeAssetId } from '../../core/ChannelUtils';
 
 // Check if we should run integration tests
 const shouldRunIntegrationTests = () => {
@@ -86,7 +87,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const assetInfo = await contract.getAssetInfo(testAsset.assetId);
       
       expect(assetInfo).toBeDefined();
-      expect(assetInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+      expect(assetInfo.assetId).toBe(normalizeAssetId(testAsset.assetId));
       expect(assetInfo.symbol).toBe('RGas');
     });
 
@@ -182,7 +183,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       expect(channelInfo.payerDid).toBe(payer.did);
       expect(channelInfo.payeeDid).toBe(payee.did);
       expect(channelInfo.status).toBe('active');
-      expect(channelInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+      expect(channelInfo.assetId).toBe(normalizeAssetId(testAsset.assetId));
 
       // Verify the sub-channel was authorized
       const subChannelInfo = await contract.getSubChannel({
@@ -290,7 +291,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       expect(channelInfo.channelId).toBe(channelId);
       expect(channelInfo.payerDid).toBe(payer.did);
       expect(channelInfo.payeeDid).toBe(payee.did);
-      expect(channelInfo.assetId).toBe(contract.normalizeAssetId(testAsset.assetId));
+      expect(channelInfo.assetId).toBe(normalizeAssetId(testAsset.assetId));
       expect(channelInfo.status).toBe('active');
       expect(typeof channelInfo.epoch).toBe('bigint');
 

@@ -42,6 +42,7 @@ import type {
   ChannelInfo,
 } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
+import { calcChannelObjectId, normalizeAssetId } from '../core/ChannelUtils';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
 
 export interface RoochContractOptions {
@@ -147,25 +148,7 @@ export const DynamicFieldSubChannelSchema: any = bcs.struct('DynamicField', {
   value: SubChannelSchema,
 });
 
-export interface ChannelKey {
-  sender: string;
-  receiver: string;
-  coin_type: string;
-}
-
-/**
- * BCS Schema for ChannelKey - matches Move contract exactly
- * 
- * Note: This uses bcs.Address which is the correct type for Move address,
- * but in test environments, the Rooch SDK may have dependency issues 
- * (e.g., import_bs58check.default.decode is not a function).
- * The implementation is correct and will work in production environments.
- */
-export const ChannelKeySchema: any = bcs.struct('ChannelKey', {
-  sender: bcs.Address,
-  receiver: bcs.Address,
-  coin_type: bcs.string(),
-});
+// ChannelKey and ChannelKeySchema moved to ChannelUtils
 
 const RGAS_CANONICAL_TAG: string = '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
 
@@ -238,7 +221,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
+      const channelId = calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
       
       return {
         channelId,
@@ -295,7 +278,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = this.calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
+      const channelId = calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
       
       return {
         channelId,
@@ -529,7 +512,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   async getAssetInfo(assetId: string): Promise<AssetInfo> {
     this.logger.debug('Getting asset info for:', assetId);
-    let canonicalAssetId = this.normalizeAssetId(assetId);
+    let canonicalAssetId = normalizeAssetId(assetId);
     // TODO: Add support for other assets
     if (canonicalAssetId === RGAS_CANONICAL_TAG) {
       let assetInfo: AssetInfo = {
@@ -547,7 +530,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       this.logger.debug('Getting asset price for:', assetId);
       
       // Normalize asset ID to canonical string
-      const canonicalAssetId = this.normalizeAssetId(assetId);
+      const canonicalAssetId = normalizeAssetId(assetId);
       
       //Currently only support RGas
       if (canonicalAssetId === RGAS_CANONICAL_TAG) {
@@ -637,58 +620,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     return DidAccountSigner.create(signer);
   }
 
-  /**
-   * Calculate channel object ID using the same logic as Move contract
-   * 
-   * This replicates object::custom_object_id<ChannelKey, PaymentChannel>(key)
-   * from payment_channel.move using proper BCS serialization.
-   * 
-   * @param senderAddress - Sender address
-   * @param receiverAddress - Receiver address
-   * @param coinType - Coin type string
-   * @returns Channel object ID as hex string
-   */
-  private calcChannelObjectId(senderAddress: string, receiverAddress: string, coinType: string): string {
-    
-    let coin_type = this.normalizeAssetId(coinType);
-    this.logger.debug('Calculating channel object ID for:', { senderAddress, receiverAddress, coin_type });
-    
-    // Create ChannelKey struct - this must match the Move struct exactly
-    const channelKey: ChannelKey  = {
-      sender: senderAddress,
-      receiver: receiverAddress,
-      coin_type: coin_type,
-    };
-    
-    // Create PaymentChannel struct tag  
-    const paymentChannelStructTag = {
-      address: '0x3',
-      module: 'payment_channel', 
-      name: 'PaymentChannel',
-      type_params: [],
-    };
-    
-    // Implement custom_object_id logic:
-    // 1. BCS serialize the ChannelKey struct (not JSON!)
-    // 2. Append the PaymentChannel struct tag canonical string as bytes
-    // 3. SHA3-256 hash the combined bytes
-    // 4. Return as ObjectID
-    
-    // BCS serialize the ChannelKey
-    const idBytes = ChannelKeySchema.serialize(channelKey).toBytes();
-    
-    // Get PaymentChannel struct tag canonical string as bytes
-    const typeBytes = new TextEncoder().encode(Serializer.structTagToCanonicalString(paymentChannelStructTag));
-    
-    // Concatenate: bcs(ChannelKey) + canonical_string(PaymentChannel)
-    const bytes = new Uint8Array(idBytes.length + typeBytes.length);
-    bytes.set(idBytes);
-    bytes.set(typeBytes, idBytes.length);
-    
-    // SHA3-256 hash
-    const hash = sha3_256(bytes);
-    return `0x${toHEX(hash)}`;
-  }
+
 
   private createTransaction(): Transaction {
     return new Transaction();
@@ -862,11 +794,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
   }
 
-  public normalizeAssetId(assetId: string): string {
-    let coinTypeTag = this.parseAssetIdToStructTag(assetId);
-    let canonicalString = this.structTagToCanonicalString(coinTypeTag);
-    return canonicalString;
-  }
+
 
   /**
    * Convert StructTag to canonical string representation

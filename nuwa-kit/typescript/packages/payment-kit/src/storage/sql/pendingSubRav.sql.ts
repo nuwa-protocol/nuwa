@@ -116,6 +116,28 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     }
   }
 
+  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(`
+        SELECT sub_rav_bcs 
+        FROM ${this.pendingSubRAVsTable}
+        WHERE channel_id = $1
+        ORDER BY nonce DESC
+        LIMIT 1
+      `, [channelId]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const subRavBcs = result.rows[0].sub_rav_bcs as Buffer;
+      return decodeSubRAV(subRavBcs);
+    } finally {
+      client.release();
+    }
+  }
+
   async remove(channelId: string, nonce: bigint): Promise<void> {
     const client = await this.pool.connect();
     try {

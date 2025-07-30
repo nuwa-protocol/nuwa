@@ -308,6 +308,13 @@ export class HttpBillingMiddleware {
   }
 
   /**
+   * Find the latest pending SubRAV proposal for a channel
+   */
+  async findLatestPendingProposal(channelId: string): Promise<any> {
+    return await this.processor.findLatestPendingProposal(channelId);
+  }
+
+  /**
    * Security: Check if a client should be rate-limited
    */
   shouldRateLimit(clientId: string): boolean {

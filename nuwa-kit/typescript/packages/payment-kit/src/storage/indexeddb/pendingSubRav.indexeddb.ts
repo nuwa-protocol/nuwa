@@ -78,6 +78,45 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     };
   }
 
+  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+    const db = await this.getDB();
+    const tx = db.transaction(['pendingSubRAVs'], 'readonly');
+    const store = tx.objectStore('pendingSubRAVs');
+    const channelIndex = store.index('by-channel');
+    
+    let latestSubRAV: SubRAV | null = null;
+    let maxNonce = BigInt(-1);
+
+    // Use cursor to iterate through all records for this channel
+    const cursorRequest = channelIndex.openCursor(IDBKeyRange.only(channelId));
+    
+    await new Promise<void>((resolve, reject) => {
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (cursor) {
+          const record = cursor.value;
+          const subRAV = {
+            ...record.subRAVData,
+            nonce: BigInt(record.subRAVData.nonce),
+            accumulatedAmount: BigInt(record.subRAVData.accumulatedAmount),
+          };
+          
+          if (subRAV.nonce > maxNonce) {
+            maxNonce = subRAV.nonce;
+            latestSubRAV = subRAV;
+          }
+          
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      cursorRequest.onerror = () => reject(cursorRequest.error);
+    });
+
+    return latestSubRAV;
+  }
+
   async remove(channelId: string, nonce: bigint): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');

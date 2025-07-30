@@ -23,6 +23,13 @@ export interface PendingSubRAVRepository {
   find(channelId: string, nonce: bigint): Promise<SubRAV | null>;
 
   /**
+   * Find the latest pending SubRAV for a channel (for recovery scenarios)
+   * @param channelId Channel identifier
+   * @returns The pending SubRAV with highest nonce, or null if none found
+   */
+  findLatestByChannel(channelId: string): Promise<SubRAV | null>;
+
+  /**
    * Remove a pending SubRAV after it's been signed and processed
    */
   remove(channelId: string, nonce: bigint): Promise<void>;

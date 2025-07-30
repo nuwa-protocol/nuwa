@@ -38,7 +38,7 @@ async function main() {
       defaultPricePicoUSD: '1000000000', // 0.001 USD default price
       
       // DID authentication (optional)
-      didAuth: process.env.NODE_ENV === 'production', // Enable in production
+      // DID authentication is now always enabled for security
       
       debug: process.env.NODE_ENV !== 'production',
     });

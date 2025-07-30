@@ -8,6 +8,7 @@ import type {
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
+import { DIDAuth } from '@nuwa-ai/identity-kit';
 
 export interface BillingServerConfig {
   // Use new simplified configuration
@@ -21,6 +22,8 @@ export interface BillingServerConfig {
   debug?: boolean;
   rpcUrl?: string; // For blockchain connection
   network?: 'local' | 'dev' | 'test' | 'main';
+  // Admin DIDs that can access admin endpoints
+  adminDid?: string | string[];
 }
 
 export async function createBillingServer(config: BillingServerConfig) {
@@ -33,7 +36,8 @@ export async function createBillingServer(config: BillingServerConfig) {
     defaultAssetId = '0x3::gas_coin::RGas',
     debug = true,
     rpcUrl,
-    network = 'local'
+    network = 'local',
+    adminDid
   } = config;
 
   // Validate configuration
@@ -52,7 +56,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     network,
     defaultAssetId,
     defaultPricePicoUSD: '500000000', // 0.0005 USD
-    didAuth: false, // Temporarily disable DID authentication in test environment
+    adminDid,
     debug
   });
 
@@ -142,13 +146,54 @@ export async function createBillingServer(config: BillingServerConfig) {
 }
 
 // Client call example (deferred payment mode)
-export function createTestClient(payerClient: any, baseURL: string, channelId: string) {
+export function createTestClient(payerClient: any, baseURL: string, channelId: string, payerDid?: string, payerKeyManager?: any) {
   let pendingSubRAV: SubRAV | null = null; // Cache the previous SubRAV
   let isFirstRequest = true; // Flag to mark if it's the first request
+
+  // Helper function to generate DID authentication header
+  async function generateDIDAuthHeader(): Promise<string | undefined> {
+    if (!payerDid || !payerKeyManager) {
+      console.warn('No payer DID or key manager provided, skipping DID auth');
+      return undefined;
+    }
+
+    try {
+      // Get available key IDs
+      const keyIds = await payerKeyManager.listKeyIds();
+      if (keyIds.length === 0) {
+        throw new Error('No key IDs available for signing');
+      }
+      
+      const keyId = keyIds[0]; // Use first available key
+
+      // Create a signed object with proper payload structure
+      const signedObject = await DIDAuth.v1.createSignature(
+        { 
+          operation: 'http_request',
+          params: { uri: baseURL }
+        },
+        payerKeyManager,
+        keyId
+      );
+
+      // Convert to authorization header
+      const authHeader = DIDAuth.v1.toAuthorizationHeader(signedObject);
+      return authHeader;
+    } catch (error) {
+      console.error('Failed to generate DID auth header:', error);
+      return undefined;
+    }
+  }
 
   return {
     async callEcho(query: string) {
       let headers: Record<string, string> = {};
+      
+      // 0. Generate DID authentication header
+      const authHeader = await generateDIDAuthHeader();
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
       
       // 1. Always generate signed SubRAV
       let signedSubRAV: any;
@@ -214,6 +259,12 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
       let headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
+      
+      // 0. Generate DID authentication header
+      const authHeader = await generateDIDAuthHeader();
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
       
       // Generate signed SubRAV
       let signedSubRAV: any;
@@ -292,7 +343,15 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
 
     // Get admin information
     async getAdminClaims() {
-      const response = await fetch(`${baseURL}/admin/claims`);
+      const headers: Record<string, string> = {};
+      
+      // Add DID authentication header for admin endpoint
+      const authHeader = await generateDIDAuthHeader();
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+      
+      const response = await fetch(`${baseURL}/admin/claims`, { headers });
       const text = await response.text();
       
       if (!response.ok) {
@@ -310,8 +369,17 @@ export function createTestClient(payerClient: any, baseURL: string, channelId: s
     },
 
     async triggerClaim(channelId: string) {
+      const headers: Record<string, string> = {};
+      
+      // Add DID authentication header for admin endpoint
+      const authHeader = await generateDIDAuthHeader();
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+      
       const response = await fetch(`${baseURL}/admin/claim/${channelId}`, {
-        method: 'POST'
+        method: 'POST',
+        headers
       });
       return await response.json();
     },

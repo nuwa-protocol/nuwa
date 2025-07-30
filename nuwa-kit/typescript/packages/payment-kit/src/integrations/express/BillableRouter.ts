@@ -83,17 +83,18 @@ export class BillableRouter {
    * Returns a ConfigLoader instance that feeds the collected rules to BillingEngine.
    */
   getConfigLoader(): ConfigLoader {
-    const cfg: BillingConfig = {
-      version: this.opts.version ?? 1,
-      serviceId: this.opts.serviceId,
-      rules: [...this.rules]
-    };
+    const self = this; // Capture 'this' reference for closure
     return {
       async load(serviceId: string): Promise<BillingConfig> {
-        if (serviceId !== cfg.serviceId) {
-          throw new Error(`BillableRouter config loader mismatch: expected ${cfg.serviceId}, got ${serviceId}`);
+        if (serviceId !== self.opts.serviceId) {
+          throw new Error(`BillableRouter config loader mismatch: expected ${self.opts.serviceId}, got ${serviceId}`);
         }
-        return cfg;
+        // Return current config with latest rules (not a fixed snapshot)
+        return {
+          version: self.opts.version ?? 1,
+          serviceId: self.opts.serviceId,
+          rules: [...self.rules] // Make a fresh copy of current rules
+        };
       }
     };
   }

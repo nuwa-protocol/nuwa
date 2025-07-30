@@ -33,6 +33,23 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
     return { ...entry.subRAV }; // Return copy to avoid mutations
   }
 
+  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+    let latestSubRAV: SubRAV | null = null;
+    let maxNonce = BigInt(-1);
+
+    for (const [key, entry] of this.proposals) {
+      if (key.startsWith(`${channelId}:`)) {
+        const subRAV = entry.subRAV;
+        if (subRAV.nonce > maxNonce) {
+          maxNonce = subRAV.nonce;
+          latestSubRAV = subRAV;
+        }
+      }
+    }
+
+    return latestSubRAV ? { ...latestSubRAV } : null; // Return copy to avoid mutations
+  }
+
   async remove(channelId: string, nonce: bigint): Promise<void> {
     const key = this.getKey(channelId, nonce);
     this.proposals.delete(key);
