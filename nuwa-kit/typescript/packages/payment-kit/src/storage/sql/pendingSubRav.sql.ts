@@ -145,8 +145,8 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
       // Use database server time to avoid client-server time drift issues
       const result = await client.query(`
         DELETE FROM ${this.pendingSubRAVsTable} 
-        WHERE created_at < NOW() - INTERVAL '${maxAgeMs} milliseconds'
-      `);
+        WHERE created_at < NOW() - (make_interval(secs => $1 / 1000))
+      `, [maxAgeMs]);
 
       return result.rowCount || 0;
     } finally {

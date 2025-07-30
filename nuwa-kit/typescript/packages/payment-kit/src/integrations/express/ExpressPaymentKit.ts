@@ -119,7 +119,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       try {
         // Step 1: DID Authentication (if enabled)
         if (this.config.didAuth !== false) {
-          await this.performDIDAuth(req as express.Request, res as express.Response);
+          await this.performDIDAuth(req, res);
         }
 
         // Step 2: Apply billing middleware
