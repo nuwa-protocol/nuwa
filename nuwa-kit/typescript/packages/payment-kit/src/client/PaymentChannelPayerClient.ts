@@ -413,18 +413,15 @@ export class PaymentChannelPayerClient {
     return this.contract.getAssetPrice(assetId);
   }
 
-  // -------- Private Helpers --------
-
-  /**
-   * Get cached chain ID or fetch from contract
-   */
-  private async getChainId(): Promise<bigint> {
+  public async getChainId(): Promise<bigint> {
     if (this.chainIdCache === undefined) {
       this.chainIdCache = await this.contract.getChainId();
     }
     return this.chainIdCache;
   }
 
+  // -------- Private Helpers --------
+  
   /**
    * Extract fragment from full key ID
    */

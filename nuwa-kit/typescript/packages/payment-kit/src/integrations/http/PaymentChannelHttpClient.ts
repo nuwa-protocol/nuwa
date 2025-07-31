@@ -538,11 +538,16 @@ export class PaymentChannelHttpClient {
         const signer = this.options.signer;
         
         const keyIds = await signer.listKeyIds();
-        const vmIdFragment = keyIds[0]?.split('#')[1] || 'key1'; // Extract fragment part
+        const vmIdFragment = keyIds[0]?.split('#')[1] // Extract fragment part
+
+        if (!vmIdFragment) {
+          throw new Error('No VM ID fragment found');
+        }
         
+        const chainId = await this.payerClient.getChainId();
         const handshakeSubRAV: SubRAV = {
           version: 1,
-          chainId: BigInt(4), // Based on network configuration - should be made configurable
+          chainId: chainId,
           channelId: this.clientState.channelId,
           channelEpoch: channelInfo.epoch,
           vmIdFragment,
