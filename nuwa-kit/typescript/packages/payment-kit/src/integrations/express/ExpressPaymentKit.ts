@@ -6,6 +6,7 @@ import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
 import { MemoryChannelRepository } from '../../storage';
+import { ClaimScheduler } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import type { StrategyConfig } from '../../billing/types';
@@ -71,6 +72,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly payeeClient: PaymentChannelPayeeClient;
   private readonly rateProvider: RateProvider;
   private readonly serviceDid: string;
+  private readonly claimScheduler: ClaimScheduler;
 
   constructor(
     config: ExpressPaymentKitOptions,
@@ -93,13 +95,31 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     const configLoader = this.billableRouter.getConfigLoader();
     const usdBillingEngine = new UsdBillingEngine(configLoader, rateProvider);
 
-    // Create HTTP billing middleware
+    // Create ClaimScheduler for automated claiming
+    // Use the same RAV repository and contract as the PayeeClient
+    this.claimScheduler = new ClaimScheduler({
+      store: payeeClient.getRAVRepository(), // Use the same RAV repository
+      contract: payeeClient.getContract(), // Use the same contract
+      signer: config.signer,
+      policy: {
+        minClaimAmount: BigInt('10000000'), // 1 RGas minimum
+        maxIntervalMs: 24 * 60 * 60 * 1000, // 24 hours maximum
+        maxConcurrentClaims: 5,
+        maxRetries: 3,
+        retryDelayMs: 60_000 // 1 minute
+      },
+      pollIntervalMs: 30_000, // 30 seconds
+      debug: config.debug || false
+    });
+
+    // Create HTTP billing middleware with ClaimScheduler
     this.middleware = new HttpBillingMiddleware({
       payeeClient,
       billingEngine: usdBillingEngine,
       serviceId: config.serviceId,
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
-      debug: config.debug || false
+      debug: config.debug || false,
+      claimScheduler: this.claimScheduler
     });
 
     // Create main router
@@ -123,11 +143,14 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       }
 
       try {
-        // Step 1: DID Authentication (always required)
-        await this.performDIDAuth(req, res);
+        // Step 1: DID Authentication (skip for public payment-channel endpoints)
+        const isPublicPaymentChannelEndpoint = req.path === '/payment-channel/info' || req.path === '/payment-channel/price';
+        if (!isPublicPaymentChannelEndpoint) {
+          await this.performDIDAuth(req, res);
+        }
 
-        // Step 2: Apply billing middleware for non-admin routes
-        if (!req.path.startsWith('/admin')) {
+        // Step 2: Apply billing middleware for business routes only (exclude admin and payment-channel)
+        if (!req.path.startsWith('/admin') && !req.path.startsWith('/payment-channel')) {
           const billingMiddleware = this.middleware.createExpressMiddleware();
           await new Promise<void>((resolve, reject) => {
             billingMiddleware(req as any, res as any, (error?: any) => {
@@ -221,6 +244,43 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Access the billing engine through the middleware and clear its cache
     // This ensures that newly registered routes are picked up on next billing calculation
     (this.middleware as any).processor?.billingEngine?.clearCache?.(this.config.serviceId);
+  }
+
+  /**
+   * JSON replacer function to handle BigInt serialization
+   */
+  private bigintReplacer(key: string, value: any): any {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    return value;
+  }
+
+  /**
+   * Recursively serialize BigInt values in an object to strings
+   */
+  private serializeBigInt(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (typeof obj === 'bigint') {
+      return obj.toString();
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.serializeBigInt(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const result: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = this.serializeBigInt(value);
+      }
+      return result;
+    }
+    
+    return obj;
   }
 
   /**
@@ -393,24 +453,64 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       });
     });
 
-    // Apply custom auth middleware if provided, otherwise use admin authorization check
-    const authMiddleware = options?.auth || this.createAdminAuthMiddleware();
+    // Apply custom auth middleware if provided, otherwise use DID auth + admin authorization check
+    const authMiddleware = options?.auth || ((req: Request, res: Response, next: NextFunction) => {
+      const self = this;
+      (async () => {
+        try {
+          console.log('🔐 Admin middleware: Starting DID authentication for', req.method, req.path);
+          // First perform DID authentication
+          await self.performDIDAuth(req, res);
+          console.log('✅ Admin middleware: DID authentication successful');
+          
+          // Then check admin authorization
+          const adminMiddleware = self.createAdminAuthMiddleware();
+          adminMiddleware(req, res, (err?: any) => {
+            if (err) {
+              console.error('❌ Admin middleware: Authorization failed:', err);
+              next(err);
+            } else {
+              console.log('✅ Admin middleware: Authorization successful');
+              next();
+            }
+          });
+        } catch (error) {
+          console.error('❌ Admin middleware: DID authentication failed:', error);
+          // Ensure proper error response for DID auth failures
+          if (!res.headersSent) {
+            res.status(401).json({
+              error: 'DID authentication failed',
+              details: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+      })();
+    });
     router.use(authMiddleware);
 
     // GET /claims - Get claim status and processing stats
     router.get('/claims', async (req: Request, res: Response) => {
       try {
+        console.log('📊 Admin: Getting claims status...');
         const claimsStatus = this.middleware.getClaimStatus();
-        const processingStats = this.middleware.getProcessingStats();
+        console.log('📊 Claims status:', JSON.stringify(claimsStatus, this.bigintReplacer));
         
-        res.json({ 
-          claimsStatus,
-          processingStats,
+        const processingStats = this.middleware.getProcessingStats();
+        console.log('📊 Processing stats:', JSON.stringify(processingStats, this.bigintReplacer));
+        
+        const result = { 
+          claimsStatus: this.serializeBigInt(claimsStatus),
+          processingStats: this.serializeBigInt(processingStats),
           timestamp: new Date().toISOString()
-        });
+        };
+        console.log('✅ Admin: Claims data retrieved successfully');
+        res.json(result);
       } catch (error) {
+        console.error('❌ Admin: Failed to get claims status:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         res.status(500).json({ 
-          error: error instanceof Error ? error.message : String(error) 
+          error: error instanceof Error ? error.message : String(error),
+          details: 'Failed to retrieve claims status'
         });
       }
     });
@@ -418,11 +518,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // POST /claim/:channelId - Manually trigger claim
     router.post('/claim/:channelId', async (req: Request, res: Response) => {
       try {
+        console.log('🚀 Admin: Triggering claim for channel:', req.params.channelId);
         const success = await this.middleware.manualClaim(req.params.channelId);
+        console.log('✅ Admin: Claim trigger result:', success);
         res.json({ success, channelId: req.params.channelId });
       } catch (error) {
+        console.error('❌ Admin: Failed to trigger claim:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         res.status(500).json({ 
-          error: error instanceof Error ? error.message : String(error) 
+          error: error instanceof Error ? error.message : String(error),
+          details: 'Failed to trigger claim'
         });
       }
     });
@@ -431,15 +536,21 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     router.get('/subrav/:channelId/:nonce', async (req: Request, res: Response) => {
       try {
         const { channelId, nonce } = req.params;
+        console.log('📋 Admin: Getting SubRAV for channel:', channelId, 'nonce:', nonce);
         const subRAV = await this.middleware.findPendingProposal(channelId, BigInt(nonce));
         if (subRAV) {
-          res.json(subRAV);
+          console.log('✅ Admin: SubRAV found:', JSON.stringify(subRAV, this.bigintReplacer));
+          res.json(this.serializeBigInt(subRAV));
         } else {
+          console.log('❌ Admin: SubRAV not found for channel:', channelId, 'nonce:', nonce);
           res.status(404).json({ error: 'SubRAV not found' });
         }
       } catch (error) {
+        console.error('❌ Admin: Failed to get SubRAV:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         res.status(500).json({ 
-          error: error instanceof Error ? error.message : String(error) 
+          error: error instanceof Error ? error.message : String(error),
+          details: 'Failed to retrieve SubRAV'
         });
       }
     });
@@ -448,11 +559,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     router.delete('/cleanup', async (req: Request, res: Response) => {
       try {
         const maxAge = parseInt(req.query.maxAge as string) || 30;
+        console.log('🧹 Admin: Cleaning up expired proposals, max age:', maxAge, 'minutes');
         const clearedCount = await this.middleware.clearExpiredProposals(maxAge);
+        console.log('✅ Admin: Cleanup completed, cleared count:', clearedCount);
         res.json({ clearedCount, maxAgeMinutes: maxAge });
       } catch (error) {
+        console.error('❌ Admin: Failed to cleanup expired proposals:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         res.status(500).json({ 
-          error: error instanceof Error ? error.message : String(error) 
+          error: error instanceof Error ? error.message : String(error),
+          details: 'Failed to cleanup expired proposals'
         });
       }
     });
