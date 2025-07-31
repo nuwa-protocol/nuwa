@@ -25,7 +25,6 @@ export interface OpenChannelParams {
   payerDid: string;
   payeeDid: string;
   assetId: string;
-  collateral: bigint;
   signer: SignerInterface;
 }
 
@@ -36,7 +35,6 @@ export interface OpenChannelWithSubChannelParams {
   payerDid: string;
   payeeDid: string;
   assetId: string;
-  collateral: bigint;
   vmIdFragment: string;
   signer: SignerInterface;
 }
@@ -182,21 +180,84 @@ export interface IPaymentChannelContract {
    */
   getChainId(): Promise<bigint>;
 
+  // -------- PaymentHub Operations --------
+
   /**
    * Deposit funds to a payment hub for later use in payment channels
    * @param params Deposit parameters including target address, asset, amount, and signer
    * @returns Transaction result
    */
-  depositToHub(params: DepositToHubParams): Promise<TxResult>;
+  depositToHub(params: DepositParams): Promise<TxResult>;
+
+  /**
+   * Withdraw funds from a payment hub to owner's account
+   * @param params Withdraw parameters including owner DID, asset, amount, and signer
+   * @returns Transaction result
+   */
+  withdrawFromHub(params: WithdrawParams): Promise<TxResult>;
+
+  /**
+   * Get balance of a specific asset in payment hub
+   * @param ownerDid Owner DID of the hub
+   * @param assetId Asset identifier
+   * @returns Balance amount
+   */
+  getHubBalance(ownerDid: string, assetId: string): Promise<bigint>;
+
+  /**
+   * Get all balances in payment hub for all assets
+   * @param ownerDid Owner DID of the hub
+   * @returns Record mapping asset IDs to balance amounts
+   */
+  getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>>;
+
+  /**
+   * Get active channels count in payment hub for all assets
+   * @param ownerDid Owner DID of the hub
+   * @returns Record mapping asset IDs to active channel counts
+   */
+  getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>>;
 }
 
-export interface DepositToHubParams {
+// -------- PaymentHub Type Alias --------
+
+/**
+ * Type alias for PaymentHub operations only
+ * Useful for dependency injection when only hub operations are needed
+ */
+export type IPaymentHubContract = Pick<
+  IPaymentChannelContract,
+  'depositToHub' | 'withdrawFromHub' | 'getHubBalance' | 'getAllHubBalances' | 'getActiveChannelsCounts'
+>;
+
+// -------- PaymentHub Parameters --------
+
+/**
+ * Parameters for depositing to payment hub
+ */
+export interface DepositParams {
   /** Target DID to receive the deposit */
-  targetDid: string;
+  ownerDid: string;
   /** Asset information */
   assetId: string;
   /** Amount to deposit (in smallest asset units) */
   amount: bigint;
   /** Signer for the transaction */
   signer: SignerInterface;
-} 
+}
+
+/**
+ * Parameters for withdrawing from payment hub
+ */
+export interface WithdrawParams {
+  /** Owner DID of the hub */
+  ownerDid: string;
+  /** Asset information */
+  assetId: string;
+  /** Amount to withdraw (0 = withdraw all) */
+  amount: bigint;
+  /** Optional recipient address/DID (defaults to owner's account) */
+  recipient?: string;
+  /** Signer for the transaction */
+  signer: SignerInterface;
+}

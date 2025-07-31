@@ -22,17 +22,16 @@ import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
 import { SubRAVManager } from '../core/SubRav';
+import { PaymentHubClient } from './PaymentHubClient';
 
 export interface PayerOpenChannelParams {
   payeeDid: string;
   assetId: string;
-  collateral: bigint;
 }
 
 export interface PayerOpenChannelWithSubChannelParams {
   payeeDid: string;
   assetId: string;
-  collateral: bigint;
   vmIdFragment?: string;
 }
 
@@ -86,12 +85,13 @@ export class PaymentChannelPayerClient {
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
   private activeChannelId?: string;
+  private defaultAssetId: string;
 
   constructor(options: PaymentChannelPayerClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
     this.keyId = options.keyId;
-    
+    this.defaultAssetId = "0x3::gas_coin::RGas";
     // Initialize storage
     if (options.storageOptions?.customChannelRepo) {
       this.channelRepo = options.storageOptions.customChannelRepo;
@@ -117,7 +117,6 @@ export class PaymentChannelPayerClient {
       payerDid,
       payeeDid: params.payeeDid,
       assetId: params.assetId,
-      collateral: params.collateral,
       signer: this.signer,
     };
 
@@ -154,7 +153,6 @@ export class PaymentChannelPayerClient {
       payerDid,
       payeeDid: params.payeeDid,
       assetId: params.assetId,
-      collateral: params.collateral,
       vmIdFragment: useFragment,
       signer: this.signer,
     };
@@ -335,19 +333,15 @@ export class PaymentChannelPayerClient {
   }
  
   /**
-   * Deposit funds to the payment hub for the current payer
+   * Get a PaymentHubClient instance that reuses this client's contract and signer
+   * This is the recommended way to access payment hub operations
    */
-  async depositToHub(params: { assetId: string; amount: bigint }): Promise<{ txHash: string }> {
-    const payerDid = await this.signer.getDid();
-    
-    const result = await this.contract.depositToHub({
-      targetDid: payerDid,
-      assetId: params.assetId,
-      amount: params.amount,
+  getHubClient(): PaymentHubClient {
+    return new PaymentHubClient({
+      contract: this.contract,
       signer: this.signer,
+      defaultAssetId: this.defaultAssetId,
     });
-
-    return { txHash: result.txHash };
   }
 
   /**

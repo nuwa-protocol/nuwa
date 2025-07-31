@@ -88,7 +88,7 @@ describe('PaymentChannelIntegration', () => {
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid,
       assetId: testAsset.assetId,
-      collateral: BigInt(1000000), // 0.01 RGas
+
       vmIdFragment: 'account-key',
     });
 
@@ -203,14 +203,14 @@ describe('PaymentChannelIntegration', () => {
     const channel1 = await payerClient.openChannelWithSubChannel({
       payeeDid,
       assetId: testAsset.assetId,
-      collateral: BigInt(500000),
+
       vmIdFragment: 'account-key',
     });
 
     const channel2 = await payerClient.openChannelWithSubChannel({
       payeeDid,
       assetId: testAsset.assetId,
-      collateral: BigInt(800000),
+
       vmIdFragment: 'account-key',
     });
 
@@ -283,7 +283,7 @@ describe('PaymentChannelIntegration', () => {
     const validationChannel = await validationPayerClient.openChannelWithSubChannel({
       payeeDid: validationTestEnv.payeeDid,
       assetId: validationTestEnv.asset.assetId,
-      collateral: BigInt(1000000),
+
       vmIdFragment: 'account-key',
     });
 
@@ -325,7 +325,7 @@ describe('PaymentChannelIntegration', () => {
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid,
       assetId: testAsset.assetId,
-      collateral: BigInt(1000000),
+
       vmIdFragment: 'account-key',
     });
 

@@ -18,6 +18,7 @@ import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '
 import { createChannelRepoAuto, createRAVRepoAuto, createPendingSubRAVRepoAuto } from '../storage';
 import { SubRAVManager, SubRAVUtils } from '../core/SubRav';
 import { PaymentUtils } from '../core/PaymentUtils';
+import { PaymentHubClient } from './PaymentHubClient';
 
 /**
  * Storage options for PaymentChannelPayeeClient
@@ -95,11 +96,13 @@ export class PaymentChannelPayeeClient {
   private pendingSubRAVRepo: PendingSubRAVRepository;
   private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
+  private defaultAssetId: string;
 
   constructor(options: PaymentChannelPayeeClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
     this.didResolver = options.didResolver;
+    this.defaultAssetId = "0x3::gas_coin::RGas";
     
     // Initialize repositories
     if (options.storageOptions?.customChannelRepo) {
@@ -737,6 +740,18 @@ export class PaymentChannelPayeeClient {
       failedVerifications: 0,
       commonErrors: {}
     };
+  }
+
+  /**
+   * Get a PaymentHubClient instance that reuses this client's contract and signer
+   * Primarily useful for balance queries and withdraw operations on the payee side
+   */
+  getHubClient(): PaymentHubClient {
+    return new PaymentHubClient({
+      contract: this.contract,
+      signer: this.signer,
+      defaultAssetId: this.defaultAssetId,
+    });
   }
 
   /**

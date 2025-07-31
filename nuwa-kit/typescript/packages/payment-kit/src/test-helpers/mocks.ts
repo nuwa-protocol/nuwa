@@ -12,7 +12,8 @@ import type {
   ClaimParams,
   ClaimResult,
   TxResult,
-  DepositToHubParams,
+  DepositParams,
+  WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
 import type { ChannelInfo, AssetInfo } from '../core/types';
 import type { DIDResolver, DIDDocument } from '@nuwa-ai/identity-kit';
@@ -27,6 +28,7 @@ import { KeyType } from '@nuwa-ai/identity-kit';
 export class MockContract implements IPaymentChannelContract {
   private channels = new Map<string, ChannelInfo>();
   private channelCounter = 0;
+  private hubBalances = new Map<string, bigint>();
 
   /**
    * Reset the contract state (useful for test isolation)
@@ -34,6 +36,7 @@ export class MockContract implements IPaymentChannelContract {
   reset(): void {
     this.channels.clear();
     this.channelCounter = 0;
+    this.hubBalances.clear();
   }
 
   async openChannel(params: any): Promise<OpenChannelResult> {
@@ -85,10 +88,59 @@ export class MockContract implements IPaymentChannelContract {
     };
   }
 
-  async depositToHub(params: DepositToHubParams): Promise<TxResult> {
+  async depositToHub(params: DepositParams): Promise<TxResult> {
+    // Store hub balance for testing
+    const balanceKey = `${params.ownerDid}:${params.assetId}`;
+    const currentBalance = this.hubBalances.get(balanceKey) || BigInt(0);
+    this.hubBalances.set(balanceKey, currentBalance + params.amount);
+    
     return {
       txHash: `deposit-tx-${Date.now()}`,
       blockHeight: BigInt(500),
+    };
+  }
+
+  async withdrawFromHub(params: WithdrawParams): Promise<TxResult> {
+    // Update hub balance for testing
+    const balanceKey = `${params.ownerDid}:${params.assetId}`;
+    const currentBalance = this.hubBalances.get(balanceKey) || BigInt(0);
+    
+    const withdrawAmount = params.amount === BigInt(0) ? currentBalance : params.amount;
+    if (currentBalance < withdrawAmount) {
+      throw new Error(`Insufficient balance: have ${currentBalance}, need ${withdrawAmount}`);
+    }
+    
+    this.hubBalances.set(balanceKey, currentBalance - withdrawAmount);
+    
+    return {
+      txHash: `withdraw-tx-${Date.now()}`,
+      blockHeight: BigInt(600),
+    };
+  }
+
+  async getHubBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    const balanceKey = `${ownerDid}:${assetId}`;
+    return this.hubBalances.get(balanceKey) || BigInt(0);
+  }
+
+  async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
+    const balances: Record<string, bigint> = {};
+    
+    for (const [key, balance] of this.hubBalances.entries()) {
+      if (key.startsWith(`${ownerDid}:`)) {
+        const assetId = key.substring(ownerDid.length + 1);
+        balances[assetId] = balance;
+      }
+    }
+    
+    return balances;
+  }
+
+  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
+    // Mock implementation - return some test data
+    return {
+      '0x3::gas_coin::RGas': 2,
+      '0x3::stable_coin::USDC': 1,
     };
   }
 

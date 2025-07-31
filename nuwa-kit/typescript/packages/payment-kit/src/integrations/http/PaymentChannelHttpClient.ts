@@ -431,10 +431,8 @@ export class PaymentChannelHttpClient {
       
       try {
         this.log('Depositing funds to hub:', hubFundAmount, 'of', defaultAssetId);
-        await this.payerClient.depositToHub({
-          assetId: defaultAssetId,
-          amount: hubFundAmount,
-        });
+        const hubClient = this.payerClient.getHubClient();
+        await hubClient.deposit(defaultAssetId, hubFundAmount);
         this.log('Hub funding completed');
       } catch (error) {
         this.log('Hub funding failed (might already have funds):', error);
@@ -458,7 +456,6 @@ export class PaymentChannelHttpClient {
       const channelInfo = await this.payerClient.openChannelWithSubChannel({
         payeeDid,
         assetId: defaultAssetId,
-        collateral: this.options.channelCollateral || BigInt('100000000'), // 1 RGas
       });
 
       this.clientState.channelId = channelInfo.channelId;

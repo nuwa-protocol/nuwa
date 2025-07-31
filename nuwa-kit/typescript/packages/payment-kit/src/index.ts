@@ -20,6 +20,7 @@ export * from './contracts/IPaymentChannelContract';
 // Chain-agnostic clients
 export * from './client/PaymentChannelPayerClient';
 export * from './client/PaymentChannelPayeeClient';
+export * from './client/PaymentHubClient';
 
 // Factory for creating clients
 export * from './factory/chainFactory';

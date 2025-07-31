@@ -125,7 +125,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
     // Note: In real tests, we might need to ensure the payer has sufficient balance
     // This might require pre-funding the test accounts or using a faucet
     const depositResult = await contract.depositToHub({
-      targetDid: payer.did,
+      ownerDid: payer.did,
       assetId: testAsset.assetId,
       amount: fundAmount,
       signer: payer.signer,
@@ -139,7 +139,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid: payee.did,
       assetId: testAsset.assetId,
-      collateral: BigInt(50000000), // 0.5 RGas
+
       vmIdFragment: payer.vmIdFragment,
     });
 
@@ -231,7 +231,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
 
     // Setup: fund hub and open channel
     await contract.depositToHub({
-      targetDid: payer.did,
+      ownerDid: payer.did,
       assetId: testAsset.assetId,
       amount: BigInt(1000000000), // 10 RGas
       signer: payer.signer,
@@ -240,7 +240,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid: payee.did,
       assetId: testAsset.assetId,
-      collateral: BigInt(100000000), // 1 RGas
+
       vmIdFragment: payer.vmIdFragment,
     });
 
@@ -316,7 +316,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
 
     // Setup
     await contract.depositToHub({
-      targetDid: payer.did,
+      ownerDid: payer.did,
       assetId: testAsset.assetId,
       amount: BigInt(500000000), // 5 RGas
       signer: payer.signer,
@@ -325,7 +325,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
     const openResult = await payerClient.openChannelWithSubChannel({
       payeeDid: payee.did,
       assetId: testAsset.assetId,
-      collateral: BigInt(50000000), // 0.5 RGas
+
       vmIdFragment: payer.vmIdFragment,
     });
 

@@ -9,8 +9,10 @@ import type {
   ChannelStatusParams,
   SubChannelParams,
   SubChannelInfo,
-  DepositToHubParams,
+  DepositParams,
 } from '../../contracts/IPaymentChannelContract';
+import { PaymentHubClient } from '../../client/PaymentHubClient';
+import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
 import type { ChannelInfo, AssetInfo, SignedSubRAV, SubRAV } from '../../core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, MultibaseCodec, parseDid } from '@nuwa-ai/identity-kit';
@@ -122,6 +124,184 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
   });
 
+  describe('Payment Hub Operations', () => {
+    
+    it('should get hub balance after deposit', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      const depositAmount = BigInt(100000000); // 1 RGas (100M smallest units)
+
+      // Deposit to hub
+      const depositParams: DepositParams = {
+        ownerDid: payer.did,
+        assetId: testAsset.assetId,
+        amount: depositAmount,
+        signer: payer.signer,
+      };
+
+      await contract.depositToHub(depositParams);
+
+      // Check hub balance
+      const balance = await contract.getHubBalance(payer.did, testAsset.assetId);
+      
+      expect(balance).toBeGreaterThanOrEqual(depositAmount);
+      expect(typeof balance).toBe('bigint');
+
+      console.log(`Hub balance retrieved:
+        Owner DID: ${payer.did}
+        Asset: ${testAsset.assetId}
+        Balance: ${balance} (${Number(balance) / 100000000} RGas)`);
+    });
+
+    it('should get all hub balances', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // Make sure we have some balance first
+      await fundPayerHub();
+
+      // Get all balances
+      const allBalances = await contract.getAllHubBalances(payer.did);
+      
+      expect(allBalances).toBeDefined();
+      expect(typeof allBalances).toBe('object');
+      
+      // Should have at least one balance (RGas)
+      const normalizedAssetId = normalizeAssetId(testAsset.assetId);
+      expect(allBalances[normalizedAssetId]).toBeDefined();
+      expect(allBalances[normalizedAssetId]).toBeGreaterThan(BigInt(0));
+
+      console.log(`All hub balances retrieved:
+        Owner DID: ${payer.did}
+        Balances:`, allBalances);
+    });
+
+    it('should get active channels counts', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // First fund the hub and open some channels
+      await fundPayerHub();
+      await openTestChannel();
+
+      // Get active channels counts
+      const channelCounts = await contract.getActiveChannelsCounts(payer.did);
+      
+      expect(channelCounts).toBeDefined();
+      expect(typeof channelCounts).toBe('object');
+      
+      // Should have at least one active channel for RGas
+      const normalizedAssetId = normalizeAssetId(testAsset.assetId);
+      if (channelCounts[normalizedAssetId]) {
+        expect(channelCounts[normalizedAssetId]).toBeGreaterThan(0);
+        expect(typeof channelCounts[normalizedAssetId]).toBe('number');
+      }
+
+      console.log(`Active channels counts retrieved:
+        Owner DID: ${payer.did}
+        Channel Counts:`, channelCounts);
+    });
+
+    it('should verify PaymentHub BCS parsing with real data', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // Ensure we have a PaymentHub with data
+      await fundPayerHub();
+      await openTestChannel();
+
+      // Test getHubBalance - this will exercise PaymentHub parsing
+      const balance = await contract.getHubBalance(payer.did, testAsset.assetId);
+      expect(balance).toBeGreaterThan(BigInt(0));
+
+      // Test getAllHubBalances - this will exercise DynamicField<String, CoinStoreField> parsing
+      const allBalances = await contract.getAllHubBalances(payer.did);
+      expect(Object.keys(allBalances).length).toBeGreaterThan(0);
+
+      // Test getActiveChannelsCounts - this will exercise DynamicField<String, u64> parsing
+      const channelCounts = await contract.getActiveChannelsCounts(payer.did);
+      
+      // Log detailed parsing results for verification
+      console.log(`PaymentHub BCS parsing verification:
+        Single balance query: ${balance}
+        All balances: ${JSON.stringify(allBalances, (key, value) => 
+          typeof value === 'bigint' ? value.toString() : value, 2)}
+        Channel counts: ${JSON.stringify(channelCounts, null, 2)}`);
+
+      // Verify consistency between single and batch balance queries
+      const normalizedAssetId = normalizeAssetId(testAsset.assetId);
+      if (allBalances[normalizedAssetId]) {
+        expect(balance).toBe(allBalances[normalizedAssetId]);
+      }
+    });
+
+    it('should handle empty hub gracefully', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // Create a new DID that has no PaymentHub yet
+      const emptyPayer = await createSelfDid(env, {
+        keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
+        skipFunding: false
+      });
+
+      // Test balance queries on empty hub
+      const balance = await contract.getHubBalance(emptyPayer.did, testAsset.assetId);
+      expect(balance).toBe(BigInt(0));
+
+      const allBalances = await contract.getAllHubBalances(emptyPayer.did);
+      expect(allBalances).toEqual({});
+
+      const channelCounts = await contract.getActiveChannelsCounts(emptyPayer.did);
+      expect(channelCounts).toEqual({});
+
+      console.log(`Empty hub handling verified:
+        Balance: ${balance}
+        All balances: ${JSON.stringify(allBalances)}
+        Channel counts: ${JSON.stringify(channelCounts)}`);
+    });
+
+    it('should test PaymentHubClient integration', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // Create PaymentHubClient instance
+      const hubClient = new PaymentHubClient({
+        contract,
+        signer: payer.signer,
+        defaultAssetId: testAsset.assetId,
+      });
+
+      // Test deposit using HubClient
+      const depositAmount = BigInt(200000000); // 2 RGas
+      await hubClient.deposit(testAsset.assetId, depositAmount);
+
+      // Test getBalance using HubClient
+      const balance = await hubClient.getBalance();
+      expect(balance).toBeGreaterThanOrEqual(depositAmount);
+
+      // Test getAllBalances using HubClient
+      const allBalances = await hubClient.getAllBalances();
+      expect(Object.keys(allBalances).length).toBeGreaterThan(0);
+
+      // Test hasBalance using HubClient
+      const hasEnoughBalance = await hubClient.hasBalance(undefined, undefined, BigInt(100000000)); // 1 RGas
+      expect(hasEnoughBalance).toBe(true);
+
+      const hasInsufficientBalance = await hubClient.hasBalance(undefined, undefined, BigInt(10000000000)); // 100 RGas
+      expect(hasInsufficientBalance).toBe(false);
+
+      // Open a channel to test getActiveChannelsCounts
+      await openTestChannel();
+      const channelCounts = await hubClient.getActiveChannelsCounts();
+
+      console.log(`PaymentHubClient integration test results:
+        Deposit Amount: ${depositAmount}
+        Current Balance: ${balance}
+        All Balances: ${JSON.stringify(allBalances, (key, value) => 
+          typeof value === 'bigint' ? value.toString() : value, 2)}
+        Has Enough Balance (1 RGas): ${hasEnoughBalance}
+        Has Insufficient Balance (100 RGas): ${hasInsufficientBalance}
+        Active Channels Counts: ${JSON.stringify(channelCounts, null, 2)}`);
+    });
+
+  });
+
   describe('Payment Channel Operations', () => {
     
     it('should deposit to payment hub', async () => {
@@ -129,8 +309,8 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       const depositAmount = BigInt(100000000); // 1 RGas (100M smallest units)
 
-      const depositParams: DepositToHubParams = {
-        targetDid: payer.did,
+      const depositParams: DepositParams = {
+        ownerDid: payer.did,
         assetId: testAsset.assetId,
         amount: depositAmount,
         signer: payer.signer,
@@ -159,7 +339,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         payerDid: payer.did,
         payeeDid: payee.did,
         assetId: testAsset.assetId,
-        collateral: BigInt(50000000), // 0.5 RGas collateral
         vmIdFragment: payer.vmIdFragment,
         signer: payer.signer,
       };
@@ -213,7 +392,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         payerDid: payer.did,
         payeeDid: payee.did,
         assetId: testAsset.assetId,
-        collateral: BigInt(50000000), // 0.5 RGas
         vmIdFragment: payer.vmIdFragment,
         signer: payer.signer,
       };
@@ -232,7 +410,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         payerDid: payer.did,
         payeeDid: payee2.did,
         assetId: testAsset.assetId,
-        collateral: BigInt(50000000),
         signer: payer.signer,
       };
 
@@ -389,14 +566,48 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         Last Claimed Amount: ${updatedSubChannelInfo.lastClaimedAmount}
         Last Confirmed Nonce: ${updatedSubChannelInfo.lastConfirmedNonce}`);
     });
+
+    it('should test getHubClient from PaymentChannelClient', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      // Create PaymentChannelPayerClient
+      const payerClient = new PaymentChannelPayerClient({
+        contract,
+        signer: payer.signer,
+      });
+
+      // Get HubClient from PayerClient
+      const hubClient = payerClient.getHubClient();
+      expect(hubClient).toBeInstanceOf(PaymentHubClient);
+
+      // Test hub operations through the client
+      const depositAmount = BigInt(50000000); // 0.5 RGas
+      await hubClient.deposit(testAsset.assetId, depositAmount);
+
+      const balance = await hubClient.getBalance();
+      expect(balance).toBeGreaterThanOrEqual(depositAmount);
+
+      // Test withdrawal
+      const withdrawAmount = BigInt(10000000); // 0.1 RGas
+      await hubClient.withdraw(testAsset.assetId, withdrawAmount);
+
+      const balanceAfterWithdraw = await hubClient.getBalance();
+      expect(balanceAfterWithdraw).toBeLessThan(balance);
+
+      console.log(`PaymentChannelClient.getHubClient() integration test:
+        Deposited: ${depositAmount}
+        Balance after deposit: ${balance}
+        Withdrew: ${withdrawAmount}
+        Balance after withdraw: ${balanceAfterWithdraw}`);
+    });
   });
 
   // Helper functions
   async function fundPayerHub(): Promise<void> {
     const depositAmount = BigInt(1000000000); // 10 RGas (1B smallest units) for testing
 
-    const depositParams: DepositToHubParams = {
-      targetDid: payer.did,
+    const depositParams: DepositParams = {
+      ownerDid: payer.did,
       assetId: testAsset.assetId,
       amount: depositAmount,
       signer: payer.signer,
@@ -415,7 +626,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       payerDid: payer.did,
       payeeDid: payee.did,
       assetId: testAsset.assetId,
-      collateral: BigInt(1000000),
       signer: payer.signer,
     };
 

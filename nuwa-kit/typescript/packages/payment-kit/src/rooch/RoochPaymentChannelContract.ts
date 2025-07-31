@@ -20,6 +20,7 @@ import {
   RoochAddress,
 } from '@roochnetwork/rooch-sdk';
 import { bcs } from '@roochnetwork/rooch-sdk';
+
 import type { 
   IPaymentChannelContract,
   OpenChannelParams,
@@ -33,7 +34,8 @@ import type {
   ChannelStatusParams,
   SubChannelParams,
   SubChannelInfo,
-  DepositToHubParams,
+  DepositParams,
+  WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
 import type { 
   AssetInfo,
@@ -42,7 +44,24 @@ import type {
   ChannelInfo,
 } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
-import { calcChannelObjectId, normalizeAssetId } from '../core/ChannelUtils';
+import { 
+  calcChannelObjectId, 
+  normalizeAssetId, 
+  calculatePaymentHubId,
+  deriveFieldKeyFromString,
+  deriveCoinTypeFieldKey,
+  parsePaymentChannelData,
+  parsePaymentHubData,
+  parseDynamicFieldSubChannel,
+  parseDynamicFieldCoinStore,
+  parseDynamicFieldU64,
+  safeBalanceToBigint,
+  PaymentChannelData,
+  PaymentHub,
+  SubChannel,
+  DynamicField,
+  CoinStoreFieldData,
+} from '../core/ChannelUtils';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
 
 export interface RoochContractOptions {
@@ -74,81 +93,7 @@ export const CancelProofsSchema: any = bcs.struct('CancelProofs', {
   proofs: bcs.vector(CancelProofSchema),
 });
 
-/**
- * BCS Schema definitions for PaymentChannel related structs
- * These must match the Move contract definitions exactly
- */
-
-// CancellationInfo struct
-export interface CancellationInfo {
-  initiated_time: bigint;
-  pending_amount: bigint;
-}
-
-export const CancellationInfoSchema: any = bcs.struct('CancellationInfo', {
-  initiated_time: bcs.u64(),
-  pending_amount: bcs.u256(),
-});
-
-// SubChannel struct  
-export interface SubChannel {
-  pk_multibase: string;
-  method_type: string;
-  last_claimed_amount: bigint;
-  last_confirmed_nonce: bigint;
-}
-
-export const SubChannelSchema: any = bcs.struct('SubChannel', {
-  pk_multibase: bcs.string(),
-  method_type: bcs.string(),
-  last_claimed_amount: bcs.u256(),
-  last_confirmed_nonce: bcs.u64(),
-});
-
-// PaymentChannel struct - matches Move contract exactly
-export interface PaymentChannelData {
-  sender: string;
-  receiver: string;
-  coin_type: string;
-  sub_channels: string; // ObjectID as hex string (Table handle)
-  status: number;
-  channel_epoch: bigint;
-  cancellation_info: CancellationInfo | null;
-}
-
-export const PaymentChannelSchema: any = bcs.struct('PaymentChannel', {
-  sender: bcs.Address,
-  receiver: bcs.Address,
-  coin_type: bcs.string(),
-  sub_channels: bcs.ObjectId, // Table<String, SubChannel> stored as ObjectID
-  status: bcs.u8(),
-  channel_epoch: bcs.u64(),
-  cancellation_info: bcs.option(CancellationInfoSchema),
-});
-
-// PaymentHub struct - for future reference
-export interface PaymentHubData {
-  multi_coin_store: string; // ObjectID as hex string
-  active_channels: string; // ObjectID as hex string (Table handle)
-}
-
-export const PaymentHubSchema: any = bcs.struct('PaymentHub', {
-  multi_coin_store: bcs.ObjectId,
-  active_channels: bcs.ObjectId, // Table<String, u64>
-});
-
-// DynamicField struct for parsing Table fields
-export interface DynamicField<K, V> {
-  name: K;
-  value: V;
-}
-
-export const DynamicFieldSubChannelSchema: any = bcs.struct('DynamicField', {
-  name: bcs.string(),
-  value: SubChannelSchema,
-});
-
-// ChannelKey and ChannelKeySchema moved to ChannelUtils
+// BCS Schema definitions are now in ChannelUtils.ts
 
 const RGAS_CANONICAL_TAG: string = '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
 
@@ -451,7 +396,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const channelState = channelObject[0];
       
       // Parse channel data from BCS - no need for view functions anymore
-      const channelData = this.parseChannelData(channelState.value);
+      const channelData = parsePaymentChannelData(channelState.value);
       
       // Convert status number to string
       const statusString = this.convertChannelStatus(channelData.status);
@@ -485,7 +430,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         throw new Error(`Channel ${params.channelId} not found`);
       }
 
-      const channelData = this.parseChannelData(channelObject[0].value);
+      const channelData = parsePaymentChannelData(channelObject[0].value);
       
       // Get the sub-channel data from the sub_channels Table
       const subChannelData = await this.getSubChannelData(
@@ -564,14 +509,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
   }
 
-  async depositToHub(params: DepositToHubParams): Promise<TxResult> {
+  async depositToHub(params: DepositParams): Promise<TxResult> {
     try {
       this.logger.debug('Depositing to payment hub with params:', params);
       
-      // Parse and validate target DID
-      const targetParsed = parseDid(params.targetDid);
-      if (targetParsed.method !== 'rooch') {
-        throw new Error(`Invalid target DID method: expected 'rooch', got '${targetParsed.method}'`);
+      // Parse and validate owner DID
+      const ownerParsed = parseDid(params.ownerDid);
+      if (ownerParsed.method !== 'rooch') {
+        throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
       }
       
       const signer = await this.convertSigner(params.signer);
@@ -582,7 +527,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         target: `${this.contractAddress}::deposit_to_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [
-          Args.address(targetParsed.identifier),
+          Args.address(ownerParsed.identifier),
           Args.u256(params.amount),
         ],
         maxGas: 100000000,
@@ -611,6 +556,318 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       throw error;
     }
   }
+
+  async withdrawFromHub(params: WithdrawParams): Promise<TxResult> {
+    try {
+      this.logger.debug('Withdrawing from payment hub with params:', params);
+      
+      // Parse and validate owner DID
+      const ownerParsed = parseDid(params.ownerDid);
+      if (ownerParsed.method !== 'rooch') {
+        throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
+      }
+      
+      const signer = await this.convertSigner(params.signer);
+      
+      // Create transaction to withdraw from hub
+      const transaction = this.createTransaction();
+      transaction.callFunction({
+        target: `${this.contractAddress}::withdraw_from_hub_entry`,
+        typeArgs: [params.assetId], // CoinType as type argument
+        args: [
+          Args.u256(params.amount),
+        ],
+        maxGas: 100000000,
+      });
+
+      this.logger.debug('Executing withdrawFromHub transaction');
+      
+      // Execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        transaction,
+        signer,
+        option: { withOutput: true },
+      });
+
+      if (result.execution_info.status.type !== 'executed') {
+        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+      }
+
+      return {
+        txHash: result.execution_info.tx_hash || '',
+        blockHeight: BigInt(0),
+        events: result.output?.events,
+      };
+    } catch (error) {
+      this.logger.error('Error withdrawing from hub:', error);
+      throw error;
+    }
+  }
+
+  async getHubBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    try {
+      this.logger.debug('Getting hub balance for DID:', ownerDid, 'asset:', assetId);
+      
+      // Get PaymentHub object
+      const paymentHub = await this.getPaymentHub(ownerDid);
+      if (!paymentHub) {
+        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        return BigInt(0);
+      }
+      
+      this.logger.debug('MultiCoinStore ID extracted:', paymentHub.multi_coin_store);
+      // Query the specific field for this coin type in the multi_coin_store
+      const fieldKey = deriveCoinTypeFieldKey(assetId);
+      const fieldStates = await this.client.getFieldStates({ 
+        objectId: paymentHub.multi_coin_store, 
+        fieldKey: [fieldKey] 
+      });
+      
+      if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
+        // Asset not found in the store, balance is 0
+        this.logger.debug('Asset not found in multi_coin_store:', assetId);
+        return BigInt(0);
+      }
+      
+      // Parse the DynamicField<String, CoinStoreField> to get balance
+      const fieldState = fieldStates[0];
+      const fieldValue = fieldState.value;
+      
+      if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
+        // Parse BCS bytes using DynamicFieldCoinStoreSchema
+        try {
+          this.logger.debug('Parsing DynamicField<String, CoinStoreField> from BCS hex:', fieldValue);
+          const parsed = parseDynamicFieldCoinStore(fieldValue);
+          
+          this.logger.debug('Parsed DynamicField:', parsed);
+          
+          // Extract balance from the parsed CoinStoreField and ensure it's bigint
+          return safeBalanceToBigint(parsed.value.balance.value);
+        } catch (parseError) {
+          this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
+          return BigInt(0);
+        }
+      } else if (fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue) {
+        // If already parsed
+        const coinStoreField = (fieldValue as any).value;
+        if (coinStoreField && typeof coinStoreField === 'object' && 'balance' in coinStoreField) {
+          return BigInt(coinStoreField.balance as string);
+        }
+      }
+      
+      this.logger.warn('Could not parse balance from field state');
+      return BigInt(0);
+      
+    } catch (error) {
+      this.logger.error('Error getting hub balance:', error);
+      // Return 0 instead of throwing for balance queries
+      return BigInt(0);
+    }
+  }
+
+  async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
+    try {
+      this.logger.debug('Getting all hub balances for DID:', ownerDid);
+      
+      // Get PaymentHub object
+      const paymentHub = await this.getPaymentHub(ownerDid);
+      if (!paymentHub) {
+        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        return {};
+      }
+      
+      this.logger.debug('MultiCoinStore ID extracted for all balances:', paymentHub.multi_coin_store);
+      
+      // List all field states in multi_coin_store to get all coin types and balances
+      const balances: Record<string, bigint> = {};
+      let cursor = null;
+      // We only need to get the first 100 fields for now
+      const pageSize = 100;
+      
+      // while (true) {
+        const fieldStates = await this.client.listFieldStates({
+          objectId: paymentHub.multi_coin_store,
+          cursor,
+          limit: pageSize.toString()
+        });
+        
+        if (!fieldStates || !fieldStates.data) {
+          return balances;
+        }
+        
+        for (const state of fieldStates.data) {
+          try {
+            // Parse DynamicField<String, CoinStoreField>
+            const fieldValue = state.state.value;
+            
+            if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
+              // Parse BCS bytes using DynamicFieldCoinStoreSchema
+              try {
+                this.logger.debug('Parsing DynamicField<String, CoinStoreField> from BCS hex:', fieldValue);
+                const parsed = parseDynamicFieldCoinStore(fieldValue);
+                
+                this.logger.debug('Parsed DynamicField:', parsed);
+                
+                // Extract coin type and balance from the parsed data
+                const coinType = parsed.name;
+                const balance = safeBalanceToBigint(parsed.value.balance.value);
+                
+                if (coinType && balance > 0) {
+                  balances[coinType] = balance;
+                }
+              } catch (parseError) {
+                this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
+                continue;
+              }
+            } else{
+              this.logger.warn('Could not parse balance from field state');
+              throw new Error('Could not parse balance from field state');
+            }
+            
+          } catch (parseError) {
+            this.logger.warn('Failed to parse field state for balance:', parseError);
+            continue;
+          }
+        }
+        
+      // if (!fieldStates.has_next_page) {
+      //   break;
+      // }
+      // }
+      // cursor = fieldStates.next_cursor;
+      // }
+      
+      return balances;
+    } catch (error) {
+      this.logger.error('Error getting all hub balances:', error);
+      // Return empty object instead of throwing
+      return {};
+    }
+  }
+
+  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
+    try {
+      this.logger.debug('Getting active channels counts for DID:', ownerDid);
+      
+      // Get PaymentHub object
+      const paymentHub = await this.getPaymentHub(ownerDid);
+      if (!paymentHub) {
+        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        return {};
+      }
+      
+      this.logger.debug('Active channels table ID:', paymentHub.active_channels);
+      
+      // List all field states in active_channels table to get all coin types and their counts
+      const channelCounts: Record<string, number> = {};
+      let cursor = null;
+      const pageSize = 100;
+      
+      const fieldStates = await this.client.listFieldStates({
+        objectId: paymentHub.active_channels,
+        cursor,
+        limit: pageSize.toString()
+      });
+        
+      if (!fieldStates || !fieldStates.data) {
+        return channelCounts;
+      }
+        
+      for (const state of fieldStates.data) {
+        try {
+          // Parse DynamicField<String, u64> for active channels counts
+          const fieldValue = state.state.value;
+          
+          // Parse BCS bytes using DynamicFieldU64Schema
+          try {
+            this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
+            const parsed = parseDynamicFieldU64(fieldValue);
+            
+            this.logger.debug('Parsed DynamicField:', parsed);
+            
+            // Extract coin type and count from the parsed data
+            const coinType = parsed.name;
+            const count = parsed.value;
+            
+            if (coinType && count > 0) {
+              channelCounts[coinType] = count;
+            }
+          } catch (parseError) {
+            this.logger.warn('Failed to parse u64 BCS data:', parseError);
+            continue;
+          }
+          
+        } catch (parseError) {
+          this.logger.warn('Failed to parse field state for active channels count:', parseError);
+          continue;
+        }
+      }
+        
+        // if (!fieldStates.has_next_page) {
+        //   break;
+        // }
+        // cursor = fieldStates.next_cursor;
+      
+      return channelCounts;
+    } catch (error) {
+      this.logger.error('Error getting active channels counts:', error);
+      // Return empty object instead of throwing
+      return {};
+    }
+  }
+
+  // PaymentHub ID calculation and field key derivation are now in ChannelUtils.ts
+
+  // Get PaymentHub object for a given owner DID
+  private async getPaymentHub(ownerDid: string): Promise<PaymentHub | null> {
+    try {
+      this.logger.debug('Getting PaymentHub for DID:', ownerDid);
+      
+      // Parse and validate owner DID
+      const ownerParsed = parseDid(ownerDid);
+      if (ownerParsed.method !== 'rooch') {
+        throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
+      }
+
+      // Calculate hub ID
+      const hubId = calculatePaymentHubId(ownerParsed.identifier);
+      
+      // Get PaymentHub object state
+      const hubObjectViews = await this.client.getObjectStates({ ids: [hubId] });
+      
+      if (!hubObjectViews || hubObjectViews.length === 0 || !hubObjectViews[0]) {
+        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        return null;
+      }
+
+      const hubObjectView = hubObjectViews[0];
+      
+      // Parse PaymentHub using BCS deserialization
+      try {
+        const hubValue = hubObjectView.value;
+        
+        if (typeof hubValue === 'string' && hubValue.startsWith('0x')) {
+          // Parse BCS bytes using PaymentHubSchema
+          this.logger.debug('Parsing PaymentHub from BCS hex:', hubValue);
+          const parsed = parsePaymentHubData(hubValue);
+          
+          this.logger.debug('Parsed PaymentHub:', parsed);
+          
+          return parsed;
+        } else {
+          throw new Error('Unexpected PaymentHub value format');
+        }
+      } catch (parseError) {
+        this.logger.error('Failed to parse PaymentHub object:', parseError);
+        return null;
+      }
+    } catch (error) {
+      this.logger.error('Error getting PaymentHub:', error);
+      return null;
+    }
+  }
+
+
 
   // Helper methods
   private async convertSigner(signer: SignerInterface): Promise<Signer> {
@@ -684,39 +941,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     return BigInt(0);
   }
 
-  /**
-   * Parse PaymentChannel data from BCS hex string
-   * @param value BCS encoded hex string from object state
-   * @returns Parsed PaymentChannelData
-   */
-  private parseChannelData(value: string): PaymentChannelData {
-    try {
-      // Remove '0x' prefix if present
-      const bcsHex = value.startsWith('0x') ? value.slice(2) : value;
-      const bcsBytes = new Uint8Array(
-        bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
-      );
-      
-      // Parse using BCS schema
-      const parsed = PaymentChannelSchema.parse(bcsBytes);
-      
-      return {
-        sender: parsed.sender,
-        receiver: parsed.receiver,
-        coin_type: parsed.coin_type,
-        sub_channels: parsed.sub_channels,
-        status: parsed.status,
-        channel_epoch: BigInt(parsed.channel_epoch),
-        cancellation_info: parsed.cancellation_info ? {
-          initiated_time: BigInt(parsed.cancellation_info.initiated_time),
-          pending_amount: BigInt(parsed.cancellation_info.pending_amount),
-        } : null,
-      };
-    } catch (error) {
-      this.logger.error('Error parsing PaymentChannel data:', error);
-      throw new Error(`Failed to parse PaymentChannel data: ${error}`);
-    }
-  }
+  // parseChannelData method moved to ChannelUtils.parsePaymentChannelData
 
   /**
    * Get sub-channel data by VM ID fragment
@@ -729,7 +954,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       this.logger.debug(`Getting sub-channel data for: ${vmIdFragment} from table: ${subChannelsTableId}`);
       
       // Create field key from vm_id_fragment - this follows Rooch's FieldKey::derive_from_string logic
-      const fieldKey = this.deriveFieldKeyFromString(vmIdFragment);
+      const fieldKey = deriveFieldKeyFromString(vmIdFragment);
       
       // Query specific field by key using getFieldStates API
       const fieldStates = await this.client.getFieldStates({
@@ -745,7 +970,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const fieldState = fieldStates[0];
       
       // Parse the DynamicField<String, SubChannel> from BCS
-      const dynamicField = this.parseDynamicFieldSubChannel(fieldState.value);
+      const dynamicField = parseDynamicFieldSubChannel(fieldState.value);
       
       return dynamicField.value;
     } catch (error) {
@@ -809,70 +1034,5 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
   }
 
-  /**
-   * TODO: migrate this function to rooch-sdk
-   * Derive a FieldKey from a string VM ID fragment.
-   * This follows Rooch's FieldKey::derive_from_string logic:
-   * hash(bcs(MoveString) || canonical_type_tag_string)
-   * @param vmIdFragment The VM ID fragment string
-   * @returns FieldKey as hex string
-   */
-  private deriveFieldKeyFromString(vmIdFragment: string): string {
-    this.logger.debug(`Deriving FieldKey from VM ID fragment: ${vmIdFragment}`);
-    
-    try {
-      // BCS serialize the vmIdFragment as MoveString using Rooch's bcs library
-      const keyBytes = bcs.string().serialize(vmIdFragment).toBytes();
-      
-      // Get the canonical type tag string for String type
-      // Must use full canonical address format (32-byte) as specified in Rust implementation
-      const stringTypeTag = "0x0000000000000000000000000000000000000000000000000000000000000001::string::String";
-      const typeTagBytes = new TextEncoder().encode(stringTypeTag);
-      
-      // Concatenate: bcs(key) + canonical_type_tag_string
-      const combinedBytes = new Uint8Array(keyBytes.length + typeTagBytes.length);
-      combinedBytes.set(keyBytes);
-      combinedBytes.set(typeTagBytes, keyBytes.length);
-      
-      // SHA3-256 hash
-      const hash = sha3_256(combinedBytes);
-      return `0x${toHEX(hash)}`;
-    } catch (error) {
-      this.logger.error('Error deriving field key:', error);
-      throw new Error(`Failed to derive field key: ${error}`);
-    }
-  }
-
-  /**
-   * Parse a DynamicField<String, SubChannel> from BCS hex string.
-   * @param value BCS encoded hex string from a DynamicField
-   * @returns Parsed DynamicField<String, SubChannel> object
-   */
-  private parseDynamicFieldSubChannel(value: string): DynamicField<string, SubChannel> {
-    this.logger.debug(`Parsing DynamicField<String, SubChannel> from BCS hex: ${value}`);
-    
-    try {
-      // Remove '0x' prefix if present
-      const bcsHex = value.startsWith('0x') ? value.slice(2) : value;
-      const bcsBytes = new Uint8Array(
-        bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
-      );
-      
-      // Parse using DynamicField BCS schema
-      const parsed = DynamicFieldSubChannelSchema.parse(bcsBytes);
-      
-      return {
-        name: parsed.name,
-        value: {
-          pk_multibase: parsed.value.pk_multibase,
-          method_type: parsed.value.method_type,
-          last_claimed_amount: BigInt(parsed.value.last_claimed_amount),
-          last_confirmed_nonce: BigInt(parsed.value.last_confirmed_nonce),
-        },
-      };
-    } catch (error) {
-      this.logger.error('Error parsing DynamicField:', error);
-      throw new Error(`Failed to parse DynamicField: ${error}`);
-    }
-  }
+  // deriveFieldKeyFromString and parseDynamicFieldSubChannel methods moved to ChannelUtils
 } 

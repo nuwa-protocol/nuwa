@@ -6,7 +6,7 @@
  */
 
 import { parseDid } from '@nuwa-ai/identity-kit';
-import { bcs, sha3_256, toHEX, Serializer } from '@roochnetwork/rooch-sdk';
+import { bcs, sha3_256, toHEX, Serializer, RoochAddress } from '@roochnetwork/rooch-sdk';
 
 /**
  * Channel key structure matching Move contract ChannelKey
@@ -24,6 +24,109 @@ export const ChannelKeySchema: any = bcs.struct('ChannelKey', {
   sender: bcs.Address,
   receiver: bcs.Address,
   coin_type: bcs.string(),
+});
+
+// ==================== BCS Schema Definitions ====================
+
+// CancellationInfo struct
+export interface CancellationInfo {
+  initiated_time: bigint;
+  pending_amount: bigint;
+}
+
+export const CancellationInfoSchema: any = bcs.struct('CancellationInfo', {
+  initiated_time: bcs.u64(),
+  pending_amount: bcs.u256(),
+});
+
+// SubChannel struct  
+export interface SubChannel {
+  pk_multibase: string;
+  method_type: string;
+  last_claimed_amount: bigint;
+  last_confirmed_nonce: bigint;
+}
+
+export const SubChannelSchema: any = bcs.struct('SubChannel', {
+  pk_multibase: bcs.string(),
+  method_type: bcs.string(),
+  last_claimed_amount: bcs.u256(),
+  last_confirmed_nonce: bcs.u64(),
+});
+
+// PaymentChannel struct - matches Move contract exactly
+export interface PaymentChannelData {
+  sender: string;
+  receiver: string;
+  coin_type: string;
+  sub_channels: string; // ObjectID as hex string (Table handle)
+  status: number;
+  channel_epoch: bigint;
+  cancellation_info: CancellationInfo | null;
+}
+
+export const PaymentChannelSchema: any = bcs.struct('PaymentChannel', {
+  sender: bcs.Address,
+  receiver: bcs.Address,
+  coin_type: bcs.string(),
+  sub_channels: bcs.ObjectId, // Table<String, SubChannel> stored as ObjectID
+  status: bcs.u8(),
+  channel_epoch: bcs.u64(),
+  cancellation_info: bcs.option(CancellationInfoSchema),
+});
+
+// PaymentHub structure definition matching the Move contract
+export interface PaymentHub {
+  multi_coin_store: string; // ObjectID as hex string
+  active_channels: string;  // ObjectID as hex string
+}
+
+export const PaymentHubSchema: any = bcs.struct('PaymentHub', {
+  multi_coin_store: bcs.ObjectId,
+  active_channels: bcs.ObjectId, // Table<String, u64>
+});
+
+// Balance struct - matches multi_coin_store.move
+export interface BalanceData {
+  value: bigint;
+}
+
+export const BalanceSchema: any = bcs.struct('Balance', {
+  value: bcs.u256(),
+});
+
+// CoinStoreField struct - matches multi_coin_store.move
+export interface CoinStoreFieldData {
+  coin_type: string;
+  balance: BalanceData;
+  frozen: boolean;
+}
+
+export const CoinStoreFieldSchema: any = bcs.struct('CoinStoreField', {
+  coin_type: bcs.string(),
+  balance: BalanceSchema,
+  frozen: bcs.bool(),
+});
+
+// DynamicField struct for parsing Table fields
+export interface DynamicField<K, V> {
+  name: K;
+  value: V;
+}
+
+export const DynamicFieldSubChannelSchema: any = bcs.struct('DynamicField', {
+  name: bcs.string(),
+  value: SubChannelSchema,
+});
+
+export const DynamicFieldCoinStoreSchema: any = bcs.struct('DynamicField', {
+  name: bcs.string(),
+  value: CoinStoreFieldSchema,
+});
+
+export const DynamicFieldU64Schema: any = bcs.struct('DynamicField', {
+  name: bcs.string(),
+  value: bcs.u64(),
 });
 
 /**
@@ -149,4 +252,229 @@ export function parseChannelIdInfo(channelId: string): { isValid: boolean; objec
     isValid: true,
     objectId: channelId,
   };
+}
+
+// ==================== PaymentHub Utilities ====================
+
+/**
+ * Calculate PaymentHub ID using the same algorithm as in Move
+ * 
+ * Replicates the logic from moveos_types::moveos_std::object::account_named_object_id
+ * and payment_channel.move::get_payment_hub_id function
+ * 
+ * @param ownerAddress - Owner address (DID identifier or hex address)
+ * @returns PaymentHub object ID as hex string
+ */
+export function calculatePaymentHubId(ownerAddress: string): string {
+  // Create PaymentHub struct tag using the same approach as ChannelUtils
+  const paymentHubStructTag = {
+    address: '0x3',
+    module: 'payment_channel', 
+    name: 'PaymentHub',
+    type_params: [],
+  };
+  
+  // Get canonical string representation using Serializer
+  const canonicalStructTag = Serializer.structTagToCanonicalString(paymentHubStructTag);
+  
+  const roochAddress = new RoochAddress(ownerAddress);
+  
+  // Convert owner address to bytes - Rooch SDK handles the address format conversion
+  const ownerBytes = roochAddress.toBytes();
+  
+  // Append struct tag bytes (canonical string format)
+  const structTagBytes = Buffer.from(canonicalStructTag, 'utf8');
+  
+  // Combine owner address bytes + struct tag bytes
+  const combined = Buffer.concat([ownerBytes, structTagBytes]);
+  
+  // Calculate SHA3-256 hash
+  const hash = sha3_256(combined);
+  
+  // Return as hex string with 0x prefix (ObjectID format)
+  return '0x' + toHEX(hash);
+}
+
+/**
+ * Derive a FieldKey from a string value.
+ * This follows Rooch's FieldKey::derive_from_string logic:
+ * hash(bcs(MoveString) || canonical_type_tag_string)
+ * 
+ * @param value - The string value to derive field key from
+ * @returns FieldKey as hex string
+ */
+export function deriveFieldKeyFromString(value: string): string {
+  try {
+    // BCS serialize the value as MoveString using Rooch's bcs library
+    const keyBytes = bcs.string().serialize(value).toBytes();
+    
+    // Get the canonical type tag string for String type
+    // Must use full canonical address format (32-byte) as specified in Rust implementation
+    const stringTypeTag = "0x0000000000000000000000000000000000000000000000000000000000000001::string::String";
+    const typeTagBytes = new TextEncoder().encode(stringTypeTag);
+    
+    // Concatenate: bcs(key) + canonical_type_tag_string
+    const combinedBytes = new Uint8Array(keyBytes.length + typeTagBytes.length);
+    combinedBytes.set(keyBytes);
+    combinedBytes.set(typeTagBytes, keyBytes.length);
+    
+    // SHA3-256 hash
+    const hash = sha3_256(combinedBytes);
+    return `0x${toHEX(hash)}`;
+  } catch (error) {
+    throw new Error(`Failed to derive field key: ${error}`);
+  }
+}
+
+/**
+ * Derive field key for coin type asset ID
+ * @param coinType - Asset ID (e.g., "0x3::gas_coin::RGas")
+ * @returns FieldKey as hex string
+ */
+export function deriveCoinTypeFieldKey(coinType: string): string {
+  const assetIdCanonical = normalizeAssetId(coinType);
+  return deriveFieldKeyFromString(assetIdCanonical);
+}
+
+// ==================== BCS Parsing Utilities ====================
+
+/**
+ * Parse PaymentChannel data from BCS hex string
+ * @param value BCS encoded hex string from object state
+ * @returns Parsed PaymentChannelData
+ */
+export function parsePaymentChannelData(value: string): PaymentChannelData {
+  try {
+    // Remove '0x' prefix if present
+    const bcsHex = value.startsWith('0x') ? value.slice(2) : value;
+    const bcsBytes = new Uint8Array(
+      bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+    );
+    
+    // Parse using BCS schema
+    const parsed = PaymentChannelSchema.parse(bcsBytes);
+    
+    return {
+      sender: parsed.sender,
+      receiver: parsed.receiver,
+      coin_type: parsed.coin_type,
+      sub_channels: parsed.sub_channels,
+      status: parsed.status,
+      channel_epoch: BigInt(parsed.channel_epoch),
+      cancellation_info: parsed.cancellation_info ? {
+        initiated_time: BigInt(parsed.cancellation_info.initiated_time),
+        pending_amount: BigInt(parsed.cancellation_info.pending_amount),
+      } : null,
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse PaymentChannel data: ${error}`);
+  }
+}
+
+/**
+ * Parse PaymentHub data from BCS hex string
+ * @param value BCS encoded hex string from object state
+ * @returns Parsed PaymentHub
+ */
+export function parsePaymentHubData(value: string): PaymentHub {
+  try {
+    if (typeof value === 'string' && value.startsWith('0x')) {
+      // Parse BCS bytes using PaymentHubSchema
+      const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+      const parsed = PaymentHubSchema.parse(bcsBytes);
+      
+      return {
+        multi_coin_store: parsed.multi_coin_store,
+        active_channels: parsed.active_channels,
+      };
+    } else {
+      throw new Error('Unexpected PaymentHub value format');
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse PaymentHub data: ${error}`);
+  }
+}
+
+/**
+ * Parse a DynamicField<String, SubChannel> from BCS hex string
+ * @param value BCS encoded hex string from a DynamicField
+ * @returns Parsed DynamicField<String, SubChannel> object
+ */
+export function parseDynamicFieldSubChannel(value: string): DynamicField<string, SubChannel> {
+  try {
+    // Remove '0x' prefix if present
+    const bcsHex = value.startsWith('0x') ? value.slice(2) : value;
+    const bcsBytes = new Uint8Array(
+      bcsHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+    );
+    
+    // Parse using DynamicField BCS schema
+    const parsed = DynamicFieldSubChannelSchema.parse(bcsBytes);
+    
+    return {
+      name: parsed.name,
+      value: {
+        pk_multibase: parsed.value.pk_multibase,
+        method_type: parsed.value.method_type,
+        last_claimed_amount: BigInt(parsed.value.last_claimed_amount),
+        last_confirmed_nonce: BigInt(parsed.value.last_confirmed_nonce),
+      },
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse DynamicField<String, SubChannel>: ${error}`);
+  }
+}
+
+/**
+ * Parse a DynamicField<String, CoinStoreField> from BCS hex string
+ * @param value BCS encoded hex string from a DynamicField
+ * @returns Parsed DynamicField<String, CoinStoreField> object
+ */
+export function parseDynamicFieldCoinStore(value: string): DynamicField<string, CoinStoreFieldData> {
+  try {
+    const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+    const parsed = DynamicFieldCoinStoreSchema.parse(bcsBytes);
+    
+    return {
+      name: parsed.name as string,
+      value: parsed.value as CoinStoreFieldData,
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse DynamicField<String, CoinStoreField>: ${error}`);
+  }
+}
+
+/**
+ * Parse a DynamicField<String, u64> from BCS hex string
+ * @param value BCS encoded hex string from a DynamicField
+ * @returns Parsed DynamicField<String, u64> object
+ */
+export function parseDynamicFieldU64(value: string): DynamicField<string, number> {
+  try {
+    const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+    const parsed = DynamicFieldU64Schema.parse(bcsBytes);
+    
+    return {
+      name: parsed.name as string,
+      value: Number(parsed.value), // Convert bigint to number for count
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse DynamicField<String, u64>: ${error}`);
+  }
+}
+
+/**
+ * Safely convert balance value to bigint
+ * @param balanceValue - The balance value from BCS parsing (could be string or bigint)
+ * @returns Balance as bigint
+ */
+export function safeBalanceToBigint(balanceValue: any): bigint {
+  if (typeof balanceValue === 'string') {
+    return BigInt(balanceValue);
+  } else if (typeof balanceValue === 'bigint') {
+    return balanceValue;
+  } else {
+    console.warn('Unexpected balance value type:', typeof balanceValue);
+    return BigInt(0);
+  }
 }

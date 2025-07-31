@@ -44,8 +44,7 @@ export interface HttpPayerOptions {
   /** Amount to deposit to hub when creating channels (defaults to 10 RGas) */
   hubFundAmount?: bigint;
 
-  /** Collateral amount for new channels (defaults to 1 RGas) */
-  channelCollateral?: bigint;
+
 
   /** Default maximum amount to accept per request, refuse payment if exceeded */
   maxAmount?: bigint;

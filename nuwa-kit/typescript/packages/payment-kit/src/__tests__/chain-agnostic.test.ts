@@ -100,6 +100,36 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
       events: [],
     };
   }
+
+  async withdrawFromHub(params: any): Promise<any> {
+    // Mock withdraw from hub - return success
+    return {
+      txHash: '0xmock_withdraw_hash',
+      blockHeight: BigInt(200),
+      events: [],
+    };
+  }
+
+  async getHubBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    // Mock hub balance - return test balance
+    return BigInt(1000000000); // 1 unit of test asset
+  }
+
+  async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
+    // Mock all hub balances
+    return {
+      '0x3::gas_coin::RGas': BigInt(1000000000),
+      '0x3::stable_coin::USDC': BigInt(500000000),
+    };
+  }
+
+  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
+    // Mock active channels counts
+    return {
+      '0x3::gas_coin::RGas': 3,
+      '0x3::stable_coin::USDC': 1,
+    };
+  }
 }
 
 // Mock SignerInterface - simplified for testing
@@ -159,7 +189,6 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
       const channelMeta = await client.openChannel({
         payeeDid: 'did:test:0x456',
         assetId: '0x3::gas_coin::RGas',
-        collateral: BigInt('1000000000000000000'),
       });
 
       expect(channelMeta.channelId).toBe('0x1234567890abcdef1234567890abcdef12345678');
