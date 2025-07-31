@@ -1,3 +1,6 @@
 // Express integration exports
 export * from './BillableRouter';
-export * from './ExpressPaymentKit'; 
+export * from './ExpressPaymentKit';
+
+// IdentityEnv integration
+export { createExpressPaymentKitFromEnv } from './fromIdentityEnv'; 

@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createExpressPaymentKit } from '../../../src/integrations/express/ExpressPaymentKit';
+import { createExpressPaymentKitFromEnv } from '../../../src/integrations/express/fromIdentityEnv';
 import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 
@@ -7,27 +8,34 @@ import type {
   SubRAV 
 } from '../../../src/core/types';
 import type { PaymentChannelPayeeClient } from '../../../src/client/PaymentChannelPayeeClient';
-import type { SignerInterface } from '@nuwa-ai/identity-kit';
+import type { SignerInterface, IdentityEnv } from '@nuwa-ai/identity-kit';
 import { DIDAuth } from '@nuwa-ai/identity-kit';
 
 export interface BillingServerConfig {
-  // Use new simplified configuration
+  // Preferred: Use IdentityEnv for simplified configuration
+  env?: IdentityEnv;
+  
+  // Legacy: still allow manual configuration for backward compatibility
   signer?: SignerInterface;
   did?: string;
+  rpcUrl?: string; // For blockchain connection
+  network?: 'local' | 'dev' | 'test' | 'main';
+  
   // Alternative: still allow pre-created payeeClient for backward compatibility
   payeeClient?: PaymentChannelPayeeClient;
+  
+  // Common configuration
   port?: number;
   serviceId?: string;
   defaultAssetId?: string;
   debug?: boolean;
-  rpcUrl?: string; // For blockchain connection
-  network?: 'local' | 'dev' | 'test' | 'main';
   // Admin DIDs that can access admin endpoints
   adminDid?: string | string[];
 }
 
 export async function createBillingServer(config: BillingServerConfig) {
   const {
+    env,
     signer,
     did,
     payeeClient,
@@ -41,27 +49,41 @@ export async function createBillingServer(config: BillingServerConfig) {
   } = config;
 
   // Validate configuration
-  if (!signer && !payeeClient) {
-    throw new Error('Either signer or payeeClient must be provided');
+  if (!env && !signer && !payeeClient) {
+    throw new Error('Either env, signer, or payeeClient must be provided');
   }
 
   const app = express();
   app.use(express.json());
 
   // 1. Create ExpressPaymentKit integration for billing functionality
-  const billing = await createExpressPaymentKit({
-    serviceId,
-    signer: signer!,
-    rpcUrl,
-    network,
-    defaultAssetId,
-    defaultPricePicoUSD: '500000000', // 0.0005 USD
-    adminDid,
-    debug
-  });
+  let billing;
+  
+  if (env) {
+    // Use fromIdentityEnv for simplified configuration
+    billing = await createExpressPaymentKitFromEnv(env, {
+      serviceId,
+      defaultAssetId,
+      defaultPricePicoUSD: '500000000', // 0.0005 USD
+      adminDid,
+      debug
+    });
+  } else {
+    // Use legacy manual configuration
+    billing = await createExpressPaymentKit({
+      serviceId,
+      signer: signer!,
+      rpcUrl,
+      network,
+      defaultAssetId,
+      defaultPricePicoUSD: '500000000', // 0.0005 USD
+      adminDid,
+      debug
+    });
+  }
 
   // 2. Declare routes & pricing strategies
-  billing.get('/v1/echo', '1000000000', (req: Request, res: Response) => {
+  billing.get('/v1/echo', '1000000000', (req: Request, res: Response) => { // 0.001 USD = 1,000,000,000 picoUSD
     const paymentResult = (req as any).paymentResult;
     res.json({
       echo: req.query.q || 'hello',
@@ -71,7 +93,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     });
   });
 
-  billing.post('/v1/process', '10000000000', (req: Request, res: Response) => {
+  billing.post('/v1/process', '10000000000', (req: Request, res: Response) => { // 0.01 USD = 10,000,000,000 picoUSD
     const paymentResult = (req as any).paymentResult;
     res.json({
       processed: req.body,

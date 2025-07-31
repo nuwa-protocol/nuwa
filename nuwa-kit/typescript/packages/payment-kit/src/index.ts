@@ -107,5 +107,11 @@ export {
   DebugLogger 
 } from './utils';
 
-export * from './integrations/express/BillableRouter';
-export * from './integrations/express/ExpressPaymentKit';
+// HTTP Payer Client integration
+export * from './integrations/http';
+
+// Express Payment Kit integration
+export * from './integrations/express';
+
+// Core IdentityEnv integration helpers (shared utilities)
+export { getChainConfigFromEnv } from './helpers/fromIdentityEnv';

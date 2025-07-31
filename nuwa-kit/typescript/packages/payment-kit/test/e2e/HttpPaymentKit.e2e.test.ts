@@ -9,15 +9,14 @@
  */
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { PaymentChannelPayerClient } from '../../src/client/PaymentChannelPayerClient';
-import { PaymentChannelPayeeClient } from '../../src/client/PaymentChannelPayeeClient';
+import { PaymentChannelHttpClient } from '../../src/integrations/http';
+import { createHttpClientFromEnv } from '../../src/integrations/http/fromIdentityEnv';
+import { PaymentChannelFactory } from '../../src/factory/chainFactory';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
-import { RoochVDR, VDRRegistry } from '@nuwa-ai/identity-kit';
 import type { AssetInfo } from '../../src/core/types';
-import { MemoryChannelRepository } from '../../src/storage';
 import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
-import { DebugLogger } from '@nuwa-ai/identity-kit';
-import { createBillingServer, createTestClient } from './server';
+import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
+import { createBillingServer } from './server';
 
 // Check if we should run E2E tests
 const shouldRunE2ETests = () => {
@@ -25,16 +24,12 @@ const shouldRunE2ETests = () => {
 };
 
 describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
-  let contract: RoochPaymentChannelContract;
   let env: TestEnv;
   let payer: CreateSelfDidResult;
   let payee: CreateSelfDidResult;
-  let payerClient: PaymentChannelPayerClient;
-  let payeeClient: PaymentChannelPayeeClient;
   let testAsset: AssetInfo;
   let billingServerInstance: any;
-  let testClient: any;
-  let channelId: string;
+  let httpClient: PaymentChannelHttpClient;
 
   beforeAll(async () => {
     if (!shouldRunE2ETests()) {
@@ -51,22 +46,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       network: 'local',
       debug: false, // Reduce debug noise
     });
-
-    // Initialize real contract
-    contract = new RoochPaymentChannelContract({
-      rpcUrl: env.rpcUrl,
-      network: 'local', 
-      debug: false,
-    });
-
-    // Initialize DID resolver
-    const roochVDR = new RoochVDR({
-      rpcUrl: env.rpcUrl,
-      network: 'local',
-    });
-    
-    const vdrRegistry = VDRRegistry.getInstance();
-    vdrRegistry.registerVDR(roochVDR);
 
     // Create test identities
     payer = await createSelfDid(env, {
@@ -85,16 +64,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       decimals: 8, // RGas has 8 decimal places
     };
 
-    // Initialize payment clients
-    payerClient = new PaymentChannelPayerClient({
-      contract,
-      signer: payer.keyManager,
-      keyId: `${payer.did}#${payer.vmIdFragment}`,
-      storageOptions: {
-        customChannelRepo: new MemoryChannelRepository(),
-      },
-    });
-
     console.log(`✅ Test setup completed:
       Payer DID: ${payer.did}
       Payee DID: ${payee.did}
@@ -102,10 +71,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       Node URL: ${env.rpcUrl}
     `);
 
-    // Fund and setup payment channel
-    await setupPaymentChannel();
-
-    // Start billing server using new ExpressPaymentKitOptions API
+    // Start billing server using fromIdentityEnv integration
     billingServerInstance = await createBillingServer({
       signer: payee.keyManager,
       did: payee.did,
@@ -118,11 +84,24 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: false
     });
 
-    // Get the created payeeClient from billing server for other operations
-    payeeClient = billingServerInstance.billing.getPayeeClient();
-
-    // Create test client with DID authentication
-    testClient = createTestClient(payerClient, billingServerInstance.baseURL, channelId, payer.did, payer.keyManager);
+    // Create HTTP client - it will automatically handle channel creation and funding
+    httpClient = new PaymentChannelHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      chainConfig: {
+        chain: 'rooch',
+        rpcUrl: env.rpcUrl,
+        network: 'local'
+      },
+      signer: payer.keyManager,
+      keyId: `${payer.did}#${payer.vmIdFragment}`,
+      payerDid: payer.did,
+      payeeDid: payee.did, // Specify the payee for channel creation
+      defaultAssetId: testAsset.assetId,
+      hubFundAmount: BigInt('1000000000'), // 10 RGas
+      channelCollateral: BigInt('100000000'), // 1 RGas
+      maxAmount: BigInt('500000000'), // 5 RGas
+      debug: true
+    });
 
     console.log(`✅ Billing server started on ${billingServerInstance.baseURL}`);
   }, 180000); // 3 minutes timeout for setup
@@ -136,49 +115,26 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       console.log('✅ Billing server shutdown');
     }
 
-    // Close payment channel if it exists
-    if (channelId && payerClient) {
-      try {
-        await payerClient.closeChannel(channelId, true);
-        console.log('✅ Payment channel closed');
-      } catch (error) {
-        console.warn('Warning: Failed to close channel:', error);
-      }
-    }
-
+    // Note: PaymentChannelHttpClient should handle channel cleanup automatically
+    // or provide explicit cleanup methods in the future
     console.log('🏁 HTTP Payment Kit E2E Tests completed');
   }, 60000); // 1 minute timeout for cleanup
 
-  async function setupPaymentChannel() {
-    console.log('💰 Setting up payment channel...');
-    
-    // Fund payer's payment hub
-    const fundAmount = BigInt('1000000000'); // 10 RGas
-    
-    const depositResult = await contract.depositToHub({
-      targetDid: payer.did,
-      assetId: testAsset.assetId,
-      amount: fundAmount,
-      signer: payer.signer,
-    });
+  // Helper function to generate admin authentication header
+  async function generateAdminAuthHeader(): Promise<string> {
+    const keyIds = await payer.keyManager.listKeyIds();
+    const keyId = keyIds[0];
 
-    console.log(`✅ Hub funded: ${fundAmount} units (tx: ${depositResult.txHash})`);
+    const signedObject = await DIDAuth.v1.createSignature(
+      { 
+        operation: 'admin_request',
+        params: { uri: billingServerInstance.baseURL }
+      },
+      payer.keyManager,
+      keyId
+    );
 
-    // Open channel with sub-channel
-    const openResult = await payerClient.openChannelWithSubChannel({
-      payeeDid: payee.did,
-      assetId: testAsset.assetId,
-      collateral: BigInt('100000000'), // 1 RGas
-      vmIdFragment: payer.vmIdFragment,
-    });
-
-    channelId = openResult.channelId;
-    console.log(`✅ Channel opened: ${channelId} (tx: ${openResult.txHash})`);
-
-    // Verify channel is active
-    const channelInfo = await payerClient.getChannelInfo(channelId);
-    expect(channelInfo.status).toBe('active');
-    console.log('✅ Channel verified as active');
+    return DIDAuth.v1.toAuthorizationHeader(signedObject);
   }
 
   test('Complete HTTP deferred payment flow', async () => {
@@ -186,47 +142,53 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('🔄 Testing complete HTTP deferred payment flow');
 
-    // Test 1: First request (no payment required, receives SubRAV proposal)
-    console.log('📞 Request 1: First call (no payment required)');
-    const response1 = await testClient.callEcho('hello world');
+    // Test 1: First request (handshake)
+    console.log('📞 Request 1: First call (handshake)');
+    const response1 = await httpClient.get('/v1/echo?q=hello%20world');
     
     expect(response1.echo).toBe('hello world');
     expect(response1.cost).toBe('10000000'); // 0.001 USD = 10,000,000 RGAS units (0.1 RGAS)
     expect(response1.timestamp).toBeTruthy();
     
     // Should have received a SubRAV proposal for next request
-    const pendingSubRAV1 = testClient.getPendingSubRAV();
+    const pendingSubRAV1 = httpClient.getPendingSubRAV();
     expect(pendingSubRAV1).toBeTruthy();
-    expect(pendingSubRAV1.channelId).toBe(channelId);
-    expect(pendingSubRAV1.nonce).toBe(BigInt(1));
+    expect(pendingSubRAV1!.channelId).toBe(httpClient.getChannelId());
+    expect(pendingSubRAV1!.nonce).toBe(BigInt(1));
     
-    console.log(`✅ First request successful, received SubRAV proposal (nonce: ${pendingSubRAV1.nonce})`);
+    console.log(`✅ First request successful, received SubRAV proposal (nonce: ${pendingSubRAV1!.nonce})`);
 
     // Test 2: Second request (pays for first request, receives new proposal)
     console.log('📞 Request 2: Second call (pays for first request)');
-    const response2 = await testClient.callEcho('second call');
+    const response2 = await httpClient.get('/v1/echo?q=second%20call');
     
     expect(response2.echo).toBe('second call');
     expect(response2.cost).toBe('10000000');
     
-    const pendingSubRAV2 = testClient.getPendingSubRAV();
+    const pendingSubRAV2 = httpClient.getPendingSubRAV();
     expect(pendingSubRAV2).toBeTruthy();
-    expect(pendingSubRAV2.nonce).toBe(BigInt(2));
+    expect(pendingSubRAV2!.nonce).toBe(BigInt(2));
     
-    console.log(`✅ Second request successful, payment processed (nonce: ${pendingSubRAV2.nonce})`);
+    console.log(`✅ Second request successful, payment processed (nonce: ${pendingSubRAV2!.nonce})`);
 
     // Test 3: Multiple requests to verify consistent payment processing
     console.log('📞 Requests 3-6: Multiple calls to verify payment consistency');
     
     for (let i = 3; i <= 6; i++) {
-      const response = await testClient.callEcho(`call ${i}`);
+      const response = await httpClient.get(`/v1/echo?q=call%20${i}`);
       expect(response.echo).toBe(`call ${i}`);
       expect(response.cost).toBe('10000000');
-      console.log(`✅ Request ${i} successful (nonce: ${response.nonce || 'unknown'})`);
+      console.log(`✅ Request ${i} successful`);
     }
 
     // Check admin stats for payment tracking
-    const adminStats = await testClient.getAdminClaims();
+    // Create a basic HTTP client for admin endpoints (no payment required)
+    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
+      headers: {
+        'Authorization': await generateAdminAuthHeader()
+      }
+    });
+    const adminStats = await adminResponse.json();
     console.log('📊 Admin stats after multiple requests:', JSON.stringify(adminStats, null, 2));
 
     console.log('🎉 Complete HTTP deferred payment flow successful!');
@@ -238,27 +200,32 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🔄 Testing mixed request types with different pricing');
 
     // Reset client state
-    testClient.clearPendingSubRAV();
+    httpClient.clearPendingSubRAV();
 
     // Test echo requests (cheaper)
     console.log('📞 Echo requests (0.001 USD each)');
-    await testClient.callEcho('test echo 1');
-    await testClient.callEcho('test echo 2');
+    await httpClient.get('/v1/echo?q=test%20echo%201');
+    await httpClient.get('/v1/echo?q=test%20echo%202');
 
     // Test process requests (more expensive)
     console.log('📞 Process requests (0.01 USD each)');
-    const processResponse1 = await testClient.callProcess({ data: 'test data 1' });
+    const processResponse1 = await httpClient.post('/v1/process', { data: 'test data 1' });
     expect(processResponse1.processed.data).toBe('test data 1');
     expect(processResponse1.cost).toBe('100000000'); // 0.01 USD = 100,000,000 RGAS units (1.0 RGAS)
 
-    const processResponse2 = await testClient.callProcess({ operation: 'complex task' });
+    const processResponse2 = await httpClient.post('/v1/process', { operation: 'complex task' });
     expect(processResponse2.processed.operation).toBe('complex task');
     expect(processResponse2.cost).toBe('100000000');
 
     console.log('✅ Mixed request types processed successfully');
 
     // Check accumulated costs
-    const adminStats = await testClient.getAdminClaims();
+    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
+      headers: {
+        'Authorization': await generateAdminAuthHeader()
+      }
+    });
+    const adminStats = await adminResponse.json();
     console.log('📊 Final admin stats:', JSON.stringify(adminStats, null, 2));
 
     console.log('🎉 Mixed request types test successful!');
@@ -280,7 +247,13 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('✅ Health check works without payment');
 
     // Test admin endpoints
-    const adminStats = await testClient.getAdminClaims();
+    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
+      headers: {
+        'Authorization': await generateAdminAuthHeader()
+      }
+    });
+    expect(adminResponse.ok).toBe(true);
+    const adminStats = await adminResponse.json();
     expect(adminStats).toBeTruthy();
 
     console.log('✅ Admin endpoints accessible');
@@ -293,17 +266,35 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('🔄 Testing channel state consistency between client and blockchain');
 
+    // Get the channel ID from the HTTP client
+    const channelId = httpClient.getChannelId();
+    expect(channelId).toBeTruthy();
+
+    // Create a direct contract instance to access blockchain
+    const contract = new RoochPaymentChannelContract({
+      rpcUrl: env.rpcUrl,
+      network: 'local',
+      debug: false,
+    });
+
+    // Create a temporary client for channel info
+    const tempPayerClient = PaymentChannelFactory.createClient({
+      chainConfig: {
+        chain: 'rooch',
+        rpcUrl: env.rpcUrl,
+        network: 'local'
+      },
+      signer: payer.keyManager,
+      keyId: `${payer.did}#${payer.vmIdFragment}`
+    });
+
     // Get channel info from blockchain
     const blockchainChannelInfo = await contract.getChannelStatus({
-      channelId: channelId,
-    });
-    const blockchainSubChannelInfo = await contract.getSubChannel({
-      channelId,
-      vmIdFragment: payer.vmIdFragment,
+      channelId: channelId!,
     });
 
     // Get channel info from client
-    const clientChannelInfo = await payerClient.getChannelInfo(channelId);
+    const clientChannelInfo = await tempPayerClient.getChannelInfo(channelId!);
 
     // Verify consistency
     expect(clientChannelInfo.channelId).toBe(blockchainChannelInfo.channelId);
@@ -314,12 +305,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log(`✅ Channel state consistent:
       Channel ID: ${clientChannelInfo.channelId}
       Status: ${clientChannelInfo.status}
-      Last Confirmed Nonce: ${blockchainSubChannelInfo.lastConfirmedNonce}
-      Last Claimed Amount: ${blockchainSubChannelInfo.lastClaimedAmount}
     `);
 
-    // Test sync functionality
-    await payeeClient.syncChannelState(channelId);
+    // Test sync functionality using the billing server's ExpressPaymentKit
+    await billingServerInstance.billing.getPayeeClient().syncChannelState(channelId!);
     console.log('✅ Channel state sync completed');
 
     console.log('🎉 Channel state consistency test successful!');

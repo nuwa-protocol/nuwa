@@ -335,6 +335,22 @@ export class PaymentChannelPayerClient {
   }
  
   /**
+   * Deposit funds to the payment hub for the current payer
+   */
+  async depositToHub(params: { assetId: string; amount: bigint }): Promise<{ txHash: string }> {
+    const payerDid = await this.signer.getDid();
+    
+    const result = await this.contract.depositToHub({
+      targetDid: payerDid,
+      assetId: params.assetId,
+      amount: params.amount,
+      signer: this.signer,
+    });
+
+    return { txHash: result.txHash };
+  }
+
+  /**
    * Close a payment channel
    */
   async closeChannel(channelId: string, cooperative: boolean = true): Promise<{ txHash: string }> {
