@@ -20,6 +20,15 @@ export interface PaymentHubClientOptions {
   defaultAssetId: string;
 }
 
+export interface BalanceOptions {
+  ownerDid?: string;
+  assetId?: string;
+}
+
+export interface HasBalanceOptions extends BalanceOptions {
+  requiredAmount?: bigint;
+}
+
 /**
  * Chain-agnostic Payment Hub Client
  * 
@@ -89,13 +98,9 @@ export class PaymentHubClient {
   /**
    * Get balance of a specific asset in the payment hub
    */
-  async getBalance(ownerDid?: string, assetId?: string): Promise<bigint> {
-    if (!ownerDid) {
-      ownerDid = await this.signer.getDid();
-    }
-    if (!assetId) {
-      assetId = this.defaultAssetId;
-    }
+  async getBalance(options: BalanceOptions = {}): Promise<bigint> {
+    const ownerDid = options.ownerDid || await this.signer.getDid();
+    const assetId = options.assetId || this.defaultAssetId;
     return this.contract.getHubBalance(ownerDid, assetId);
   }
 
@@ -122,8 +127,9 @@ export class PaymentHubClient {
   /**
    * Check if hub has sufficient balance for a payment
    */
-  async hasBalance(ownerDid?: string, assetId?: string, requiredAmount: bigint = BigInt(0)): Promise<boolean> {
-    const balance = await this.getBalance(ownerDid, assetId);
+  async hasBalance(options: HasBalanceOptions = {}): Promise<boolean> {
+    const { requiredAmount = BigInt(0), ...balanceOptions } = options;
+    const balance = await this.getBalance(balanceOptions);
     return balance >= requiredAmount;
   }
 }

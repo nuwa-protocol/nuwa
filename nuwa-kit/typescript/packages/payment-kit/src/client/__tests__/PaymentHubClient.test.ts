@@ -33,7 +33,7 @@ describe('PaymentHubClient', () => {
       expect(result.txHash).toMatch(/^deposit-tx-/);
       
       // Verify balance was updated
-      const balance = await hubClient.getBalance(undefined, '0x3::gas_coin::RGas');
+      const balance = await hubClient.getBalance({ assetId: '0x3::gas_coin::RGas' });
       expect(balance).toBe(BigInt(1000));
     });
 
@@ -41,7 +41,7 @@ describe('PaymentHubClient', () => {
       await hubClient.deposit('0x3::gas_coin::RGas', BigInt(500));
       await hubClient.deposit('0x3::gas_coin::RGas', BigInt(300));
       
-      const balance = await hubClient.getBalance(undefined, '0x3::gas_coin::RGas');
+      const balance = await hubClient.getBalance({ assetId: '0x3::gas_coin::RGas' });
       expect(balance).toBe(BigInt(800));
     });
   });
@@ -58,7 +58,7 @@ describe('PaymentHubClient', () => {
       expect(result.txHash).toMatch(/^withdraw-tx-/);
       
       // Verify balance was updated
-      const balance = await hubClient.getBalance(undefined, '0x3::gas_coin::RGas');
+      const balance = await hubClient.getBalance({ assetId: '0x3::gas_coin::RGas' });
       expect(balance).toBe(BigInt(700));
     });
 
@@ -68,7 +68,7 @@ describe('PaymentHubClient', () => {
       expect(result.txHash).toMatch(/^withdraw-tx-/);
       
       // Verify balance is now 0
-      const balance = await hubClient.getBalance('0x3::gas_coin::RGas');
+      const balance = await hubClient.getBalance({ assetId: '0x3::gas_coin::RGas' });
       expect(balance).toBe(BigInt(0));
     });
 
@@ -81,7 +81,7 @@ describe('PaymentHubClient', () => {
 
   describe('getBalance', () => {
     it('should return 0 for non-existent asset', async () => {
-      const balance = await hubClient.getBalance(undefined, '0x3::unknown::Token');
+      const balance = await hubClient.getBalance({ assetId: '0x3::unknown::Token' });
       expect(balance).toBe(BigInt(0));
     });
 
@@ -89,7 +89,7 @@ describe('PaymentHubClient', () => {
       await hubClient.deposit('0x3::gas_coin::RGas', BigInt(1500));
       await hubClient.withdraw('0x3::gas_coin::RGas', BigInt(500));
       
-      const balance = await hubClient.getBalance(undefined, '0x3::gas_coin::RGas');
+      const balance = await hubClient.getBalance({ assetId: '0x3::gas_coin::RGas' });
       expect(balance).toBe(BigInt(1000));
     });
   });
@@ -144,17 +144,26 @@ describe('PaymentHubClient', () => {
     });
 
     it('should return true when sufficient balance', async () => {
-      const result = await hubClient.hasBalance(undefined, '0x3::gas_coin::RGas', BigInt(500));
+      const result = await hubClient.hasBalance({ 
+        assetId: '0x3::gas_coin::RGas', 
+        requiredAmount: BigInt(500) 
+      });
       expect(result).toBe(true);
     });
 
     it('should return false when insufficient balance', async () => {
-      const result = await hubClient.hasBalance(undefined, '0x3::gas_coin::RGas', BigInt(2000));
+      const result = await hubClient.hasBalance({ 
+        assetId: '0x3::gas_coin::RGas', 
+        requiredAmount: BigInt(2000) 
+      });
       expect(result).toBe(false);
     });
 
     it('should return false for non-existent asset', async () => {
-      const result = await hubClient.hasBalance(undefined, '0x3::unknown::Token', BigInt(1));
+      const result = await hubClient.hasBalance({ 
+        assetId: '0x3::unknown::Token', 
+        requiredAmount: BigInt(1) 
+      });
       expect(result).toBe(false);
     });
   });

@@ -280,10 +280,10 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       expect(Object.keys(allBalances).length).toBeGreaterThan(0);
 
       // Test hasBalance using HubClient
-      const hasEnoughBalance = await hubClient.hasBalance(undefined, undefined, BigInt(100000000)); // 1 RGas
+      const hasEnoughBalance = await hubClient.hasBalance({ requiredAmount: BigInt(100000000) }); // 1 RGas
       expect(hasEnoughBalance).toBe(true);
 
-      const hasInsufficientBalance = await hubClient.hasBalance(undefined, undefined, BigInt(10000000000)); // 100 RGas
+      const hasInsufficientBalance = await hubClient.hasBalance({ requiredAmount: BigInt(10000000000) }); // 100 RGas
       expect(hasInsufficientBalance).toBe(false);
 
       // Open a channel to test getActiveChannelsCounts
