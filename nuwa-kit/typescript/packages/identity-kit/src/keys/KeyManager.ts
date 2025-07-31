@@ -106,6 +106,13 @@ export class KeyManager implements SignerInterface {
   }
 
   /**
+   * Clear all keys from the store
+   */
+  async clear(): Promise<void> {
+    await this.store.clear();
+  }
+
+  /**
    * List all available key IDs
    */
   async listKeyIds(): Promise<string[]> {

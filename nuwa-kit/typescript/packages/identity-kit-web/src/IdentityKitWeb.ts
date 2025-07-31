@@ -5,6 +5,7 @@ import {
   VDRRegistry,
   SignedData,
   IdentityKit,
+  IdentityEnv,
 } from '@nuwa-ai/identity-kit';
 import { LocalStorageKeyStore } from './keystore/LocalStorageKeyStore';
 import { IndexedDBKeyStore } from './keystore/IndexedDBKeyStore';
@@ -15,8 +16,6 @@ export interface IdentityKitWebOptions {
   appName?: string;
   cadopDomain?: string;
   storage?: 'local' | 'indexeddb' | 'memory';
-  keyManager?: KeyManager;
-  deepLinkManager?: DeepLinkManager;
   /** Optional explicit RPC endpoint for Rooch node */
   roochRpcUrl?: string;
 }
@@ -30,21 +29,24 @@ export class IdentityKitWeb {
   private deepLinkManager: DeepLinkManager;
   private cadopDomain: string;
   private appName?: string;
+  private identityEnv: IdentityEnv;
 
   private constructor(
     keyManager: KeyManager,
     deepLinkManager: DeepLinkManager,
     cadopDomain: string,
+    identityEnv: IdentityEnv,
     appName?: string
   ) {
     this.keyManager = keyManager;
     this.deepLinkManager = deepLinkManager;
     this.cadopDomain = cadopDomain;
+    this.identityEnv = identityEnv;
     this.appName = appName;
   }
 
   /**
-   * Initialize the IdentityKitWeb
+   * Initialize the IdentityKitWeb with automatic component initialization
    */
   static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
     const { appName } = options;
@@ -78,17 +80,36 @@ export class IdentityKitWeb {
       vdrOptions: { network, rpcUrl },
     });
 
-    // Use provided KeyManager if specified, otherwise take from env
-    const keyManager = options.keyManager || env.keyManager;
+    // Use KeyManager from the bootstrapped environment
+    const keyManager = env.keyManager;
 
-    // Create or use provided DeepLinkManager
-    const deepLinkManager =
-      options.deepLinkManager ||
-      new DeepLinkManager({
-        keyManager,
-      });
+    // Create DeepLinkManager with the KeyManager
+    const deepLinkManager = new DeepLinkManager({
+      keyManager,
+    });
 
-    return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, appName);
+    return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, env, appName);
+  }
+
+  /**
+   * Advanced factory method for users who need to provide custom components
+   */
+  static async create(options: {
+    keyManager: KeyManager;
+    deepLinkManager?: DeepLinkManager;
+    identityEnv: IdentityEnv;
+    cadopDomain?: string;
+    appName?: string;
+  }): Promise<IdentityKitWeb> {
+    const { keyManager, identityEnv, appName } = options;
+    const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
+    
+    // Create DeepLinkManager if not provided
+    const deepLinkManager = options.deepLinkManager || new DeepLinkManager({
+      keyManager,
+    });
+
+    return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, identityEnv, appName);
   }
 
   /**
@@ -168,10 +189,7 @@ export class IdentityKitWeb {
    * Logout (clear all keys)
    */
   async logout(): Promise<void> {
-    const store = this.keyManager['store']; // Accessing private field
-    if (store) {
-      await store.clear();
-    }
+    await this.keyManager.clear();
   }
 
   /**
@@ -202,6 +220,41 @@ export class IdentityKitWeb {
     }
 
     return `${base}-${Date.now()}`;
+  }
+
+  /**
+   * Get the KeyManager instance
+   */
+  getKeyManager(): KeyManager {
+    return this.keyManager;
+  }
+
+  /**
+   * Get the IdentityEnv instance
+   */
+  getIdentityEnv(): IdentityEnv {
+    return this.identityEnv;
+  }
+
+  /**
+   * Get the DeepLinkManager instance
+   */
+  getDeepLinkManager(): DeepLinkManager {
+    return this.deepLinkManager;
+  }
+
+  /**
+   * Get the Cadop domain
+   */
+  getCadopDomain(): string {
+    return this.cadopDomain;
+  }
+
+  /**
+   * Get the app name
+   */
+  getAppName(): string | undefined {
+    return this.appName;
   }
 
   /**
