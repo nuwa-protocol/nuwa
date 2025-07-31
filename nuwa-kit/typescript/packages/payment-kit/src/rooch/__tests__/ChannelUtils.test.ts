@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { deriveFieldKeyFromString } from '../../core/ChannelUtils';
+import { deriveFieldKeyFromString } from '../ChannelUtils';
 
 
 describe('ChannelUtils', () => {

@@ -7,7 +7,7 @@ import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClien
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
 import { MemoryChannelRepository } from '../../storage';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
-import { deriveChannelId } from '../../core/ChannelUtils';
+import { deriveChannelId } from '../../rooch/ChannelUtils';
 import type { StrategyConfig } from '../../billing/types';
 import type { RateProvider } from '../../billing/rate/types';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';

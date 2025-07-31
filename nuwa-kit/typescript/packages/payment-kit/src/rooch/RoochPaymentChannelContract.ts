@@ -61,7 +61,7 @@ import {
   SubChannel,
   DynamicField,
   CoinStoreFieldData,
-} from '../core/ChannelUtils';
+} from './ChannelUtils';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
 
 export interface RoochContractOptions {
@@ -995,44 +995,4 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     return parts[parts.length - 1] || 'UNKNOWN';
   }
 
-
-
-  /**
-   * Parse asset ID string to StructTag
-   * @param assetId Asset ID string (e.g., "0x3::gas_coin::RGas" or "3::gas_coin::RGas")
-   * @returns Parsed StructTag object
-   */
-  private parseAssetIdToStructTag(assetId: string): any {
-    try {
-      // Use Rooch SDK's built-in parser with address normalization
-      const typeTag = Serializer.typeTagParseFromStr(assetId, true);
-      
-      // Ensure it's a struct type (not a primitive type)
-      if (!('struct' in typeTag)) {
-        throw new Error(`Asset ID must be a struct type, got: ${assetId}`);
-      }
-      
-      return typeTag.struct;
-    } catch (error) {
-      this.logger.error('Error parsing asset ID to struct tag:', error);
-      throw new Error(`Failed to parse asset ID: ${assetId}`);
-    }
-  }
-
-
-
-  /**
-   * Convert StructTag to canonical string representation
-   * @param structTag StructTag object
-   * @returns Canonical string representation
-   */
-  private structTagToCanonicalString(structTag: any): string {
-    try {
-      return Serializer.structTagToCanonicalString(structTag);
-    } catch (error) {
-      throw new Error(`Failed to convert struct tag to canonical string: ${error}`);
-    }
-  }
-
-  // deriveFieldKeyFromString and parseDynamicFieldSubChannel methods moved to ChannelUtils
 } 
