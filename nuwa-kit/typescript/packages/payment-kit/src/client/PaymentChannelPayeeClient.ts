@@ -135,6 +135,38 @@ export class PaymentChannelPayeeClient {
     this.ravManager = new SubRAVManager();
   }
 
+  // -------- Public accessors for internal components --------
+
+  /**
+   * Get the RAV repository used by this client
+   * This is needed for ClaimScheduler to access the same RAV data
+   */
+  getRAVRepository(): RAVRepository {
+    return this.ravRepo;
+  }
+
+  /**
+   * Get the contract instance used by this client
+   * This is needed for ClaimScheduler to perform claims
+   */
+  getContract(): IPaymentChannelContract {
+    return this.contract;
+  }
+
+  /**
+   * Get the channel repository used by this client
+   */
+  getChannelRepository(): ChannelRepository {
+    return this.channelRepo;
+  }
+
+  /**
+   * Get the pending SubRAV repository used by this client
+   */
+  getPendingSubRAVRepository(): PendingSubRAVRepository {
+    return this.pendingSubRAVRepo;
+  }
+
   // -------- SubRAV Generation (for API services) --------
 
   /**

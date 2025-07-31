@@ -184,7 +184,7 @@ export class PaymentChannelHttpClient {
     defaultAssetId: string;
     defaultPricePicoUSD?: string;
   }> {
-    const infoUrl = new URL('/info', this.options.baseUrl).toString();
+    const infoUrl = new URL('/payment-channel/info', this.options.baseUrl).toString();
     
     try {
       const response = await this.fetchImpl(infoUrl, {
@@ -224,7 +224,7 @@ export class PaymentChannelHttpClient {
     source: string;
     lastUpdated?: string;
   }> {
-    const priceUrl = new URL('/price', this.options.baseUrl).toString();
+    const priceUrl = new URL('/payment-channel/price', this.options.baseUrl).toString();
     
     try {
       const response = await this.fetchImpl(priceUrl, {
@@ -257,7 +257,7 @@ export class PaymentChannelHttpClient {
     pendingSubRav: SubRAV | null;
     timestamp: string;
   }> {
-    const recoveryUrl = new URL('/recovery', this.options.baseUrl).toString();
+    const recoveryUrl = new URL('/payment-channel/recovery', this.options.baseUrl).toString();
     
     try {
       // Generate DID auth header for authentication
@@ -317,7 +317,7 @@ export class PaymentChannelHttpClient {
    * Commit a signed SubRAV to the service
    */
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: boolean }> {
-    const commitUrl = new URL('/commit', this.options.baseUrl).toString();
+    const commitUrl = new URL('/payment-channel/commit', this.options.baseUrl).toString();
     
     try {
       // Generate DID auth header for authentication
