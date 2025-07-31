@@ -2,13 +2,13 @@ import type {
   HttpPayerOptions, 
   FetchLike, 
   HttpClientState,
+  PersistedHttpClientState,
   PaymentRequestContext,
   HostChannelMappingStore 
 } from './types';
 import type { SubRAV, SignedSubRAV } from '../../core/types';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
 import { PaymentChannelFactory } from '../../factory/chainFactory';
-import { SubRAVCache } from './internal/SubRAVCache';
 import { DidAuthHelper } from './internal/DidAuthHelper';
 import { HttpPaymentCodec } from './internal/codec';
 import { 
@@ -43,7 +43,6 @@ export class PaymentChannelHttpClient {
   private options: HttpPayerOptions;
   private fetchImpl: FetchLike;
   private mappingStore: HostChannelMappingStore;
-  private subRAVCache: SubRAVCache;
   private host: string;
   private state: ClientState = ClientState.INIT;
   private clientState: HttpClientState;
@@ -52,7 +51,6 @@ export class PaymentChannelHttpClient {
     this.options = options;
     this.fetchImpl = options.fetchImpl || ((globalThis as any).fetch?.bind(globalThis));
     this.mappingStore = options.mappingStore || createDefaultMappingStore();
-    this.subRAVCache = new SubRAVCache();
     this.host = extractHost(options.baseUrl);
     
     if (!this.fetchImpl) {
@@ -158,14 +156,15 @@ export class PaymentChannelHttpClient {
    * Get the currently cached pending SubRAV
    */
   getPendingSubRAV(): SubRAV | null {
-    return this.subRAVCache.getPending();
+    return this.clientState.pendingSubRAV || null;
   }
 
   /**
    * Clear the pending SubRAV cache
    */
   clearPendingSubRAV(): void {
-    this.subRAVCache.clear();
+    this.clientState.pendingSubRAV = undefined;
+    this.persistClientState();
   }
 
   /**
@@ -292,7 +291,7 @@ export class PaymentChannelHttpClient {
       
       // If there's a pending SubRAV, cache it
       if (recoveryData.pendingSubRav) {
-        this.subRAVCache.setPending(recoveryData.pendingSubRav);
+        this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
         this.log('Recovered and cached pending SubRAV:', recoveryData.pendingSubRav.nonce);
       }
 
@@ -301,6 +300,9 @@ export class PaymentChannelHttpClient {
         this.clientState.channelId = recoveryData.channel.channelId;
         this.log('Recovered channel state:', recoveryData.channel.channelId);
       }
+
+      // Persist the recovered state
+      this.persistClientState();
 
       this.log('Recovery completed successfully');
       return recoveryData;
@@ -368,7 +370,13 @@ export class PaymentChannelHttpClient {
       return;
     }
 
-    await this.initializeChannel();
+    // Try to load persisted state first
+    await this.loadPersistedState();
+
+    // If we still don't have a ready channel, initialize it
+    if (this.state !== ClientState.READY || !this.clientState.channelId) {
+      await this.initializeChannel();
+    }
   }
 
   /**
@@ -396,14 +404,21 @@ export class PaymentChannelHttpClient {
             this.clientState.channelId = channelId;
             this.state = ClientState.HANDSHAKE;
             this.log('Using existing active channel:', channelId);
+            await this.persistClientState();
             return;
           } else {
             this.log('Channel is not active, removing from store:', channelId, channelInfo.status);
             await this.mappingStore.delete(this.host);
+            if (this.mappingStore.deleteState) {
+              await this.mappingStore.deleteState(this.host);
+            }
           }
         } catch (error) {
           this.log('Channel verification failed, removing from store:', error);
           await this.mappingStore.delete(this.host);
+          if (this.mappingStore.deleteState) {
+            await this.mappingStore.deleteState(this.host);
+          }
         }
       }
 
@@ -448,11 +463,14 @@ export class PaymentChannelHttpClient {
 
       this.clientState.channelId = channelInfo.channelId;
       
-      // Store the mapping
+      // Store the mapping (legacy compatibility)
       await this.mappingStore.set(this.host, channelInfo.channelId);
       
       this.state = ClientState.HANDSHAKE;
       this.log('Created new channel:', channelInfo.channelId);
+
+      // Persist the new state
+      await this.persistClientState();
       
     } catch (error) {
       this.handleError('Failed to initialize channel', error);
@@ -519,9 +537,10 @@ export class PaymentChannelHttpClient {
     try {
       let signedSubRAV: SignedSubRAV;
 
-      if (this.subRAVCache.hasPending()) {
+      if (this.clientState.pendingSubRAV) {
         // Sign the pending SubRAV
-        const pendingSubRAV = this.subRAVCache.takePending()!;
+        const pendingSubRAV = this.clientState.pendingSubRAV;
+        this.clientState.pendingSubRAV = undefined; // Clear after taking
         
         // Check amount limit if configured
         if (this.options.maxAmount && pendingSubRAV.accumulatedAmount > this.options.maxAmount) {
@@ -610,8 +629,9 @@ export class PaymentChannelHttpClient {
         
         if (responsePayload.subRav) {
           // Cache the unsigned SubRAV for the next request
-          this.subRAVCache.setPending(responsePayload.subRav);
+          this.clientState.pendingSubRAV = responsePayload.subRav;
           this.log('Cached new unsigned SubRAV:', responsePayload.subRav.nonce);
+          await this.persistClientState();
         }
         
         if (responsePayload.serviceTxRef) {
@@ -625,15 +645,17 @@ export class PaymentChannelHttpClient {
     // Handle payment-related status codes
     if (response.status === 402) {
       this.log('Payment required (402) - clearing cache and retrying');
-      this.subRAVCache.clear();
+      this.clientState.pendingSubRAV = undefined;
+      await this.persistClientState();
       throw new Error('Payment required - insufficient balance or invalid proposal');
     }
     
     if (response.status === 409) {
       this.log('SubRAV conflict (409) - resetting handshake');
-      this.subRAVCache.clear();
+      this.clientState.pendingSubRAV = undefined;
       this.clientState.isHandshakeComplete = false;
       this.state = ClientState.HANDSHAKE;
+      await this.persistClientState();
       throw new Error('SubRAV conflict - need to re-handshake');
     }
 
@@ -642,6 +664,7 @@ export class PaymentChannelHttpClient {
       this.clientState.isHandshakeComplete = true;
       this.state = ClientState.READY;
       this.log('Handshake completed successfully');
+      await this.persistClientState();
     }
   }
 
@@ -677,6 +700,73 @@ export class PaymentChannelHttpClient {
     
     if (this.options.debug) {
       console.error('PaymentChannelHttpClient error:', errorMessage);
+    }
+  }
+
+  /**
+   * Load persisted client state from storage
+   */
+  private async loadPersistedState(): Promise<void> {
+    if (!this.mappingStore.getState) {
+      // Fallback to legacy method for backward compatibility
+      const channelId = await this.mappingStore.get(this.host);
+      if (channelId) {
+        this.clientState.channelId = channelId;
+        this.state = ClientState.HANDSHAKE;
+        this.log('Loaded channelId from legacy storage:', channelId);
+      }
+      return;
+    }
+
+    try {
+      const persistedState = await this.mappingStore.getState(this.host);
+      if (persistedState) {
+        this.clientState.channelId = persistedState.channelId;
+        this.clientState.pendingSubRAV = persistedState.pendingSubRAV;
+        this.clientState.isHandshakeComplete = persistedState.isHandshakeComplete;
+        
+        // Set appropriate state based on persisted data
+        if (persistedState.isHandshakeComplete && persistedState.channelId) {
+          this.state = ClientState.READY;
+        } else if (persistedState.channelId) {
+          this.state = ClientState.HANDSHAKE;
+        }
+        
+        this.log('Loaded persisted client state:', {
+          channelId: persistedState.channelId,
+          hasPendingSubRAV: !!persistedState.pendingSubRAV,
+          isHandshakeComplete: persistedState.isHandshakeComplete
+        });
+      }
+    } catch (error) {
+      this.log('Failed to load persisted state:', error);
+    }
+  }
+
+  /**
+   * Persist current client state to storage
+   */
+  private async persistClientState(): Promise<void> {
+    if (!this.mappingStore.setState) {
+      // Fallback to legacy method for backward compatibility
+      if (this.clientState.channelId) {
+        await this.mappingStore.set(this.host, this.clientState.channelId);
+      }
+      return;
+    }
+
+    try {
+      const stateToStore: PersistedHttpClientState = {
+        channelId: this.clientState.channelId,
+        pendingSubRAV: this.clientState.pendingSubRAV,
+        isHandshakeComplete: this.clientState.isHandshakeComplete,
+        lastUpdated: new Date().toISOString()
+      };
+
+      await this.mappingStore.setState(this.host, stateToStore);
+      this.log('Persisted client state');
+    } catch (error) {
+      this.log('Failed to persist client state:', error);
     }
   }
 

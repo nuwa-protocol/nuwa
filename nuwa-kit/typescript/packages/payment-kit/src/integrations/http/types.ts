@@ -68,12 +68,29 @@ export interface HttpPayerOptions {
 }
 
 /**
- * Host to ChannelId mapping repository
+ * Extended client state for persistence
+ */
+export interface PersistedHttpClientState {
+  channelId?: string;
+  pendingSubRAV?: SubRAV;
+  isHandshakeComplete: boolean;
+  lastUpdated?: string; // ISO timestamp
+}
+
+/**
+ * Host to client state mapping repository
+ * Extended to support full client state persistence
  */
 export interface HostChannelMappingStore {
+  // Legacy methods for backward compatibility
   get(host: string): Promise<string | undefined>;
   set(host: string, channelId: string): Promise<void>;
   delete(host: string): Promise<void>;
+  
+  // New methods for full state management
+  getState?(host: string): Promise<PersistedHttpClientState | undefined>;
+  setState?(host: string, state: PersistedHttpClientState): Promise<void>;
+  deleteState?(host: string): Promise<void>;
 }
 
 /**

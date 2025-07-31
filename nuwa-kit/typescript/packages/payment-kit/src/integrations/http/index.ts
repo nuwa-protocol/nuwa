@@ -20,7 +20,6 @@ export {
 
 // Utilities
 export { DidAuthHelper } from './internal/DidAuthHelper';
-export { SubRAVCache } from './internal/SubRAVCache';
 
 // Factory functions (recommended: use createHttpClient with IdentityEnv)
 export { 

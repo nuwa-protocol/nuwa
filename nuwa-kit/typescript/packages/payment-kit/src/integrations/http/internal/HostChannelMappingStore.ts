@@ -1,4 +1,4 @@
-import type { HostChannelMappingStore } from '../types';
+import type { HostChannelMappingStore, PersistedHttpClientState } from '../types';
 
 /**
  * Memory-based implementation of HostChannelMappingStore
@@ -6,7 +6,9 @@ import type { HostChannelMappingStore } from '../types';
  */
 export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
   private store = new Map<string, string>();
+  private stateStore = new Map<string, PersistedHttpClientState>();
 
+  // Legacy methods for backward compatibility
   async get(host: string): Promise<string | undefined> {
     return this.store.get(host);
   }
@@ -17,13 +19,33 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
 
   async delete(host: string): Promise<void> {
     this.store.delete(host);
+    this.stateStore.delete(host);
+  }
+
+  // New methods for full state management
+  async getState(host: string): Promise<PersistedHttpClientState | undefined> {
+    return this.stateStore.get(host);
+  }
+
+  async setState(host: string, state: PersistedHttpClientState): Promise<void> {
+    this.stateStore.set(host, state);
+    // Keep legacy store in sync
+    if (state.channelId) {
+      this.store.set(host, state.channelId);
+    }
+  }
+
+  async deleteState(host: string): Promise<void> {
+    this.stateStore.delete(host);
+    this.store.delete(host);
   }
 
   /**
-   * Clear all stored mappings
+   * Clear all stored mappings and states
    */
   clear(): void {
     this.store.clear();
+    this.stateStore.clear();
   }
 }
 
@@ -32,14 +54,16 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
  * Provides persistence across browser sessions
  */
 export class LocalStorageHostChannelMappingStore implements HostChannelMappingStore {
-  private static readonly PREFIX = 'nuwa-payment-channel-mapping:';
+  private static readonly CHANNEL_PREFIX = 'nuwa-payment-channel-mapping:';
+  private static readonly STATE_PREFIX = 'nuwa-payment-client-state:';
 
+  // Legacy methods for backward compatibility
   async get(host: string): Promise<string | undefined> {
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
     
-    const key = LocalStorageHostChannelMappingStore.PREFIX + host;
+    const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     const value = localStorage.getItem(key);
     return value || undefined;
   }
@@ -49,7 +73,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       throw new Error('localStorage is not available');
     }
     
-    const key = LocalStorageHostChannelMappingStore.PREFIX + host;
+    const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     localStorage.setItem(key, channelId);
   }
 
@@ -58,12 +82,66 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       throw new Error('localStorage is not available');
     }
     
-    const key = LocalStorageHostChannelMappingStore.PREFIX + host;
-    localStorage.removeItem(key);
+    const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
+    const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
+    localStorage.removeItem(channelKey);
+    localStorage.removeItem(stateKey);
+  }
+
+  // New methods for full state management
+  async getState(host: string): Promise<PersistedHttpClientState | undefined> {
+    if (typeof localStorage === 'undefined') {
+      throw new Error('localStorage is not available');
+    }
+    
+    const key = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
+    const value = localStorage.getItem(key);
+    
+    if (!value) {
+      return undefined;
+    }
+    
+    try {
+      return JSON.parse(value) as PersistedHttpClientState;
+    } catch (error) {
+      console.warn('Failed to parse stored client state:', error);
+      return undefined;
+    }
+  }
+
+  async setState(host: string, state: PersistedHttpClientState): Promise<void> {
+    if (typeof localStorage === 'undefined') {
+      throw new Error('localStorage is not available');
+    }
+    
+    const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
+    const stateWithTimestamp = {
+      ...state,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    localStorage.setItem(stateKey, JSON.stringify(stateWithTimestamp));
+    
+    // Keep legacy store in sync
+    if (state.channelId) {
+      const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
+      localStorage.setItem(channelKey, state.channelId);
+    }
+  }
+
+  async deleteState(host: string): Promise<void> {
+    if (typeof localStorage === 'undefined') {
+      throw new Error('localStorage is not available');
+    }
+    
+    const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
+    const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
+    localStorage.removeItem(channelKey);
+    localStorage.removeItem(stateKey);
   }
 
   /**
-   * Clear all stored mappings
+   * Clear all stored mappings and states
    */
   async clear(): Promise<void> {
     if (typeof localStorage === 'undefined') {
@@ -73,7 +151,10 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(LocalStorageHostChannelMappingStore.PREFIX)) {
+      if (key && (
+        key.startsWith(LocalStorageHostChannelMappingStore.CHANNEL_PREFIX) ||
+        key.startsWith(LocalStorageHostChannelMappingStore.STATE_PREFIX)
+      )) {
         keysToRemove.push(key);
       }
     }
