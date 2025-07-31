@@ -60,6 +60,43 @@ Creates a custodian DID with CADOP service.
 #### createDidViaCadop()
 Creates a user DID via CADOP protocol using an existing custodian.
 
+## Payment Kit Integration
+
+TestEnv now includes a pre-configured `IdentityEnv` that can be used directly with Payment Kit:
+
+```ts
+import { TestEnv, createSelfDid } from '@nuwa-ai/identity-kit/testHelpers';
+import { createHttpClient } from '@nuwa-ai/payment-kit';
+
+describe('Payment Integration Test', () => {
+  test('should work with simplified API', async () => {
+    if (TestEnv.skipIfNoNode()) return;
+    
+    // Bootstrap test environment
+    const env = await TestEnv.bootstrap({
+      rpcUrl: 'http://localhost:6767',
+      network: 'local'
+    });
+    
+    // Create a test DID
+    const payer = await createSelfDid(env);
+    
+    // Configure IdentityEnv to use the payer's keys
+    env.configureIdentityEnvForDid(payer);
+    
+    // Create HTTP client with automatic service discovery
+    const client = await createHttpClient({
+      baseUrl: 'https://api.example.com',
+      env: env.identityEnv,  // Use TestEnv's IdentityEnv directly
+      maxAmount: BigInt('1000000000')
+    });
+    
+    // Make paid API calls
+    const result = await client.get('/v1/echo?q=hello');
+  });
+});
+```
+
 ## Environment Variables
 
 - `ROOCH_NODE_URL`: RPC endpoint for Rooch node (defaults to `http://localhost:6767`)

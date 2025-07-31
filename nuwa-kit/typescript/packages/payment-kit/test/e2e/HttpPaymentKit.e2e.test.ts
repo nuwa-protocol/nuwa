@@ -3,19 +3,18 @@
  * 
  * This test suite tests the complete HTTP payment workflow against a real Rooch node:
  * 1. Uses real blockchain connection and payment channels
- * 2. Tests the deferred payment model with HTTP middleware
- * 3. Covers the complete API billing scenario
- * 4. Tests multi-request payment sequences
+ * 2. Tests the simplified createHttpClient API with automatic service discovery
+ * 3. Tests the deferred payment model with HTTP middleware
+ * 4. Covers the complete API billing scenario
+ * 5. Tests multi-request payment sequences
  */
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { PaymentChannelHttpClient } from '../../src/integrations/http';
-import { createHttpClientFromEnv } from '../../src/integrations/http/fromIdentityEnv';
+import { PaymentChannelHttpClient, createHttpClient } from '../../src/integrations/http';
 import { PaymentChannelFactory } from '../../src/factory/chainFactory';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import type { AssetInfo } from '../../src/core/types';
-import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-kit/testHelpers';
-import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
+import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
 
 // Check if we should run E2E tests
@@ -47,7 +46,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: false, // Reduce debug noise
     });
 
-    // Create test identities
+    // Create test identities first
     payer = await createSelfDid(env, {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
       skipFunding: false
@@ -57,6 +56,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
       skipFunding: false
     });
+
+    // Configure the TestEnv's IdentityEnv to use the payer's keys
+    // This allows us to use env.identityEnv directly with createHttpClient
+    env.configureIdentityEnvForDid(payer);
 
     // Define test asset
     testAsset = {
@@ -71,7 +74,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       Node URL: ${env.rpcUrl}
     `);
 
-    // Start billing server using fromIdentityEnv integration
+    // Start billing server
     billingServerInstance = await createBillingServer({
       signer: payee.keyManager,
       did: payee.did,
@@ -84,26 +87,16 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: false
     });
 
-    // Create HTTP client - it will automatically handle channel creation and funding
-    httpClient = new PaymentChannelHttpClient({
+    // Create HTTP client using the new simplified API with automatic service discovery
+    httpClient = await createHttpClient({
       baseUrl: billingServerInstance.baseURL,
-      chainConfig: {
-        chain: 'rooch',
-        rpcUrl: env.rpcUrl,
-        network: 'local'
-      },
-      signer: payer.keyManager,
-      keyId: `${payer.did}#${payer.vmIdFragment}`,
-      payerDid: payer.did,
-      payeeDid: payee.did, // Specify the payee for channel creation
-      defaultAssetId: testAsset.assetId,
-      hubFundAmount: BigInt('1000000000'), // 10 RGas
-      channelCollateral: BigInt('100000000'), // 1 RGas
+      env: env.identityEnv, // Use the TestEnv's IdentityEnv (now configured with payer's keys)
       maxAmount: BigInt('500000000'), // 5 RGas
       debug: true
     });
 
     console.log(`✅ Billing server started on ${billingServerInstance.baseURL}`);
+    console.log(`✅ HTTP client created using simplified createHttpClient API with automatic service discovery`);
   }, 180000); // 3 minutes timeout for setup
 
   afterAll(async () => {
@@ -136,6 +129,39 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     return DIDAuth.v1.toAuthorizationHeader(signedObject);
   }
+
+  test('Service discovery with createHttpClient', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔍 Testing service discovery with simplified API');
+
+    // Test that service discovery works
+    const serviceInfo = await httpClient.discoverService();
+    expect(serviceInfo.serviceDid).toBe(payee.did);
+    expect(serviceInfo.serviceId).toBe('e2e-test-service');
+    expect(serviceInfo.defaultAssetId).toBe(testAsset.assetId);
+    expect(serviceInfo.network).toBe('local');
+
+    console.log('✅ Service discovery successful:', {
+      serviceDid: serviceInfo.serviceDid,
+      serviceId: serviceInfo.serviceId,
+      network: serviceInfo.network
+    });
+
+    // Test asset price discovery
+    const priceInfo = await httpClient.getAssetPrice(testAsset.assetId);
+    expect(priceInfo.assetId).toBe(testAsset.assetId);
+    expect(priceInfo.pricePicoUSD).toBeTruthy();
+    expect(priceInfo.priceUSD).toBeTruthy();
+
+    console.log('✅ Asset price discovery successful:', {
+      asset: priceInfo.assetId,
+      priceUSD: priceInfo.priceUSD,
+      source: priceInfo.source
+    });
+
+    console.log('🎉 Service discovery test successful!');
+  }, 60000);
 
   test('Complete HTTP deferred payment flow', async () => {
     if (!shouldRunE2ETests()) return;
@@ -312,5 +338,43 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('✅ Channel state sync completed');
 
     console.log('🎉 Channel state consistency test successful!');
+  }, 60000);
+
+  test('Recovery functionality with createHttpClient', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔄 Testing recovery functionality with simplified API');
+
+    // Make a few requests to create some state
+    await httpClient.get('/v1/echo?q=recovery%20test%201');
+    await httpClient.get('/v1/echo?q=recovery%20test%202');
+
+    // Test recovery functionality
+    const recoveryData = await httpClient.recoverFromService();
+    
+    expect(recoveryData.channel).toBeTruthy();
+    expect(recoveryData.channel.channelId).toBe(httpClient.getChannelId());
+    expect(recoveryData.timestamp).toBeTruthy();
+
+    console.log('✅ Recovery data retrieved:', {
+      channelId: recoveryData.channel?.channelId,
+      pendingSubRav: recoveryData.pendingSubRav ? {
+        nonce: recoveryData.pendingSubRav.nonce.toString(),
+        amount: recoveryData.pendingSubRav.accumulatedAmount.toString()
+      } : null,
+      timestamp: recoveryData.timestamp
+    });
+
+    // Test that pending SubRAV was properly cached from recovery
+    if (recoveryData.pendingSubRav) {
+      const cachedPending = httpClient.getPendingSubRAV();
+      expect(cachedPending).toBeTruthy();
+      expect(cachedPending!.nonce).toBe(recoveryData.pendingSubRav.nonce);
+      expect(cachedPending!.accumulatedAmount).toBe(recoveryData.pendingSubRav.accumulatedAmount);
+      
+      console.log('✅ Pending SubRAV properly cached from recovery');
+    }
+
+    console.log('🎉 Recovery functionality test successful!');
   }, 60000);
 }); 

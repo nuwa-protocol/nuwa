@@ -13,42 +13,113 @@ PaymentChannelHttpClient 提供了一套 **Payer 侧的 HTTP 高级封装**，�
 
 ## 快速开始
 
-```typescript
-import { PaymentChannelHttpClient } from '@nuwa-kit/payment-kit';
+### 推荐方式：使用 IdentityEnv (最简单)
 
-const httpPayer = new PaymentChannelHttpClient({
-  baseUrl: 'https://api.llm-gateway.com',
-  chainConfig: { 
-    chain: 'rooch', 
-    rpcUrl: 'http://localhost:6767', 
-    network: 'local' 
-  },
-  signer: myKeyManager,
-  keyId: `${myDid}#key1`,
-  payerDid: myDid, // Optional: will be derived from signer if not provided
-  maxAmount: BigInt('50000000000'), // 0.5 USD
-  debug: true,
+```typescript
+import { bootstrapIdentityEnv, createHttpClient } from '@nuwa-ai/payment-kit';
+
+// 1. 设置身份环境 (整个应用只需一次)
+const env = await bootstrapIdentityEnv({
+  method: 'rooch',
+  vdrOptions: {
+    rpcUrl: 'https://testnet.rooch.network',
+    network: 'test'
+  }
 });
 
-// 简单的 GET 请求
-const result = await httpPayer.get('/v1/echo?q=hello');
+// 2. 创建支付客户端 (自动服务发现)
+const client = await createHttpClient({
+  baseUrl: 'https://api.llm-gateway.com',
+  env,
+  maxAmount: BigInt('500000000000'), // 50 cents USD
+});
 
-// POST 请求
-const response = await httpPayer.post('/v1/chat', {
+// 3. 开始使用！
+const result = await client.get('/v1/echo?q=hello');
+const response = await client.post('/v1/chat', {
   message: 'Hello, how are you?',
   model: 'gpt-3.5-turbo'
 });
 ```
 
+### 多服务使用
+
+```typescript
+// 一次创建多个服务的客户端
+const clients = await createMultipleHttpClients(env, [
+  { 
+    name: 'llm', 
+    baseUrl: 'https://api.llm-gateway.com', 
+    maxAmount: BigInt('500000000000') // 50 cents
+  },
+  { 
+    name: 'storage', 
+    baseUrl: 'https://api.storage.com', 
+    maxAmount: BigInt('100000000000') // 10 cents
+  }
+]);
+
+// 使用不同的服务
+await clients.llm.post('/v1/chat', { message: 'hello' });
+await clients.storage.post('/v1/upload', fileData);
+```
+
+### 高级配置 (不推荐)
+
+```typescript
+import { createHttpPayerClientWithDiscovery } from '@nuwa-kit/payment-kit';
+
+// 手动配置所有参数 (繁琐，不推荐)
+const client = await createHttpPayerClientWithDiscovery({
+  baseUrl: 'https://api.llm-gateway.com',
+  signer: myKeyManager,
+  rpcUrl: 'https://testnet.rooch.network',
+  network: 'test',
+  maxAmount: BigInt('500000000000'),
+  debug: true,
+});
+```
+
 ## API 文档
 
-### 构造函数
+### 主要工厂函数
+
+#### `createHttpClient` (推荐)
+
+```typescript
+async function createHttpClient(options: CreateHttpClientOptions): Promise<PaymentChannelHttpClient>
+```
+
+##### CreateHttpClientOptions
+
+| 参数 | 类型 | 必需 | 描述 |
+|-----|------|------|------|
+| `baseUrl` | `string` | ✅ | 目标服务根地址 |
+| `env` | `IdentityEnv` | ✅ | 预配置的身份环境 (包含 VDR 注册表、KeyManager 和链配置) |
+| `maxAmount` | `bigint` | ❌ | 每次请求的最大金额 (默认: 50 cents USD) |
+| `debug` | `boolean` | ❌ | 调试模式 (默认继承自 IdentityEnv) |
+| `onError` | `(err: unknown) => void` | ❌ | 自定义错误处理器 |
+| `fetchImpl` | `FetchLike` | ❌ | 自定义 fetch 实现 |
+| `mappingStore` | `HostChannelMappingStore` | ❌ | 主机到频道映射存储 |
+
+#### `createMultipleHttpClients` (多服务)
+
+```typescript
+async function createMultipleHttpClients<T extends string>(
+  env: IdentityEnv,
+  services: Array<{ name: T; baseUrl: string; maxAmount?: bigint; debug?: boolean }>
+): Promise<Record<T, PaymentChannelHttpClient>>
+```
+
+### 高级构造函数
+
+#### PaymentChannelHttpClient
 
 ```typescript
 new PaymentChannelHttpClient(options: HttpPayerOptions)
 ```
 
-#### HttpPayerOptions
+##### HttpPayerOptions
 
 | 参数 | 类型 | 必需 | 描述 |
 |-----|------|------|------|
@@ -204,13 +275,43 @@ if (channelId) {
 }
 ```
 
+### 服务发现和恢复功能
+
+```typescript
+// 手动发现服务信息
+const serviceInfo = await client.discoverService();
+console.log('Service DID:', serviceInfo.serviceDid);
+console.log('Default asset:', serviceInfo.defaultAssetId);
+
+// 获取资产价格
+const priceInfo = await client.getAssetPrice('0x3::gas_coin::RGas');
+console.log('Current price:', priceInfo.priceUSD, 'USD');
+
+// 从服务恢复频道状态和待处理的 SubRAV
+const recoveryData = await client.recoverFromService();
+if (recoveryData.channel) {
+  console.log('Recovered channel:', recoveryData.channel.channelId);
+}
+if (recoveryData.pendingSubRav) {
+  console.log('Recovered pending SubRAV:', recoveryData.pendingSubRav.nonce);
+}
+
+// 手动提交已签名的 SubRAV
+const signedSubRAV = /* 获取已签名的 SubRAV */;
+const result = await client.commitSubRAV(signedSubRAV);
+console.log('SubRAV committed:', result.success);
+```
+
 ## 最佳实践
 
-1. **配置合理的 `maxAmount`**：防止意外的高额支付
-2. **启用 debug 模式**：开发时便于排查问题
-3. **处理网络错误**：使用 try-catch 包装请求
-4. **复用客户端实例**：避免重复创建通道
-5. **监控支付状态**：定期检查 pending SubRAV
+1. **使用 IdentityEnv 方式**：推荐使用 `createHttpClient` 配合 `bootstrapIdentityEnv`，最简单且功能完整
+2. **一次设置，处处使用**：在应用启动时配置一次 `IdentityEnv`，然后在各处复用
+3. **合理设置 `maxAmount`**：根据服务类型设置合适的金额上限，防止意外消费
+4. **多服务统一管理**：使用 `createMultipleHttpClients` 统一管理多个付费服务
+5. **启用调试模式**：开发时在 `bootstrapIdentityEnv` 中启用 debug，无需到处配置
+6. **错误处理**：使用 try-catch 包装请求，处理网络和支付错误
+7. **复用客户端实例**：避免重复创建，每个服务创建一次即可
+8. **利用恢复功能**：应用重启后自动恢复频道状态，无需手动处理
 
 ## 与现有组件的关系
 

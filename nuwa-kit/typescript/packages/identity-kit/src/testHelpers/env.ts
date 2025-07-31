@@ -4,6 +4,7 @@ import { VDRRegistry } from '../vdr/VDRRegistry';
 import { RoochVDR } from '../vdr/roochVDR';
 import { KeyManager } from '../keys/KeyManager';
 import { MemoryKeyStore } from '../keys/KeyStore';
+import { IdentityEnv } from '../IdentityEnv';
 import { 
   TestEnvOptions, 
   EnvironmentCheck, 
@@ -14,6 +15,11 @@ import {
 
 /**
  * Test environment for Rooch DID integration testing
+ * 
+ * Provides a pre-configured environment with:
+ * - Rooch client and VDR registry
+ * - IdentityEnv for simplified payment kit integration
+ * - Helper methods for configuring test identities
  */
 export class TestEnv {
   private static instance?: TestEnv;
@@ -24,6 +30,7 @@ export class TestEnv {
   public readonly client: RoochClient;
   public readonly vdrRegistry: VDRRegistry;
   public readonly roochVDR: RoochVDR;
+  public readonly identityEnv: IdentityEnv;
 
   private constructor(options: Required<TestEnvOptions>) {
     this.logger = DebugLogger.get('TestEnv');
@@ -46,6 +53,10 @@ export class TestEnv {
       this.vdrRegistry.registerVDR(this.roochVDR);
     }
 
+    // Create IdentityEnv with a memory key store for testing
+    const keyManager = new KeyManager({ store: new MemoryKeyStore() });
+    this.identityEnv = new IdentityEnv(this.vdrRegistry, keyManager);
+
     if (options.debug) {
       this.logger.debug('TestEnv initialized', {
         rpcUrl: this.rpcUrl,
@@ -67,6 +78,21 @@ export class TestEnv {
     }
     
     return new TestEnv(resolvedOptions);
+  }
+
+  /**
+   * Configure the IdentityEnv to use a specific DID's KeyManager
+   * This is useful for testing when you want the IdentityEnv to use
+   * keys from a specific test identity
+   */
+  configureIdentityEnvForDid(didResult: CreateSelfDidResult): void {
+    // Set the DID in the IdentityEnv's KeyManager
+    this.identityEnv.keyManager.setDid(didResult.did);
+    
+    // In a real scenario, we'd import the keys, but for testing
+    // we can use the didResult's keyManager directly by replacing
+    // the IdentityEnv's keyManager
+    (this.identityEnv as any).keyManager = didResult.keyManager;
   }
 
   /**

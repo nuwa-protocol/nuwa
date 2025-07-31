@@ -22,12 +22,17 @@ export {
 export { DidAuthHelper } from './internal/DidAuthHelper';
 export { SubRAVCache } from './internal/SubRAVCache';
 
-// Factory functions
+// Factory functions (recommended: use createHttpClient with IdentityEnv)
 export { 
+  createHttpClient,
+  createMultipleHttpClients,
   createHttpPayerClient, 
+  createHttpPayerClientWithDiscovery,
   createMultipleHttpPayerClients 
 } from './factory';
-export type { CreateHttpPayerClientOptions } from './factory';
+export type { 
+  CreateHttpClientOptions,
+  CreateHttpPayerClientOptions 
+} from './factory';
 
-// IdentityEnv integration
-export { createHttpClientFromEnv } from './fromIdentityEnv';
+// Note: createHttpClientFromEnv has been replaced by createHttpClient

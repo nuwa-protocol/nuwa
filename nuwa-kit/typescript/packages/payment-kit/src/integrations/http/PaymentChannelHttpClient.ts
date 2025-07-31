@@ -175,6 +175,189 @@ export class PaymentChannelHttpClient {
     return this.clientState.channelId;
   }
 
+  /**
+   * Discover service information and get service DID
+   */
+  async discoverService(): Promise<{
+    serviceId: string;
+    serviceDid: string;
+    network: string;
+    defaultAssetId: string;
+    defaultPricePicoUSD?: string;
+  }> {
+    const infoUrl = new URL('/info', this.options.baseUrl).toString();
+    
+    try {
+      const response = await this.fetchImpl(infoUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to discover service info: HTTP ${response.status}`);
+      }
+
+      const serviceInfo = await response.json();
+      
+      if (!serviceInfo.serviceDid) {
+        throw new Error('Service discovery response missing serviceDid');
+      }
+
+      this.log('Service discovery successful:', serviceInfo);
+      return serviceInfo;
+    } catch (error) {
+      const errorMessage = `Service discovery failed: ${error instanceof Error ? error.message : String(error)}`;
+      this.log(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Get asset price from service
+   */
+  async getAssetPrice(assetId: string): Promise<{
+    assetId: string;
+    priceUSD: string;
+    pricePicoUSD: string;
+    timestamp: string;
+    source: string;
+    lastUpdated?: string;
+  }> {
+    const priceUrl = new URL('/price', this.options.baseUrl).toString();
+    
+    try {
+      const response = await this.fetchImpl(priceUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get asset price: HTTP ${response.status}`);
+      }
+
+      const priceInfo = await response.json();
+      this.log('Asset price retrieved:', priceInfo);
+      return priceInfo;
+    } catch (error) {
+      const errorMessage = `Asset price query failed: ${error instanceof Error ? error.message : String(error)}`;
+      this.log(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Recover channel state and pending SubRAV from service
+   * This requires DID authentication
+   */
+  async recoverFromService(): Promise<{
+    channel: any | null;
+    pendingSubRav: SubRAV | null;
+    timestamp: string;
+  }> {
+    const recoveryUrl = new URL('/recovery', this.options.baseUrl).toString();
+    
+    try {
+      // Generate DID auth header for authentication
+      const payerDid = this.options.payerDid || await this.options.signer.getDid();
+      const authHeader = await DidAuthHelper.generateAuthHeader(
+        payerDid,
+        this.options.signer,
+        recoveryUrl,
+        'GET',
+        this.options.keyId
+      );
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      };
+      
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
+      const response = await this.fetchImpl(recoveryUrl, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to recover from service: HTTP ${response.status}`);
+      }
+
+      const recoveryData = await response.json();
+      
+      // If there's a pending SubRAV, cache it
+      if (recoveryData.pendingSubRav) {
+        this.subRAVCache.setPending(recoveryData.pendingSubRav);
+        this.log('Recovered and cached pending SubRAV:', recoveryData.pendingSubRav.nonce);
+      }
+
+      // If there's channel info, update our state
+      if (recoveryData.channel) {
+        this.clientState.channelId = recoveryData.channel.channelId;
+        this.log('Recovered channel state:', recoveryData.channel.channelId);
+      }
+
+      this.log('Recovery completed successfully');
+      return recoveryData;
+    } catch (error) {
+      const errorMessage = `Recovery failed: ${error instanceof Error ? error.message : String(error)}`;
+      this.log(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Commit a signed SubRAV to the service
+   */
+  async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: boolean }> {
+    const commitUrl = new URL('/commit', this.options.baseUrl).toString();
+    
+    try {
+      // Generate DID auth header for authentication
+      const payerDid = this.options.payerDid || await this.options.signer.getDid();
+      const authHeader = await DidAuthHelper.generateAuthHeader(
+        payerDid,
+        this.options.signer,
+        commitUrl,
+        'POST',
+        this.options.keyId
+      );
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      };
+      
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
+      const response = await this.fetchImpl(commitUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ subRav: signedSubRAV })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Failed to commit SubRAV: HTTP ${response.status} - ${errorBody}`);
+      }
+
+      const result = await response.json();
+      this.log('SubRAV committed successfully');
+      return result;
+    } catch (error) {
+      const errorMessage = `SubRAV commit failed: ${error instanceof Error ? error.message : String(error)}`;
+      this.log(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }
+
   // -------- Private Methods --------
 
   /**
@@ -243,9 +426,19 @@ export class PaymentChannelHttpClient {
         // Continue anyway - the hub might already have sufficient funds
       }
       
-      // Get payee DID from options or use a default approach
-      // In a real implementation, this should come from the service discovery
-      const payeeDid = this.options.payeeDid || await this.options.signer.getDid();
+      // Get payee DID from options or discover from service
+      let payeeDid = this.options.payeeDid;
+      
+      if (!payeeDid) {
+        try {
+          this.log('PayeeDid not provided, discovering from service...');
+          const serviceInfo = await this.discoverService();
+          payeeDid = serviceInfo.serviceDid;
+          this.log('Discovered payeeDid from service:', payeeDid);
+        } catch (error) {
+          throw new Error(`PayeeDid not provided and service discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
       
       const channelInfo = await this.payerClient.openChannelWithSubChannel({
         payeeDid,
