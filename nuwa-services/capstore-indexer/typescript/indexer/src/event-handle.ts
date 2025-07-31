@@ -1,6 +1,6 @@
 import axios from "axios";
 import yaml from "js-yaml";
-import { storeToSupabase } from './supabase.js';
+import {getLastCursor, saveCursor, storeToSupabase} from './supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
 import type { Cap } from "./type.js";
 import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "./constant.js";
@@ -42,10 +42,13 @@ export async function fetchAndParseYaml(cid: string): Promise<Cap> {
 export async function processRoochRegisterEvent() {
   try {
     const client = new RoochClient({url: ROOCH_NODE_URL});
+    const lastCursor = await getLastCursor();
     const events = await client.queryEvents({
       filter: {
         event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,
-      }
+      },
+      cursor: lastCursor || undefined,
+      limit: '1',
     });
 
     for (const event of events.data) {
@@ -64,6 +67,12 @@ export async function processRoochRegisterEvent() {
       } catch (innerError) {
         console.error(`Error processing event: ${(innerError as Error).message}`);
       }
+    }
+
+    if (events.next_cursor) {
+      await saveCursor(events.next_cursor);
+    } else {
+      console.log('No new cursor to save');
     }
 
     return events;

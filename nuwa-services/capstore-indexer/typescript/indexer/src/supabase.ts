@@ -1,9 +1,71 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Cap } from './type.js';
 import { config } from 'dotenv';
-import { SUPABASE_KEY, SUPABASE_URL } from './constant.js';
+import {PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL} from './constant.js';
+import {IndexerEventIDView} from "@roochnetwork/rooch-sdk";
 
 config();
+
+const CURSOR_TABLE_NAME = "rooch_cursor_state";
+
+function serializeCursor(cursor: IndexerEventIDView | null): string | null {
+  return cursor ? JSON.stringify(cursor) : null;
+}
+
+function deserializeCursor(cursorStr: string | null): IndexerEventIDView | null {
+  if (!cursorStr) return null;
+  try {
+    const parsed = JSON.parse(cursorStr) as IndexerEventIDView;
+
+    if (parsed?.event_index && parsed?.tx_order) {
+      return parsed;
+    }
+    throw new Error('Invalid cursor structure');
+  } catch (e) {
+    console.error('Cursor deserialization failed:', e);
+    return null;
+  }
+}
+
+export async function getLastCursor(): Promise<IndexerEventIDView | null> {
+  try {
+    const { data, error } = await supabase
+      .from(CURSOR_TABLE_NAME)
+      .select('cursor')
+      .eq('event_type', `${PACKAGE_ID}::acp_registry::RegisterEvent`)
+      .single();
+
+    if (error || !data || !data.cursor) {
+      console.warn('Cursor not found, starting from beginning:', error?.message);
+      return null;
+    }
+    return deserializeCursor(data.cursor);
+  } catch (e) {
+    console.error('Error fetching cursor:', e);
+    return null;
+  }
+}
+
+export async function saveCursor(cursor: IndexerEventIDView | null) {
+  try {
+    const cursorStr = serializeCursor(cursor);
+    const { error } = await supabase
+      .from(CURSOR_TABLE_NAME)
+      .upsert(
+        {
+          event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,
+          cursor: cursorStr,
+          last_updated: new Date()
+        },
+        { onConflict: 'event_type' }
+      );
+
+    if (error) throw error;
+    console.log(`Cursor saved: ${cursorStr}`);
+  } catch (e) {
+    console.error('Error saving cursor:', e);
+  }
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
