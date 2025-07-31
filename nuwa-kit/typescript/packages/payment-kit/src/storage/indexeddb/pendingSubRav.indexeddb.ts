@@ -111,7 +111,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
           resolve();
         }
       };
-      cursorRequest.onerror = () => reject(cursorRequest.error);
+      cursorRequest.onerror = () => reject(new Error(`Failed to iterate through pending SubRAVs for channel '${channelId}': ${cursorRequest.error?.message || 'Unknown error'}`));
     });
 
     return latestSubRAV;

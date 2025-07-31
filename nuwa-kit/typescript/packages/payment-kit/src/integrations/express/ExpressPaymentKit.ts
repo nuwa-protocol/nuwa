@@ -353,7 +353,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         const didInfo = (req as any).didInfo;
         if (!didInfo || !didInfo.did) {
           return res.status(401).json({ 
-            error: 'DID authentication required. Missing didInfo on request.' 
+            error: 'DID authentication required.' 
           });
         }
 
@@ -362,8 +362,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         if (!allowedDids.includes(signerDid)) {
           return res.status(403).json({ 
             error: 'Access denied. DID not authorized for admin operations.',
-            signerDid,
-            allowedDids 
+            signerDid
           });
         }
 
@@ -481,7 +480,7 @@ export async function createExpressPaymentKit(config: ExpressPaymentKitOptions):
   // Get service DID from signer
   const serviceDid = typeof (config.signer as any).getDid === 'function' 
     ? await (config.signer as any).getDid()
-    : (() => { throw new Error('Signer must implement getDid() method'); })();
+    : (() => { throw new Error('Signer must implement getDid() method to return the service DID'); })();
 
   // Set up blockchain connection
   const rpcUrl = config.rpcUrl;
