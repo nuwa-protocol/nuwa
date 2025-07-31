@@ -2,6 +2,7 @@ import { DIDDocument } from '../types/did';
 import { KeyManager } from '../keys/KeyManager';
 import { SignerInterface } from '../signers/types';
 import { KeyType } from '../types/crypto';
+import type { IdentityEnv } from '../IdentityEnv';
 
 /**
  * Options for bootstrapping test environment
@@ -31,6 +32,8 @@ export interface CreateSelfDidResult {
   keyManager: KeyManager;
   /** Signer interface for this DID */
   signer: SignerInterface;
+  /** Pre-configured IdentityEnv for this DID (convenient for Payment Kit integration) */
+  identityEnv: IdentityEnv;
 }
 
 /**

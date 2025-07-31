@@ -57,9 +57,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       skipFunding: false
     });
 
-    // Configure the TestEnv's IdentityEnv to use the payer's keys
-    // This allows us to use env.identityEnv directly with createHttpClient
-    env.configureIdentityEnvForDid(payer);
+    // Note: Each CreateSelfDidResult now includes its own IdentityEnv
+    // This avoids conflicts when testing multiple identities
 
     // Define test asset
     testAsset = {
@@ -76,10 +75,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Start billing server
     billingServerInstance = await createBillingServer({
-      signer: payee.keyManager,
-      did: payee.did,
-      rpcUrl: env.rpcUrl,
-      network: 'local',
+      env: payee.identityEnv, // Use payee's IdentityEnv
       port: 3001, // Use different port to avoid conflicts
       serviceId: 'e2e-test-service',
       defaultAssetId: testAsset.assetId,
@@ -90,7 +86,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Create HTTP client using the new simplified API with automatic service discovery
     httpClient = await createHttpClient({
       baseUrl: billingServerInstance.baseURL,
-      env: env.identityEnv, // Use the TestEnv's IdentityEnv (now configured with payer's keys)
+      env: payer.identityEnv, // Use the payer's dedicated IdentityEnv
       maxAmount: BigInt('500000000'), // 5 RGas
       debug: true
     });

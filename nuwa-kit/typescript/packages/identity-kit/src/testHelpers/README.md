@@ -78,21 +78,51 @@ describe('Payment Integration Test', () => {
       network: 'local'
     });
     
-    // Create a test DID
+    // Create a test DID (now includes its own IdentityEnv)
     const payer = await createSelfDid(env);
-    
-    // Configure IdentityEnv to use the payer's keys
-    env.configureIdentityEnvForDid(payer);
     
     // Create HTTP client with automatic service discovery
     const client = await createHttpClient({
       baseUrl: 'https://api.example.com',
-      env: env.identityEnv,  // Use TestEnv's IdentityEnv directly
+      env: payer.identityEnv,  // Use the DID's dedicated IdentityEnv
       maxAmount: BigInt('1000000000')
     });
     
     // Make paid API calls
     const result = await client.get('/v1/echo?q=hello');
+  });
+});
+```
+
+### Multi-Identity Testing
+
+Each DID created with `createSelfDid` gets its own `IdentityEnv`, making it perfect for testing scenarios with multiple parties:
+
+```ts
+describe('Multi-Party Payment Test', () => {
+  test('should work with separate identities', async () => {
+    if (TestEnv.skipIfNoNode()) return;
+    
+    const env = await TestEnv.bootstrap({
+      rpcUrl: 'http://localhost:6767',
+      network: 'local'
+    });
+    
+    // Create separate identities for payer and payee
+    const payer = await createSelfDid(env);
+    const payee = await createSelfDid(env);
+    
+    // Each has their own IdentityEnv - no conflicts!
+    const payerClient = await createHttpClient({
+      baseUrl: 'https://api.example.com',
+      env: payer.identityEnv,  // Payer's IdentityEnv
+      maxAmount: BigInt('1000000000')
+    });
+    
+    // You could also create a payee service using payee.identityEnv
+    // without any interference between the two
+    
+    const result = await payerClient.get('/v1/echo?q=hello');
   });
 });
 ```

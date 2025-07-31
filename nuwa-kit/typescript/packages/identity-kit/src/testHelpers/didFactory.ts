@@ -7,6 +7,7 @@ import { DIDCreationRequest } from '../vdr/types';
 import { MultibaseCodec, DidKeyCodec } from '../multibase';
 import { CryptoUtils } from '../crypto';
 import { IdentityKit } from '../IdentityKit';
+import { IdentityEnv } from '../IdentityEnv';
 import { 
   CreateSelfDidResult, 
   CreateSelfDidOptions,
@@ -81,11 +82,15 @@ export async function createSelfDid(
   // Create signer
   const signer = await DidAccountSigner.create(keyManager, keyId);
 
+  // Create a dedicated IdentityEnv for this DID
+  const identityEnv = new IdentityEnv(env.vdrRegistry, keyManager);
+
   return {
     did,
     vmIdFragment: keyFragment,
     keyManager,
-    signer
+    signer,
+    identityEnv
   };
 }
 
@@ -183,11 +188,15 @@ export async function createDidViaCadop(
   // Create user signer
   const userSigner = await DidAccountSigner.create(userKeyManager, userKeyId);
 
+  // Create a dedicated IdentityEnv for this user DID
+  const userIdentityEnv = new IdentityEnv(env.vdrRegistry, userKeyManager);
+
   return {
     did: userDid,
     vmIdFragment: userKeyFragment,
     keyManager: userKeyManager,
     signer: userSigner,
+    identityEnv: userIdentityEnv
   };
 }
 
