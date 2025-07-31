@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
-import { custodianClient } from '../lib/api/client';
 import { DIDService } from '../lib/did/DIDService';
-import { WebAuthnSigner } from '../lib/auth/WebAuthnSigner';
-import { ArrowLeft, Key } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import {
   MultibaseCodec,
-  type OperationalKeyInfo,
   type VerificationRelationship,
 } from '@nuwa-ai/identity-kit';
 import { VerificationMethodForm, VerificationMethodFormValues } from '@/components/did/VerificationMethodForm';
 import { useDIDService } from '@/hooks/useDIDService';
-import { Alert, AlertTitle, AlertDescription, Spinner, SpinnerContainer } from '@/components/ui';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui';
 
 export function AddAuthMethodPage() {
   const { t } = useTranslation();
@@ -24,7 +21,7 @@ export function AddAuthMethodPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { didService, isLoading: serviceLoading, error: serviceError } = useDIDService(did);
+  const { didService, error: serviceError } = useDIDService(did);
 
   useEffect(() => {
     if (did) {
@@ -36,7 +33,7 @@ export function AddAuthMethodPage() {
     if (!did || !userDid) return;
 
     try {
-      const service = await DIDService.initialize(did);
+      await DIDService.initialize(did);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');
       setError(message);
@@ -100,6 +97,7 @@ export function AddAuthMethodPage() {
               submitting={loading}
               submitText="Add Method"
               onSubmit={handleSubmit}
+              did={did}
             />
           </CardContent>
         </Card>

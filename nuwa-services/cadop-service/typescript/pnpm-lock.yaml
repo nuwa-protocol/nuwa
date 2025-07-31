@@ -237,8 +237,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.2
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.1
-        version: 0.3.1(typescript@4.9.5)
+        specifier: ^0.3.2
+        version: 0.3.2(typescript@4.9.5)
       '@peculiar/asn1-schema':
         specifier: ^2.3.8
         version: 2.3.15
@@ -1405,6 +1405,9 @@ packages:
 
   '@nuwa-ai/identity-kit@0.3.1':
     resolution: {integrity: sha512-8cGgKvR+lx/cjHSHL2n/OixHmn+JdLhU+e6BM4rPYqdZ83DWKgCxEo023kiv0DBi2iRx6DZ/X/pgWtQf26MyMw==}
+
+  '@nuwa-ai/identity-kit@0.3.2':
+    resolution: {integrity: sha512-XtIOaEhs77WcXjp6JAQWJ0OrcGB4i6QQLHxeO6PBQn//Pdp7oWlpoqhSgSfOPiwZ8suISE2cF3YgEprqldlQNg==}
 
   '@paralleldrive/cuid2@2.2.2':
     resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
@@ -6104,21 +6107,21 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/identity-kit@0.3.1(typescript@4.9.5)':
-    dependencies:
-      '@noble/curves': 1.9.2
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.6(typescript@4.9.5)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   '@nuwa-ai/identity-kit@0.3.1(typescript@5.8.3)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.3.2(typescript@4.9.5)':
+    dependencies:
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@4.9.5)
       multiformats: 9.9.0
     transitivePeerDependencies:
       - supports-color

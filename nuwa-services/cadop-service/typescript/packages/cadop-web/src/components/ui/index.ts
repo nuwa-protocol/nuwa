@@ -21,6 +21,7 @@ export * from './space';
 export * from './descriptions';
 export * from './toast';
 export * from './toaster';
+export * from './CopyButton';
 
 // Export custom domain components that build on the ui primitives
 export * from '../did/DIDDisplay';

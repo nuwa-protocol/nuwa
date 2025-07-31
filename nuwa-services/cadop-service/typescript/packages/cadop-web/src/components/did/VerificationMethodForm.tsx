@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { 
   Button,
@@ -13,10 +13,16 @@ import {
   FormItem,
   FormLabel,
   FormControl,
-  FormMessage
+  FormMessage,
+  CopyButton,
+  Alert,
+  AlertTitle,
+  AlertDescription
 } from '@/components/ui';
 import type { OperationalKeyInfo, VerificationRelationship } from '@nuwa-ai/identity-kit';
-import { MultibaseCodec } from '@nuwa-ai/identity-kit';
+import { MultibaseCodec, KeyType } from '@nuwa-ai/identity-kit';
+import { generateKeyPair, methodTypeToKeyType, getKeyTypeDisplayName, type GeneratedKeyInfo } from '@/lib/crypto/keyGeneration';
+import { Key, Shield, AlertTriangle } from 'lucide-react';
 
 export interface VerificationMethodFormValues {
   type: string;
@@ -30,9 +36,14 @@ interface Props {
   onSubmit: (values: VerificationMethodFormValues) => void;
   submitting?: boolean;
   submitText?: string;
+  did?: string; // Required for key generation
 }
 
-export function VerificationMethodForm({ initial, onSubmit, submitting, submitText = 'Submit' }: Props) {
+export function VerificationMethodForm({ initial, onSubmit, submitting, submitText = 'Submit', did }: Props) {
+  const [generatedKey, setGeneratedKey] = useState<GeneratedKeyInfo | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
   const form = useForm<VerificationMethodFormValues>({
     defaultValues: {
       type: initial?.type || 'Ed25519VerificationKey2020',
@@ -46,9 +57,109 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
     onSubmit(values);
   };
 
+  const handleGenerateKey = async () => {
+    if (!did) {
+      setGenerationError('DID is required for key generation');
+      return;
+    }
+
+    setGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const selectedType = form.getValues('type');
+      const keyType = methodTypeToKeyType(selectedType);
+      const fragment = form.getValues('idFragment') || `key-${Date.now()}`;
+      
+      const keyInfo = await generateKeyPair(did, keyType, fragment);
+      setGeneratedKey(keyInfo);
+
+      // Auto-fill the form with generated values
+      form.setValue('publicKeyMultibase', keyInfo.publicKeyMultibase);
+      form.setValue('idFragment', keyInfo.idFragment);
+      form.setValue('type', getKeyTypeDisplayName(keyInfo.keyType));
+      
+      // Set default relationships for authentication
+      if (!form.getValues('relationships').length) {
+        form.setValue('relationships', ['authentication', 'capabilityInvocation']);
+      }
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate key');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {/* Key Generation Section */}
+        {did && (
+          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+            <div className="flex items-center gap-2 mb-3">
+              <Key className="h-4 w-4 text-blue-600" />
+              <h4 className="font-medium text-blue-900 dark:text-blue-100">Generate New Key Pair</h4>
+            </div>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+              Generate a new cryptographic key pair for this DID. The private key will be provided as a Service Key for server deployment.
+            </p>
+            
+            <Button
+              type="button"
+              onClick={handleGenerateKey}
+              disabled={generating || submitting}
+              className="mb-3"
+            >
+              {generating ? (
+                <>
+                  <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Key className="mr-2 h-3 w-3" />
+                  Generate Key Pair
+                </>
+              )}
+            </Button>
+
+            {generationError && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Generation Failed</AlertTitle>
+                <AlertDescription>{generationError}</AlertDescription>
+              </Alert>
+            )}
+
+            {generatedKey && (
+              <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                <Shield className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800 dark:text-green-200">Service Key Generated</AlertTitle>
+                <AlertDescription className="mt-2">
+                  <p className="text-sm text-green-700 dark:text-green-300 mb-3">
+                    <strong>Important:</strong> Copy and save the Service Key immediately. You won't be able to view it again.
+                  </p>
+                  <div className="bg-white dark:bg-gray-800 border rounded p-3 mb-3">
+                    <div className="flex items-center justify-between">
+                      <code className="text-xs font-mono break-all pr-2 text-gray-700 dark:text-gray-300">
+                        {generatedKey.storedKeyString}
+                      </code>
+                      <CopyButton
+                        value={generatedKey.storedKeyString}
+                        variant="outline"
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Add this to your server environment variables: <code>SERVICE_KEY="&lt;copied_value&gt;"</code>
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
         <FormField
           control={form.control}
           name="type"
@@ -82,8 +193,18 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
             <FormItem>
               <FormLabel>Public Key (Base58)</FormLabel>
               <FormControl>
-                <Input placeholder="z...." {...field} />
+                <Input 
+                  placeholder="z...." 
+                  {...field}
+                  readOnly={!!generatedKey}
+                  className={generatedKey ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                />
               </FormControl>
+              {generatedKey && (
+                <p className="text-xs text-gray-500">
+                  This field was auto-filled from the generated key pair above.
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}
