@@ -5,6 +5,7 @@ import OpenRouterService from "../services/openrouter.js";
 import { didAuthMiddleware } from "../middleware/didAuth.js";
 import { userInitMiddleware } from "../middleware/userInit.js";
 import { userInitLiteLLMMiddleware } from "../middleware/userInitLiteLLM.js";
+import { getPaymentKit, isPaymentKitEnabled, isDIDAuthOnly } from "../services/paymentService.js";
 import { parse } from "url";
 import { setImmediate } from "timers";
 import LiteLLMService from "../services/litellm.js";
@@ -41,37 +42,83 @@ const runMiddleware = (
     });
   });
 
-for (const method of SUPPORTED_METHODS) {
-  router[method](
-    "/*", // match everything under /api/v1 from index.ts
-    didAuthMiddleware,
-    async (req: Request, res: Response) => {
-      // Determine provider from header or fallback env
-      const providerHeader = (req.headers["x-llm-provider"] as string | undefined)?.toLowerCase();
-      let backendEnvVar = (process.env.LLM_BACKEND || "openrouter").toLowerCase();
-      if (backendEnvVar === "both") backendEnvVar = "openrouter"; // default provider when both enabled
-      const providerName = providerHeader || backendEnvVar;
-
-      let provider: any = openrouterProvider;
-
-      try {
-        if (providerName === "litellm" && LITELLM_ENABLED) {
-          await runMiddleware(req, res, userInitLiteLLMMiddleware);
-          provider = litellmProvider;
-        } else if (OPENROUTER_ENABLED) {
-          await runMiddleware(req, res, userInitMiddleware);
-        } else {
-          return res.status(503).json({ success: false, error: "Requested provider not enabled" });
-        }
-      } catch (err) {
-        console.error("Middleware error:", err);
-        return res.status(500).json({ success: false, error: "Middleware failed" });
+// Setup routes based on payment kit configuration
+async function setupRoutes() {
+  const usePaymentKit = isPaymentKitEnabled();
+  
+  if (usePaymentKit) {
+    console.log('🚀 Setting up routes with ExpressPaymentKit');
+    try {
+      const paymentKit = await getPaymentKit();
+      
+      // Register billing routes with ExpressPaymentKit
+      for (const method of SUPPORTED_METHODS) {
+        const pricing = method === 'post' ? {
+          type: 'perToken' as const,
+          unitPricePicoUSD: '15000000000', // 15 picoUSD per token
+          usageKey: 'usage.total_tokens'
+        } : '0'; // Free for non-POST requests
+        
+        (paymentKit as any)[method]("/*", pricing, async (req: Request, res: Response) => {
+          return await handleLLMProxyWithProvider(req, res);
+        });
       }
-
-      return handleLLMProxy(req, res, provider, providerName);
+      
+      // Mount payment kit router (includes DID auth + billing)
+      router.use(paymentKit.router);
+      
+    } catch (error) {
+      console.error('❌ Failed to setup PaymentKit routes, falling back to DID auth only:', error);
+      setupFallbackRoutes();
     }
-  );
+  } else {
+    console.log('📋 Setting up routes with traditional DID auth');
+    setupFallbackRoutes();
+  }
 }
+
+// Fallback routes using traditional didAuthMiddleware
+function setupFallbackRoutes() {
+  for (const method of SUPPORTED_METHODS) {
+    router[method](
+      "/*", // match everything under /api/v1 from index.ts
+      didAuthMiddleware,
+      async (req: Request, res: Response) => {
+        return await handleLLMProxyWithProvider(req, res);
+      }
+    );
+  }
+}
+
+// Common handler for both payment kit and fallback routes
+async function handleLLMProxyWithProvider(req: Request, res: Response) {
+  // Determine provider from header or fallback env
+  const providerHeader = (req.headers["x-llm-provider"] as string | undefined)?.toLowerCase();
+  let backendEnvVar = (process.env.LLM_BACKEND || "openrouter").toLowerCase();
+  if (backendEnvVar === "both") backendEnvVar = "openrouter"; // default provider when both enabled
+  const providerName = providerHeader || backendEnvVar;
+
+  let provider: any = openrouterProvider;
+
+  try {
+    if (providerName === "litellm" && LITELLM_ENABLED) {
+      await runMiddleware(req, res, userInitLiteLLMMiddleware);
+      provider = litellmProvider;
+    } else if (OPENROUTER_ENABLED) {
+      await runMiddleware(req, res, userInitMiddleware);
+    } else {
+      return res.status(503).json({ success: false, error: "Requested provider not enabled" });
+    }
+  } catch (err) {
+    console.error("Middleware error:", err);
+    return res.status(500).json({ success: false, error: "Middleware failed" });
+  }
+
+  return handleLLMProxy(req, res, provider, providerName);
+}
+
+// Initialize routes
+setupRoutes();
 
 export const llmRoutes = router;
 
@@ -154,7 +201,7 @@ async function handleLLMProxy(
     });
   };
 
-  // Extract usage info from response
+  // Extract usage info from response and attach to request for payment-kit
   const extractUsageInfo = (responseData: any) => {
     if (responseData && responseData.usage) {
       const usage = responseData.usage;
@@ -163,7 +210,18 @@ async function handleLLMProxy(
         output_tokens: usage.completion_tokens || 0,
         total_cost: usage.cost ?? undefined, // Directly store usage.cost, in dollars
       };
+      
+      // Attach usage data to request for payment-kit billing
+      if (!req.body) req.body = {};
+      req.body.usage = {
+        total_tokens: (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+        prompt_tokens: usage.prompt_tokens || 0,
+        completion_tokens: usage.completion_tokens || 0,
+        cost: usage.cost
+      };
+      
       console.log("📊 Extracted usage info:", usageData);
+      console.log("💳 Attached usage data to request for billing:", req.body.usage);
       return usageData;
     }
     return null;

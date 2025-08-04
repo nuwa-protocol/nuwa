@@ -20,6 +20,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { llmRoutes } from "./routes/llm.js";
 import { usageRoutes } from "./routes/usage.js";
+import { adminRoutes } from "./routes/admin.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ async function start() {
     // 注册路由
     app.use("/api/v1", llmRoutes);
     app.use("/usage", usageRoutes);
+    app.use("/api/v1/admin", adminRoutes);
 
     // 根路径健康检查
     app.get("/", (req: Request, res: Response) => {
