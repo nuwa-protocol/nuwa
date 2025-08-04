@@ -103,12 +103,26 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
     baseUrl: options.baseUrl,
     chainConfig,
     signer: options.env.keyManager,
+    // keyId will be set dynamically below if not provided
     maxAmount: options.maxAmount || BigInt('500000000000'), // Default: 50 cents USD
     debug: options.debug ?? chainConfig.debug,
     onError: options.onError,
     fetchImpl: options.fetchImpl,
     mappingStore: options.mappingStore
   };
+
+  // If caller did not explicitly provide a keyId, pick the first available from the KeyManager
+  try {
+    if (!httpPayerOptions.keyId) {
+      const keyIds = await options.env.keyManager.listKeyIds?.();
+      if (keyIds && keyIds.length > 0) {
+        httpPayerOptions.keyId = keyIds[0];
+      }
+    }
+  } catch {
+    // If we cannot resolve a keyId automatically, continue without it – the downstream
+    // code will throw a clear error so that the caller can address the issue.
+  }
 
   const client = new PaymentChannelHttpClient(httpPayerOptions);
   

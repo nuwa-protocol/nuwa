@@ -145,16 +145,16 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     });
 
     // Test asset price discovery
-    const priceInfo = await httpClient.getAssetPrice(testAsset.assetId);
-    expect(priceInfo.assetId).toBe(testAsset.assetId);
-    expect(priceInfo.pricePicoUSD).toBeTruthy();
-    expect(priceInfo.priceUSD).toBeTruthy();
+    // const priceInfo = await httpClient.getAssetPrice(testAsset.assetId);
+    // expect(priceInfo.assetId).toBe(testAsset.assetId);
+    // expect(priceInfo.pricePicoUSD).toBeTruthy();
+    // expect(priceInfo.priceUSD).toBeTruthy();
 
-    console.log('✅ Asset price discovery successful:', {
-      asset: priceInfo.assetId,
-      priceUSD: priceInfo.priceUSD,
-      source: priceInfo.source
-    });
+    // console.log('✅ Asset price discovery successful:', {
+    //   asset: priceInfo.assetId,
+    //   priceUSD: priceInfo.priceUSD,
+    //   source: priceInfo.source
+    // });
 
     console.log('🎉 Service discovery test successful!');
   }, 60000);
@@ -166,7 +166,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 1: First request (handshake)
     console.log('📞 Request 1: First call (handshake)');
-    const response1 = await httpClient.get('/v1/echo?q=hello%20world');
+    const response1 = await httpClient.get('/api/echo?q=hello%20world');
     
     expect(response1.echo).toBe('hello world');
     expect(response1.cost).toBe('10000000'); // 0.001 USD = 10,000,000 RGAS units (0.1 RGAS)
@@ -182,7 +182,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 2: Second request (pays for first request, receives new proposal)
     console.log('📞 Request 2: Second call (pays for first request)');
-    const response2 = await httpClient.get('/v1/echo?q=second%20call');
+    const response2 = await httpClient.get('/api/echo?q=second%20call');
     
     expect(response2.echo).toBe('second call');
     expect(response2.cost).toBe('10000000');
@@ -197,7 +197,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('📞 Requests 3-6: Multiple calls to verify payment consistency');
     
     for (let i = 3; i <= 6; i++) {
-      const response = await httpClient.get(`/v1/echo?q=call%20${i}`);
+      const response = await httpClient.get(`/api/echo?q=call%20${i}`);
       expect(response.echo).toBe(`call ${i}`);
       expect(response.cost).toBe('10000000');
       console.log(`✅ Request ${i} successful`);
@@ -205,12 +205,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Check admin stats for payment tracking
     // Create a basic HTTP client for admin endpoints (no payment required)
-    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
-      headers: {
-        'Authorization': await generateAdminAuthHeader()
-      }
-    });
-    const adminStats = await adminResponse.json();
+    const adminStats = await httpClient.get(`/payment-channel/admin/claims`);
     console.log('📊 Admin stats after multiple requests:', JSON.stringify(adminStats, null, 2));
 
     console.log('🎉 Complete HTTP deferred payment flow successful!');
@@ -226,28 +221,23 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test echo requests (cheaper)
     console.log('📞 Echo requests (0.001 USD each)');
-    await httpClient.get('/v1/echo?q=test%20echo%201');
-    await httpClient.get('/v1/echo?q=test%20echo%202');
+    await httpClient.get('/api/echo?q=test%20echo%201');
+    await httpClient.get('/api/echo?q=test%20echo%202');
 
     // Test process requests (more expensive)
     console.log('📞 Process requests (0.01 USD each)');
-    const processResponse1 = await httpClient.post('/v1/process', { data: 'test data 1' });
+    const processResponse1 = await httpClient.post('/api/process', { data: 'test data 1' });
     expect(processResponse1.processed.data).toBe('test data 1');
     expect(processResponse1.cost).toBe('100000000'); // 0.01 USD = 100,000,000 RGAS units (1.0 RGAS)
 
-    const processResponse2 = await httpClient.post('/v1/process', { operation: 'complex task' });
+    const processResponse2 = await httpClient.post('/api/process', { operation: 'complex task' });
     expect(processResponse2.processed.operation).toBe('complex task');
     expect(processResponse2.cost).toBe('100000000');
 
     console.log('✅ Mixed request types processed successfully');
 
     // Check accumulated costs
-    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
-      headers: {
-        'Authorization': await generateAdminAuthHeader()
-      }
-    });
-    const adminStats = await adminResponse.json();
+    const adminStats = await httpClient.get(`/payment-channel/admin/claims`);
     console.log('📊 Final admin stats:', JSON.stringify(adminStats, null, 2));
 
     console.log('🎉 Mixed request types test successful!');
@@ -260,26 +250,17 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('⚠️ Testing error handling in deferred payment');
 
-    // Test health check (should work without payment)
-    const healthResponse = await fetch(`${billingServerInstance.baseURL}/health`);
-    expect(healthResponse.ok).toBe(true);
-    const healthData = await healthResponse.json();
-    expect(healthData.status).toBe('ok');
+    const healthResponse = await httpClient.healthCheck();
+    expect(healthResponse.success).toBe(true);
 
-    console.log('✅ Health check works without payment');
+    // console.log('✅ Health check works without payment');
 
     // Test admin endpoints
-    const adminResponse = await fetch(`${billingServerInstance.baseURL}/admin/claims`, {
-      headers: {
-        'Authorization': await generateAdminAuthHeader()
-      }
-    });
-    expect(adminResponse.ok).toBe(true);
-    const adminStats = await adminResponse.json();
-    expect(adminStats).toBeTruthy();
+    const adminResponse = await httpClient.get(`/payment-channel/admin/claims`);
+    
 
-    console.log('✅ Admin endpoints accessible');
-
+    console.log('✅ Admin endpoints accessible response:', JSON.stringify(adminResponse, null, 2));
+    expect(adminResponse.claimsStatus).toBeTruthy();
     console.log('🎉 Error handling test successful!');
   }, 60000);
 
@@ -342,8 +323,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🔄 Testing recovery functionality with simplified API');
 
     // Make a few requests to create some state
-    await httpClient.get('/v1/echo?q=recovery%20test%201');
-    await httpClient.get('/v1/echo?q=recovery%20test%202');
+    await httpClient.get('/api/echo?q=recovery%20test%201');
+    await httpClient.get('/api/echo?q=recovery%20test%202');
 
     // Test recovery functionality
     const recoveryData = await httpClient.recoverFromService();

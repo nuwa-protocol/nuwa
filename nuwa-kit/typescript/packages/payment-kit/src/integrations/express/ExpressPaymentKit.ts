@@ -289,6 +289,19 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   recoveryRouter(): Router {
     const router = express.Router();
     
+    // Create DID authentication middleware for protected endpoints
+    const didAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+      this.performDIDAuth(req, res)
+        .then(() => next())
+        .catch((error) => {
+          if (!res.headersSent) {
+            res.status(401).json({
+              error: 'DID authentication failed',
+              details: error instanceof Error ? error.message : String(error)
+            });
+          }
+        });
+    };
 
     // GET /price - Get current price for an asset
     router.get('/price', async (req: Request, res: Response) => {
@@ -339,8 +352,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       });
     });
 
-    // GET /recovery - channel state & pending SubRAV
-    router.get('/recovery', async (req: Request, res: Response) => {
+    // GET /recovery - channel state & pending SubRAV (requires DID authentication)
+    router.get('/recovery', didAuthMiddleware, async (req: Request, res: Response) => {
       try {
         // Get clientDid from authenticated DID info (set by performDIDAuth)
         const didInfo = (req as any).didInfo;
@@ -363,18 +376,22 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         // Find the latest pending SubRAV for this channel (for recovery scenarios)
         const pending = await this.middleware.findLatestPendingProposal(channelId);
 
-        res.json({
+        const response = {
           channel: channel ?? null,
           pendingSubRav: pending ?? null,
           timestamp: new Date().toISOString()
-        });
+        };
+        
+        // Serialize BigInt values before sending response
+        const serializedResponse = this.serializeBigInt(response);
+        res.json(serializedResponse);
       } catch (err) {
         res.status(500).json({ error: 'Failed to perform recovery', details: err instanceof Error ? err.message : String(err) });
       }
     });
 
-    // POST /commit - submit signed SubRAV
-    router.post('/commit', async (req: Request, res: Response) => {
+    // POST /commit - submit signed SubRAV (requires DID authentication)
+    router.post('/commit', didAuthMiddleware, async (req: Request, res: Response) => {
       try {
 
         const { subRav } = req.body || {};

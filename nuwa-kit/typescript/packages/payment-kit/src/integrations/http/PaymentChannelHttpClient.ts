@@ -248,6 +248,15 @@ export class PaymentChannelHttpClient {
     }
   }
 
+  async healthCheck(): Promise<{
+    success: boolean;
+    timestamp: string;
+  }> {
+    const healthUrl = new URL('/payment-channel/admin/health', this.options.baseUrl).toString();
+    const response = await this.fetchImpl(healthUrl, { method: 'GET' });
+    return response.json();
+  } 
+
   /**
    * Recover channel state and pending SubRAV from service
    * This requires DID authentication
@@ -261,7 +270,7 @@ export class PaymentChannelHttpClient {
     
     try {
       // Generate DID auth header for authentication
-      const payerDid = this.options.payerDid || await this.options.signer.getDid();
+      const payerDid = await this.options.signer.getDid();
       const authHeader = await DidAuthHelper.generateAuthHeader(
         payerDid,
         this.options.signer,
@@ -284,6 +293,7 @@ export class PaymentChannelHttpClient {
       });
 
       if (!response.ok) {
+        console.log('Response error:', response);
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
@@ -670,6 +680,7 @@ export class PaymentChannelHttpClient {
    */
   private async parseJsonResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+      console.log('Response error:', response);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
