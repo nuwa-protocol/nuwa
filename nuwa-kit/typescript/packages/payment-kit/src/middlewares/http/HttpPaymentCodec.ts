@@ -204,7 +204,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Extract payment header value from request headers
    */
-  static extractPaymentHeader(headers: Record<string, string | string[]>): string | null {
+  static extractPaymentHeader(headers: Record<string, string | string[] | undefined>): string | null {
     const headerName = this.getHeaderName();
     const headerValue = headers[headerName.toLowerCase()] || headers[headerName];
     

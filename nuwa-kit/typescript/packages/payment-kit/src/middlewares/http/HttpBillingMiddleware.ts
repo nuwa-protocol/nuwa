@@ -24,8 +24,23 @@ import type { CostCalculator } from '../../billing/types';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 
-// Express types (optional dependency)
-interface Request {
+// Generic HTTP interfaces (framework-agnostic)
+export interface GenericHttpRequest {
+  path: string;
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+  query: Record<string, any>;
+  body?: any;
+}
+
+export interface ResponseAdapter {
+  setStatus(code: number): ResponseAdapter;
+  json(obj: any): ResponseAdapter | void;
+  setHeader(name: string, value: string): ResponseAdapter;
+}
+
+// Express types (for backward compatibility)
+interface ExpressRequest {
   path: string;
   method: string;
   headers: Record<string, string | string[]>;
@@ -33,10 +48,11 @@ interface Request {
   body?: any;
 }
 
-interface Response {
-  status(code: number): Response;
-  json(obj: any): Response;
-  setHeader(name: string, value: string): Response;
+interface ExpressResponse {
+  status(code: number): ExpressResponse;
+  json(obj: any): ExpressResponse;
+  setHeader(name: string, value: string): ExpressResponse;
+  headersSent: boolean;
 }
 
 interface NextFunction {
@@ -110,40 +126,68 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Create Express middleware function
+   * Framework-agnostic payment processing handler
+   */
+  async handle(req: GenericHttpRequest, resAdapter: ResponseAdapter): Promise<void> {
+    try {
+      this.log('🔍 Processing HTTP payment request:', req.method, req.path);
+      
+      const result = await this.processHttpPayment(req);
+      
+      if (!result.success) {
+        const statusCode = this.mapErrorToHttpStatus(result.errorCode);
+        resAdapter.setStatus(statusCode).json({ 
+          error: result.error || 'Payment required',
+          code: result.errorCode,
+          assetId: result.assetId
+        });
+        return;
+      }
+
+      // Add payment proposal to response if available
+      if (result.unsignedSubRAV) {
+        this.addPaymentProposalToResponse(resAdapter, result);
+      }
+
+      // Success - no response modification needed
+      this.log('✅ Payment processing completed successfully');
+    } catch (error) {
+      this.log('🚨 HTTP payment middleware error:', error);
+      resAdapter.setStatus(500).json({ 
+        error: 'Payment processing failed',
+        code: 'PAYMENT_ERROR',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Create Express middleware function (backward compatibility)
+   * @deprecated Use handle() method for better framework independence
    */
   createExpressMiddleware() {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    return async (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
       try {
-        this.log('🔍 Processing HTTP payment request:', req.method, req.path);
+        const resAdapter = this.createExpressResponseAdapter(res);
+        await this.handle(req, resAdapter);
         
+        // Attach payment result to request for downstream handlers (Express-specific)
         const result = await this.processHttpPayment(req);
-        
-        if (!result.success) {
-          const statusCode = this.mapErrorToHttpStatus(result.errorCode);
-          return res.status(statusCode).json({ 
-            error: result.error || 'Payment required',
-            code: result.errorCode,
-            assetId: result.assetId
-          });
-        }
-
-        // Add payment proposal to response if available
-        if (result.unsignedSubRAV) {
-          this.addPaymentProposalToResponse(res, result);
-        }
-
-        // Attach payment result to request for downstream handlers
         (req as any).paymentResult = result;
         
-        next();
+        // Only call next() if response wasn't sent (success case)
+        if (result.success) {
+          next();
+        }
       } catch (error) {
-        this.log('🚨 HTTP payment middleware error:', error);
-        res.status(500).json({ 
-          error: 'Payment processing failed',
-          code: 'PAYMENT_ERROR',
-          details: error instanceof Error ? error.message : String(error)
-        });
+        this.log('🚨 Express middleware wrapper error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ 
+            error: 'Payment processing failed',
+            code: 'PAYMENT_ERROR',
+            details: error instanceof Error ? error.message : String(error)
+          });
+        }
       }
     };
   }
@@ -151,9 +195,9 @@ export class HttpBillingMiddleware {
   /**
    * Process HTTP payment request
    */
-  async processHttpPayment(req: Request): Promise<ProcessorPaymentResult> {
+  async processHttpPayment(req: GenericHttpRequest): Promise<ProcessorPaymentResult> {
     // 1. Extract payment data from HTTP headers
-    const paymentData = this.extractPaymentData(req.headers as Record<string, string>);
+    const paymentData = this.extractPaymentData(req.headers);
     
     // 2. Build protocol-agnostic request metadata
     const requestMeta = this.buildRequestMetadata(req, paymentData || undefined);
@@ -170,7 +214,7 @@ export class HttpBillingMiddleware {
   /**
    * Extract payment data from HTTP request headers
    */
-  extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
+  extractPaymentData(headers: Record<string, string | string[] | undefined>): HttpRequestPayload | null {
     const headerValue = HttpPaymentCodec.extractPaymentHeader(headers);
     
     if (!headerValue) {
@@ -191,7 +235,7 @@ export class HttpBillingMiddleware {
   /**
    * Build protocol-agnostic request metadata from HTTP request
    */
-  private buildRequestMetadata(req: Request, paymentData?: HttpRequestPayload): RequestMetadata {
+  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: HttpRequestPayload): RequestMetadata {
     return {
       operation: `${req.method.toLowerCase()}:${req.path}`,
       
@@ -219,7 +263,7 @@ export class HttpBillingMiddleware {
   /**
    * Add payment proposal to HTTP response headers
    */
-  private addPaymentProposalToResponse(res: Response, result: ProcessorPaymentResult): void {
+  private addPaymentProposalToResponse(resAdapter: ResponseAdapter, result: ProcessorPaymentResult): void {
     if (!result.unsignedSubRAV) return;
 
     try {
@@ -233,7 +277,7 @@ export class HttpBillingMiddleware {
         }
       );
 
-      res.setHeader(HttpPaymentCodec.getHeaderName(), responseHeader);
+      resAdapter.setHeader(HttpPaymentCodec.getHeaderName(), responseHeader);
       this.log('✅ Added payment proposal to response header');
     } catch (error) {
       this.log('⚠️ Failed to add payment proposal to response:', error);
@@ -323,6 +367,26 @@ export class HttpBillingMiddleware {
   }
 
   /**
+   * Create ExpressJS ResponseAdapter
+   */
+  private createExpressResponseAdapter(res: ExpressResponse): ResponseAdapter {
+    return {
+      setStatus: (code: number) => {
+        res.status(code);
+        return this.createExpressResponseAdapter(res); // Return adapter for chaining
+      },
+      json: (obj: any) => {
+        res.json(obj);
+        // Note: Express res.json() returns void, so we return void to match interface
+      },
+      setHeader: (name: string, value: string) => {
+        res.setHeader(name, value);
+        return this.createExpressResponseAdapter(res); // Return adapter for chaining
+      }
+    };
+  }
+
+  /**
    * Debug logging
    */
   private log(...args: any[]): void {
@@ -376,5 +440,43 @@ export function createBasicBillingConfig(
         }
       }
     ]
+  };
+}
+
+/**
+ * Utility function to create ExpressJS ResponseAdapter
+ */
+export function createExpressResponseAdapter(res: any): ResponseAdapter {
+  return {
+    setStatus: (code: number) => {
+      res.status(code);
+      return createExpressResponseAdapter(res);
+    },
+    json: (obj: any) => {
+      res.json(obj);
+    },
+    setHeader: (name: string, value: string) => {
+      res.setHeader(name, value);
+      return createExpressResponseAdapter(res);
+    }
+  };
+}
+
+/**
+ * Utility function to create Koa ResponseAdapter (example for other frameworks)
+ */
+export function createKoaResponseAdapter(ctx: any): ResponseAdapter {
+  return {
+    setStatus: (code: number) => {
+      ctx.status = code;
+      return createKoaResponseAdapter(ctx);
+    },
+    json: (obj: any) => {
+      ctx.body = obj;
+    },
+    setHeader: (name: string, value: string) => {
+      ctx.set(name, value);
+      return createKoaResponseAdapter(ctx);
+    }
   };
 } 

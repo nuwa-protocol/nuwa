@@ -1,6 +1,6 @@
 import express, { Router, RequestHandler, Request, Response, NextFunction } from 'express';
 import { BillableRouter, RouteOptions } from './BillableRouter';
-import { HttpBillingMiddleware } from '../../middlewares/http/HttpBillingMiddleware';
+import { HttpBillingMiddleware, ResponseAdapter } from '../../middlewares/http/HttpBillingMiddleware';
 import { UsdBillingEngine } from '../../billing/usd-engine';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
@@ -497,7 +497,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         const needPayment = rule?.paymentRequired ?? false;
         if (needPayment) {
           // Extract payment data to check if signedSubRAV is present
-          const paymentData = this.middleware.extractPaymentData(req.headers as Record<string, string>);
+          const paymentData = this.middleware.extractPaymentData(req.headers);
           if (!paymentData?.signedSubRav) {
             console.log(`💳 Payment required but no signed SubRAV provided for ${req.method} ${req.path}`);
             return res.status(402).json({
@@ -525,13 +525,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         // Step 4: Apply billing middleware (for all registered routes)
         if (rule) {
           console.log(`💰 Applying billing for ${req.method} ${req.path}`);
-          const billingMiddleware = this.middleware.createExpressMiddleware();
-          await new Promise<void>((resolve, reject) => {
-            billingMiddleware(req as any, res as any, (error?: any) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          });
+          
+          // Create response adapter for framework-agnostic billing
+          const resAdapter = this.createResponseAdapter(res);
+          
+          // Use the new framework-agnostic handle method
+          await this.middleware.handle(req, resAdapter);
+          
+          // Attach payment result to request for downstream handlers (Express-specific)
+          const result = await this.middleware.processHttpPayment(req);
+          (req as any).paymentResult = result;
         } else {
           console.log(`⏭️ Skipping billing for ${req.method} ${req.path} (unregistered route)`);
         }
@@ -674,6 +677,25 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Access the billing engine through the middleware and clear its cache
     // This ensures that newly registered routes are picked up on next billing calculation
     (this.middleware as any).processor?.billingEngine?.clearCache?.(this.config.serviceId);
+  }
+
+  /**
+   * Create Express ResponseAdapter for framework-agnostic billing
+   */
+  private createResponseAdapter(res: Response): ResponseAdapter {
+    return {
+      setStatus: (code: number) => {
+        res.status(code);
+        return this.createResponseAdapter(res);
+      },
+      json: (obj: any) => {
+        res.json(obj);
+      },
+      setHeader: (name: string, value: string) => {
+        res.setHeader(name, value);
+        return this.createResponseAdapter(res);
+      }
+    };
   }
 
   /**
