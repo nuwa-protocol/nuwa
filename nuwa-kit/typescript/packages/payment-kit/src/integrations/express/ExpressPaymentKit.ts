@@ -594,35 +594,30 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
     this.billableRouter.get(path, options, handler, ruleId);
-    this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
     this.billableRouter.post(path, options, handler, ruleId);
-    this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
     this.billableRouter.put(path, options, handler, ruleId);
-    this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
     this.billableRouter.delete(path, options, handler, ruleId);
-    this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
     this.billableRouter.patch(path, options, handler, ruleId);
-    this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
@@ -643,16 +638,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       throw new Error('Cannot create admin endpoints without authentication: adminOnly requires authRequired to be true or undefined');
     }
   }
-
-  /**
-   * Clear billing engine cache to ensure new routes are picked up
-   */
-  private clearBillingCache(): void {
-    // With the new RuleProvider pattern, BillingEngine fetches rules dynamically
-    // on each request, so no explicit cache clearing is needed.
-    // This method is kept for API compatibility but does nothing.
-  }
-
+ 
   /**
    * Create Express ResponseAdapter for framework-agnostic billing
    */
