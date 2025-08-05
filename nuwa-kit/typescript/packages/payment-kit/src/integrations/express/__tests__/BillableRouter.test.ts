@@ -38,7 +38,10 @@ describe('BillableRouter', () => {
         strategy: {
           type: 'PerRequest',
           price: defaultPrice.toString()
-        }
+        },
+        authRequired: true,
+        adminOnly: false,
+        paymentRequired: true
       });
     });
 
@@ -85,7 +88,10 @@ describe('BillableRouter', () => {
         strategy: {
           type: 'PerRequest',
           price: price.toString()
-        }
+        },
+        authRequired: true,
+        adminOnly: false,
+        paymentRequired: true
       });
     });
 
@@ -114,7 +120,10 @@ describe('BillableRouter', () => {
           path: '/api/update',
           method: 'PUT'
         },
-        strategy
+        strategy,
+        authRequired: false,
+        adminOnly: false,
+        paymentRequired: true
       });
     });
 
@@ -233,17 +242,26 @@ describe('BillableRouter', () => {
           {
             id: 'get:/v1/chat/completions',
             when: { path: '/v1/chat/completions', method: 'GET' },
-            strategy: { type: 'PerRequest', price: '5000000000' }
+            strategy: { type: 'PerRequest', price: '5000000000' },
+            authRequired: true,
+            adminOnly: false,
+            paymentRequired: true
           },
           {
             id: 'post:/v1/embeddings',
             when: { path: '/v1/embeddings', method: 'POST' },
-            strategy: { type: 'PerRequest', price: '1000000000' }
+            strategy: { type: 'PerRequest', price: '1000000000' },
+            authRequired: true,
+            adminOnly: false,
+            paymentRequired: true
           },
           {
             id: 'default-pricing',
             default: true,
-            strategy: { type: 'PerRequest', price: '1000000000' }
+            strategy: { type: 'PerRequest', price: '1000000000' },
+            authRequired: true,
+            adminOnly: false,
+            paymentRequired: true
           }
         ]
       });
@@ -340,7 +358,7 @@ describe('BillableRouter', () => {
       router.get('/api/test', 100n, mockHandler);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '🔧 Registering route: GET /api/test with pricing:',
+        '🔧 Registering route: GET /api/test with options:',
         100n
       );
     });

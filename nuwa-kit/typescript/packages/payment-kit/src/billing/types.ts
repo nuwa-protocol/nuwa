@@ -52,6 +52,12 @@ export interface BillingRule {
   default?: boolean;
   /** Strategy configuration */
   strategy: StrategyConfig;
+  /** Whether DID authentication is required for this rule */
+  authRequired?: boolean;
+  /** Whether admin authorization is required for this rule (implies authRequired: true) */
+  adminOnly?: boolean;
+  /** Whether payment (signed SubRAV) is required for this rule */
+  paymentRequired?: boolean;
 }
 
 /**

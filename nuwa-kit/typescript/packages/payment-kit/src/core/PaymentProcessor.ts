@@ -156,64 +156,56 @@ export interface PaymentVerificationResult extends VerificationResult {
       this.log('Processing payment for operation:', requestMeta.operation);
   
       try {
-        // Step 1: Check if signed SubRAV is provided
-        if (!signedSubRAV) {
-          this.stats.failedPayments++;
-          return {
-            success: false,
-            cost: 0n,
-            assetId: requestMeta.assetId || this.config.defaultAssetId || 'unknown',
-            error: 'Signed SubRAV required for payment',
-            errorCode: 'PAYMENT_REQUIRED'
-          };
+        let autoClaimTriggered = false;
+        let verificationResult: PaymentVerificationResult | undefined;
+        let isHandshake = false;
+        
+        // Step 1: If signedSubRAV is provided, verify it (handles previous payment)
+        if (signedSubRAV) {
+          isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
+  
+          if (isHandshake) {
+            // Handshake verification
+            verificationResult = await this.verifyHandshake(signedSubRAV);
+            if (!verificationResult.isValid) {
+              this.stats.failedPayments++;
+              return {
+                success: false,
+                cost: 0n,
+                assetId: signedSubRAV.subRav.channelId,
+                error: verificationResult.error,
+                errorCode: 'INVALID_PAYMENT',
+                isHandshake: true
+              };
+            }
+            this.stats.handshakes++;
+            this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
+          } else {
+            // Regular payment verification
+            verificationResult = await this.confirmDeferredPayment(signedSubRAV);
+            if (!verificationResult.isValid) {
+              this.stats.failedPayments++;
+              return {
+                success: false,
+                cost: 0n,
+                assetId: signedSubRAV.subRav.channelId,
+                error: verificationResult.error,
+                errorCode: this.extractErrorCode(verificationResult.error || ''),
+                isHandshake: false
+              };
+            }
+  
+            // Process the verified payment
+            autoClaimTriggered = await this.processVerifiedPayment(signedSubRAV);
+            this.stats.successfulPayments++;
+          }
         }
   
-              // Step 2: Check if this is a handshake request
-        const isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
-      let autoClaimTriggered = false;
-      let verificationResult: PaymentVerificationResult;
-  
-        if (isHandshake) {
-          // Handshake verification
-          verificationResult = await this.verifyHandshake(signedSubRAV);
-          if (!verificationResult.isValid) {
-            this.stats.failedPayments++;
-            return {
-              success: false,
-              cost: 0n,
-              assetId: signedSubRAV.subRav.channelId,
-              error: verificationResult.error,
-              errorCode: 'INVALID_PAYMENT',
-              isHandshake: true
-            };
-          }
-          this.stats.handshakes++;
-          this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
-        } else {
-          // Regular payment verification
-          verificationResult = await this.confirmDeferredPayment(signedSubRAV);
-          if (!verificationResult.isValid) {
-            this.stats.failedPayments++;
-            return {
-              success: false,
-              cost: 0n,
-              assetId: signedSubRAV.subRav.channelId,
-              error: verificationResult.error,
-              errorCode: this.extractErrorCode(verificationResult.error || ''),
-              isHandshake: false
-            };
-          }
-  
-          // Process the verified payment
-          autoClaimTriggered = await this.processVerifiedPayment(signedSubRAV);
-          this.stats.successfulPayments++;
-        }
-  
-        // Step 3: Build billing context using BillingContextBuilder
+        // Step 2: Build billing context for current request
         const enhancedMeta = {
           ...requestMeta,
-          channelId: signedSubRAV.subRav.channelId,
-          vmIdFragment: signedSubRAV.subRav.vmIdFragment
+          channelId: signedSubRAV?.subRav.channelId || requestMeta.channelId,
+          vmIdFragment: signedSubRAV?.subRav.vmIdFragment
         };
         
         const billingContext = BillingContextBuilder.build(
@@ -222,7 +214,7 @@ export interface PaymentVerificationResult extends VerificationResult {
           this.config.defaultAssetId
         );
   
-                // Step 4: Calculate cost for current request with conversion details
+        // Step 3: Calculate cost for current request with conversion details
         const costResult = await this.calculateCostWithDetails(billingContext);
         const { cost, conversion } = costResult;
 
@@ -234,13 +226,13 @@ export interface PaymentVerificationResult extends VerificationResult {
             assetId: billingContext.assetId || this.config.defaultAssetId || 'unknown',
             autoClaimTriggered,
             isHandshake,
-            payerKeyId: verificationResult.payerKeyId,
+            payerKeyId: verificationResult?.payerKeyId,
             signedSubRAV,
             conversion
           };
         }
 
-        // Step 5: Generate unsigned SubRAV proposal for next request
+        // Step 4: Generate unsigned SubRAV proposal for next request
         const unsignedSubRAV = await this.generateProposal(billingContext, cost);
         
         // Store the unsigned SubRAV for later verification
@@ -254,7 +246,7 @@ export interface PaymentVerificationResult extends VerificationResult {
           signedSubRAV,
           autoClaimTriggered,
           isHandshake,
-          payerKeyId: verificationResult.payerKeyId,
+          payerKeyId: verificationResult?.payerKeyId,
           serviceTxRef: PaymentUtils.generateTxRef(),
           conversion
         };

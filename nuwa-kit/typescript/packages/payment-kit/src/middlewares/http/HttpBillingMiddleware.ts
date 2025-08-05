@@ -170,7 +170,7 @@ export class HttpBillingMiddleware {
   /**
    * Extract payment data from HTTP request headers
    */
-  private extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
+  extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
     const headerValue = HttpPaymentCodec.extractPaymentHeader(headers);
     
     if (!headerValue) {

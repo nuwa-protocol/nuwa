@@ -251,6 +251,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('⚠️ Testing error handling in deferred payment');
 
     const healthResponse = await httpClient.healthCheck();
+    console.log('📊 Health check response:', JSON.stringify(healthResponse, null, 2));
     expect(healthResponse.success).toBe(true);
 
     // console.log('✅ Health check works without payment');

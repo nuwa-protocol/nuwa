@@ -32,6 +32,21 @@ export interface RouteOptions {
    * If developer explicitly sets false with pricing>0, framework will throw error during startup.
    */
   authRequired?: boolean;
+
+  /**
+   * Whether payment (signed SubRAV) is required for this route.
+   * Default rules:
+   *   pricing == 0 (fixed) → false
+   *   pricing > 0 (fixed) → true  
+   *   dynamic strategy → true
+   */
+  paymentRequired?: boolean;
+
+  /**
+   * Whether admin authorization is required (implies authRequired: true).
+   * Admin routes require both DID authentication and admin permission check.
+   */
+  adminOnly?: boolean;
 }
 
 /**
@@ -79,10 +94,16 @@ export interface ExpressPaymentKit {
   delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
   patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
   
-  /** Get recovery router for client data recovery */
+  /** 
+   * Get recovery router for client data recovery 
+   * @deprecated Recovery routes are now automatically registered through BillableRouter. Use the main router instead.
+   */
   recoveryRouter(): Router;
   
-  /** Get admin router for operations management */
+  /** 
+   * Get admin router for operations management
+   * @deprecated Admin routes are now automatically registered through BillableRouter. Use the main router instead.
+   */
   adminRouter(options?: { auth?: RequestHandler }): Router;
   
   /** Get the underlying PayeeClient for advanced operations */
@@ -173,12 +194,10 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     
     // Note: /info endpoint is removed - use /.well-known/nuwa-payment/info instead
 
-    // Add public price endpoint (no middleware)
-    paymentRouter.get('/price', async (req: Request, res: Response) => {
-      await this.handlePriceRequest(req, res);
-    });
+    // Register built-in routes through BillableRouter for consistent auth/billing handling
+    this.registerBuiltInRoutes();
 
-    // Apply billing middleware wrapper to other payment routes
+    // Apply billing middleware wrapper to all payment routes
     paymentRouter.use(this.createBillingWrapper());
 
     // Mount billable router under payment routes
@@ -186,6 +205,257 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // Mount payment router under basePath
     this.router.use(basePath, paymentRouter);
+  }
+
+  /**
+   * Register built-in routes through BillableRouter for consistent auth/billing handling
+   */
+  private registerBuiltInRoutes(): void {
+    // Price endpoint (public, free, no auth required)
+    this.billableRouter.get('/price', { 
+      pricing: '0', 
+      authRequired: false 
+    }, async (req: Request, res: Response) => {
+      await this.handlePriceRequest(req, res);
+    }, 'builtin:price');
+
+    // Recovery endpoint (private, free, auth required)
+    this.billableRouter.get('/recovery', { 
+      pricing: '0', 
+      authRequired: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleRecoveryRequest(req, res);
+    }, 'builtin:recovery');
+
+    // Commit endpoint (private, free, auth required)
+    this.billableRouter.post('/commit', { 
+      pricing: '0', 
+      authRequired: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleCommitRequest(req, res);
+    }, 'builtin:commit');
+
+    // Admin endpoints
+    this.registerAdminRoutes();
+  }
+
+  /**
+   * Register admin routes through BillableRouter for consistent auth/billing handling
+   */
+  private registerAdminRoutes(): void {
+    // Health endpoint (public, no auth required)
+    this.billableRouter.get('/admin/health', { 
+      pricing: '0', 
+      authRequired: false 
+    }, async (req: Request, res: Response) => {
+      await this.handleAdminHealthRequest(req, res);
+    }, 'admin:health');
+
+    // Claims endpoint (admin only)
+    this.billableRouter.get('/admin/claims', { 
+      pricing: '0', 
+      adminOnly: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleAdminClaimsRequest(req, res);
+    }, 'admin:claims');
+
+    // Manual claim trigger endpoint (admin only)
+    this.billableRouter.post('/admin/claim/:channelId', { 
+      pricing: '0', 
+      adminOnly: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleAdminClaimRequest(req, res);
+    }, 'admin:claim');
+
+    // Get SubRAV endpoint (admin only)
+    this.billableRouter.get('/admin/subrav/:channelId/:nonce', { 
+      pricing: '0', 
+      adminOnly: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleAdminSubRavRequest(req, res);
+    }, 'admin:subrav');
+
+    // Cleanup endpoint (admin only)
+    this.billableRouter.delete('/admin/cleanup', { 
+      pricing: '0', 
+      adminOnly: true 
+    }, async (req: Request, res: Response) => {
+      await this.handleAdminCleanupRequest(req, res);
+    }, 'admin:cleanup');
+  }
+
+  /**
+   * Handle recovery endpoint requests
+   */
+  private async handleRecoveryRequest(req: Request, res: Response): Promise<void> {
+    try {
+      // Get clientDid from authenticated DID info (set by performDIDAuth)
+      const didInfo = (req as any).didInfo;
+      if (!didInfo || !didInfo.did) {
+        res.status(401).json({ error: 'DID authentication required' });
+        return;
+      }
+      const clientDid = didInfo.did;
+
+      // Derive channelId deterministically using ChannelUtils
+      const defaultAssetId = this.config.defaultAssetId ?? '0x3::gas_coin::RGas';
+      const channelId = deriveChannelId(clientDid, this.serviceDid, defaultAssetId);
+
+      let channel: any = null;
+      try {
+        channel = await this.payeeClient.getChannelInfo(channelId);
+      } catch (_) {
+        // Channel doesn't exist yet - this is normal for first-time clients
+      }
+
+      // Find the latest pending SubRAV for this channel (for recovery scenarios)
+      const pending = await this.middleware.findLatestPendingProposal(channelId);
+
+      const response = {
+        channel: channel ?? null,
+        pendingSubRav: pending ?? null,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Serialize BigInt values before sending response
+      const serializedResponse = this.serializeBigInt(response);
+      res.json(serializedResponse);
+    } catch (err) {
+      res.status(500).json({ 
+        error: 'Failed to perform recovery', 
+        details: err instanceof Error ? err.message : String(err) 
+      });
+    }
+  }
+
+  /**
+   * Handle commit endpoint requests
+   */
+  private async handleCommitRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const { subRav } = req.body || {};
+      if (!subRav) {
+        res.status(400).json({ error: 'subRav required' });
+        return;
+      }
+
+      try {
+        await this.payeeClient.processSignedSubRAV(subRav);
+        res.json({ success: true });
+      } catch (e) {
+        res.status(409).json({ error: (e as Error).message });
+      }
+    } catch (err) {
+      res.status(500).json({ 
+        error: 'Failed to commit SubRAV', 
+        details: err instanceof Error ? err.message : String(err) 
+      });
+    }
+  }
+
+  /**
+   * Handle admin health endpoint requests
+   */
+  private async handleAdminHealthRequest(req: Request, res: Response): Promise<void> {
+    res.json({
+      success: true,
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      paymentKitEnabled: true
+    });
+  }
+
+  /**
+   * Handle admin claims endpoint requests
+   */
+  private async handleAdminClaimsRequest(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('📊 Admin: Getting claims status...');
+      const claimsStatus = this.middleware.getClaimStatus();
+      console.log('📊 Claims status:', JSON.stringify(claimsStatus, this.bigintReplacer));
+      
+      const processingStats = this.middleware.getProcessingStats();
+      console.log('📊 Processing stats:', JSON.stringify(processingStats, this.bigintReplacer));
+      
+      const result = { 
+        claimsStatus: this.serializeBigInt(claimsStatus),
+        processingStats: this.serializeBigInt(processingStats),
+        timestamp: new Date().toISOString()
+      };
+      console.log('✅ Admin: Claims data retrieved successfully');
+      res.json(result);
+    } catch (error) {
+      console.error('❌ Admin: Failed to get claims status:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error),
+        details: 'Failed to retrieve claims status'
+      });
+    }
+  }
+
+  /**
+   * Handle admin claim trigger endpoint requests
+   */
+  private async handleAdminClaimRequest(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('🚀 Admin: Triggering claim for channel:', req.params.channelId);
+      const success = await this.middleware.manualClaim(req.params.channelId);
+      console.log('✅ Admin: Claim trigger result:', success);
+      res.json({ success, channelId: req.params.channelId });
+    } catch (error) {
+      console.error('❌ Admin: Failed to trigger claim:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error),
+        details: 'Failed to trigger claim'
+      });
+    }
+  }
+
+  /**
+   * Handle admin SubRAV endpoint requests
+   */
+  private async handleAdminSubRavRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const { channelId, nonce } = req.params;
+      console.log('📋 Admin: Getting SubRAV for channel:', channelId, 'nonce:', nonce);
+      const subRAV = await this.middleware.findPendingProposal(channelId, BigInt(nonce));
+      if (subRAV) {
+        console.log('✅ Admin: SubRAV found:', JSON.stringify(subRAV, this.bigintReplacer));
+        res.json(this.serializeBigInt(subRAV));
+      } else {
+        console.log('❌ Admin: SubRAV not found for channel:', channelId, 'nonce:', nonce);
+        res.status(404).json({ error: 'SubRAV not found' });
+      }
+    } catch (error) {
+      console.error('❌ Admin: Failed to get SubRAV:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error),
+        details: 'Failed to retrieve SubRAV'
+      });
+    }
+  }
+
+  /**
+   * Handle admin cleanup endpoint requests
+   */
+  private async handleAdminCleanupRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const maxAge = parseInt(req.query.maxAge as string) || 30;
+      console.log('🧹 Admin: Cleaning up expired proposals, max age:', maxAge, 'minutes');
+      const clearedCount = await this.middleware.clearExpiredProposals(maxAge);
+      console.log('✅ Admin: Cleanup completed, cleared count:', clearedCount);
+      res.json({ clearedCount, maxAgeMinutes: maxAge });
+    } catch (error) {
+      console.error('❌ Admin: Failed to cleanup expired proposals:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error),
+        details: 'Failed to cleanup expired proposals'
+      });
+    }
   }
 
   /**
@@ -248,20 +518,48 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
    */
   private createBillingWrapper(): RequestHandler {
     return async (req: Request, res: Response, next: NextFunction) => {
-      // Skip billing for health routes only
+      // Skip everything for health routes only
       if (req.path === '/health') {
         return next();
       }
 
       try {
-        // Step 1: DID Authentication (skip for public endpoints)
-        const isPublicEndpoint = req.path === '/price' || req.path === '/.well-known/nuwa-payment/info';
-        if (!isPublicEndpoint) {
-          await this.performDIDAuth(req, res);
+        // Step 1: Find matching billing rule to determine auth and billing requirements
+        const rule = this.billableRouter.findRule(req.method, req.path);
+        console.log(`🔍 Found rule for ${req.method} ${req.path}:`, rule);
+
+        // Step 2: Check payment requirement FIRST (before auth)
+        const needPayment = rule?.paymentRequired ?? false;
+        if (needPayment) {
+          // Extract payment data to check if signedSubRAV is present
+          const paymentData = this.middleware.extractPaymentData(req.headers as Record<string, string>);
+          if (!paymentData?.signedSubRav) {
+            console.log(`💳 Payment required but no signed SubRAV provided for ${req.method} ${req.path}`);
+            return res.status(402).json({
+              error: 'Payment Required',
+              message: 'Signed SubRAV required for this endpoint',
+              errorCode: 'PAYMENT_REQUIRED'
+            });
+          }
+          console.log(`💳 Payment data found for ${req.method} ${req.path}`);
         }
 
-        // Step 2: Apply billing middleware for business routes only (exclude admin endpoints)
-        if (!req.path.startsWith('/admin')) {
+        // Step 3: Authentication (based on rule configuration)
+        const needAuth = rule?.authRequired ?? false;
+        const needAdminAuth = rule?.adminOnly ?? false;
+        console.log(`🔐 Auth required for ${req.method} ${req.path}: ${needAuth}, Admin: ${needAdminAuth}`);
+        
+        if (needAuth || needAdminAuth) {
+          await this.performDIDAuth(req, res);
+        }
+        
+        if (needAdminAuth) {
+          await this.performAdminAuth(req, res);
+        }
+
+        // Step 4: Apply billing middleware (for all registered routes)
+        if (rule) {
+          console.log(`💰 Applying billing for ${req.method} ${req.path}`);
           const billingMiddleware = this.middleware.createExpressMiddleware();
           await new Promise<void>((resolve, reject) => {
             billingMiddleware(req as any, res as any, (error?: any) => {
@@ -269,6 +567,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               else resolve();
             });
           });
+        } else {
+          console.log(`⏭️ Skipping billing for ${req.method} ${req.path} (unregistered route)`);
         }
 
         next();
@@ -280,6 +580,37 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         });
       }
     };
+  }
+
+  /**
+   * Perform admin authorization check
+   */
+  private async performAdminAuth(req: express.Request, res: express.Response): Promise<void> {
+    try {
+      // Get allowed admin DIDs (default to service DID)
+      const allowedDids = Array.isArray(this.config.adminDid) 
+        ? this.config.adminDid 
+        : this.config.adminDid 
+          ? [this.config.adminDid] 
+          : [this.serviceDid];
+
+      // Get DID from request (set by performDIDAuth)
+      const didInfo = (req as any).didInfo;
+      if (!didInfo || !didInfo.did) {
+        throw new Error('DID authentication required for admin access');
+      }
+
+      // Check if signer DID is authorized for admin operations
+      const signerDid = didInfo.did;
+      if (!allowedDids.includes(signerDid)) {
+        throw new Error(`Access denied. DID ${signerDid} not authorized for admin operations`);
+      }
+
+      console.log(`✅ Admin authorization successful for DID: ${signerDid}`);
+    } catch (error) {
+      console.error('🚨 Admin authorization failed:', error);
+      throw new Error(`Admin authorization failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**
@@ -320,35 +651,35 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   // HTTP verb methods
   get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
-    this.billableRouter.get(path, options.pricing, handler, ruleId);
+    this.billableRouter.get(path, options, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
-    this.billableRouter.post(path, options.pricing, handler, ruleId);
+    this.billableRouter.post(path, options, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
-    this.billableRouter.put(path, options.pricing, handler, ruleId);
+    this.billableRouter.put(path, options, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
-    this.billableRouter.delete(path, options.pricing, handler, ruleId);
+    this.billableRouter.delete(path, options, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
   patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
     this.validateRouteOptions(options);
-    this.billableRouter.patch(path, options.pricing, handler, ruleId);
+    this.billableRouter.patch(path, options, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
@@ -363,6 +694,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Rule: If pricing > 0 and authRequired is explicitly false, throw error
     if (pricingAmount > 0 && options.authRequired === false) {
       throw new Error('Cannot create anonymous paid endpoints: pricing > 0 requires authRequired to be true or undefined');
+    }
+
+    // Rule: If adminOnly is true and authRequired is explicitly false, throw error
+    if (options.adminOnly && options.authRequired === false) {
+      throw new Error('Cannot create admin endpoints without authentication: adminOnly requires authRequired to be true or undefined');
     }
   }
 
@@ -432,112 +768,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         });
     };
 
-    // GET /price - Get current price for an asset
-    router.get('/price', async (req: Request, res: Response) => {
-      try {
-        const assetId = req.query.assetId as string;
-        if (!assetId) {
-          return res.status(400).json({ error: 'Missing assetId parameter' });
-        }
-
-        // Get price from rate provider
-        try {
-          const pricePicoUSD = await this.rateProvider.getPricePicoUSD(assetId);
-          const priceUSD = (Number(pricePicoUSD) / 1e12).toString();
-          
-          res.json({ 
-            assetId,
-            priceUSD,
-            pricePicoUSD: pricePicoUSD.toString(),
-            timestamp: new Date().toISOString(),
-            source: 'rate_provider',
-            lastUpdated: this.rateProvider.getLastUpdated(assetId) || undefined
-          });
-        } catch (rateError) {
-          // No fallback - rate provider error should be reported to client
-          throw rateError;
-        }
-      } catch (error) {
-        res.status(500).json({ 
-          error: 'Failed to get asset price',
-          details: error instanceof Error ? error.message : String(error)
-        });
-      }
-    });
+    // Note: /price endpoint moved to payment router to avoid duplication
 
     // -------------------------------------------------------------------
     // New unified recovery endpoints
     // -------------------------------------------------------------------
 
-    // GET /info - public service metadata
-    router.get('/info', (_req: Request, res: Response) => {
-      res.json({
-        serviceId: this.config.serviceId,
-        serviceDid: this.serviceDid,
-        network: this.config.network ?? 'local',
-        defaultAssetId: this.config.defaultAssetId ?? '0x3::gas_coin::RGas',
-        defaultPricePicoUSD: this.config.defaultPricePicoUSD?.toString(),
-        timestamp: new Date().toISOString()
-      });
-    });
+    // Note: /info endpoint removed - use /.well-known/nuwa-payment/info discovery endpoint instead
 
-    // GET /recovery - channel state & pending SubRAV (requires DID authentication)
-    router.get('/recovery', didAuthMiddleware, async (req: Request, res: Response) => {
-      try {
-        // Get clientDid from authenticated DID info (set by performDIDAuth)
-        const didInfo = (req as any).didInfo;
-        if (!didInfo || !didInfo.did) {
-          return res.status(401).json({ error: 'DID authentication required' });
-        }
-        const clientDid = didInfo.did;
-
-        // Derive channelId deterministically using ChannelUtils
-        const defaultAssetId = this.config.defaultAssetId ?? '0x3::gas_coin::RGas';
-        const channelId = deriveChannelId(clientDid, this.serviceDid, defaultAssetId);
-
-        let channel: any = null;
-        try {
-          channel = await this.payeeClient.getChannelInfo(channelId);
-        } catch (_) {
-          // Channel doesn't exist yet - this is normal for first-time clients
-        }
-
-        // Find the latest pending SubRAV for this channel (for recovery scenarios)
-        const pending = await this.middleware.findLatestPendingProposal(channelId);
-
-        const response = {
-          channel: channel ?? null,
-          pendingSubRav: pending ?? null,
-          timestamp: new Date().toISOString()
-        };
-        
-        // Serialize BigInt values before sending response
-        const serializedResponse = this.serializeBigInt(response);
-        res.json(serializedResponse);
-      } catch (err) {
-        res.status(500).json({ error: 'Failed to perform recovery', details: err instanceof Error ? err.message : String(err) });
-      }
-    });
-
-    // POST /commit - submit signed SubRAV (requires DID authentication)
-    router.post('/commit', didAuthMiddleware, async (req: Request, res: Response) => {
-      try {
-
-        const { subRav } = req.body || {};
-        if (!subRav) {
-          return res.status(400).json({ error: 'subRav required' });
-        }
-
-        try {
-          await this.payeeClient.processSignedSubRAV(subRav);
-          res.json({ success: true });
-        } catch (e) {
-          res.status(409).json({ error: (e as Error).message });
-        }
-      } catch (err) {
-        res.status(500).json({ error: 'Failed to commit SubRAV', details: err instanceof Error ? err.message : String(err) });
-      }
-    });
+    // Note: /recovery endpoint moved to BillableRouter for consistent auth/billing handling
+    // Note: /commit endpoint moved to BillableRouter for consistent auth/billing handling
 
     return router;
   }
