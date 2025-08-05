@@ -1,56 +1,64 @@
-import { Strategy, BillingContext, CostCalculator, ConfigLoader } from './types';
-import { StrategyFactory } from './factory';
-
-/**
- * Main billing engine that coordinates strategy execution and caching
+/*
+ * Compatibility wrapper: allows existing code that instantiates
+ * `new BillingEngine(configLoader)` to continue to work while delegating the
+ * real work to the Billing V2 engine.
  */
-export class BillingEngine implements CostCalculator {
-  private readonly strategyCache = new Map<string, Strategy>();
 
-  constructor(private readonly configLoader: ConfigLoader) {}
+import { BillingEngine as BillingEngineV2 } from './engine/billingEngine';
+import { BillingRule } from './core/types';
+// Ensure built-in strategies are registered
+import './strategies';
+import type { BillingContext, ConfigLoader } from './types';
+
+export class BillingEngine {
+  private readonly engineCache = new Map<string, BillingEngineV2>();
+
+  constructor(
+    private readonly configLoader: ConfigLoader,
+    private readonly rateProvider?: import('./rate/types').RateProvider,
+  ) {}
 
   /**
-   * Calculate cost for a billing context
+   * Lazily build (or fetch from cache) a V2 engine for the given service.
    */
-  async calcCost(ctx: BillingContext): Promise<bigint> {
-    let strategy = this.strategyCache.get(ctx.serviceId);
-    
-    if (!strategy) {
-      // Load configuration and build strategy
-      const config = await this.configLoader.load(ctx.serviceId);
-      strategy = StrategyFactory.buildRuleMatcher(config);
-      this.strategyCache.set(ctx.serviceId, strategy);
+  private async getEngineForService(serviceId: string): Promise<BillingEngineV2> {
+    let engine = this.engineCache.get(serviceId);
+    if (!engine) {
+      const cfg = await this.configLoader.load(serviceId);
+      const rules: BillingRule[] = cfg.rules;
+      engine = new BillingEngineV2(() => rules, this.rateProvider);
+      this.engineCache.set(serviceId, engine);
     }
+    return engine;
+  }
 
-    return strategy.evaluate(ctx);
+  async calcCost(ctx: BillingContext): Promise<bigint> {
+    const engine = await this.getEngineForService(ctx.serviceId);
+    return engine.calcCost(ctx as any); // cast – structural compatibility
   }
 
   /**
-   * Clear strategy cache for a specific service or all services
+   * Expose a list of currently cached service IDs (legacy API)
+   */
+  getCachedServices(): string[] {
+    return Array.from(this.engineCache.keys());
+  }
+
+  /**
+   * Clear cached engines (legacy API)
    */
   clearCache(serviceId?: string): void {
     if (serviceId) {
-      this.strategyCache.delete(serviceId);
+      this.engineCache.delete(serviceId);
     } else {
-      this.strategyCache.clear();
+      this.engineCache.clear();
     }
   }
 
   /**
-   * Preload and cache strategy for a service
+   * Preload (and cache) a strategy for a given service ID (legacy API)
    */
   async preloadStrategy(serviceId: string): Promise<void> {
-    if (!this.strategyCache.has(serviceId)) {
-      const config = await this.configLoader.load(serviceId);
-      const strategy = StrategyFactory.buildRuleMatcher(config);
-      this.strategyCache.set(serviceId, strategy);
-    }
+    await this.getEngineForService(serviceId);
   }
-
-  /**
-   * Get cached service IDs
-   */
-  getCachedServices(): string[] {
-    return Array.from(this.strategyCache.keys());
-  }
-} 
+}

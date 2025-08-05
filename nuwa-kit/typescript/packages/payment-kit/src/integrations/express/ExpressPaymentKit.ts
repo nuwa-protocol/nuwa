@@ -1,7 +1,7 @@
 import express, { Router, RequestHandler, Request, Response, NextFunction } from 'express';
 import { BillableRouter, RouteOptions } from './BillableRouter';
 import { HttpBillingMiddleware, ResponseAdapter, PaymentRule } from '../../middlewares/http/HttpBillingMiddleware';
-import { UsdBillingEngine } from '../../billing/usd-engine';
+import { BillingEngine } from '../../billing';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
@@ -95,7 +95,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // Create billing engine
     const configLoader = this.billableRouter.getConfigLoader();
-    const usdBillingEngine = new UsdBillingEngine(configLoader, rateProvider);
+    const billingEngine = new BillingEngine(configLoader, rateProvider);
 
     // Create ClaimScheduler for automated claiming
     // Use the same RAV repository and contract as the PayeeClient
@@ -117,7 +117,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Create HTTP billing middleware with ClaimScheduler
     this.middleware = new HttpBillingMiddleware({
       payeeClient,
-      billingEngine: usdBillingEngine,
+      billingEngine, 
       serviceId: config.serviceId,
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
       debug: config.debug || false,

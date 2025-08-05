@@ -9,7 +9,7 @@ import type {
   CostCalculator
 } from '../billing/types';
 import type { ConversionResult } from '../billing/rate/types';
-import { UsdBillingEngine } from '../billing/usd-engine';
+
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import type { ClaimScheduler } from './ClaimScheduler';
@@ -420,18 +420,8 @@ export interface PaymentVerificationResult extends VerificationResult {
      */
     private async calculateCostWithDetails(context: BillingContext): Promise<{cost: bigint, conversion?: ConversionResult}> {
       try {
-        // Check if billing engine supports detailed conversion
-        if (this.config.billingEngine instanceof UsdBillingEngine) {
-          const conversion = await this.config.billingEngine.calcCostWithDetails(context);
-          return {
-            cost: conversion.assetCost,
-            conversion
-          };
-        } else {
-          // Fallback to simple cost calculation
-          const cost = await this.config.billingEngine.calcCost(context);
-          return { cost };
-        }
+        const cost = await this.config.billingEngine.calcCost(context);
+        return { cost };
       } catch (error) {
         this.log('Billing calculation error:', error);
         throw new Error(`Failed to calculate cost: ${error}`);

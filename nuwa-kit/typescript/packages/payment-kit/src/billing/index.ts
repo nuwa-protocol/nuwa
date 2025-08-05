@@ -1,18 +1,25 @@
-// Core types and interfaces
-export * from './types';
+/**
+ * Payment-Kit – Billing module public surface
+ *
+ * This file now exposes *both* the legacy Billing V1 APIs and the new Billing
+ * V2 refactor side-by-side to allow incremental migration.
+ */
 
-// Billing engine
-export { BillingEngine } from './engine';
+// ──────────────────────
+// Stateless core (V2)
+// ──────────────────────
+export * from './core/types';
+export { findRule } from './core/rule-matcher';
+export {
+  register as registerStrategy,
+  getStrategy as getRegisteredStrategy,
+} from './core/strategy-registry';
 
-// Strategy factory
-export { StrategyFactory } from './factory';
-
-// Built-in strategies
+// Built-in strategies self-register on import
 export * from './strategies';
 
-// Configuration loaders
-export * from './config';
-
-// Rate providers and USD conversion
-export * from './rate';
-export { UsdBillingEngine } from './usd-engine'; 
+// ──────────────────────
+// Engines
+// ──────────────────────
+// Engine export
+export { BillingEngine } from './engine';

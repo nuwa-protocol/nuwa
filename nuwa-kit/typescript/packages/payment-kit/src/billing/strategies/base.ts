@@ -1,4 +1,4 @@
-import { Strategy, BillingContext } from '../types';
+import { Strategy, BillingContext } from '../core/types';
 
 /**
  * Base class for all billing strategies

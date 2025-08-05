@@ -1,4 +1,4 @@
-import type { BillingContext } from '../types';
+import type { BillingContext } from '../core/types';
 import { BaseStrategy } from './base';
 
 /**

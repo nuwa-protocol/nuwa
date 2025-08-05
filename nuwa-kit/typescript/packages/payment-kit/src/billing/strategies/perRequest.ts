@@ -1,5 +1,5 @@
 import { BaseStrategy } from './base';
-import { BillingContext } from '../types';
+import { BillingContext } from '../core/types';
 
 /**
  * Configuration for PerRequest strategy
