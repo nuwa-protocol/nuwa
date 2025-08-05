@@ -21,6 +21,7 @@ import type {
 } from '../../core/types';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import type { CostCalculator } from '../../billing/types';
+import type { BillingRule, RuleProvider } from '../../billing/core/types';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 
@@ -37,13 +38,6 @@ export interface ResponseAdapter {
   setStatus(code: number): ResponseAdapter;
   json(obj: any): ResponseAdapter | void;
   setHeader(name: string, value: string): ResponseAdapter;
-}
-
-// Rule information for payment processing (protocol-agnostic)
-export interface PaymentRule {
-  paymentRequired?: boolean;
-  authRequired?: boolean;
-  adminOnly?: boolean;
 }
 
 // Express types (for backward compatibility)
@@ -74,6 +68,8 @@ export interface HttpBillingMiddlewareConfig {
   payeeClient: PaymentChannelPayeeClient;
   /** Billing engine for cost calculation */
   billingEngine: CostCalculator;
+  /** Rule provider for pre-matching billing rules (V2 optimization) */
+  ruleProvider?: RuleProvider;
   /** Service ID for billing configuration */
   serviceId: string;
   /** Default asset ID if not provided in request context */
@@ -135,13 +131,13 @@ export class HttpBillingMiddleware {
   /**
    * Framework-agnostic payment processing handler
    */
-  async handle(req: GenericHttpRequest, resAdapter: ResponseAdapter, rule?: PaymentRule): Promise<ProcessorPaymentResult | null> {
+  async handle(req: GenericHttpRequest, resAdapter: ResponseAdapter, billingRule?: BillingRule): Promise<ProcessorPaymentResult | null> {
     try {
       this.log('🔍 Processing HTTP payment request:', req.method, req.path);
       
       // Step 1: Early payment requirement check if rule is provided
       let cachedPaymentData: HttpRequestPayload | null = null;
-      if (rule?.paymentRequired) {
+      if (billingRule?.paymentRequired) {
         cachedPaymentData = this.extractPaymentData(req.headers);
         if (!cachedPaymentData?.signedSubRav) {
           this.log(`💳 Payment required but no signed SubRAV provided for ${req.method} ${req.path}`);
@@ -160,7 +156,7 @@ export class HttpBillingMiddleware {
       const paymentData = cachedPaymentData || this.extractPaymentData(req.headers);
       
       // Build protocol-agnostic request metadata
-      const requestMeta = this.buildRequestMetadata(req, paymentData || undefined);
+      const requestMeta = this.buildRequestMetadata(req, paymentData || undefined, billingRule);
       
       // Delegate to PaymentProcessor for core payment logic
       const result = await this.processor.processPayment(
@@ -198,27 +194,6 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Process HTTP payment request
-   */
-  async processHttpPayment(req: GenericHttpRequest): Promise<ProcessorPaymentResult> {
-    // Extract payment data from HTTP headers
-    const paymentData = this.extractPaymentData(req.headers);
-    
-    // Build protocol-agnostic request metadata
-    const requestMeta = this.buildRequestMetadata(req, paymentData || undefined);
-    
-    // Delegate to PaymentProcessor for core payment logic
-    const result = await this.processor.processPayment(
-      requestMeta,
-      paymentData?.signedSubRav
-    );
-
-    return result;
-  }
-
-
-
-  /**
    * Extract payment data from HTTP request headers
    */
   extractPaymentData(headers: Record<string, string | string[] | undefined>): HttpRequestPayload | null {
@@ -242,7 +217,7 @@ export class HttpBillingMiddleware {
   /**
    * Build protocol-agnostic request metadata from HTTP request
    */
-  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: HttpRequestPayload): RequestMetadata {
+  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: HttpRequestPayload, billingRule?: BillingRule): RequestMetadata {
     return {
       operation: `${req.method.toLowerCase()}:${req.path}`,
       
@@ -253,6 +228,9 @@ export class HttpBillingMiddleware {
       // Extract payment channel info from signed SubRAV
       channelId: paymentData?.signedSubRav.subRav.channelId,
       vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment,
+      
+      // Pre-matched billing rule (V2 optimization)
+      billingRule,
       
       // HTTP-specific metadata for billing rules
       method: req.method,

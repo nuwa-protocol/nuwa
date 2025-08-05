@@ -1,6 +1,6 @@
 import express, { Router, RequestHandler, Request, Response, NextFunction } from 'express';
 import { BillableRouter, RouteOptions } from './BillableRouter';
-import { HttpBillingMiddleware, ResponseAdapter, PaymentRule } from '../../middlewares/http/HttpBillingMiddleware';
+import { HttpBillingMiddleware, ResponseAdapter } from '../../middlewares/http/HttpBillingMiddleware';
 import { BillingEngine } from '../../billing';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
@@ -116,7 +116,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Create HTTP billing middleware with ClaimScheduler
     this.middleware = new HttpBillingMiddleware({
       payeeClient,
-      billingEngine, 
+      billingEngine,
+      ruleProvider: this.billableRouter, // V2 optimization for pre-matching rules
       serviceId: config.serviceId,
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
       debug: config.debug || false,
@@ -501,15 +502,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           // Create response adapter for framework-agnostic billing
           const resAdapter = this.createResponseAdapter(res);
           
-          // Extract rule information for protocol-agnostic payment processing
-          const paymentRule: PaymentRule = {
-            paymentRequired: rule.paymentRequired,
-            authRequired: rule.authRequired,
-            adminOnly: rule.adminOnly
-          };
-          
           // Use the new framework-agnostic handle method with rule information
-          const result = await this.middleware.handle(req, resAdapter, paymentRule);
+          const result = await this.middleware.handle(req, resAdapter, rule);
           
           // Attach payment result to request for downstream handlers (Express-specific)
           if (result) {

@@ -8,6 +8,7 @@ import type {
   BillingContext,
   CostCalculator
 } from '../billing/types';
+import type { BillingRule } from '../billing/core/types';
 import type { ConversionResult } from '../billing/rate/types';
 
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
@@ -56,6 +57,9 @@ import { BillingContextBuilder } from './BillingContextBuilder';
     /** Payment channel information (extracted from signed SubRAV) */
     channelId?: string;
     vmIdFragment?: string;
+    
+    /** Pre-matched billing rule (optimization to avoid duplicate rule matching) */
+    billingRule?: BillingRule;
     
     /** Protocol-specific additional metadata */
     [key: string]: any;
@@ -215,7 +219,8 @@ export interface PaymentVerificationResult extends VerificationResult {
         );
   
         // Step 3: Calculate cost for current request with conversion details
-        const costResult = await this.calculateCostWithDetails(billingContext);
+        const preMatchedRule = requestMeta.billingRule;
+        const costResult = await this.calculateCostWithDetails(billingContext, preMatchedRule);
         const { cost, conversion } = costResult;
 
         if (cost === 0n) {
@@ -418,9 +423,18 @@ export interface PaymentVerificationResult extends VerificationResult {
     /**
      * Calculate cost with conversion details (USD billing)
      */
-    private async calculateCostWithDetails(context: BillingContext): Promise<{cost: bigint, conversion?: ConversionResult}> {
+    private async calculateCostWithDetails(context: BillingContext, preMatchedRule?: BillingRule): Promise<{cost: bigint, conversion?: ConversionResult}> {
       try {
-        const cost = await this.config.billingEngine.calcCost(context);
+        let cost: bigint;
+        
+        if (preMatchedRule && 'calcCostByRule' in this.config.billingEngine) {
+          // Use pre-matched rule to avoid duplicate rule matching (V2 optimization)
+          cost = await (this.config.billingEngine as any).calcCostByRule(context, preMatchedRule);
+        } else {
+          // Fallback to standard method
+          cost = await this.config.billingEngine.calcCost(context);
+        }
+        
         return { cost };
       } catch (error) {
         this.log('Billing calculation error:', error);
