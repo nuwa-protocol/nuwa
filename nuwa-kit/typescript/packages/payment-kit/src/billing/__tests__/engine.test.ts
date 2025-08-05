@@ -1,19 +1,44 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { BillingEngine } from '../engine';
+import { BillingEngine } from '../engine/billingEngine';
 import { FileConfigLoader } from '../config/fileLoader';
-import { BillingContext } from '../types';
+import { BillingContext, BillingRule } from '../types';
+import { RuleProvider } from '../core/types';
+// Import strategies to trigger registration
+import '../strategies';
+
+// Test RuleProvider that adapts FileConfigLoader for a specific service
+class TestRuleProvider implements RuleProvider {
+  constructor(
+    private readonly configLoader: FileConfigLoader,
+    private readonly serviceId: string
+  ) {}
+
+  getRules(): BillingRule[] {
+    // This is a synchronous version for testing - in real usage you'd cache the loaded config
+    return this.rules || [];
+  }
+
+  private rules: BillingRule[] = [];
+
+  async loadRules(): Promise<void> {
+    const config = await this.configLoader.load(this.serviceId);
+    this.rules = config.rules;
+  }
+}
 
 describe('BillingEngine Integration Tests', () => {
   const testConfigDir = path.join(__dirname, 'engine-test-configs');
   let engine: BillingEngine;
+  let ruleProvider: TestRuleProvider;
 
   beforeEach(async () => {
     // Create test config directory
     await fs.mkdir(testConfigDir, { recursive: true });
     const loader = new FileConfigLoader(testConfigDir);
-    engine = new BillingEngine(loader);
+    ruleProvider = new TestRuleProvider(loader, 'test-service');
+    engine = new BillingEngine(ruleProvider);
   });
 
   afterEach(async () => {
@@ -29,7 +54,7 @@ describe('BillingEngine Integration Tests', () => {
     // Create test configuration
     const yamlContent = `
 version: 1
-serviceId: test-api
+serviceId: test-service
 rules:
   - id: default-pricing
     default: true
@@ -39,13 +64,16 @@ rules:
 `;
 
     await fs.writeFile(
-      path.join(testConfigDir, 'test-api.yaml'),
+      path.join(testConfigDir, 'test-service.yaml'),
       yamlContent,
       'utf-8'
     );
 
+    // Load rules into the provider
+    await ruleProvider.loadRules();
+
     const ctx: BillingContext = {
-      serviceId: 'test-api',
+      serviceId: 'test-service',
       operation: 'upload',
       meta: { path: '/upload', method: 'POST' }
     };
@@ -57,7 +85,7 @@ rules:
   it('should match rules by path', async () => {
     const yamlContent = `
 version: 1
-serviceId: web-api
+serviceId: test-service
 rules:
   - id: upload-pricing
     when:
@@ -79,14 +107,17 @@ rules:
 `;
 
     await fs.writeFile(
-      path.join(testConfigDir, 'web-api.yaml'),
+      path.join(testConfigDir, 'test-service.yaml'),
       yamlContent,
       'utf-8'
     );
 
+    // Load rules into the provider
+    await ruleProvider.loadRules();
+
     // Test upload path
     const uploadCtx: BillingContext = {
-      serviceId: 'web-api',
+      serviceId: 'test-service',
       operation: 'upload',
       meta: { path: '/upload', method: 'POST' }
     };
@@ -96,7 +127,7 @@ rules:
 
     // Test download path
     const downloadCtx: BillingContext = {
-      serviceId: 'web-api',
+      serviceId: 'test-service',
       operation: 'download',
       meta: { path: '/download', method: 'GET' }
     };
@@ -106,7 +137,7 @@ rules:
 
     // Test default path
     const defaultCtx: BillingContext = {
-      serviceId: 'web-api',
+      serviceId: 'test-service',
       operation: 'other',
       meta: { path: '/other', method: 'GET' }
     };
@@ -118,7 +149,7 @@ rules:
   it('should match rules by method', async () => {
     const yamlContent = `
 version: 1
-serviceId: rest-api
+serviceId: test-service
 rules:
   - id: post-pricing
     when:
@@ -140,14 +171,17 @@ rules:
 `;
 
     await fs.writeFile(
-      path.join(testConfigDir, 'rest-api.yaml'),
+      path.join(testConfigDir, 'test-service.yaml'),
       yamlContent,
       'utf-8'
     );
 
+    // Load rules into the provider
+    await ruleProvider.loadRules();
+
     // Test POST method
     const postCtx: BillingContext = {
-      serviceId: 'rest-api',
+      serviceId: 'test-service',
       operation: 'create',
       meta: { method: 'POST', path: '/api/users' }
     };
@@ -157,7 +191,7 @@ rules:
 
     // Test GET method
     const getCtx: BillingContext = {
-      serviceId: 'rest-api',
+      serviceId: 'test-service',
       operation: 'read',
       meta: { method: 'GET', path: '/api/users' }
     };
@@ -166,104 +200,4 @@ rules:
     expect(getCost).toBe(BigInt(1000));
   });
 
-  it('should cache strategies for repeated calls', async () => {
-    const yamlContent = `
-version: 1
-serviceId: cached-service
-rules:
-  - id: default
-    default: true
-    strategy:
-      type: PerRequest
-      price: "1000"
-`;
-
-    await fs.writeFile(
-      path.join(testConfigDir, 'cached-service.yaml'),
-      yamlContent,
-      'utf-8'
-    );
-
-    const ctx: BillingContext = {
-      serviceId: 'cached-service',
-      operation: 'test',
-      meta: {}
-    };
-
-    // First call
-    const cost1 = await engine.calcCost(ctx);
-    
-    // Second call should use cached strategy
-    const cost2 = await engine.calcCost(ctx);
-
-    expect(cost1).toBe(BigInt(1000));
-    expect(cost2).toBe(BigInt(1000));
-    expect(engine.getCachedServices()).toContain('cached-service');
-  });
-
-  it('should clear cache when requested', async () => {
-    const yamlContent = `
-version: 1
-serviceId: cache-clear-test
-rules:
-  - id: default
-    default: true
-    strategy:
-      type: PerRequest
-      price: "1000"
-`;
-
-    await fs.writeFile(
-      path.join(testConfigDir, 'cache-clear-test.yaml'),
-      yamlContent,
-      'utf-8'
-    );
-
-    const ctx: BillingContext = {
-      serviceId: 'cache-clear-test',
-      operation: 'test',
-      meta: {}
-    };
-
-    // Load and cache
-    await engine.calcCost(ctx);
-    expect(engine.getCachedServices()).toContain('cache-clear-test');
-
-    // Clear cache
-    engine.clearCache('cache-clear-test');
-    expect(engine.getCachedServices()).not.toContain('cache-clear-test');
-  });
-
-  it('should preload strategies', async () => {
-    const yamlContent = `
-version: 1
-serviceId: preload-test
-rules:
-  - id: default
-    default: true
-    strategy:
-      type: PerRequest
-      price: "1000"
-`;
-
-    await fs.writeFile(
-      path.join(testConfigDir, 'preload-test.yaml'),
-      yamlContent,
-      'utf-8'
-    );
-
-    // Preload strategy
-    await engine.preloadStrategy('preload-test');
-    expect(engine.getCachedServices()).toContain('preload-test');
-
-    // Should work without loading again
-    const ctx: BillingContext = {
-      serviceId: 'preload-test',
-      operation: 'test',
-      meta: {}
-    };
-
-    const cost = await engine.calcCost(ctx);
-    expect(cost).toBe(BigInt(1000));
-  });
 }); 

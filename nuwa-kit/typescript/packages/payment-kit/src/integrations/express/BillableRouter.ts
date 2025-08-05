@@ -1,5 +1,7 @@
 import express, { Router, RequestHandler } from 'express';
+import { findRule as coreFindRule } from '../../billing/core/rule-matcher';
 import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig } from '../../billing/types';
+import type { RuleProvider } from '../../billing/core/types';
 
 /**
  * Route options for registering routes with billing
@@ -50,7 +52,7 @@ export interface BillableRouterOptions {
  * const billingEngine = new UsdBillingEngine(br.getConfigLoader(), rateProvider);
  * ```
  */
-export class BillableRouter {
+export class BillableRouter implements RuleProvider {
   /** The underlying Express Router you should mount into your app */
   public readonly router: Router;
   /** Collected billing rules */
@@ -113,59 +115,11 @@ export class BillableRouter {
   }
 
   /**
-   * Find a billing rule that matches the given method and path
+   * Find a billing rule that matches the given HTTP method + path using the
+   * shared core rule-matcher (single source of truth).
    */
   findRule(method: string, path: string): BillingRule | undefined {
-    console.log(`🔍 Looking for rule matching: ${method.toUpperCase()} ${path}`);
-    
-    for (const rule of this.rules) {
-      console.log(`🔍 Checking rule:`, rule.id, rule.when);
-      
-      // Check if this rule matches
-      if (rule.when) {
-        // Check method match
-        if (rule.when.method && rule.when.method !== method.toUpperCase()) {
-          //console.log(`  ❌ Method mismatch: expected ${rule.when.method}, got ${method.toUpperCase()}`);
-          continue;
-        }
-        
-        // Check path match
-        if (rule.when.path) {
-          if (rule.when.path === path) {
-            console.log(`  ✅ Exact path match: ${rule.id}`);
-            return rule;
-          } else {
-            //console.log(`  ❌ Path mismatch: expected ${rule.when.path}, got ${path}`);
-            continue;
-          }
-        }
-        
-        // Check path regex match
-        if (rule.when.pathRegex) {
-          const regex = new RegExp(rule.when.pathRegex);
-          if (regex.test(path)) {
-            console.log(`  ✅ Regex path match: ${rule.id}`);
-            return rule;
-          } else {
-            //console.log(`  ❌ Regex path mismatch: ${rule.when.pathRegex} does not match ${path}`);
-            continue;
-          }
-        }
-        
-        // If no path/pathRegex specified but method matches, this could be a catch-all
-        if (!rule.when.path && !rule.when.pathRegex) {
-          console.log(`  ✅ Method-only match: ${rule.id}`);
-          return rule;
-        }
-      } else if (rule.default) {
-        // Default rule - matches anything if no other rules matched
-        console.log(`  ✅ Default rule match: ${rule.id}`);
-        return rule;
-      }
-    }
-    
-    console.log(`  ❌ No rule found for ${method.toUpperCase()} ${path}`);
-    return undefined;
+    return coreFindRule({ method: method.toUpperCase(), path }, this.rules);
   }
 
   /**

@@ -21,5 +21,5 @@ export * from './strategies';
 // ──────────────────────
 // Engines
 // ──────────────────────
-// Engine export
-export { BillingEngine } from './engine';
+// New V2 engine
+export { BillingEngine } from './engine/billingEngine';

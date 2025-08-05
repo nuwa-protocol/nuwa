@@ -93,9 +93,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       defaultPricePicoUSD: config.defaultPricePicoUSD
     });
 
-    // Create billing engine
-    const configLoader = this.billableRouter.getConfigLoader();
-    const billingEngine = new BillingEngine(configLoader, rateProvider);
+    // Create billing engine using the billable router as rule provider
+    const billingEngine = new BillingEngine(this.billableRouter, rateProvider);
 
     // Create ClaimScheduler for automated claiming
     // Use the same RAV repository and contract as the PayeeClient
@@ -655,9 +654,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
    * Clear billing engine cache to ensure new routes are picked up
    */
   private clearBillingCache(): void {
-    // Access the billing engine through the middleware and clear its cache
-    // This ensures that newly registered routes are picked up on next billing calculation
-    (this.middleware as any).processor?.billingEngine?.clearCache?.(this.config.serviceId);
+    // With the new RuleProvider pattern, BillingEngine fetches rules dynamically
+    // on each request, so no explicit cache clearing is needed.
+    // This method is kept for API compatibility but does nothing.
   }
 
   /**

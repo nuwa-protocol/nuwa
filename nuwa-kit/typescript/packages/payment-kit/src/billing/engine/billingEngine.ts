@@ -1,4 +1,4 @@
-import { BillingContext, BillingRule } from '../core/types';
+import { BillingContext, BillingRule, RuleProvider } from '../core/types';
 import { findRule } from '../core/rule-matcher';
 import { getStrategy } from '../core/strategy-registry';
 import { RateProvider } from '../rate/types';
@@ -17,8 +17,8 @@ import { convertUsdToAsset } from '../core/converter';
  */
 export class BillingEngine {
   constructor(
-    /** Function returning the latest rule list. Allows dynamic hot-reloading. */
-    private readonly getRules: () => BillingRule[],
+    /** Rule provider for accessing the latest billing rules */
+    private readonly ruleProvider: RuleProvider,
     /** Optional rate provider for multi-asset settlement */
     private readonly rateProvider?: RateProvider,
   ) {}
@@ -28,7 +28,7 @@ export class BillingEngine {
    * matching on every call to ensure we always use the latest rule set.
    */
   async calcCost(ctx: BillingContext): Promise<bigint> {
-    const rule = findRule(ctx.meta, this.getRules());
+    const rule = findRule(ctx.meta, this.ruleProvider.getRules());
     if (!rule) {
       throw new Error('No billing rule matched the provided context.');
     }

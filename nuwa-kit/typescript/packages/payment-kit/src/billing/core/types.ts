@@ -59,3 +59,15 @@ export interface BillingRule {
   adminOnly?: boolean;
   paymentRequired?: boolean;
 }
+
+/**
+ * Interface for providing billing rules to the BillingEngine.
+ * This replaces the ConfigLoader pattern and removes serviceId dependency.
+ */
+export interface RuleProvider {
+  /**
+   * Returns the current set of billing rules.
+   * Called by BillingEngine on each cost calculation to ensure latest rules.
+   */
+  getRules(): BillingRule[];
+}
