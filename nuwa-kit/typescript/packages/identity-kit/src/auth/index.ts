@@ -8,4 +8,5 @@ export const DIDAuth = {
 } as const;
 
 export * from './types';
+export { AuthErrorCode } from './v1';
 export default DIDAuth;
