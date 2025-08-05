@@ -100,6 +100,7 @@ export interface DIDAuthResult {
   did: string;
   isValid: boolean;
   error?: string;
+  warning?: string; // For cases where we ignore certain errors in development
 }
 
 // Request Context

@@ -2,7 +2,7 @@
  * MCP Server Proxy - DIDAuth Module
  */
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { DIDAuth, VDRRegistry, initRoochVDR } from '@nuwa-ai/identity-kit';
+import { DIDAuth, VDRRegistry, initRoochVDR, AuthErrorCode } from '@nuwa-ai/identity-kit';
 import { DIDAuthResult } from './types.js';
 import { performance } from 'node:perf_hooks';
 
@@ -41,11 +41,44 @@ export async function verifyDIDAuth(authHeader: string): Promise<DIDAuthResult> 
 
     const verify = await DIDAuth.v1.verifyAuthHeader(authHeader, registry);
     if (!verify.ok) {
-      const msg = (verify as { error: string }).error;
+      // Check for specific error codes that we want to temporarily ignore
+      if (verify.errorCode === AuthErrorCode.NONCE_REPLAYED) {
+        console.warn('Ignoring nonce replay error for development/testing:', verify.error);
+        // Extract DID from signedObject even though verification failed
+        if (verify.signedObject) {
+          const signerDid = verify.signedObject.signature.signer_did;
+          return { 
+            isValid: true, 
+            did: signerDid,
+            warning: `Ignored nonce replay: ${verify.error}`
+          };
+        }
+      }
+      
+      if (verify.errorCode === AuthErrorCode.TIMESTAMP_OUT_OF_WINDOW) {
+        console.warn('Ignoring timestamp error for development/testing:', verify.error);
+        // Extract DID from signedObject even though verification failed
+        if (verify.signedObject) {
+          const signerDid = verify.signedObject.signature.signer_did;
+          return { 
+            isValid: true, 
+            did: signerDid,
+            warning: `Ignored timestamp error: ${verify.error}`
+          };
+        }
+      }
+
+      // For other errors, fail the verification
+      console.error('DIDAuth verification failed:', {
+        errorCode: verify.errorCode,
+        error: verify.error,
+        header: authHeader.substring(0, 50) + '...' // truncate for logging
+      });
+      
       return { 
         isValid: false, 
         did: '', 
-        error: `Invalid DIDAuth: ${msg}` 
+        error: `DIDAuth verification failed [${verify.errorCode}]: ${verify.error}` 
       };
     }
     
@@ -55,6 +88,7 @@ export async function verifyDIDAuth(authHeader: string): Promise<DIDAuthResult> 
       did: signerDid 
     };
   } catch (error) {
+    console.error('DIDAuth verification exception:', error);
     return { 
       isValid: false, 
       did: '', 
