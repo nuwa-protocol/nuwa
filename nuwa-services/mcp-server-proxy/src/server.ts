@@ -97,7 +97,9 @@ function registerRoutes(
     const tRouteStart = performance.now();
     const upstream = determineUpstream(request, config.routes, config.defaultUpstream);
     setUpstreamInContext(request, upstream);
-    request.ctx.timings.route = Number((performance.now() - tRouteStart).toFixed(3));
+    if (request.ctx && request.ctx.timings) {
+      request.ctx.timings.route = Number((performance.now() - tRouteStart).toFixed(3));
+    }
     done();
   });
   
@@ -108,7 +110,7 @@ function registerRoutes(
   
   // MCP tool.list route
   server.get('/mcp/tools', async (request, reply) => {
-    const upstreamName = request.ctx.upstream;
+    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
     const upstream = upstreams[upstreamName];
     
     if (!upstream) {
@@ -130,7 +132,7 @@ function registerRoutes(
   
   // MCP tool.call route
   server.post('/mcp/tool.call', async (request, reply) => {
-    const upstreamName = request.ctx.upstream;
+    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
     const upstream = upstreams[upstreamName];
     
     if (!upstream) {
@@ -152,7 +154,7 @@ function registerRoutes(
   
   // MCP prompt.load route
   server.post('/mcp/prompt.load', async (request, reply) => {
-    const upstreamName = request.ctx.upstream;
+    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
     const upstream = upstreams[upstreamName];
     
     if (!upstream) {
@@ -220,10 +222,12 @@ function registerRoutes(
     }
 
     // Record JSON-RPC method to ctx
-    request.ctx.rpcMethod = payload?.method ?? null;
+    if (request.ctx) {
+      request.ctx.rpcMethod = payload?.method ?? null;
+    }
 
     const { method, params, id } = payload || {};
-    const upstreamName = request.ctx.upstream;
+    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
     const upstream = upstreams[upstreamName];
     const caps = upstream?.capabilities || {};
 
@@ -350,6 +354,18 @@ function registerRoutes(
 
   // --- logging ---
   server.addHook('onResponse', (request, reply, done) => {
+    // Safely handle cases where request.ctx might be undefined
+    if (!request.ctx) {
+      request.log.warn({
+        reqId: request.id,
+        method: request.method,
+        url: request.url,
+        status: reply.statusCode,
+      }, 'request.summary.no_ctx');
+      done();
+      return;
+    }
+    
     const total = Number((performance.now() - request.ctx.startTime).toFixed(3));
     const summary = {
       reqId: request.id,

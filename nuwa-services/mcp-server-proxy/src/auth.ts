@@ -116,14 +116,18 @@ export async function didAuthMiddleware(
       ...request.ctx,
       callerDid: sock[SOCKET_DID_KEY] as string,
     };
-    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    if (request.ctx && request.ctx.timings) {
+      request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    }
     return; // already authenticated
   }
 
   const authHeader = extractAuthHeader(request);
   
   if (!authHeader) {
-    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    if (request.ctx && request.ctx.timings) {
+      request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    }
     return reply
       .status(401)
       .send({ error: 'Missing Authorization header' });
@@ -131,7 +135,9 @@ export async function didAuthMiddleware(
   const result = await verifyDIDAuth(authHeader);
   console.debug('request '+ request.id +' verifyDIDAuth result', result);
   if (!result.isValid) {
-    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    if (request.ctx && request.ctx.timings) {
+      request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+    }
     return reply
       .status(403)
       .send({ error: result.error || 'DIDAuth verification failed' });
@@ -145,5 +151,7 @@ export async function didAuthMiddleware(
     ...request.ctx,
     callerDid: result.did,
   };
-  request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+  if (request.ctx && request.ctx.timings) {
+    request.ctx.timings.auth = Number((performance.now() - t0).toFixed(3));
+  }
 } 

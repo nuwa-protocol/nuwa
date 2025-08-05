@@ -2,6 +2,7 @@
  * MCP Server Proxy - Router Module
  */
 import { FastifyRequest } from 'fastify';
+import { performance } from 'node:perf_hooks';
 import { RouteConfig } from './types.js';
 
 /**
@@ -45,8 +46,16 @@ export function determineUpstream(
  * @param upstream The upstream name
  */
 export function setUpstreamInContext(request: FastifyRequest, upstream: string): void {
-  request.ctx = {
-    ...request.ctx,
-    upstream,
-  };
+  if (!request.ctx) {
+    request.ctx = {
+      upstream,
+      startTime: performance.now(),
+      timings: {},
+    } as any;
+  } else {
+    request.ctx = {
+      ...request.ctx,
+      upstream,
+    };
+  }
 } 
