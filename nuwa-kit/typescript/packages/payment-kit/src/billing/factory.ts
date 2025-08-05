@@ -95,7 +95,6 @@ class RuleMatcherStrategy implements Strategy {
 
     // Check path matching
     if (when.path && ctx.meta.path !== when.path) {
-      console.log(`❌ Rule ${rule.id} path mismatch: expected ${when.path}, got ${ctx.meta.path}`);
       return false;
     }
 
@@ -114,7 +113,6 @@ class RuleMatcherStrategy implements Strategy {
 
     // Check method matching
     if (when.method && ctx.meta.method !== when.method) {
-      console.log(`❌ Rule ${rule.id} method mismatch: expected ${when.method}, got ${ctx.meta.method}`);
       return false;
     }
 
