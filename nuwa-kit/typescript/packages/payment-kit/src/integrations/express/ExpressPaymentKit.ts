@@ -1,5 +1,5 @@
 import express, { Router, RequestHandler, Request, Response, NextFunction } from 'express';
-import { BillableRouter } from './BillableRouter';
+import { BillableRouter, RouteOptions } from './BillableRouter';
 import { HttpBillingMiddleware } from '../../middlewares/http/HttpBillingMiddleware';
 import { UsdBillingEngine } from '../../billing/usd-engine';
 import { ContractRateProvider } from '../../billing/rate/contract';
@@ -13,41 +13,6 @@ import type { StrategyConfig } from '../../billing/types';
 import type { RateProvider } from '../../billing/rate/types';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
-
-/**
- * Route registration options
- */
-export interface RouteOptions {
-  /**
-   * Pricing strategy.
-   * 0 / '0' means free (skip billing logic)
-   */
-  pricing: bigint | string | StrategyConfig;
-
-  /**
-   * Whether DIDAuthV1 authentication is required.
-   * Default rules:
-   *   pricing == 0  → false
-   *   pricing  > 0  → true
-   * If developer explicitly sets false with pricing>0, framework will throw error during startup.
-   */
-  authRequired?: boolean;
-
-  /**
-   * Whether payment (signed SubRAV) is required for this route.
-   * Default rules:
-   *   pricing == 0 (fixed) → false
-   *   pricing > 0 (fixed) → true  
-   *   dynamic strategy → true
-   */
-  paymentRequired?: boolean;
-
-  /**
-   * Whether admin authorization is required (implies authRequired: true).
-   * Admin routes require both DID authentication and admin permission check.
-   */
-  adminOnly?: boolean;
-}
 
 /**
  * Configuration for creating ExpressPaymentKit

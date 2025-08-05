@@ -2,17 +2,29 @@ import express, { Router, RequestHandler } from 'express';
 import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig } from '../../billing/types';
 
 /**
- * Route options for registering with BillableRouter
+ * Route options for registering routes with billing
  */
 export interface RouteOptions {
-  /** Pricing strategy */
+  /**
+   * Pricing strategy.
+   * 0 / '0' means free (skip billing logic)
+   */
   pricing: bigint | string | StrategyConfig;
-  /** Whether DID authentication is required */
+
+  /**
+   * Whether DID authentication is required.
+   * Default rules:
+   *   pricing == 0  → false
+   *   pricing  > 0  → true
+   * If developer explicitly sets false with pricing>0, framework will throw error during startup.
+   */
   authRequired?: boolean;
-  /** Whether admin authorization is required (implies authRequired: true) */
+
+  /**
+   * Whether admin authorization is required (implies authRequired: true).
+   * Admin routes require both DID authentication and admin permission check.
+   */
   adminOnly?: boolean;
-  /** Whether payment (signed SubRAV) is required for this route */
-  paymentRequired?: boolean;
 }
 
 /**
@@ -208,24 +220,21 @@ export class BillableRouter {
     // Validate and determine auth and payment requirements
     const adminOnly = routeOptions.adminOnly || false;
     let authRequired = routeOptions.authRequired;
-    let paymentRequired = routeOptions.paymentRequired;
     
     // Validation: adminOnly implies authRequired
     if (adminOnly && authRequired === false) {
       throw new Error(`Route ${method.toUpperCase()} ${path}: adminOnly requires authRequired to be true or undefined`);
     }
     
-    // Determine payment requirement first
-    if (paymentRequired === undefined) {
-      // Determine based on pricing strategy
-      const pricing = typeof routeOptions.pricing === 'string' ? BigInt(routeOptions.pricing) : routeOptions.pricing;
-      if (typeof pricing === 'bigint') {
-        // Fixed price: only require payment if price > 0
-        paymentRequired = pricing > 0n;
-      } else {
-        // Dynamic strategy: always require payment (per user requirement)
-        paymentRequired = true;
-      }
+    // Auto-determine payment requirement based on pricing strategy
+    const pricing = typeof routeOptions.pricing === 'string' ? BigInt(routeOptions.pricing) : routeOptions.pricing;
+    let paymentRequired: boolean;
+    if (typeof pricing === 'bigint') {
+      // Fixed price: only require payment if price > 0
+      paymentRequired = pricing > 0n;
+    } else {
+      // Dynamic strategy: always require payment
+      paymentRequired = true;
     }
     
     // Determine final auth requirement
@@ -235,7 +244,6 @@ export class BillableRouter {
         authRequired = true;
       } else {
         // Default behavior: free endpoints don't require auth, paid ones do
-        const pricing = typeof routeOptions.pricing === 'string' ? BigInt(routeOptions.pricing) : routeOptions.pricing;
         const pricingAmount = typeof pricing === 'bigint' ? pricing : BigInt(0);
         authRequired = pricingAmount > 0;
       }

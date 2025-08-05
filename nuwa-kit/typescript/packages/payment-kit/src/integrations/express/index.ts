@@ -1,6 +1,5 @@
 // Express integration exports
-export { BillableRouter, BillableRouterOptions } from './BillableRouter';
-export { RouteOptions as BillableRouteOptions } from './BillableRouter';
+export { BillableRouter, BillableRouterOptions, RouteOptions } from './BillableRouter';
 export * from './ExpressPaymentKit';
 
 // IdentityEnv integration
