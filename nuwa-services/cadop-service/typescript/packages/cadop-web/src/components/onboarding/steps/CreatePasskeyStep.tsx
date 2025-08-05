@@ -1,58 +1,83 @@
-import React, { useState } from 'react';
-import { Button, Spinner, Alert, AlertTitle, AlertDescription } from '@/components/ui';
-import { PasskeyService } from '@/lib/passkey/PasskeyService';
+import { KeyRound } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+	FixedCardActionButton,
+	FixedCardLayout,
+	FixedCardLoading,
+} from "@/components/ui";
+import { PasskeyService } from "@/lib/passkey/PasskeyService";
 
 interface Props {
-  onComplete: (userDid: string) => void;
+	onComplete: (userDid: string) => void;
 }
 
 export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-  const handleCreate = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const service = new PasskeyService();
-      const did = await service.ensureUser();
-      onComplete(did);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
+	const handleCreate = async () => {
+		setLoading(true);
+		setError(null);
+		try {
+			const service = new PasskeyService();
+			const did = await service.ensureUser();
+			onComplete(did);
+		} catch (e) {
+			setError(e instanceof Error ? e.message : String(e));
+		} finally {
+			setLoading(false);
+		}
+	};
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="large" />
-      </div>
-    );
-  }
+	if (loading) {
+		return (
+			<FixedCardLoading
+				title="Creating Passkey..."
+				message="Please complete the passkey creation in your device"
+			/>
+		);
+	}
 
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      {error ? (
-        <div className="w-full max-w-md">
-          <Alert variant="destructive">
-            <AlertTitle>Failed to create Passkey</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <div className="mt-4 flex justify-center">
-            <Button variant="outline" onClick={handleCreate}>Retry</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md text-center">
-          <h2 className="text-2xl font-bold mb-2">Create a Passkey to get started</h2>
-          <p className="text-gray-600 mb-6">We will use a platform Passkey to generate your user DID.</p>
-          <Button onClick={handleCreate}>
-            Create Passkey
-          </Button>
-        </div>
-      )}
-    </div>
-  );
+	if (error) {
+		return (
+			<FixedCardLayout
+				icon={<KeyRound className="h-12 w-12 text-red-400" />}
+				title="Passkey creation failed"
+				actions={
+					<FixedCardActionButton onClick={handleCreate} size="lg">
+						Retry
+					</FixedCardActionButton>
+				}
+			>
+				<Alert variant="destructive">
+					<AlertTitle>Error</AlertTitle>
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			</FixedCardLayout>
+		);
+	}
+
+	return (
+		<FixedCardLayout
+			icon={<KeyRound className="h-12 w-12 text-primary-600" />}
+			title="Create Passkey for Nuwa DID"
+			subtitle="We will use the passkey to generate your Nuwa DID."
+			actions={
+				<FixedCardActionButton onClick={handleCreate} size="lg">
+					Create Passkey
+				</FixedCardActionButton>
+			}
+		>
+			<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md text-center">
+				<p className="text-blue-800 font-semibold text-md">
+					Please Note: The passkey will be securely stored on your device for
+					DID authentication and management.
+				</p>
+			</div>
+		</FixedCardLayout>
+	);
 };
