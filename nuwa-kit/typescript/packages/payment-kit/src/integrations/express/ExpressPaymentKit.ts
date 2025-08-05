@@ -15,6 +15,26 @@ import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 
 /**
+ * Route registration options
+ */
+export interface RouteOptions {
+  /**
+   * Pricing strategy.
+   * 0 / '0' means free (skip billing logic)
+   */
+  pricing: bigint | string | StrategyConfig;
+
+  /**
+   * Whether DIDAuthV1 authentication is required.
+   * Default rules:
+   *   pricing == 0  → false
+   *   pricing  > 0  → true
+   * If developer explicitly sets false with pricing>0, framework will throw error during startup.
+   */
+  authRequired?: boolean;
+}
+
+/**
  * Configuration for creating ExpressPaymentKit
  */
 export interface ExpressPaymentKitOptions {
@@ -31,6 +51,14 @@ export interface ExpressPaymentKitOptions {
   defaultAssetId?: string;
   /** Default price in picoUSD when no rule matches */
   defaultPricePicoUSD?: string | bigint;
+
+  /**
+   * Prefix under which all payment-channel routes are mounted.
+   * Defaults to "/payment-channel".
+   * Example: "/billing" or "/api/pay"
+   */
+  basePath?: string;
+
   /** One or more DIDs that are authorized to call admin endpoints (defaults to service signer DID) */
   adminDid?: string | string[];
   /** Debug logging */
@@ -45,11 +73,11 @@ export interface ExpressPaymentKit {
   readonly router: Router;
   
   /** HTTP verb methods for registering routes with billing */
-  get(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this;
-  post(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this;
-  put(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this;
-  delete(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this;
-  patch(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this;
+  get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
   
   /** Get recovery router for client data recovery */
   recoveryRouter(): Router;
@@ -125,11 +153,94 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Create main router
     this.router = express.Router();
     
-    // Apply billing middleware wrapper
-    this.router.use(this.createBillingWrapper());
+    // Set up discovery endpoint and routes
+    this.setupRoutes();
+  }
+
+  /**
+   * Set up all routes including discovery endpoint and payment-related routes
+   */
+  private setupRoutes(): void {
+    const basePath = this.config.basePath || '/payment-channel';
+
+    // 1. Discovery endpoint (well-known, completely public - no middleware)
+    this.router.get('/.well-known/nuwa-payment/info', (req: Request, res: Response) => {
+      this.handleDiscoveryRequest(req, res);
+    });
+
+    // 2. Create a sub-router for all payment-related routes
+    const paymentRouter = express.Router();
     
-    // Mount billable router
-    this.router.use(this.billableRouter.router);
+    // Note: /info endpoint is removed - use /.well-known/nuwa-payment/info instead
+
+    // Add public price endpoint (no middleware)
+    paymentRouter.get('/price', async (req: Request, res: Response) => {
+      await this.handlePriceRequest(req, res);
+    });
+
+    // Apply billing middleware wrapper to other payment routes
+    paymentRouter.use(this.createBillingWrapper());
+
+    // Mount billable router under payment routes
+    paymentRouter.use(this.billableRouter.router);
+
+    // Mount payment router under basePath
+    this.router.use(basePath, paymentRouter);
+  }
+
+  /**
+   * Handle discovery requests for the well-known endpoint
+   */
+  private handleDiscoveryRequest(req: Request, res: Response): void {
+    const discoveryInfo = {
+      version: 1,
+      serviceId: this.config.serviceId,
+      serviceDid: this.serviceDid,
+      network: this.config.network || 'test',
+      defaultAssetId: this.config.defaultAssetId || '0x3::gas_coin::RGas',
+      basePath: this.config.basePath || '/payment-channel'
+    };
+
+    if (this.config.defaultPricePicoUSD) {
+      (discoveryInfo as any).defaultPricePicoUSD = this.config.defaultPricePicoUSD.toString();
+    }
+
+    // Set cache headers as recommended in the spec
+    res.set('Cache-Control', 'max-age=3600, public');
+    res.json(discoveryInfo);
+  }
+
+  /**
+   * Handle price requests - get current asset price
+   */
+  private async handlePriceRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const assetId = req.query.assetId as string || this.config.defaultAssetId || '0x3::gas_coin::RGas';
+      
+      // Get price from rate provider
+      const pricePicoUSD = await this.rateProvider.getPricePicoUSD(assetId);
+      const lastUpdated = this.rateProvider.getLastUpdated(assetId);
+      
+      // Convert picoUSD to USD (divide by 10^12)
+      const priceUSD = Number(pricePicoUSD) / 1e12;
+      
+      const response = {
+        assetId,
+        priceUSD: priceUSD.toString(),
+        pricePicoUSD: pricePicoUSD.toString(),
+        timestamp: new Date().toISOString(),
+        source: 'rate-provider',
+        lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : undefined
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Price request failed:', error);
+      res.status(500).json({
+        error: 'Price lookup failed',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   /**
@@ -143,14 +254,14 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       }
 
       try {
-        // Step 1: DID Authentication (skip for public payment-channel endpoints)
-        const isPublicPaymentChannelEndpoint = req.path === '/payment-channel/info' || req.path === '/payment-channel/price';
-        if (!isPublicPaymentChannelEndpoint) {
+        // Step 1: DID Authentication (skip for public endpoints)
+        const isPublicEndpoint = req.path === '/price' || req.path === '/.well-known/nuwa-payment/info';
+        if (!isPublicEndpoint) {
           await this.performDIDAuth(req, res);
         }
 
-        // Step 2: Apply billing middleware for business routes only (exclude admin and payment-channel)
-        if (!req.path.startsWith('/admin') && !req.path.startsWith('/payment-channel')) {
+        // Step 2: Apply billing middleware for business routes only (exclude admin endpoints)
+        if (!req.path.startsWith('/admin')) {
           const billingMiddleware = this.middleware.createExpressMiddleware();
           await new Promise<void>((resolve, reject) => {
             billingMiddleware(req as any, res as any, (error?: any) => {
@@ -207,34 +318,52 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   }
 
   // HTTP verb methods
-  get(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this {
-    this.billableRouter.get(path, pricing, handler, ruleId);
+  get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+    this.validateRouteOptions(options);
+    this.billableRouter.get(path, options.pricing, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
-  post(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this {
-    this.billableRouter.post(path, pricing, handler, ruleId);
+  post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+    this.validateRouteOptions(options);
+    this.billableRouter.post(path, options.pricing, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
-  put(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this {
-    this.billableRouter.put(path, pricing, handler, ruleId);
+  put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+    this.validateRouteOptions(options);
+    this.billableRouter.put(path, options.pricing, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
-  delete(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this {
-    this.billableRouter.delete(path, pricing, handler, ruleId);
+  delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+    this.validateRouteOptions(options);
+    this.billableRouter.delete(path, options.pricing, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
   }
 
-  patch(path: string, pricing: bigint | string | StrategyConfig, handler: RequestHandler, ruleId?: string): this {
-    this.billableRouter.patch(path, pricing, handler, ruleId);
+  patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+    this.validateRouteOptions(options);
+    this.billableRouter.patch(path, options.pricing, handler, ruleId);
     this.clearBillingCache(); // Clear cache after adding route
     return this;
+  }
+
+  /**
+   * Validate route options according to the security rules
+   */
+  private validateRouteOptions(options: RouteOptions): void {
+    const pricing = typeof options.pricing === 'string' ? BigInt(options.pricing) : options.pricing;
+    const pricingAmount = typeof pricing === 'bigint' ? pricing : BigInt(0);
+    
+    // Rule: If pricing > 0 and authRequired is explicitly false, throw error
+    if (pricingAmount > 0 && options.authRequired === false) {
+      throw new Error('Cannot create anonymous paid endpoints: pricing > 0 requires authRequired to be true or undefined');
+    }
   }
 
   /**

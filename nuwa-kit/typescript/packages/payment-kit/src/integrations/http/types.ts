@@ -64,6 +64,7 @@ export interface HttpPayerOptions {
 
   /** Custom fetch implementation (defaults to global fetch) */
   fetchImpl?: FetchLike;
+
 }
 
 /**

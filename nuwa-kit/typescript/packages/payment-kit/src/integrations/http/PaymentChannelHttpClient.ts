@@ -46,6 +46,9 @@ export class PaymentChannelHttpClient {
   private host: string;
   private state: ClientState = ClientState.INIT;
   private clientState: HttpClientState;
+  private discoveredBasePath?: string;
+  private discoveryAttempted: boolean = false;
+  private cachedDiscoveryInfo?: any;
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -80,7 +83,15 @@ export class PaymentChannelHttpClient {
     path: string,
     init?: RequestInit
   ): Promise<Response> {
-    const fullUrl = new URL(path, this.options.baseUrl).toString();
+    // First perform discovery if not attempted yet
+    if (!this.discoveryAttempted) {
+      await this.performDiscovery();
+    }
+    
+    // Build URL - use buildPaymentUrl for relative paths, direct construction for absolute paths
+    const fullUrl = path.startsWith('http') || path.startsWith('/') && this.pathAlreadyIncludesBasePath(path)
+      ? new URL(path, this.options.baseUrl).toString()
+      : this.buildPaymentUrl(path);
     
     // Ensure channel is ready
     await this.ensureChannelReady();
@@ -183,34 +194,21 @@ export class PaymentChannelHttpClient {
     network: string;
     defaultAssetId: string;
     defaultPricePicoUSD?: string;
+    basePath?: string;
   }> {
-    const infoUrl = new URL('/payment-channel/info', this.options.baseUrl).toString();
-    
-    try {
-      const response = await this.fetchImpl(infoUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to discover service info: HTTP ${response.status}`);
-      }
-
-      const serviceInfo = await response.json();
-      
-      if (!serviceInfo.serviceDid) {
-        throw new Error('Service discovery response missing serviceDid');
-      }
-
-      this.log('Service discovery successful:', serviceInfo);
-      return serviceInfo;
-    } catch (error) {
-      const errorMessage = `Service discovery failed: ${error instanceof Error ? error.message : String(error)}`;
-      this.log(errorMessage);
-      throw new Error(errorMessage);
+    // Perform discovery using the well-known endpoint
+    if (!this.discoveryAttempted) {
+      await this.performDiscovery();
     }
+    
+    // Check if we have cached discovery results
+    if (this.cachedDiscoveryInfo) {
+      this.log('Using cached service discovery:', this.cachedDiscoveryInfo);
+      return this.cachedDiscoveryInfo;
+    }
+    
+    // If discovery failed, we can't proceed
+    throw new Error('Service discovery failed: No discovery information available');
   }
 
   /**
@@ -224,7 +222,7 @@ export class PaymentChannelHttpClient {
     source: string;
     lastUpdated?: string;
   }> {
-    const priceUrl = new URL('/payment-channel/price', this.options.baseUrl).toString();
+    const priceUrl = this.buildPaymentUrl('/price');
     
     try {
       const response = await this.fetchImpl(priceUrl, {
@@ -252,7 +250,7 @@ export class PaymentChannelHttpClient {
     success: boolean;
     timestamp: string;
   }> {
-    const healthUrl = new URL('/payment-channel/admin/health', this.options.baseUrl).toString();
+    const healthUrl = this.buildPaymentUrl('/admin/health');
     const response = await this.fetchImpl(healthUrl, { method: 'GET' });
     return response.json();
   } 
@@ -266,7 +264,7 @@ export class PaymentChannelHttpClient {
     pendingSubRav: SubRAV | null;
     timestamp: string;
   }> {
-    const recoveryUrl = new URL('/payment-channel/recovery', this.options.baseUrl).toString();
+    const recoveryUrl = this.buildPaymentUrl('/recovery');
     
     try {
       // Generate DID auth header for authentication
@@ -327,7 +325,7 @@ export class PaymentChannelHttpClient {
    * Commit a signed SubRAV to the service
    */
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: boolean }> {
-    const commitUrl = new URL('/payment-channel/commit', this.options.baseUrl).toString();
+    const commitUrl = this.buildPaymentUrl('/commit');
     
     try {
       // Generate DID auth header for authentication
@@ -776,6 +774,70 @@ export class PaymentChannelHttpClient {
     } catch (error) {
       this.log('Failed to persist client state:', error);
     }
+  }
+
+
+
+  /**
+   * Perform discovery using the well-known endpoint
+   */
+  private async performDiscovery(): Promise<void> {
+    this.discoveryAttempted = true;
+    const discoveryUrl = new URL('/.well-known/nuwa-payment/info', this.options.baseUrl);
+    
+    try {
+      this.log('Attempting service discovery at:', discoveryUrl.toString());
+      const response = await this.fetchImpl(discoveryUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const serviceInfo = await response.json();
+        this.log('Service discovery successful:', serviceInfo);
+        
+        // Cache the discovery info for later use
+        this.cachedDiscoveryInfo = serviceInfo;
+        
+        if (serviceInfo.basePath) {
+          this.discoveredBasePath = serviceInfo.basePath;
+        }
+      } else {
+        this.log('Service discovery failed with status:', response.status);
+      }
+    } catch (error) {
+      this.log('Service discovery failed, using fallback:', error);
+    }
+    
+    // Always set a fallback basePath if discovery failed
+    if (!this.discoveredBasePath) {
+      this.discoveredBasePath = '/payment-channel';
+    }
+  }
+
+  /**
+   * Get the effective base path for payment-related requests
+   */
+  private getBasePath(): string {
+    return this.discoveredBasePath || '/payment-channel';
+  }
+
+  /**
+   * Check if path already includes the base path
+   */
+  private pathAlreadyIncludesBasePath(path: string): boolean {
+    const basePath = this.getBasePath();
+    return path.startsWith(basePath);
+  }
+
+  /**
+   * Build URL for payment-related endpoints
+   */
+  private buildPaymentUrl(endpoint: string): string {
+    const basePath = this.getBasePath();
+    return new URL(`${basePath}${endpoint}`, this.options.baseUrl).toString();
   }
 
   /**

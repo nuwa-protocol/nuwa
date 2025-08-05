@@ -53,7 +53,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   });
 
   // 2. Declare routes & pricing strategies
-  billing.get('/echo', '1000000000', (req: Request, res: Response) => { // 0.001 USD = 1,000,000,000 picoUSD
+  billing.get('/echo', { pricing: '1000000000' }, (req: Request, res: Response) => { // 0.001 USD = 1,000,000,000 picoUSD
     const paymentResult = (req as any).paymentResult;
     res.json({
       echo: req.query.q || 'hello',
@@ -63,7 +63,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     });
   });
 
-  billing.post('/process', '10000000000', (req: Request, res: Response) => { // 0.01 USD = 10,000,000,000 picoUSD
+  billing.post('/process', { pricing: '10000000000' }, (req: Request, res: Response) => { // 0.01 USD = 10,000,000,000 picoUSD
     const paymentResult = (req as any).paymentResult;
     res.json({
       processed: req.body,
@@ -75,9 +75,11 @@ export async function createBillingServer(config: BillingServerConfig) {
 
   // Test new route with PerToken strategy
   billing.post('/chat/completions', {
-    type: 'PerToken',
-    unitPricePicoUSD: '20000', // 0.00002 USD per token
-    usageKey: 'usage.total_tokens'
+    pricing: {
+      type: 'PerToken',
+      unitPricePicoUSD: '20000', // 0.00002 USD per token
+      usageKey: 'usage.total_tokens'
+    }
   }, (req: Request, res: Response) => {
     const paymentResult = (req as any).paymentResult;
     
@@ -113,13 +115,8 @@ export async function createBillingServer(config: BillingServerConfig) {
 
   // Original business routes have been migrated to BillableRouter
 
-  // 4. Mount admin and recovery routes
-  app.use('/payment-channel/admin', billing.adminRouter()); // Admin interface
-  app.use('/payment-channel', billing.recoveryRouter()); // Client recovery interface
-
-
-  // 5. Mount billing routes
-  app.use('/api', billing.router);
+  // 4. Mount billing routes with all integrated endpoints (discovery, admin, recovery, business routes)
+  app.use(billing.router);
 
   const server = app.listen(port);
   
