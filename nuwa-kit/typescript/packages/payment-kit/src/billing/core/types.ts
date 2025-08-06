@@ -27,6 +27,12 @@ export interface BillingContext {
    */
   export interface Strategy {
     evaluate(ctx: BillingContext): Promise<bigint>;
+    /**
+     * Whether this strategy requires execution results (usage data) to calculate costs.
+     * - `false` (default): Can calculate cost before request execution (pre-flight)
+     * - `true`: Must wait for request execution to complete (post-flight)
+     */
+    readonly deferred?: boolean;
   }
   
   /**

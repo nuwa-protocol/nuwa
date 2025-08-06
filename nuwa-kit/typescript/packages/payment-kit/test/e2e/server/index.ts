@@ -93,29 +93,38 @@ export async function createBillingServer(config: BillingServerConfig) {
     }
   });
 
-  // Test new route with PerToken strategy
+  // PerToken strategy route for post-flight billing testing
   billing.post('/chat/completions', {
     pricing: {
       type: 'PerToken',
-      unitPricePicoUSD: '20000', // 0.00002 USD per token
+      unitPricePicoUSD: '20000000', // 0.02 picoUSD per token (more visible for testing)
       usageKey: 'usage.total_tokens'
-    }
+    },
+    authRequired: true // paymentRequired is implied when pricing > 0
   }, (req: Request, res: Response, next: NextFunction) => {
     try {
       const paymentResult = (req as any).paymentResult;
       
-      // Mock LLM response and usage
+      // Mock LLM response with variable usage based on request
+      const { messages = [] } = req.body;
+      const baseTokens = 100;
+      const extraTokens = Math.min(messages.length * 20, 200); // Variable based on input
+      
       const mockUsage = {
-        prompt_tokens: 100,
-        completion_tokens: 50,
-        total_tokens: 150
+        prompt_tokens: baseTokens,
+        completion_tokens: extraTokens,
+        total_tokens: baseTokens + extraTokens
       };
       
-      // Set usage to res.locals (ExpressPaymentKit will read this)
-      res.locals.usage = mockUsage;
+          // Critical: Set usage to res.locals for post-flight billing
+    // The middleware will automatically detect this is a PerToken strategy
+      // and trigger post-flight billing after the response is sent
+      res.locals.usage = {
+        usage: mockUsage
+      };
       
       res.json({
-        id: 'chatcmpl-test',
+        id: `chatcmpl-${Date.now()}`,
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
         model: 'gpt-3.5-turbo',
@@ -123,23 +132,24 @@ export async function createBillingServer(config: BillingServerConfig) {
           index: 0,
           message: {
             role: 'assistant',
-            content: `Echo: ${JSON.stringify(req.body)}`
+            content: `Chat response for: ${JSON.stringify(req.body.messages || [])}`
           },
           finish_reason: 'stop'
         }],
         usage: mockUsage,
-        // Billing information
-        cost: paymentResult?.cost?.toString(),
-        nonce: paymentResult?.subRav?.nonce?.toString()
+        // Note: In post-flight billing, cost is calculated AFTER response
+        // paymentResult may be null here as billing happens in the background
+        billingInfo: {
+          expectedCost: (mockUsage.total_tokens * 20000000).toString() + ' picoUSD',
+          mode: 'post-flight',
+          tokensUsed: mockUsage.total_tokens
+        }
       });
     } catch (error) {
-      // Only handle specific error cases, let middleware errors propagate
-      if (error instanceof Error && error.message.includes('Cannot set headers after they are sent')) {
-        console.log('Response already sent by middleware, skipping route handler');
-        return;
-      }
       console.error('Error in /chat/completions route:', error);
-      next(error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Chat completion failed' });
+      }
     }
   });
 

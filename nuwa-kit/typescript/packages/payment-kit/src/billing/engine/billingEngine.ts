@@ -49,4 +49,26 @@ export class BillingEngine implements CostCalculator {
 
     return usdCost;
   }
+
+  /**
+   * Check if a billing rule requires deferred (post-flight) calculation.
+   * This is used by middleware to determine whether to calculate costs
+   * before or after request execution.
+   */
+  isDeferred(rule: BillingRule): boolean {
+    const strategy = getStrategy(rule);
+    return strategy.deferred ?? false;
+  }
+
+  /**
+   * Alternative API: check if deferred based on rule matching from context.
+   * Returns true if the matched rule requires deferred calculation.
+   */
+  isDeferredByContext(ctx: BillingContext): boolean {
+    const rule = findRule(ctx.meta, this.ruleProvider.getRules());
+    if (!rule) {
+      return false; // No rule = no calculation needed
+    }
+    return this.isDeferred(rule);
+  }
 }

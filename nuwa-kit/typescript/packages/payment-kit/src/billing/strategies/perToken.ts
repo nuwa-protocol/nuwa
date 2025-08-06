@@ -17,6 +17,11 @@ export interface PerTokenConfig {
  * Calculates cost based on token usage: unitPricePicoUSD × tokens
  */
 export class PerTokenStrategy extends BaseStrategy {
+  /**
+   * PerToken strategy requires execution results (usage data) from LLM calls
+   */
+  readonly deferred: boolean = true;
+  
   private readonly unitPrice: bigint;
   private readonly usageKey: string;
 

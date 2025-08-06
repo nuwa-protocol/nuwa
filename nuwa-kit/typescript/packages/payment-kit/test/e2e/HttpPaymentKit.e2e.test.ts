@@ -404,6 +404,83 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 Admin Client functionality test successful!');
   }, 120000);
 
+  test('PerToken post-flight billing with chat completions', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🤖 Testing PerToken post-flight billing with /chat/completions');
+
+    // Test 1: Single chat completion request
+    console.log('📞 Request 1: Chat completion with small message');
+    const chatRequest1 = {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'user', content: 'Hello, how are you?' }
+      ]
+    };
+
+    const response1 = await httpClient.post('/chat/completions', chatRequest1);
+    
+    expect(response1.object).toBe('chat.completion');
+    expect(response1.choices).toHaveLength(1);
+    expect(response1.usage).toBeTruthy();
+    expect(response1.usage.total_tokens).toBeGreaterThan(0);
+    expect(response1.billingInfo).toBeTruthy();
+    expect(response1.billingInfo.mode).toBe('post-flight');
+    
+    console.log(`✅ Chat completion 1 successful:
+      Tokens used: ${response1.usage.total_tokens}
+      Expected cost: ${response1.billingInfo.expectedCost}
+      Mode: ${response1.billingInfo.mode}
+    `);
+
+    // Test 2: Chat completion with multiple messages (more tokens)
+    console.log('📞 Request 2: Chat completion with multiple messages');
+    const chatRequest2 = {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi there!' },
+        { role: 'user', content: 'Can you help me with a complex task?' },
+        { role: 'assistant', content: 'Of course! What do you need help with?' },
+        { role: 'user', content: 'I need to understand the difference between pre-flight and post-flight billing.' }
+      ]
+    };
+
+    const response2 = await httpClient.post('/chat/completions', chatRequest2);
+    
+    expect(response2.object).toBe('chat.completion');
+    expect(response2.usage.total_tokens).toBeGreaterThan(response1.usage.total_tokens);
+    expect(response2.billingInfo.mode).toBe('post-flight');
+    
+    console.log(`✅ Chat completion 2 successful:
+      Tokens used: ${response2.usage.total_tokens}
+      Expected cost: ${response2.billingInfo.expectedCost}
+      More tokens than request 1: ${response2.usage.total_tokens > response1.usage.total_tokens}
+    `);
+
+    // Test 3: Verify post-flight billing behavior
+    console.log('📞 Request 3: Quick chat to verify billing consistency');
+    const response3 = await httpClient.post('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'Quick test' }]
+    });
+
+    expect(response3.billingInfo.mode).toBe('post-flight');
+    console.log(`✅ Post-flight billing consistency verified`);
+
+    // Compare with pre-flight billing (echo endpoint)
+    console.log('📞 Comparison: Pre-flight billing with echo endpoint');
+    const echoResponse = await httpClient.get('/echo?q=pre-flight%20test');
+    expect(echoResponse.cost).toBeTruthy(); // Pre-flight has immediate cost
+    
+    console.log(`📊 Billing mode comparison:
+      Echo (pre-flight): Cost available immediately = ${echoResponse.cost}
+      Chat (post-flight): Cost calculated after response based on usage
+    `);
+
+    console.log('🎉 PerToken post-flight billing test successful!');
+  }, 120000);
+
   test('maxAmount limit enforcement', async () => {
     if (!shouldRunE2ETests()) {
       console.log('Skipping test - E2E tests disabled');

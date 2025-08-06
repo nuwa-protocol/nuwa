@@ -5,6 +5,10 @@ import { Strategy, BillingContext } from '../core/types';
  */
 export abstract class BaseStrategy implements Strategy {
   /**
+   * Default implementation: most strategies don't require execution results
+   */
+  readonly deferred: boolean = false;
+  /**
    * Convert string or bigint to bigint
    * Handles scientific notation strings like "5e12"
    */
