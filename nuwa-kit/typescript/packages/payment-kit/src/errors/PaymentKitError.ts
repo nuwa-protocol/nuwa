@@ -1,18 +1,18 @@
-import type { ApiError } from '../types/api';
-import { ErrorCode } from '../types/api';
+import { ErrorCode, type ErrorCode as ErrorCodeType } from '../types/api';
+import type { ApiError } from '../schema';
 
 /**
  * Base error class for Payment Kit
  */
 export class PaymentKitError extends Error {
-  public readonly code: ErrorCode;
+  public readonly code: ErrorCodeType;
   public readonly httpStatus: number;
   public readonly details?: unknown;
 
-  constructor(code: ErrorCode, message: string, httpStatus = 500, details?: unknown) {
+  constructor(code: ErrorCodeType | string, message: string, httpStatus = 500, details?: unknown) {
     super(message);
     this.name = 'PaymentKitError';
-    this.code = code;
+    this.code = code as ErrorCodeType;
     this.httpStatus = httpStatus;
     this.details = details;
   }

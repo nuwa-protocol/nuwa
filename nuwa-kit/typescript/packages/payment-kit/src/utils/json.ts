@@ -19,36 +19,24 @@ export function serializeJson(value: any): string {
 }
 
 /**
- * Parse JSON string to object with BigInt support
- * Only converts specific fields that are known to be BigInt values
+ * Parse JSON string to object with minimal processing
+ * Now that we use Zod schemas for validation and transformation,
+ * this function only handles basic lossless parsing without field-specific logic
  */
 export function parseJson<T = any>(text: string): T {
   return parse(text, (key, value) => {
-    // Convert LosslessNumber to BigInt only for specific BigInt fields
+    // Convert LosslessNumber to safe numbers where possible
     if (value instanceof LosslessNumber) {
       const str = value.toString();
       // Check if it's an integer (no decimal point)
       if (str.indexOf('.') === -1 && str.indexOf('e') === -1 && str.indexOf('E') === -1) {
-        // Only convert to BigInt for known BigInt fields
-        const bigintFields = [
-          'chainId', 'channelEpoch', 'accumulatedAmount', 'nonce', 
-          'epoch', 'amount', 'claimedAmount', 'totalAmount'
-        ];
-        
-        if (bigintFields.includes(key)) {
-          try {
-            return BigInt(str);
-          } catch {
-            // If BigInt conversion fails, keep as LosslessNumber
-            return value;
-          }
-        }
-        
-        // For other integer fields, convert to regular number if within safe range
+        // For integer fields, convert to regular number if within safe range
         const num = Number(str);
         if (Number.isSafeInteger(num)) {
           return num;
         }
+        // Keep as LosslessNumber for large integers - Zod will handle BigInt conversion
+        return value;
       }
     }
     return value;

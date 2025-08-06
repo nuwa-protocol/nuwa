@@ -11,6 +11,7 @@
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { PaymentChannelHttpClient, createHttpClient, PaymentChannelAdminClient, createAdminClient } from '../../src/integrations/http';
+import { safeStringify } from '../../src/utils/json';
 import { PaymentChannelFactory } from '../../src/factory/chainFactory';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import type { AssetInfo } from '../../src/core/types';
@@ -198,7 +199,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Check admin stats for payment tracking using AdminClient
     const adminStats = await adminClient.getClaimsStatus();
-    console.log('📊 Admin stats after multiple requests:', JSON.stringify(adminStats, null, 2));
+    console.log('📊 Admin stats after multiple requests:', safeStringify(adminStats, 2));
 
     console.log('🎉 Complete HTTP deferred payment flow successful!');
   }, 120000); // 2 minutes timeout
@@ -230,7 +231,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Check accumulated costs using AdminClient
     const adminStats = await adminClient.getClaimsStatus();
-    console.log('📊 Final admin stats:', JSON.stringify(adminStats, null, 2));
+    console.log('📊 Final admin stats:', safeStringify(adminStats, 2));
 
     console.log('🎉 Mixed request types test successful!');
   }, 120000);
@@ -244,12 +245,12 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test health check using AdminClient
     const healthResponse = await adminClient.healthCheck();
-    console.log('📊 Health check response:', JSON.stringify(healthResponse, null, 2));
+    console.log('📊 Health check response:', safeStringify(healthResponse, 2));
     expect(healthResponse.success).toBe(true);
 
     // Test admin endpoints using AdminClient
     const adminResponse = await adminClient.getClaimsStatus();
-    console.log('✅ Admin endpoints accessible response:', JSON.stringify(adminResponse, null, 2));
+    console.log('✅ Admin endpoints accessible response:', safeStringify(adminResponse, 2));
     expect(adminResponse.claimsStatus).toBeTruthy();
     console.log('🎉 Error handling test successful!');
   }, 60000);
@@ -414,7 +415,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       maxAge: 1 // 1 minute
     });
     expect(cleanupResponse.clearedCount).toBeGreaterThanOrEqual(0);
-    expect(cleanupResponse.maxAgeMinutes).toBe(1);
+    expect(Number(cleanupResponse.maxAgeMinutes)).toBe(1);
     console.log('✅ Cleanup successful:', cleanupResponse);
 
     console.log('🎉 Admin Client functionality test successful!');

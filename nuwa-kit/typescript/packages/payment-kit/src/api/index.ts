@@ -14,6 +14,25 @@ import {
   handleSubRavQuery
 } from './handlers';
 
+import { createValidatedHandler } from './utils';
+import { 
+  RecoveryRequestSchema, 
+  RecoveryResponseSchema,
+  CommitRequestSchema,
+  CommitResponseSchema,
+  HealthRequestSchema,
+  HealthResponseSchema,
+  SubRavRequestSchema,
+  SubRavQueryResponseSchema,
+  AdminRequestSchema,
+  ClaimsStatusResponseSchema,
+  // Import admin schemas from core since they're the same
+  ClaimTriggerRequestSchema,
+  ClaimTriggerResponseSchema,
+  CleanupRequestSchema,
+  CleanupResponseSchema,
+} from '../schema';
+
 /**
  * Configuration for a built-in API handler
  */
@@ -36,7 +55,13 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
 
   // Recovery endpoint (auth required)
   '/recovery': {
-    handler: handleRecovery,
+    handler: createValidatedHandler({
+      schema: {
+        request: RecoveryRequestSchema,
+        response: RecoveryResponseSchema,
+      },
+      handler: handleRecovery,
+    }),
     method: 'GET',
     options: { pricing: '0', authRequired: true },
     description: 'Recover channel state and pending SubRAV'
@@ -44,7 +69,13 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   
   // Commit endpoint (auth required)
   '/commit': {
-    handler: handleCommit,
+    handler: createValidatedHandler({
+      schema: {
+        request: CommitRequestSchema,
+        response: CommitResponseSchema,
+      },
+      handler: handleCommit,
+    }),
     method: 'POST',
     options: { pricing: '0', authRequired: true },
     description: 'Commit a signed SubRAV to the service'
@@ -52,14 +83,26 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   
   // Health endpoint (public, no auth)
   '/health': {
-    handler: handleHealth,
+    handler: createValidatedHandler({
+      schema: {
+        request: HealthRequestSchema,
+        response: HealthResponseSchema,
+      },
+      handler: handleHealth,
+    }),
     method: 'GET',
     options: { pricing: '0', authRequired: false },
     description: 'Health check endpoint (public)'
   },
 
   '/subrav': {
-    handler: handleSubRavQuery,
+    handler: createValidatedHandler({
+      schema: {
+        request: SubRavRequestSchema,
+        response: SubRavQueryResponseSchema,
+      },
+      handler: handleSubRavQuery,
+    }),
     method: 'GET',
     options: { pricing: '0', authRequired: true },  // Changed: auth required but not admin-only
     description: 'Get SubRAV details (requires auth, users can only query their own)'
@@ -67,20 +110,38 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   
   // Admin endpoints
   '/admin/claims': {
-    handler: handleAdminClaims,
+    handler: createValidatedHandler({
+      schema: {
+        request: AdminRequestSchema,
+        response: ClaimsStatusResponseSchema,
+      },
+      handler: handleAdminClaims,
+    }),
     method: 'GET',
     options: { pricing: '0', adminOnly: true },
     description: 'Get claims status and statistics (admin only)'
   },
   '/admin/claim-trigger': {
-    handler: handleAdminClaimTrigger,
+    handler: createValidatedHandler({
+      schema: {
+        request: ClaimTriggerRequestSchema,
+        response: ClaimTriggerResponseSchema,
+      },
+      handler: handleAdminClaimTrigger,
+    }),
     method: 'POST',
     options: { pricing: '0', adminOnly: true },
     description: 'Manually trigger claim for a specific channel (admin only)'
   },
 
   '/admin/cleanup': {
-    handler: handleAdminCleanup,
+    handler: createValidatedHandler({
+      schema: {
+        request: CleanupRequestSchema,
+        response: CleanupResponseSchema,
+      },
+      handler: handleAdminCleanup,
+    }),
     method: 'DELETE',
     options: { pricing: '0', adminOnly: true },
     description: 'Clean up old processed SubRAVs (admin only)'

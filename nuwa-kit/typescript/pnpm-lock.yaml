@@ -302,6 +302,9 @@ importers:
       pg:
         specifier: ^8.16.3
         version: 8.16.3
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.67
     devDependencies:
       '@jest/globals':
         specifier: ^29.7.0

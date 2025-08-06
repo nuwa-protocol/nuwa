@@ -1,22 +1,22 @@
+import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../types/internal';
+import { createSuccessResponse, PaymentKitError } from '../../errors';
+import type { Handler, ApiContext } from '../../types/api';
+import { ErrorCode } from '../../types/api';
 import type { 
-  Handler, 
-  ApiContext, 
   HealthResponse, 
   ClaimsStatusResponse,
+  ClaimTriggerRequest,
   ClaimTriggerResponse,
   CleanupRequest,
   CleanupResponse
-} from '../../types/api';
-import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../types/internal';
-import { createSuccessResponse, PaymentKitError } from '../../errors';
-import { ErrorCode } from '../../types/api';
+} from '../../schema';
 
 
 /**
  * Handle admin claims status endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> = async (ctx) => {
+export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
       console.log('📊 Admin: Getting claims status...');
@@ -62,7 +62,7 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
  * Handle admin claim trigger endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaimTrigger: Handler<ApiContext, InternalClaimTriggerRequest, ClaimTriggerResponse> = async (ctx, req) => {
+export const handleAdminClaimTrigger: Handler<ApiContext, ClaimTriggerRequest, ClaimTriggerResponse> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
       console.log('🚀 Admin: Triggering claim for channel:', req.channelId);

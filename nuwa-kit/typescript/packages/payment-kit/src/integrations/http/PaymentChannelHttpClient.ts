@@ -7,13 +7,13 @@ import type {
   HostChannelMappingStore 
 } from './types';
 import type { SubRAV, SignedSubRAV } from '../../core/types';
+import type { ApiResponse } from '../../types/api';
 import type { 
-  ApiResponse, 
   DiscoveryResponse,
   HealthResponse,
   RecoveryResponse,
   CommitResponse
-} from '../../types/api';
+} from '../../schema';
 import { ErrorCode } from '../../types/api';
 import { PaymentKitError } from '../../errors';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
@@ -26,6 +26,15 @@ import {
   MemoryHostChannelMappingStore 
 } from './internal/HostChannelMappingStore';
 import { parseJsonResponse } from '../../utils/json';
+import { 
+  RecoveryResponseSchema,
+  HealthResponseSchema,
+  DiscoveryResponseSchema,
+  // Also import core schemas for direct use
+  ServiceDiscoverySchema,
+  HealthCheckSchema
+} from '../../schema';
+import type { z } from 'zod';
 
 /**
  * HTTP Client State enum for internal state management
@@ -216,7 +225,7 @@ export class PaymentChannelHttpClient {
   async healthCheck(): Promise<HealthResponse> {
     const healthUrl = this.buildPaymentUrl('/health');
     const response = await this.fetchImpl(healthUrl, { method: 'GET' });
-    return this.parseJsonResponse<HealthResponse>(response);
+    return this.parseJsonResponseWithSchema(response, HealthResponseSchema);
   } 
 
   /**
@@ -255,7 +264,7 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
-      const recoveryData = await this.parseJsonResponse<RecoveryResponse>(response);
+      const recoveryData = await this.parseJsonResponseWithSchema(response, RecoveryResponseSchema) as RecoveryResponse;
       
       // If there's a pending SubRAV, cache it
       if (recoveryData.pendingSubRav) {
@@ -635,8 +644,63 @@ export class PaymentChannelHttpClient {
   }
 
   /**
+   * Parse Response to JSON with Zod schema validation and BigInt support
+   */
+  private async parseJsonResponseWithSchema<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Response is not JSON');
+    }
+
+    // Handle non-ok HTTP status first
+    if (!response.ok) {
+      console.log('Response error:', response);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    let responseData: any;
+    try {
+      // Use lossless-json for automatic BigInt handling
+      responseData = await parseJsonResponse<any>(response);
+    } catch (error) {
+      throw new Error('Failed to parse JSON response');
+    }
+
+    // Expect ApiResponse format
+    if (responseData && typeof responseData === 'object' && 'success' in responseData) {
+      const apiResponse = responseData as ApiResponse<any>;
+      
+      if (apiResponse.success) {
+        // Apply Zod schema validation and transformation
+        return schema.parse(apiResponse.data);
+      } else {
+        // Handle error response
+        const error = apiResponse.error;
+        if (error) {
+          throw new PaymentKitError(
+            error.code || ErrorCode.INTERNAL_ERROR,
+            error.message || 'Unknown error',
+            error.httpStatus || response.status,
+            error.details
+          );
+        } else {
+          throw new PaymentKitError(
+            ErrorCode.INTERNAL_ERROR,
+            'Unknown error occurred',
+            response.status
+          );
+        }
+      }
+    }
+
+    // If response doesn't follow ApiResponse format, treat as raw data and validate
+    return schema.parse(responseData);
+  }
+
+  /**
    * Parse JSON response with error handling
    * Expects standard ApiResponse format
+   * @deprecated Use parseJsonResponseWithSchema for better type safety
    */
   private async parseJsonResponse<T>(response: Response): Promise<T> {
     const contentType = response.headers.get('content-type');

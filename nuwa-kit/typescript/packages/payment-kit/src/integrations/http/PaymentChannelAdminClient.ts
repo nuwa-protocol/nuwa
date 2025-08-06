@@ -6,7 +6,7 @@ import type {
   SubRavRequest,
   CleanupRequest,
   CleanupResponse
-} from '../../types/api';
+} from '../../schema';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 
 /**

@@ -1,9 +1,15 @@
 /**
- * Common API types shared between server and client
+ * Framework-level API types for Payment Kit
+ * 
+ * This file contains types for the API framework itself (handlers, context, etc.)
+ * rather than specific data models which are defined in schema/.
  */
+
+import type { ErrorCodeType, ApiError } from '../schema/core';
 
 /**
  * Standard API response envelope
+ * Generic container for all API responses
  */
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -13,37 +19,31 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * Standard API error structure
+ * Standard error codes enum for convenient access
+ * Note: The authoritative schema is in schema/core/ErrorCodeSchema
  */
-export interface ApiError {
-  code: ErrorCode;
-  message: string;
-  details?: unknown;
-  httpStatus?: number;
-}
-
-/**
- * Standard error codes
- */
-export enum ErrorCode {
+export const ErrorCode = {
   // Authentication & Authorization
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  FORBIDDEN = 'FORBIDDEN',
+  UNAUTHORIZED: 'UNAUTHORIZED' as const,
+  FORBIDDEN: 'FORBIDDEN' as const,
   
   // Payment related
-  PAYMENT_REQUIRED = 'PAYMENT_REQUIRED',
-  INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS',
-  CONFLICT = 'CONFLICT',
+  PAYMENT_REQUIRED: 'PAYMENT_REQUIRED' as const,
+  INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS' as const,
+  CONFLICT: 'CONFLICT' as const,
   
   // General errors
-  NOT_FOUND = 'NOT_FOUND',
-  BAD_REQUEST = 'BAD_REQUEST',
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
-}
+  NOT_FOUND: 'NOT_FOUND' as const,
+  BAD_REQUEST: 'BAD_REQUEST' as const,
+  INTERNAL_ERROR: 'INTERNAL_ERROR' as const,
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE' as const,
+} as const;
+
+export type ErrorCode = ErrorCodeType;
 
 /**
  * Handler context interface
+ * Contains all dependencies and configuration needed by API handlers
  */
 export interface ApiContext {
   config: {
@@ -62,91 +62,7 @@ export interface ApiContext {
 
 /**
  * Framework-agnostic handler signature
+ * All API handlers must conform to this signature
  */
 export type Handler<Ctx = ApiContext, Req = any, Res = any> =
   (ctx: Ctx, req: Req) => Promise<ApiResponse<Res>>;
-
-
-// ====== Recovery API Types ======
-
-/**
- * Client-side recovery request (no parameters needed)
- */
-export interface RecoveryRequest {
-  // Empty - recovery is based on authenticated user's DID
-}
-
-export interface RecoveryResponse {
-  channel: any | null;
-  pendingSubRav: any | null; // SubRAV | null
-  timestamp: string;
-}
-
-// ====== Commit API Types ======
-
-/**
- * Client-side commit request
- */
-export interface CommitRequest {
-  subRav: any; // SignedSubRAV
-}
-
-export interface CommitResponse {
-  success: boolean;
-}
-
-// ====== Admin API Types ======
-
-export interface HealthResponse {
-  success: boolean;
-  status: string;
-  timestamp: string;
-  paymentKitEnabled: boolean;
-}
-
-export interface ClaimsStatusResponse {
-  claimsStatus: any;
-  processingStats: any;
-  timestamp: string;
-}
-
-/**
- * Client-side claim trigger request
- */
-export interface ClaimTriggerRequest {
-  channelId: string;
-}
-
-export interface ClaimTriggerResponse {
-  success: boolean;
-  channelId: string;
-}
-
-/**
- * Client-side SubRAV query request
- */
-export interface SubRavRequest {
-  channelId: string;
-  nonce: string;
-}
-
-export interface CleanupRequest {
-  maxAge?: number; // minutes
-}
-
-export interface CleanupResponse {
-  clearedCount: number;
-  maxAgeMinutes: number;
-}
-
-// ====== Discovery API Types ======
-
-export interface DiscoveryResponse {
-  version: number;
-  serviceId: string;
-  serviceDid: string;
-  network: string;
-  defaultAssetId: string;
-  defaultPricePicoUSD?: string;
-  basePath: string;
-}

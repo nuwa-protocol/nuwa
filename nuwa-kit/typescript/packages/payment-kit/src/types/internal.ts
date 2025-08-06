@@ -8,7 +8,7 @@ import type {
   CommitRequest, 
   SubRavRequest, 
   ClaimTriggerRequest 
-} from './api';
+} from '../schema';
 
 /**
  * Authentication information added by DID authentication middleware

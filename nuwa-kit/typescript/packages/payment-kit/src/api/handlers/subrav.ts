@@ -1,7 +1,8 @@
-import type { Handler, ApiContext } from '../../types/api';
 import type { InternalSubRavRequest } from '../../types/internal';
 import { PaymentKitError, createSuccessResponse } from '../../errors';
+import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
+import type { SubRavRequest } from '../../schema';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 
 /**
@@ -9,14 +10,15 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
  * Requires DID authentication
  * Users can only query SubRAVs from channels they own
  */
-export const handleSubRavQuery: Handler<ApiContext, InternalSubRavRequest, any> = async (ctx, req) => {
+export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
       console.log('📋 SubRAV Query: Getting SubRAV for channel:', req.channelId, 'nonce:', req.nonce);
     }
     
     // Check if user is authenticated
-    if (!req.didInfo || !req.didInfo.did) {
+    const internalReq = req as InternalSubRavRequest;
+    if (!internalReq.didInfo || !internalReq.didInfo.did) {
       throw new PaymentKitError(
         ErrorCode.UNAUTHORIZED,
         'DID authentication required',
@@ -24,7 +26,7 @@ export const handleSubRavQuery: Handler<ApiContext, InternalSubRavRequest, any> 
       );
     }
 
-    const clientDid = req.didInfo.did;
+    const clientDid = internalReq.didInfo.did;
     
     // Derive the expected channelId for this user
     const defaultAssetId = ctx.config.defaultAssetId ?? '0x3::gas_coin::RGas';

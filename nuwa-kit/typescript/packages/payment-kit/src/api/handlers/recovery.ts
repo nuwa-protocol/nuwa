@@ -1,16 +1,18 @@
-import type { Handler, ApiContext, RecoveryResponse } from '../../types/api';
 import type { InternalRecoveryRequest } from '../../types/internal';
 import { PaymentKitError, createSuccessResponse } from '../../errors';
+import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
+import type { RecoveryResponse } from '../../schema';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 
 /**
  * Handle recovery endpoint requests
  * Requires DID authentication
  */
-export const handleRecovery: Handler<ApiContext, InternalRecoveryRequest, RecoveryResponse> = async (ctx, req) => {
+export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (ctx, req) => {
   try {
-    if (!req.didInfo || !req.didInfo.did) {
+    const internalReq = req as InternalRecoveryRequest;
+    if (!internalReq.didInfo || !internalReq.didInfo.did) {
       throw new PaymentKitError(
         ErrorCode.UNAUTHORIZED,
         'DID authentication required',
@@ -18,7 +20,7 @@ export const handleRecovery: Handler<ApiContext, InternalRecoveryRequest, Recove
       );
     }
     
-    const clientDid = req.didInfo.did;
+    const clientDid = internalReq.didInfo.did;
 
     // Derive channelId deterministically using ChannelUtils
     const defaultAssetId = ctx.config.defaultAssetId ?? '0x3::gas_coin::RGas';
