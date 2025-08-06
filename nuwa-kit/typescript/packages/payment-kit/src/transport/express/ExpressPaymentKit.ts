@@ -243,9 +243,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           if (!detection.isDeferred) {
             // Pre-flight billing completed or no billing needed
             if (detection.result) {
+              // Pre-flight billing successful
               (req as any).paymentResult = detection.result;
+              return next();
+            } else if (detection.result === undefined) {
+              // No billing rule matched - proceed without payment
+              return next();
+            } else {
+              // Pre-flight billing failed (result is null) - response already sent by middleware
+              return;
             }
-            return next();
           } else {
           // Post-flight billing - attach payment session to response locals
           if (detection.paymentSession) {

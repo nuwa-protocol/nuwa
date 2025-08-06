@@ -15,7 +15,7 @@ import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRA
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import type { ClaimScheduler } from './ClaimScheduler';
 import { PaymentUtils } from './PaymentUtils';
-import { BillingContextBuilder } from './BillingContextBuilder';
+
   
   /**
    * Configuration for PaymentProcessor
@@ -43,23 +43,7 @@ import { BillingContextBuilder } from './BillingContextBuilder';
     debug?: boolean;
   }
   
-  /**
-   * Protocol-agnostic request metadata
-   */
-  export interface RequestMetadata {
-    /** Business operation identifier (e.g., "POST:/api/chat/completions") */
-    operation: string;
-    
-    /** Payment channel information (extracted from signed SubRAV) */
-    channelId?: string;
-    vmIdFragment?: string;
-    
-    /** Pre-matched billing rule (optimization to avoid duplicate rule matching) */
-    billingRule?: BillingRule;
-    
-    /** Protocol-specific additional metadata */
-    [key: string]: any;
-  }
+
   
   /**
  * Payment processing result from PaymentProcessor
@@ -145,17 +129,19 @@ export interface PaymentVerificationResult extends VerificationResult {
      * Process payment for a request using deferred payment model
      */
     async processPayment(
-      requestMeta: RequestMetadata,
-      signedSubRAV?: SignedSubRAV
+      ctx: BillingContext
     ): Promise<ProcessorPaymentResult> {
       this.stats.totalRequests++;
       
-      this.log('Processing payment for operation:', requestMeta.operation);
+      this.log('Processing payment for operation:', ctx.meta.operation);
   
       try {
         let autoClaimTriggered = false;
         let verificationResult: PaymentVerificationResult | undefined;
         let isHandshake = false;
+        
+        // Extract SignedSubRAV from context
+        const signedSubRAV = ctx.meta.signedSubRav;
         
         // Step 1: If signedSubRAV is provided, verify it (handles previous payment)
         if (signedSubRAV) {
@@ -196,25 +182,13 @@ export interface PaymentVerificationResult extends VerificationResult {
           }
         }
   
-        // Step 2: Build billing context for current request
-        const enhancedMeta = {
-          ...requestMeta,
-          channelId: signedSubRAV?.subRav.channelId || requestMeta.channelId,
-          vmIdFragment: signedSubRAV?.subRav.vmIdFragment
-        };
-        
-        const billingContext = BillingContextBuilder.build(
-          this.config.serviceId,
-          enhancedMeta
-        );
-  
         // Step 3: Calculate cost for current request with conversion details
-        const preMatchedRule = requestMeta.billingRule;
-        const costResult = await this.calculateCostWithDetails(billingContext, preMatchedRule);
+        const preMatchedRule = ctx.meta.billingRule;
+        const costResult = await this.calculateCostWithDetails(ctx, preMatchedRule);
         const { cost, conversion } = costResult;
 
         // Step 3.5: Check if cost exceeds maxAmount limit (only if maxAmount > 0)
-        if (requestMeta.maxAmount && requestMeta.maxAmount > 0n && cost > requestMeta.maxAmount) {
+        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
           this.stats.failedPayments++;
           return {
             success: false,
@@ -238,7 +212,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         }
 
         // Step 4: Generate unsigned SubRAV proposal for next request
-        const unsignedSubRAV = await this.generateProposal(billingContext, cost);
+        const unsignedSubRAV = await this.generateProposal(ctx, cost);
         
         // Store the unsigned SubRAV for later verification
         await this.pendingSubRAVStore.save(unsignedSubRAV);
@@ -361,12 +335,14 @@ export interface PaymentVerificationResult extends VerificationResult {
      * Generate SubRAV proposal for client to sign
      */
     async generateProposal(context: BillingContext, amount: bigint): Promise<SubRAV> {
-      const channelId = context.meta.channelId;
-      const vmIdFragment = context.meta.vmIdFragment;
+      const signedSubRav = context.meta.signedSubRav;
       
-      if (!channelId || !vmIdFragment) {
-        throw new Error('channelId and vmIdFragment are required for SubRAV generation');
+      if (!signedSubRav) {
+        throw new Error('SignedSubRAV is required for SubRAV generation');
       }
+      
+      const channelId = signedSubRav.subRav.channelId;
+      const vmIdFragment = signedSubRav.subRav.vmIdFragment;
   
       // Get channel info to construct proper payer key ID
       const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
@@ -376,7 +352,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         channelId,
         payerKeyId,
         amount,
-        description: `${context.operation} - ${this.config.serviceId}`
+        description: `${context.meta.operation} - ${this.config.serviceId}`
       });
     }
   

@@ -8,8 +8,9 @@ describe('PerRequestStrategy', () => {
     
     const ctx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'test-op',
-      meta: {}
+      meta: {
+        operation: 'test-op'
+      }
     };
 
     const cost = await strategy.evaluate(ctx);
@@ -21,8 +22,10 @@ describe('PerRequestStrategy', () => {
     
     const ctx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'test-op',
-      meta: { someData: 'ignored' }
+      meta: {
+        operation: 'test-op',
+        someData: 'ignored'
+      }
     };
 
     const cost = await strategy.evaluate(ctx);
@@ -34,8 +37,9 @@ describe('PerRequestStrategy', () => {
     
     const ctx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'test-op',
-      meta: {}
+      meta: {
+        operation: 'test-op'
+      }
     };
 
     const cost = await strategy.evaluate(ctx);
@@ -47,14 +51,21 @@ describe('PerRequestStrategy', () => {
     
     const ctx1: BillingContext = {
       serviceId: 'service1',
-      operation: 'op1',
-      meta: { tokens: 100, model: 'gpt-4' }
+      meta: {
+        operation: 'op1',
+        tokens: 100,
+        model: 'gpt-4'
+      }
     };
 
     const ctx2: BillingContext = {
       serviceId: 'service2',
-      operation: 'op2',
-      meta: { tokens: 1000, model: 'claude', path: '/api/v1' }
+      meta: {
+        operation: 'op2',
+        tokens: 1000,
+        model: 'claude',
+        path: '/api/v1'
+      }
     };
 
     const cost1 = await strategy.evaluate(ctx1);

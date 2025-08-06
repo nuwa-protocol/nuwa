@@ -63,8 +63,8 @@ describe('Billing V2 Auto-Detection', () => {
 
       const context = {
         serviceId: 'test-service',
-        operation: 'test-op',
         meta: {
+          operation: 'test-op',
           path: '/unknown',
           method: 'GET'
         }
@@ -88,8 +88,8 @@ describe('Billing V2 Auto-Detection', () => {
 
       const context = {
         serviceId: 'test-service',
-        operation: 'test-op',
         meta: {
+          operation: 'test-op',
           path: '/echo',
           method: 'GET'
         }
@@ -114,8 +114,8 @@ describe('Billing V2 Auto-Detection', () => {
 
       const context = {
         serviceId: 'test-service',
-        operation: 'test-op',
         meta: {
+          operation: 'test-op',
           path: '/chat',
           method: 'POST'
         }
@@ -159,8 +159,8 @@ describe('Billing V2 Auto-Detection', () => {
       // Calculate cost immediately (pre-flight)
       const context = {
         serviceId: 'test-service',
-        operation: 'upload',
         meta: {
+          operation: 'upload',
           path: '/upload',
           method: 'POST'
         }
@@ -189,8 +189,8 @@ describe('Billing V2 Auto-Detection', () => {
       // Calculate cost with usage data (post-flight)
       const context = {
         serviceId: 'test-service',
-        operation: 'chat',
         meta: {
+          operation: 'chat',
           path: '/chat',
           method: 'POST',
           usage: {

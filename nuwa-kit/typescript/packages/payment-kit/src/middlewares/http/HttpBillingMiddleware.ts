@@ -9,10 +9,9 @@
 import { PaymentProcessor } from '../../core/PaymentProcessor';
 import type { 
   PaymentProcessorConfig,
-  RequestMetadata,
   ProcessorPaymentResult
 } from '../../core/PaymentProcessor';
-import { BillingContextBuilder } from '../../core/BillingContextBuilder';
+import type { BillingContext } from '../../billing';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
 import type { 
   PaymentHeaderPayload,
@@ -63,14 +62,13 @@ interface NextFunction {
 }
 
 /**
- * Payment session for deferred billing
+ * Payment session for deferred billing - simplified to use unified BillingContext
  */
 export interface PaymentSession {
   rule: BillingRule;
   signedSubRav?: SignedSubRAV;
-  requestMeta: RequestMetadata;
+  ctx: BillingContext;
   paymentRequired: boolean;
-  meta: Record<string, any>;
 }
 
 /**
@@ -216,14 +214,11 @@ export class HttpBillingMiddleware {
       // Use cached payment data or extract from HTTP headers
       const paymentData = cachedPaymentData || this.extractPaymentData(req.headers);
       
-      // Build protocol-agnostic request metadata
-      const requestMeta = this.buildRequestMetadata(req, paymentData || undefined, billingRule);
+      // Build billing context
+      const ctx = this.buildBillingContext(req, paymentData || undefined, billingRule);
       
       // Delegate to PaymentProcessor for core payment logic
-      const result = await this.processor.processPayment(
-        requestMeta,
-        paymentData?.signedSubRav
-      );
+      const result = await this.processor.processPayment(ctx);
       
       if (!result.success) {
         const statusCode = this.mapErrorToHttpStatus(result.errorCode);
@@ -310,14 +305,13 @@ export class HttpBillingMiddleware {
       };
     }
     
-    const requestMeta = this.buildRequestMetadata(req, paymentData, rule);
+    const ctx = this.buildBillingContext(req, paymentData, rule);
     
     return {
       rule,
       signedSubRav,
-      requestMeta,
-      paymentRequired: rule.paymentRequired ?? false,
-      meta: {} // Will be populated with usage data after request execution
+      ctx,
+      paymentRequired: rule.paymentRequired ?? false
     };
   }
 
@@ -332,17 +326,17 @@ export class HttpBillingMiddleware {
     try {
       this.log('🔄 Completing deferred billing with usage data:', usage);
       
-      // Update metadata with usage information
-      const enhancedMeta = {
-        ...paymentSession.requestMeta,
-        ...usage
+      // Update context with usage information
+      const enhancedCtx: BillingContext = {
+        ...paymentSession.ctx,
+        meta: {
+          ...paymentSession.ctx.meta,
+          ...usage
+        }
       };
 
-      // Process payment with updated metadata
-      const result = await this.processor.processPayment(
-        enhancedMeta,
-        paymentSession.signedSubRav
-      );
+      // Process payment with updated context
+      const result = await this.processor.processPayment(enhancedCtx);
       
       if (!result.success) {
         const statusCode = this.mapErrorToHttpStatus(result.errorCode);
@@ -389,30 +383,33 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Build protocol-agnostic request metadata from HTTP request
+   * Build billing context from HTTP request
    */
-  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: PaymentHeaderPayload, billingRule?: BillingRule): RequestMetadata {
+  private buildBillingContext(req: GenericHttpRequest, paymentData?: PaymentHeaderPayload, billingRule?: BillingRule): BillingContext {
     return {
-      operation: `${req.method.toLowerCase()}:${req.path}`,
-      
-      // Extract payment channel info from signed SubRAV
-      channelId: paymentData?.signedSubRav.subRav.channelId,
-      vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment,
-      maxAmount: paymentData?.maxAmount,
-      
-      // Pre-matched billing rule (V2 optimization)
-      billingRule,
-      
-      // HTTP-specific metadata for billing rules
-      method: req.method,
-      path: req.path,
-      
-      // Also keep HTTP-prefixed versions for other uses
-      httpMethod: req.method,
-      httpPath: req.path,
-      httpQuery: req.query,
-      httpBody: req.body,
-      httpHeaders: req.headers
+      serviceId: this.config.serviceId,
+      assetId: this.config.defaultAssetId,
+      meta: {
+        operation: `${req.method.toLowerCase()}:${req.path}`,
+        
+        // Pre-matched billing rule (V2 optimization)
+        billingRule,
+        
+        // Payment data from HTTP headers
+        maxAmount: paymentData?.maxAmount,
+        signedSubRav: paymentData?.signedSubRav,
+        
+        // HTTP-specific metadata for billing rules
+        method: req.method,
+        path: req.path,
+        
+        // Also keep HTTP-prefixed versions for other uses
+        httpMethod: req.method,
+        httpPath: req.path,
+        httpQuery: req.query,
+        httpBody: req.body,
+        httpHeaders: req.headers
+      }
     };
   }
 

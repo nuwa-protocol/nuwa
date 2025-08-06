@@ -9,7 +9,7 @@ export * from './core/ClaimScheduler';
 // Payment processor architecture
 export * from './core/PaymentProcessor';
 export * from './core/PaymentUtils';
-export * from './core/BillingContextBuilder';
+
 
 // Payment codecs
 // export * from './codecs/PaymentCodec';
