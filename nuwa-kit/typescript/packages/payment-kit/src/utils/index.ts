@@ -3,6 +3,7 @@
  */
 
 export * from './bigint';
+export * from './json';
 
 // Import and re-export existing utils from other modules
 export { DebugLogger } from '@nuwa-ai/identity-kit';

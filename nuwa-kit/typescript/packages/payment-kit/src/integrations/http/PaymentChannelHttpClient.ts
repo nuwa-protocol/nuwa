@@ -25,6 +25,7 @@ import {
   extractHost,
   MemoryHostChannelMappingStore 
 } from './internal/HostChannelMappingStore';
+import { parseJsonResponse } from '../../utils/json';
 
 /**
  * HTTP Client State enum for internal state management
@@ -643,17 +644,18 @@ export class PaymentChannelHttpClient {
       throw new Error('Response is not JSON');
     }
 
-    let responseData: any;
-    try {
-      responseData = await response.json();
-    } catch (error) {
-      throw new Error('Failed to parse JSON response');
-    }
-
     // Handle non-ok HTTP status first
     if (!response.ok) {
       console.log('Response error:', response);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    let responseData: any;
+    try {
+      // Use lossless-json for automatic BigInt handling
+      responseData = await parseJsonResponse<any>(response);
+    } catch (error) {
+      throw new Error('Failed to parse JSON response');
     }
 
     // Expect ApiResponse format
@@ -661,9 +663,7 @@ export class PaymentChannelHttpClient {
       const apiResponse = responseData as ApiResponse<T>;
       
       if (apiResponse.success) {
-        // Convert SubRAV BigInt fields from strings back to BigInt
-        const data = this.deserializeBigIntFields(apiResponse.data);
-        return data as T;
+        return apiResponse.data as T;
       } else {
         // Handle error response
         const error = apiResponse.error;
@@ -685,58 +685,10 @@ export class PaymentChannelHttpClient {
     }
 
     // If response doesn't follow ApiResponse format, treat as raw data
-    return this.deserializeBigIntFields(responseData) as T;
+    return responseData as T;
   }
 
-  /**
-   * Convert BigInt fields from strings back to BigInt for SubRAV objects
-   */
-  private deserializeBigIntFields(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
-    }
 
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.deserializeBigIntFields(item));
-    }
-
-    if (typeof obj === 'object') {
-      const result: any = { ...obj };
-      
-      // Convert SubRAV BigInt fields
-      if (result.chainId && typeof result.chainId === 'string') {
-        result.chainId = BigInt(result.chainId);
-      }
-      if (result.channelEpoch && typeof result.channelEpoch === 'string') {
-        result.channelEpoch = BigInt(result.channelEpoch);
-      }
-      if (result.accumulatedAmount && typeof result.accumulatedAmount === 'string') {
-        result.accumulatedAmount = BigInt(result.accumulatedAmount);
-      }
-      if (result.nonce && typeof result.nonce === 'string') {
-        result.nonce = BigInt(result.nonce);
-      }
-
-      // Handle nested objects (like in recovery response)
-      if (result.pendingSubRav) {
-        result.pendingSubRav = this.deserializeBigIntFields(result.pendingSubRav);
-      }
-      if (result.channel) {
-        result.channel = this.deserializeBigIntFields(result.channel);
-      }
-
-      // Recursively handle other nested objects
-      for (const [key, value] of Object.entries(result)) {
-        if (typeof value === 'object' && value !== null) {
-          result[key] = this.deserializeBigIntFields(value);
-        }
-      }
-
-      return result;
-    }
-
-    return obj;
-  }
 
   /**
    * Handle errors with optional custom error handler

@@ -81,6 +81,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/pg": "^8.15.4",
     "js-yaml": "^4.1.0",
+    "lossless-json": "^4.1.1",
     "pg": "^8.16.3"
   },
   "tsup": {

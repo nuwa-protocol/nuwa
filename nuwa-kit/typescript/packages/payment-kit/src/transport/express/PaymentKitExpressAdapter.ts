@@ -3,6 +3,7 @@ import type { Handler, ApiContext } from '../../types/api';
 import type { ApiHandlerConfig } from '../../api';
 import { toApiError, createErrorResponse } from '../../errors';
 import type { BillableRouter, RouteOptions } from './BillableRouter';
+import { sendJsonResponse } from '../../utils/json';
 
 /**
  * Express-specific adapter that mounts API handlers to Express router
@@ -91,10 +92,7 @@ export class PaymentKitExpressAdapter {
         const result = await handler(this.context, requestData);
         
         // Send successful response with BigInt handling
-        res.setHeader('Content-Type', 'application/json');
-        res.send(JSON.stringify(result, (key, value) => {
-          return typeof value === 'bigint' ? value.toString() : value;
-        }));
+        sendJsonResponse(res, result);
       } catch (error) {
         // Convert error to standard API error format
         const apiError = toApiError(error);
@@ -103,10 +101,7 @@ export class PaymentKitExpressAdapter {
         // Set appropriate HTTP status and send error response with BigInt handling
         const statusCode = apiError.httpStatus || 500;
         res.status(statusCode);
-        res.setHeader('Content-Type', 'application/json');
-        res.send(JSON.stringify(errorResponse, (key, value) => {
-          return typeof value === 'bigint' ? value.toString() : value;
-        }));
+        sendJsonResponse(res, errorResponse);
       }
     });
   }

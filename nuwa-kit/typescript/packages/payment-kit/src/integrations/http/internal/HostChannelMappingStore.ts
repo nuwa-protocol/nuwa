@@ -1,4 +1,5 @@
 import type { HostChannelMappingStore, PersistedHttpClientState } from '../types';
+import { serializeJson, parseJson } from '../../../utils/json';
 
 /**
  * Memory-based implementation of HostChannelMappingStore
@@ -102,20 +103,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     }
     
     try {
-      const parsed = JSON.parse(value) as any;
-      
-      // Fix BigInt deserialization for pendingSubRAV
-      if (parsed.pendingSubRAV) {
-        parsed.pendingSubRAV = {
-          ...parsed.pendingSubRAV,
-          chainId: BigInt(parsed.pendingSubRAV.chainId),
-          channelEpoch: BigInt(parsed.pendingSubRAV.channelEpoch),
-          accumulatedAmount: BigInt(parsed.pendingSubRAV.accumulatedAmount),
-          nonce: BigInt(parsed.pendingSubRAV.nonce)
-        };
-      }
-      
-      return parsed as PersistedHttpClientState;
+      return parseJson<PersistedHttpClientState>(value);
     } catch (error) {
       console.warn('Failed to parse stored client state:', error);
       return undefined;
@@ -133,10 +121,8 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       lastUpdated: new Date().toISOString()
     };
     
-    // Use JSON.stringify with BigInt replacer for proper serialization
-    const serializedState = JSON.stringify(stateWithTimestamp, (key, value) => {
-      return typeof value === 'bigint' ? value.toString() : value;
-    });
+    // Use lossless-json for proper BigInt serialization
+    const serializedState = serializeJson(stateWithTimestamp);
     
     localStorage.setItem(stateKey, serializedState);
     
