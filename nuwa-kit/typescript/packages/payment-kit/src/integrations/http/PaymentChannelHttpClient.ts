@@ -7,7 +7,13 @@ import type {
   HostChannelMappingStore 
 } from './types';
 import type { SubRAV, SignedSubRAV } from '../../core/types';
-import type { ApiResponse } from '../../types/api';
+import type { 
+  ApiResponse, 
+  DiscoveryResponse,
+  HealthResponse,
+  RecoveryResponse,
+  CommitResponse
+} from '../../types/api';
 import { ErrorCode } from '../../types/api';
 import { PaymentKitError } from '../../errors';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
@@ -50,8 +56,7 @@ export class PaymentChannelHttpClient {
   private state: ClientState = ClientState.INIT;
   private clientState: HttpClientState;
   private discoveredBasePath?: string;
-  private discoveryAttempted: boolean = false;
-  private cachedDiscoveryInfo?: any;
+  private cachedDiscoveryInfo?: DiscoveryResponse;
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -86,8 +91,8 @@ export class PaymentChannelHttpClient {
     path: string,
     init?: RequestInit
   ): Promise<Response> {
-    // First perform discovery if not attempted yet
-    if (!this.discoveryAttempted) {
+    // First perform discovery if not done yet
+    if (!this.cachedDiscoveryInfo) {
       await this.performDiscovery();
     }
     
@@ -191,16 +196,9 @@ export class PaymentChannelHttpClient {
   /**
    * Discover service information and get service DID
    */
-  async discoverService(): Promise<{
-    serviceId: string;
-    serviceDid: string;
-    network: string;
-    defaultAssetId: string;
-    defaultPricePicoUSD?: string;
-    basePath?: string;
-  }> {
-    // Perform discovery using the well-known endpoint
-    if (!this.discoveryAttempted) {
+  async discoverService(): Promise<DiscoveryResponse> {
+    // Perform discovery using the well-known endpoint if not done yet
+    if (!this.cachedDiscoveryInfo) {
       await this.performDiscovery();
     }
     
@@ -214,24 +212,17 @@ export class PaymentChannelHttpClient {
     throw new Error('Service discovery failed: No discovery information available');
   } 
 
-  async healthCheck(): Promise<{
-    success: boolean;
-    timestamp: string;
-  }> {
+  async healthCheck(): Promise<HealthResponse> {
     const healthUrl = this.buildPaymentUrl('/health');
     const response = await this.fetchImpl(healthUrl, { method: 'GET' });
-    return response.json();
+    return this.parseJsonResponse<HealthResponse>(response);
   } 
 
   /**
    * Recover channel state and pending SubRAV from service
    * This requires DID authentication
    */
-  async recoverFromService(): Promise<{
-    channel: any | null;
-    pendingSubRav: SubRAV | null;
-    timestamp: string;
-  }> {
+  async recoverFromService(): Promise<RecoveryResponse> {
     const recoveryUrl = this.buildPaymentUrl('/recovery');
     
     try {
@@ -263,17 +254,7 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
-      const responseData = await response.json();
-      
-      // Check if this is the new ApiResponse format
-      let recoveryData;
-      if (responseData.success && responseData.data) {
-        // New ApiResponse format
-        recoveryData = responseData.data;
-      } else {
-        // Legacy direct format (for backward compatibility)
-        recoveryData = responseData;
-      }
+      const recoveryData = await this.parseJsonResponse<RecoveryResponse>(response);
       
       // If there's a pending SubRAV, cache it
       if (recoveryData.pendingSubRav) {
@@ -302,7 +283,7 @@ export class PaymentChannelHttpClient {
   /**
    * Commit a signed SubRAV to the service
    */
-  async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: boolean }> {
+  async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<CommitResponse> {
     const commitUrl = this.buildPaymentUrl('/commit');
     
     try {
@@ -336,17 +317,7 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to commit SubRAV: HTTP ${response.status} - ${errorBody}`);
       }
 
-      const responseData = await response.json();
-      
-      // Check if this is the new ApiResponse format
-      let result;
-      if (responseData.success && responseData.data) {
-        // New ApiResponse format
-        result = responseData.data;
-      } else {
-        // Legacy direct format (for backward compatibility)
-        result = responseData;
-      }
+      const result = await this.parseJsonResponse<CommitResponse>(response);
       
       this.log('SubRAV committed successfully');
       return result;
@@ -664,7 +635,7 @@ export class PaymentChannelHttpClient {
 
   /**
    * Parse JSON response with error handling
-   * Supports both legacy and new ApiResponse formats
+   * Expects standard ApiResponse format
    */
   private async parseJsonResponse<T>(response: Response): Promise<T> {
     const contentType = response.headers.get('content-type');
@@ -679,7 +650,13 @@ export class PaymentChannelHttpClient {
       throw new Error('Failed to parse JSON response');
     }
 
-    // Check if this is a new ApiResponse format
+    // Handle non-ok HTTP status first
+    if (!response.ok) {
+      console.log('Response error:', response);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Expect ApiResponse format
     if (responseData && typeof responseData === 'object' && 'success' in responseData) {
       const apiResponse = responseData as ApiResponse<T>;
       
@@ -705,13 +682,7 @@ export class PaymentChannelHttpClient {
       }
     }
 
-    // Handle non-ok HTTP status for legacy responses
-    if (!response.ok) {
-      console.log('Response error:', response);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    // Return legacy response format as-is
+    // If response doesn't follow ApiResponse format, treat as raw data
     return responseData as T;
   }
 
@@ -803,7 +774,6 @@ export class PaymentChannelHttpClient {
    * Perform discovery using the well-known endpoint
    */
   private async performDiscovery(): Promise<void> {
-    this.discoveryAttempted = true;
     const discoveryUrl = new URL('/.well-known/nuwa-payment/info', this.options.baseUrl);
     
     try {
@@ -816,7 +786,7 @@ export class PaymentChannelHttpClient {
       });
 
       if (response.ok) {
-        const serviceInfo = await response.json();
+        const serviceInfo = await response.json() as DiscoveryResponse;
         this.log('Service discovery successful:', serviceInfo);
         
         // Cache the discovery info for later use
