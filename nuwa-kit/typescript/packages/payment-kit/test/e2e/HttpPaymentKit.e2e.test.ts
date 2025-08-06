@@ -143,19 +143,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       serviceId: serviceInfo.serviceId,
       network: serviceInfo.network
     });
-
-    // Test asset price discovery
-    // const priceInfo = await httpClient.getAssetPrice(testAsset.assetId);
-    // expect(priceInfo.assetId).toBe(testAsset.assetId);
-    // expect(priceInfo.pricePicoUSD).toBeTruthy();
-    // expect(priceInfo.priceUSD).toBeTruthy();
-
-    // console.log('✅ Asset price discovery successful:', {
-    //   asset: priceInfo.assetId,
-    //   priceUSD: priceInfo.priceUSD,
-    //   source: priceInfo.source
-    // });
-
+ 
     console.log('🎉 Service discovery test successful!');
   }, 60000);
 
