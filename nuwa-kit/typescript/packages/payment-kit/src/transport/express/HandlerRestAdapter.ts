@@ -7,7 +7,7 @@ import { sendJsonResponse } from '../../utils/json';
  * Prepare request data from Express Request object
  * Extracted from PaymentKitExpressAdapter for reuse
  */
-function prepareRequestData(req: Request, path?: string): any {
+function prepareRequestData(req: Request): any {
   let baseData: any = {};
 
   // Extract from URL parameters
