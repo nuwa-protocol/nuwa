@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { BillableRouter } from '../BillableRouter';
 import express, { Request, Response } from 'express';
-import { BillingRule, BillingConfig, StrategyConfig } from '../../../billing/types';
+import { BillingRule, BillingConfig, StrategyConfig } from '../../../billing';
 
 describe('BillableRouter', () => {
   let router: BillableRouter;

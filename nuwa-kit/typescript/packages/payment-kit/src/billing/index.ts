@@ -17,6 +17,7 @@ export {
 
 // Built-in strategies self-register on import
 export * from './strategies';
+export * from './rate';
 
 // ──────────────────────
 // Engines

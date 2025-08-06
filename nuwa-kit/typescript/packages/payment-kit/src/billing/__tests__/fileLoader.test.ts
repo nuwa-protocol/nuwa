@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FileConfigLoader } from '../config/fileLoader';
-import { BillingConfig } from '../types';
+import { BillingConfig } from '../core/types';
 
 describe('FileConfigLoader', () => {
   const testConfigDir = path.join(__dirname, 'test-configs');

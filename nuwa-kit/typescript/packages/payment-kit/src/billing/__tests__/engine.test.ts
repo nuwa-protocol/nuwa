@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BillingEngine } from '../engine/billingEngine';
 import { FileConfigLoader } from '../config/fileLoader';
-import { BillingContext, BillingRule } from '../types';
+import { BillingContext, BillingRule } from '../core/types';
 import { RuleProvider } from '../core/types';
 // Import strategies to trigger registration
 import '../strategies';

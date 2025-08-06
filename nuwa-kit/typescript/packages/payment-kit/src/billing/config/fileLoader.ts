@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { ConfigLoader, BillingConfig } from '../types';
+import { ConfigLoader, BillingConfig } from '../core/types';
 
 /**
  * File-based configuration loader for YAML billing configurations

@@ -20,8 +20,7 @@ import type {
   SignedSubRAV
 } from '../../core/types';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
-import type { CostCalculator } from '../../billing/types';
-import type { BillingRule, RuleProvider } from '../../billing/core/types';
+import type { CostCalculator, BillingRule, RuleProvider } from '../../billing';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 

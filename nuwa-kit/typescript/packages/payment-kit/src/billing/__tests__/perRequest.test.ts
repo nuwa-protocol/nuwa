@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { PerRequestStrategy } from '../strategies/perRequest';
-import { BillingContext } from '../types';
+import { BillingContext } from '../core/types';
 
 describe('PerRequestStrategy', () => {
   it('should charge fixed price for any request', async () => {

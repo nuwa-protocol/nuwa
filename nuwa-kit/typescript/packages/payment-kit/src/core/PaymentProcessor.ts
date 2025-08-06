@@ -6,9 +6,9 @@ import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
 import type { 
   BillingContext,
-  CostCalculator
-} from '../billing/types';
-import type { BillingRule } from '../billing/core/types';
+  CostCalculator,
+  BillingRule,
+} from '../billing';
 import type { ConversionResult } from '../billing/rate/types';
 
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
@@ -427,9 +427,9 @@ export interface PaymentVerificationResult extends VerificationResult {
       try {
         let cost: bigint;
         
-        if (preMatchedRule && 'calcCostByRule' in this.config.billingEngine) {
+        if (preMatchedRule) {
           // Use pre-matched rule to avoid duplicate rule matching (V2 optimization)
-          cost = await (this.config.billingEngine as any).calcCostByRule(context, preMatchedRule);
+          cost = await this.config.billingEngine.calcCostByRule(context, preMatchedRule);
         } else {
           // Fallback to standard method
           cost = await this.config.billingEngine.calcCost(context);

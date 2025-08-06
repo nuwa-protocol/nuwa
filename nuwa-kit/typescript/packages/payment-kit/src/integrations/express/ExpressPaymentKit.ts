@@ -1,7 +1,7 @@
 import express, { Router, RequestHandler, Request, Response, NextFunction } from 'express';
 import { BillableRouter, RouteOptions } from './BillableRouter';
 import { HttpBillingMiddleware, ResponseAdapter } from '../../middlewares/http/HttpBillingMiddleware';
-import { BillingEngine } from '../../billing';
+import { BillingEngine, RateProvider } from '../../billing';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
@@ -9,8 +9,6 @@ import { MemoryChannelRepository } from '../../storage';
 import { ClaimScheduler } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
-import type { StrategyConfig } from '../../billing/types';
-import type { RateProvider } from '../../billing/rate/types';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 

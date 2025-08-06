@@ -1,73 +1,123 @@
 /**
- * Billing V2 – Core stateless type declarations
+ * Billing – Core stateless type declarations
  *
  * This module MUST remain free of any side-effects so that it can run in any
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
 export interface BillingContext {
-  /** Service identifier (e.g. "llm-gateway", "mcp-server") */
-  serviceId: string;
-  /** Operation name within the service (e.g. "chat:completion") */
-  operation: string;
+    /** Service identifier (e.g. "llm-gateway", "mcp-server") */
+    serviceId: string;
+    /** Operation name within the service (e.g. "chat:completion") */
+    operation: string;
+    /**
+     * Optional asset identifier for settlement. If provided and a `RateProvider`
+     * is injected into `BillingEngine`, costs will automatically be converted
+     * from picoUSD to the asset's smallest unit.
+     */
+    assetId?: string;
+    /** Arbitrary metadata passed along the billing pipeline */
+    meta: Record<string, any>;
+  }
+  
   /**
-   * Optional asset identifier for settlement. If provided and a `RateProvider`
-   * is injected into `BillingEngine`, costs will automatically be converted
-   * from picoUSD to the asset's smallest unit.
+   * Strategy evaluation interface – every billing strategy implements a single
+   * asynchronous `evaluate` method returning a `bigint` cost in picoUSD by
+   * default.
    */
-  assetId?: string;
-  /** Arbitrary metadata passed along the billing pipeline */
-  meta: Record<string, any>;
-}
-
-/**
- * Strategy evaluation interface – every billing strategy implements a single
- * asynchronous `evaluate` method returning a `bigint` cost in picoUSD by
- * default.
- */
-export interface Strategy {
-  evaluate(ctx: BillingContext): Promise<bigint>;
-}
-
-/**
- * Strategy configuration blob coming from declarative route rules.
- */
-export interface StrategyConfig {
-  /** Strategy type – e.g. `PerRequest`, `PerToken` */
-  type: string;
-  /** Additional arbitrary fields consumed by the concrete strategy */
-  [key: string]: any;
-}
-
-/**
- * Declarative billing rule attached to an application route.
- */
-export interface BillingRule {
-  /** Unique rule identifier */
-  id: string;
+  export interface Strategy {
+    evaluate(ctx: BillingContext): Promise<bigint>;
+  }
+  
   /**
-   * Condition object describing when this rule applies. **All** fields must
-   * match for the rule to be considered a hit.
+   * Strategy configuration blob coming from declarative route rules.
    */
-  when?: Record<string, any>;
-  /** Flag indicating this rule is the catch-all default */
-  default?: boolean;
-  /** Strategy configuration telling the engine how to bill the request */
-  strategy: StrategyConfig;
-  /** Optional auth / permission flags (checked by middleware, not the engine) */
-  authRequired?: boolean;
-  adminOnly?: boolean;
-  paymentRequired?: boolean;
-}
+  export interface StrategyConfig {
+    /** Strategy type – e.g. `PerRequest`, `PerToken` */
+    type: string;
+    /** Additional arbitrary fields consumed by the concrete strategy */
+    [key: string]: any;
+  }
+  
+  
+  /**
+   * Interface for providing billing rules to the BillingEngine.
+   * This replaces the ConfigLoader pattern and removes serviceId dependency.
+   */
+  export interface RuleProvider {
+    /**
+     * Returns the current set of billing rules.
+     * Called by BillingEngine on each cost calculation to ensure latest rules.
+     */
+    getRules(): BillingRule[];
+  }
+  
+  /**
+   * Configuration for billing rules
+   */
+  export interface BillingRule {
+    /** Unique identifier for the rule */
+    id: string;
+    /** Condition to match for this rule */
+    when?: BillingCondition;
+    /** Whether this is the default rule */
+    default?: boolean;
+    /** Strategy configuration */
+    strategy: StrategyConfig;
+    /** Whether DID authentication is required for this rule */
+    authRequired?: boolean;
+    /** Whether admin authorization is required for this rule (implies authRequired: true) */
+    adminOnly?: boolean;
+    /** Whether payment (signed SubRAV) is required for this rule */
+    paymentRequired?: boolean;
+  }
+  
+  /**
+   * Condition matching for billing rules
+   */
+  export interface BillingCondition {
+    /** Match by path */
+    path?: string;
+    /** Match by path regex */
+    pathRegex?: string;
+    /** Match by model name */
+    model?: string;
+    /** Match by HTTP method */
+    method?: string;
+    /** Match by asset identifier */
+    assetId?: string;
+    /** Match by metadata fields */
+    [key: string]: any;
+  }
+  
+  /**
+   * Complete billing configuration
+   */
+  export interface BillingConfig {
+    /** Configuration version */
+    version: number;
+    /** Service identifier */
+    serviceId: string;
+    /** List of billing rules */
+    rules: BillingRule[];
+  }
+  
+  /**
+   * Configuration loader interface
+   */
+  export interface ConfigLoader {
+    /**
+     * Load billing configuration for a service
+     * @param serviceId Service identifier
+     * @returns Billing configuration
+     */
+    load(serviceId: string): Promise<BillingConfig>;
+  } 
 
 /**
- * Interface for providing billing rules to the BillingEngine.
- * This replaces the ConfigLoader pattern and removes serviceId dependency.
+ * Interface for calculating costs
  */
-export interface RuleProvider {
-  /**
-   * Returns the current set of billing rules.
-   * Called by BillingEngine on each cost calculation to ensure latest rules.
-   */
-  getRules(): BillingRule[];
+export interface CostCalculator {
+  calcCost(ctx: BillingContext): Promise<bigint>;
+  calcCostByRule(ctx: BillingContext, rule: BillingRule): Promise<bigint>;
 }

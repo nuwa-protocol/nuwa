@@ -1,4 +1,4 @@
-import type { BillingContext } from '../billing/types';
+import type { BillingContext } from '../billing';
 import type { RequestMetadata } from './PaymentProcessor';
 import type { HttpRequestPayload } from './types';
 

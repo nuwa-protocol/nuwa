@@ -1,4 +1,4 @@
-import { BillingContext, BillingRule, RuleProvider } from '../core/types';
+import { BillingContext, BillingRule, CostCalculator, RuleProvider } from '../core/types';
 import { findRule } from '../core/rule-matcher';
 import { getStrategy } from '../core/strategy-registry';
 import { RateProvider } from '../rate/types';
@@ -15,7 +15,7 @@ import { convertUsdToAsset } from '../core/converter';
  * The engine itself is stateful – it maintains no internal cache except what
  * `strategy-registry` does at the process level.
  */
-export class BillingEngine {
+export class BillingEngine implements CostCalculator {
   constructor(
     /** Rule provider for accessing the latest billing rules */
     private readonly ruleProvider: RuleProvider,

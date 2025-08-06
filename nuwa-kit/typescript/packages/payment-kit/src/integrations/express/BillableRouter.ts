@@ -1,7 +1,6 @@
 import express, { Router, RequestHandler } from 'express';
 import { findRule as coreFindRule } from '../../billing/core/rule-matcher';
-import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig } from '../../billing/types';
-import type { RuleProvider } from '../../billing/core/types';
+import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig, RuleProvider } from '../../billing';
 
 /**
  * Route options for registering routes with billing
