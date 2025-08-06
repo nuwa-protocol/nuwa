@@ -4,7 +4,6 @@
 
 import type { Handler, ApiContext } from '../types/api';
 import {
-  handleDiscovery,
   handlePrice,
   handleRecovery,
   handleCommit,

@@ -2,7 +2,6 @@
  * Built-in API handlers for Payment Kit
  */
 
-export * from './discovery';
 export * from './price';
 export * from './recovery';
 export * from './commit';
