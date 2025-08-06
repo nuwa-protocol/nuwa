@@ -102,7 +102,20 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     }
     
     try {
-      return JSON.parse(value) as PersistedHttpClientState;
+      const parsed = JSON.parse(value) as any;
+      
+      // Fix BigInt deserialization for pendingSubRAV
+      if (parsed.pendingSubRAV) {
+        parsed.pendingSubRAV = {
+          ...parsed.pendingSubRAV,
+          chainId: BigInt(parsed.pendingSubRAV.chainId),
+          channelEpoch: BigInt(parsed.pendingSubRAV.channelEpoch),
+          accumulatedAmount: BigInt(parsed.pendingSubRAV.accumulatedAmount),
+          nonce: BigInt(parsed.pendingSubRAV.nonce)
+        };
+      }
+      
+      return parsed as PersistedHttpClientState;
     } catch (error) {
       console.warn('Failed to parse stored client state:', error);
       return undefined;
@@ -120,7 +133,12 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       lastUpdated: new Date().toISOString()
     };
     
-    localStorage.setItem(stateKey, JSON.stringify(stateWithTimestamp));
+    // Use JSON.stringify with BigInt replacer for proper serialization
+    const serializedState = JSON.stringify(stateWithTimestamp, (key, value) => {
+      return typeof value === 'bigint' ? value.toString() : value;
+    });
+    
+    localStorage.setItem(stateKey, serializedState);
     
     // Keep legacy store in sync
     if (state.channelId) {

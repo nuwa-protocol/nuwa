@@ -90,16 +90,23 @@ export class PaymentKitExpressAdapter {
         // Call the handler
         const result = await handler(this.context, requestData);
         
-        // Send successful response
-        res.json(result);
+        // Send successful response with BigInt handling
+        res.setHeader('Content-Type', 'application/json');
+        res.send(JSON.stringify(result, (key, value) => {
+          return typeof value === 'bigint' ? value.toString() : value;
+        }));
       } catch (error) {
         // Convert error to standard API error format
         const apiError = toApiError(error);
         const errorResponse = createErrorResponse(apiError);
         
-        // Set appropriate HTTP status
+        // Set appropriate HTTP status and send error response with BigInt handling
         const statusCode = apiError.httpStatus || 500;
-        res.status(statusCode).json(errorResponse);
+        res.status(statusCode);
+        res.setHeader('Content-Type', 'application/json');
+        res.send(JSON.stringify(errorResponse, (key, value) => {
+          return typeof value === 'bigint' ? value.toString() : value;
+        }));
       }
     });
   }

@@ -1,20 +1,14 @@
 import type { Handler, ApiContext, RecoveryResponse } from '../../types/api';
-import { PaymentKitError } from '../../errors';
+import type { InternalRecoveryRequest } from '../../types/internal';
+import { PaymentKitError, createSuccessResponse } from '../../errors';
 import { ErrorCode } from '../../types/api';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
-import { createSuccessResponseWithBigInt } from '../../utils';
-
-export interface RecoveryRequest {
-  didInfo: {
-    did: string;
-  };
-}
 
 /**
  * Handle recovery endpoint requests
  * Requires DID authentication
  */
-export const handleRecovery: Handler<ApiContext, RecoveryRequest, RecoveryResponse> = async (ctx, req) => {
+export const handleRecovery: Handler<ApiContext, InternalRecoveryRequest, RecoveryResponse> = async (ctx, req) => {
   try {
     if (!req.didInfo || !req.didInfo.did) {
       throw new PaymentKitError(
@@ -46,7 +40,7 @@ export const handleRecovery: Handler<ApiContext, RecoveryRequest, RecoveryRespon
       timestamp: new Date().toISOString()
     };
     
-    return createSuccessResponseWithBigInt(response);
+    return createSuccessResponse(response);
   } catch (error) {
     if (error instanceof PaymentKitError) {
       throw error;

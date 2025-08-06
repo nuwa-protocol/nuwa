@@ -69,6 +69,13 @@ export type Handler<Ctx = ApiContext, Req = any, Res = any> =
 
 // ====== Recovery API Types ======
 
+/**
+ * Client-side recovery request (no parameters needed)
+ */
+export interface RecoveryRequest {
+  // Empty - recovery is based on authenticated user's DID
+}
+
 export interface RecoveryResponse {
   channel: any | null;
   pendingSubRav: any | null; // SubRAV | null
@@ -77,6 +84,9 @@ export interface RecoveryResponse {
 
 // ====== Commit API Types ======
 
+/**
+ * Client-side commit request
+ */
 export interface CommitRequest {
   subRav: any; // SignedSubRAV
 }
@@ -100,6 +110,9 @@ export interface ClaimsStatusResponse {
   timestamp: string;
 }
 
+/**
+ * Client-side claim trigger request
+ */
 export interface ClaimTriggerRequest {
   channelId: string;
 }
@@ -109,6 +122,9 @@ export interface ClaimTriggerResponse {
   channelId: string;
 }
 
+/**
+ * Client-side SubRAV query request
+ */
 export interface SubRavRequest {
   channelId: string;
   nonce: string;

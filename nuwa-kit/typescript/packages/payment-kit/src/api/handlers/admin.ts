@@ -3,15 +3,13 @@ import type {
   ApiContext, 
   HealthResponse, 
   ClaimsStatusResponse,
-  ClaimTriggerRequest,
   ClaimTriggerResponse,
-  SubRavRequest,
   CleanupRequest,
   CleanupResponse
 } from '../../types/api';
+import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../types/internal';
 import { createSuccessResponse, PaymentKitError } from '../../errors';
 import { ErrorCode } from '../../types/api';
-import { serializeBigInt, bigintReplacer, createSuccessResponseWithBigInt } from '../../utils';
 
 
 /**
@@ -26,12 +24,12 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
     
     const claimsStatus = ctx.middleware.getClaimStatus();
     if (ctx.config.debug) {
-      console.log('📊 Claims status:', JSON.stringify(claimsStatus, bigintReplacer));
+      console.log('📊 Claims status:', claimsStatus);
     }
     
     const processingStats = ctx.middleware.getProcessingStats();
     if (ctx.config.debug) {
-      console.log('📊 Processing stats:', JSON.stringify(processingStats, bigintReplacer));
+      console.log('📊 Processing stats:', processingStats);
     }
     
     const result: ClaimsStatusResponse = { 
@@ -44,7 +42,7 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
       console.log('✅ Admin: Claims data retrieved successfully');
     }
     
-    return createSuccessResponseWithBigInt(result);
+    return createSuccessResponse(result);
   } catch (error) {
     if (ctx.config.debug) {
       console.error('❌ Admin: Failed to get claims status:', error);
@@ -64,7 +62,7 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
  * Handle admin claim trigger endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaimTrigger: Handler<ApiContext, ClaimTriggerRequest, ClaimTriggerResponse> = async (ctx, req) => {
+export const handleAdminClaimTrigger: Handler<ApiContext, InternalClaimTriggerRequest, ClaimTriggerResponse> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
       console.log('🚀 Admin: Triggering claim for channel:', req.channelId);

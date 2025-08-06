@@ -1,5 +1,6 @@
 // Main exports
 export { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
+export { PaymentChannelAdminClient, createAdminClient } from './PaymentChannelAdminClient';
 
 // Types
 export type {
