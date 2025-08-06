@@ -275,3 +275,20 @@ export const ApiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+/**
+ * Persisted HTTP client state schema for JSON serialization
+ * Used by HostChannelMappingStore for safe BigInt handling
+ */
+export const PersistedHttpClientStateSchema = z.object({
+  /** Channel identifier */
+  channelId: z.string().optional(),
+  /** Pending SubRAV data */
+  pendingSubRAV: SubRAVSchema.optional(),
+  /** Whether handshake is complete */
+  isHandshakeComplete: z.boolean(),
+  /** Last update timestamp (ISO string) */
+  lastUpdated: z.string().optional(),
+});
+
+export type PersistedHttpClientState = z.infer<typeof PersistedHttpClientStateSchema>;

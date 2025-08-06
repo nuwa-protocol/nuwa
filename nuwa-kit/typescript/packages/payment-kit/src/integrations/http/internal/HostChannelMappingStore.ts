@@ -1,4 +1,5 @@
 import type { HostChannelMappingStore, PersistedHttpClientState } from '../types';
+import { PersistedHttpClientStateSchema } from '../../../schema/core';
 import { serializeJson, parseJson } from '../../../utils/json';
 
 /**
@@ -29,10 +30,13 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
   }
 
   async setState(host: string, state: PersistedHttpClientState): Promise<void> {
-    this.stateStore.set(host, state);
+    // Validate with Zod schema to ensure data integrity
+    const validatedState = PersistedHttpClientStateSchema.parse(state);
+    
+    this.stateStore.set(host, validatedState);
     // Keep legacy store in sync
-    if (state.channelId) {
-      this.store.set(host, state.channelId);
+    if (validatedState.channelId) {
+      this.store.set(host, validatedState.channelId);
     }
   }
 
@@ -103,7 +107,10 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     }
     
     try {
-      return parseJson<PersistedHttpClientState>(value);
+      // Parse JSON with lossless-json first
+      const parsedData = parseJson(value);
+      // Then validate and transform with Zod (handles BigInt conversion)
+      return PersistedHttpClientStateSchema.parse(parsedData);
     } catch (error) {
       console.warn('Failed to parse stored client state:', error);
       return undefined;
@@ -121,8 +128,11 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       lastUpdated: new Date().toISOString()
     };
     
+    // Validate and transform with Zod (ensures proper structure)
+    const validatedState = PersistedHttpClientStateSchema.parse(stateWithTimestamp);
+    
     // Use lossless-json for proper BigInt serialization
-    const serializedState = serializeJson(stateWithTimestamp);
+    const serializedState = serializeJson(validatedState);
     
     localStorage.setItem(stateKey, serializedState);
     

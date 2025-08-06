@@ -2,6 +2,7 @@ import type { ChainConfig } from '../../factory/chainFactory';
 import type { PaymentChannelPayerClientOptions } from '../../client/PaymentChannelPayerClient';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { SubRAV } from '../../core/types';
+import type { PersistedHttpClientState } from '../../schema/core';
 
 /**
  * Configuration options for PaymentChannelHttpClient
@@ -67,15 +68,10 @@ export interface HttpPayerOptions {
 
 }
 
-/**
- * Extended client state for persistence
- */
-export interface PersistedHttpClientState {
-  channelId?: string;
-  pendingSubRAV?: SubRAV;
-  isHandshakeComplete: boolean;
-  lastUpdated?: string; // ISO timestamp
-}
+// PersistedHttpClientState is now imported from schema/core to ensure 
+// consistency with Zod validation and avoid type duplication
+// Re-export for convenience and backward compatibility
+export type { PersistedHttpClientState };
 
 /**
  * Host to client state mapping repository

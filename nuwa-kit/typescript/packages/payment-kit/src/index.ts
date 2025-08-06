@@ -122,5 +122,31 @@ export * from './api';
 export * from './types/api';
 export * from './errors';
 
+// Zod schemas for validation and serialization (avoiding duplicates)
+export { 
+  // Core schemas only for serialization
+  PersistedHttpClientStateSchema,
+  // Other essential schemas not conflicting with core types
+  ServiceDiscoverySchema,
+  ClaimsStatusSchema,
+  ClaimTriggerRequestSchema,
+  ClaimTriggerResponseSchema,
+  CleanupRequestSchema,
+  CleanupResponseSchema,
+  RecoveryRequestSchema,
+  RecoveryResponseSchema,
+  CommitRequestSchema,
+  CommitResponseSchema,
+  HealthRequestSchema,
+  HealthResponseSchema,
+  SubRavRequestSchema,
+  SubRavQueryResponseSchema,
+  AdminRequestSchema,
+  ClaimsStatusResponseSchema,
+  DiscoveryRequestSchema,
+  DiscoveryResponseSchema,
+} from './schema';
+// Note: PersistedHttpClientState type is exported via integrations/http
+
 // Core IdentityEnv integration helpers (shared utilities)
 export { getChainConfigFromEnv } from './helpers/fromIdentityEnv';
