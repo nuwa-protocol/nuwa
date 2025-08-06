@@ -109,6 +109,20 @@ module acp_registry::acp_registry {
         let cap_uri = get_did_identifier_string(doc_id(did_document));
         string::append_utf8(&mut cap_uri, b":");
         string::append(&mut cap_uri, name);
+        let agent_capability_obj_id = object::custom_object_id<String, AgentCapability>(cap_uri);
+        if (object::exists_object_with_type<AgentCapability>(agent_capability_obj_id)) {
+            let mut_agent_capability_obj = object::borrow_mut_object<AgentCapability>(account, agent_capability_obj_id);
+            let mut_agent_capability = object::borrow_mut(mut_agent_capability_obj);
+            mut_agent_capability.version = mut_agent_capability.version + 1;
+            mut_agent_capability.cid = cid;
+            emit(UpdateEvent{
+                cap_uri: mut_agent_capability.cap_uri,
+                creator: mut_agent_capability.creator,
+                version: mut_agent_capability.version,
+                cid: mut_agent_capability.cid
+            });
+            return
+        };
         let agent_capability = object::new_with_id(cap_uri, AgentCapability{
             cap_uri,
             creator,
@@ -128,17 +142,17 @@ module acp_registry::acp_registry {
         })
     }
 
-    public entry fun update(agent_capability_obj: &mut Object<AgentCapability>, cid: String) {
-        let agent_capability = object::borrow_mut(agent_capability_obj);
-        agent_capability.version = agent_capability.version + 1;
-        agent_capability.cid = cid;
-        emit(UpdateEvent{
-            cap_uri: agent_capability.cap_uri,
-            creator: agent_capability.creator,
-            version: agent_capability.version,
-            cid: agent_capability.cid
-        })
-    }
+    // public entry fun update(agent_capability_obj: &mut Object<AgentCapability>, cid: String) {
+    //     let agent_capability = object::borrow_mut(agent_capability_obj);
+    //     agent_capability.version = agent_capability.version + 1;
+    //     agent_capability.cid = cid;
+    //     emit(UpdateEvent{
+    //         cap_uri: agent_capability.cap_uri,
+    //         creator: agent_capability.creator,
+    //         version: agent_capability.version,
+    //         cid: agent_capability.cid
+    //     })
+    // }
 
     public fun get_agent_capability_id(creator: address, name: String): ObjectID {
         let did_document = did::get_did_document_by_address(creator);
