@@ -86,12 +86,8 @@ export interface BillingContext {
     path?: string;
     /** Match by path regex */
     pathRegex?: string;
-    /** Match by model name */
-    model?: string;
     /** Match by HTTP method */
     method?: string;
-    /** Match by asset identifier */
-    assetId?: string;
     /** Match by metadata fields */
     [key: string]: any;
   }

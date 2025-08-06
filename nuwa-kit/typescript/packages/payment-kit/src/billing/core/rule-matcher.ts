@@ -49,14 +49,7 @@ function matchesRule(meta: Record<string, any>, rule: BillingRule): boolean {
     }
   }
 
-  // Model / method / assetId direct comparisons
-  if (when.model && meta.model !== when.model) {
-    return false;
-  }
   if (when.method && meta.method !== when.method) {
-    return false;
-  }
-  if (when.assetId && meta.assetId !== when.assetId) {
     return false;
   }
 
