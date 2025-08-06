@@ -62,16 +62,12 @@ export class PaymentChannelAdminClient {
    * Clean up old SubRAV proposals (admin only)
    */
   async cleanup(request?: CleanupRequest): Promise<CleanupResponse> {
-    if (request) {
-      // Use the generic request method for DELETE with body
-      const response = await this.httpClient.request('DELETE', '/admin/cleanup', {
-        body: JSON.stringify(request),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      return (this.httpClient as any).parseJsonResponse(response);
-    } else {
-      return this.httpClient.delete<CleanupResponse>('/admin/cleanup');
+    // Use POST and JSON body for cleanup
+    if (request && Object.keys(request).length > 0) {
+      return this.httpClient.post<CleanupResponse>('/admin/cleanup', request);
     }
+    return this.httpClient.post<CleanupResponse>('/admin/cleanup');
+
   }
 
   /**

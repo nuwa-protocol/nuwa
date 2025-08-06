@@ -150,7 +150,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       },
       handler: handleAdminCleanup,
     }),
-    method: 'DELETE',
+    method: 'POST',
     path: '/admin/cleanup',
     options: { pricing: '0', adminOnly: true },
     description: 'Clean up old processed SubRAVs (admin only)'

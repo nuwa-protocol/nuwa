@@ -113,24 +113,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Note: PaymentChannelHttpClient should handle channel cleanup automatically
     // or provide explicit cleanup methods in the future
     console.log('🏁 HTTP Payment Kit E2E Tests completed');
-  }, 60000); // 1 minute timeout for cleanup
-
-  // Helper function to generate admin authentication header
-  async function generateAdminAuthHeader(): Promise<string> {
-    const keyIds = await payer.keyManager.listKeyIds();
-    const keyId = keyIds[0];
-
-    const signedObject = await DIDAuth.v1.createSignature(
-      { 
-        operation: 'admin_request',
-        params: { uri: billingServerInstance.baseURL }
-      },
-      payer.keyManager,
-      keyId
-    );
-
-    return DIDAuth.v1.toAuthorizationHeader(signedObject);
-  }
+  }, 60000); // 1 minute timeout for cleanup 
 
   test('Service discovery with createHttpClient', async () => {
     if (!shouldRunE2ETests()) return;
