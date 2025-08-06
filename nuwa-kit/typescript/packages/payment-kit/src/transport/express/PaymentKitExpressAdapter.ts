@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import type { Handler, ApiContext } from '../../types/api';
+import type { ApiHandlerConfig } from '../../api';
 import { toApiError, createErrorResponse } from '../../errors';
 import type { BillableRouter, RouteOptions } from './BillableRouter';
 
@@ -8,16 +9,16 @@ import type { BillableRouter, RouteOptions } from './BillableRouter';
  */
 export class PaymentKitExpressAdapter {
   private router: Router;
-  private handlers: Record<string, Handler<ApiContext, any, any>>;
+  private handlerConfigs: Record<string, ApiHandlerConfig>;
   private context: ApiContext;
   private billableRouter: BillableRouter;
 
   constructor(
-    handlers: Record<string, Handler<ApiContext, any, any>>,
+    handlerConfigs: Record<string, ApiHandlerConfig>,
     context: ApiContext,
     billableRouter: BillableRouter
   ) {
-    this.handlers = handlers;
+    this.handlerConfigs = handlerConfigs;
     this.context = context;
     this.billableRouter = billableRouter;
     this.router = Router();
@@ -36,51 +37,25 @@ export class PaymentKitExpressAdapter {
    * Set up all routes
    */
   private setupRoutes(): void {
-    Object.entries(this.handlers).forEach(([key, handler]) => {
+    Object.entries(this.handlerConfigs).forEach(([key, config]) => {
       const [method, path] = key.split(' ', 2);
       
       if (!method || !path) {
         throw new Error(`Invalid route key format: ${key}. Expected "METHOD /path"`);
       }
 
-      // Determine route options based on the handler type
-      const routeOptions = this.getRouteOptions(key, path);
+      // Use the route options from configuration
+      const routeOptions = config.options;
       
       // Register the route with BillableRouter for billing rules
       this.registerBillingRule(method, path, routeOptions, key);
       
       // Mount the handler on Express router
-      this.mountHandler(method, path, handler, key);
+      this.mountHandler(method, path, config.handler, key);
     });
   }
 
-  /**
-   * Get route options based on handler type
-   */
-  private getRouteOptions(key: string, path: string): RouteOptions {
-    // Price endpoint is free and public
-    if (key === 'GET /price') {
-      return { pricing: '0', authRequired: false };
-    }
-    
-    // Admin health is free and public
-    if (key === 'GET /admin/health') {
-      return { pricing: '0', authRequired: false };
-    }
-    
-    // Other admin endpoints are free but admin-only
-    if (path.startsWith('/admin/')) {
-      return { pricing: '0', adminOnly: true };
-    }
-    
-    // Recovery and commit endpoints are free but require auth
-    if (key === 'GET /recovery' || key === 'POST /commit') {
-      return { pricing: '0', authRequired: true };
-    }
-    
-    // Default: free and no auth required
-    return { pricing: '0', authRequired: false };
-  }
+
 
   /**
    * Register billing rule for the route
@@ -169,10 +144,10 @@ export class PaymentKitExpressAdapter {
  * Factory function to create Express adapter
  */
 export function createExpressAdapter(
-  handlers: Record<string, Handler<ApiContext, any, any>>,
+  handlerConfigs: Record<string, ApiHandlerConfig>,
   context: ApiContext,
   billableRouter: BillableRouter
 ): Router {
-  const adapter = new PaymentKitExpressAdapter(handlers, context, billableRouter);
+  const adapter = new PaymentKitExpressAdapter(handlerConfigs, context, billableRouter);
   return adapter.getRouter();
 }
