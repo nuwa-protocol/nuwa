@@ -212,42 +212,7 @@ export class PaymentChannelHttpClient {
     
     // If discovery failed, we can't proceed
     throw new Error('Service discovery failed: No discovery information available');
-  }
-
-  /**
-   * Get asset price from service
-   */
-  async getAssetPrice(assetId: string): Promise<{
-    assetId: string;
-    priceUSD: string;
-    pricePicoUSD: string;
-    timestamp: string;
-    source: string;
-    lastUpdated?: string;
-  }> {
-    const priceUrl = this.buildPaymentUrl('/price');
-    
-    try {
-      const response = await this.fetchImpl(priceUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get asset price: HTTP ${response.status}`);
-      }
-
-      const priceInfo = await response.json();
-      this.log('Asset price retrieved:', priceInfo);
-      return priceInfo;
-    } catch (error) {
-      const errorMessage = `Asset price query failed: ${error instanceof Error ? error.message : String(error)}`;
-      this.log(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
+  } 
 
   async healthCheck(): Promise<{
     success: boolean;

@@ -66,20 +66,6 @@ export interface ApiContext {
 export type Handler<Ctx = ApiContext, Req = any, Res = any> =
   (ctx: Ctx, req: Req) => Promise<ApiResponse<Res>>;
 
-// ====== Price API Types ======
-
-export interface PriceRequest {
-  assetId?: string;
-}
-
-export interface PriceResponse {
-  assetId: string;
-  priceUSD: string;
-  pricePicoUSD: string;
-  timestamp: string;
-  source: string;
-  lastUpdated?: string;
-}
 
 // ====== Recovery API Types ======
 

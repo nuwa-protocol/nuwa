@@ -5,13 +5,11 @@
 import type { Handler, ApiContext } from '../types/api';
 import type { RouteOptions } from '../transport/express/BillableRouter';
 import {
-  handlePrice,
   handleRecovery,
   handleCommit,
-  handleAdminHealth,
+  handleHealth,
   handleAdminClaims,
   handleAdminClaimTrigger,
-  handleAdminSubRav,
   handleAdminCleanup,
   handleSubRavQuery
 } from './handlers';
@@ -35,14 +33,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   // Note: Discovery endpoint is handled directly in ExpressPaymentKit at root level
   // to comply with well-known URI RFC specifications
   
-  // Price endpoint (public, no auth)
-  '/price': {
-    handler: handlePrice,
-    method: 'GET',
-    options: { pricing: '0', authRequired: false },
-    description: 'Get asset price information'
-  },
-  
+
   // Recovery endpoint (auth required)
   '/recovery': {
     handler: handleRecovery,
@@ -59,12 +50,19 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     description: 'Commit a signed SubRAV to the service'
   },
   
-  // Health endpoint (public, no auth, will be at /payment-channel/health)
+  // Health endpoint (public, no auth)
   '/health': {
-    handler: handleAdminHealth,
+    handler: handleHealth,
     method: 'GET',
     options: { pricing: '0', authRequired: false },
     description: 'Health check endpoint (public)'
+  },
+
+  '/subrav': {
+    handler: handleSubRavQuery,
+    method: 'GET',
+    options: { pricing: '0', authRequired: true },  // Changed: auth required but not admin-only
+    description: 'Get SubRAV details (requires auth, users can only query their own)'
   },
   
   // Admin endpoints
@@ -80,12 +78,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     options: { pricing: '0', adminOnly: true },
     description: 'Manually trigger claim for a specific channel (admin only)'
   },
-  '/subrav': {
-    handler: handleSubRavQuery,
-    method: 'GET',
-    options: { pricing: '0', authRequired: true },  // Changed: auth required but not admin-only
-    description: 'Get SubRAV details (requires auth, users can only query their own)'
-  },
+
   '/admin/cleanup': {
     handler: handleAdminCleanup,
     method: 'DELETE',
