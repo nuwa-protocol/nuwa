@@ -22,7 +22,7 @@ export function generateNonce(): bigint {
 export function extractFragment(keyId: string): string {
   const hashIndex = keyId.indexOf('#');
   if (hashIndex === -1) {
-    return '';
+    throw new Error(`No fragment found in keyId: ${keyId}`);
   }
   return keyId.substring(hashIndex + 1);
 }
