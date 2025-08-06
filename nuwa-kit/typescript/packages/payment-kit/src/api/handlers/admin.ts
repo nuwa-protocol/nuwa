@@ -96,7 +96,7 @@ export const handleAdminClaimTrigger: Handler<ApiContext, ClaimTriggerRequest, C
  */
 export const handleAdminCleanup: Handler<ApiContext, CleanupRequest, CleanupResponse> = async (ctx, req) => {
   try {
-    const maxAge = req.maxAge || 30;
+    const maxAge = req.maxAgeMinutes || 30;
     
     if (ctx.config.debug) {
       console.log('🧹 Admin: Cleaning up expired proposals, max age:', maxAge, 'minutes');

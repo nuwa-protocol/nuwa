@@ -135,13 +135,67 @@ export const HealthCheckSchema = z.object({
 export type HealthCheck = z.infer<typeof HealthCheckSchema>;
 
 /**
+ * Claims policy configuration schema
+ */
+export const ClaimPolicySchema = z.object({
+  /** Minimum accumulated amount to trigger claim (in smallest unit) */
+  minClaimAmount: createBigIntSchema(),
+  /** Maximum interval between claims in milliseconds */
+  maxIntervalMs: z.number(),
+  /** Maximum number of concurrent claim operations */
+  maxConcurrentClaims: z.number().optional(),
+  /** Retry attempts for failed claims */
+  maxRetries: z.number().optional(),
+  /** Delay between retries in milliseconds */
+  retryDelayMs: z.number().optional(),
+});
+
+export type ClaimPolicy = z.infer<typeof ClaimPolicySchema>;
+
+/**
+ * Claim scheduler status schema
+ */
+export const ClaimSchedulerStatusSchema = z.object({
+  /** Whether scheduler is currently running */
+  isRunning: z.boolean(),
+  /** Number of active claim operations */
+  activeClaims: z.number(),
+  /** Number of failed claim attempts */
+  failedAttempts: z.number(),
+  /** Last poll timestamp */
+  lastPollTime: z.number(),
+  /** Current claiming policy */
+  policy: ClaimPolicySchema,
+});
+
+export type ClaimSchedulerStatus = z.infer<typeof ClaimSchedulerStatusSchema>;
+
+/**
+ * Payment processing statistics schema
+ */
+export const PaymentProcessingStatsSchema = z.object({
+  /** Total number of payment requests processed */
+  totalRequests: z.number(),
+  /** Number of successful payments */
+  successfulPayments: z.number(),
+  /** Number of failed payments */
+  failedPayments: z.number(),
+  /** Number of handshakes completed */
+  handshakes: z.number(),
+  /** Number of auto claims triggered */
+  autoClaimsTriggered: z.number(),
+});
+
+export type PaymentProcessingStats = z.infer<typeof PaymentProcessingStatsSchema>;
+
+/**
  * Claims status information schema
  */
 export const ClaimsStatusSchema = z.object({
-  /** Current claims status data */
-  claimsStatus: z.any(), // TODO: Define more specific schema based on actual structure
-  /** Processing statistics */
-  processingStats: z.any(), // TODO: Define more specific schema based on actual structure  
+  /** Current claims scheduler status */
+  claimsStatus: ClaimSchedulerStatusSchema,
+  /** Payment processing statistics */
+  processingStats: PaymentProcessingStatsSchema,
   /** Response timestamp in ISO-8601 format */
   timestamp: z.string(),
 });
@@ -175,7 +229,7 @@ export type ClaimTriggerResponse = z.infer<typeof ClaimTriggerResponseSchema>;
  */
 export const CleanupRequestSchema = z.object({
   /** Maximum age in minutes (optional) */
-  maxAge: z.number().optional(),
+  maxAgeMinutes: z.number().optional(),
 });
 
 export type CleanupRequest = z.infer<typeof CleanupRequestSchema>;

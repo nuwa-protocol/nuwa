@@ -121,11 +121,6 @@ export class PaymentKitExpressAdapter {
       baseData.didInfo = (req as any).didInfo;
     }
 
-    // Handle specific query parameters
-    if (req.query.maxAge) {
-      baseData.maxAge = parseInt(req.query.maxAge as string);
-    }
-
     return baseData;
   }
 }
