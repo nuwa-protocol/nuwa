@@ -40,21 +40,23 @@ export interface ApiHandlerConfig {
   handler: Handler<ApiContext, any, any>;
   options: RouteOptions;
   description?: string;
-  // Suggested HTTP method (adapters may ignore this)
+  // HTTP method for REST adapters (MCP/JSON-RPC adapters may ignore this)
   method?: 'GET' | 'POST' | 'DELETE';
+  // REST path for HTTP adapters (other adapters may ignore this)
+  path?: string;
 }
 
 /**
  * Registry of built-in API handlers with their configuration
- * Key format: "/path" (no HTTP method, no path variables)
+ * Key format: semantic handler name (protocol agnostic)
  */
 export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   // Note: Discovery endpoint is handled directly in ExpressPaymentKit at root level
   // to comply with well-known URI RFC specifications
   
 
-  // Recovery endpoint (auth required)
-  '/recovery': {
+  // Core payment operations
+  recovery: {
     handler: createValidatedHandler({
       schema: {
         request: RecoveryRequestSchema,
@@ -63,12 +65,12 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleRecovery,
     }),
     method: 'GET',
+    path: '/recovery',
     options: { pricing: '0', authRequired: true },
     description: 'Recover channel state and pending SubRAV'
   },
   
-  // Commit endpoint (auth required)
-  '/commit': {
+  commit: {
     handler: createValidatedHandler({
       schema: {
         request: CommitRequestSchema,
@@ -77,12 +79,13 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleCommit,
     }),
     method: 'POST',
+    path: '/commit',
     options: { pricing: '0', authRequired: true },
     description: 'Commit a signed SubRAV to the service'
   },
   
-  // Health endpoint (public, no auth)
-  '/health': {
+  // System operations
+  health: {
     handler: createValidatedHandler({
       schema: {
         request: HealthRequestSchema,
@@ -91,11 +94,12 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleHealth,
     }),
     method: 'GET',
+    path: '/health',
     options: { pricing: '0', authRequired: false },
     description: 'Health check endpoint (public)'
   },
 
-  '/subrav': {
+  subravQuery: {
     handler: createValidatedHandler({
       schema: {
         request: SubRavRequestSchema,
@@ -104,12 +108,13 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleSubRavQuery,
     }),
     method: 'GET',
-    options: { pricing: '0', authRequired: true },  // Changed: auth required but not admin-only
+    path: '/subrav',
+    options: { pricing: '0', authRequired: true },
     description: 'Get SubRAV details (requires auth, users can only query their own)'
   },
   
-  // Admin endpoints
-  '/admin/claims': {
+  // Admin operations
+  adminClaims: {
     handler: createValidatedHandler({
       schema: {
         request: AdminRequestSchema,
@@ -118,10 +123,12 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleAdminClaims,
     }),
     method: 'GET',
+    path: '/admin/claims',
     options: { pricing: '0', adminOnly: true },
     description: 'Get claims status and statistics (admin only)'
   },
-  '/admin/claim-trigger': {
+
+  adminClaimTrigger: {
     handler: createValidatedHandler({
       schema: {
         request: ClaimTriggerRequestSchema,
@@ -130,11 +137,12 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleAdminClaimTrigger,
     }),
     method: 'POST',
+    path: '/admin/claim-trigger',
     options: { pricing: '0', adminOnly: true },
     description: 'Manually trigger claim for a specific channel (admin only)'
   },
 
-  '/admin/cleanup': {
+  adminCleanup: {
     handler: createValidatedHandler({
       schema: {
         request: CleanupRequestSchema,
@@ -143,6 +151,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
       handler: handleAdminCleanup,
     }),
     method: 'DELETE',
+    path: '/admin/cleanup',
     options: { pricing: '0', adminOnly: true },
     description: 'Clean up old processed SubRAVs (admin only)'
   },

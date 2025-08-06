@@ -1,15 +1,14 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import type { Handler, ApiContext } from '../../types/api';
+import { Router } from 'express';
+import type { ApiContext } from '../../types/api';
 import type { ApiHandlerConfig } from '../../api';
-import { toApiError, createErrorResponse } from '../../errors';
-import type { BillableRouter, RouteOptions } from './BillableRouter';
-import { sendJsonResponse } from '../../utils/json';
+import type { BillableRouter } from './BillableRouter';
+import { registerHandlersWithBillableRouter } from './HandlerRestAdapter';
 
 /**
- * Express-specific adapter that mounts API handlers to Express router
+ * Express-specific adapter that registers PaymentKit handlers with BillableRouter
+ * This eliminates the need for dummyHandler and separate routing layers
  */
 export class PaymentKitExpressAdapter {
-  private router: Router;
   private handlerConfigs: Record<string, ApiHandlerConfig>;
   private context: ApiContext;
   private billableRouter: BillableRouter;
@@ -22,111 +21,34 @@ export class PaymentKitExpressAdapter {
     this.handlerConfigs = handlerConfigs;
     this.context = context;
     this.billableRouter = billableRouter;
-    this.router = Router();
     
     this.setupRoutes();
   }
 
   /**
-   * Get the Express router
+   * Get the Express router from BillableRouter
+   * All routes are now registered directly with BillableRouter
    */
   getRouter(): Router {
-    return this.router;
+    return this.billableRouter.router;
   }
 
   /**
-   * Set up all routes
+   * Set up all routes by registering handlers directly with BillableRouter
+   * This ensures billing rules and Express routes are created together
    */
   private setupRoutes(): void {
-    Object.entries(this.handlerConfigs).forEach(([path, config]) => {
-      // Use suggested method from config, default to POST if not specified
-      const method = config.method || 'POST';
-      
-      // Use the route options from configuration
-      const routeOptions = config.options;
-      
-      // Register the route with BillableRouter for billing rules
-      this.registerBillingRule(method, path, routeOptions, path);
-      
-      // Mount the handler on Express router
-      this.mountHandler(method, path, config.handler, path);
-    });
-  }
-
-
-
-  /**
-   * Register billing rule for the route
-   */
-  private registerBillingRule(method: string, path: string, options: RouteOptions, ruleId: string): void {
-    // Use the billable router's register method to add billing rules
-    const routerMethod = method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
-    
-    // Create a dummy handler for billing registration
-    const dummyHandler = (req: Request, res: Response) => {
-      // This should never be called as we handle routing separately
-      res.status(500).json({ error: 'Internal routing error' });
-    };
-    
-    if (this.billableRouter[routerMethod]) {
-      this.billableRouter[routerMethod](path, options, dummyHandler, ruleId);
-    }
-  }
-
-  /**
-   * Mount handler on Express router
-   */
-  private mountHandler(method: string, path: string, handler: Handler<ApiContext, any, any>, key: string): void {
-    const routerMethod = method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
-    
-    if (!this.router[routerMethod]) {
-      throw new Error(`Unsupported HTTP method: ${method}`);
-    }
-
-    this.router[routerMethod](path, async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        // Prepare request data for handler
-        const requestData = this.prepareRequestData(req, path);
-        
-        // Call the handler
-        const result = await handler(this.context, requestData);
-        
-        // Send successful response with BigInt handling
-        sendJsonResponse(res, result);
-      } catch (error) {
-        // Convert error to standard API error format
-        const apiError = toApiError(error);
-        const errorResponse = createErrorResponse(apiError);
-        
-        // Set appropriate HTTP status and send error response with BigInt handling
-        const statusCode = apiError.httpStatus || 500;
-        res.status(statusCode);
-        sendJsonResponse(res, errorResponse);
-      }
-    });
-  }
-
-  /**
-   * Prepare request data for handler
-   */
-  private prepareRequestData(req: Request, path: string): any {
-    const baseData = {
-      ...req.query,
-      ...req.body,
-      params: req.params
-    };
-
-    // Add DID info if available (set by authentication middleware)
-    if ((req as any).didInfo) {
-      baseData.didInfo = (req as any).didInfo;
-    }
-
-    return baseData;
+    registerHandlersWithBillableRouter(
+      this.handlerConfigs,
+      this.context,
+      this.billableRouter
+    );
   }
 }
 
 /**
  * Factory function to create Express adapter
+ * Returns the BillableRouter's router with all handlers registered
  */
 export function createExpressAdapter(
   handlerConfigs: Record<string, ApiHandlerConfig>,
