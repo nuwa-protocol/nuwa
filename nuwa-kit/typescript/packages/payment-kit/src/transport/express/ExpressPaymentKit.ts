@@ -161,18 +161,19 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // 2. Create Express adapter for built-in handlers
     const adapterRouter = createExpressAdapter(BuiltInApiHandlers, apiContext, this.billableRouter);
 
-    // 3. Apply billing middleware wrapper to all payment routes
+    // 3. Apply billing middleware wrapper to built-in payment routes only
     const paymentRouter = express.Router();
     paymentRouter.use(this.createBillingWrapper());
     
     // Mount adapter router for built-in API handlers under payment routes
     paymentRouter.use(adapterRouter);
-    
-    // Mount billable router for business routes under payment routes
-    paymentRouter.use(this.billableRouter.router);
 
-    // Mount payment router under basePath
+    // Mount payment router under basePath (only contains built-in routes)
     this.router.use(basePath, paymentRouter);
+    
+    // 4. Mount business routes directly on main router with billing middleware
+    // This allows business routes to keep their original paths without basePath prefix
+    this.router.use(this.createBillingWrapper(), this.billableRouter.router);
   }
 
   /**

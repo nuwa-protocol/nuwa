@@ -30,6 +30,14 @@ export class PaymentChannelAdminClient {
   }
 
   /**
+   * Build URL for payment-related endpoints (internal use)
+   */
+  private buildPaymentUrl(endpoint: string): string {
+    // Use the public buildPaymentUrl method
+    return this.httpClient.buildPaymentUrl(endpoint);
+  }
+
+  /**
    * Health check endpoint (public, no auth required)
    */
   async healthCheck(): Promise<HealthResponse> {
@@ -40,14 +48,14 @@ export class PaymentChannelAdminClient {
    * Get claims status and processing statistics (admin only)
    */
   async getClaimsStatus(): Promise<ClaimsStatusResponse> {
-    return this.httpClient.get<ClaimsStatusResponse>('/admin/claims');
+    return this.httpClient.get<ClaimsStatusResponse>(this.buildPaymentUrl('/admin/claims'));
   }
 
   /**
    * Manually trigger a claim for a specific channel (admin only)
    */
   async triggerClaim(request: ClaimTriggerRequest): Promise<ClaimTriggerResponse> {
-    return this.httpClient.post<ClaimTriggerResponse>('/admin/claim-trigger', request);
+    return this.httpClient.post<ClaimTriggerResponse>(this.buildPaymentUrl('/admin/claim-trigger'), request);
   }
 
   /**
@@ -55,7 +63,7 @@ export class PaymentChannelAdminClient {
    */
   async querySubRav(request: SubRavRequest): Promise<any> {
     const queryPath = `/subrav?channelId=${encodeURIComponent(request.channelId)}&nonce=${encodeURIComponent(request.nonce)}`;
-    return this.httpClient.get<any>(queryPath);
+    return this.httpClient.get<any>(this.buildPaymentUrl(queryPath));
   }
 
   /**
@@ -64,9 +72,9 @@ export class PaymentChannelAdminClient {
   async cleanup(request?: CleanupRequest): Promise<CleanupResponse> {
     // Use POST and JSON body for cleanup
     if (request && Object.keys(request).length > 0) {
-      return this.httpClient.post<CleanupResponse>('/admin/cleanup', request);
+      return this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'), request);
     }
-    return this.httpClient.post<CleanupResponse>('/admin/cleanup');
+    return this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'));
 
   }
 

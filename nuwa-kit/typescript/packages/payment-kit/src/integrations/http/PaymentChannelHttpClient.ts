@@ -106,10 +106,10 @@ export class PaymentChannelHttpClient {
       await this.performDiscovery();
     }
     
-    // Build URL - use buildPaymentUrl for relative paths, direct construction for absolute paths
-    const fullUrl = path.startsWith('http') || path.startsWith('/') && this.pathAlreadyIncludesBasePath(path)
-      ? new URL(path, this.options.baseUrl).toString()
-      : this.buildPaymentUrl(path);
+    // Build URL - use direct construction for all paths except relative ones
+    const fullUrl = path.startsWith('http')
+      ? path
+      : new URL(path, this.options.baseUrl).toString();
     
     // Ensure channel is ready
     await this.ensureChannelReady();
@@ -883,18 +883,12 @@ export class PaymentChannelHttpClient {
     return this.discoveredBasePath || '/payment-channel';
   }
 
-  /**
-   * Check if path already includes the base path
-   */
-  private pathAlreadyIncludesBasePath(path: string): boolean {
-    const basePath = this.getBasePath();
-    return path.startsWith(basePath);
-  }
+
 
   /**
    * Build URL for payment-related endpoints
    */
-  private buildPaymentUrl(endpoint: string): string {
+  public buildPaymentUrl(endpoint: string): string {
     const basePath = this.getBasePath();
     return new URL(`${basePath}${endpoint}`, this.options.baseUrl).toString();
   }
