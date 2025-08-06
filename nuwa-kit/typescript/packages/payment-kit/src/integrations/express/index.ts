@@ -1,6 +1,12 @@
-// Express integration exports
-export { BillableRouter, BillableRouterOptions, RouteOptions } from './BillableRouter';
-export * from './ExpressPaymentKit';
+/**
+ * @deprecated This path is deprecated. Please import from '@nuwa-ai/payment-kit/transport/express' instead.
+ * This re-export will be removed in a future major version.
+ */
 
-// IdentityEnv integration
-export { createExpressPaymentKitFromEnv } from './fromIdentityEnv'; 
+console.warn(
+  '[DEPRECATION WARNING] Importing from "integrations/express" is deprecated. ' +
+  'Please update your imports to use "transport/express" instead. ' +
+  'This path will be removed in a future major version.'
+);
+
+export * from '../../transport/express';

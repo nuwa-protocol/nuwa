@@ -6,7 +6,7 @@
  * respective modules for better discoverability:
  * 
  * - createHttpClientFromEnv: integrations/http/fromIdentityEnv
- * - createExpressPaymentKitFromEnv: integrations/express/fromIdentityEnv
+ * - createExpressPaymentKitFromEnv: transport/express/fromIdentityEnv
  */
 
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';

@@ -111,8 +111,16 @@ export {
 // HTTP Payer Client integration
 export * from './integrations/http';
 
-// Express Payment Kit integration
+// Express Payment Kit integration (legacy path - deprecated)
 export * from './integrations/express';
+
+// New transport layer (recommended)
+export * from './transport/express';
+
+// Framework-agnostic API handlers and types
+export * from './api';
+export * from './types/api';
+export * from './errors';
 
 // Core IdentityEnv integration helpers (shared utilities)
 export { getChainConfigFromEnv } from './helpers/fromIdentityEnv';

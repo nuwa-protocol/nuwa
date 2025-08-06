@@ -7,6 +7,9 @@ import type {
   HostChannelMappingStore 
 } from './types';
 import type { SubRAV, SignedSubRAV } from '../../core/types';
+import type { ApiResponse } from '../../types/api';
+import { ErrorCode } from '../../types/api';
+import { PaymentKitError } from '../../errors';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
 import { PaymentChannelFactory } from '../../factory/chainFactory';
 import { DidAuthHelper } from './internal/DidAuthHelper';
@@ -295,7 +298,17 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
-      const recoveryData = await response.json();
+      const responseData = await response.json();
+      
+      // Check if this is the new ApiResponse format
+      let recoveryData;
+      if (responseData.success && responseData.data) {
+        // New ApiResponse format
+        recoveryData = responseData.data;
+      } else {
+        // Legacy direct format (for backward compatibility)
+        recoveryData = responseData;
+      }
       
       // If there's a pending SubRAV, cache it
       if (recoveryData.pendingSubRav) {
@@ -358,7 +371,18 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to commit SubRAV: HTTP ${response.status} - ${errorBody}`);
       }
 
-      const result = await response.json();
+      const responseData = await response.json();
+      
+      // Check if this is the new ApiResponse format
+      let result;
+      if (responseData.success && responseData.data) {
+        // New ApiResponse format
+        result = responseData.data;
+      } else {
+        // Legacy direct format (for backward compatibility)
+        result = responseData;
+      }
+      
       this.log('SubRAV committed successfully');
       return result;
     } catch (error) {
@@ -675,23 +699,55 @@ export class PaymentChannelHttpClient {
 
   /**
    * Parse JSON response with error handling
+   * Supports both legacy and new ApiResponse formats
    */
   private async parseJsonResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      console.log('Response error:', response);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('Response is not JSON');
     }
 
+    let responseData: any;
     try {
-      return await response.json();
+      responseData = await response.json();
     } catch (error) {
       throw new Error('Failed to parse JSON response');
     }
+
+    // Check if this is a new ApiResponse format
+    if (responseData && typeof responseData === 'object' && 'success' in responseData) {
+      const apiResponse = responseData as ApiResponse<T>;
+      
+      if (apiResponse.success) {
+        return apiResponse.data as T;
+      } else {
+        // Handle error response
+        const error = apiResponse.error;
+        if (error) {
+          throw new PaymentKitError(
+            error.code || ErrorCode.INTERNAL_ERROR,
+            error.message || 'Unknown error',
+            error.httpStatus || response.status,
+            error.details
+          );
+        } else {
+          throw new PaymentKitError(
+            ErrorCode.INTERNAL_ERROR,
+            'Unknown error occurred',
+            response.status
+          );
+        }
+      }
+    }
+
+    // Handle non-ok HTTP status for legacy responses
+    if (!response.ok) {
+      console.log('Response error:', response);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Return legacy response format as-is
+    return responseData as T;
   }
 
   /**
