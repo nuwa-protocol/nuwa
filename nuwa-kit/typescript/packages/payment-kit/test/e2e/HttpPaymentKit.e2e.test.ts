@@ -321,7 +321,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const recoveryData = await httpClient.recoverFromService();
     
     expect(recoveryData.channel).toBeTruthy();
-    expect(recoveryData.channel.channelId).toBe(httpClient.getChannelId());
+    expect(recoveryData.channel!.channelId).toBe(httpClient.getChannelId());
     expect(recoveryData.timestamp).toBeTruthy();
 
     console.log('✅ Recovery data retrieved:', {
@@ -412,7 +412,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Test 6: Cleanup (admin endpoint)
     console.log('📞 Testing cleanup via AdminClient');
     const cleanupResponse = await adminClient.cleanup({
-      maxAge: 1 // 1 minute
+      maxAgeMinutes: 1 // 1 minute
     });
     expect(cleanupResponse.clearedCount).toBeGreaterThanOrEqual(0);
     expect(Number(cleanupResponse.maxAgeMinutes)).toBe(1);

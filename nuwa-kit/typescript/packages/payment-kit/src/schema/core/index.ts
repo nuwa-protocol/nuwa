@@ -66,32 +66,28 @@ export const AssetInfoSchema = z.object({
 export type AssetInfo = z.infer<typeof AssetInfoSchema>;
 
 /**
- * Channel status enumeration
+ * Channel status enumeration (matches core/types.ts)
  */
-export const ChannelStatusSchema = z.enum(['Open', 'Closed', 'Disputed']);
+export const ChannelStatusSchema = z.enum(['active', 'closing', 'closed']);
 
 export type ChannelStatus = z.infer<typeof ChannelStatusSchema>;
 
 /**
- * Channel information schema
+ * Channel information schema (matches core/types.ts ChannelInfo interface)
  */
 export const ChannelInfoSchema = z.object({
   /** Channel identifier */
   channelId: z.string(),
+  /** Payer DID */
+  payerDid: z.string(),
+  /** Payee DID */
+  payeeDid: z.string(),
+  /** Asset identifier */
+  assetId: z.string(),
+  /** Channel epoch */
+  epoch: createBigIntSchema(),
   /** Channel status */
   status: ChannelStatusSchema,
-  /** Current channel epoch */
-  channelEpoch: createBigIntSchema(),
-  /** Total deposited amount */
-  depositedAmount: createBigIntSchema(),
-  /** Total claimed amount */
-  claimedAmount: createBigIntSchema(),
-  /** Asset information */
-  asset: AssetInfoSchema,
-  /** Channel creation timestamp */
-  createdAt: z.string().optional(),
-  /** Last update timestamp */
-  updatedAt: z.string().optional(),
 });
 
 export type ChannelInfo = z.infer<typeof ChannelInfoSchema>;
