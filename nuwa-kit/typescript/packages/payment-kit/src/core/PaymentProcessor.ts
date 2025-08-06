@@ -50,10 +50,6 @@ import { BillingContextBuilder } from './BillingContextBuilder';
     /** Business operation identifier (e.g., "POST:/api/chat/completions") */
     operation: string;
     
-    /** Optional business parameters */
-    model?: string;
-    assetId?: string;
-    
     /** Payment channel information (extracted from signed SubRAV) */
     channelId?: string;
     vmIdFragment?: string;
@@ -74,9 +70,6 @@ export interface ProcessorPaymentResult {
     
     /** Cost calculated for this request */
     cost: bigint;
-    
-    /** Asset ID used for calculation */
-    assetId: string;
     
     /** Generated unsigned SubRAV for next request */
     unsignedSubRAV?: SubRAV;
@@ -176,7 +169,6 @@ export interface PaymentVerificationResult extends VerificationResult {
               return {
                 success: false,
                 cost: 0n,
-                assetId: signedSubRAV.subRav.channelId,
                 error: verificationResult.error,
                 errorCode: 'INVALID_PAYMENT',
                 isHandshake: true
@@ -192,7 +184,6 @@ export interface PaymentVerificationResult extends VerificationResult {
               return {
                 success: false,
                 cost: 0n,
-                assetId: signedSubRAV.subRav.channelId,
                 error: verificationResult.error,
                 errorCode: this.extractErrorCode(verificationResult.error || ''),
                 isHandshake: false
@@ -214,8 +205,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         
         const billingContext = BillingContextBuilder.build(
           this.config.serviceId,
-          enhancedMeta,
-          this.config.defaultAssetId
+          enhancedMeta
         );
   
         // Step 3: Calculate cost for current request with conversion details
@@ -223,12 +213,22 @@ export interface PaymentVerificationResult extends VerificationResult {
         const costResult = await this.calculateCostWithDetails(billingContext, preMatchedRule);
         const { cost, conversion } = costResult;
 
+        // Step 3.5: Check if cost exceeds maxAmount limit (only if maxAmount > 0)
+        if (requestMeta.maxAmount && requestMeta.maxAmount > 0n && cost > requestMeta.maxAmount) {
+          this.stats.failedPayments++;
+          return {
+            success: false,
+            cost,
+            error: 'OVER_BUDGET',
+            errorCode: 'MAX_AMOUNT_EXCEEDED'
+          };
+        }
+
         if (cost === 0n) {
           // Free request, no payment needed
           return {
             success: true,
             cost: 0n,
-            assetId: billingContext.assetId || this.config.defaultAssetId || 'unknown',
             autoClaimTriggered,
             isHandshake,
             payerKeyId: verificationResult?.payerKeyId,
@@ -246,7 +246,6 @@ export interface PaymentVerificationResult extends VerificationResult {
         return {
           success: true,
           cost,
-          assetId: billingContext.assetId || this.config.defaultAssetId || 'unknown',
           unsignedSubRAV,
           signedSubRAV,
           autoClaimTriggered,
@@ -263,7 +262,6 @@ export interface PaymentVerificationResult extends VerificationResult {
         return {
           success: false,
           cost: 0n,
-          assetId: requestMeta.assetId || this.config.defaultAssetId || 'unknown',
           error: `Payment processing failed: ${error}`,
           errorCode: 'PAYMENT_ERROR'
         };
@@ -363,10 +361,6 @@ export interface PaymentVerificationResult extends VerificationResult {
      * Generate SubRAV proposal for client to sign
      */
     async generateProposal(context: BillingContext, amount: bigint): Promise<SubRAV> {
-      if (!context.assetId) {
-        throw new Error('assetId is required for SubRAV generation');
-      }
-  
       const channelId = context.meta.channelId;
       const vmIdFragment = context.meta.vmIdFragment;
       

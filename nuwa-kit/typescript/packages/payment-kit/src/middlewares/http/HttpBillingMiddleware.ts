@@ -15,6 +15,7 @@ import type {
 import { BillingContextBuilder } from '../../core/BillingContextBuilder';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
 import type { 
+  PaymentHeaderPayload,
   HttpRequestPayload, 
   HttpResponsePayload, 
   SignedSubRAV
@@ -92,7 +93,8 @@ export enum HttpPaymentErrorCode {
   PAYMENT_ERROR = 'PAYMENT_ERROR',            // 500
   INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS',  // 402
   CHANNEL_CLOSED = 'CHANNEL_CLOSED',          // 400
-  EPOCH_MISMATCH = 'EPOCH_MISMATCH'           // 400
+  EPOCH_MISMATCH = 'EPOCH_MISMATCH',          // 400
+  MAX_AMOUNT_EXCEEDED = 'MAX_AMOUNT_EXCEEDED' // 400
 }
 
 /**
@@ -168,7 +170,6 @@ export class HttpBillingMiddleware {
         resAdapter.setStatus(statusCode).json({ 
           error: result.error || 'Payment required',
           code: result.errorCode,
-          assetId: result.assetId
         });
         return null;
       }
@@ -195,7 +196,7 @@ export class HttpBillingMiddleware {
   /**
    * Extract payment data from HTTP request headers
    */
-  extractPaymentData(headers: Record<string, string | string[] | undefined>): HttpRequestPayload | null {
+  extractPaymentData(headers: Record<string, string | string[] | undefined>): PaymentHeaderPayload | null {
     const headerValue = HttpPaymentCodec.extractPaymentHeader(headers);
     
     if (!headerValue) {
@@ -203,11 +204,7 @@ export class HttpBillingMiddleware {
     }
 
     try {
-      const decoded = this.codec.decode(headerValue);
-      return {
-        signedSubRav: decoded.signedSubRAV,
-        ...(decoded.metadata || {})
-      };
+      return this.codec.decodePayload(headerValue);
     } catch (error) {
       throw new Error(`Invalid payment channel header: ${error}`);
     }
@@ -216,17 +213,14 @@ export class HttpBillingMiddleware {
   /**
    * Build protocol-agnostic request metadata from HTTP request
    */
-  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: HttpRequestPayload, billingRule?: BillingRule): RequestMetadata {
+  private buildRequestMetadata(req: GenericHttpRequest, paymentData?: PaymentHeaderPayload, billingRule?: BillingRule): RequestMetadata {
     return {
       operation: `${req.method.toLowerCase()}:${req.path}`,
-      
-      // Extract business parameters from query/body
-      model: req.query?.model || req.body?.model,
-      assetId: req.query?.assetId || req.body?.assetId,
       
       // Extract payment channel info from signed SubRAV
       channelId: paymentData?.signedSubRav.subRav.channelId,
       vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment,
+      maxAmount: paymentData?.maxAmount,
       
       // Pre-matched billing rule (V2 optimization)
       billingRule,
@@ -283,6 +277,7 @@ export class HttpBillingMiddleware {
       case HttpPaymentErrorCode.TAMPERED_SUBRAV:
       case HttpPaymentErrorCode.CHANNEL_CLOSED:
       case HttpPaymentErrorCode.EPOCH_MISMATCH:
+      case HttpPaymentErrorCode.MAX_AMOUNT_EXCEEDED:
         return 400; // Bad Request
       
       case HttpPaymentErrorCode.PAYMENT_ERROR:

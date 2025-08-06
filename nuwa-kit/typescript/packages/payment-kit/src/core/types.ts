@@ -95,16 +95,21 @@ export interface TransactionResult {
  */
 
 /**
- * HTTP request header payload
+ * Payment header payload - protocol-agnostic structure for payment requests
  */
-export interface HttpRequestPayload {
-  /** Signed SubRAV from client (required, including handshake with nonce=0, amount=0) */
+export interface PaymentHeaderPayload {
+  /** Signed SubRAV from client */
   signedSubRav: SignedSubRAV;
-  /** Maximum amount client willing to pay for this request */
-  maxAmount?: bigint;
-  /** Client transaction reference for idempotency */
+  /** Per-request max amount (token smallest unit) */
+  maxAmount: bigint;
+  /** Optional client-side tx reference (idempotency) */
   clientTxRef?: string;
+  /** Protocol version (default: 1) */
+  version: number;
 }
+
+// Compatibility alias - maintain backward compatibility
+export type HttpRequestPayload = PaymentHeaderPayload;
 
 /**
  * HTTP response header payload

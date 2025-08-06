@@ -555,7 +555,12 @@ export class PaymentChannelHttpClient {
 
       // Encode to header
       const codec = new HttpPaymentCodec();
-      const headerValue = codec.encode(signedSubRAV);
+      const headerValue = codec.encodePayload({
+        signedSubRav: signedSubRAV,
+        maxAmount: this.options.maxAmount || BigInt(0),
+        clientTxRef: crypto.randomUUID(),
+        version: 1
+      });
       headers[HttpPaymentCodec.getHeaderName()] = headerValue;
       
     } catch (error) {

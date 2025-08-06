@@ -291,17 +291,39 @@ export class PaymentChannelPayerClient {
       throw new Error(`Epoch mismatch: channel ${channelInfo.epoch}, SubRAV ${subRAV.channelEpoch}`);
     }
 
-    // 3. Check against maximum amount limit
-    if (maxAmount && subRAV.accumulatedAmount > maxAmount) {
-      throw new Error(`SubRAV amount ${subRAV.accumulatedAmount} exceeds maximum allowed ${maxAmount}`);
-    }
-
-    // 4. Verify nonce progression (if we have previous state)
+    // 3. Verify nonce progression and check amount limit using delta amount
     const payerDid = await this.signer.getDid();
     const keyId = `${payerDid}#${subRAV.vmIdFragment}`;
     
-    try {
-      const prevState = await this.channelRepo.getSubChannelState(subRAV.channelId, keyId);
+    // Check if this is a handshake SubRAV (nonce=0, amount=0)
+    const isHandshake = subRAV.nonce === BigInt(0) && subRAV.accumulatedAmount === BigInt(0);
+    
+    if (isHandshake) {
+      // Handshake SubRAV - always allowed, no sequence validation needed
+      // This allows for re-handshaking after clearPendingSubRAV() or other resets
+      
+      // For handshake, maxAmount check is not applicable since amount is always 0
+      return; // Skip further validation for handshake
+    }
+    
+    // Non-handshake SubRAV - need to validate sequence and amount
+    const prevState = await this.channelRepo.getSubChannelState(subRAV.channelId, keyId);
+    
+    // Check if this appears to be the first real payment (stored state is still default)
+    const isFirstPayment = prevState.nonce === BigInt(0) && prevState.accumulatedAmount === BigInt(0);
+    
+    if (isFirstPayment) {
+      // First payment after handshake - should have nonce=1
+      if (subRAV.nonce !== BigInt(1)) {
+        throw new Error(`First payment SubRAV must have nonce 1, got ${subRAV.nonce}`);
+      }
+      
+      // Check accumulated amount against maximum amount limit for first payment
+      if (maxAmount && maxAmount > 0n && subRAV.accumulatedAmount > maxAmount) {
+        throw new Error(`SubRAV amount ${subRAV.accumulatedAmount} exceeds maximum allowed ${maxAmount}`);
+      }
+    } else {
+      // Subsequent payments - verify strict progression
       
       // Verify nonce increments by 1
       const expectedNonce = prevState.nonce + BigInt(1);
@@ -313,15 +335,13 @@ export class PaymentChannelPayerClient {
       if (subRAV.accumulatedAmount <= prevState.accumulatedAmount) {
         throw new Error(`Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`);
       }
-    } catch (error) {
-      // No previous state - this could be handshake (nonce = 0) or first payment (nonce = 1)
-      if (subRAV.nonce !== BigInt(0) && subRAV.nonce !== BigInt(1)) {
-        throw new Error(`First SubRAV must have nonce 0 (handshake) or 1 (first payment), got ${subRAV.nonce}`);
-      }
-      
-      // Additional validation for handshake
-      if (subRAV.nonce === BigInt(0) && subRAV.accumulatedAmount !== BigInt(0)) {
-        throw new Error(`Handshake SubRAV (nonce=0) must have zero amount, got ${subRAV.accumulatedAmount}`);
+
+      // Check delta amount against maximum amount limit
+      if (maxAmount && maxAmount > 0n) {
+        const deltaAmount = subRAV.accumulatedAmount - prevState.accumulatedAmount;
+        if (deltaAmount > maxAmount) {
+          throw new Error(`Delta amount ${deltaAmount} exceeds maximum allowed ${maxAmount}`);
+        }
       }
     }
 

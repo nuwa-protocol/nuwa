@@ -8,10 +8,6 @@ import type { HttpRequestPayload } from './types';
 export interface BillingRequestContext {
   /** HTTP path */
   path?: string;
-  /** HTTP method */
-  method?: string;
-  /** Model name for AI services */
-  model?: string;
   /** Asset ID for settlement */
   assetId?: string;
   /** Payment channel ID */
@@ -32,12 +28,10 @@ export class BillingContextBuilder {
   static build(
     serviceId: string,
     requestMeta: RequestMetadata,
-    defaultAssetId?: string
   ): BillingContext {
     return {
       serviceId,
       operation: requestMeta.operation,
-      assetId: requestMeta.assetId || defaultAssetId,
       meta: requestMeta
     };
   }
@@ -68,64 +62,8 @@ export class BillingContextBuilder {
     return {
       serviceId,
       operation: `${req.method.toLowerCase()}:${req.path}`,
-      assetId: meta.assetId || undefined,
       meta
     };
-  }
-
-  /**
-   * Build billing context from MCP request
-   */
-  static fromMcpRequest(
-    serviceId: string,
-    request: McpRequest,
-    paymentData?: { signedSubRAV: any }
-  ): BillingContext {
-    const meta: RequestMetadata = {
-      operation: `mcp:${request.method}`,
-      
-      // From MCP parameters
-      model: request.params?.model,
-      assetId: request.params?.assetId,
-      
-      // From payment data
-      channelId: paymentData?.signedSubRAV.subRav.channelId,
-      vmIdFragment: paymentData?.signedSubRAV.subRav.vmIdFragment,
-      
-      // MCP specific
-      mcpMethod: request.method,
-      mcpParams: request.params,
-      mcpId: request.id
-    };
-
-    return this.build(serviceId, meta);
-  }
-
-  /**
-   * Build billing context from A2A message
-   */
-  static fromA2aMessage(
-    serviceId: string,
-    message: A2aMessage,
-    paymentData?: { signedSubRAV: any }
-  ): BillingContext {
-    const meta: RequestMetadata = {
-      operation: `a2a:${message.service}:${message.method}`,
-      
-      // From A2A payload
-      ...message.payload,
-      
-      // From payment data
-      channelId: paymentData?.signedSubRAV.subRav.channelId,
-      vmIdFragment: paymentData?.signedSubRAV.subRav.vmIdFragment,
-      
-      // A2A specific
-      a2aService: message.service,
-      a2aMethod: message.method,
-      a2aMessageId: message.id
-    };
-
-    return this.build(serviceId, meta);
   }
 
   /**
@@ -184,18 +122,3 @@ interface HttpRequest {
   query: Record<string, any>;
   body?: any;
 }
-
-interface McpRequest {
-  jsonrpc: string;
-  id: string;
-  method: string;
-  params?: Record<string, any>;
-}
-
-interface A2aMessage {
-  id: string;
-  type: 'request' | 'response';
-  service: string;
-  method: string;
-  payload: any;
-} 

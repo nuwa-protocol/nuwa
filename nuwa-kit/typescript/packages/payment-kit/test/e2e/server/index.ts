@@ -163,7 +163,7 @@ export async function createBillingServer(config: BillingServerConfig) {
       res.status(500).json({
         error: 'Internal Server Error',
         message: err.message,
-        stack: debug ? err.stack : undefined
+        stack: err.stack
       });
     }
   });

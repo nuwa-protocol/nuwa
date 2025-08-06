@@ -2,7 +2,7 @@ import { MultibaseCodec } from '@nuwa-ai/identity-kit';
 import type { SignedSubRAV, SubRAV } from '../../core/types';
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
 import { EncodingError, DecodingError } from '../../codecs/PaymentCodec';
-import type { HttpRequestPayload, HttpResponsePayload } from '../../core/types';
+import type { PaymentHeaderPayload, HttpRequestPayload, HttpResponsePayload } from '../../core/types';
 
 /**
  * HTTP-specific payment codec
@@ -14,13 +14,15 @@ export class HttpPaymentCodec implements PaymentCodec {
   private static readonly HEADER_NAME = 'X-Payment-Channel-Data';
 
   /**
-   * Encode signed SubRAV for HTTP request header
+   * Encode signed SubRAV for HTTP request header (legacy interface for PaymentCodec)
    */
   encode(signedSubRAV: SignedSubRAV, metadata?: any): string {
     try {
-      const payload: HttpRequestPayload = {
+      const payload: PaymentHeaderPayload = {
         signedSubRav: signedSubRAV,
-        ...metadata
+        maxAmount: metadata?.maxAmount || BigInt(0),
+        clientTxRef: metadata?.clientTxRef,
+        version: metadata?.version || 1
       };
       
       return HttpPaymentCodec.buildRequestHeader(payload);
@@ -33,17 +35,48 @@ export class HttpPaymentCodec implements PaymentCodec {
   }
 
   /**
-   * Decode HTTP request header to signed SubRAV
+   * Decode HTTP request header to signed SubRAV (legacy interface for PaymentCodec)
    */
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     try {
       const payload = HttpPaymentCodec.parseRequestHeader(encoded);
       
-      const { signedSubRav, ...metadata } = payload;
       return {
-        signedSubRAV: signedSubRav,
-        metadata
+        signedSubRAV: payload.signedSubRav,
+        metadata: {
+          maxAmount: payload.maxAmount,
+          clientTxRef: payload.clientTxRef,
+          version: payload.version
+        }
       };
+    } catch (error) {
+      throw new DecodingError(
+        'Failed to decode HTTP payment data',
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /**
+   * Encode payment header payload for HTTP request header (new interface)
+   */
+  encodePayload(payload: PaymentHeaderPayload): string {
+    try {
+      return HttpPaymentCodec.buildRequestHeader(payload);
+    } catch (error) {
+      throw new EncodingError(
+        'Failed to encode HTTP payment data',
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /**
+   * Decode HTTP request header to payment header payload (new interface)
+   */
+  decodePayload(encoded: string): PaymentHeaderPayload {
+    try {
+      return HttpPaymentCodec.parseRequestHeader(encoded);
     } catch (error) {
       throw new DecodingError(
         'Failed to decode HTTP payment data',
@@ -116,12 +149,13 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Build HTTP request header value
    */
-  static buildRequestHeader(payload: HttpRequestPayload): string {
+  static buildRequestHeader(payload: PaymentHeaderPayload): string {
     // Convert payload to serializable format
     const serializable = {
       signedSubRav: this.serializeSignedSubRAV(payload.signedSubRav),
-      maxAmount: payload.maxAmount?.toString(),
+      maxAmount: payload.maxAmount.toString(),
       clientTxRef: payload.clientTxRef,
+      version: payload.version.toString(),
     };
 
     // Convert to JSON and encode
@@ -132,15 +166,16 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Parse HTTP request header value
    */
-  static parseRequestHeader(headerValue: string): HttpRequestPayload {
+  static parseRequestHeader(headerValue: string): PaymentHeaderPayload {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
 
       return {
         signedSubRav: this.deserializeSignedSubRAV(data.signedSubRav),
-        maxAmount: data.maxAmount ? BigInt(data.maxAmount) : undefined,
+        maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0), // Handle old format without maxAmount
         clientTxRef: data.clientTxRef,
+        version: parseInt(data.version) || 1,
       };
     } catch (error) {
       throw new Error(`Failed to parse request header: ${error}`);
@@ -218,7 +253,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Extract payment data from request headers
    */
-  static extractPaymentData(headers: Record<string, string>): HttpRequestPayload | null {
+  static extractPaymentData(headers: Record<string, string>): PaymentHeaderPayload | null {
     const headerValue = headers[this.getHeaderName().toLowerCase()] || 
                        headers[this.getHeaderName()];
     
@@ -251,14 +286,14 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Validate payment requirements for a request
    */
   static validatePaymentRequirement(
-    paymentData: HttpRequestPayload | null,
+    paymentData: PaymentHeaderPayload | null,
     requiredAmount: bigint
   ): { valid: boolean; error?: string } {
     if (!paymentData) {
       return { valid: false, error: 'Payment required' };
     }
 
-    if (paymentData.maxAmount && paymentData.maxAmount < requiredAmount) {
+    if (paymentData.maxAmount < requiredAmount) {
       return { valid: false, error: 'Insufficient payment allowance' };
     }
 
