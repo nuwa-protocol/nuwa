@@ -204,7 +204,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private createBillingWrapper(): RequestHandler {
     return async (req: Request, res: Response, next: NextFunction) => {
       // Skip everything for health routes only
-      if (req.path === '/admin/health') {
+              if (req.path === '/health') {
         return next();
       }
 

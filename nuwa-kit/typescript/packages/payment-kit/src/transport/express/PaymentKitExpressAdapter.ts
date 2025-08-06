@@ -37,21 +37,18 @@ export class PaymentKitExpressAdapter {
    * Set up all routes
    */
   private setupRoutes(): void {
-    Object.entries(this.handlerConfigs).forEach(([key, config]) => {
-      const [method, path] = key.split(' ', 2);
+    Object.entries(this.handlerConfigs).forEach(([path, config]) => {
+      // Use suggested method from config, default to POST if not specified
+      const method = config.method || 'POST';
       
-      if (!method || !path) {
-        throw new Error(`Invalid route key format: ${key}. Expected "METHOD /path"`);
-      }
-
       // Use the route options from configuration
       const routeOptions = config.options;
       
       // Register the route with BillableRouter for billing rules
-      this.registerBillingRule(method, path, routeOptions, key);
+      this.registerBillingRule(method, path, routeOptions, path);
       
       // Mount the handler on Express router
-      this.mountHandler(method, path, config.handler, key);
+      this.mountHandler(method, path, config.handler, path);
     });
   }
 
@@ -88,7 +85,7 @@ export class PaymentKitExpressAdapter {
     this.router[routerMethod](path, async (req: Request, res: Response, next: NextFunction) => {
       try {
         // Prepare request data for handler
-        const requestData = this.prepareRequestData(req, key);
+        const requestData = this.prepareRequestData(req, path);
         
         // Call the handler
         const result = await handler(this.context, requestData);
@@ -110,7 +107,7 @@ export class PaymentKitExpressAdapter {
   /**
    * Prepare request data for handler
    */
-  private prepareRequestData(req: Request, key: string): any {
+  private prepareRequestData(req: Request, path: string): any {
     const baseData = {
       ...req.query,
       ...req.body,
@@ -122,16 +119,7 @@ export class PaymentKitExpressAdapter {
       baseData.didInfo = (req as any).didInfo;
     }
 
-    // Handle specific route parameter extraction
-    if (key.includes(':channelId')) {
-      baseData.channelId = req.params.channelId;
-    }
-    
-    if (key.includes(':nonce')) {
-      baseData.nonce = req.params.nonce;
-    }
-
-    // For query parameters like maxAge in cleanup endpoint
+    // Handle specific query parameters
     if (req.query.maxAge) {
       baseData.maxAge = parseInt(req.query.maxAge as string);
     }

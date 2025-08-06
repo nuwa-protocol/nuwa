@@ -1,34 +1,8 @@
 import type { Handler, ApiContext, RecoveryResponse } from '../../types/api';
-import { createSuccessResponse, PaymentKitError } from '../../errors';
+import { PaymentKitError } from '../../errors';
 import { ErrorCode } from '../../types/api';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
-
-/**
- * Serialize BigInt values in an object to strings
- */
-function serializeBigInt(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  
-  if (typeof obj === 'bigint') {
-    return obj.toString();
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => serializeBigInt(item));
-  }
-  
-  if (typeof obj === 'object') {
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = serializeBigInt(value);
-    }
-    return result;
-  }
-  
-  return obj;
-}
+import { createSuccessResponseWithBigInt } from '../../utils';
 
 export interface RecoveryRequest {
   didInfo: {
@@ -72,9 +46,7 @@ export const handleRecovery: Handler<ApiContext, RecoveryRequest, RecoveryRespon
       timestamp: new Date().toISOString()
     };
     
-    // Serialize BigInt values before sending response
-    const serializedResponse = serializeBigInt(response);
-    return createSuccessResponse(serializedResponse);
+    return createSuccessResponseWithBigInt(response);
   } catch (error) {
     if (error instanceof PaymentKitError) {
       throw error;

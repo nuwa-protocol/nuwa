@@ -253,7 +253,7 @@ export class PaymentChannelHttpClient {
     success: boolean;
     timestamp: string;
   }> {
-    const healthUrl = this.buildPaymentUrl('/admin/health');
+    const healthUrl = this.buildPaymentUrl('/health');
     const response = await this.fetchImpl(healthUrl, { method: 'GET' });
     return response.json();
   } 

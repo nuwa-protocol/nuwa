@@ -11,43 +11,7 @@ import type {
 } from '../../types/api';
 import { createSuccessResponse, PaymentKitError } from '../../errors';
 import { ErrorCode } from '../../types/api';
-
-/**
- * Serialize BigInt values in an object to strings
- */
-function serializeBigInt(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  
-  if (typeof obj === 'bigint') {
-    return obj.toString();
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => serializeBigInt(item));
-  }
-  
-  if (typeof obj === 'object') {
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = serializeBigInt(value);
-    }
-    return result;
-  }
-  
-  return obj;
-}
-
-/**
- * BigInt replacer for JSON.stringify
- */
-function bigintReplacer(key: string, value: any): any {
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-  return value;
-}
+import { serializeBigInt, bigintReplacer, createSuccessResponseWithBigInt } from '../../utils';
 
 /**
  * Handle admin health endpoint requests
@@ -85,8 +49,8 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
     }
     
     const result: ClaimsStatusResponse = { 
-      claimsStatus: serializeBigInt(claimsStatus),
-      processingStats: serializeBigInt(processingStats),
+      claimsStatus,
+      processingStats,
       timestamp: new Date().toISOString()
     };
     
@@ -94,7 +58,7 @@ export const handleAdminClaims: Handler<ApiContext, void, ClaimsStatusResponse> 
       console.log('✅ Admin: Claims data retrieved successfully');
     }
     
-    return createSuccessResponse(result);
+    return createSuccessResponseWithBigInt(result);
   } catch (error) {
     if (ctx.config.debug) {
       console.error('❌ Admin: Failed to get claims status:', error);
@@ -159,7 +123,7 @@ export const handleAdminSubRav: Handler<ApiContext, SubRavRequest, any> = async 
         console.log('✅ Admin: SubRAV found:', JSON.stringify(subRAV, bigintReplacer));
       }
       
-      return createSuccessResponse(serializeBigInt(subRAV));
+      return createSuccessResponseWithBigInt(subRAV);
     } else {
       if (ctx.config.debug) {
         console.log('❌ Admin: SubRAV not found for channel:', req.channelId, 'nonce:', req.nonce);
