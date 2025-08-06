@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { createExpressPaymentKitFromEnv } from '../../../src/integrations/express/fromIdentityEnv';
+import { createExpressPaymentKitFromEnv } from '../../../src/transport/express/fromIdentityEnv';
 import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { 
   HttpRequestPayload, 
