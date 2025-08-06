@@ -35,37 +35,7 @@ export class BillingContextBuilder {
       meta: requestMeta
     };
   }
-
-  /**
-   * Build billing context from HTTP request
-   */
-  static fromHttpRequest(
-    serviceId: string,
-    req: HttpRequest,
-    paymentData?: HttpRequestPayload
-  ): BillingContext {
-    // Extract channel ID and payer key ID from the signed SubRAV
-    const channelId = paymentData?.signedSubRav.subRav.channelId;
-    const vmIdFragment = paymentData?.signedSubRav.subRav.vmIdFragment;
-    
-    const meta: BillingRequestContext = {
-      path: req.path,
-      method: req.method,
-      // Extract additional metadata from query/body
-      ...req.query,
-      ...(req.body && typeof req.body === 'object' ? req.body : {}),
-      // Include channel ID and vm ID fragment from SubRAV
-      channelId,
-      vmIdFragment
-    };
-
-    return {
-      serviceId,
-      operation: `${req.method.toLowerCase()}:${req.path}`,
-      meta
-    };
-  }
-
+ 
   /**
    * Enhance existing billing context with additional metadata
    */
