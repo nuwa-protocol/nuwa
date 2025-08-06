@@ -46,7 +46,7 @@ export function toExpressHandler<
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Prepare request data from Express request
-      const requestData = prepareRequestData(req, req.path);
+      const requestData = prepareRequestData(req);
 
       // Execute PaymentKit handler with proper context and data
       const result = await handler(ctx, requestData as unknown as Req);
