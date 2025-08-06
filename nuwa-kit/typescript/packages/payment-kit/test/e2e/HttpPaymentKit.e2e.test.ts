@@ -89,7 +89,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     httpClient = await createHttpClient({
       baseUrl: billingServerInstance.baseURL,
       env: payer.identityEnv, // Use the payer's dedicated IdentityEnv
-      maxAmount: BigInt('500000000'), // 5 RGas
+      maxAmount: BigInt('50000000000'), // 50 RGas - sufficient for any single request in our tests
       debug: true
     });
 
@@ -146,7 +146,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response1 = await httpClient.get('/echo?q=hello%20world');
     
     expect(response1.echo).toBe('hello world');
-    expect(response1.cost).toBe('10000000'); // 0.001 USD = 10,000,000 RGAS units (0.1 RGAS)
+    expect(response1.cost).toBe('1000000000'); // 0.001 USD = 1,000,000,000 picoUSD = 1 RGas 
     expect(response1.timestamp).toBeTruthy();
     
     // Should have received a SubRAV proposal for next request
@@ -162,7 +162,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response2 = await httpClient.get('/echo?q=second%20call');
     
     expect(response2.echo).toBe('second call');
-    expect(response2.cost).toBe('10000000');
+    expect(response2.cost).toBe('1000000000'); // 0.001 USD = 1,000,000,000 picoUSD = 1 RGas
     
     const pendingSubRAV2 = httpClient.getPendingSubRAV();
     expect(pendingSubRAV2).toBeTruthy();
@@ -176,7 +176,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     for (let i = 3; i <= 6; i++) {
       const response = await httpClient.get(`/echo?q=call%20${i}`);
       expect(response.echo).toBe(`call ${i}`);
-      expect(response.cost).toBe('10000000');
+      expect(response.cost).toBe('1000000000'); // 0.001 USD = 1,000,000,000 picoUSD = 1 RGas
       console.log(`✅ Request ${i} successful`);
     }
 
@@ -204,11 +204,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('📞 Process requests (0.01 USD each)');
     const processResponse1 = await httpClient.post('/process', { data: 'test data 1' });
     expect(processResponse1.processed.data).toBe('test data 1');
-    expect(processResponse1.cost).toBe('100000000'); // 0.01 USD = 100,000,000 RGAS units (1.0 RGAS)
+    expect(processResponse1.cost).toBe('10000000000'); // 0.01 USD = 10,000,000,000 picoUSD = 10 RGas
 
     const processResponse2 = await httpClient.post('/process', { operation: 'complex task' });
     expect(processResponse2.processed.operation).toBe('complex task');
-    expect(processResponse2.cost).toBe('100000000');
+    expect(processResponse2.cost).toBe('10000000000'); // 0.01 USD = 10,000,000,000 picoUSD = 10 RGas
 
     console.log('✅ Mixed request types processed successfully');
 
@@ -403,4 +403,71 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('🎉 Admin Client functionality test successful!');
   }, 120000);
+
+  test('maxAmount limit enforcement', async () => {
+    if (!shouldRunE2ETests()) {
+      console.log('Skipping test - E2E tests disabled');
+      return;
+    }
+
+    console.log('🧪 Testing maxAmount limit enforcement');
+
+    // Test 1: First test without maxAmount to make sure basic functionality works
+    console.log('📞 Testing request without maxAmount (baseline)');
+    const baselineClient = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: payer.identityEnv,
+      debug: true
+    });
+
+    try {
+      const baselineResponse = await baselineClient.get('/echo?q=baseline%20test');
+      console.log('🔍 Baseline response:', baselineResponse);
+      expect(baselineResponse).toBeTruthy();
+      expect(baselineResponse.echo).toBe('baseline test');
+      console.log('✅ Baseline request successful');
+    } catch (error: any) {
+      console.log('❌ Baseline request failed:', error.message);
+      console.log('❌ Error stack:', error.stack);
+      throw error;
+    }
+
+    // Test 2: Request with high maxAmount limit should succeed
+    console.log('📞 Testing request with high maxAmount limit');
+    const clientWithHighLimit = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: payer.identityEnv,
+      maxAmount: BigInt(10000000000), // High limit
+      debug: false
+    });
+
+    const response1 = await clientWithHighLimit.get('/echo?q=high%20limit');
+    expect(response1).toBeTruthy();
+    expect(response1.echo).toBe('high limit');
+    console.log('✅ Request with high limit successful');
+
+    // Test 3: Request exceeding maxAmount limit should fail
+    console.log('📞 Testing request exceeding maxAmount limit');
+    const clientWithLowLimit = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: payer.identityEnv,
+      maxAmount: BigInt(1), // Very low limit to trigger failure
+      debug: false
+    });
+
+    try {
+      await clientWithLowLimit.get('/echo?q=exceed%20limit');
+      // If we reach here, the test should fail
+      throw new Error('Expected request to fail due to maxAmount limit, but it succeeded');
+    } catch (error: any) {
+      if (error.message.includes('Expected request to fail')) {
+        throw error; // Re-throw our test failure
+      }
+      // This is expected - request should fail due to maxAmount limit
+      console.log('✅ Request exceeding limit correctly rejected:', error.message);
+    }
+
+    console.log('🎉 MaxAmount limit enforcement test successful!');
+  }, 60000);
+
 }); 

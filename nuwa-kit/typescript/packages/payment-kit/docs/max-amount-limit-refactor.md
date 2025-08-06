@@ -40,11 +40,11 @@ export interface PaymentHeaderPayload {
   /** Signed SubRAV from client */
   signedSubRav: SignedSubRAV;
   /** Per-request max amount (token smallest unit) */
-  maxAmount?: bigint;
+  maxAmount: bigint;
   /** Optional client-side tx reference (idempotency) */
   clientTxRef?: string;
-  /** Future-proof version field (default: 1) */
-  version?: number;
+  /** Protocol version (default: 1) */
+  version: number;
 }
 
 // 兼容旧代码
@@ -80,8 +80,8 @@ const headerValue = codec.encode({
    ```
 2. **PaymentProcessor.processPayment** 在计费完成后加入：
    ```ts
-   if (maxAmount && cost > maxAmount) {
-     return { success: false, error: 'OVER_BUDGET', errorCode: 'INSUFFICIENT_FUNDS', cost, ... };
+   if (cost > maxAmount) {
+     return { success: false, error: 'OVER_BUDGET', errorCode: 'MAX_AMOUNT_EXCEEDED', cost, ... };
    }
    ```
    返回 402。
@@ -108,12 +108,12 @@ graph LR
 
 ---
 
-## 5. 兼容性与迁移
+## 5. 版本策略与迁移
 
-1. **向后兼容**：如果客户端未发送 `maxAmount`，Payee 按旧逻辑处理。  
-2. 发布 **minor 版本**（例如 `0.x.+1`）。
-3. 客户端侧：
-   * 升级依赖后若使用 `maxAmount`，需保证单位为 token。  
+1. 客户端 **必须** 在 `PaymentHeaderPayload` 中发送 `maxAmount` 与 `version` 字段。  
+2. 发布 **minor 版本**（例如 `0.x.+1`）。  
+3. 客户端侧：  
+   * 升级依赖后需保证 `maxAmount` 单位为 token。  
    * 建议使用 `/payment-channel/price` API 将预算 USD ⇒ token。
 
 ---
