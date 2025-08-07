@@ -675,27 +675,7 @@ export class HttpBillingMiddleware {
 
   /**
    * Debug logging
-   */
-  /**
-   * Extract token count from usage data synchronously
-   */
-  private extractTokenCountSync(usage: any, usageKey: string): number {
-    try {
-      // usageKey format: "usage.total_tokens"
-      const keys = usageKey.split('.');
-      let value = usage;
-      for (const key of keys) {
-        value = value[key];
-        if (value === undefined) {
-          return 0;
-        }
-      }
-      return typeof value === 'number' ? value : parseInt(value) || 0;
-    } catch {
-      return 0;
-    }
-  }
-
+   */ 
   private log(...args: any[]): void {
     if (this.config.debug) {
       console.log('[HttpBillingMiddleware]', ...args);

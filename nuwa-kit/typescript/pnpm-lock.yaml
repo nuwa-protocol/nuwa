@@ -299,6 +299,9 @@ importers:
       lossless-json:
         specifier: ^4.1.1
         version: 4.1.1
+      on-headers:
+        specifier: ^1.1.0
+        version: 1.1.0
       pg:
         specifier: ^8.16.3
         version: 8.16.3
@@ -318,6 +321,9 @@ importers:
       '@types/node':
         specifier: ^20.10.0
         version: 20.17.50
+      '@types/on-headers':
+        specifier: ^1.0.4
+        version: 1.0.4
       '@typescript-eslint/eslint-plugin':
         specifier: ^7.3.1
         version: 7.18.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.4.5))(eslint@8.57.1)(typescript@5.4.5)
@@ -1253,6 +1259,9 @@ packages:
 
   '@types/node@20.17.50':
     resolution: {integrity: sha512-Mxiq0ULv/zo1OzOhwPqOA13I81CV/W3nvd3ChtQZRT5Cwz3cr0FKo/wMSsbTqL3EXpaBAEQhva2B8ByRkOIh9A==}
+
+  '@types/on-headers@1.0.4':
+    resolution: {integrity: sha512-D8Dy7oiM4fFQPA1TtHVTGPFNgCCYY132dTFLezhvlPiiiyKkuW6tVipPXpUOiuTUu8Kzd+ASKjULvZld197Dhw==}
 
   '@types/pg@8.15.4':
     resolution: {integrity: sha512-I6UNVBAoYbvuWkkU3oosC8yxqH21f4/Jc4DK71JLG3dT2mdlGe1z+ep/LQGXaKaOgcvUrsQoPRqfgtMcvZiJhg==}
@@ -2823,6 +2832,10 @@ packages:
 
   on-finished@2.4.1:
     resolution: {integrity: sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==}
+    engines: {node: '>= 0.8'}
+
+  on-headers@1.1.0:
+    resolution: {integrity: sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==}
     engines: {node: '>= 0.8'}
 
   once@1.4.0:
@@ -4922,6 +4935,10 @@ snapshots:
     dependencies:
       undici-types: 6.19.8
 
+  '@types/on-headers@1.0.4':
+    dependencies:
+      '@types/node': 20.17.50
+
   '@types/pg@8.15.4':
     dependencies:
       '@types/node': 20.17.50
@@ -6870,6 +6887,8 @@ snapshots:
   on-finished@2.4.1:
     dependencies:
       ee-first: 1.1.1
+
+  on-headers@1.1.0: {}
 
   once@1.4.0:
     dependencies:
