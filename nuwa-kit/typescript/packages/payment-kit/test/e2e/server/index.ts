@@ -97,7 +97,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   billing.post('/chat/completions', {
     pricing: {
       type: 'PerToken',
-      unitPricePicoUSD: '20000000', // 0.02 picoUSD per token (more visible for testing)
+      unitPricePicoUSD: '20000000', // 20,000,000 picoUSD (0.00002 USD) per token
       usageKey: 'usage.total_tokens'
     },
     authRequired: true // paymentRequired is implied when pricing > 0

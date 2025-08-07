@@ -146,7 +146,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response1 = await httpClient.get('/echo?q=hello%20world');
     
     expect(response1.echo).toBe('hello world');
-    expect(response1.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas units
+    expect(response1.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     expect(response1.timestamp).toBeTruthy();
     
     // Should have received a SubRAV proposal for next request
@@ -162,7 +162,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response2 = await httpClient.get('/echo?q=second%20call');
     
     expect(response2.echo).toBe('second call');
-    expect(response2.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas units
+    expect(response2.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     
     const pendingSubRAV2 = httpClient.getPendingSubRAV();
     expect(pendingSubRAV2).toBeTruthy();
@@ -176,7 +176,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     for (let i = 3; i <= 6; i++) {
       const response = await httpClient.get(`/echo?q=call%20${i}`);
       expect(response.echo).toBe(`call ${i}`);
-      expect(response.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas units
+      expect(response.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
       console.log(`✅ Request ${i} successful`);
     }
 
@@ -204,11 +204,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('📞 Process requests (0.01 USD each)');
     const processResponse1 = await httpClient.post('/process', { data: 'test data 1' });
     expect(processResponse1.processed.data).toBe('test data 1');
-    expect(processResponse1.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas units
+    expect(processResponse1.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
 
     const processResponse2 = await httpClient.post('/process', { operation: 'complex task' });
     expect(processResponse2.processed.operation).toBe('complex task');
-    expect(processResponse2.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas units
+    expect(processResponse2.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
 
     console.log('✅ Mixed request types processed successfully');
 
