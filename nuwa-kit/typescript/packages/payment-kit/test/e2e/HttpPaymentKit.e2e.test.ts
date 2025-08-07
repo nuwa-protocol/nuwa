@@ -468,7 +468,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('🤖 Testing PerToken post-flight billing with /chat/completions');
 
-    // Test 1: Single chat completion request
+    // Test 1: Single chat completion request with detailed header verification
     console.log('📞 Request 1: Chat completion with small message');
     const chatRequest1 = {
       model: 'gpt-3.5-turbo',
@@ -487,18 +487,30 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(response1.billingInfo).toBeTruthy();
     expect(response1.billingInfo.mode).toBe('post-flight');
     
-    // Log payment info for chat completion
-    if (result1.payment) {
-      console.log(`💰 Chat 1 payment - ${formatPaymentInfo(result1.payment)}`);
-    }
+    // CRITICAL: Verify payment header was received and processed
+    expect(result1.payment).toBeTruthy();
+    expect(result1.payment!.cost).toBeGreaterThan(0n);
+    expect(result1.payment!.nonce).toBeGreaterThan(0n);
+    expect(result1.payment!.serviceTxRef).toBeTruthy();
+    expect(result1.payment!.clientTxRef).toBeTruthy();
+    
+    console.log(`💰 Chat 1 payment received - ${formatPaymentInfo(result1.payment!)}`);
+    console.log(`📋 Chat 1 detailed payment info:
+      Cost: ${result1.payment!.cost.toString()} base units
+      Cost USD: ${result1.payment!.costUsd.toString()} picoUSD
+      Nonce: ${result1.payment!.nonce.toString()}
+      Service Tx Ref: ${result1.payment!.serviceTxRef}
+      Client Tx Ref: ${result1.payment!.clientTxRef}
+    `);
     
     console.log(`✅ Chat completion 1 successful:
       Tokens used: ${response1.usage.total_tokens}
       Expected cost: ${response1.billingInfo.expectedCost}
       Mode: ${response1.billingInfo.mode}
+      Payment header received: ✅
     `);
 
-    // Test 2: Chat completion with multiple messages (more tokens)
+    // Test 2: Chat completion with multiple messages (more tokens) with payment verification
     console.log('📞 Request 2: Chat completion with multiple messages');
     const chatRequest2 = {
       model: 'gpt-3.5-turbo',
@@ -518,18 +530,22 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(response2.usage.total_tokens).toBeGreaterThan(response1.usage.total_tokens);
     expect(response2.billingInfo.mode).toBe('post-flight');
     
-    // Log payment info for chat completion 2
-    if (result2.payment) {
-      console.log(`💰 Chat 2 payment - ${formatPaymentInfo(result2.payment)}`);
-    }
+    // CRITICAL: Verify payment header for second request
+    expect(result2.payment).toBeTruthy();
+    expect(result2.payment!.cost).toBeGreaterThan(result1.payment!.cost); // Should be higher due to more tokens
+    expect(result2.payment!.nonce).toBeGreaterThan(result1.payment!.nonce); // Should be incremented
+    
+    console.log(`💰 Chat 2 payment received - ${formatPaymentInfo(result2.payment!)}`);
+    console.log(`📊 Cost comparison: Request 2 (${result2.payment!.cost.toString()}) > Request 1 (${result1.payment!.cost.toString()}): ${result2.payment!.cost > result1.payment!.cost}`);
     
     console.log(`✅ Chat completion 2 successful:
       Tokens used: ${response2.usage.total_tokens}
       Expected cost: ${response2.billingInfo.expectedCost}
       More tokens than request 1: ${response2.usage.total_tokens > response1.usage.total_tokens}
+      Payment header received: ✅
     `);
 
-    // Test 3: Verify post-flight billing behavior
+    // Test 3: Verify post-flight billing behavior with rapid successive calls
     console.log('📞 Request 3: Quick chat to verify billing consistency');
     const result3 = await httpClient.post('/chat/completions', {
       model: 'gpt-3.5-turbo',
@@ -538,30 +554,109 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response3 = result3.data;
 
     expect(response3.billingInfo.mode).toBe('post-flight');
+    expect(result3.payment).toBeTruthy();
+    expect(result3.payment!.nonce).toBeGreaterThan(result2.payment!.nonce);
     
-    // Log payment info for chat completion 3
-    if (result3.payment) {
-      console.log(`💰 Chat 3 payment - ${formatPaymentInfo(result3.payment)}`);
-    }
-    console.log(`✅ Post-flight billing consistency verified`);
+    console.log(`💰 Chat 3 payment received - ${formatPaymentInfo(result3.payment!)}`);
+    console.log(`✅ Post-flight billing consistency verified - Payment header received: ✅`);
 
-    // Compare with pre-flight billing (echo endpoint)
+    // Test 4: Compare with pre-flight billing (echo endpoint)
     console.log('📞 Comparison: Pre-flight billing with echo endpoint');
     const echoResult = await httpClient.get('/echo?q=pre-flight%20test');
     const echoResponse = echoResult.data;
     expect(echoResponse.cost).toBeTruthy(); // Pre-flight has immediate cost
+    expect(echoResult.payment).toBeTruthy(); // Pre-flight also has payment info
     
-    // Log payment info for echo comparison
-    if (echoResult.payment) {
-      console.log(`💰 Echo comparison payment - ${formatPaymentInfo(echoResult.payment)}`);
-    }
+    console.log(`💰 Echo comparison payment - ${formatPaymentInfo(echoResult.payment!)}`);
     
     console.log(`📊 Billing mode comparison:
       Echo (pre-flight): Cost available immediately = ${echoResponse.cost}
       Chat (post-flight): Cost calculated after response based on usage
+      Both modes: Payment headers received correctly ✅
     `);
 
+    // Test 5: Post-flight billing header timing verification
+    console.log('📞 Request 5: Post-flight billing header timing test');
+    const timingTestStart = Date.now();
+    const timingResult = await httpClient.post('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'Test header timing' }]
+    });
+    const timingTestEnd = Date.now();
+    
+    expect(timingResult.payment).toBeTruthy();
+    console.log(`⏱️ Timing test completed in ${timingTestEnd - timingTestStart}ms`);
+    console.log(`💰 Timing test payment - ${formatPaymentInfo(timingResult.payment!)}`);
+    console.log(`✅ Post-flight billing header timing verified - Payment header received: ✅`);
+
     console.log('🎉 PerToken post-flight billing test successful!');
+  }, 120000);
+
+  test('Post-flight billing header transmission verification', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔍 Testing post-flight billing header transmission specifically');
+
+    // Test multiple rapid post-flight requests to stress-test header transmission
+    console.log('📞 Rapid successive post-flight requests');
+    
+    const rapidResults = [];
+    for (let i = 1; i <= 5; i++) {
+      console.log(`📞 Rapid request ${i}/5`);
+      const result = await httpClient.post('/chat/completions', {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: `Rapid test ${i}` }]
+      });
+      
+      // CRITICAL: Every post-flight request should have payment info
+      expect(result.payment).toBeTruthy();
+      expect(result.payment!.cost).toBeGreaterThan(0n);
+      expect(result.payment!.nonce).toBeGreaterThan(0n);
+      expect(result.payment!.serviceTxRef).toBeTruthy();
+      expect(result.payment!.clientTxRef).toBeTruthy();
+      
+      rapidResults.push(result);
+      console.log(`✅ Rapid request ${i} - Payment header received: ✅ (Cost: ${result.payment!.cost.toString()})`);
+    }
+
+    // Verify nonce sequence integrity
+    for (let i = 1; i < rapidResults.length; i++) {
+      expect(rapidResults[i].payment!.nonce).toBeGreaterThan(rapidResults[i-1].payment!.nonce);
+    }
+    console.log('✅ Nonce sequence integrity verified across rapid requests');
+
+    // Test alternating pre-flight and post-flight requests
+    console.log('📞 Alternating pre-flight and post-flight requests');
+    
+    // Pre-flight (echo)
+    const preFlightResult1 = await httpClient.get('/echo?q=alternating%20test%201');
+    expect(preFlightResult1.payment).toBeTruthy();
+    console.log(`💰 Pre-flight 1 - ${formatPaymentInfo(preFlightResult1.payment!)}`);
+    
+    // Post-flight (chat)
+    const postFlightResult1 = await httpClient.post('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'Alternating test 1' }]
+    });
+    expect(postFlightResult1.payment).toBeTruthy();
+    console.log(`💰 Post-flight 1 - ${formatPaymentInfo(postFlightResult1.payment!)}`);
+    
+    // Pre-flight (echo)
+    const preFlightResult2 = await httpClient.get('/echo?q=alternating%20test%202');
+    expect(preFlightResult2.payment).toBeTruthy();
+    console.log(`💰 Pre-flight 2 - ${formatPaymentInfo(preFlightResult2.payment!)}`);
+    
+    // Post-flight (chat)
+    const postFlightResult2 = await httpClient.post('/chat/completions', {
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'Alternating test 2' }]
+    });
+    expect(postFlightResult2.payment).toBeTruthy();
+    console.log(`💰 Post-flight 2 - ${formatPaymentInfo(postFlightResult2.payment!)}`);
+    
+    console.log('✅ Alternating pre-flight and post-flight requests - All payment headers received correctly');
+
+    console.log('🎉 Post-flight billing header transmission verification successful!');
   }, 120000);
 
   test('maxAmount limit enforcement', async () => {

@@ -3,6 +3,6 @@
  */
 
 export * from './BillableRouter';
-export * from './PaymentKitExpressAdapter';
+export * from './HandlerRestAdapter';
 export * from './ExpressPaymentKit';
 export * from './fromIdentityEnv';

@@ -65,24 +65,38 @@ export function toExpressHandler<
 }
 
 /**
+ * Options for registering handlers with BillableRouter
+ */
+export interface RegisterHandlersOptions {
+  /** Path prefix to add to all handler paths (e.g. '/payment-channel') */
+  pathPrefix?: string;
+}
+
+/**
  * Register PaymentKit handlers directly with BillableRouter
  * This eliminates the need for dummyHandler and separate routing layers
  */
 export function registerHandlersWithBillableRouter(
   handlerConfigs: Record<string, any>,
   context: ApiContext,
-  billableRouter: any
+  billableRouter: any,
+  options?: RegisterHandlersOptions
 ): void {
+  const prefix = options?.pathPrefix?.replace(/\/$/, '') ?? '';
+
   Object.entries(handlerConfigs).forEach(([handlerName, config]) => {
     // Now handlerName is a semantic name (e.g., 'recovery', 'commit')
     // and path is a property of config
-    const { method, path, options, handler } = config;
+    const { method, path, options: routeOptions, handler } = config;
     
     // Skip handlers without path (they're not REST endpoints)
     if (!path) {
       console.log(`⏩ Skipped handler '${handlerName}': no REST path defined`);
       return;
     }
+    
+    // Build full path with prefix
+    const fullPath = prefix ? `${prefix}/${path.replace(/^\//, '')}` : path;
     
     // Convert PaymentKit Handler to Express RequestHandler
     const expressHandler = toExpressHandler(context, handler);
@@ -99,8 +113,8 @@ export function registerHandlersWithBillableRouter(
     
     // Register directly with BillableRouter using the public API
     // Use handlerName as ruleId for clearer billing rule identification
-    billableRouter[methodName](path, options, expressHandler, handlerName);
+    billableRouter[methodName](fullPath, routeOptions, expressHandler, handlerName);
     
-    console.log(`📝 Registered handler '${handlerName}': ${httpMethod.toUpperCase()} ${path} with options:`, options);
+    console.log(`📝 Registered handler '${handlerName}': ${httpMethod.toUpperCase()} ${fullPath} with options:`, routeOptions);
   });
 }
