@@ -74,8 +74,7 @@ rules:
 
     const ctx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'upload',
-      meta: { path: '/upload', method: 'POST' }
+      meta: { operation: 'upload', path: '/upload', method: 'POST' }
     };
 
     const cost = await engine.calcCost(ctx);
@@ -118,8 +117,7 @@ rules:
     // Test upload path
     const uploadCtx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'upload',
-      meta: { path: '/upload', method: 'POST' }
+      meta: { operation: 'upload', path: '/upload', method: 'POST' }
     };
 
     const uploadCost = await engine.calcCost(uploadCtx);
@@ -128,8 +126,7 @@ rules:
     // Test download path
     const downloadCtx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'download',
-      meta: { path: '/download', method: 'GET' }
+      meta: { operation: 'download', path: '/download', method: 'GET' }
     };
 
     const downloadCost = await engine.calcCost(downloadCtx);
@@ -138,8 +135,7 @@ rules:
     // Test default path
     const defaultCtx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'other',
-      meta: { path: '/other', method: 'GET' }
+      meta: { operation: 'other', path: '/other', method: 'GET' }
     };
 
     const defaultCost = await engine.calcCost(defaultCtx);
@@ -182,8 +178,7 @@ rules:
     // Test POST method
     const postCtx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'create',
-      meta: { method: 'POST', path: '/api/users' }
+      meta: { operation: 'create', method: 'POST', path: '/api/users' }
     };
 
     const postCost = await engine.calcCost(postCtx);
@@ -192,8 +187,7 @@ rules:
     // Test GET method
     const getCtx: BillingContext = {
       serviceId: 'test-service',
-      operation: 'read',
-      meta: { method: 'GET', path: '/api/users' }
+      meta: { operation: 'read', method: 'GET', path: '/api/users' }
     };
 
     const getCost = await engine.calcCost(getCtx);
