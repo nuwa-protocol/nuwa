@@ -14,9 +14,15 @@ import { PaymentChannelHttpClient, createHttpClient, PaymentChannelAdminClient, 
 import { safeStringify } from '../../src/utils/json';
 import { PaymentChannelFactory } from '../../src/factory/chainFactory';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
-import type { AssetInfo } from '../../src/core/types';
+import type { AssetInfo, PaymentInfo } from '../../src/core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
+import { PaymentHubClient } from '../../src/client/PaymentHubClient';
+
+// Helper function to format payment info consistently
+function formatPaymentInfo(payment: PaymentInfo): string {
+  return `Cost: ${payment.cost.toString()} units, USD: ${payment.costUsd.toString()} pUSD, Tx: ${payment.clientTxRef}`;
+}
 
 // Check if we should run E2E tests
 const shouldRunE2ETests = () => {
@@ -31,6 +37,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
   let billingServerInstance: any;
   let httpClient: PaymentChannelHttpClient;
   let adminClient: PaymentChannelAdminClient;
+  let hubClient: PaymentHubClient;
 
   beforeAll(async () => {
     if (!shouldRunE2ETests()) {
@@ -93,6 +100,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: true
     });
 
+    hubClient = httpClient.getHubClient();
+
+    let tx = await hubClient.deposit(testAsset.assetId, BigInt('1000000000'));
+    console.log('💰 Deposit tx:', tx);
+
     // Create admin client for testing admin endpoints
     adminClient = createAdminClient(httpClient);
 
@@ -152,7 +164,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Check payment info
     if (result1.payment) {
-      console.log(`💰 Payment info - Cost: ${result1.payment.cost}, Tx: ${result1.payment.clientTxRef}`);
+      console.log(`💰 Payment info - ${formatPaymentInfo(result1.payment)}`);
     }
     
     // Should have received a SubRAV proposal for next request
@@ -173,7 +185,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Check payment info
     if (result2.payment) {
-      console.log(`💰 Payment info - Cost: ${result2.payment.cost}, Tx: ${result2.payment.clientTxRef}`);
+      console.log(`💰 Payment info - ${formatPaymentInfo(result2.payment)}`);
     }
     
     const pendingSubRAV2 = httpClient.getPendingSubRAV();
@@ -194,7 +206,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       
       // Log payment info for verification
       if (result.payment) {
-        console.log(`💰 Request ${i} payment - Cost: ${result.payment.cost}, Tx: ${result.payment.clientTxRef}`);
+        console.log(`💰 Request ${i} payment - ${formatPaymentInfo(result.payment)}`);
       }
     }
 
@@ -220,10 +232,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for echo requests
     if (echoResult1.payment) {
-      console.log(`💰 Echo 1 payment - Cost: ${echoResult1.payment.cost}, Tx: ${echoResult1.payment.clientTxRef}`);
+      console.log(`💰 Echo 1 payment - ${formatPaymentInfo(echoResult1.payment)}`);
     }
     if (echoResult2.payment) {
-      console.log(`💰 Echo 2 payment - Cost: ${echoResult2.payment.cost}, Tx: ${echoResult2.payment.clientTxRef}`);
+      console.log(`💰 Echo 2 payment - ${formatPaymentInfo(echoResult2.payment)}`);
     }
 
     // Test process requests (more expensive)
@@ -234,7 +246,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(processResponse1.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     
     if (processResult1.payment) {
-      console.log(`💰 Process 1 payment - Cost: ${processResult1.payment.cost}, Tx: ${processResult1.payment.clientTxRef}`);
+      console.log(`💰 Process 1 payment - ${formatPaymentInfo(processResult1.payment)}`);
     }
 
     const processResult2 = await httpClient.post('/process', { operation: 'complex task' });
@@ -243,7 +255,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(processResponse2.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     
     if (processResult2.payment) {
-      console.log(`💰 Process 2 payment - Cost: ${processResult2.payment.cost}, Tx: ${processResult2.payment.clientTxRef}`);
+      console.log(`💰 Process 2 payment - ${formatPaymentInfo(processResult2.payment)}`);
     }
 
     console.log('✅ Mixed request types processed successfully');
@@ -338,10 +350,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for recovery tests
     if (recoveryResult1.payment) {
-      console.log(`💰 Recovery test 1 payment - Cost: ${recoveryResult1.payment.cost}, Tx: ${recoveryResult1.payment.clientTxRef}`);
+      console.log(`💰 Recovery test 1 payment - ${formatPaymentInfo(recoveryResult1.payment)}`);
     }
     if (recoveryResult2.payment) {
-      console.log(`💰 Recovery test 2 payment - Cost: ${recoveryResult2.payment.cost}, Tx: ${recoveryResult2.payment.clientTxRef}`);
+      console.log(`💰 Recovery test 2 payment - ${formatPaymentInfo(recoveryResult2.payment)}`);
     }
 
     // Test recovery functionality
@@ -405,7 +417,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Make a paid request to have some SubRAV data for query test
     const adminTestResult = await httpClient.get('/echo?q=admin%20test');
     if (adminTestResult.payment) {
-      console.log(`💰 Admin test payment - Cost: ${adminTestResult.payment.cost}, Tx: ${adminTestResult.payment.clientTxRef}`);
+      console.log(`💰 Admin test payment - ${formatPaymentInfo(adminTestResult.payment)}`);
     }
 
     // Test 4: SubRAV query (authenticated endpoint)
@@ -477,7 +489,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for chat completion
     if (result1.payment) {
-      console.log(`💰 Chat 1 payment - Cost: ${result1.payment.cost}, Tx: ${result1.payment.clientTxRef}`);
+      console.log(`💰 Chat 1 payment - ${formatPaymentInfo(result1.payment)}`);
     }
     
     console.log(`✅ Chat completion 1 successful:
@@ -508,7 +520,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for chat completion 2
     if (result2.payment) {
-      console.log(`💰 Chat 2 payment - Cost: ${result2.payment.cost}, Tx: ${result2.payment.clientTxRef}`);
+      console.log(`💰 Chat 2 payment - ${formatPaymentInfo(result2.payment)}`);
     }
     
     console.log(`✅ Chat completion 2 successful:
@@ -529,7 +541,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for chat completion 3
     if (result3.payment) {
-      console.log(`💰 Chat 3 payment - Cost: ${result3.payment.cost}, Tx: ${result3.payment.clientTxRef}`);
+      console.log(`💰 Chat 3 payment - ${formatPaymentInfo(result3.payment)}`);
     }
     console.log(`✅ Post-flight billing consistency verified`);
 
@@ -541,7 +553,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for echo comparison
     if (echoResult.payment) {
-      console.log(`💰 Echo comparison payment - Cost: ${echoResult.payment.cost}, Tx: ${echoResult.payment.clientTxRef}`);
+      console.log(`💰 Echo comparison payment - ${formatPaymentInfo(echoResult.payment)}`);
     }
     
     console.log(`📊 Billing mode comparison:
@@ -578,7 +590,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       
       // Log payment info for baseline
       if (baselineResult.payment) {
-        console.log(`💰 Baseline payment - Cost: ${baselineResult.payment.cost}, Tx: ${baselineResult.payment.clientTxRef}`);
+        console.log(`💰 Baseline payment - ${formatPaymentInfo(baselineResult.payment)}`);
       }
     } catch (error: any) {
       console.log('❌ Baseline request failed:', error.message);
@@ -603,7 +615,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     
     // Log payment info for high limit test
     if (result1.payment) {
-      console.log(`💰 High limit payment - Cost: ${result1.payment.cost}, Tx: ${result1.payment.clientTxRef}`);
+      console.log(`💰 High limit payment - ${formatPaymentInfo(result1.payment)}`);
     }
 
     // Test 3: Request exceeding maxAmount limit should fail

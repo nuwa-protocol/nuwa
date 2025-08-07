@@ -36,6 +36,7 @@ import {
   HealthCheckSchema
 } from '../../schema';
 import type { z } from 'zod';
+import { PaymentHubClient } from '../../client/PaymentHubClient';
 
 /**
  * HTTP Client State enum for internal state management
@@ -242,6 +243,10 @@ export class PaymentChannelHttpClient {
    */
   getChannelId(): string | undefined {
     return this.clientState.channelId;
+  }
+
+  getHubClient(): PaymentHubClient {
+    return this.payerClient.getHubClient();
   }
 
   /**
@@ -698,12 +703,23 @@ export class PaymentChannelHttpClient {
         if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
           const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
           
+          // Calculate USD cost with fallback to 0
+          let costUsd: bigint = BigInt(0);
+          try {
+            const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
+            costUsd = responsePayload.amountDebited * assetPrice;
+          } catch (error) {
+            this.log('Failed to calculate USD cost, using 0:', error);
+            // Keep costUsd as 0 if price lookup fails
+          }
+          
           // Create PaymentInfo from response
           const paymentInfo: PaymentInfo = {
             clientTxRef: responsePayload.clientTxRef,
             serviceTxRef: responsePayload.serviceTxRef,
-            cost: responsePayload.amountDebited.toString(),
-            nonce: responsePayload.subRav.nonce.toString(),
+            cost: responsePayload.amountDebited,
+            costUsd,
+            nonce: responsePayload.subRav.nonce,
             channelId: pendingRequest.channelId,
             assetId: pendingRequest.assetId,
             timestamp: new Date().toISOString()
@@ -713,7 +729,7 @@ export class PaymentChannelHttpClient {
           pendingRequest.resolve(paymentInfo);
           this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
           
-          this.log('Resolved payment for clientTxRef:', responsePayload.clientTxRef, 'cost:', paymentInfo.cost);
+          this.log('Resolved payment for clientTxRef:', responsePayload.clientTxRef, 'cost:', paymentInfo.cost.toString(), 'costUsd:', paymentInfo.costUsd.toString());
         }
         
         if (responsePayload.subRav) {

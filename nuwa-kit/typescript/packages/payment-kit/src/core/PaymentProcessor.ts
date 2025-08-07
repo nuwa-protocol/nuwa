@@ -79,9 +79,12 @@ export interface ProcessorPaymentResult {
     /** Service transaction reference */
     serviceTxRef?: string;
     
+    /** Client transaction reference for request tracking */
+    clientTxRef?: string;
+    
     /** USD billing conversion details (for auditing) */
     conversion?: ConversionResult;
-  }
+}
   
   /**
  * Enhanced verification result with payer key ID
@@ -207,6 +210,7 @@ export interface PaymentVerificationResult extends VerificationResult {
             isHandshake,
             payerKeyId: verificationResult?.payerKeyId,
             signedSubRAV,
+            clientTxRef: ctx.meta.clientTxRef,
             conversion
           };
         }
@@ -226,6 +230,7 @@ export interface PaymentVerificationResult extends VerificationResult {
           isHandshake,
           payerKeyId: verificationResult?.payerKeyId,
           serviceTxRef: PaymentUtils.generateTxRef(),
+          clientTxRef: ctx.meta.clientTxRef,
           conversion
         };
   

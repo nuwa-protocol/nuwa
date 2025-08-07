@@ -90,3 +90,14 @@ export function bigintToString(value: bigint): string {
 export function stringToBigint(value: string): bigint {
   return BigInt(value);
 }
+
+/**
+ * Format picoUSD amount to human-readable USD string
+ * @param picoUsd Amount in picoUSD (1 USD = 1,000,000,000,000 picoUSD)
+ * @returns Formatted USD string (e.g., "$0.0123")
+ */
+export function formatUsdAmount(picoUsd: bigint): string {
+  // 1 USD = 1,000,000,000,000 picoUSD
+  const usdAmount = Number(picoUsd) / 1_000_000_000_000;
+  return `$${usdAmount.toFixed(4)}`;
+}

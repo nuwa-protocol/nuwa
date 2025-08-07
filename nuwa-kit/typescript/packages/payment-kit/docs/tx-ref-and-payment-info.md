@@ -88,8 +88,9 @@ Payment Kit 的 HTTP 协议目前仅在 _请求头_ 携带 `clientTxRef`，而 _
 interface PaymentInfo {
   clientTxRef: string;
   serviceTxRef?: string;
-  cost: string;        // Amount of *this* request (pico-unit)
-  nonce: string;       // Completed nonce
+  cost: bigint;        // Amount of *this* request (in asset's smallest/base units)
+  costUsd: bigint;     // Amount in picoUSD for display purposes
+  nonce: bigint;       // Completed nonce
   channelId: string;
   assetId: string;
   timestamp: string;   // ISO8601 – generated client-side when resolved

@@ -137,10 +137,12 @@ export interface PaymentInfo {
   clientTxRef: string;
   /** Service transaction reference (optional) */
   serviceTxRef?: string;
-  /** Amount charged for this request (pico-unit) */
-  cost: string;
+  /** Amount charged for this request (in asset's smallest/base units) */
+  cost: bigint;
+  /** Amount charged in picoUSD for display purposes */
+  costUsd: bigint;
   /** Completed nonce value */
-  nonce: string;
+  nonce: bigint;
   /** Channel identifier */
   channelId: string;
   /** Asset identifier */

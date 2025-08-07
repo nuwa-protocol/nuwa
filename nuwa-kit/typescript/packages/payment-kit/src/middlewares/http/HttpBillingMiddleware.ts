@@ -392,6 +392,7 @@ export class HttpBillingMiddleware {
         // Payment data from HTTP headers
         maxAmount: paymentData?.maxAmount,
         signedSubRav: paymentData?.signedSubRav,
+        clientTxRef: paymentData?.clientTxRef,
         
         // HTTP-specific metadata for billing rules
         method: req.method,
@@ -420,7 +421,8 @@ export class HttpBillingMiddleware {
         result.serviceTxRef || '',
         {
           isHandshake: result.isHandshake,
-          autoClaimTriggered: result.autoClaimTriggered
+          autoClaimTriggered: result.autoClaimTriggered,
+          clientTxRef: result.clientTxRef
         }
       );
 
