@@ -13,6 +13,7 @@ import type { ConversionResult } from '../billing/rate/types';
 
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
+import { HttpPaymentCodec } from '../middlewares/http/HttpPaymentCodec';
 import type { ClaimScheduler } from './ClaimScheduler';
 import { PaymentUtils } from './PaymentUtils';
 
@@ -128,12 +129,211 @@ export interface PaymentVerificationResult extends VerificationResult {
       };
     }
   
-    /**
-     * Process payment for a request using deferred payment model
-     */
-    async processPayment(
-      ctx: BillingContext
-    ): Promise<ProcessorPaymentResult> {
+      /**
+   * Step A: Pre-process request - complete all I/O operations and verification
+   * Returns context with state populated for both pre-flight and post-flight
+   */
+  async preProcess(ctx: BillingContext): Promise<BillingContext> {
+    this.stats.totalRequests++;
+    
+    this.log('Pre-processing payment for operation:', ctx.meta.operation);
+
+    // Initialize state if not present
+    if (!ctx.state) {
+      ctx.state = {};
+    }
+
+    try {
+      let verificationResult: PaymentVerificationResult | undefined;
+      let isHandshake = false;
+      
+      // Extract SignedSubRAV from context
+      const signedSubRAV = ctx.meta.signedSubRav;
+      
+      // Step 1: Verify SignedSubRAV if present (async I/O operations)
+      if (signedSubRAV) {
+        isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
+
+        if (isHandshake) {
+          // Handshake verification
+          verificationResult = await this.verifyHandshake(signedSubRAV);
+          if (!verificationResult.isValid) {
+            this.stats.failedPayments++;
+            ctx.state.signedSubRavVerified = false;
+            return ctx;
+          }
+          this.stats.handshakes++;
+          this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
+        } else {
+          // Regular payment verification
+          verificationResult = await this.confirmDeferredPayment(signedSubRAV);
+          if (!verificationResult.isValid) {
+            this.stats.failedPayments++;
+            ctx.state.signedSubRavVerified = false;
+            return ctx;
+          }
+
+          // Process the verified payment (persist to RAV store)
+          await this.config.payeeClient.processSignedSubRAV(signedSubRAV);
+          this.stats.successfulPayments++;
+        }
+        
+        ctx.state.signedSubRavVerified = true;
+      } else {
+        ctx.state.signedSubRavVerified = true;
+      }
+
+      // Step 2: For Pre-flight rules, complete billing immediately
+      const rule = ctx.meta.billingRule;
+      if (rule && !this.config.billingEngine.isDeferred(rule)) {
+        this.log('⚡ Pre-flight rule detected - completing billing in preProcess');
+        
+        // Calculate cost with async operations
+        const costResult = await this.calculateCostWithDetails(ctx, rule);
+        const { cost, conversion } = costResult;
+        ctx.state.cost = cost;
+
+        // Check maxAmount limit
+        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
+          this.stats.failedPayments++;
+          this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          return ctx;
+        }
+
+        // Generate SubRAV and header for pre-flight
+        const { unsignedSubRAV, clientTxRef, serviceTxRef } = await this.generateSubRAV(ctx, cost, verificationResult);
+        
+        ctx.state.unsignedSubRav = unsignedSubRAV;
+        ctx.state.serviceTxRef = serviceTxRef;
+        ctx.state.nonce = unsignedSubRAV.nonce;
+        
+        // Generate response header
+        ctx.state.headerValue = await this.generateResponseHeader(unsignedSubRAV, cost, serviceTxRef, {
+          isHandshake,
+          autoClaimTriggered: false,
+          clientTxRef,
+          conversion
+        });
+
+        this.log('✅ Pre-flight billing completed in preProcess');
+      }
+
+      this.log('✅ Pre-processing completed');
+      return ctx;
+
+    } catch (error) {
+      this.log('🚨 Pre-processing error:', error);
+      if (!ctx.state) ctx.state = {};
+      ctx.state.signedSubRavVerified = false;
+      return ctx;
+    }
+  }
+
+  /**
+   * Step B & C: Settle billing - lightweight synchronous operations only
+   * For Pre-flight: essentially no-op (already completed in preProcess)
+   * For Post-flight: calculate cost based on usage and generate header
+   */
+  settle(ctx: BillingContext, usage?: Record<string, any>): BillingContext {
+    this.log('🔄 Settling billing with usage:', usage);
+
+    if (!ctx.state) {
+      ctx.state = {};
+    }
+
+    // Add usage data to state if provided
+    if (usage) {
+      ctx.state.usage = usage;
+    }
+
+    try {
+      const rule = ctx.meta.billingRule;
+      
+      // For Pre-flight rules, everything should be done already
+      if (rule && !this.config.billingEngine.isDeferred(rule)) {
+        this.log('⚡ Pre-flight rule - using pre-computed values');
+        // All values should already be in ctx.state from preProcess
+        if (!ctx.state.headerValue) {
+          this.log('⚠️ Pre-flight rule but no header value found in state');
+        }
+        return ctx;
+      }
+
+      // For Post-flight rules, calculate cost based on usage
+      if (rule && this.config.billingEngine.isDeferred(rule)) {
+        this.log('⏳ Post-flight rule - calculating cost from usage');
+        
+        // Calculate cost synchronously for known strategy types
+        let cost = 0n;
+        if (rule.strategy.type === 'PerToken') {
+          const unitPricePicoUSD = BigInt(rule.strategy.unitPricePicoUSD || '0');
+          const totalTokens = this.extractTokenCountSync(usage || {}, rule.strategy.usageKey || 'usage.total_tokens');
+          cost = unitPricePicoUSD * BigInt(totalTokens);
+        } else if (rule.strategy.type === 'PerRequest') {
+          cost = BigInt(rule.strategy.pricePicoUSD || '0');
+        }
+
+        ctx.state.cost = cost;
+
+        // Check maxAmount limit
+        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
+          this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          return ctx;
+        }
+
+        // Generate SubRAV and header synchronously
+        const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateSubRAVSync(ctx, cost);
+        
+        ctx.state.unsignedSubRav = unsignedSubRAV;
+        ctx.state.serviceTxRef = serviceTxRef;
+        ctx.state.nonce = unsignedSubRAV.nonce;
+        ctx.state.headerValue = headerValue;
+
+        this.log('✅ Post-flight billing settled successfully');
+      }
+
+      return ctx;
+
+    } catch (error) {
+      this.log('🚨 Billing settlement error:', error);
+      if (!ctx.state) ctx.state = {};
+      ctx.state.cost = 0n;
+      return ctx;
+    }
+  }
+
+  /**
+   * Step D: Persist billing state to storage
+   */
+  async persist(ctx: BillingContext): Promise<void> {
+    if (!ctx.state?.unsignedSubRav) {
+      this.log('⚠️ No unsignedSubRAV to persist');
+      return;
+    }
+
+    try {
+      this.log('💾 Persisting billing state');
+      
+      // Store the unsigned SubRAV for future verification
+      await this.pendingSubRAVStore.save(ctx.state.unsignedSubRav);
+      
+      // Mark as persisted
+      ctx.state.persisted = true;
+      
+      this.log('✅ Billing state persisted successfully');
+    } catch (error) {
+      this.log('🚨 Persistence error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * @deprecated Use preProcess + settle + persist instead
+   */
+  async processPayment(
+    ctx: BillingContext
+  ): Promise<ProcessorPaymentResult> {
       this.stats.totalRequests++;
       
       this.log('Processing payment for operation:', ctx.meta.operation);
@@ -456,6 +656,147 @@ export interface PaymentVerificationResult extends VerificationResult {
       return await this.pendingSubRAVStore.findLatestByChannel(channelId);
     }
   
+    /**
+     * Generate unsigned SubRAV for the response
+     */
+    private async generateSubRAV(
+      ctx: BillingContext, 
+      cost: bigint, 
+      verificationResult?: PaymentVerificationResult
+    ): Promise<{ unsignedSubRAV: SubRAV; clientTxRef: string; serviceTxRef: string }> {
+      const signedSubRAV = ctx.meta.signedSubRav;
+      const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
+
+      if (signedSubRAV) {
+        // Generate follow-up SubRAV
+        const channelId = signedSubRAV.subRav.channelId;
+        const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
+        const currentNonce = signedSubRAV.subRav.nonce;
+        const nextNonce = currentNonce + 1n;
+        const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
+
+        const unsignedSubRAV: SubRAV = {
+          version: 1,
+          chainId: signedSubRAV.subRav.chainId,
+          channelId,
+          channelEpoch: signedSubRAV.subRav.channelEpoch,
+          vmIdFragment,
+          nonce: nextNonce,
+          accumulatedAmount: newAccumulatedAmount
+        };
+
+        return { unsignedSubRAV, clientTxRef, serviceTxRef };
+      } else {
+        // This should be a handshake - generate handshake SubRAV
+        throw new Error('Cannot generate SubRAV without existing channel context');
+      }
+    }
+
+    /**
+     * Generate response header with payment information
+     */
+    private async generateResponseHeader(
+      unsignedSubRAV: SubRAV,
+      cost: bigint,
+      serviceTxRef: string,
+      options: {
+        isHandshake?: boolean;
+        autoClaimTriggered?: boolean;
+        clientTxRef?: string;
+        conversion?: any;
+      }
+    ): Promise<string> {
+      try {
+        // Import HttpPaymentCodec dynamically to avoid circular dependencies
+        const { HttpPaymentCodec } = await import('../middlewares/http/HttpPaymentCodec');
+        
+        const codec = new HttpPaymentCodec();
+        return codec.encodeResponse(
+          unsignedSubRAV,
+          cost,
+          serviceTxRef,
+          {
+            isHandshake: options.isHandshake,
+            autoClaimTriggered: options.autoClaimTriggered,
+            clientTxRef: options.clientTxRef
+          }
+        );
+      } catch (error) {
+        this.log('🚨 Failed to generate response header:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Generate SubRAV and header synchronously for post-flight billing
+     */
+    private generateSubRAVSync(ctx: BillingContext, cost: bigint): {
+      unsignedSubRAV: SubRAV;
+      serviceTxRef: string;
+      headerValue: string;
+    } {
+      const signedSubRAV = ctx.meta.signedSubRav;
+      const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
+
+      if (!signedSubRAV) {
+        throw new Error('Cannot generate SubRAV without existing channel context');
+      }
+
+      // Generate follow-up SubRAV
+      const channelId = signedSubRAV.subRav.channelId;
+      const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
+      const currentNonce = signedSubRAV.subRav.nonce;
+      const nextNonce = currentNonce + 1n;
+      const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
+
+      const unsignedSubRAV: SubRAV = {
+        version: 1,
+        chainId: signedSubRAV.subRav.chainId,
+        channelId,
+        channelEpoch: signedSubRAV.subRav.channelEpoch,
+        vmIdFragment,
+        nonce: nextNonce,
+        accumulatedAmount: newAccumulatedAmount
+      };
+
+      // Generate header using HttpPaymentCodec
+      const responsePayload = {
+        subRav: unsignedSubRAV,
+        amountDebited: cost,
+        clientTxRef: clientTxRef,
+        serviceTxRef: serviceTxRef,
+        errorCode: 0,
+        message: 'Post-flight billing completed'
+      };
+
+      // Use HttpPaymentCodec to generate header
+      const headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
+
+      return { unsignedSubRAV, serviceTxRef, headerValue };
+    }
+
+    /**
+     * Extract token count from usage data synchronously
+     */
+    private extractTokenCountSync(usage: any, usageKey: string): number {
+      try {
+        // usageKey format: "usage.total_tokens"
+        const keys = usageKey.split('.');
+        let value = usage;
+        for (const key of keys) {
+          value = value[key];
+          if (value === undefined) {
+            return 0;
+          }
+        }
+        return typeof value === 'number' ? value : parseInt(value) || 0;
+      } catch {
+        return 0;
+      }
+    }
+
     /**
      * Debug logging
      */

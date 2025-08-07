@@ -5,7 +5,7 @@
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
-import type { SignedSubRAV } from '../../core/types';
+import type { SignedSubRAV, SubRAV } from '../../core/types';
 
 export interface BillingContext {
     /** Service identifier (e.g. "llm-gateway", "mcp-server") */
@@ -16,7 +16,7 @@ export interface BillingContext {
      * from picoUSD to the asset's smallest unit.
      */
     assetId?: string;
-    /** All billing-related context information */
+    /** All billing-related context information (input only) */
     meta: {
       /** Business operation identifier (e.g., "POST:/api/chat/completions") */
       operation: string;
@@ -26,12 +26,34 @@ export interface BillingContext {
       path?: string;
       /** HTTP method */
       method?: string;
-      /** Usage data for post-flight billing (e.g. token counts) */
-      usage?: Record<string, any>;
       /** Signed SubRAV for payment verification (contains channelId and vmIdFragment) */
       signedSubRav?: SignedSubRAV;
+      /** Client transaction reference for tracking and idempotency */
+      clientTxRef?: string;
+      /** Maximum amount limit for this request */
+      maxAmount?: bigint;
       /** Additional arbitrary metadata */
       [key: string]: any;
+    };
+    /** Runtime state (mutable outputs from billing process) */
+    state?: {
+      // Step A: Verification
+      signedSubRavVerified?: boolean;
+      
+      // Step B: Charging
+      cost?: bigint;
+      
+      // Step C: Issuing
+      unsignedSubRav?: SubRAV;
+      headerValue?: string;
+      serviceTxRef?: string;
+      nonce?: bigint;
+      
+      // Step D: Persistence
+      persisted?: boolean;
+      
+      // Post-flight usage data
+      usage?: Record<string, any>;
     };
   }
   

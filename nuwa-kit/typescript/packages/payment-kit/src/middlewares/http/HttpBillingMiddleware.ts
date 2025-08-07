@@ -140,10 +140,134 @@ export class HttpBillingMiddleware {
   }
 
   /**
+   * New unified billing handler using the three-step process
+   */
+  async handleWithNewAPI(req: GenericHttpRequest): Promise<{
+    ctx: BillingContext;
+    isDeferred: boolean;
+  } | null> {
+    try {
+      this.log('🔍 Processing HTTP payment request with new API:', req.method, req.path);
+      
+      // Step 1: Find matching billing rule
+      const rule = this.findBillingRule(req);
+      
+      if (!rule) {
+        this.log('📝 No billing rule matched - proceeding without payment processing');
+        return null;
+      }
+
+      // Step 2: Build initial billing context
+      const paymentData = this.extractPaymentData(req.headers);
+      const ctx = this.buildBillingContext(req, paymentData || undefined, rule);
+      
+      // Step 3: Pre-process the request
+      const processedCtx = await this.processor.preProcess(ctx);
+      
+      // Step 4: Check if this is deferred billing
+      const isDeferred = this.isBillingDeferred(rule);
+      
+      this.log(`📋 Request pre-processed, deferred: ${isDeferred}`);
+      return { ctx: processedCtx, isDeferred };
+
+    } catch (error) {
+      this.log('🚨 New API payment processing error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Complete billing settlement synchronously (Step B & C) - for on-headers use
+   */
+  settleBillingSync(ctx: BillingContext, usage?: Record<string, any>, resAdapter?: ResponseAdapter): boolean {
+    try {
+      this.log('🔄 Settling billing synchronously with usage:', usage);
+      
+      // Use the processor's synchronous settle method
+      const settledCtx = this.processor.settle(ctx, usage);
+      
+      if (!settledCtx.state?.headerValue) {
+        this.log('⚠️ No header value generated during settlement');
+        return false;
+      }
+
+      // Add response header if adapter provided
+      if (resAdapter) {
+        resAdapter.setHeader('X-Payment-Channel-Data', settledCtx.state.headerValue);
+        this.log('✅ Payment header added to response synchronously');
+      }
+
+      return true;
+    } catch (error) {
+      this.log('🚨 Synchronous billing settlement error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Persist billing results (Step D) - async persistence only
+   */
+  async persistBilling(ctx: BillingContext): Promise<void> {
+    try {
+      this.log('💾 Persisting billing results');
+      
+      if (ctx.state?.unsignedSubRav) {
+        await this.processor.persist(ctx);
+        this.log('✅ Billing results persisted successfully');
+      } else {
+        this.log('⚠️ No SubRAV to persist');
+      }
+    } catch (error) {
+      this.log('🚨 Billing persistence error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete billing settlement (Step B & C) - async version
+   */
+  async settleBilling(ctx: BillingContext, usage?: Record<string, any>, resAdapter?: ResponseAdapter): Promise<boolean> {
+    try {
+      this.log('🔄 Settling billing with usage:', usage);
+      
+      const settledCtx = this.processor.settle(ctx, usage);
+      
+      if (!settledCtx.state?.headerValue) {
+        this.log('⚠️ No header value generated during settlement');
+        return false;
+      }
+
+      // Add response header if adapter provided
+      if (resAdapter) {
+        resAdapter.setHeader('X-Payment-Channel-Data', settledCtx.state.headerValue);
+        this.log('✅ Payment header added to response');
+      }
+
+      // Trigger async persistence (Step D)
+      this.processor.persist(settledCtx).catch(error => {
+        this.log('🚨 Async persistence error:', error);
+      });
+
+      return true;
+    } catch (error) {
+      this.log('🚨 Billing settlement error:', error);
+      if (resAdapter) {
+        resAdapter.setStatus(500).json({ 
+          error: 'Billing settlement failed',
+          code: 'PAYMENT_ERROR',
+          details: error instanceof Error ? error.message : String(error)
+        });
+      }
+      return false;
+    }
+  }
+
+  /**
    * Enhanced framework-agnostic payment processing handler with automatic pre/post-flight detection
    * 
    * This method automatically determines whether to use pre-flight or post-flight billing
    * based on the strategy's `deferred` property.
+   * @deprecated Use handleWithNewAPI + settleBilling instead
    */
   async handleWithAutoDetection(req: GenericHttpRequest, resAdapter: ResponseAdapter): Promise<{ 
     isDeferred: boolean; 
@@ -539,6 +663,26 @@ export class HttpBillingMiddleware {
   /**
    * Debug logging
    */
+  /**
+   * Extract token count from usage data synchronously
+   */
+  private extractTokenCountSync(usage: any, usageKey: string): number {
+    try {
+      // usageKey format: "usage.total_tokens"
+      const keys = usageKey.split('.');
+      let value = usage;
+      for (const key of keys) {
+        value = value[key];
+        if (value === undefined) {
+          return 0;
+        }
+      }
+      return typeof value === 'number' ? value : parseInt(value) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   private log(...args: any[]): void {
     if (this.config.debug) {
       console.log('[HttpBillingMiddleware]', ...args);

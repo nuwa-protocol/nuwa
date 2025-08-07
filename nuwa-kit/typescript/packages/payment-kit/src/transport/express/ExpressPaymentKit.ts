@@ -228,29 +228,46 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           // Create response adapter for framework-agnostic billing
           const resAdapter = this.createResponseAdapter(res);
           
-          // Use auto-detection for pre/post-flight billing
-          const detection = await this.middleware.handleWithAutoDetection(req, resAdapter);
+          // Use new unified billing API  
+          const billingResult = await this.middleware.handleWithNewAPI(req);
           
-          if (!detection.isDeferred) {
-            // Pre-flight billing completed or no billing needed
-            if (detection.result) {
-              // Pre-flight billing successful
-              (req as any).paymentResult = detection.result;
+          if (!billingResult) {
+            // No billing rule matched - proceed without payment
+            if (this.config.debug) {
+              console.log(`⏭️ No billing rule for ${req.method} ${req.path}`);
+            }
+            return next();
+          }
+
+          const { ctx: billingContext, isDeferred } = billingResult;
+
+          if (!isDeferred) {
+            // Pre-flight billing completed in preProcess
+            if (billingContext.state?.headerValue) {
+              // Pre-flight billing successful - header already generated
+              resAdapter.setHeader('X-Payment-Channel-Data', billingContext.state.headerValue);
+              // Set paymentResult with correct structure for backward compatibility
+              (req as any).paymentResult = {
+                ...billingContext,
+                cost: billingContext.state.cost,
+                subRav: billingContext.state.unsignedSubRav
+              };
               return next();
-            } else if (detection.result === null) {
-              // Pre-flight billing failed - response already sent by middleware
+            } else {
+              // Pre-flight billing failed
               if (this.config.debug) {
                 console.log('❌ Pre-flight billing failed, blocking request continuation');
               }
+              res.status(402).json({ error: 'Payment required' });
               return;
-            } else {
-              // No billing rule matched (result is undefined) - proceed without payment
-              return next();
             }
           } else {
-          // Post-flight billing - attach payment session to response locals
-          if (detection.paymentSession) {
-            res.locals.paymentSession = detection.paymentSession;
+            // Post-flight billing - attach billing context for later processing
+            res.locals.billingContext = billingContext;
+            
+            // For compatibility, also set paymentResult even though it's incomplete
+            // The complete payment result will be available after response processing
+            (req as any).paymentResult = billingContext;
             
             // Use on-headers package for reliable header interception
             let billingCompleted = false;
@@ -274,8 +291,17 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                     console.log('🔄 Processing post-flight billing synchronously with usage:', usage);
                   }
                   
-                  // Complete deferred billing synchronously using a blocking approach
-                  this.completeDeferredBillingSync(detection.paymentSession!, usage, resAdapter);
+                  // Complete deferred billing synchronously using new API
+                  this.middleware.settleBillingSync(billingContext, usage, resAdapter);
+                  
+                  // Update req.paymentResult with calculated cost for backward compatibility
+                  if (billingContext.state?.cost !== undefined) {
+                    (req as any).paymentResult = {
+                      ...billingContext,
+                      cost: billingContext.state.cost,
+                      subRav: billingContext.state.unsignedSubRav
+                    };
+                  }
                   
                   if (this.config.debug) {
                     console.log('✅ Post-flight billing header completed synchronously');
@@ -301,12 +327,10 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                     console.log('🔄 Completing async post-flight chain operations with usage:', usage);
                   }
                   
-                  // This handles the async chain operations (SubRAV processing, etc.)
-                  await this.middleware.completeDeferredBilling(
-                    detection.paymentSession!, 
-                    usage, 
-                    this.createNullResponseAdapter() // Don't modify headers here
-                  );
+                  // This handles the async chain operations (SubRAV persistence, etc.)
+                  if (billingContext.state?.unsignedSubRav) {
+                    await this.middleware.persistBilling(billingContext);
+                  }
                   
                   if (this.config.debug) {
                     console.log('✅ Async post-flight chain operations completed');
@@ -318,7 +342,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             });
           }
           return next();
-        }
         } else {
           if (this.config.debug) {
             console.log(`⏭️ Skipping billing for ${req.method} ${req.path} (unregistered route)`);
