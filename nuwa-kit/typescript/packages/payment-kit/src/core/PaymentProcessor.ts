@@ -129,7 +129,7 @@ export interface PaymentVerificationResult extends VerificationResult {
       };
     }
   
-      /**
+    /**
    * Step A: Pre-process request - complete all I/O operations and verification
    * Returns context with state populated for both pre-flight and post-flight
    */
@@ -197,6 +197,14 @@ export interface PaymentVerificationResult extends VerificationResult {
         if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
           this.stats.failedPayments++;
           this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          return ctx;
+        }
+
+        // For zero-cost requests, skip SubRAV generation (like old API)
+        if (cost === 0n) {
+          this.log('✅ Zero-cost request, skipping SubRAV generation');
+          // Mark as successful but no SubRAV needed
+          ctx.state.signedSubRavVerified = true;
           return ctx;
         }
 
@@ -330,10 +338,10 @@ export interface PaymentVerificationResult extends VerificationResult {
   /**
    * Legacy method for backward compatibility
    * @deprecated Use preProcess + settle + persist instead
-   */
-  async processPayment(
-    ctx: BillingContext
-  ): Promise<ProcessorPaymentResult> {
+     */
+    async processPayment(
+      ctx: BillingContext
+    ): Promise<ProcessorPaymentResult> {
       this.stats.totalRequests++;
       
       this.log('Processing payment for operation:', ctx.meta.operation);
@@ -796,7 +804,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         return 0;
       }
     }
-
+  
     /**
      * Debug logging
      */

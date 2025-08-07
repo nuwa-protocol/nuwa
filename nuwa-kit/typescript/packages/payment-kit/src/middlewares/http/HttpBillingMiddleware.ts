@@ -164,10 +164,23 @@ export class HttpBillingMiddleware {
       // Step 3: Pre-process the request
       const processedCtx = await this.processor.preProcess(ctx);
       
-      // Step 4: Check if this is deferred billing
+      // Step 4: Check if verification failed
+      if (processedCtx.state && processedCtx.state.signedSubRavVerified === false) {
+        this.log('🚨 Payment verification failed during pre-processing');
+        return null;
+      }
+      
+      // Step 5: Check if this is deferred billing
       const isDeferred = this.isBillingDeferred(rule);
       
-      this.log(`📋 Request pre-processed, deferred: ${isDeferred}`);
+      this.log(`📋 Request pre-processed for ${rule.strategy.type}, deferred: ${isDeferred}`);
+      if (processedCtx.state) {
+        this.log(`📋 Context state:`, {
+          signedSubRavVerified: processedCtx.state.signedSubRavVerified,
+          cost: processedCtx.state.cost,
+          headerValue: !!processedCtx.state.headerValue
+        });
+      }
       return { ctx: processedCtx, isDeferred };
 
     } catch (error) {

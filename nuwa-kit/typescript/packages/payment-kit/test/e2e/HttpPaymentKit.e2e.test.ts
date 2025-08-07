@@ -159,8 +159,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response1 = result1.data;
     
     expect(response1.echo).toBe('hello world');
-    expect(response1.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     expect(response1.timestamp).toBeTruthy();
+    
+    // Payment information should come from headers, not business response
+    expect(result1.payment).toBeTruthy();
+    expect(result1.payment!.cost).toBe(BigInt('10000000')); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     
     // Check payment info
     if (result1.payment) {
@@ -181,7 +184,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response2 = result2.data;
     
     expect(response2.echo).toBe('second call');
-    expect(response2.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
+    
+    // Payment information should come from headers, not business response
+    expect(result2.payment).toBeTruthy();
+    expect(result2.payment!.cost).toBe(BigInt('10000000')); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     
     // Check payment info
     if (result2.payment) {
@@ -201,7 +207,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       const result = await httpClient.get(`/echo?q=call%20${i}`);
       const response = result.data;
       expect(response.echo).toBe(`call ${i}`);
-      expect(response.cost).toBe('10000000'); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
+      
+      // Payment information should come from headers, not business response
+      expect(result.payment).toBeTruthy();
+      expect(result.payment!.cost).toBe(BigInt('10000000')); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
       console.log(`✅ Request ${i} successful`);
       
       // Log payment info for verification
@@ -243,7 +252,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const processResult1 = await httpClient.post('/process', { data: 'test data 1' });
     const processResponse1 = processResult1.data;
     expect(processResponse1.processed.data).toBe('test data 1');
-    expect(processResponse1.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
+    
+    // Payment information should come from headers, not business response
+    expect(processResult1.payment).toBeTruthy();
+    expect(processResult1.payment!.cost).toBe(BigInt('100000000')); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     
     if (processResult1.payment) {
       console.log(`💰 Process 1 payment - ${formatPaymentInfo(processResult1.payment)}`);
@@ -252,7 +264,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const processResult2 = await httpClient.post('/process', { operation: 'complex task' });
     const processResponse2 = processResult2.data;
     expect(processResponse2.processed.operation).toBe('complex task');
-    expect(processResponse2.cost).toBe('100000000'); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
+    
+    // Payment information should come from headers, not business response
+    expect(processResult2.payment).toBeTruthy();
+    expect(processResult2.payment!.cost).toBe(BigInt('100000000')); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     
     if (processResult2.payment) {
       console.log(`💰 Process 2 payment - ${formatPaymentInfo(processResult2.payment)}`);
@@ -564,13 +579,13 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('📞 Comparison: Pre-flight billing with echo endpoint');
     const echoResult = await httpClient.get('/echo?q=pre-flight%20test');
     const echoResponse = echoResult.data;
-    expect(echoResponse.cost).toBeTruthy(); // Pre-flight has immediate cost
     expect(echoResult.payment).toBeTruthy(); // Pre-flight also has payment info
+    expect(echoResult.payment!.cost).toBeTruthy(); // Pre-flight has immediate cost
     
     console.log(`💰 Echo comparison payment - ${formatPaymentInfo(echoResult.payment!)}`);
     
     console.log(`📊 Billing mode comparison:
-      Echo (pre-flight): Cost available immediately = ${echoResponse.cost}
+      Echo (pre-flight): Cost available in headers = ${echoResult.payment!.cost.toString()}
       Chat (post-flight): Cost calculated after response based on usage
       Both modes: Payment headers received correctly ✅
     `);
@@ -600,7 +615,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Test multiple rapid post-flight requests to stress-test header transmission
     console.log('📞 Rapid successive post-flight requests');
     
-    const rapidResults = [];
+    const rapidResults: any[] = [];
     for (let i = 1; i <= 5; i++) {
       console.log(`📞 Rapid request ${i}/5`);
       const result = await httpClient.post('/chat/completions', {
@@ -681,6 +696,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       console.log('🔍 Baseline response:', baselineResponse);
       expect(baselineResponse).toBeTruthy();
       expect(baselineResponse.echo).toBe('baseline test');
+      
+      // Payment information should come from headers, not business response
+      expect(baselineResult.payment).toBeTruthy();
+      expect(baselineResult.payment!.cost).toBeTruthy();
       console.log('✅ Baseline request successful');
       
       // Log payment info for baseline
@@ -706,6 +725,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const response1 = result1.data;
     expect(response1).toBeTruthy();
     expect(response1.echo).toBe('high limit');
+    
+    // Payment information should come from headers, not business response
+    expect(result1.payment).toBeTruthy();
+    expect(result1.payment!.cost).toBeTruthy();
     console.log('✅ Request with high limit successful');
     
     // Log payment info for high limit test

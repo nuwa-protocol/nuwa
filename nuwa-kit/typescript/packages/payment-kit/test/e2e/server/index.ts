@@ -55,11 +55,10 @@ export async function createBillingServer(config: BillingServerConfig) {
   // 2. Declare routes & pricing strategies
   billing.get('/echo', { pricing: '1000000000' }, (req: Request, res: Response, next: NextFunction) => { // 0.001 USD = 1,000,000,000 picoUSD
     try {
-      const paymentResult = (req as any).paymentResult;
+      // Business logic should not depend on payment information
+      // Payment info is automatically handled by middleware and sent via headers
       res.json({
         echo: req.query.q || 'hello',
-        cost: paymentResult?.cost?.toString(),
-        nonce: paymentResult?.subRav?.nonce?.toString(),
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -75,12 +74,11 @@ export async function createBillingServer(config: BillingServerConfig) {
 
   billing.post('/process', { pricing: '10000000000' }, (req: Request, res: Response, next: NextFunction) => { // 0.01 USD = 10,000,000,000 picoUSD
     try {
-      const paymentResult = (req as any).paymentResult;
+      // Business logic should not depend on payment information
+      // Payment info is automatically handled by middleware and sent via headers
       res.json({
         processed: req.body,
-        timestamp: Date.now(),
-        cost: paymentResult?.cost?.toString(),
-        nonce: paymentResult?.subRav?.nonce?.toString()
+        timestamp: Date.now()
       });
     } catch (error) {
       // Only handle specific error cases, let middleware errors propagate
@@ -103,8 +101,6 @@ export async function createBillingServer(config: BillingServerConfig) {
     authRequired: true // paymentRequired is implied when pricing > 0
   }, (req: Request, res: Response, next: NextFunction) => {
     try {
-      const paymentResult = (req as any).paymentResult;
-      
       // Mock LLM response with variable usage based on request
       const { messages = [] } = req.body;
       const baseTokens = 100;
@@ -116,8 +112,8 @@ export async function createBillingServer(config: BillingServerConfig) {
         total_tokens: baseTokens + extraTokens
       };
       
-          // Critical: Set usage to res.locals for post-flight billing
-    // The middleware will automatically detect this is a PerToken strategy
+      // Critical: Set usage to res.locals for post-flight billing
+      // The middleware will automatically detect this is a PerToken strategy
       // and trigger post-flight billing after the response is sent
       res.locals.usage = {
         usage: mockUsage
@@ -138,7 +134,7 @@ export async function createBillingServer(config: BillingServerConfig) {
         }],
         usage: mockUsage,
         // Note: In post-flight billing, cost is calculated AFTER response
-        // paymentResult may be null here as billing happens in the background
+        // Business logic should not include payment details - they're handled by middleware
         billingInfo: {
           expectedCost: (mockUsage.total_tokens * 20000000).toString() + ' picoUSD',
           mode: 'post-flight',

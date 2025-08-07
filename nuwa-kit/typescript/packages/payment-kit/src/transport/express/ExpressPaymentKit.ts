@@ -166,7 +166,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // 3. Create billing middleware wrapper and mount all routes
     const billingWrapper = this.createBillingWrapper();
-    this.router.use(billingWrapper, this.billableRouter.router);
+    this.router.use(billingWrapper);
+    this.router.use(this.billableRouter.router);
   }
 
   /**
@@ -222,7 +223,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         // Step 3: Apply billing middleware (for all registered routes)
         if (rule) {
           if (this.config.debug) {
-            console.log(`💰 Applying billing for ${req.method} ${req.path}`);
+            console.log(`💰 Applying billing for ${req.method} ${req.path} with rule:`, rule.strategy.type);
           }
           
           // Create response adapter for framework-agnostic billing
@@ -251,6 +252,26 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                 ...billingContext,
                 cost: billingContext.state.cost,
                 subRav: billingContext.state.unsignedSubRav
+              };
+              
+              // CRITICAL: Async persist for pre-flight billing
+              // This stores the unsignedSubRAV for future verification
+              if (billingContext.state.unsignedSubRav) {
+                this.middleware.persistBilling(billingContext).catch((error) => {
+                  console.error('🚨 Failed to persist pre-flight billing:', error);
+                });
+              }
+              
+              return next();
+            } else if (billingContext.state?.cost === 0n) {
+              // Zero-cost request - no header needed, just proceed
+              if (this.config.debug) {
+                console.log('✅ Zero-cost request processed successfully');
+              }
+              // Set minimal paymentResult for backward compatibility
+              (req as any).paymentResult = {
+                ...billingContext,
+                cost: billingContext.state.cost
               };
               return next();
             } else {
@@ -351,6 +372,13 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         next();
       } catch (error) {
         console.error('🚨 Billing wrapper error:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          url: req.path,
+          method: req.method,
+          headers: req.headers
+        });
         res.status(500).json({ 
           error: 'Payment processing failed', 
           details: error instanceof Error ? error.message : String(error) 

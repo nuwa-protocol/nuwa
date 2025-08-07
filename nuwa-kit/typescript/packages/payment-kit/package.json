@@ -60,6 +60,7 @@
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.10.0",
+    "@types/on-headers": "^1.0.4",
     "@typescript-eslint/eslint-plugin": "^7.3.1",
     "@typescript-eslint/parser": "^7.3.1",
     "dotenv": "^16.3.1",
@@ -82,6 +83,7 @@
     "@types/pg": "^8.15.4",
     "js-yaml": "^4.1.0",
     "lossless-json": "^4.1.1",
+    "on-headers": "^1.1.0",
     "pg": "^8.16.3",
     "zod": "^3.25.0"
   },
