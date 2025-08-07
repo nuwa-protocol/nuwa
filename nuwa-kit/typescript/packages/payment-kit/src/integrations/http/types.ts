@@ -116,6 +116,8 @@ export interface PendingPaymentRequest {
   /** Channel and asset info for PaymentInfo construction */
   channelId: string;
   assetId: string;
+  /** Timeout ID for cleanup */
+  timeoutId: NodeJS.Timeout;
 }
 
 /**

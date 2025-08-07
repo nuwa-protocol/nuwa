@@ -526,21 +526,22 @@ export class PaymentChannelHttpClient {
     return new Promise((resolve, reject) => {
       const defaultAssetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
       
-      this.clientState.pendingPayments!.set(clientTxRef, {
-        resolve,
-        reject,
-        timestamp: new Date(),
-        channelId: this.clientState.channelId!,
-        assetId: defaultAssetId
-      });
-      
       // Set timeout for cleanup (30 seconds)
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (this.clientState.pendingPayments?.has(clientTxRef)) {
           this.clientState.pendingPayments.delete(clientTxRef);
           reject(new Error('Payment resolution timeout'));
         }
       }, 30000);
+      
+      this.clientState.pendingPayments!.set(clientTxRef, {
+        resolve,
+        reject,
+        timestamp: new Date(),
+        channelId: this.clientState.channelId!,
+        assetId: defaultAssetId,
+        timeoutId
+      });
     });
   }
 
@@ -703,10 +704,14 @@ export class PaymentChannelHttpClient {
         if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
           const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
           
+          // Clear the timeout to prevent memory leak
+          clearTimeout(pendingRequest.timeoutId);
+          
           // Calculate USD cost with fallback to 0
           let costUsd: bigint = BigInt(0);
           try {
             const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
+            //TODO: Overflow check
             costUsd = responsePayload.amountDebited * assetPrice;
           } catch (error) {
             this.log('Failed to calculate USD cost, using 0:', error);
@@ -725,7 +730,7 @@ export class PaymentChannelHttpClient {
             timestamp: new Date().toISOString()
           };
           
-          // Resolve the payment promise
+          // Resolve the payment promise and remove from pending payments
           pendingRequest.resolve(paymentInfo);
           this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
           
@@ -747,9 +752,11 @@ export class PaymentChannelHttpClient {
       }
     } else {
       // No payment header means this is a free endpoint
-      // Resolve any pending payments with undefined
+      // Resolve any pending payments with undefined and clear timeouts
       if (this.clientState.pendingPayments) {
         for (const [clientTxRef, pendingRequest] of this.clientState.pendingPayments.entries()) {
+          // Clear the timeout to prevent memory leak
+          clearTimeout(pendingRequest.timeoutId);
           pendingRequest.resolve(undefined);
           this.clientState.pendingPayments.delete(clientTxRef);
         }
