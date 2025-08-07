@@ -196,9 +196,13 @@ export class BillableRouter implements RuleProvider {
         // Admin routes always require auth
         authRequired = true;
       } else {
-        // Default behavior: free endpoints don't require auth, paid ones do
-        const pricingAmount = typeof pricing === 'bigint' ? pricing : BigInt(0);
-        authRequired = pricingAmount > 0;
+        // Default behavior: payment requires auth
+        if (paymentRequired) {
+          authRequired = true;
+        } else {
+          // Free endpoints don't require auth by default
+          authRequired = false;
+        }
       }
     }
 
