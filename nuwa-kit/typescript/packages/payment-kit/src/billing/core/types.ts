@@ -137,6 +137,12 @@ export interface BillingContext {
 export interface CostCalculator {
   calcCost(ctx: BillingContext): Promise<bigint>;
   calcCostByRule(ctx: BillingContext, rule: BillingRule): Promise<bigint>;
+  /**
+   * Check if a billing rule requires deferred (post-flight) calculation
+   * @param rule The billing rule to check
+   * @returns true if the rule requires post-flight billing, false otherwise
+   */
+  isDeferred(rule: BillingRule): boolean;
 }
 
 /**

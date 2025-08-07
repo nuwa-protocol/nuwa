@@ -22,7 +22,6 @@ import type {
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import type { CostCalculator, BillingRule, RuleProvider } from '../../billing';
 import { findRule } from '../../billing/core/rule-matcher';
-import { BillingEngine } from '../../billing/engine/billingEngine';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 
@@ -272,14 +271,9 @@ export class HttpBillingMiddleware {
    * Check if billing for this rule should be deferred (post-flight)
    */
   private isBillingDeferred(rule: BillingRule): boolean {
-    // Cast to BillingEngine to access isDeferred method
-    if (this.config.billingEngine instanceof BillingEngine) {
-      return this.config.billingEngine.isDeferred(rule);
-    }
-    
-    // Fallback: assume non-deferred for compatibility
-    this.log('⚠️ BillingEngine does not support deferred detection - defaulting to pre-flight');
-    return false;
+    // Now that isDeferred is part of the CostCalculator interface,
+    // we can call it directly without type checking
+    return this.config.billingEngine.isDeferred(rule);
   }
 
   /**
