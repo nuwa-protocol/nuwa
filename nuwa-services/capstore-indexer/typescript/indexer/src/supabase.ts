@@ -67,20 +67,83 @@ export async function saveCursor(cursor: IndexerEventIDView | null) {
   }
 }
 
+export async function getLastUpdateCursor(): Promise<IndexerEventIDView | null> {
+  try {
+    const { data, error } = await supabase
+      .from(CURSOR_TABLE_NAME)
+      .select('cursor')
+      .eq('event_type', `${PACKAGE_ID}::acp_registry::UpdateEvent`)
+      .single();
+
+    if (error || !data || !data.cursor) {
+      console.warn('Cursor not found, starting from beginning:', error?.message);
+      return null;
+    }
+    return deserializeCursor(data.cursor);
+  } catch (e) {
+    console.error('Error fetching cursor:', e);
+    return null;
+  }
+}
+
+export async function saveUpdateCursor(cursor: IndexerEventIDView | null) {
+  try {
+    const cursorStr = serializeCursor(cursor);
+    const { error } = await supabase
+      .from(CURSOR_TABLE_NAME)
+      .upsert(
+        {
+          event_type: `${PACKAGE_ID}::acp_registry::UpdateEvent`,
+          cursor: cursorStr,
+          last_updated: new Date()
+        },
+        { onConflict: 'event_type' }
+      );
+
+    if (error) throw error;
+    console.log(`Cursor saved: ${cursorStr}`);
+  } catch (e) {
+    console.error('Error saving cursor:', e);
+  }
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export async function storeToSupabase(data: Cap, cid: string): Promise<void> {
-  const { error } = await supabase
-    .from('ipfs_data')
-    .upsert(
-      {
-        name: data.name || null,
-        id: data.id || null,
-        cid: cid,
-        timestamp: new Date().toISOString()
-      },
-      { onConflict: 'cid' }
+export async function storeToSupabase(
+  data: Cap,
+  cid: string,
+  car_uri: string,
+  version: number
+): Promise<void> {
+  const { data: existingData, error: queryError } = await supabase
+    .from("ipfs_data")
+    .select("version")
+    .eq("car_uri", car_uri)
+    .maybeSingle();
+
+  if (queryError) {
+    throw new Error(`Supabase query failed: ${queryError.message}`);
+  }
+
+  if (existingData && version <= existingData.version) {
+    console.log(
+      `Skipping update for ${car_uri}. ` +
+        `Current version ${existingData.version} >= provided version ${version}`
     );
+    return;
+  }
+
+  const { error } = await supabase.from("ipfs_data").upsert(
+    {
+      car_uri: car_uri,
+      name: data.name || null,
+      id: data.id || null,
+      cid: cid,
+      version: version,
+      timestamp: new Date().toISOString(),
+    },
+    { onConflict: "car_uri" }
+  );
 
   if (error) {
     throw new Error(`Supabase operation failed: ${error.message}`);

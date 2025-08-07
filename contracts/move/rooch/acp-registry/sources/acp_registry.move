@@ -142,17 +142,17 @@ module acp_registry::acp_registry {
         })
     }
 
-    // public entry fun update(agent_capability_obj: &mut Object<AgentCapability>, cid: String) {
-    //     let agent_capability = object::borrow_mut(agent_capability_obj);
-    //     agent_capability.version = agent_capability.version + 1;
-    //     agent_capability.cid = cid;
-    //     emit(UpdateEvent{
-    //         cap_uri: agent_capability.cap_uri,
-    //         creator: agent_capability.creator,
-    //         version: agent_capability.version,
-    //         cid: agent_capability.cid
-    //     })
-    // }
+    public entry fun update(agent_capability_obj: &mut Object<AgentCapability>, cid: String) {
+        let agent_capability = object::borrow_mut(agent_capability_obj);
+        agent_capability.version = agent_capability.version + 1;
+        agent_capability.cid = cid;
+        emit(UpdateEvent{
+            cap_uri: agent_capability.cap_uri,
+            creator: agent_capability.creator,
+            version: agent_capability.version,
+            cid: agent_capability.cid
+        })
+    }
 
     public fun get_agent_capability_id(creator: address, name: String): ObjectID {
         let did_document = did::get_did_document_by_address(creator);

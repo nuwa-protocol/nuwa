@@ -5,11 +5,13 @@ CREATE TABLE rooch_cursor_state (
 );
 
 CREATE TABLE ipfs_data (
+  car_uri TEXT NOT NULL,
   name TEXT NOT NULL,
   id TEXT NOT NULL,
   cid TEXT NOT NULL,
   timestamp TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (cid)
+  version INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (car_uri)
 );
 
 -- Create index on cid for faster queries
