@@ -148,7 +148,7 @@ export class HttpBillingMiddleware {
   async handleWithAutoDetection(req: GenericHttpRequest, resAdapter: ResponseAdapter): Promise<{ 
     isDeferred: boolean; 
     paymentSession?: PaymentSession; 
-    result?: ProcessorPaymentResult 
+    result?: ProcessorPaymentResult | null  // null = failed, undefined = no rule matched
   }> {
     try {
       this.log('🔍 Processing HTTP payment request with auto-detection:', req.method, req.path);
@@ -168,7 +168,7 @@ export class HttpBillingMiddleware {
         // Pre-flight billing - calculate cost immediately
         this.log('⚡ Pre-flight billing detected - processing payment now');
         const result = await this.handle(req, resAdapter, rule);
-        return { isDeferred: false, result: result || undefined };
+        return { isDeferred: false, result };
       } else {
         // Post-flight billing - prepare payment session
         this.log('⏳ Post-flight billing detected - preparing payment session');

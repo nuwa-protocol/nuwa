@@ -246,12 +246,15 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               // Pre-flight billing successful
               (req as any).paymentResult = detection.result;
               return next();
-            } else if (detection.result === undefined) {
-              // No billing rule matched - proceed without payment
-              return next();
-            } else {
-              // Pre-flight billing failed (result is null) - response already sent by middleware
+            } else if (detection.result === null) {
+              // Pre-flight billing failed - response already sent by middleware
+              if (this.config.debug) {
+                console.log('❌ Pre-flight billing failed, blocking request continuation');
+              }
               return;
+            } else {
+              // No billing rule matched (result is undefined) - proceed without payment
+              return next();
             }
           } else {
           // Post-flight billing - attach payment session to response locals
@@ -259,7 +262,21 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             res.locals.paymentSession = detection.paymentSession;
             
             // Use Express 'header' event to catch the moment before response is sent
+            // Add safety guards to prevent multiple executions and header conflicts
+            let billingCompleted = false;
             res.on('header', async () => {
+              // Guard 1: Prevent multiple executions
+              if (billingCompleted) {
+                return;
+              }
+              billingCompleted = true;
+
+              // Guard 2: Check if headers have been sent (safety check)
+              if (res.headersSent) {
+                console.warn('⚠️ Headers already sent, skipping post-flight billing header update');
+                return;
+              }
+
               try {
                 // Extract usage data from response locals (populated by business logic)
                 const usage = res.locals.usage || {};
