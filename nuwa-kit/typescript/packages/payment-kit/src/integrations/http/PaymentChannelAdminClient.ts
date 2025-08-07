@@ -7,6 +7,7 @@ import type {
   CleanupRequest,
   CleanupResponse
 } from '../../schema';
+import type { PaymentResult } from '../../core/types';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 
 /**
@@ -48,14 +49,16 @@ export class PaymentChannelAdminClient {
    * Get claims status and processing statistics (admin only)
    */
   async getClaimsStatus(): Promise<ClaimsStatusResponse> {
-    return this.httpClient.get<ClaimsStatusResponse>(this.buildPaymentUrl('/admin/claims'));
+    const result = await this.httpClient.get<ClaimsStatusResponse>(this.buildPaymentUrl('/admin/claims'));
+    return result.data;
   }
 
   /**
    * Manually trigger a claim for a specific channel (admin only)
    */
   async triggerClaim(request: ClaimTriggerRequest): Promise<ClaimTriggerResponse> {
-    return this.httpClient.post<ClaimTriggerResponse>(this.buildPaymentUrl('/admin/claim-trigger'), request);
+    const result = await this.httpClient.post<ClaimTriggerResponse>(this.buildPaymentUrl('/admin/claim-trigger'), request);
+    return result.data;
   }
 
   /**
@@ -63,7 +66,8 @@ export class PaymentChannelAdminClient {
    */
   async querySubRav(request: SubRavRequest): Promise<any> {
     const queryPath = `/subrav?channelId=${encodeURIComponent(request.channelId)}&nonce=${encodeURIComponent(request.nonce)}`;
-    return this.httpClient.get<any>(this.buildPaymentUrl(queryPath));
+    const result = await this.httpClient.get<any>(this.buildPaymentUrl(queryPath));
+    return result.data;
   }
 
   /**
@@ -72,10 +76,11 @@ export class PaymentChannelAdminClient {
   async cleanup(request?: CleanupRequest): Promise<CleanupResponse> {
     // Use POST and JSON body for cleanup
     if (request && Object.keys(request).length > 0) {
-      return this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'), request);
+      const result = await this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'), request);
+      return result.data;
     }
-    return this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'));
-
+    const result = await this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'));
+    return result.data;
   }
 
   /**

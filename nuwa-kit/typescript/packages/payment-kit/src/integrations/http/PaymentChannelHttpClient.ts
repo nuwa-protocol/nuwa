@@ -4,9 +4,10 @@ import type {
   HttpClientState,
   PersistedHttpClientState,
   PaymentRequestContext,
-  HostChannelMappingStore 
+  HostChannelMappingStore,
+  PendingPaymentRequest
 } from './types';
-import type { SubRAV, SignedSubRAV } from '../../core/types';
+import type { SubRAV, SignedSubRAV, PaymentInfo, PaymentResult } from '../../core/types';
 import type { ApiResponse } from '../../types/api';
 import type { 
   DiscoveryResponse,
@@ -87,7 +88,8 @@ export class PaymentChannelHttpClient {
     });
     
     this.clientState = {
-      isHandshakeComplete: false
+      isHandshakeComplete: false,
+      pendingPayments: new Map()
     };
 
     this.log('PaymentChannelHttpClient initialized for host:', this.host);
@@ -95,12 +97,13 @@ export class PaymentChannelHttpClient {
 
   /**
    * Send an HTTP request with payment channel integration
+   * Returns response with payment information
    */
-  async request(
+  async requestWithPayment(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
     init?: RequestInit
-  ): Promise<Response> {
+  ): Promise<PaymentResult<Response>> {
     // First perform discovery if not done yet
     if (!this.cachedDiscoveryInfo) {
       await this.performDiscovery();
@@ -114,8 +117,14 @@ export class PaymentChannelHttpClient {
     // Ensure channel is ready
     await this.ensureChannelReady();
     
-    // Prepare headers
-    const headers = await this.prepareHeaders(fullUrl, method, init?.headers);
+    // Generate or extract clientTxRef
+    const clientTxRef = this.extractOrGenerateClientTxRef(init?.headers);
+    
+    // Create payment promise for this request
+    const paymentPromise = this.createPaymentPromise(clientTxRef);
+    
+    // Prepare headers with clientTxRef
+    const headers = await this.prepareHeaders(fullUrl, method, init?.headers, clientTxRef);
     
     // Build request context
     const requestContext: PaymentRequestContext = {
@@ -125,19 +134,47 @@ export class PaymentChannelHttpClient {
       body: init?.body
     };
 
-    // Execute request with retry logic
-    return this.executeRequest(requestContext, init);
+    try {
+      // Execute request
+      const response = await this.executeRequest(requestContext, init);
+      
+      // Wait for payment information to be resolved
+      const payment = await paymentPromise;
+      
+      return {
+        data: response,
+        payment
+      };
+    } catch (error) {
+      // Clean up pending payment on error
+      this.clientState.pendingPayments?.delete(clientTxRef);
+      throw error;
+    }
   }
 
   /**
-   * Convenience methods for common HTTP verbs
+   * Legacy method for backward compatibility
+   * @deprecated Use requestWithPayment for payment info or convenience methods
    */
-  async get<T = any>(path: string, init?: RequestInit): Promise<T> {
-    const response = await this.request('GET', path, init);
-    return this.parseJsonResponse(response);
+  async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+    path: string,
+    init?: RequestInit
+  ): Promise<Response> {
+    const result = await this.requestWithPayment(method, path, init);
+    return result.data;
   }
 
-  async post<T = any>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  /**
+   * Convenience methods for common HTTP verbs with payment info
+   */
+  async get<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
+    const result = await this.requestWithPayment('GET', path, init);
+    const data = await this.parseJsonResponse<T>(result.data);
+    return { data, payment: result.payment };
+  }
+
+  async post<T = any>(path: string, body?: any, init?: RequestInit): Promise<PaymentResult<T>> {
     const requestInit = {
       ...init,
       body: body ? JSON.stringify(body) : undefined,
@@ -146,11 +183,12 @@ export class PaymentChannelHttpClient {
         ...init?.headers
       }
     };
-    const response = await this.request('POST', path, requestInit);
-    return this.parseJsonResponse(response);
+    const result = await this.requestWithPayment('POST', path, requestInit);
+    const data = await this.parseJsonResponse<T>(result.data);
+    return { data, payment: result.payment };
   }
 
-  async put<T = any>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  async put<T = any>(path: string, body?: any, init?: RequestInit): Promise<PaymentResult<T>> {
     const requestInit = {
       ...init,
       body: body ? JSON.stringify(body) : undefined,
@@ -159,11 +197,12 @@ export class PaymentChannelHttpClient {
         ...init?.headers
       }
     };
-    const response = await this.request('PUT', path, requestInit);
-    return this.parseJsonResponse(response);
+    const result = await this.requestWithPayment('PUT', path, requestInit);
+    const data = await this.parseJsonResponse<T>(result.data);
+    return { data, payment: result.payment };
   }
 
-  async patch<T = any>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  async patch<T = any>(path: string, body?: any, init?: RequestInit): Promise<PaymentResult<T>> {
     const requestInit = {
       ...init,
       body: body ? JSON.stringify(body) : undefined,
@@ -172,13 +211,15 @@ export class PaymentChannelHttpClient {
         ...init?.headers
       }
     };
-    const response = await this.request('PATCH', path, requestInit);
-    return this.parseJsonResponse(response);
+    const result = await this.requestWithPayment('PATCH', path, requestInit);
+    const data = await this.parseJsonResponse<T>(result.data);
+    return { data, payment: result.payment };
   }
 
-  async delete<T = any>(path: string, init?: RequestInit): Promise<T> {
-    const response = await this.request('DELETE', path, init);
-    return this.parseJsonResponse(response);
+  async delete<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
+    const result = await this.requestWithPayment('DELETE', path, init);
+    const data = await this.parseJsonResponse<T>(result.data);
+    return { data, payment: result.payment };
   }
 
   /**
@@ -405,17 +446,6 @@ export class PaymentChannelHttpClient {
       
       // First, ensure the payer has sufficient funds in the hub
       const defaultAssetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
-      const hubFundAmount = this.options.hubFundAmount || BigInt('1000000000'); // 10 RGas
-      
-      try {
-        this.log('Depositing funds to hub:', hubFundAmount, 'of', defaultAssetId);
-        const hubClient = this.payerClient.getHubClient();
-        await hubClient.deposit(defaultAssetId, hubFundAmount);
-        this.log('Hub funding completed');
-      } catch (error) {
-        this.log('Hub funding failed (might already have funds):', error);
-        // Continue anyway - the hub might already have sufficient funds
-      }
       
       // Get payee DID from options or discover from service
       let payeeDid = this.options.payeeDid;
@@ -454,12 +484,69 @@ export class PaymentChannelHttpClient {
   }
 
   /**
+   * Extract clientTxRef from headers or generate a new one
+   */
+  private extractOrGenerateClientTxRef(providedHeaders?: HeadersInit): string {
+    // Check if clientTxRef is provided in headers
+    if (providedHeaders) {
+      let clientTxRef: string | undefined;
+      
+      if (providedHeaders instanceof Headers) {
+        clientTxRef = providedHeaders.get('X-Client-Tx-Ref') || undefined;
+      } else if (Array.isArray(providedHeaders)) {
+        const found = providedHeaders.find(([key]) => key.toLowerCase() === 'x-client-tx-ref');
+        clientTxRef = found?.[1];
+      } else if (typeof providedHeaders === 'object') {
+        clientTxRef = (providedHeaders as Record<string, string>)['X-Client-Tx-Ref'] ||
+                     (providedHeaders as Record<string, string>)['x-client-tx-ref'];
+      }
+      
+      if (clientTxRef) {
+        return clientTxRef;
+      }
+    }
+    
+    // Generate new UUID if not provided
+    return crypto.randomUUID();
+  }
+
+  /**
+   * Create a payment promise for tracking request payment info
+   */
+  private createPaymentPromise(clientTxRef: string): Promise<PaymentInfo | undefined> {
+    if (!this.clientState.pendingPayments) {
+      this.clientState.pendingPayments = new Map();
+    }
+    
+    return new Promise((resolve, reject) => {
+      const defaultAssetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
+      
+      this.clientState.pendingPayments!.set(clientTxRef, {
+        resolve,
+        reject,
+        timestamp: new Date(),
+        channelId: this.clientState.channelId!,
+        assetId: defaultAssetId
+      });
+      
+      // Set timeout for cleanup (30 seconds)
+      setTimeout(() => {
+        if (this.clientState.pendingPayments?.has(clientTxRef)) {
+          this.clientState.pendingPayments.delete(clientTxRef);
+          reject(new Error('Payment resolution timeout'));
+        }
+      }, 30000);
+    });
+  }
+
+  /**
    * Prepare headers for the request
    */
   private async prepareHeaders(
     fullUrl: string, 
     method: string, 
-    providedHeaders?: HeadersInit
+    providedHeaders?: HeadersInit,
+    clientTxRef?: string
   ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
 
@@ -495,8 +582,8 @@ export class PaymentChannelHttpClient {
       this.log('Failed to generate DID auth header:', error);
     }
 
-    // Add payment channel header
-    await this.addPaymentChannelHeader(headers);
+    // Add payment channel header with clientTxRef
+    await this.addPaymentChannelHeader(headers, clientTxRef);
 
     return headers;
   }
@@ -504,7 +591,7 @@ export class PaymentChannelHttpClient {
   /**
    * Add payment channel data to headers
    */
-  private async addPaymentChannelHeader(headers: Record<string, string>): Promise<void> {
+  private async addPaymentChannelHeader(headers: Record<string, string>, clientTxRef?: string): Promise<void> {
     if (!this.clientState.channelId) {
       throw new Error('Channel not initialized');
     }
@@ -558,7 +645,7 @@ export class PaymentChannelHttpClient {
       const headerValue = codec.encodePayload({
         signedSubRav: signedSubRAV,
         maxAmount: this.options.maxAmount || BigInt(0),
-        clientTxRef: crypto.randomUUID(),
+        clientTxRef: clientTxRef || crypto.randomUUID(),
         version: 1
       });
       headers[HttpPaymentCodec.getHeaderName()] = headerValue;
@@ -607,6 +694,28 @@ export class PaymentChannelHttpClient {
       try {
         const responsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
         
+        // Handle clientTxRef-based payment resolution
+        if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
+          const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
+          
+          // Create PaymentInfo from response
+          const paymentInfo: PaymentInfo = {
+            clientTxRef: responsePayload.clientTxRef,
+            serviceTxRef: responsePayload.serviceTxRef,
+            cost: responsePayload.amountDebited.toString(),
+            nonce: responsePayload.subRav.nonce.toString(),
+            channelId: pendingRequest.channelId,
+            assetId: pendingRequest.assetId,
+            timestamp: new Date().toISOString()
+          };
+          
+          // Resolve the payment promise
+          pendingRequest.resolve(paymentInfo);
+          this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
+          
+          this.log('Resolved payment for clientTxRef:', responsePayload.clientTxRef, 'cost:', paymentInfo.cost);
+        }
+        
         if (responsePayload.subRav) {
           // Cache the unsigned SubRAV for the next request
           this.clientState.pendingSubRAV = responsePayload.subRav;
@@ -619,6 +728,15 @@ export class PaymentChannelHttpClient {
         }
       } catch (error) {
         this.log('Failed to parse payment response header:', error);
+      }
+    } else {
+      // No payment header means this is a free endpoint
+      // Resolve any pending payments with undefined
+      if (this.clientState.pendingPayments) {
+        for (const [clientTxRef, pendingRequest] of this.clientState.pendingPayments.entries()) {
+          pendingRequest.resolve(undefined);
+          this.clientState.pendingPayments.delete(clientTxRef);
+        }
       }
     }
 

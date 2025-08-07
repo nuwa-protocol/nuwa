@@ -189,6 +189,7 @@ export class HttpPaymentCodec implements PaymentCodec {
     const serializable = {
       subRav: this.serializeSubRAV(payload.subRav),
       amountDebited: payload.amountDebited.toString(),
+      clientTxRef: payload.clientTxRef,
       serviceTxRef: payload.serviceTxRef,
       errorCode: payload.errorCode,
       message: payload.message
@@ -209,6 +210,7 @@ export class HttpPaymentCodec implements PaymentCodec {
       return {
         subRav: this.deserializeSubRAV(data.subRav),
         amountDebited: BigInt(data.amountDebited),
+        clientTxRef: data.clientTxRef,
         serviceTxRef: data.serviceTxRef,
         errorCode: data.errorCode,
         message: data.message

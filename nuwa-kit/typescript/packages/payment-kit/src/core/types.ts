@@ -119,6 +119,8 @@ export interface HttpResponsePayload {
   subRav: SubRAV;
   /** Amount debited for this transaction */
   amountDebited: bigint;
+  /** Client transaction reference (echoed back from request) */
+  clientTxRef?: string;
   /** Service transaction reference */
   serviceTxRef?: string;
   /** Error code (0 = success) */
@@ -126,6 +128,36 @@ export interface HttpResponsePayload {
   /** Human-readable message */
   message?: string;
 } 
+
+/**
+ * Payment information for completed requests
+ */
+export interface PaymentInfo {
+  /** Client transaction reference */
+  clientTxRef: string;
+  /** Service transaction reference (optional) */
+  serviceTxRef?: string;
+  /** Amount charged for this request (pico-unit) */
+  cost: string;
+  /** Completed nonce value */
+  nonce: string;
+  /** Channel identifier */
+  channelId: string;
+  /** Asset identifier */
+  assetId: string;
+  /** Timestamp when payment was resolved (ISO8601) */
+  timestamp: string;
+}
+
+/**
+ * Result wrapper for HTTP requests with payment information
+ */
+export interface PaymentResult<T> {
+  /** Response data */
+  data: T;
+  /** Payment information (undefined for free endpoints) */
+  payment?: PaymentInfo;
+}
 
 /**
  * Asset information including on-chain metadata

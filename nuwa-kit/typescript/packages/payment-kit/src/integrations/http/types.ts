@@ -1,7 +1,7 @@
 import type { ChainConfig } from '../../factory/chainFactory';
 import type { PaymentChannelPayerClientOptions } from '../../client/PaymentChannelPayerClient';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
-import type { SubRAV } from '../../core/types';
+import type { SubRAV, PaymentInfo } from '../../core/types';
 import type { PersistedHttpClientState } from '../../schema/core';
 
 /**
@@ -41,10 +41,6 @@ export interface HttpPayerOptions {
 
   /** Default asset ID for channel operations (defaults to RGas) */
   defaultAssetId?: string;
-
-  /** Amount to deposit to hub when creating channels (defaults to 10 RGas) */
-  hubFundAmount?: bigint;
-
 
 
   /** Default maximum amount to accept per request, refuse payment if exceeded */
@@ -103,6 +99,23 @@ export interface HttpClientState {
   channelId?: string;
   pendingSubRAV?: SubRAV;
   isHandshakeComplete: boolean;
+  /** Pending requests by clientTxRef for payment resolution */
+  pendingPayments?: Map<string, PendingPaymentRequest>;
+}
+
+/**
+ * Pending payment request context
+ */
+export interface PendingPaymentRequest {
+  /** Promise resolver for PaymentInfo */
+  resolve: (paymentInfo: PaymentInfo | undefined) => void;
+  /** Promise rejector */
+  reject: (error: Error) => void;
+  /** Request timestamp */
+  timestamp: Date;
+  /** Channel and asset info for PaymentInfo construction */
+  channelId: string;
+  assetId: string;
 }
 
 /**
