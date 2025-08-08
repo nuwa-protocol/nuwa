@@ -45,7 +45,6 @@ import { PaymentHubClient } from '../../client/PaymentHubClient';
 enum ClientState {
   INIT = 'INIT',
   OPENING = 'OPENING', 
-  HANDSHAKE = 'HANDSHAKE',
   READY = 'READY'
 }
 
@@ -90,7 +89,6 @@ export class PaymentChannelHttpClient {
     });
     
     this.clientState = {
-      isHandshakeComplete: false,
       pendingPayments: new Map()
     };
 
@@ -427,7 +425,7 @@ export class PaymentChannelHttpClient {
           const channelInfo = await this.payerClient.getChannelInfo(channelId);
           if (channelInfo.status === 'active') {
             this.clientState.channelId = channelId;
-            this.state = ClientState.HANDSHAKE;
+            this.state = ClientState.READY;
             this.log('Using existing active channel:', channelId);
             await this.persistClientState();
             return;
@@ -477,7 +475,7 @@ export class PaymentChannelHttpClient {
       // Store the mapping (legacy compatibility)
       await this.mappingStore.set(this.host, channelInfo.channelId);
       
-      this.state = ClientState.HANDSHAKE;
+      this.state = ClientState.READY;
       this.log('Created new channel:', channelInfo.channelId);
 
       // Persist the new state
@@ -519,7 +517,7 @@ export class PaymentChannelHttpClient {
   /**
    * Create a payment promise for tracking request payment info
    */
-  private createPaymentPromise(clientTxRef: string, requestContext: PaymentRequestContext, sentedSubRav: SignedSubRAV): Promise<PaymentInfo | undefined> {
+  private createPaymentPromise(clientTxRef: string, requestContext: PaymentRequestContext, sentedSubRav: SignedSubRAV | undefined): Promise<PaymentInfo | undefined> {
     if (!this.clientState.pendingPayments) {
       this.clientState.pendingPayments = new Map();
     }
@@ -557,7 +555,7 @@ export class PaymentChannelHttpClient {
     method: string, 
     providedHeaders?: HeadersInit,
     clientTxRef?: string
-  ): Promise<{ headers: Record<string, string>; sentedSubRav: SignedSubRAV }> {
+  ): Promise<{ headers: Record<string, string>; sentedSubRav: SignedSubRAV | undefined }> {
     const headers: Record<string, string> = {};
 
     // Copy provided headers
@@ -601,7 +599,7 @@ export class PaymentChannelHttpClient {
   /**
    * Add payment channel data to headers
    */
-  private async addPaymentChannelHeader(headers: Record<string, string>, clientTxRef?: string): Promise<SignedSubRAV> {
+  private async addPaymentChannelHeader(headers: Record<string, string>, clientTxRef?: string): Promise<SignedSubRAV | undefined> {
     if (!this.clientState.channelId) {
       throw new Error('Channel not initialized');
     }
@@ -609,8 +607,14 @@ export class PaymentChannelHttpClient {
     try {
       const signedSubRAV = await this.buildSignedSubRavIfNeeded();
 
-      const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
-      headers[HttpPaymentCodec.getHeaderName()] = headerValue;
+      if (signedSubRAV) {
+        const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
+        headers[HttpPaymentCodec.getHeaderName()] = headerValue;
+        this.log('Added payment header with SignedSubRAV');
+      } else {
+        this.log('No SignedSubRAV - operating in FREE mode without payment header');
+      }
+      
       return signedSubRAV;
     } catch (error) {
       this.handleError('Failed to add payment channel header', error);
@@ -801,20 +805,11 @@ export class PaymentChannelHttpClient {
     }
     
     if (response.status === 409) {
-      this.log('SubRAV conflict (409) - resetting handshake');
+      this.log('SubRAV conflict (409) - clearing pending proposal');
       this.clientState.pendingSubRAV = undefined;
-      this.clientState.isHandshakeComplete = false;
-      this.state = ClientState.HANDSHAKE;
-      await this.persistClientState();
-      throw new Error('SubRAV conflict - need to re-handshake');
-    }
-
-    // Mark handshake as complete after first successful response
-    if (!this.clientState.isHandshakeComplete && response.ok) {
-      this.clientState.isHandshakeComplete = true;
       this.state = ClientState.READY;
-      this.log('Handshake completed successfully');
       await this.persistClientState();
+      throw new Error('SubRAV conflict - cleared pending proposal');
     }
   }
 
@@ -953,7 +948,7 @@ export class PaymentChannelHttpClient {
       const channelId = await this.mappingStore.get(this.host);
       if (channelId) {
         this.clientState.channelId = channelId;
-        this.state = ClientState.HANDSHAKE;
+        this.state = ClientState.READY;
         this.log('Loaded channelId from legacy storage:', channelId);
       }
       return;
@@ -964,19 +959,15 @@ export class PaymentChannelHttpClient {
       if (persistedState) {
         this.clientState.channelId = persistedState.channelId;
         this.clientState.pendingSubRAV = persistedState.pendingSubRAV;
-        this.clientState.isHandshakeComplete = persistedState.isHandshakeComplete;
         
         // Set appropriate state based on persisted data
-        if (persistedState.isHandshakeComplete && persistedState.channelId) {
+        if (persistedState.channelId) {
           this.state = ClientState.READY;
-        } else if (persistedState.channelId) {
-          this.state = ClientState.HANDSHAKE;
         }
         
         this.log('Loaded persisted client state:', {
           channelId: persistedState.channelId,
-          hasPendingSubRAV: !!persistedState.pendingSubRAV,
-          isHandshakeComplete: persistedState.isHandshakeComplete
+          hasPendingSubRAV: !!persistedState.pendingSubRAV
         });
       }
     } catch (error) {
@@ -1000,7 +991,6 @@ export class PaymentChannelHttpClient {
       const stateToStore: PersistedHttpClientState = {
         channelId: this.clientState.channelId,
         pendingSubRAV: this.clientState.pendingSubRAV,
-        isHandshakeComplete: this.clientState.isHandshakeComplete,
         lastUpdated: new Date().toISOString()
       };
 
@@ -1078,11 +1068,11 @@ export class PaymentChannelHttpClient {
   }
 
   /**
-   * Build and sign a SubRAV for the current request without changing behavior.
+   * Build and sign a SubRAV for the current request per rav-handling.md §3.
    * - If there is a pendingSubRAV, sign it and clear the pending cache.
-   * - Otherwise, create a legacy handshake SubRAV (nonce=0, amount=0) and sign it.
+   * - Otherwise, return undefined (FREE mode - no RAV sent per rav-handling.md §2.1)
    */
-  private async buildSignedSubRavIfNeeded(): Promise<SignedSubRAV> {
+  private async buildSignedSubRavIfNeeded(): Promise<SignedSubRAV | undefined> {
     if (!this.clientState.channelId) {
       throw new Error('Channel not initialized');
     }
@@ -1099,27 +1089,9 @@ export class PaymentChannelHttpClient {
       return signed;
     }
 
-    // Legacy handshake path preserved (no behavior change)
-    const channelInfo = await this.payerClient.getChannelInfo(this.clientState.channelId);
-    const signer = this.options.signer;
-    const keyIds = await signer.listKeyIds();
-    const vmIdFragment = keyIds[0]?.split('#')[1];
-    if (!vmIdFragment) {
-      throw new Error('No VM ID fragment found');
-    }
-    const chainId = await this.payerClient.getChainId();
-    const handshakeSubRAV: SubRAV = {
-      version: 1,
-      chainId: chainId,
-      channelId: this.clientState.channelId,
-      channelEpoch: channelInfo.epoch,
-      vmIdFragment,
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0)
-    };
-    const signed = await this.payerClient.signSubRAV(handshakeSubRAV);
-    this.log('Created handshake SubRAV:', handshakeSubRAV.nonce);
-    return signed;
+    // No handshake RAV sent - FREE mode per rav-handling.md §3
+    this.log('No pending SubRAV - operating in FREE mode without RAV');
+    return undefined;
   }
 
   /**

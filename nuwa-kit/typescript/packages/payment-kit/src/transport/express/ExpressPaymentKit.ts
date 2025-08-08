@@ -255,9 +255,12 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               case 'CHANNEL_CLOSED':
               case 'EPOCH_MISMATCH':
               case 'MAX_AMOUNT_EXCEEDED':
+              case 'CLIENT_TX_REF_MISSING':
                 status = 400; break;
               case 'SUBRAV_CONFLICT':
                 status = 409; break;
+              case 'RATE_NOT_AVAILABLE':
+              case 'BILLING_CONFIG_ERROR':
               default:
                 status = 500; break;
             }

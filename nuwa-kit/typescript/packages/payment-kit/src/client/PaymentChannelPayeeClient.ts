@@ -618,29 +618,7 @@ export class PaymentChannelPayeeClient {
 
   // -------- Enhanced Methods for PaymentProcessor --------
 
-  /**
-   * Verify handshake request (specialized method for nonce=0, amount=0)
-   */
-  async verifyHandshake(signedSubRAV: SignedSubRAV): Promise<VerificationResult> {
-    // Verify this is actually a handshake
-    if (!PaymentUtils.isHandshake(signedSubRAV.subRav)) {
-      return {
-        isValid: false,
-        error: `Not a handshake SubRAV: nonce=${signedSubRAV.subRav.nonce}, amount=${signedSubRAV.subRav.accumulatedAmount}`
-      };
-    }
-
-    // Use standard verification but optimized for handshake case
-    const result = await this.verifySubRAV(signedSubRAV);
-    
-    if (result.isValid) {
-      console.log(`✅ Handshake verified for channel ${signedSubRAV.subRav.channelId}`);
-    } else {
-      console.log(`❌ Handshake verification failed: ${result.error}`);
-    }
-
-    return result;
-  }
+  
 
   /**
    * Confirm signed proposal from pending store

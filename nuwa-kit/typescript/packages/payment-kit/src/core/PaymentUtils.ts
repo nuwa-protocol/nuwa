@@ -26,12 +26,7 @@ export class PaymentUtils {
     );
   }
 
-  /**
-   * Check if SubRAV is a handshake request (nonce=0, amount=0)
-   */
-  static isHandshake(subRAV: SubRAV): boolean {
-    return subRAV.nonce === 0n && subRAV.accumulatedAmount === 0n;
-  }
+
 
   /**
    * Extract error code from error message

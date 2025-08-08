@@ -98,7 +98,6 @@ export interface FetchLike {
 export interface HttpClientState {
   channelId?: string;
   pendingSubRAV?: SubRAV;
-  isHandshakeComplete: boolean;
   /** Pending requests by clientTxRef for payment resolution */
   pendingPayments?: Map<string, PendingPaymentRequest>;
 }

@@ -285,8 +285,6 @@ export const PersistedHttpClientStateSchema = z.object({
   channelId: z.string().optional(),
   /** Pending SubRAV data */
   pendingSubRAV: SubRAVSchema.optional(),
-  /** Whether handshake is complete */
-  isHandshakeComplete: z.boolean(),
   /** Last update timestamp (ISO string) */
   lastUpdated: z.string().optional(),
 });
