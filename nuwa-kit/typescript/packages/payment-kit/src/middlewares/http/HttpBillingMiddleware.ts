@@ -315,32 +315,6 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Add payment proposal to HTTP response headers
-   */
-  private addPaymentProposalToResponse(resAdapter: ResponseAdapter, result: ProcessorPaymentResult): void {
-    if (!result.unsignedSubRAV) return;
-
-    try {
-      const responseHeader = this.codec.encodeResponse(
-        result.unsignedSubRAV,
-        result.cost,
-        result.serviceTxRef || '',
-        {
-          isHandshake: result.isHandshake,
-          autoClaimTriggered: result.autoClaimTriggered,
-          clientTxRef: result.clientTxRef
-        }
-      );
-
-      resAdapter.setHeader(HttpPaymentCodec.getHeaderName(), responseHeader);
-      this.log('✅ Added payment proposal to response header');
-    } catch (error) {
-      this.log('⚠️ Failed to add payment proposal to response:', error);
-      // Non-fatal error - don't fail the request
-    }
-  }
-
-  /**
    * Map error code to HTTP status code
    */
   private mapErrorToHttpStatus(errorCode?: string): number {
@@ -415,14 +389,6 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Security: Check if a client should be rate-limited
-   */
-  shouldRateLimit(clientId: string): boolean {
-    // Delegate to processor or implement HTTP-specific rate limiting
-    return false;
-  }
-
-  /**
    * Create ExpressJS ResponseAdapter
    */
   private createExpressResponseAdapter(res: ExpressResponse): ResponseAdapter {
@@ -474,29 +440,6 @@ export class HttpBillingMiddleware {
       ...options
     });
   }
-}
-
-/**
- * Utility function to create basic billing configuration
- */
-export function createBasicBillingConfig(
-  serviceId: string,
-  defaultPrice: string | bigint
-): any {
-  return {
-    version: 1,
-    serviceId,
-    rules: [
-      {
-        id: 'default-pricing',
-        default: true,
-        strategy: {
-          type: 'PerRequest',
-          price: defaultPrice.toString()
-        }
-      }
-    ]
-  };
 }
 
 /**
