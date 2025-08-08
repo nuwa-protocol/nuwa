@@ -227,15 +227,6 @@ export class HttpBillingMiddleware {
   }
 
   /**
-   * Check if billing for this rule should be deferred (post-flight)
-   */
-  private isBillingDeferred(rule: BillingRule): boolean {
-    // Now that isDeferred is part of the CostCalculator interface,
-    // we can call it directly without type checking
-    return this.config.billingEngine.isDeferred(rule);
-  }
-
-  /**
    * Extract payment data from HTTP request headers
    */
   extractPaymentData(headers: Record<string, string | string[] | undefined>): PaymentHeaderPayload | null {
