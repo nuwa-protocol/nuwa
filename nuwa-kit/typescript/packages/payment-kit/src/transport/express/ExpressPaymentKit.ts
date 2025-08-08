@@ -230,17 +230,15 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           const resAdapter = this.createResponseAdapter(res);
           
           // Use new unified billing API  
-          const billingResult = await this.middleware.handleWithNewAPI(req);
+          const billingContext = await this.middleware.handleWithNewAPI(req);
           
-          if (!billingResult) {
+          if (!billingContext) {
             // No billing rule matched - proceed without payment
             if (this.config.debug) {
               console.log(`⏭️ No billing rule for ${req.method} ${req.path}`);
             }
             return next();
           }
-
-          const { ctx: billingContext } = billingResult;
 
           // Unified handling for both pre-flight and post-flight
           res.locals.billingContext = billingContext;

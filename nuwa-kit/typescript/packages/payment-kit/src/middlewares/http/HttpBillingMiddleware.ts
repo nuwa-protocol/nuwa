@@ -118,10 +118,7 @@ export class HttpBillingMiddleware {
   /**
    * New unified billing handler using the three-step process
    */
-  async handleWithNewAPI(req: GenericHttpRequest): Promise<{
-    ctx: BillingContext;
-    isDeferred: boolean;
-  } | null> {
+  async handleWithNewAPI(req: GenericHttpRequest): Promise<BillingContext| null> {
     try {
       this.log('🔍 Processing HTTP payment request with new API:', req.method, req.path);
       
@@ -146,10 +143,7 @@ export class HttpBillingMiddleware {
         return null;
       }
       
-      // Step 5: Check if this is deferred billing
-      const isDeferred = this.isBillingDeferred(rule);
-      
-      this.log(`📋 Request pre-processed for ${rule.strategy.type}, deferred: ${isDeferred}`);
+      this.log(`📋 Request pre-processed for ${rule.strategy.type}`);
       if (processedCtx.state) {
         this.log(`📋 Context state:`, {
           signedSubRavVerified: processedCtx.state.signedSubRavVerified,
@@ -157,7 +151,7 @@ export class HttpBillingMiddleware {
           headerValue: !!processedCtx.state.headerValue
         });
       }
-      return { ctx: processedCtx, isDeferred };
+      return processedCtx;
 
     } catch (error) {
       this.log('🚨 New API payment processing error:', error);
