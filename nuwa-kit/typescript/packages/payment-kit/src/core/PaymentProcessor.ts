@@ -6,13 +6,10 @@ import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
 import type { 
   BillingContext,
-  BillingRule,
 } from '../billing';
 import { getStrategy } from '../billing/core/strategy-registry';
 import { convertUsdToAssetUsingPrice } from '../billing/core/converter';
 import type { RateProvider, RateResult } from '../billing/rate/types';
-import type { ConversionResult } from '../billing/rate/types';
-
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import { HttpPaymentCodec } from '../middlewares/http/HttpPaymentCodec';
@@ -91,17 +88,6 @@ export interface PaymentVerificationResult extends VerificationResult {
     }
 
     /**
-     * Decode request header payload safely (used for recovering clientTxRef if missing)
-     */
-    private codecDecodePayload(headerValue: string) {
-      try {
-        return HttpPaymentCodec.parseRequestHeader(headerValue);
-      } catch {
-        return null;
-      }
-    }
-  
-    /**
    * Step A: Pre-process request - complete all I/O operations and verification
    * Returns context with state populated for both pre-flight and post-flight
    */
@@ -123,24 +109,14 @@ export interface PaymentVerificationResult extends VerificationResult {
       let verificationResult: PaymentVerificationResult | undefined;
 
       if (signedSubRAV) {
-        const verify = await this.verifySignedSubRAV(signedSubRAV);
-        if (!verify.isValid) {
+        const result = await this.verifyAndProcessSignedSubRAV(signedSubRAV);
+        if (!result.isValid) {
           this.stats.failedPayments++;
           ctx.state.signedSubRavVerified = false;
           return ctx;
         }
-        isHandshake = verify.isHandshake;
-        verificationResult = verify;
-
-        if (isHandshake) {
-          this.stats.handshakes++;
-          this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
-        } else {
-          // Process the verified payment (persist to RAV store)
-          await this.config.payeeClient.processSignedSubRAV(signedSubRAV);
-          this.stats.successfulPayments++;
-        }
-
+        isHandshake = result.isHandshake;
+        verificationResult = result;
         ctx.state.signedSubRavVerified = true;
       } else {
         ctx.state.signedSubRavVerified = true;
@@ -438,47 +414,6 @@ export interface PaymentVerificationResult extends VerificationResult {
     }
   
     /**
-     * Process verified payment and optionally trigger claim
-     */
-    private async processVerifiedPayment(signedSubRAV: SignedSubRAV): Promise<boolean> {
-      try {
-        // Process the signed SubRAV - this persists to RAVStore automatically
-        await this.config.payeeClient.processSignedSubRAV(signedSubRAV);
-  
-        const channelId = signedSubRAV.subRav.channelId;
-        const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
-        
-        // If ClaimScheduler is configured, optionally trigger immediate claim
-        if (this.config.claimScheduler) {
-          try {
-            const results = await this.config.claimScheduler.triggerClaim(channelId, vmIdFragment);
-            if (results.length > 0) {
-              this.log(`ClaimScheduler processed ${results.length} claims for channel ${channelId}`);
-              this.stats.autoClaimsTriggered++;
-              return true;
-            }
-          } catch (error) {
-            this.log('ClaimScheduler trigger failed (non-fatal):', error);
-            // Continue - this is not a critical error
-          }
-        }
-  
-        return false;
-      } catch (error) {
-        this.log('Payment processing error:', error);
-        throw error;
-      }
-    }
-   
-  
-    /**
-     * Extract error code from error message
-     */
-    private extractErrorCode(error: string): string {
-      return PaymentUtils.extractErrorCode(error);
-    }
-  
-    /**
      * Clear expired pending SubRAV proposals
      */
     async clearExpiredProposals(maxAgeMinutes: number = 30): Promise<number> {
@@ -522,49 +457,17 @@ export interface PaymentVerificationResult extends VerificationResult {
       const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
 
-      if (signedSubRAV) {
-        const unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
-        return { unsignedSubRAV, clientTxRef, serviceTxRef };
-      } else {
-        // This should be a handshake - generate handshake SubRAV
+      if (!signedSubRAV) {
+        // §4.2: For paid routes without prior signed RAV, generate the next unsigned directly
+        // We need channel context; derive from verificationResult if available
         throw new Error('Cannot generate SubRAV without existing channel context');
       }
+
+      const unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
+      return { unsignedSubRAV, clientTxRef, serviceTxRef };
     }
 
-    /**
-     * Generate response header with payment information
-     */
-    private async generateResponseHeader(
-      unsignedSubRAV: SubRAV,
-      cost: bigint,
-      serviceTxRef: string,
-      options: {
-        isHandshake?: boolean;
-        autoClaimTriggered?: boolean;
-        clientTxRef?: string;
-        conversion?: any;
-      }
-    ): Promise<string> {
-      try {
-        // Import HttpPaymentCodec dynamically to avoid circular dependencies
-        const { HttpPaymentCodec } = await import('../middlewares/http/HttpPaymentCodec');
-        
-        const codec = new HttpPaymentCodec();
-        return codec.encodeResponse(
-          unsignedSubRAV,
-          cost,
-          serviceTxRef,
-          {
-            isHandshake: options.isHandshake,
-            autoClaimTriggered: options.autoClaimTriggered,
-            clientTxRef: options.clientTxRef
-          }
-        );
-      } catch (error) {
-        this.log('🚨 Failed to generate response header:', error);
-        throw error;
-      }
-    }
+   
 
     /**
      * Generate SubRAV and header synchronously for post-flight billing
@@ -602,17 +505,23 @@ export interface PaymentVerificationResult extends VerificationResult {
       return { unsignedSubRAV, serviceTxRef, headerValue };
     }
 
+
   /**
-   * Unified verification for signed SubRAV without changing behavior.
+   * Unified verification and processing per rav-handling.md
    */
-  private async verifySignedSubRAV(signedSubRAV: SignedSubRAV): Promise<PaymentVerificationResult & { isHandshake: boolean }> {
+  private async verifyAndProcessSignedSubRAV(signedSubRAV: SignedSubRAV): Promise<PaymentVerificationResult & { isHandshake: boolean }> {
     const isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
     if (isHandshake) {
       const verificationResult = await this.verifyHandshake(signedSubRAV);
       return { ...verificationResult, isHandshake } as PaymentVerificationResult & { isHandshake: boolean };
     }
-    const verificationResult = await this.confirmDeferredPayment(signedSubRAV);
-    return { ...verificationResult, isHandshake: false } as PaymentVerificationResult & { isHandshake: boolean };
+    const verification = await this.confirmDeferredPayment(signedSubRAV);
+    if (verification.isValid) {
+      this.stats.successfulPayments++;
+    } else {
+      this.stats.failedPayments++;
+    }
+    return { ...verification, isHandshake: false } as PaymentVerificationResult & { isHandshake: boolean };
   }
 
   /**
@@ -636,26 +545,6 @@ export interface PaymentVerificationResult extends VerificationResult {
     };
   }
 
-    /**
-     * Extract token count from usage data synchronously
-     */
-    private extractTokenCountSync(usage: any, usageKey: string): number {
-      try {
-        // usageKey format: "usage.total_tokens"
-        const keys = usageKey.split('.');
-        let value = usage;
-        for (const key of keys) {
-          value = value[key];
-          if (value === undefined) {
-            return 0;
-          }
-        }
-        return typeof value === 'number' ? value : parseInt(value) || 0;
-      } catch {
-        return 0;
-      }
-    }
-  
     /**
      * Debug logging
      */
