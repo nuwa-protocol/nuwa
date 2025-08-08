@@ -318,9 +318,12 @@ export class PaymentChannelPayerClient {
         throw new Error(`First payment SubRAV must have nonce 1, got ${subRAV.nonce}`);
       }
       
-      // Check accumulated amount against maximum amount limit for first payment
-      if (maxAmount && maxAmount > 0n && subRAV.accumulatedAmount > maxAmount) {
-        throw new Error(`SubRAV amount ${subRAV.accumulatedAmount} exceeds maximum allowed ${maxAmount}`);
+      // Check delta amount against maximum amount limit for first payment
+      if (maxAmount && maxAmount > 0n) {
+        const deltaAmount = subRAV.accumulatedAmount - prevState.accumulatedAmount;
+        if (deltaAmount > maxAmount) {
+          throw new Error(`Delta amount ${deltaAmount} exceeds maximum allowed ${maxAmount}`);
+        }
       }
     } else {
       // Subsequent payments - verify strict progression

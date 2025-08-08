@@ -1015,10 +1015,6 @@ export class PaymentChannelHttpClient {
       // Clear after taking to keep existing semantics
       this.clientState.pendingSubRAV = undefined;
 
-      if (this.options.maxAmount && pendingSubRAV.accumulatedAmount > this.options.maxAmount) {
-        throw new Error(`Payment amount ${pendingSubRAV.accumulatedAmount} exceeds maximum allowed ${this.options.maxAmount}`);
-      }
-
       const signed = await this.payerClient.signSubRAV(pendingSubRAV, {
         maxAmount: this.options.maxAmount
       });
