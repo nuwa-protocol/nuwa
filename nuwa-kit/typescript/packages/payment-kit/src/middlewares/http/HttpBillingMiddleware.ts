@@ -8,8 +8,7 @@
 
 import { PaymentProcessor } from '../../core/PaymentProcessor';
 import type { 
-  PaymentProcessorConfig,
-  ProcessorPaymentResult
+  PaymentProcessorConfig
 } from '../../core/PaymentProcessor';
 import type { BillingContext } from '../../billing';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
@@ -40,34 +39,11 @@ export interface ResponseAdapter {
   setHeader(name: string, value: string): ResponseAdapter;
 }
 
-// Express types (for backward compatibility)
-interface ExpressRequest {
-  path: string;
-  method: string;
-  headers: Record<string, string | string[]>;
-  query: Record<string, any>;
-  body?: any;
-}
-
 interface ExpressResponse {
   status(code: number): ExpressResponse;
   json(obj: any): ExpressResponse;
   setHeader(name: string, value: string): ExpressResponse;
   headersSent: boolean;
-}
-
-interface NextFunction {
-  (error?: any): void;
-}
-
-/**
- * Payment session for deferred billing - simplified to use unified BillingContext
- */
-export interface PaymentSession {
-  rule: BillingRule;
-  signedSubRav?: SignedSubRAV;
-  ctx: BillingContext;
-  paymentRequired: boolean;
 }
 
 /**
@@ -461,8 +437,7 @@ export function createExpressResponseAdapter(res: any): ResponseAdapter {
   };
 }
 
-// Re-export ProcessorPaymentResult for framework integrations
-export type { ProcessorPaymentResult } from '../../core/PaymentProcessor';
+// No longer re-export ProcessorPaymentResult; results are available via BillingContext.state
 
 /**
  * Utility function to create Koa ResponseAdapter (example for other frameworks)

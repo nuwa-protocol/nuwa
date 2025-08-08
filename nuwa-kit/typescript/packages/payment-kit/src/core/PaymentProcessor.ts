@@ -47,47 +47,6 @@ import { PaymentUtils } from './PaymentUtils';
 
   
   /**
- * Payment processing result from PaymentProcessor
- */
-export interface ProcessorPaymentResult {
-    /** Whether payment was processed successfully */
-    success: boolean;
-    
-    /** Cost calculated for this request */
-    cost: bigint;
-    
-    /** Generated unsigned SubRAV for next request */
-    unsignedSubRAV?: SubRAV;
-    
-    /** Signed SubRAV received from client */
-    signedSubRAV?: SignedSubRAV;
-    
-    /** Whether auto-claim was triggered */
-    autoClaimTriggered?: boolean;
-    
-    /** Whether this was a handshake request */
-    isHandshake?: boolean;
-    
-    /** Error message if failed */
-    error?: string;
-    
-    /** Error code for client handling */
-    errorCode?: string;
-    
-    /** Payer key ID extracted from payment verification */
-    payerKeyId?: string;
-    
-    /** Service transaction reference */
-    serviceTxRef?: string;
-    
-    /** Client transaction reference for request tracking */
-    clientTxRef?: string;
-    
-    /** USD billing conversion details (for auditing) */
-    conversion?: ConversionResult;
-}
-  
-  /**
  * Enhanced verification result with payer key ID
  */
 export interface PaymentVerificationResult extends VerificationResult {

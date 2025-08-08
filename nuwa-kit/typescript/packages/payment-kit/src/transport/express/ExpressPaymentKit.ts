@@ -247,12 +247,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             if (billingContext.state?.headerValue) {
               // Pre-flight billing successful - header already generated
               resAdapter.setHeader('X-Payment-Channel-Data', billingContext.state.headerValue);
-              // Set paymentResult with correct structure for backward compatibility
-              (req as any).paymentResult = {
-                ...billingContext,
-                cost: billingContext.state.cost,
-                subRav: billingContext.state.unsignedSubRav
-              };
               
               // CRITICAL: Async persist for pre-flight billing
               // This stores the unsignedSubRAV for future verification
@@ -268,11 +262,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               if (this.config.debug) {
                 console.log('✅ Zero-cost request processed successfully');
               }
-              // Set minimal paymentResult for backward compatibility
-              (req as any).paymentResult = {
-                ...billingContext,
-                cost: billingContext.state.cost
-              };
               return next();
             } else {
               // Pre-flight billing failed
@@ -285,10 +274,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           } else {
             // Post-flight billing - attach billing context for later processing
             res.locals.billingContext = billingContext;
-            
-            // For compatibility, also set paymentResult even though it's incomplete
-            // The complete payment result will be available after response processing
-            (req as any).paymentResult = billingContext;
             
             // Use on-headers package for reliable header interception
             let billingCompleted = false;
@@ -314,15 +299,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                   
                   // Complete deferred billing synchronously using new API
                   this.middleware.settleBillingSync(billingContext, usage, resAdapter);
-                  
-                  // Update req.paymentResult with calculated cost for backward compatibility
-                  if (billingContext.state?.cost !== undefined) {
-                    (req as any).paymentResult = {
-                      ...billingContext,
-                      cost: billingContext.state.cost,
-                      subRav: billingContext.state.unsignedSubRav
-                    };
-                  }
                   
                   if (this.config.debug) {
                     console.log('✅ Post-flight billing header completed synchronously');
