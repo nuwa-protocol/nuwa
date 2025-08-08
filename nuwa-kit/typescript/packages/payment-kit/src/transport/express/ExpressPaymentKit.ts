@@ -14,6 +14,7 @@ import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
+import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 
 /**
  * Configuration for creating ExpressPaymentKit
@@ -266,7 +267,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             }
 
             // Build protocol error header
-            const { HttpPaymentCodec } = await import('../../middlewares/http/HttpPaymentCodec');
             let clientTxRef: string | undefined;
             try {
               const headerValueIn = HttpPaymentCodec.extractPaymentHeader(req.headers as any);

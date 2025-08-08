@@ -75,6 +75,7 @@ export interface HttpBillingMiddlewareConfig {
 export enum HttpPaymentErrorCode {
   PAYMENT_REQUIRED = 'PAYMENT_REQUIRED',      // 402
   SUBRAV_CONFLICT = 'SUBRAV_CONFLICT',        // 409
+  MISSING_CHANNEL_CONTEXT = 'MISSING_CHANNEL_CONTEXT', // 409
   INVALID_PAYMENT = 'INVALID_PAYMENT',        // 400
   UNKNOWN_SUBRAV = 'UNKNOWN_SUBRAV',          // 400
   TAMPERED_SUBRAV = 'TAMPERED_SUBRAV',        // 400
@@ -112,6 +113,7 @@ export class HttpBillingMiddleware {
       defaultAssetId: config.defaultAssetId,
       rateProvider: config.rateProvider,
       pendingSubRAVStore: config.pendingSubRAVStore,
+      ravRepository: config.payeeClient.getRAVRepository(),
       claimScheduler: config.claimScheduler,
       debug: config.debug
     });
@@ -298,6 +300,7 @@ export class HttpBillingMiddleware {
         return 402; // Payment Required
       
       case HttpPaymentErrorCode.SUBRAV_CONFLICT:
+      case HttpPaymentErrorCode.MISSING_CHANNEL_CONTEXT:
         return 409; // Conflict
       
       case HttpPaymentErrorCode.INVALID_PAYMENT:

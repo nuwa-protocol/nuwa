@@ -7,15 +7,7 @@ import type { SignedSubRAV } from '../core/types';
  * for specific protocols (HTTP, MCP, A2A, etc.)
  */
 export interface PaymentCodec {
-  /**
-   * Encode signed SubRAV and optional metadata into protocol-specific format
-   */
-  encode(signedSubRAV: SignedSubRAV, metadata?: any): string;
   
-  /**
-   * Decode protocol-specific format back to signed SubRAV and metadata
-   */
-  decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any };
 }
 
 /**

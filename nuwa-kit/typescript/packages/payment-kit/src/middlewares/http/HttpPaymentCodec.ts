@@ -14,50 +14,6 @@ export class HttpPaymentCodec implements PaymentCodec {
   private static readonly HEADER_NAME = 'X-Payment-Channel-Data';
 
   /**
-   * Encode signed SubRAV for HTTP request header (legacy interface for PaymentCodec)
-   */
-  encode(signedSubRAV: SignedSubRAV, metadata?: any): string {
-    try {
-      const payload: PaymentHeaderPayload = {
-        signedSubRav: signedSubRAV,
-        maxAmount: metadata?.maxAmount || BigInt(0),
-        clientTxRef: metadata?.clientTxRef,
-        version: metadata?.version || 1
-      };
-      
-      return HttpPaymentCodec.buildRequestHeader(payload);
-    } catch (error) {
-      throw new EncodingError(
-        'Failed to encode HTTP payment data',
-        error instanceof Error ? error : new Error(String(error))
-      );
-    }
-  }
-
-  /**
-   * Decode HTTP request header to signed SubRAV (legacy interface for PaymentCodec)
-   */
-  decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
-    try {
-      const payload = HttpPaymentCodec.parseRequestHeader(encoded);
-      
-      return {
-        signedSubRAV: payload.signedSubRav,
-        metadata: {
-          maxAmount: payload.maxAmount,
-          clientTxRef: payload.clientTxRef,
-          version: payload.version
-        }
-      };
-    } catch (error) {
-      throw new DecodingError(
-        'Failed to decode HTTP payment data',
-        error instanceof Error ? error : new Error(String(error))
-      );
-    }
-  }
-
-  /**
    * Encode payment header payload for HTTP request header (new interface)
    */
   encodePayload(payload: PaymentHeaderPayload): string {
@@ -174,12 +130,16 @@ export class HttpPaymentCodec implements PaymentCodec {
    */
   static buildRequestHeader(payload: PaymentHeaderPayload): string {
     // Convert payload to serializable format
-    const serializable = {
-      signedSubRav: this.serializeSignedSubRAV(payload.signedSubRav),
+    const serializable: any = {
       maxAmount: payload.maxAmount.toString(),
       clientTxRef: payload.clientTxRef,
       version: payload.version.toString(),
     };
+    
+    // signedSubRav is now optional
+    if (payload.signedSubRav) {
+      serializable.signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
+    }
 
     // Convert to JSON and encode
     const json = JSON.stringify(serializable);
@@ -193,13 +153,24 @@ export class HttpPaymentCodec implements PaymentCodec {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
+      
+      // clientTxRef is now required
+      if (!data.clientTxRef) {
+        throw new Error('clientTxRef is required in payment header');
+      }
 
-      return {
-        signedSubRav: this.deserializeSignedSubRAV(data.signedSubRav),
+      const result: PaymentHeaderPayload = {
         maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0), // Handle old format without maxAmount
         clientTxRef: data.clientTxRef,
         version: parseInt(data.version) || 1,
       };
+      
+      // signedSubRav is now optional
+      if (data.signedSubRav) {
+        result.signedSubRav = this.deserializeSignedSubRAV(data.signedSubRav);
+      }
+      
+      return result;
     } catch (error) {
       throw new Error(`Failed to parse request header: ${error}`);
     }
@@ -383,7 +354,11 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SignedSubRAV for JSON transport
    */
-  private static serializeSignedSubRAV(signedSubRav: SignedSubRAV): Record<string, any> {
+  private static serializeSignedSubRAV(signedSubRav: SignedSubRAV | undefined): Record<string, any> | undefined {
+    if (!signedSubRav) {
+      return undefined;
+    }
+    
     return {
       subRav: this.serializeSubRAV(signedSubRav.subRav),
       signature: MultibaseCodec.encodeBase64url(signedSubRav.signature)
@@ -393,7 +368,11 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SignedSubRAV from JSON transport
    */
-  private static deserializeSignedSubRAV(data: Record<string, any>): SignedSubRAV {
+  private static deserializeSignedSubRAV(data: Record<string, any> | undefined): SignedSubRAV | undefined {
+    if (!data) {
+      return undefined;
+    }
+    
     return {
       subRav: this.deserializeSubRAV(data.subRav),
       signature: MultibaseCodec.decodeBase64url(data.signature)

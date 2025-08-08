@@ -161,6 +161,23 @@ export class PaymentChannelPayeeClient {
   }
 
   /**
+   * Get sub-channel state by (channelId, vmIdFragment)
+   * Convenience wrapper to reconstruct payer keyId from chain metadata
+   */
+  async getSubChannelStateByFragment(channelId: string, vmIdFragment: string): Promise<SubChannelState> {
+    const info = await this.getChannelInfoCached(channelId);
+    const keyId = this.reconstructKeyId(info.payerDid, vmIdFragment);
+    return this.channelRepo.getSubChannelState(channelId, keyId);
+  }
+
+  /**
+   * Get the payee DID from this client's signer
+   */
+  async getPayeeDid(): Promise<string> {
+    return await this.signer.getDid();
+  }
+
+  /**
    * Get the pending SubRAV repository used by this client
    */
   getPendingSubRAVRepository(): PendingSubRAVRepository {

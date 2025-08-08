@@ -98,12 +98,12 @@ export interface TransactionResult {
  * Payment header payload - protocol-agnostic structure for payment requests
  */
 export interface PaymentHeaderPayload {
-  /** Signed SubRAV from client */
-  signedSubRav: SignedSubRAV;
+  /** Signed SubRAV from client (optional in FREE mode) */
+  signedSubRav?: SignedSubRAV;
   /** Per-request max amount (token smallest unit) */
   maxAmount: bigint;
-  /** Optional client-side tx reference (idempotency) */
-  clientTxRef?: string;
+  /** Client-side tx reference (required for request tracking) */
+  clientTxRef: string;
   /** Protocol version (default: 1) */
   version: number;
 }

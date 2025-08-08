@@ -121,7 +121,7 @@ export class PaymentChannelHttpClient {
     const clientTxRef = this.extractOrGenerateClientTxRef(init?.headers);
     
     // Prepare headers with clientTxRef
-    const { headers, sentedSubRav } = await this.prepareHeaders(fullUrl, method, init?.headers, clientTxRef);
+    const { headers, sentedSubRav } = await this.prepareHeaders(fullUrl, method, clientTxRef, init?.headers);
     
     // Build request context
     const requestContext: PaymentRequestContext = {
@@ -553,8 +553,8 @@ export class PaymentChannelHttpClient {
   private async prepareHeaders(
     fullUrl: string, 
     method: string, 
-    providedHeaders?: HeadersInit,
-    clientTxRef?: string
+    clientTxRef: string,
+    providedHeaders?: HeadersInit
   ): Promise<{ headers: Record<string, string>; sentedSubRav: SignedSubRAV | undefined }> {
     const headers: Record<string, string> = {};
 
@@ -603,16 +603,23 @@ export class PaymentChannelHttpClient {
     if (!this.clientState.channelId) {
       throw new Error('Channel not initialized');
     }
+    
+    // clientTxRef is now required
+    if (!clientTxRef) {
+      throw new Error('clientTxRef is required for payment header');
+    }
 
     try {
       const signedSubRAV = await this.buildSignedSubRavIfNeeded();
-
+      
+      // Always send payment header (with or without signedSubRAV) to include clientTxRef
+      const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
+      headers[HttpPaymentCodec.getHeaderName()] = headerValue;
+      
       if (signedSubRAV) {
-        const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
-        headers[HttpPaymentCodec.getHeaderName()] = headerValue;
         this.log('Added payment header with SignedSubRAV');
       } else {
-        this.log('No SignedSubRAV - operating in FREE mode without payment header');
+        this.log('Added payment header in FREE mode (clientTxRef only)');
       }
       
       return signedSubRAV;
@@ -1106,12 +1113,12 @@ export class PaymentChannelHttpClient {
   /**
    * Encode payment header using HttpPaymentCodec (thin wrapper, no behavior change)
    */
-  private encodePaymentHeader(signedSubRAV: SignedSubRAV, clientTxRef?: string): string {
+  private encodePaymentHeader(signedSubRAV: SignedSubRAV | undefined, clientTxRef: string): string {
     const codec = new HttpPaymentCodec();
     return codec.encodePayload({
-      signedSubRav: signedSubRAV,
+      signedSubRav: signedSubRAV, // Now optional
       maxAmount: this.options.maxAmount || BigInt(0),
-      clientTxRef: clientTxRef || crypto.randomUUID(),
+      clientTxRef: clientTxRef, // Now required
       version: 1
     });
   }

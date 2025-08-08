@@ -5,7 +5,7 @@
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
-import type { SignedSubRAV, SubRAV } from '../../core/types';
+import type { SignedSubRAV, SubRAV, SubChannelState } from '../../core/types';
 import type { RateResult } from '../rate/types';
 
 export interface BillingContext {
@@ -40,6 +40,12 @@ export interface BillingContext {
     state?: {
       // Step A: Verification
       signedSubRavVerified?: boolean;
+      /** Latest SignedSubRAV from storage for this sub-channel (fetched during preProcess) */
+      latestSignedSubRav?: SignedSubRAV;
+      /** Latest sub-channel state cursor (from ChannelRepository) */
+      subChannelState?: SubChannelState;
+      /** Chain ID cached for synchronous proposal generation */
+      chainId?: bigint;
       
       // Step B: Charging
       cost?: bigint;
