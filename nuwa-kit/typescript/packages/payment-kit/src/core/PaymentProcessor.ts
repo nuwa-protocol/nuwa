@@ -144,40 +144,31 @@ export interface PaymentVerificationResult extends VerificationResult {
     }
 
     try {
-      let verificationResult: PaymentVerificationResult | undefined;
-      let isHandshake = false;
-      
       // Extract SignedSubRAV from context
       const signedSubRAV = ctx.meta.signedSubRav;
-      
-      // Step 1: Verify SignedSubRAV if present (async I/O operations)
+
+      let isHandshake = false;
+      let verificationResult: PaymentVerificationResult | undefined;
+
       if (signedSubRAV) {
-        isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
+        const verify = await this.verifySignedSubRAV(signedSubRAV);
+        if (!verify.isValid) {
+          this.stats.failedPayments++;
+          ctx.state.signedSubRavVerified = false;
+          return ctx;
+        }
+        isHandshake = verify.isHandshake;
+        verificationResult = verify;
 
         if (isHandshake) {
-          // Handshake verification
-          verificationResult = await this.verifyHandshake(signedSubRAV);
-          if (!verificationResult.isValid) {
-            this.stats.failedPayments++;
-            ctx.state.signedSubRavVerified = false;
-            return ctx;
-          }
           this.stats.handshakes++;
           this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
         } else {
-          // Regular payment verification
-          verificationResult = await this.confirmDeferredPayment(signedSubRAV);
-          if (!verificationResult.isValid) {
-            this.stats.failedPayments++;
-            ctx.state.signedSubRavVerified = false;
-            return ctx;
-          }
-
           // Process the verified payment (persist to RAV store)
           await this.config.payeeClient.processSignedSubRAV(signedSubRAV);
           this.stats.successfulPayments++;
         }
-        
+
         ctx.state.signedSubRavVerified = true;
       } else {
         ctx.state.signedSubRavVerified = true;
@@ -348,48 +339,32 @@ export interface PaymentVerificationResult extends VerificationResult {
   
       try {
         let autoClaimTriggered = false;
-        let verificationResult: PaymentVerificationResult | undefined;
-        let isHandshake = false;
-        
-        // Extract SignedSubRAV from context
         const signedSubRAV = ctx.meta.signedSubRav;
-        
-        // Step 1: If signedSubRAV is provided, verify it (handles previous payment)
+        let isHandshake = false;
+        let verificationResult: PaymentVerificationResult | undefined;
+
         if (signedSubRAV) {
-          isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
-  
-          if (isHandshake) {
-            // Handshake verification
-            verificationResult = await this.verifyHandshake(signedSubRAV);
-            if (!verificationResult.isValid) {
-              this.stats.failedPayments++;
-              return {
-                success: false,
-                cost: 0n,
-                error: verificationResult.error,
-                errorCode: 'INVALID_PAYMENT',
-                isHandshake: true
-              };
-            }
-            this.stats.handshakes++;
-            this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
-          } else {
-            // Regular payment verification
-            verificationResult = await this.confirmDeferredPayment(signedSubRAV);
-            if (!verificationResult.isValid) {
-              this.stats.failedPayments++;
-              return {
-                success: false,
-                cost: 0n,
-                error: verificationResult.error,
-                errorCode: this.extractErrorCode(verificationResult.error || ''),
-                isHandshake: false
-              };
-            }
-  
-            // Process the verified payment
+          const verify = await this.verifySignedSubRAV(signedSubRAV);
+          if (!verify.isValid) {
+            this.stats.failedPayments++;
+            return {
+              success: false,
+              cost: 0n,
+              error: verify.error,
+              errorCode: this.extractErrorCode(verify.error || ''),
+              isHandshake: verify.isHandshake
+            };
+          }
+          isHandshake = verify.isHandshake;
+          verificationResult = verify;
+
+          // Process the verified payment when not handshake
+          if (!isHandshake) {
             autoClaimTriggered = await this.processVerifiedPayment(signedSubRAV);
             this.stats.successfulPayments++;
+          } else {
+            this.stats.handshakes++;
+            this.log('Handshake verified for channel:', signedSubRAV.subRav.channelId);
           }
         }
   
@@ -677,23 +652,7 @@ export interface PaymentVerificationResult extends VerificationResult {
       const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
 
       if (signedSubRAV) {
-        // Generate follow-up SubRAV
-        const channelId = signedSubRAV.subRav.channelId;
-        const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
-        const currentNonce = signedSubRAV.subRav.nonce;
-        const nextNonce = currentNonce + 1n;
-        const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
-
-        const unsignedSubRAV: SubRAV = {
-          version: 1,
-          chainId: signedSubRAV.subRav.chainId,
-          channelId,
-          channelEpoch: signedSubRAV.subRav.channelEpoch,
-          vmIdFragment,
-          nonce: nextNonce,
-          accumulatedAmount: newAccumulatedAmount
-        };
-
+        const unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
         return { unsignedSubRAV, clientTxRef, serviceTxRef };
       } else {
         // This should be a handshake - generate handshake SubRAV
@@ -752,22 +711,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         throw new Error('Cannot generate SubRAV without existing channel context');
       }
 
-      // Generate follow-up SubRAV
-      const channelId = signedSubRAV.subRav.channelId;
-      const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
-      const currentNonce = signedSubRAV.subRav.nonce;
-      const nextNonce = currentNonce + 1n;
-      const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
-
-      const unsignedSubRAV: SubRAV = {
-        version: 1,
-        chainId: signedSubRAV.subRav.chainId,
-        channelId,
-        channelEpoch: signedSubRAV.subRav.channelEpoch,
-        vmIdFragment,
-        nonce: nextNonce,
-        accumulatedAmount: newAccumulatedAmount
-      };
+      const unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
 
       // Generate header using HttpPaymentCodec
       const responsePayload = {
@@ -784,6 +728,40 @@ export interface PaymentVerificationResult extends VerificationResult {
 
       return { unsignedSubRAV, serviceTxRef, headerValue };
     }
+
+  /**
+   * Unified verification for signed SubRAV without changing behavior.
+   */
+  private async verifySignedSubRAV(signedSubRAV: SignedSubRAV): Promise<PaymentVerificationResult & { isHandshake: boolean }> {
+    const isHandshake = PaymentUtils.isHandshake(signedSubRAV.subRav);
+    if (isHandshake) {
+      const verificationResult = await this.verifyHandshake(signedSubRAV);
+      return { ...verificationResult, isHandshake } as PaymentVerificationResult & { isHandshake: boolean };
+    }
+    const verificationResult = await this.confirmDeferredPayment(signedSubRAV);
+    return { ...verificationResult, isHandshake: false } as PaymentVerificationResult & { isHandshake: boolean };
+  }
+
+  /**
+   * Build next unsigned SubRAV following the prior signed SubRAV, reused by async/sync paths.
+   */
+  private buildFollowUpUnsigned(signedSubRAV: SignedSubRAV, cost: bigint): SubRAV {
+    const channelId = signedSubRAV.subRav.channelId;
+    const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
+    const currentNonce = signedSubRAV.subRav.nonce;
+    const nextNonce = currentNonce + 1n;
+    const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
+
+    return {
+      version: 1,
+      chainId: signedSubRAV.subRav.chainId,
+      channelId,
+      channelEpoch: signedSubRAV.subRav.channelEpoch,
+      vmIdFragment,
+      nonce: nextNonce,
+      accumulatedAmount: newAccumulatedAmount
+    };
+  }
 
     /**
      * Extract token count from usage data synchronously

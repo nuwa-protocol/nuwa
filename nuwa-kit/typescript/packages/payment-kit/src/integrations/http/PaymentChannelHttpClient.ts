@@ -603,57 +603,9 @@ export class PaymentChannelHttpClient {
     }
 
     try {
-      let signedSubRAV: SignedSubRAV;
+      const signedSubRAV = await this.buildSignedSubRavIfNeeded();
 
-      if (this.clientState.pendingSubRAV) {
-        // Sign the pending SubRAV
-        const pendingSubRAV = this.clientState.pendingSubRAV;
-        this.clientState.pendingSubRAV = undefined; // Clear after taking
-        
-        // Check amount limit if configured
-        if (this.options.maxAmount && pendingSubRAV.accumulatedAmount > this.options.maxAmount) {
-          throw new Error(`Payment amount ${pendingSubRAV.accumulatedAmount} exceeds maximum allowed ${this.options.maxAmount}`);
-        }
-        
-        signedSubRAV = await this.payerClient.signSubRAV(pendingSubRAV, {
-          maxAmount: this.options.maxAmount
-        });
-        this.log('Signed pending SubRAV:', pendingSubRAV.nonce, pendingSubRAV.accumulatedAmount);
-      } else {
-        // First request or handshake - create nonce=0, amount=0 SubRAV manually
-        const channelInfo = await this.payerClient.getChannelInfo(this.clientState.channelId);
-        const signer = this.options.signer;
-        
-        const keyIds = await signer.listKeyIds();
-        const vmIdFragment = keyIds[0]?.split('#')[1] // Extract fragment part
-
-        if (!vmIdFragment) {
-          throw new Error('No VM ID fragment found');
-        }
-        
-        const chainId = await this.payerClient.getChainId();
-        const handshakeSubRAV: SubRAV = {
-          version: 1,
-          chainId: chainId,
-          channelId: this.clientState.channelId,
-          channelEpoch: channelInfo.epoch,
-          vmIdFragment,
-          accumulatedAmount: BigInt(0),
-          nonce: BigInt(0)
-        };
-        
-        signedSubRAV = await this.payerClient.signSubRAV(handshakeSubRAV);
-        this.log('Created handshake SubRAV:', handshakeSubRAV.nonce);
-      }
-
-      // Encode to header
-      const codec = new HttpPaymentCodec();
-      const headerValue = codec.encodePayload({
-        signedSubRav: signedSubRAV,
-        maxAmount: this.options.maxAmount || BigInt(0),
-        clientTxRef: clientTxRef || crypto.randomUUID(),
-        version: 1
-      });
+      const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
       headers[HttpPaymentCodec.getHeaderName()] = headerValue;
       
     } catch (error) {
@@ -698,7 +650,7 @@ export class PaymentChannelHttpClient {
     
     if (paymentHeader) {
       try {
-        const responsePayload = HttpPaymentCodec.parseResponseHeader(paymentHeader);
+        const responsePayload = this.parsePaymentHeader(paymentHeader);
         
         // Handle clientTxRef-based payment resolution
         if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
@@ -1046,5 +998,74 @@ export class PaymentChannelHttpClient {
     if (this.options.debug) {
       console.log('[PaymentChannelHttpClient]', ...args);
     }
+  }
+
+  /**
+   * Build and sign a SubRAV for the current request without changing behavior.
+   * - If there is a pendingSubRAV, sign it and clear the pending cache.
+   * - Otherwise, create a legacy handshake SubRAV (nonce=0, amount=0) and sign it.
+   */
+  private async buildSignedSubRavIfNeeded(): Promise<SignedSubRAV> {
+    if (!this.clientState.channelId) {
+      throw new Error('Channel not initialized');
+    }
+
+    if (this.clientState.pendingSubRAV) {
+      const pendingSubRAV = this.clientState.pendingSubRAV;
+      // Clear after taking to keep existing semantics
+      this.clientState.pendingSubRAV = undefined;
+
+      if (this.options.maxAmount && pendingSubRAV.accumulatedAmount > this.options.maxAmount) {
+        throw new Error(`Payment amount ${pendingSubRAV.accumulatedAmount} exceeds maximum allowed ${this.options.maxAmount}`);
+      }
+
+      const signed = await this.payerClient.signSubRAV(pendingSubRAV, {
+        maxAmount: this.options.maxAmount
+      });
+      this.log('Signed pending SubRAV:', pendingSubRAV.nonce, pendingSubRAV.accumulatedAmount);
+      return signed;
+    }
+
+    // Legacy handshake path preserved (no behavior change)
+    const channelInfo = await this.payerClient.getChannelInfo(this.clientState.channelId);
+    const signer = this.options.signer;
+    const keyIds = await signer.listKeyIds();
+    const vmIdFragment = keyIds[0]?.split('#')[1];
+    if (!vmIdFragment) {
+      throw new Error('No VM ID fragment found');
+    }
+    const chainId = await this.payerClient.getChainId();
+    const handshakeSubRAV: SubRAV = {
+      version: 1,
+      chainId: chainId,
+      channelId: this.clientState.channelId,
+      channelEpoch: channelInfo.epoch,
+      vmIdFragment,
+      accumulatedAmount: BigInt(0),
+      nonce: BigInt(0)
+    };
+    const signed = await this.payerClient.signSubRAV(handshakeSubRAV);
+    this.log('Created handshake SubRAV:', handshakeSubRAV.nonce);
+    return signed;
+  }
+
+  /**
+   * Encode payment header using HttpPaymentCodec (thin wrapper, no behavior change)
+   */
+  private encodePaymentHeader(signedSubRAV: SignedSubRAV, clientTxRef?: string): string {
+    const codec = new HttpPaymentCodec();
+    return codec.encodePayload({
+      signedSubRav: signedSubRAV,
+      maxAmount: this.options.maxAmount || BigInt(0),
+      clientTxRef: clientTxRef || crypto.randomUUID(),
+      version: 1
+    });
+  }
+
+  /**
+   * Parse payment header using HttpPaymentCodec (thin wrapper, no behavior change)
+   */
+  private parsePaymentHeader(headerValue: string) {
+    return HttpPaymentCodec.parseResponseHeader(headerValue);
   }
 }
