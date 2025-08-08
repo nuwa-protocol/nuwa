@@ -243,6 +243,42 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           // Unified handling for both pre-flight and post-flight
           res.locals.billingContext = billingContext;
 
+          // If processor marked a protocol-level error, short-circuit and return immediately
+          if (billingContext.state?.error) {
+            const err = billingContext.state.error as { code: string; message?: string };
+            // Map to HTTP status
+            let status = 500;
+            switch (err.code) {
+              case 'PAYMENT_REQUIRED':
+              case 'INSUFFICIENT_FUNDS':
+                status = 402; break;
+              case 'INVALID_PAYMENT':
+              case 'UNKNOWN_SUBRAV':
+              case 'TAMPERED_SUBRAV':
+              case 'CHANNEL_CLOSED':
+              case 'EPOCH_MISMATCH':
+              case 'MAX_AMOUNT_EXCEEDED':
+                status = 400; break;
+              case 'SUBRAV_CONFLICT':
+                status = 409; break;
+              default:
+                status = 500; break;
+            }
+
+            // Build protocol error header
+            const { HttpPaymentCodec } = await import('../../middlewares/http/HttpPaymentCodec');
+            const headerValue = HttpPaymentCodec.buildResponseHeader({
+              error: { code: err.code, message: err.message },
+              version: 1
+            } as any);
+            res.setHeader('X-Payment-Channel-Data', headerValue);
+
+            return res.status(status).json({
+              success: false,
+              error: { code: err.code, message: err.message, httpStatus: status }
+            });
+          }
+
           let billingCompleted = false;
           let headerWritten = false;
 

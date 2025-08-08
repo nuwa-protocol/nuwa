@@ -2,7 +2,7 @@ import { MultibaseCodec } from '@nuwa-ai/identity-kit';
 import type { SignedSubRAV, SubRAV } from '../../core/types';
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
 import { EncodingError, DecodingError } from '../../codecs/PaymentCodec';
-import type { PaymentHeaderPayload, HttpRequestPayload, HttpResponsePayload } from '../../core/types';
+import type { PaymentHeaderPayload, HttpRequestPayload, PaymentResponsePayload as HttpResponsePayload } from '../../core/types';
 
 /**
  * HTTP-specific payment codec
@@ -97,10 +97,9 @@ export class HttpPaymentCodec implements PaymentCodec {
     try {
       const payload: HttpResponsePayload = {
         subRav: subRAV,
-        amountDebited: cost,
+        cost,
         serviceTxRef,
-        errorCode: 0,
-        message: 'Payment proposal',
+        version: 1,
         ...metadata
       };
       
@@ -114,25 +113,49 @@ export class HttpPaymentCodec implements PaymentCodec {
   }
 
   /**
+   * Encode protocol-level error for HTTP response header
+   */
+  encodeError(
+    error: { code: string; message?: string },
+    metadata?: { clientTxRef?: string; serviceTxRef?: string; version?: number }
+  ): string {
+    try {
+      const payload: HttpResponsePayload = {
+        error,
+        clientTxRef: metadata?.clientTxRef,
+        serviceTxRef: metadata?.serviceTxRef,
+        version: metadata?.version ?? 1,
+      } as HttpResponsePayload;
+      return HttpPaymentCodec.buildResponseHeader(payload);
+    } catch (error) {
+      throw new EncodingError(
+        'Failed to encode HTTP response error data',
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /**
    * Decode HTTP response header to SubRAV proposal
    */
   decodeResponse(encoded: string): {
-    subRAV: SubRAV;
-    cost: bigint;
+    subRAV?: SubRAV;
+    cost?: bigint;
     serviceTxRef?: string;
     metadata?: any;
+    error?: { code: string; message?: string };
+    version?: number;
   } {
     try {
       const payload = HttpPaymentCodec.parseResponseHeader(encoded);
-      
+
       return {
         subRAV: payload.subRav,
-        cost: payload.amountDebited,
+        cost: payload.cost,
         serviceTxRef: payload.serviceTxRef,
-        metadata: {
-          errorCode: payload.errorCode,
-          message: payload.message
-        }
+        metadata: payload.clientTxRef ? { clientTxRef: payload.clientTxRef } : undefined,
+        error: payload.error,
+        version: payload.version
       };
     } catch (error) {
       throw new DecodingError(
@@ -186,14 +209,20 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Build HTTP response header value
    */
   static buildResponseHeader(payload: HttpResponsePayload): string {
-    const serializable = {
-      subRav: this.serializeSubRAV(payload.subRav),
-      amountDebited: payload.amountDebited.toString(),
+    const serializable: any = {
       clientTxRef: payload.clientTxRef,
       serviceTxRef: payload.serviceTxRef,
-      errorCode: payload.errorCode,
-      message: payload.message
+      version: (payload.version ?? 1).toString(),
     };
+
+    if (payload.subRav && payload.cost !== undefined) {
+      serializable.subRav = this.serializeSubRAV(payload.subRav);
+      serializable.cost = payload.cost.toString();
+    }
+
+    if (payload.error) {
+      serializable.error = payload.error;
+    }
 
     const json = JSON.stringify(serializable);
     return MultibaseCodec.encodeBase64url(json);
@@ -207,14 +236,29 @@ export class HttpPaymentCodec implements PaymentCodec {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
 
-      return {
-        subRav: this.deserializeSubRAV(data.subRav),
-        amountDebited: BigInt(data.amountDebited),
+      const payload: HttpResponsePayload = {
         clientTxRef: data.clientTxRef,
         serviceTxRef: data.serviceTxRef,
-        errorCode: data.errorCode,
-        message: data.message
-      };
+        version: parseInt(data.version) || 1,
+      } as HttpResponsePayload;
+
+      // Success path
+      if (data.subRav && (data.cost !== undefined || data.amountDebited !== undefined)) {
+        payload.subRav = this.deserializeSubRAV(data.subRav);
+        // Support old amountDebited for early servers
+        const costStr = data.cost ?? data.amountDebited;
+        payload.cost = costStr !== undefined ? BigInt(costStr) : undefined;
+      }
+
+      // Error path
+      if (data.error) {
+        payload.error = data.error;
+      } else if (data.errorCode !== undefined) {
+        // Map legacy numeric errorCode to string code
+        payload.error = { code: String(data.errorCode), message: data.message };
+      }
+
+      return payload;
     } catch (error) {
       throw new Error(`Failed to parse response header: ${error}`);
     }

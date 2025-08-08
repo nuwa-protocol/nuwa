@@ -147,6 +147,8 @@ export interface PaymentVerificationResult extends VerificationResult {
         if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
           this.stats.failedPayments++;
           this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          // Mark protocol-level error in context for middleware to map to HTTP status + header
+          ctx.state.error = { code: 'MAX_AMOUNT_EXCEEDED', message: `Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}` } as any;
           return ctx;
         }
 
@@ -158,20 +160,15 @@ export interface PaymentVerificationResult extends VerificationResult {
           return ctx;
         }
 
-        // Generate SubRAV and header for pre-flight
+        // Generate SubRAV for pre-flight (header will be generated in settle)
         const { unsignedSubRAV, clientTxRef, serviceTxRef } = await this.generateSubRAV(ctx, cost, verificationResult);
-        
         ctx.state.unsignedSubRav = unsignedSubRAV;
         ctx.state.serviceTxRef = serviceTxRef;
         ctx.state.nonce = unsignedSubRAV.nonce;
-        
-        // Generate response header
-        ctx.state.headerValue = await this.generateResponseHeader(unsignedSubRAV, cost, serviceTxRef, {
-          isHandshake,
-          autoClaimTriggered: false,
-          clientTxRef,
-          conversion
-        });
+        // Store clientTxRef for later use (not part of state interface; pass via meta)
+        if (!ctx.meta.clientTxRef) {
+          ctx.meta.clientTxRef = clientTxRef;
+        }
 
         this.log('✅ Pre-flight billing completed in preProcess');
       }
@@ -206,13 +203,37 @@ export interface PaymentVerificationResult extends VerificationResult {
 
     try {
       const rule = ctx.meta.billingRule;
+
+      // If a protocol-level error was set during preProcess or earlier, generate error header now
+      if (ctx.state?.error) {
+        try {
+          const errorPayload = {
+            error: ctx.state.error,
+            clientTxRef: ctx.meta.clientTxRef,
+            serviceTxRef: ctx.state.serviceTxRef,
+            version: 1
+          } as any;
+          ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+        } catch (e) {
+          this.log('Failed to build error header:', e);
+        }
+        return ctx;
+      }
       
       // For Pre-flight rules, everything should be done already
       if (rule && !this.config.billingEngine.isDeferred(rule)) {
-        this.log('⚡ Pre-flight rule - using pre-computed values');
-        // All values should already be in ctx.state from preProcess
-        if (!ctx.state.headerValue) {
-          this.log('⚠️ Pre-flight rule but no header value found in state');
+        this.log('⚡ Pre-flight rule - generating header from pre-computed values');
+        if (ctx.state.unsignedSubRav && ctx.state.cost !== undefined) {
+          const responsePayload = {
+            subRav: ctx.state.unsignedSubRav,
+            cost: ctx.state.cost,
+            clientTxRef: ctx.meta.clientTxRef,
+            serviceTxRef: ctx.state.serviceTxRef,
+            version: 1
+          } as any;
+          ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
+        } else {
+          this.log('⚠️ Pre-flight: missing unsignedSubRav or cost; cannot build header');
         }
         return ctx;
       }
@@ -236,6 +257,20 @@ export interface PaymentVerificationResult extends VerificationResult {
         // Check maxAmount limit
         if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
           this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          if (!ctx.state) ctx.state = {} as any;
+          (ctx.state as any).error = { code: 'MAX_AMOUNT_EXCEEDED', message: `Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}` };
+          // Build error header now
+          try {
+            const errorPayload = {
+              error: (ctx.state as any).error,
+              clientTxRef: ctx.meta.clientTxRef,
+              serviceTxRef: (ctx.state as any)?.serviceTxRef,
+              version: 1
+            } as any;
+            (ctx.state as any).headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+          } catch (e) {
+            this.log('Failed to build error header:', e);
+          }
           return ctx;
         }
 
@@ -568,17 +603,15 @@ export interface PaymentVerificationResult extends VerificationResult {
 
       const unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
 
-      // Generate header using HttpPaymentCodec
+      // Generate header using HttpPaymentCodec (new payload shape)
       const responsePayload = {
         subRav: unsignedSubRAV,
-        amountDebited: cost,
-        clientTxRef: clientTxRef,
-        serviceTxRef: serviceTxRef,
-        errorCode: 0,
-        message: 'Post-flight billing completed'
-      };
+        cost,
+        clientTxRef,
+        serviceTxRef,
+        version: 1
+      } as any;
 
-      // Use HttpPaymentCodec to generate header
       const headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
 
       return { unsignedSubRAV, serviceTxRef, headerValue };

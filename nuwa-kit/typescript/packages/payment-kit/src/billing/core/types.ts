@@ -49,6 +49,12 @@ export interface BillingContext {
       serviceTxRef?: string;
       nonce?: bigint;
       
+      // Protocol-level error (used to short-circuit response with error header)
+      error?: {
+        code: string;
+        message?: string;
+      };
+
       // Step D: Persistence
       persisted?: boolean;
       

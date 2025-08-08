@@ -650,10 +650,24 @@ export class PaymentChannelHttpClient {
     
     if (paymentHeader) {
       try {
-        const responsePayload = this.parsePaymentHeader(paymentHeader);
+        const responsePayload = this.parsePaymentHeader(paymentHeader) as any;
         
-        // Handle clientTxRef-based payment resolution
-        if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
+        // Protocol-level error branch
+        if (responsePayload.error && responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
+          const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
+          clearTimeout(pendingRequest.timeoutId);
+          this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
+          // Recovery: clear pendingSubRAV for safety
+          this.clientState.pendingSubRAV = undefined;
+          await this.persistClientState();
+          const status = response.status;
+          const message = responsePayload.error.message || response.statusText || 'Payment error';
+          pendingRequest.reject(new PaymentKitError(responsePayload.error.code, message, status));
+          return; // Skip success path processing
+        }
+
+        // Handle clientTxRef-based payment resolution (success)
+        if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef) && responsePayload.subRav && responsePayload.cost !== undefined) {
           const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
           
           // Clear the timeout to prevent memory leak
@@ -664,7 +678,7 @@ export class PaymentChannelHttpClient {
           try {
             const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
             //TODO: Overflow check
-            costUsd = responsePayload.amountDebited * assetPrice;
+            costUsd = responsePayload.cost * assetPrice;
           } catch (error) {
             this.log('Failed to calculate USD cost, using 0:', error);
             // Keep costUsd as 0 if price lookup fails
@@ -674,7 +688,7 @@ export class PaymentChannelHttpClient {
           const paymentInfo: PaymentInfo = {
             clientTxRef: responsePayload.clientTxRef,
             serviceTxRef: responsePayload.serviceTxRef,
-            cost: responsePayload.amountDebited,
+            cost: responsePayload.cost,
             costUsd,
             nonce: responsePayload.subRav.nonce,
             channelId: pendingRequest.channelId,
@@ -689,7 +703,7 @@ export class PaymentChannelHttpClient {
           this.log('Resolved payment for clientTxRef:', responsePayload.clientTxRef, 'cost:', paymentInfo.cost.toString(), 'costUsd:', paymentInfo.costUsd.toString());
         }
         
-        if (responsePayload.subRav) {
+        if (responsePayload.subRav && responsePayload.cost !== undefined) {
           // Cache the unsigned SubRAV for the next request
           this.clientState.pendingSubRAV = responsePayload.subRav;
           this.log('Cached new unsigned SubRAV:', responsePayload.subRav.nonce);

@@ -112,22 +112,33 @@ export interface PaymentHeaderPayload {
 export type HttpRequestPayload = PaymentHeaderPayload;
 
 /**
- * HTTP response header payload
+ * Payment response header payload (protocol-level)
+ * - Success: include subRav + cost
+ * - Error: include error { code, message? }
  */
-export interface HttpResponsePayload {
-  /** Service-proposed next SubRAV (unsigned, client will sign) */
-  subRav: SubRAV;
-  /** Amount debited for this transaction */
-  amountDebited: bigint;
+export interface PaymentResponsePayload {
+  /** Service-proposed next SubRAV (unsigned, client will sign). Present on success. */
+  subRav?: SubRAV;
+  /** Cost of this request (in asset's base unit). Present on success. */
+  cost?: bigint;
+
   /** Client transaction reference (echoed back from request) */
   clientTxRef?: string;
   /** Service transaction reference */
   serviceTxRef?: string;
-  /** Error code (0 = success) */
-  errorCode?: number;
-  /** Human-readable message */
-  message?: string;
-} 
+
+  /** Protocol-level error info. Present on error responses. */
+  error?: {
+    code: string;
+    message?: string;
+  };
+
+  /** Payload schema version (default: 1) */
+  version: number;
+}
+
+// Backward-compatible alias for existing imports
+export type HttpResponsePayload = PaymentResponsePayload;
 
 /**
  * Payment information for completed requests
