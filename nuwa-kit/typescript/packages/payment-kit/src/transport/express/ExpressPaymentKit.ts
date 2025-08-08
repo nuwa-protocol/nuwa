@@ -240,104 +240,40 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             return next();
           }
 
-          const { ctx: billingContext, isDeferred } = billingResult;
+          const { ctx: billingContext } = billingResult;
 
-          if (!isDeferred) {
-            // Pre-flight billing completed in preProcess
-            if (billingContext.state?.headerValue) {
-              // Pre-flight billing successful - header already generated
-              resAdapter.setHeader('X-Payment-Channel-Data', billingContext.state.headerValue);
-              
-              // CRITICAL: Async persist for pre-flight billing
-              // This stores the unsignedSubRAV for future verification
-              if (billingContext.state.unsignedSubRav) {
-                this.middleware.persistBilling(billingContext).catch((error) => {
-                  console.error('🚨 Failed to persist pre-flight billing:', error);
-                });
-              }
-              
-              return next();
-            } else if (billingContext.state?.cost === 0n) {
-              // Zero-cost request - no header needed, just proceed
-              if (this.config.debug) {
-                console.log('✅ Zero-cost request processed successfully');
-              }
-              return next();
-            } else {
-              // Pre-flight billing failed
-              if (this.config.debug) {
-                console.log('❌ Pre-flight billing failed, blocking request continuation');
-              }
-              res.status(402).json({ error: 'Payment required' });
-              return;
+          // Unified handling for both pre-flight and post-flight
+          res.locals.billingContext = billingContext;
+
+          let billingCompleted = false;
+          let headerWritten = false;
+
+          // Intercept headers to write payment header synchronously
+          onHeaders(res, () => {
+            if (headerWritten) return;
+            headerWritten = true;
+            try {
+              const usage = res.locals.usage || {};
+              const usageOrUndefined = Object.keys(usage).length > 0 ? usage : undefined;
+              this.middleware.settleBillingSync(billingContext, usageOrUndefined, resAdapter);
+            } catch (error) {
+              console.error('🚨 Billing header error:', error);
             }
-          } else {
-            // Post-flight billing - attach billing context for later processing
-            res.locals.billingContext = billingContext;
-            
-            // Use on-headers package for reliable header interception
-            let billingCompleted = false;
-            let headerWritten = false;
-            
-            // CRITICAL: Use on-headers package to intercept before headers are sent
-            onHeaders(res, () => {
-              console.log('🔄 on-headers triggered for post-flight billing');
-              
-              // Guard 1: Prevent multiple executions
-              if (headerWritten) {
-                return;
-              }
-              headerWritten = true;
+          });
 
-              try {
-                // Extract usage data from response locals (populated by business logic)
-                const usage = res.locals.usage || {};
-                if (Object.keys(usage).length > 0) {
-                  if (this.config.debug) {
-                    console.log('🔄 Processing post-flight billing synchronously with usage:', usage);
-                  }
-                  
-                  // Complete deferred billing synchronously using new API
-                  this.middleware.settleBillingSync(billingContext, usage, resAdapter);
-                  
-                  if (this.config.debug) {
-                    console.log('✅ Post-flight billing header completed synchronously');
-                  }
-                } else {
-                  console.warn('⚠️ No usage data found in res.locals.usage for post-flight billing');
-                }
-              } catch (error) {
-                console.error('🚨 Post-flight billing header error:', error);
-                // Don't fail the request, just log the error
+          // Persist after response is sent
+          res.on('finish', async () => {
+            if (billingCompleted) return;
+            billingCompleted = true;
+            try {
+              if (billingContext.state?.unsignedSubRav) {
+                await this.middleware.persistBilling(billingContext);
               }
-            });
-            
-            // Use 'finish' event for async chain operations after headers are sent
-            res.on('finish', async () => {
-              if (billingCompleted) return;
-              billingCompleted = true;
-              
-              try {
-                const usage = res.locals.usage || {};
-                if (Object.keys(usage).length > 0) {
-                  if (this.config.debug) {
-                    console.log('🔄 Completing async post-flight chain operations with usage:', usage);
-                  }
-                  
-                  // This handles the async chain operations (SubRAV persistence, etc.)
-                  if (billingContext.state?.unsignedSubRav) {
-                    await this.middleware.persistBilling(billingContext);
-                  }
-                  
-                  if (this.config.debug) {
-                    console.log('✅ Async post-flight chain operations completed');
-                  }
-                }
-              } catch (error) {
-                console.error('🚨 Async post-flight chain operations error:', error);
-              }
-            });
-          }
+            } catch (error) {
+              console.error('🚨 Billing persistence error:', error);
+            }
+          });
+
           return next();
         } else {
           if (this.config.debug) {
