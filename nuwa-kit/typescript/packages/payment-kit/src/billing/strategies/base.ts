@@ -30,5 +30,5 @@ export abstract class BaseStrategy implements Strategy {
   /**
    * Abstract method to be implemented by concrete strategies
    */
-  abstract evaluate(ctx: BillingContext): Promise<bigint>;
+  abstract evaluate(ctx: BillingContext, units: number): bigint;
 } 

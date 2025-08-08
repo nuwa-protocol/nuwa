@@ -116,7 +116,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Create HTTP billing middleware with ClaimScheduler
     this.middleware = new HttpBillingMiddleware({
       payeeClient,
-      billingEngine,
+      rateProvider: this.rateProvider,
       ruleProvider: this.billableRouter,
       serviceId: config.serviceId,
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
@@ -267,8 +267,17 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
             // Build protocol error header
             const { HttpPaymentCodec } = await import('../../middlewares/http/HttpPaymentCodec');
+            let clientTxRef: string | undefined;
+            try {
+              const headerValueIn = HttpPaymentCodec.extractPaymentHeader(req.headers as any);
+              if (headerValueIn) {
+                const payload = HttpPaymentCodec.parseRequestHeader(headerValueIn);
+                clientTxRef = payload.clientTxRef;
+              }
+            } catch {}
             const headerValue = HttpPaymentCodec.buildResponseHeader({
               error: { code: err.code, message: err.message },
+              clientTxRef,
               version: 1
             } as any);
             res.setHeader('X-Payment-Channel-Data', headerValue);
@@ -287,9 +296,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             if (headerWritten) return;
             headerWritten = true;
             try {
-              const usage = res.locals.usage || {};
-              const usageOrUndefined = Object.keys(usage).length > 0 ? usage : undefined;
-              this.middleware.settleBillingSync(billingContext, usageOrUndefined, resAdapter);
+              const raw = (res.locals as any).usage;
+              const units = typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1;
+              this.middleware.settleBillingSync(billingContext, units, resAdapter);
             } catch (error) {
               console.error('🚨 Billing header error:', error);
             }

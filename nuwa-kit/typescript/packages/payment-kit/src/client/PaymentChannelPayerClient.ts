@@ -334,8 +334,8 @@ export class PaymentChannelPayerClient {
         throw new Error(`Invalid nonce: expected ${expectedNonce}, got ${subRAV.nonce}`);
       }
 
-      // Verify amount only increases
-      if (subRAV.accumulatedAmount <= prevState.accumulatedAmount) {
+      // Verify amount only increases, not decreases, and allow same as previous, because there are zero-cost requests
+      if (subRAV.accumulatedAmount < prevState.accumulatedAmount) {
         throw new Error(`Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`);
       }
 

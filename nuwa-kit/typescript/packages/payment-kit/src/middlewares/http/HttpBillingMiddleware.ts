@@ -20,6 +20,7 @@ import type {
 } from '../../core/types';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import type { CostCalculator, BillingRule, RuleProvider } from '../../billing';
+import type { RateProvider } from '../../billing/rate/types';
 import { findRule } from '../../billing/core/rule-matcher';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
@@ -52,10 +53,10 @@ interface ExpressResponse {
 export interface HttpBillingMiddlewareConfig {
   /** Payee client for payment operations */
   payeeClient: PaymentChannelPayeeClient;
-  /** Billing engine for cost calculation */
-  billingEngine: CostCalculator;
   /** Rule provider for pre-matching billing rules (V2 optimization) */
-  ruleProvider?: RuleProvider;
+  ruleProvider: RuleProvider;
+  /** Rate provider for asset conversion (preferred path) */
+  rateProvider: RateProvider;
   /** Service ID for billing configuration */
   serviceId: string;
   /** Default asset ID if not provided in request context */
@@ -103,9 +104,9 @@ export class HttpBillingMiddleware {
     // Initialize PaymentProcessor with config
     this.processor = new PaymentProcessor({
       payeeClient: config.payeeClient,
-      billingEngine: config.billingEngine,
       serviceId: config.serviceId,
       defaultAssetId: config.defaultAssetId,
+      rateProvider: config.rateProvider,
       pendingSubRAVStore: config.pendingSubRAVStore,
       claimScheduler: config.claimScheduler,
       debug: config.debug
@@ -162,7 +163,7 @@ export class HttpBillingMiddleware {
   /**
    * Complete billing settlement synchronously (Step B & C) - for on-headers use
    */
-  settleBillingSync(ctx: BillingContext, usage?: Record<string, any>, resAdapter?: ResponseAdapter): boolean {
+  settleBillingSync(ctx: BillingContext, usage?: number, resAdapter?: ResponseAdapter): boolean {
     try {
       this.log('🔄 Settling billing synchronously with usage:', usage);
       
@@ -385,22 +386,6 @@ export class HttpBillingMiddleware {
     return new HttpBillingMiddleware(config);
   }
 
-  /**
-   * Static factory method with billing engine
-   */
-  static createWithBillingEngine(
-    payeeClient: PaymentChannelPayeeClient,
-    billingEngine: CostCalculator,
-    serviceId: string,
-    options: Partial<HttpBillingMiddlewareConfig> = {}
-  ): HttpBillingMiddleware {
-    return new HttpBillingMiddleware({
-      payeeClient,
-      billingEngine,
-      serviceId,
-      ...options
-    });
-  }
 }
 
 /**

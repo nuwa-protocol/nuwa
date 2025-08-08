@@ -6,6 +6,7 @@
  */
 
 import type { SignedSubRAV, SubRAV } from '../../core/types';
+import type { RateResult } from '../rate/types';
 
 export interface BillingContext {
     /** Service identifier (e.g. "llm-gateway", "mcp-server") */
@@ -42,6 +43,8 @@ export interface BillingContext {
       
       // Step B: Charging
       cost?: bigint;
+      /** Pre-fetched exchange rate used for conversion (if asset settlement is used) */
+      exchangeRate?: RateResult;
       
       // Step C: Issuing
       unsignedSubRav?: SubRAV;
@@ -69,7 +72,11 @@ export interface BillingContext {
    * default.
    */
   export interface Strategy {
-    evaluate(ctx: BillingContext): Promise<bigint>;
+    /**
+     * Synchronous cost evaluation returning picoUSD cost.
+     * units: caller-provided usage units (must be a positive integer). For PerRequest, pass 1.
+     */
+    evaluate(ctx: BillingContext, units: number): bigint;
     /**
      * Whether this strategy requires execution results (usage data) to calculate costs.
      * - `false` (default): Can calculate cost before request execution (pre-flight)

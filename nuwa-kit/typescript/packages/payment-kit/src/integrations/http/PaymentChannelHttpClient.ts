@@ -652,31 +652,74 @@ export class PaymentChannelHttpClient {
       try {
         const responsePayload = this.parsePaymentHeader(paymentHeader) as any;
         
-        // Protocol-level error branch
-        if (responsePayload.error && responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
-          const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
-          clearTimeout(pendingRequest.timeoutId);
-          this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
-          // Recovery: clear pendingSubRAV for safety
-          this.clientState.pendingSubRAV = undefined;
-          await this.persistClientState();
+        // Protocol-level error branch with robust fallback matching
+        if (responsePayload.error) {
+          const errorCode = responsePayload.error.code;
           const status = response.status;
           const message = responsePayload.error.message || response.statusText || 'Payment error';
-          pendingRequest.reject(new PaymentKitError(responsePayload.error.code, message, status));
-          return; // Skip success path processing
+          const err = new PaymentKitError(errorCode, message, status);
+
+          // Preferred: reject by clientTxRef
+          if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
+            const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
+            clearTimeout(pendingRequest.timeoutId);
+            this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
+            // Recovery: clear pendingSubRAV for safety
+            this.clientState.pendingSubRAV = undefined;
+            await this.persistClientState();
+            pendingRequest.reject(err);
+            return; // Skip success path processing
+          }
+
+          // Fallback: no clientTxRef in header – try to resolve uniquely
+          if (this.clientState.pendingPayments && this.clientState.pendingPayments.size === 1) {
+            const [[onlyKey, pendingRequest]] = this.clientState.pendingPayments.entries();
+            clearTimeout(pendingRequest.timeoutId);
+            this.clientState.pendingPayments.delete(onlyKey);
+            this.clientState.pendingSubRAV = undefined;
+            await this.persistClientState();
+            pendingRequest.reject(err);
+            return;
+          }
+
+          // Last resort: reject all pending to avoid timeouts
+          // If we reach here and still have pending items (>=0), reject all to avoid timeouts
+          if (this.clientState.pendingPayments && this.clientState.pendingPayments.size >= 1) {
+            for (const [key, pendingRequest] of this.clientState.pendingPayments.entries()) {
+              clearTimeout(pendingRequest.timeoutId);
+              pendingRequest.reject(err);
+              this.clientState.pendingPayments.delete(key);
+            }
+            this.clientState.pendingSubRAV = undefined;
+            await this.persistClientState();
+            return;
+          }
         }
 
         // Handle clientTxRef-based payment resolution (success)
-        if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef) && responsePayload.subRav && responsePayload.cost !== undefined) {
-          const pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
+        if (responsePayload.subRav && responsePayload.cost !== undefined) {
+          // Preferred: resolve by clientTxRef
+          let pendingRequest: PendingPaymentRequest | undefined;
+          let keyToDelete: string | undefined;
+          if (responsePayload.clientTxRef && this.clientState.pendingPayments?.has(responsePayload.clientTxRef)) {
+            pendingRequest = this.clientState.pendingPayments.get(responsePayload.clientTxRef)!;
+            keyToDelete = responsePayload.clientTxRef;
+          } else if (this.clientState.pendingPayments && this.clientState.pendingPayments.size === 1) {
+            // Fallback: no clientTxRef in header – resolve the only pending one
+            const [[onlyKey, onlyPending]] = this.clientState.pendingPayments.entries();
+            pendingRequest = onlyPending;
+            keyToDelete = onlyKey;
+          }
+
+          if (pendingRequest && typeof keyToDelete === 'string') {
           
           // Clear the timeout to prevent memory leak
-          clearTimeout(pendingRequest.timeoutId);
+            clearTimeout(pendingRequest.timeoutId);
           
           // Calculate USD cost with fallback to 0
           let costUsd: bigint = BigInt(0);
           try {
-            const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
+              const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
             //TODO: Overflow check
             costUsd = responsePayload.cost * assetPrice;
           } catch (error) {
@@ -684,30 +727,33 @@ export class PaymentChannelHttpClient {
             // Keep costUsd as 0 if price lookup fails
           }
           
+          // Cache the unsigned SubRAV for the next request to ensure nonce progresses
+          await this.cachePendingSubRAV(responsePayload.subRav);
+
           // Create PaymentInfo from response
           const paymentInfo: PaymentInfo = {
-            clientTxRef: responsePayload.clientTxRef,
+              clientTxRef: responsePayload.clientTxRef || keyToDelete!,
             serviceTxRef: responsePayload.serviceTxRef,
             cost: responsePayload.cost,
             costUsd,
             nonce: responsePayload.subRav.nonce,
-            channelId: pendingRequest.channelId,
-            assetId: pendingRequest.assetId,
+              channelId: pendingRequest.channelId,
+              assetId: pendingRequest.assetId,
             timestamp: new Date().toISOString()
           };
           
           // Resolve the payment promise and remove from pending payments
-          pendingRequest.resolve(paymentInfo);
-          this.clientState.pendingPayments.delete(responsePayload.clientTxRef);
+            pendingRequest!.resolve(paymentInfo);
+            this.clientState.pendingPayments?.delete(keyToDelete);
           
-          this.log('Resolved payment for clientTxRef:', responsePayload.clientTxRef, 'cost:', paymentInfo.cost.toString(), 'costUsd:', paymentInfo.costUsd.toString());
+            this.log('Resolved payment for clientTxRef:', paymentInfo.clientTxRef, 'cost:', paymentInfo.cost.toString(), 'costUsd:', paymentInfo.costUsd.toString());
+            return;
+          }
         }
         
         if (responsePayload.subRav && responsePayload.cost !== undefined) {
-          // Cache the unsigned SubRAV for the next request
-          this.clientState.pendingSubRAV = responsePayload.subRav;
-          this.log('Cached new unsigned SubRAV:', responsePayload.subRav.nonce);
-          await this.persistClientState();
+          // If not yet cached above (no matching pending), cache now
+          await this.cachePendingSubRAV(responsePayload.subRav);
         }
         
         if (responsePayload.serviceTxRef) {
@@ -1057,6 +1103,15 @@ export class PaymentChannelHttpClient {
     const signed = await this.payerClient.signSubRAV(handshakeSubRAV);
     this.log('Created handshake SubRAV:', handshakeSubRAV.nonce);
     return signed;
+  }
+
+  /**
+   * Cache pending SubRAV and persist state (helper to avoid duplication)
+   */
+  private async cachePendingSubRAV(subRav: SubRAV): Promise<void> {
+    this.clientState.pendingSubRAV = subRav;
+    this.log('Cached new unsigned SubRAV:', subRav.nonce);
+    await this.persistClientState();
   }
 
   /**

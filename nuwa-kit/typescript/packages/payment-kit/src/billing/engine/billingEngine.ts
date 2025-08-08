@@ -40,7 +40,7 @@ export class BillingEngine implements CostCalculator {
    * Calculate cost when the rule is already known (pre-flight middleware).
    */
   async calcCostByRule(ctx: BillingContext, rule: BillingRule): Promise<bigint> {
-    const usdCost = await getStrategy(rule).evaluate(ctx);
+    const usdCost = getStrategy(rule).evaluate(ctx, 1);
 
     if (ctx.assetId && this.rateProvider) {
       const result = await convertUsdToAsset(usdCost, ctx.assetId, this.rateProvider);

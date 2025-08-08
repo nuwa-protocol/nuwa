@@ -112,12 +112,8 @@ export async function createBillingServer(config: BillingServerConfig) {
         total_tokens: baseTokens + extraTokens
       };
       
-      // Critical: Set usage to res.locals for post-flight billing
-      // The middleware will automatically detect this is a PerToken strategy
-      // and trigger post-flight billing after the response is sent
-      res.locals.usage = {
-        usage: mockUsage
-      };
+      // Critical: Set numeric usage (total tokens) for post-flight billing
+      res.locals.usage = mockUsage.total_tokens;
       
       res.json({
         id: `chatcmpl-${Date.now()}`,

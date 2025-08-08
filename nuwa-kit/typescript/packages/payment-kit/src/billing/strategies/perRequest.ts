@@ -21,8 +21,8 @@ export class PerRequestStrategy extends BaseStrategy {
     this.price = this.toBigInt(config.price);
   }
 
-  async evaluate(ctx: BillingContext): Promise<bigint> {
-    // Fixed price per request - context doesn't affect pricing
-    return this.price;
+  override evaluate(ctx: BillingContext, units: number): bigint {
+    const u = Number.isFinite(units) && units > 0 ? Math.floor(units) : 1;
+    return this.price * BigInt(u);
   }
 } 

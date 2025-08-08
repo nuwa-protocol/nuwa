@@ -9,6 +9,9 @@ import type {
   CostCalculator,
   BillingRule,
 } from '../billing';
+import { getStrategy } from '../billing/core/strategy-registry';
+import { convertUsdToAssetUsingPrice } from '../billing/core/converter';
+import type { RateProvider, RateResult } from '../billing/rate/types';
 import type { ConversionResult } from '../billing/rate/types';
 
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
@@ -25,15 +28,15 @@ import { PaymentUtils } from './PaymentUtils';
     /** Payee client for payment operations */
     payeeClient: PaymentChannelPayeeClient;
     
-    /** Billing engine for cost calculation */
-    billingEngine: CostCalculator;
-    
     /** Service ID for billing configuration */
     serviceId: string;
+
+    /** Rate provider for asset conversion */
+    rateProvider: RateProvider;
     
     /** Default asset ID if not provided in request context */
     defaultAssetId?: string;
-    
+
     /** Store for pending unsigned SubRAV proposals */
     pendingSubRAVStore?: PendingSubRAVRepository;
     
@@ -87,6 +90,17 @@ export interface PaymentVerificationResult extends VerificationResult {
         autoClaimsTriggered: 0
       };
     }
+
+    /**
+     * Decode request header payload safely (used for recovering clientTxRef if missing)
+     */
+    private codecDecodePayload(headerValue: string) {
+      try {
+        return HttpPaymentCodec.parseRequestHeader(headerValue);
+      } catch {
+        return null;
+      }
+    }
   
     /**
    * Step A: Pre-process request - complete all I/O operations and verification
@@ -133,44 +147,21 @@ export interface PaymentVerificationResult extends VerificationResult {
         ctx.state.signedSubRavVerified = true;
       }
 
-      // Step 2: For Pre-flight rules, complete billing immediately
-      const rule = ctx.meta.billingRule;
-      if (rule && !this.config.billingEngine.isDeferred(rule)) {
-        this.log('⚡ Pre-flight rule detected - completing billing in preProcess');
-        
-        // Calculate cost with async operations
-        const costResult = await this.calculateCostWithDetails(ctx, rule);
-        const { cost, conversion } = costResult;
-        ctx.state.cost = cost;
-
-        // Check maxAmount limit
-        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
-          this.stats.failedPayments++;
-          this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
-          // Mark protocol-level error in context for middleware to map to HTTP status + header
-          ctx.state.error = { code: 'MAX_AMOUNT_EXCEEDED', message: `Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}` } as any;
-          return ctx;
+      // Step 2: Prefetch exchange rate only (no cost calculation here)
+      if (ctx.assetId) {
+        try {
+          const price = await this.config.rateProvider.getPricePicoUSD(ctx.assetId);
+          const timestamp = this.config.rateProvider.getLastUpdated(ctx.assetId) ?? Date.now();
+          const exchangeRate: RateResult = {
+            price,
+            timestamp,
+            provider: 'rate-provider',
+            assetId: ctx.assetId,
+          };
+          ctx.state.exchangeRate = exchangeRate;
+        } catch (e) {
+          ctx.state.error = { code: 'RATE_FETCH_FAILED', message: String(e) } as any;
         }
-
-        // For zero-cost requests, skip SubRAV generation (like old API)
-        if (cost === 0n) {
-          this.log('✅ Zero-cost request, skipping SubRAV generation');
-          // Mark as successful but no SubRAV needed
-          ctx.state.signedSubRavVerified = true;
-          return ctx;
-        }
-
-        // Generate SubRAV for pre-flight (header will be generated in settle)
-        const { unsignedSubRAV, clientTxRef, serviceTxRef } = await this.generateSubRAV(ctx, cost, verificationResult);
-        ctx.state.unsignedSubRav = unsignedSubRAV;
-        ctx.state.serviceTxRef = serviceTxRef;
-        ctx.state.nonce = unsignedSubRAV.nonce;
-        // Store clientTxRef for later use (not part of state interface; pass via meta)
-        if (!ctx.meta.clientTxRef) {
-          ctx.meta.clientTxRef = clientTxRef;
-        }
-
-        this.log('✅ Pre-flight billing completed in preProcess');
       }
 
       this.log('✅ Pre-processing completed');
@@ -189,17 +180,14 @@ export interface PaymentVerificationResult extends VerificationResult {
    * For Pre-flight: essentially no-op (already completed in preProcess)
    * For Post-flight: calculate cost based on usage and generate header
    */
-  settle(ctx: BillingContext, usage?: Record<string, any>): BillingContext {
-    this.log('🔄 Settling billing with usage:', usage);
+  settle(ctx: BillingContext, units?: number): BillingContext {
+    this.log('🔄 Settling billing with units:', units);
 
     if (!ctx.state) {
       ctx.state = {};
     }
 
-    // Add usage data to state if provided
-    if (usage) {
-      ctx.state.usage = usage;
-    }
+    // Settling uses numeric units; no structured usage is attached to state
 
     try {
       const rule = ctx.meta.billingRule;
@@ -220,54 +208,72 @@ export interface PaymentVerificationResult extends VerificationResult {
         return ctx;
       }
       
-      // For Pre-flight rules, everything should be done already
-      if (rule && !this.config.billingEngine.isDeferred(rule)) {
-        this.log('⚡ Pre-flight rule - generating header from pre-computed values');
-        if (ctx.state.unsignedSubRav && ctx.state.cost !== undefined) {
-          const responsePayload = {
-            subRav: ctx.state.unsignedSubRav,
-            cost: ctx.state.cost,
-            clientTxRef: ctx.meta.clientTxRef,
-            serviceTxRef: ctx.state.serviceTxRef,
-            version: 1
-          } as any;
-          ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
-        } else {
-          this.log('⚠️ Pre-flight: missing unsignedSubRav or cost; cannot build header');
-        }
-        return ctx;
-      }
+      // Unified synchronous calculation for both pre-flight and post-flight
+      if (rule) {
+        const usageUnits = Number.isFinite(units) && (units as number) > 0 ? Math.floor(units as number) : 1;
 
-      // For Post-flight rules, calculate cost based on usage
-      if (rule && this.config.billingEngine.isDeferred(rule)) {
-        this.log('⏳ Post-flight rule - calculating cost from usage');
-        
-        // Calculate cost synchronously for known strategy types
-        let cost = 0n;
-        if (rule.strategy.type === 'PerToken') {
-          const unitPricePicoUSD = BigInt(rule.strategy.unitPricePicoUSD || '0');
-          const totalTokens = this.extractTokenCountSync(usage || {}, rule.strategy.usageKey || 'usage.total_tokens');
-          cost = unitPricePicoUSD * BigInt(totalTokens);
-        } else if (rule.strategy.type === 'PerRequest') {
-          cost = BigInt(rule.strategy.pricePicoUSD || '0');
+        // Strict requirement: clientTxRef must be present to allow client-side resolution
+        if (!ctx.meta.clientTxRef) {
+          const err = { code: 'CLIENT_TX_REF_MISSING', message: 'clientTxRef is required in request header' } as any;
+          ctx.state.error = err;
+          try {
+            const errorPayload = {
+              error: err,
+              clientTxRef: undefined,
+              serviceTxRef: ctx.state.serviceTxRef,
+              version: 1
+            } as any;
+            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+          } catch (e) {
+            this.log('Failed to build error header:', e);
+          }
+          return ctx;
         }
 
-        ctx.state.cost = cost;
+        const strategy = getStrategy(rule);
+        const usdCost = strategy.evaluate(ctx, usageUnits);
+
+        // Convert to asset units if asset settlement is requested
+        let finalCost = usdCost;
+        if (ctx.assetId) {
+          const rate = ctx.state.exchangeRate;
+          if (!rate) {
+            // Missing rate is a hard error as required
+            const err = { code: 'RATE_NOT_AVAILABLE', message: `Missing exchange rate for asset ${ctx.assetId}` } as any;
+            ctx.state.error = err;
+            try {
+              const errorPayload = {
+                error: err,
+                clientTxRef: ctx.meta.clientTxRef,
+                serviceTxRef: ctx.state.serviceTxRef,
+                version: 1
+              } as any;
+              ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+            } catch (e) {
+              this.log('Failed to build error header:', e);
+            }
+            return ctx;
+          }
+          const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
+          finalCost = conversion.assetCost;
+        }
+
+        ctx.state.cost = finalCost;
 
         // Check maxAmount limit
-        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && cost > ctx.meta.maxAmount) {
-          this.log(`Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}`);
-          if (!ctx.state) ctx.state = {} as any;
-          (ctx.state as any).error = { code: 'MAX_AMOUNT_EXCEEDED', message: `Cost ${cost} exceeds maxAmount ${ctx.meta.maxAmount}` };
+        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && finalCost > ctx.meta.maxAmount) {
+          this.log(`Cost ${finalCost} exceeds maxAmount ${ctx.meta.maxAmount}`);
+          const err = { code: 'MAX_AMOUNT_EXCEEDED', message: `Cost ${finalCost} exceeds maxAmount ${ctx.meta.maxAmount}` } as any;
+          ctx.state.error = err;
           // Build error header now
           try {
             const errorPayload = {
-              error: (ctx.state as any).error,
+              error: err,
               clientTxRef: ctx.meta.clientTxRef,
-              serviceTxRef: (ctx.state as any)?.serviceTxRef,
+              serviceTxRef: ctx.state.serviceTxRef,
               version: 1
             } as any;
-            (ctx.state as any).headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
           } catch (e) {
             this.log('Failed to build error header:', e);
           }
@@ -275,14 +281,12 @@ export interface PaymentVerificationResult extends VerificationResult {
         }
 
         // Generate SubRAV and header synchronously
-        const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateSubRAVSync(ctx, cost);
-        
+        const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateSubRAVSync(ctx, finalCost);
         ctx.state.unsignedSubRav = unsignedSubRAV;
         ctx.state.serviceTxRef = serviceTxRef;
         ctx.state.nonce = unsignedSubRAV.nonce;
         ctx.state.headerValue = headerValue;
-
-        this.log('✅ Post-flight billing settled successfully');
+        this.log('✅ Billing settled successfully');
       }
 
       return ctx;
@@ -466,29 +470,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         throw error;
       }
     }
-  
-
-    /**
-     * Calculate cost with conversion details (USD billing)
-     */
-    private async calculateCostWithDetails(context: BillingContext, preMatchedRule?: BillingRule): Promise<{cost: bigint, conversion?: ConversionResult}> {
-      try {
-        let cost: bigint;
-        
-        if (preMatchedRule) {
-          // Use pre-matched rule to avoid duplicate rule matching (V2 optimization)
-          cost = await this.config.billingEngine.calcCostByRule(context, preMatchedRule);
-        } else {
-          // Fallback to standard method
-          cost = await this.config.billingEngine.calcCost(context);
-        }
-        
-        return { cost };
-      } catch (error) {
-        this.log('Billing calculation error:', error);
-        throw new Error(`Failed to calculate cost: ${error}`);
-      }
-    }
+   
   
     /**
      * Extract error code from error message
@@ -596,6 +578,10 @@ export interface PaymentVerificationResult extends VerificationResult {
       const signedSubRAV = ctx.meta.signedSubRav;
       const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
+      // Ensure clientTxRef is persisted back to context for consistent echoing
+      if (!ctx.meta.clientTxRef) {
+        ctx.meta.clientTxRef = clientTxRef;
+      }
 
       if (!signedSubRAV) {
         throw new Error('Cannot generate SubRAV without existing channel context');
