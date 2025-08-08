@@ -19,7 +19,7 @@ import type {
   SignedSubRAV
 } from '../../core/types';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
-import type { CostCalculator, BillingRule, RuleProvider } from '../../billing';
+import type { BillingRule, RuleProvider } from '../../billing';
 import type { RateProvider } from '../../billing/rate/types';
 import { findRule } from '../../billing/core/rule-matcher';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';

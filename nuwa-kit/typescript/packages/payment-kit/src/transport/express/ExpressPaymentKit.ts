@@ -3,7 +3,7 @@ import onHeaders from 'on-headers';
 import { BillableRouter, RouteOptions } from './BillableRouter';
 import { registerHandlersWithBillableRouter } from './HandlerRestAdapter';
 import { HttpBillingMiddleware, ResponseAdapter } from '../../middlewares/http/HttpBillingMiddleware';
-import { BillingEngine, RateProvider } from '../../billing';
+import { RateProvider } from '../../billing';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
@@ -93,9 +93,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       serviceId: config.serviceId,
       defaultPricePicoUSD: config.defaultPricePicoUSD
     });
-
-    // Create billing engine using the billable router as rule provider
-    const billingEngine = new BillingEngine(this.billableRouter, rateProvider);
 
     // Create ClaimScheduler for automated claiming
     this.claimScheduler = new ClaimScheduler({

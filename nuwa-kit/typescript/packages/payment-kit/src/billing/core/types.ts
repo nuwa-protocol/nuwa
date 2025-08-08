@@ -98,7 +98,6 @@ export interface BillingContext {
   
   /**
    * Interface for providing billing rules to the BillingEngine.
-   * This replaces the ConfigLoader pattern and removes serviceId dependency.
    */
   export interface RuleProvider {
     /**
@@ -153,35 +152,3 @@ export interface BillingContext {
     /** List of billing rules */
     rules: BillingRule[];
   }
-  
-  /**
-   * Configuration loader interface
-   */
-  export interface ConfigLoader {
-    /**
-     * Load billing configuration for a service
-     * @param serviceId Service identifier
-     * @returns Billing configuration
-     */
-    load(serviceId: string): Promise<BillingConfig>;
-  } 
-
-/**
- * Interface for calculating costs
- */
-export interface CostCalculator {
-  calcCost(ctx: BillingContext): Promise<bigint>;
-  calcCostByRule(ctx: BillingContext, rule: BillingRule): Promise<bigint>;
-  /**
-   * Check if a billing rule requires deferred (post-flight) calculation
-   * @param rule The billing rule to check
-   * @returns true if the rule requires post-flight billing, false otherwise
-   */
-  isDeferred(rule: BillingRule): boolean;
-}
-
-/**
- * @deprecated Use BillingContext.meta instead
- * This type alias is provided for backward compatibility during migration
- */
-export type RequestMetadata = BillingContext['meta'];

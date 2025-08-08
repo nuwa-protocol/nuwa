@@ -1,6 +1,6 @@
 import express, { Router, RequestHandler } from 'express';
 import { findRule as coreFindRule } from '../../billing/core/rule-matcher';
-import type { BillingRule, BillingConfig, ConfigLoader, StrategyConfig, RuleProvider } from '../../billing';
+import type { BillingRule, StrategyConfig, RuleProvider } from '../../billing';
 
 /**
  * Route options for registering routes with billing
@@ -43,13 +43,6 @@ export interface BillableRouterOptions {
 /**
  * BillableRouter helps you declare Express routes and their pricing in one place.
  *
- * Example:
- * ```ts
- * const br = new BillableRouter({ serviceId: 'echo-service' });
- * br.get('/v1/echo', 1_000_000_000n, (req,res)=> res.json({ ok:true }));
- * app.use(br.router);
- * const billingEngine = new UsdBillingEngine(br.getConfigLoader(), rateProvider);
- * ```
  */
 export class BillableRouter implements RuleProvider {
   /** The underlying Express Router you should mount into your app */
@@ -119,26 +112,6 @@ export class BillableRouter implements RuleProvider {
    */
   findRule(method: string, path: string): BillingRule | undefined {
     return coreFindRule({ method: method.toUpperCase(), path }, this.rules);
-  }
-
-  /**
-   * Returns a ConfigLoader instance that feeds the collected rules to BillingEngine.
-   */
-  getConfigLoader(): ConfigLoader {
-    const self = this; // Capture 'this' reference for closure
-    return {
-      async load(serviceId: string): Promise<BillingConfig> {
-        if (serviceId !== self.opts.serviceId) {
-          throw new Error(`BillableRouter config loader mismatch: expected ${self.opts.serviceId}, got ${serviceId}`);
-        }
-        // Return current config with latest rules (not a fixed snapshot)
-        return {
-          version: self.opts.version ?? 1,
-          serviceId: self.opts.serviceId,
-          rules: [...self.rules] // Make a fresh copy of current rules
-        };
-      }
-    };
   }
 
   // ---------------------------------------------------------------------

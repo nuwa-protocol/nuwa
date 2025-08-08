@@ -18,9 +18,3 @@ export {
 // Built-in strategies self-register on import
 export * from './strategies';
 export * from './rate';
-
-// ──────────────────────
-// Engines
-// ──────────────────────
-// New V2 engine
-export { BillingEngine } from './engine/billingEngine';

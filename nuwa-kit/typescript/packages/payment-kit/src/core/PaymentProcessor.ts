@@ -6,7 +6,6 @@ import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
 import type { 
   BillingContext,
-  CostCalculator,
   BillingRule,
 } from '../billing';
 import { getStrategy } from '../billing/core/strategy-registry';
