@@ -18,6 +18,7 @@ import type {
 import { ErrorCode } from '../../types/api';
 import { PaymentKitError } from '../../errors';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
+import { assertSubRavProgression } from '../../core/SubRavValidator';
 import { PaymentChannelFactory } from '../../factory/chainFactory';
 import { DidAuthHelper } from './internal/DidAuthHelper';
 import { HttpPaymentCodec } from './internal/codec';
@@ -26,7 +27,7 @@ import {
   extractHost,
   MemoryHostChannelMappingStore 
 } from './internal/HostChannelMappingStore';
-import { parseJsonResponse } from '../../utils/json';
+import { parseJsonResponse, serializeJson } from '../../utils/json';
 import { 
   RecoveryResponseSchema,
   HealthResponseSchema,
@@ -121,11 +122,8 @@ export class PaymentChannelHttpClient {
     // Generate or extract clientTxRef
     const clientTxRef = this.extractOrGenerateClientTxRef(init?.headers);
     
-    // Create payment promise for this request
-    const paymentPromise = this.createPaymentPromise(clientTxRef);
-    
     // Prepare headers with clientTxRef
-    const headers = await this.prepareHeaders(fullUrl, method, init?.headers, clientTxRef);
+    const { headers, sentedSubRav } = await this.prepareHeaders(fullUrl, method, init?.headers, clientTxRef);
     
     // Build request context
     const requestContext: PaymentRequestContext = {
@@ -135,6 +133,9 @@ export class PaymentChannelHttpClient {
       body: init?.body
     };
 
+    // Create payment promise for this request
+    const paymentPromise = this.createPaymentPromise(clientTxRef, requestContext, sentedSubRav);
+    
     try {
       // Execute request
       const response = await this.executeRequest(requestContext, init);
@@ -518,7 +519,7 @@ export class PaymentChannelHttpClient {
   /**
    * Create a payment promise for tracking request payment info
    */
-  private createPaymentPromise(clientTxRef: string): Promise<PaymentInfo | undefined> {
+  private createPaymentPromise(clientTxRef: string, requestContext: PaymentRequestContext, sentedSubRav: SignedSubRAV): Promise<PaymentInfo | undefined> {
     if (!this.clientState.pendingPayments) {
       this.clientState.pendingPayments = new Map();
     }
@@ -540,7 +541,10 @@ export class PaymentChannelHttpClient {
         timestamp: new Date(),
         channelId: this.clientState.channelId!,
         assetId: defaultAssetId,
-        timeoutId
+        timeoutId,
+        // Bind the RAV we are about to send with this specific pending request
+        sendedSubRav: sentedSubRav,
+        requestContext
       });
     });
   }
@@ -553,7 +557,7 @@ export class PaymentChannelHttpClient {
     method: string, 
     providedHeaders?: HeadersInit,
     clientTxRef?: string
-  ): Promise<Record<string, string>> {
+  ): Promise<{ headers: Record<string, string>; sentedSubRav: SignedSubRAV }> {
     const headers: Record<string, string> = {};
 
     // Copy provided headers
@@ -588,16 +592,16 @@ export class PaymentChannelHttpClient {
       this.log('Failed to generate DID auth header:', error);
     }
 
-    // Add payment channel header with clientTxRef
-    await this.addPaymentChannelHeader(headers, clientTxRef);
+    // Add payment channel header with clientTxRef and return the actual SubRAV used
+    const sentedSubRav = await this.addPaymentChannelHeader(headers, clientTxRef);
 
-    return headers;
+    return { headers, sentedSubRav };
   }
 
   /**
    * Add payment channel data to headers
    */
-  private async addPaymentChannelHeader(headers: Record<string, string>, clientTxRef?: string): Promise<void> {
+  private async addPaymentChannelHeader(headers: Record<string, string>, clientTxRef?: string): Promise<SignedSubRAV> {
     if (!this.clientState.channelId) {
       throw new Error('Channel not initialized');
     }
@@ -607,7 +611,7 @@ export class PaymentChannelHttpClient {
 
       const headerValue = this.encodePaymentHeader(signedSubRAV, clientTxRef);
       headers[HttpPaymentCodec.getHeaderName()] = headerValue;
-      
+      return signedSubRAV;
     } catch (error) {
       this.handleError('Failed to add payment channel header', error);
       throw error;
@@ -625,6 +629,7 @@ export class PaymentChannelHttpClient {
       // Extract headers from init to avoid overriding context.headers
       const { headers: _, ...initWithoutHeaders } = init || {};
       
+
       const response = await this.fetchImpl(context.url, {
         method: context.method,
         headers: context.headers,
@@ -698,6 +703,7 @@ export class PaymentChannelHttpClient {
 
         // Handle clientTxRef-based payment resolution (success)
         if (responsePayload.subRav && responsePayload.cost !== undefined) {
+          
           // Preferred: resolve by clientTxRef
           let pendingRequest: PendingPaymentRequest | undefined;
           let keyToDelete: string | undefined;
@@ -726,6 +732,17 @@ export class PaymentChannelHttpClient {
             this.log('Failed to calculate USD cost, using 0:', error);
             // Keep costUsd as 0 if price lookup fails
           }
+         
+           // Early local validation using shared util (allowSameAccumulated=true for admin/claims or zero-cost endpoints)
+           const prev = pendingRequest.sendedSubRav?.subRav;
+           if (prev) {
+             try {
+               assertSubRavProgression(prev, responsePayload.subRav, /* allowSameAccumulated */ true);
+             } catch (e) {
+               pendingRequest.reject(new Error('Invalid SubRAV progression: ' + (e as Error).message + ', response: ' + serializeJson(responsePayload) + ' prev: ' + serializeJson(prev) + ' requestContext: ' + serializeJson(pendingRequest.requestContext)));
+               return;
+             }
+           }
           
           // Cache the unsigned SubRAV for the next request to ensure nonce progresses
           await this.cachePendingSubRAV(responsePayload.subRav);

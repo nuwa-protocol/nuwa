@@ -1,7 +1,7 @@
 import type { ChainConfig } from '../../factory/chainFactory';
 import type { PaymentChannelPayerClientOptions } from '../../client/PaymentChannelPayerClient';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
-import type { SubRAV, PaymentInfo } from '../../core/types';
+import type { SubRAV, PaymentInfo, SignedSubRAV } from '../../core/types';
 import type { PersistedHttpClientState } from '../../schema/core';
 
 /**
@@ -118,6 +118,10 @@ export interface PendingPaymentRequest {
   assetId: string;
   /** Timeout ID for cleanup */
   timeoutId: NodeJS.Timeout;
+  /** The SignedSubRAV that was sent with this pending request */
+  sendedSubRav?: SignedSubRAV;
+  /** The request context that was sent with this pending request */
+  requestContext: PaymentRequestContext;
 }
 
 /**

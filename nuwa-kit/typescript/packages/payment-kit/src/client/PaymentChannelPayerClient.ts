@@ -22,6 +22,7 @@ import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
 import { SubRAVManager } from '../core/SubRav';
+import { assertSubRavProgression } from '../core/SubRavValidator';
 import { PaymentHubClient } from './PaymentHubClient';
 
 export interface PayerOpenChannelParams {
@@ -326,18 +327,12 @@ export class PaymentChannelPayerClient {
         }
       }
     } else {
-      // Subsequent payments - verify strict progression
-      
-      // Verify nonce increments by 1
-      const expectedNonce = prevState.nonce + BigInt(1);
-      if (subRAV.nonce !== expectedNonce) {
-        throw new Error(`Invalid nonce: expected ${expectedNonce}, got ${subRAV.nonce}`);
-      }
-
-      // Verify amount only increases, not decreases, and allow same as previous, because there are zero-cost requests
-      if (subRAV.accumulatedAmount < prevState.accumulatedAmount) {
-        throw new Error(`Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`);
-      }
+      // Subsequent payments - verify progression using shared util (no zero-cost allowed here)
+      assertSubRavProgression(
+        { nonce: prevState.nonce, accumulatedAmount: prevState.accumulatedAmount },
+        { nonce: subRAV.nonce, accumulatedAmount: subRAV.accumulatedAmount },
+        true,
+      );
 
       // Check delta amount against maximum amount limit
       if (maxAmount && maxAmount > 0n) {
