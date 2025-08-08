@@ -358,7 +358,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
       // Success path: extract signer DID and set it on the request
       (req as any).didInfo = { 
-        did: verifyResult.signedObject.signature.signer_did 
+        did: verifyResult.signedObject.signature.signer_did,
+        keyId: verifyResult.signedObject.signature.key_id
       };
 
     } catch (error) {
@@ -437,26 +438,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         return this.createResponseAdapter(res);
       }
     };
-  }
-
-  /**
-   * Create a null response adapter that doesn't modify the response
-   * Used for async operations after headers are sent
-   */
-  private createNullResponseAdapter(): ResponseAdapter {
-    return {
-      setStatus: (code: number) => {
-        // Do nothing - headers already sent
-        return this.createNullResponseAdapter();
-      },
-      json: (obj: any) => {
-        // Do nothing - response already sent
-      },
-      setHeader: (name: string, value: string) => {
-        // Do nothing - headers already sent
-        return this.createNullResponseAdapter();
-      }
-    };
   } 
 
   /**
@@ -465,8 +446,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   getPayeeClient(): PaymentChannelPayeeClient {
     return this.payeeClient;
   }
-
-
 
 }
 
@@ -529,6 +508,7 @@ declare global {
     interface Request {
       didInfo?: {
         did: string;
+        keyId: string;
       };
     }
   }
