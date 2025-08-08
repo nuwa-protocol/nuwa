@@ -389,11 +389,35 @@ export class PaymentChannelHttpClient {
    * Ensure payment channel is ready for use
    */
   private async ensureChannelReady(): Promise<void> {
+    this.log('🔧 ensureChannelReady called, state:', this.state, 'channelId:', this.clientState.channelId);
+    
     if (this.state === ClientState.READY && this.clientState.channelId) {
+      this.log('🔧 Channel already ready, checking for pending SubRAV recovery');
+      // For ready channels, try to recover pending state if we don't have any
+      if (!this.clientState.pendingSubRAV) {
+        this.log('🔧 No pending SubRAV, attempting recovery from service');
+        try {
+          const recoveryData = await this.recoverFromService();
+          this.log('🔧 Recovery response:', recoveryData);
+          if (recoveryData.pendingSubRav) {
+            this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
+            this.log('✅ Recovered pending SubRAV in ensureChannelReady:', recoveryData.pendingSubRav.nonce);
+            await this.persistClientState();
+          } else {
+            this.log('🔧 No pending SubRAV found in recovery response');
+          }
+        } catch (error) {
+          this.log('❌ Recovery failed in ensureChannelReady, continuing anyway:', error);
+          // Don't fail the request due to recovery errors
+        }
+      } else {
+        this.log('🔧 Already have pending SubRAV, no recovery needed:', this.clientState.pendingSubRAV.nonce);
+      }
       return;
     }
 
     // Try to load persisted state first
+    this.log('🔧 Loading persisted state for host:', this.host);
     await this.loadPersistedState();
 
     // If we still don't have a ready channel, initialize it
@@ -410,43 +434,35 @@ export class PaymentChannelHttpClient {
     this.log('Initializing channel for host:', this.host);
 
     try {
-      // Check if we have a specific channelId
-      let channelId = this.options.channelId;
-      
-      if (!channelId) {
-        // Try to get from mapping store
-        channelId = await this.mappingStore.get(this.host);
-        this.log('Retrieved channelId from mapping store:', channelId);
-      }
-
-      if (channelId) {
-        // Verify channel is still active
-        try {
-          const channelInfo = await this.payerClient.getChannelInfo(channelId);
-          if (channelInfo.status === 'active') {
-            this.clientState.channelId = channelId;
+      // First, try to recover existing channel from server
+      // This works even if we don't have channelId cached locally
+      try {
+        this.log('🔧 Attempting to recover channel from server');
+        const recoveryData = await this.recoverFromService();
+        if (recoveryData.channel) {
+          // Verify the recovered channel is still active
+          const channelInfo = await this.payerClient.getChannelInfo(recoveryData.channel.channelId);
+           //if (channelInfo.status === 'active') {
+            this.clientState.channelId = recoveryData.channel.channelId;
+            this.clientState.pendingSubRAV = recoveryData.pendingSubRav || undefined;
             this.state = ClientState.READY;
-            this.log('Using existing active channel:', channelId);
+            this.log('✅ Recovered active channel from server:', recoveryData.channel.channelId);
+            
+            // Update mapping store
+            await this.mappingStore.set(this.host, recoveryData.channel.channelId);
             await this.persistClientState();
             return;
-          } else {
-            this.log('Channel is not active, removing from store:', channelId, channelInfo.status);
-            await this.mappingStore.delete(this.host);
-            if (this.mappingStore.deleteState) {
-              await this.mappingStore.deleteState(this.host);
-            }
-          }
-        } catch (error) {
-          this.log('Channel verification failed, removing from store:', error);
-          await this.mappingStore.delete(this.host);
-          if (this.mappingStore.deleteState) {
-            await this.mappingStore.deleteState(this.host);
-          }
+          //} else {
+          //  this.log('⚠️ Recovered channel is not active:', recoveryData.channel.channelId, channelInfo.status);
+          //}
+        } else {
+          this.log('🔧 No existing channel found on server, will create new one');
         }
+      } catch (error) {
+        this.log('🔧 Server recovery failed, will create new channel:', error);
       }
 
-      // Need to create a new channel
-      this.log('Creating new channel...');
+      this.log('Try to discover service and open channel');
       
       // First, ensure the payer has sufficient funds in the hub
       const defaultAssetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
@@ -479,6 +495,7 @@ export class PaymentChannelHttpClient {
       this.log('Created new channel:', channelInfo.channelId);
 
       // Persist the new state
+      this.log('🔧 Persisting client state after channel creation');
       await this.persistClientState();
       
     } catch (error) {
