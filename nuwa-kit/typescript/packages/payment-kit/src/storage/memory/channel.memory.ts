@@ -13,8 +13,8 @@ export class MemoryChannelRepository implements ChannelRepository {
   private hitCount = 0;
   private missCount = 0;
 
-  private getSubChannelKey(channelId: string, keyId: string): string {
-    return `${channelId}:${keyId}`;
+  private getSubChannelKey(channelId: string, vmIdFragment: string): string {
+    return `${channelId}:${vmIdFragment}`;
   }
 
   // -------- Channel Metadata Operations --------
@@ -74,36 +74,25 @@ export class MemoryChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
-    const key = this.getSubChannelKey(channelId, keyId);
+  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+    const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key);
     
     if (existing) {
       this.hitCount++;
       return { ...existing };
     }
-
+    
     this.missCount++;
-    
-    // Return default state if not found
-    const defaultState: SubChannelState = {
-      channelId,
-      epoch: BigInt(0),
-      nonce: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      lastUpdated: Date.now(),
-    };
-    
-    this.subChannelStates.set(key, defaultState);
-    return { ...defaultState };
+    return null;
   }
 
   async updateSubChannelState(
     channelId: string,
-    keyId: string,
+    vmIdFragment: string,
     updates: Partial<SubChannelState>
   ): Promise<void> {
-    const key = this.getSubChannelKey(channelId, keyId);
+    const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key) || {
       channelId,
       epoch: BigInt(0),
@@ -126,17 +115,17 @@ export class MemoryChannelRepository implements ChannelRepository {
     
     for (const [key, state] of this.subChannelStates.entries()) {
       if (key.startsWith(channelId + ':')) {
-        // Extract keyId from the key (format: channelId:keyId)
-        const keyId = key.substring(channelId.length + 1);
-        result[keyId] = { ...state };
+        // Extract vmIdFragment from the key (format: channelId:vmIdFragment)
+        const vmIdFragment = key.substring(channelId.length + 1);
+        result[vmIdFragment] = { ...state };
       }
     }
     
     return result;
   }
 
-  async removeSubChannelState(channelId: string, keyId: string): Promise<void> {
-    const key = this.getSubChannelKey(channelId, keyId);
+  async removeSubChannelState(channelId: string, vmIdFragment: string): Promise<void> {
+    const key = this.getSubChannelKey(channelId, vmIdFragment);
     this.subChannelStates.delete(key);
   }
 

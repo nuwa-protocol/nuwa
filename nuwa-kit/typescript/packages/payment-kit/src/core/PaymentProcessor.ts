@@ -84,7 +84,8 @@ export interface PaymentVerificationResult extends VerificationResult {
     constructor(config: PaymentProcessorConfig) {
       this.config = config;
       this.pendingSubRAVStore = config.pendingSubRAVStore || createPendingSubRAVRepo({ backend: 'memory' });
-      this.ravRepository = config.ravRepository;
+      // Default to the same RAV repository as the payee client if not provided
+      this.ravRepository = config.ravRepository || config.payeeClient.getRAVRepository();
       this.stats = {
         totalRequests: 0,
         successfulPayments: 0,
@@ -173,9 +174,13 @@ export interface PaymentVerificationResult extends VerificationResult {
           if (!ctx.state.latestSignedSubRav) {
             try {
               this.log('📋 Attempting to fetch sub-channel state via ChannelRepository...');
-              const subState = await this.config.payeeClient.getSubChannelStateByFragment(channelId, vmIdFragment);
-              ctx.state.subChannelState = subState;
-              this.log('📋 Successfully fetched sub-channel state:', { nonce: subState.nonce, accumulatedAmount: subState.accumulatedAmount });
+              const subState = await this.config.payeeClient.getSubChannelState(channelId, vmIdFragment);
+              if (subState) {
+                ctx.state.subChannelState = subState;
+                this.log('📋 Successfully fetched sub-channel state:', { nonce: subState.nonce, accumulatedAmount: subState.accumulatedAmount });
+              } else {
+                this.log('📋 No local sub-channel state found');
+              }
               // Cache chainId to avoid later async
               try {
                 const chainId = await this.config.payeeClient.getContract().getChainId();
@@ -503,6 +508,13 @@ export interface PaymentVerificationResult extends VerificationResult {
         // Payment verified successfully, remove from pending list
         await this.pendingSubRAVStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.vmIdFragment, signedSubRAV.subRav.nonce);
         
+        // Persist verified SignedSubRAV so it becomes the latest baseline
+        try {
+          await this.ravRepository?.save(signedSubRAV);
+        } catch (e) {
+          this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
+        }
+        
         // Get channel info to extract payer DID for constructing payerKeyId
         const channelInfo = await this.config.payeeClient.getChannelInfo(signedSubRAV.subRav.channelId);
         const payerKeyId = `${channelInfo.payerDid}#${signedSubRAV.subRav.vmIdFragment}`;
@@ -635,24 +647,7 @@ export interface PaymentVerificationResult extends VerificationResult {
 
       return { unsignedSubRAV, serviceTxRef, headerValue };
     }
-
-
-
-
-  /**
-   * Build initial unsigned SubRAV for FREE mode (no previous SignedSubRAV)
-   */
-  private buildInitialSubRAV(channelId: string, vmIdFragment: string, cost: bigint): SubRAV {
-    return {
-      version: 1,
-      chainId: 0n, // Use default chain ID (0 for dev)
-      channelId,
-      channelEpoch: 0n, // Start with epoch 0 for new sessions
-      vmIdFragment,
-      nonce: 1n, // First nonce is 1 (0 was historically used for handshake)
-      accumulatedAmount: cost // Initial accumulated amount equals the first cost
-    };
-  }
+ 
 
   /**
    * Build next unsigned SubRAV following the prior signed SubRAV, reused by async/sync paths.

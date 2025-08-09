@@ -38,18 +38,20 @@ export interface ChannelRepository {
 
   /**
    * Get sub-channel state for nonce and amount tracking
-   * @param channelId - The channel ID to ensure no cross-channel key conflicts
-   * @param keyId - Complete DID key ID (e.g., "did:rooch:address#account-key")
+   * @param channelId - The channel ID to ensure no cross-channel conflicts
+   * @param vmIdFragment - DID verification method fragment (e.g., "key-1")
+   * @returns Sub-channel state if present; null if no local information
    */
-  getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState>;
+  getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null>;
   
   /**
    * Update sub-channel state
-   * @param channelId - The channel ID to ensure no cross-channel key conflicts
-   * @param keyId - Complete DID key ID (e.g., "did:rooch:address#account-key")
+   * Only used when synchronizing data from the blockchain.
+   * @param channelId - The channel ID to ensure no cross-channel conflicts
+   * @param vmIdFragment - DID verification method fragment (e.g., "key-1")
    * @param updates - Partial updates to apply
    */
-  updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void>;
+  updateSubChannelState(channelId: string, vmIdFragment: string, updates: Partial<SubChannelState>): Promise<void>;
 
   /**
    * List all sub-channel states for a channel
@@ -60,9 +62,9 @@ export interface ChannelRepository {
   /**
    * Remove sub-channel state
    * @param channelId - Channel ID to ensure no cross-channel conflicts
-   * @param keyId - Complete DID key ID
+   * @param vmIdFragment - DID verification method fragment
    */
-  removeSubChannelState(channelId: string, keyId: string): Promise<void>;
+  removeSubChannelState(channelId: string, vmIdFragment: string): Promise<void>;
 
   // -------- Management Operations --------
 

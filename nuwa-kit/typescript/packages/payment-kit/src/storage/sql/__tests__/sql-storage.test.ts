@@ -327,23 +327,22 @@ describe('SQL Storage Repositories', () => {
         it('should manage sub-channel states', async () => {
       if (!channelRepo) return;
 
-      const keyId = 'did:rooch:0x123#key-1';
+          const vmIdFragment = 'key-1';
         
-      // Get default state
-      let state = await channelRepo.getSubChannelState(testChannel.channelId, keyId);
-      expect(state.nonce).toBe(BigInt(0));
-      expect(state.accumulatedAmount).toBe(BigInt(0));
+          // Initially should be null
+          let state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
+          expect(state).toBeNull();
 
       // Update state
-      await channelRepo.updateSubChannelState(testChannel.channelId, keyId, {
+          await channelRepo.updateSubChannelState(testChannel.channelId, vmIdFragment, {
         nonce: BigInt(5),
         accumulatedAmount: BigInt(5000000),
       });
 
       // Verify update
-      state = await channelRepo.getSubChannelState(testChannel.channelId, keyId);
-      expect(state.nonce).toBe(BigInt(5));
-      expect(state.accumulatedAmount).toBe(BigInt(5000000));
+          state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
+          expect(state!.nonce).toBe(BigInt(5));
+          expect(state!.accumulatedAmount).toBe(BigInt(5000000));
     }, 60000); // 60 second timeout for this specific test
 
     it('should list channels with pagination', async () => {

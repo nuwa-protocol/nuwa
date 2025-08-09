@@ -173,8 +173,7 @@ export class PaymentChannelPayerClient {
     await this.channelRepo.setChannelMetadata(result.channelId, metadata);
 
     // Initialize sub-channel state for this key
-    const keyId = this.keyId || `${payerDid}#${useFragment}`;
-    await this.channelRepo.updateSubChannelState(result.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(result.channelId, useFragment, {
       channelId: result.channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
@@ -207,8 +206,7 @@ export class PaymentChannelPayerClient {
     });
 
     // Initialize sub-channel state
-    const keyId = this.keyId || `${payerDid}#${useFragment}`;
-    await this.channelRepo.updateSubChannelState(params.channelId, keyId, {
+    await this.channelRepo.updateSubChannelState(params.channelId, useFragment, {
       channelId: params.channelId,
       epoch: BigInt(0),
       accumulatedAmount: BigInt(0),
@@ -259,14 +257,6 @@ export class PaymentChannelPayerClient {
     // Sign the SubRAV
     const signedSubRAV = await this.ravManager.sign(subRAV, this.signer, useKeyId);
 
-    // Update local state to track this payment
-    await this.channelRepo.updateSubChannelState(subRAV.channelId, useKeyId, {
-      channelId: subRAV.channelId,
-      epoch: subRAV.channelEpoch,
-      accumulatedAmount: subRAV.accumulatedAmount,
-      nonce: subRAV.nonce,
-      lastUpdated: Date.now(),
-    });
 
     return signedSubRAV;
   }

@@ -72,13 +72,13 @@ export class SqlChannelRepository implements ChannelRepository {
       await client.query(`
         CREATE TABLE IF NOT EXISTS ${this.subChannelStatesTable} (
           channel_id        TEXT NOT NULL,
-          key_id           TEXT NOT NULL,
+          vm_id_fragment   TEXT NOT NULL,
           channel_id_ref   TEXT NOT NULL,
           epoch            NUMERIC(78,0) NOT NULL DEFAULT 0,
           nonce            NUMERIC(78,0) NOT NULL DEFAULT 0,
           accumulated_amount NUMERIC(78,0) NOT NULL DEFAULT 0,
           last_update_time BIGINT NOT NULL,
-          PRIMARY KEY(channel_id, key_id)
+          PRIMARY KEY(channel_id, vm_id_fragment)
         )
       `);
 
@@ -248,24 +248,17 @@ export class SqlChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
+  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
         SELECT channel_id_ref, epoch, nonce, accumulated_amount, last_update_time
         FROM ${this.subChannelStatesTable}
-        WHERE channel_id = $1 AND key_id = $2
-      `, [channelId, keyId]);
+        WHERE channel_id = $1 AND vm_id_fragment = $2
+      `, [channelId, vmIdFragment]);
 
       if (result.rows.length === 0) {
-        // Return default state if not found
-        return {
-          channelId,
-          epoch: BigInt(0),
-          nonce: BigInt(0),
-          accumulatedAmount: BigInt(0),
-          lastUpdated: Date.now(),
-        };
+        return null;
       }
 
       const row = result.rows[0];
@@ -281,11 +274,17 @@ export class SqlChannelRepository implements ChannelRepository {
     }
   }
 
-  async updateSubChannelState(channelId: string, keyId: string, updates: Partial<SubChannelState>): Promise<void> {
+  async updateSubChannelState(channelId: string, vmIdFragment: string, updates: Partial<SubChannelState>): Promise<void> {
     const client = await this.pool.connect();
     try {
       // First, get current state or create default
-      const current = await this.getSubChannelState(channelId, keyId);
+      const current = await this.getSubChannelState(channelId, vmIdFragment) || {
+        channelId,
+        epoch: BigInt(0),
+        nonce: BigInt(0),
+        accumulatedAmount: BigInt(0),
+        lastUpdated: Date.now(),
+      };
       
       // Apply updates
       const newState = {
@@ -298,9 +297,9 @@ export class SqlChannelRepository implements ChannelRepository {
 
       await client.query(`
         INSERT INTO ${this.subChannelStatesTable} 
-        (channel_id, key_id, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time)
+        (channel_id, vm_id_fragment, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (channel_id, key_id) 
+        ON CONFLICT (channel_id, vm_id_fragment) 
         DO UPDATE SET
           channel_id_ref = EXCLUDED.channel_id_ref,
           epoch = EXCLUDED.epoch,
@@ -309,7 +308,7 @@ export class SqlChannelRepository implements ChannelRepository {
           last_update_time = EXCLUDED.last_update_time
       `, [
         channelId,
-        keyId,
+        vmIdFragment,
         newState.channelId,
         newState.epoch.toString(),
         newState.nonce.toString(),
@@ -325,7 +324,7 @@ export class SqlChannelRepository implements ChannelRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT key_id, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time
+        SELECT vm_id_fragment, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time
         FROM ${this.subChannelStatesTable}
         WHERE channel_id = $1
       `, [channelId]);
@@ -333,7 +332,7 @@ export class SqlChannelRepository implements ChannelRepository {
       const states: Record<string, SubChannelState> = {};
       
       for (const row of result.rows) {
-        states[row.key_id] = {
+        states[row.vm_id_fragment] = {
           channelId: row.channel_id_ref,
           epoch: BigInt(row.epoch),
           nonce: BigInt(row.nonce),
@@ -348,13 +347,13 @@ export class SqlChannelRepository implements ChannelRepository {
     }
   }
 
-  async removeSubChannelState(channelId: string, keyId: string): Promise<void> {
+  async removeSubChannelState(channelId: string, vmIdFragment: string): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query(`
         DELETE FROM ${this.subChannelStatesTable} 
-        WHERE channel_id = $1 AND key_id = $2
-      `, [channelId, keyId]);
+        WHERE channel_id = $1 AND vm_id_fragment = $2
+      `, [channelId, vmIdFragment]);
     } finally {
       client.release();
     }

@@ -162,12 +162,35 @@ export class PaymentChannelPayeeClient {
 
   /**
    * Get sub-channel state by (channelId, vmIdFragment)
-   * Convenience wrapper to reconstruct payer keyId from chain metadata
+   * If not found locally, try deriving from on-chain and sync into repository.
    */
-  async getSubChannelStateByFragment(channelId: string, vmIdFragment: string): Promise<SubChannelState> {
-    const info = await this.getChannelInfoCached(channelId);
-    const keyId = this.reconstructKeyId(info.payerDid, vmIdFragment);
-    return this.channelRepo.getSubChannelState(channelId, keyId);
+  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+    // 1) Try local repository first (no side effects)
+    const local = await this.channelRepo.getSubChannelState(channelId, vmIdFragment);
+    if (local) return local;
+
+    // 2) Fallback to chain: derive baseline (sync-from-chain is allowed to update repo)
+    try {
+      const [channelInfo, subInfo] = await Promise.all([
+        this.getChannelInfoCached(channelId),
+        this.contract.getSubChannel({ channelId, vmIdFragment }),
+      ]);
+
+      const derived: SubChannelState = {
+        channelId,
+        epoch: channelInfo.epoch,
+        accumulatedAmount: subInfo.lastClaimedAmount,
+        nonce: subInfo.lastConfirmedNonce,
+        lastUpdated: Date.now(),
+      };
+
+      // Sync to local repository as it's sourced from chain
+      await this.channelRepo.updateSubChannelState(channelId, vmIdFragment, derived);
+      return derived;
+    } catch {
+      // Chain fallback failed (e.g., sub-channel not authorized yet)
+      return null;
+    }
   }
 
   /**
@@ -192,28 +215,20 @@ export class PaymentChannelPayeeClient {
    * after calculating the actual consumption cost
    */
   async generateSubRAV(params: GenerateSubRAVParams): Promise<SubRAV> {
-    const { channelId, payerKeyId, amount, description } = params;
+    const { channelId, payerKeyId, amount } = params;
 
     // Get channel info to validate (using cache to ensure local storage is updated)
     const channelInfo = await this.getChannelInfoCached(channelId);
     
-    // Get current sub-channel state or initialize if first time
-    let subChannelState;
-    try {
-      subChannelState = await this.channelRepo.getSubChannelState(channelId, payerKeyId);
-    } catch (error) {
-      // First SubRAV for this sub-channel, initialize state
-      subChannelState = {
-        channelId,
-        epoch: channelInfo.epoch,
-        accumulatedAmount: BigInt(0),
-        nonce: BigInt(0),
-        lastUpdated: Date.now(),
-      };
-      
-      // Store initial state
-      await this.channelRepo.updateSubChannelState(channelId, payerKeyId, subChannelState);
-    }
+    // Get current sub-channel state or compute baseline in-memory if first time
+    const vmIdFragment = this.extractVmIdFragment(payerKeyId);
+    const subChannelState = (await this.channelRepo.getSubChannelState(channelId, vmIdFragment)) ?? {
+      channelId,
+      epoch: channelInfo.epoch,
+      accumulatedAmount: BigInt(0),
+      nonce: BigInt(0),
+      lastUpdated: Date.now(),
+    };
 
     // Validate that epoch matches
     if (subChannelState.epoch !== channelInfo.epoch) {
@@ -224,8 +239,7 @@ export class PaymentChannelPayeeClient {
     const newNonce = subChannelState.nonce + BigInt(1);
     const newAccumulatedAmount = subChannelState.accumulatedAmount + amount;
 
-    // Extract vmIdFragment from full keyId
-    const vmIdFragment = this.extractVmIdFragment(payerKeyId);
+    // vmIdFragment already extracted above
 
     const chainId = await this.getChainId();
 
@@ -237,9 +251,6 @@ export class PaymentChannelPayeeClient {
       accumulatedAmount: newAccumulatedAmount,
       nonce: newNonce,
     });
-
-    // Note: We don't update local state here - it will be updated when we receive 
-    // the signed SubRAV back and verify it successfully
     
     return subRAV;
   }
@@ -254,31 +265,8 @@ export class PaymentChannelPayeeClient {
     if (!verification.isValid) {
       throw new Error(`Invalid signed SubRAV: ${verification.error}`);
     }
-
-    // Update local state now that we have a verified signed SubRAV
-    const channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
-    const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
-    
-    // Special handling for handshake reset (nonce=0, amount=0)
-    const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
-                           signedSubRAV.subRav.accumulatedAmount === BigInt(0);
-    
-    await this.channelRepo.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
-      channelId: signedSubRAV.subRav.channelId,
-      epoch: signedSubRAV.subRav.channelEpoch,
-      accumulatedAmount: signedSubRAV.subRav.accumulatedAmount,
-      nonce: signedSubRAV.subRav.nonce,
-      lastUpdated: Date.now(),
-    });
-
     // Persist the signed SubRAV to RAVStore for ClaimScheduler and persistence
     await this.ravRepo.save(signedSubRAV);
-
-    if (isHandshakeReset) {
-      console.log(`Successfully processed handshake reset for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
-    } else {
-      console.log(`Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
-    }
   }
 
   // -------- SubRAV Verification --------
@@ -339,19 +327,19 @@ export class PaymentChannelPayeeClient {
       }
 
       // 4. Verify nonce progression (if we have previous state)
-      const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
-      try {
-        const prevState = await this.channelRepo.getSubChannelState(signedSubRAV.subRav.channelId, keyId);
-        
+      const vmIdFragmentPrev = signedSubRAV.subRav.vmIdFragment;
+      const prevState = await this.channelRepo.getSubChannelState(signedSubRAV.subRav.channelId, vmIdFragmentPrev);
+
+      if (prevState) {
         // Allow same nonce if it's the exact same SubRAV (same amount and other fields)
         const isSameSubRAV = signedSubRAV.subRav.nonce === prevState.nonce && 
-                            signedSubRAV.subRav.accumulatedAmount === prevState.accumulatedAmount &&
-                            signedSubRAV.subRav.channelEpoch === prevState.epoch;
-        
+                             signedSubRAV.subRav.accumulatedAmount === prevState.accumulatedAmount &&
+                             signedSubRAV.subRav.channelEpoch === prevState.epoch;
+
         // Allow handshake reset: nonce 0 with amount 0 is always valid as a reset
         const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
-                               signedSubRAV.subRav.accumulatedAmount === BigInt(0);
-        
+                                 signedSubRAV.subRav.accumulatedAmount === BigInt(0);
+
         const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce || isSameSubRAV || isHandshakeReset;
         result.details!.nonceProgression = nonceProgression;
         
@@ -368,7 +356,7 @@ export class PaymentChannelPayeeClient {
           result.error = `Amount cannot decrease: expected >= ${prevState.accumulatedAmount}, got ${signedSubRAV.subRav.accumulatedAmount}`;
           return result;
         }
-      } catch (error) {
+      } else {
         // No previous state found - this is the first SubRAV for this sub-channel
         // Allow nonce 0 (handshake) or nonce 1 (first payment)
         const isHandshake = signedSubRAV.subRav.nonce === BigInt(0) && signedSubRAV.subRav.accumulatedAmount === BigInt(0);
@@ -408,18 +396,7 @@ export class PaymentChannelPayeeClient {
       throw new Error(`Cannot store invalid SubRAV: ${verification.error}`);
     }
 
-    // Get channel info to reconstruct keyId
-    const channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
-    const keyId = this.reconstructKeyId(channelInfo.payerDid, signedSubRAV.subRav.vmIdFragment);
-
-    // Update sub-channel state
-    await this.channelRepo.updateSubChannelState(signedSubRAV.subRav.channelId, keyId, {
-      channelId: signedSubRAV.subRav.channelId,
-      epoch: signedSubRAV.subRav.channelEpoch,
-      accumulatedAmount: signedSubRAV.subRav.accumulatedAmount,
-      nonce: signedSubRAV.subRav.nonce,
-      lastUpdated: Date.now(),
-    });
+    // Do not update local sub-channel state here; only sync from on-chain data
   }
 
   // -------- Claims Management --------
@@ -710,7 +687,6 @@ export class PaymentChannelPayeeClient {
       channelId: params.channelId,
       payerKeyId,
       amount: params.amount,
-      description: params.description || `Payment proposal for ${params.channelId}`
     });
   }
 

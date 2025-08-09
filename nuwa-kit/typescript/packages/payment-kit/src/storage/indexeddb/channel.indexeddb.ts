@@ -31,7 +31,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
         // Sub-channel states store
         if (!db.objectStoreNames.contains('subChannelStates')) {
           const store = db.createObjectStore('subChannelStates', { 
-            keyPath: ['channelId', 'keyId'] 
+            keyPath: ['channelId', 'vmIdFragment'] 
           });
           store.createIndex('channelId', 'channelId', { unique: false });
         }
@@ -137,13 +137,13 @@ export class IndexedDBChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, keyId: string): Promise<SubChannelState> {
+  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readonly');
     const store = tx.objectStore('subChannelStates');
     
     const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
-      const request = store.get([channelId, keyId]);
+      const request = store.get([channelId, vmIdFragment]);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
@@ -151,28 +151,17 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     if (existing) {
       return {
         ...existing,
-        nonce: BigInt(existing.nonce as any),
-        accumulatedAmount: BigInt(existing.accumulatedAmount as any),
+        nonce: BigInt((existing as any).nonce),
+        accumulatedAmount: BigInt((existing as any).accumulatedAmount),
       };
     }
-
-    // Return default state if not found
-    const defaultState: SubChannelState = {
-      channelId,
-      epoch: BigInt(0),
-      nonce: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      lastUpdated: Date.now(),
-    };
     
-    // Save the default state
-    await this.updateSubChannelState(channelId, keyId, defaultState);
-    return defaultState;
+    return null;
   }
 
   async updateSubChannelState(
     channelId: string,
-    keyId: string,
+    vmIdFragment: string,
     updates: Partial<SubChannelState>
   ): Promise<void> {
     const db = await this.getDB();
@@ -181,14 +170,14 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     
     // Get existing state first
     const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
-      const request = store.get([channelId, keyId]);
+      const request = store.get([channelId, vmIdFragment]);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
 
     const baseState = existing || {
       channelId,
-      keyId,
+      vmIdFragment,
       epoch: BigInt(0),
       nonce: BigInt(0),
       accumulatedAmount: BigInt(0),
@@ -199,7 +188,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       ...baseState,
       ...updates,
       channelId,
-      keyId,
+      vmIdFragment,
       lastUpdated: Date.now(),
       // Convert bigints to strings for storage
       nonce: (updates.nonce || baseState.nonce).toString(),
@@ -227,8 +216,8 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
-          const state = cursor.value;
-          result[state.keyId] = {
+          const state = cursor.value as any;
+          result[state.vmIdFragment] = {
             ...state,
             nonce: BigInt(state.nonce),
             accumulatedAmount: BigInt(state.accumulatedAmount),
@@ -245,13 +234,13 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     return result;
   }
 
-  async removeSubChannelState(channelId: string, keyId: string): Promise<void> {
+  async removeSubChannelState(channelId: string, vmIdFragment: string): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readwrite');
     const store = tx.objectStore('subChannelStates');
     
     await new Promise<void>((resolve, reject) => {
-      const request = store.delete([channelId, keyId]);
+      const request = store.delete([channelId, vmIdFragment]);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
