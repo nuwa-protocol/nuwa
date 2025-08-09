@@ -1106,9 +1106,7 @@ export class PaymentChannelHttpClient {
       // Clear after taking to keep existing semantics
       this.clientState.pendingSubRAV = undefined;
 
-      const signed = await this.payerClient.signSubRAV(pendingSubRAV, {
-        maxAmount: this.options.maxAmount
-      });
+      const signed = await this.payerClient.signSubRAV(pendingSubRAV);
       this.log('Signed pending SubRAV:', pendingSubRAV.nonce, pendingSubRAV.accumulatedAmount);
       return signed;
     }
