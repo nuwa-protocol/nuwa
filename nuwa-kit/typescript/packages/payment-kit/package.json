@@ -3,14 +3,37 @@
   "version": "0.1.0",
   "description": "SDK for NIP-4 Unidirectional Payment Channels on Rooch and other ledgers",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/node/index.cjs",
+  "module": "./dist/node/index.js",
+  "types": "./dist/node/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "types": "./dist/node/index.d.ts",
+      "browser": "./dist/browser/index.js",
+      "import": "./dist/node/index.js",
+      "require": "./dist/node/index.cjs"
+    },
+    "./http": {
+      "types": "./dist/node/integrations/http/index.d.ts",
+      "browser": "./dist/browser/integrations/http/index.js",
+      "import": "./dist/node/integrations/http/index.js",
+      "require": "./dist/node/integrations/http/index.cjs"
+    },
+    "./express": {
+      "types": "./dist/node/transport/express/index.d.ts",
+      "import": "./dist/node/transport/express/index.js",
+      "require": "./dist/node/transport/express/index.cjs"
+    },
+    "./storage/sql": {
+      "types": "./dist/node/storage/sql/index.d.ts",
+      "import": "./dist/node/storage/sql/index.js",
+      "require": "./dist/node/storage/sql/index.cjs"
+    },
+    "./storage/indexeddb": {
+      "types": "./dist/node/empty.d.ts",
+      "browser": "./dist/browser/storage/indexeddb/index.js",
+      "import": "./dist/node/empty.js",
+      "require": "./dist/node/empty.cjs"
     }
   },
   "scripts": {
@@ -87,17 +110,36 @@
     "pg": "^8.16.3",
     "zod": "^3.25.0"
   },
+  "sideEffects": [
+    "src/billing/strategies/index.ts"
+  ],
+  "peerDependencies": {
+    "express": ">=4",
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "express": { "optional": true },
+    "pg": { "optional": true }
+  },
   "tsup": {
-    "entry": [
-      "src/index.ts"
-    ],
-    "format": [
-      "esm",
-      "cjs"
-    ],
+    "clean": true,
+    "sourcemap": true,
     "dts": true,
     "splitting": false,
-    "sourcemap": true,
-    "clean": true
+    "skipNodeModulesBundle": true,
+    "entry": {
+      "browser/index": "src/index.browser.ts",
+      "node/index": "src/index.node.ts",
+      "browser/integrations/http/index": "src/integrations/http/index.ts",
+      "node/integrations/http/index": "src/integrations/http/index.ts",
+      "node/transport/express/index": "src/transport/express/index.ts",
+      "node/storage/sql/index": "src/storage/sql/index.ts",
+      "browser/storage/indexeddb/index": "src/storage/indexeddb/index.ts",
+      "node/empty": "src/node/empty.ts"
+    },
+    "format": ["esm", "cjs"],
+    "outDir": "dist",
+    "platform": "neutral",
+    "target": "es2020"
   }
 }
