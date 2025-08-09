@@ -12,7 +12,7 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
 export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (ctx, req) => {
   try {
     const internalReq = req as InternalRecoveryRequest;
-    if (!internalReq.didInfo || !internalReq.didInfo.did) {
+    if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
       throw new PaymentKitError(
         ErrorCode.UNAUTHORIZED,
         'DID authentication required',
@@ -33,8 +33,12 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
       // Channel doesn't exist yet - this is normal for first-time clients
     }
 
-    // Find the latest pending SubRAV for this channel (for recovery scenarios)
-    const pending = await ctx.middleware.findLatestPendingProposal(channelId);
+    // Extract vmIdFragment from DID keyId and find latest pending for sub-channel
+    const keyParts = internalReq.didInfo.keyId.split('#');
+    const vmIdFragment = keyParts.length > 1 ? keyParts[1] : '';
+    const pending = vmIdFragment
+      ? await ctx.middleware.findLatestPendingProposal(channelId, vmIdFragment)
+      : null;
 
     const response: RecoveryResponse = {
       channel: channel ?? null,

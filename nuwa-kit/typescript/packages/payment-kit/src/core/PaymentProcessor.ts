@@ -225,6 +225,10 @@ export interface PaymentVerificationResult extends VerificationResult {
     }
   }
 
+  getPendingSubRAVRepository(): PendingSubRAVRepository {
+    return this.pendingSubRAVStore;
+  }
+
   /**
    * Step B & C: Settle billing - lightweight synchronous operations only
    * For Pre-flight: essentially no-op (already completed in preProcess)
@@ -433,7 +437,7 @@ export interface PaymentVerificationResult extends VerificationResult {
       if (newSubRAV.nonce > 1n) {
         const prevNonce = newSubRAV.nonce - 1n;
         try {
-          await this.pendingSubRAVStore.remove(newSubRAV.channelId, prevNonce);
+          await this.pendingSubRAVStore.remove(newSubRAV.channelId, newSubRAV.vmIdFragment, prevNonce);
           this.log('🗑️ Removed previous pending SubRAV:', {
             channelId: newSubRAV.channelId,
             nonce: prevNonce.toString()
@@ -467,6 +471,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         // Check if this SubRAV matches one we previously sent
         const pendingSubRAV = await this.pendingSubRAVStore.find(
           signedSubRAV.subRav.channelId,
+          signedSubRAV.subRav.vmIdFragment,
           signedSubRAV.subRav.nonce
         );
         
@@ -496,7 +501,7 @@ export interface PaymentVerificationResult extends VerificationResult {
         }
   
         // Payment verified successfully, remove from pending list
-        await this.pendingSubRAVStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.nonce);
+        await this.pendingSubRAVStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.vmIdFragment, signedSubRAV.subRav.nonce);
         
         // Get channel info to extract payer DID for constructing payerKeyId
         const channelInfo = await this.config.payeeClient.getChannelInfo(signedSubRAV.subRav.channelId);
@@ -560,15 +565,15 @@ export interface PaymentVerificationResult extends VerificationResult {
     /**
      * Find pending SubRAV proposal by channel and nonce
      */
-    async findPendingProposal(channelId: string, nonce: bigint): Promise<SubRAV | null> {
-      return await this.pendingSubRAVStore.find(channelId, nonce);
+    async findPendingProposal(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
+      return await this.pendingSubRAVStore.find(channelId, vmIdFragment, nonce);
     }
 
     /**
      * Find the latest pending SubRAV proposal for a channel (for recovery scenarios)
      */
-    async findLatestPendingProposal(channelId: string): Promise<SubRAV | null> {
-      return await this.pendingSubRAVStore.findLatestByChannel(channelId);
+    async findLatestPendingProposal(channelId: string, vmIdFragment: string): Promise<SubRAV | null> {
+      return await this.pendingSubRAVStore.findLatestBySubChannel(channelId, vmIdFragment);
     }
 
     /**
@@ -699,8 +704,8 @@ export interface PaymentVerificationResult extends VerificationResult {
         }
 
         // Check if there's a pending proposal for this (channelId, vmIdFragment)
-        const latestPending = await this.pendingSubRAVStore.findLatestByChannel(channelId);
-        if (!latestPending || latestPending.vmIdFragment !== vmIdFragment) {
+        const latestPending = await this.pendingSubRAVStore.findLatestBySubChannel(channelId, vmIdFragment);
+        if (!latestPending) {
           this.log('No pending proposal found for channel:', channelId, 'vmId:', vmIdFragment);
           return { shouldReturnEarly: false };
         }

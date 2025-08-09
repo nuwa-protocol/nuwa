@@ -409,7 +409,7 @@ describe('SQL Storage Repositories', () => {
 
       await pendingRepo.save(testSubRAV);
 
-      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.nonce);
+      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
       expect(found).not.toBeNull();
       expect(found!.channelId).toBe(testSubRAV.channelId);
       expect(found!.nonce).toBe(testSubRAV.nonce);
@@ -421,14 +421,14 @@ describe('SQL Storage Repositories', () => {
       await pendingRepo.save(testSubRAV);
       
       // Verify it exists
-      let found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.nonce);
+      let found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
       expect(found).not.toBeNull();
 
       // Remove it
-      await pendingRepo.remove(testSubRAV.channelId, testSubRAV.nonce);
+      await pendingRepo.remove(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
 
       // Verify it's gone
-      found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.nonce);
+      found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
       expect(found).toBeNull();
     });
 
@@ -464,7 +464,7 @@ describe('SQL Storage Repositories', () => {
       expect(deletedCount).toBe(1);
 
       // Verify it's gone
-      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.nonce);
+      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
       expect(found).toBeNull();
     });
   });

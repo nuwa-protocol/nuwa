@@ -649,6 +649,7 @@ export class PaymentChannelPayeeClient {
       // Check if this SubRAV matches one we previously sent
       const pendingSubRAV = await pendingStore.find(
         signedSubRAV.subRav.channelId,
+        signedSubRAV.subRav.vmIdFragment,
         signedSubRAV.subRav.nonce
       );
       
@@ -672,7 +673,11 @@ export class PaymentChannelPayeeClient {
       
       if (result.isValid) {
         // Remove from pending list on successful verification
-        await pendingStore.remove(signedSubRAV.subRav.channelId, signedSubRAV.subRav.nonce);
+        await pendingStore.remove(
+          signedSubRAV.subRav.channelId,
+          signedSubRAV.subRav.vmIdFragment,
+          signedSubRAV.subRav.nonce
+        );
         console.log(`✅ Confirmed signed proposal for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
       } else {
         console.log(`❌ Signed proposal verification failed: ${result.error}`);

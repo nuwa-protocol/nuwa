@@ -370,7 +370,7 @@ describe('Repository-Based Storage Layer', () => {
       const subRAV = createMockSubRAV('ch1', BigInt(1), BigInt(100));
       
       await pendingRepo.save(subRAV);
-      const found = await pendingRepo.find('ch1', BigInt(1));
+      const found = await pendingRepo.find('ch1', 'test-vm', BigInt(1));
       
       expect(found).toEqual(subRAV);
     });
@@ -379,9 +379,9 @@ describe('Repository-Based Storage Layer', () => {
       const subRAV = createMockSubRAV('ch1', BigInt(1), BigInt(100));
       
       await pendingRepo.save(subRAV);
-      await pendingRepo.remove('ch1', BigInt(1));
+      await pendingRepo.remove('ch1', 'test-vm', BigInt(1));
       
-      const found = await pendingRepo.find('ch1', BigInt(1));
+      const found = await pendingRepo.find('ch1', 'test-vm', BigInt(1));
       expect(found).toBeNull();
     });
 
@@ -531,7 +531,7 @@ describe('Factory Functions and Multi-Backend Support', () => {
           };
           
           await repo.save(subRAV);
-          const retrieved = await repo.find('test-channel', BigInt(1));
+          const retrieved = await repo.find('test-channel', 'test-vm', BigInt(1));
           
           expect(retrieved).toEqual(subRAV);
         });

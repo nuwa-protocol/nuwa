@@ -54,10 +54,11 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
       await client.query(`
         CREATE TABLE IF NOT EXISTS ${this.pendingSubRAVsTable} (
           channel_id        TEXT NOT NULL,
-          nonce            NUMERIC(78,0) NOT NULL,
-          sub_rav_bcs      BYTEA NOT NULL,
-          created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          PRIMARY KEY(channel_id, nonce)
+          vm_id_fragment    TEXT NOT NULL,
+          nonce             NUMERIC(78,0) NOT NULL,
+          sub_rav_bcs       BYTEA NOT NULL,
+          created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          PRIMARY KEY(channel_id, vm_id_fragment, nonce)
         )
       `);
 
@@ -65,6 +66,10 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_${this.tablePrefix}pending_sub_ravs_created_at 
         ON ${this.pendingSubRAVsTable}(created_at)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_${this.tablePrefix}pending_sub_ravs_sub_channel 
+        ON ${this.pendingSubRAVsTable}(channel_id, vm_id_fragment)
       `);
 
     } finally {
@@ -80,14 +85,15 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
       
       await client.query(`
         INSERT INTO ${this.pendingSubRAVsTable} 
-        (channel_id, nonce, sub_rav_bcs)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (channel_id, nonce) 
+        (channel_id, vm_id_fragment, nonce, sub_rav_bcs)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (channel_id, vm_id_fragment, nonce) 
         DO UPDATE SET 
           sub_rav_bcs = EXCLUDED.sub_rav_bcs,
           created_at = NOW()
       `, [
         subRAV.channelId,
+        subRAV.vmIdFragment,
         subRAV.nonce.toString(),
         subRavBcs
       ]);
@@ -96,14 +102,14 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     }
   }
 
-  async find(channelId: string, nonce: bigint): Promise<SubRAV | null> {
+  async find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
         SELECT sub_rav_bcs 
         FROM ${this.pendingSubRAVsTable}
-        WHERE channel_id = $1 AND nonce = $2
-      `, [channelId, nonce.toString()]);
+        WHERE channel_id = $1 AND vm_id_fragment = $2 AND nonce = $3
+      `, [channelId, vmIdFragment, nonce.toString()]);
 
       if (result.rows.length === 0) {
         return null;
@@ -116,16 +122,16 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     }
   }
 
-  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+  async findLatestBySubChannel(channelId: string, vmIdFragment: string): Promise<SubRAV | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
         SELECT sub_rav_bcs 
         FROM ${this.pendingSubRAVsTable}
-        WHERE channel_id = $1
+        WHERE channel_id = $1 AND vm_id_fragment = $2
         ORDER BY nonce DESC
         LIMIT 1
-      `, [channelId]);
+      `, [channelId, vmIdFragment]);
 
       if (result.rows.length === 0) {
         return null;
@@ -138,13 +144,13 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     }
   }
 
-  async remove(channelId: string, nonce: bigint): Promise<void> {
+  async remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query(`
         DELETE FROM ${this.pendingSubRAVsTable} 
-        WHERE channel_id = $1 AND nonce = $2
-      `, [channelId, nonce.toString()]);
+        WHERE channel_id = $1 AND vm_id_fragment = $2 AND nonce = $3
+      `, [channelId, vmIdFragment, nonce.toString()]);
     } finally {
       client.release();
     }

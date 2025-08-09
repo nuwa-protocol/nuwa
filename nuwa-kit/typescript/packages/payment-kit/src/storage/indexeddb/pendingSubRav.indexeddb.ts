@@ -8,7 +8,7 @@ import type { PendingSubRAVStats } from '../types/pagination';
 
 export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository {
   private dbName = 'nuwa-payment-kit-pending-subravs';
-  private version = 1;
+  private version = 2;
 
   private async getDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -19,15 +19,24 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
       
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        
-        // Pending SubRAVs store
-        if (!db.objectStoreNames.contains('pendingSubRAVs')) {
-          const store = db.createObjectStore('pendingSubRAVs', { 
-            keyPath: ['channelId', 'nonce'] 
-          });
-          store.createIndex('channelId', 'channelId', { unique: false });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
+        const oldVersion = (event as any).oldVersion as number | undefined;
+
+        // If upgrading from v1 (or creating fresh), ensure store has new keyPath including vmIdFragment
+        if (db.objectStoreNames.contains('pendingSubRAVs')) {
+          // For old schemas, drop and recreate with the new composite key
+          try {
+            db.deleteObjectStore('pendingSubRAVs');
+          } catch (_) {
+            // ignore if delete fails
+          }
         }
+
+        const store = db.createObjectStore('pendingSubRAVs', {
+          keyPath: ['channelId', 'vmIdFragment', 'nonce']
+        });
+        store.createIndex('channelId', 'channelId', { unique: false });
+        store.createIndex('subChannel', ['channelId', 'vmIdFragment'], { unique: false });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
       };
     });
   }
@@ -39,6 +48,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     
     const record = {
       channelId: subRAV.channelId,
+      vmIdFragment: subRAV.vmIdFragment,
       nonce: subRAV.nonce.toString(),
       subRAVData: {
         ...subRAV,
@@ -55,13 +65,13 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     });
   }
 
-  async find(channelId: string, nonce: bigint): Promise<SubRAV | null> {
+  async find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readonly');
     const store = tx.objectStore('pendingSubRAVs');
     
     const record = await new Promise<any>((resolve, reject) => {
-      const request = store.get([channelId, nonce.toString()]);
+      const request = store.get([channelId, vmIdFragment, nonce.toString()]);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -78,17 +88,17 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     };
   }
 
-  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+  async findLatestBySubChannel(channelId: string, vmIdFragment: string): Promise<SubRAV | null> {
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readonly');
     const store = tx.objectStore('pendingSubRAVs');
-    const channelIndex = store.index('by-channel');
+    const subChannelIndex = store.index('subChannel');
     
     let latestSubRAV: SubRAV | null = null;
     let maxNonce = BigInt(-1);
 
     // Use cursor to iterate through all records for this channel
-    const cursorRequest = channelIndex.openCursor(IDBKeyRange.only(channelId));
+    const cursorRequest = subChannelIndex.openCursor(IDBKeyRange.only([channelId, vmIdFragment]));
     
     await new Promise<void>((resolve, reject) => {
       cursorRequest.onsuccess = () => {
@@ -117,13 +127,13 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     return latestSubRAV;
   }
 
-  async remove(channelId: string, nonce: bigint): Promise<void> {
+  async remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');
     const store = tx.objectStore('pendingSubRAVs');
     
     await new Promise<void>((resolve, reject) => {
-      const request = store.delete([channelId, nonce.toString()]);
+      const request = store.delete([channelId, vmIdFragment, nonce.toString()]);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });

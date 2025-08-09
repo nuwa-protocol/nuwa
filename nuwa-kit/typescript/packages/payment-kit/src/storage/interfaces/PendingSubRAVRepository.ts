@@ -18,21 +18,22 @@ export interface PendingSubRAVRepository {
   save(subRAV: SubRAV): Promise<void>;
 
   /**
-   * Find a pending SubRAV by channel ID and nonce
+   * Find a pending SubRAV by channel ID, sub-channel fragment and nonce
    */
-  find(channelId: string, nonce: bigint): Promise<SubRAV | null>;
+  find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null>;
 
   /**
-   * Find the latest pending SubRAV for a channel (for recovery scenarios)
+   * Find the latest pending SubRAV for a specific sub-channel (for recovery scenarios)
    * @param channelId Channel identifier
-   * @returns The pending SubRAV with highest nonce, or null if none found
+   * @param vmIdFragment DID verification method fragment (sub-channel key)
+   * @returns The pending SubRAV with highest nonce for that sub-channel, or null if none found
    */
-  findLatestByChannel(channelId: string): Promise<SubRAV | null>;
+  findLatestBySubChannel(channelId: string, vmIdFragment: string): Promise<SubRAV | null>;
 
   /**
    * Remove a pending SubRAV after it's been signed and processed
    */
-  remove(channelId: string, nonce: bigint): Promise<void>;
+  remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void>;
 
   /**
    * Clean up expired proposals older than specified age

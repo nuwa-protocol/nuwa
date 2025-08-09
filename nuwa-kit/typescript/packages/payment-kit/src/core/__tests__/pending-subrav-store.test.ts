@@ -26,7 +26,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
 
     await store.save(subRAV);
 
-    const found = await store.find('test-channel', BigInt(1));
+    const found = await store.find('test-channel', 'test-key', BigInt(1));
     expect(found).toBeDefined();
     expect(found?.channelId).toBe('test-channel');
     expect(found?.nonce).toBe(BigInt(1));
@@ -34,7 +34,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
   });
 
   test('should return null for non-existent SubRAV', async () => {
-    const found = await store.find('non-existent', BigInt(1));
+    const found = await store.find('non-existent', 'test-key', BigInt(1));
     expect(found).toBeNull();
   });
 
@@ -52,14 +52,14 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
     await store.save(subRAV);
     
     // Verify it exists
-    let found = await store.find('test-channel', BigInt(1));
+    let found = await store.find('test-channel', 'test-key', BigInt(1));
     expect(found).toBeDefined();
 
     // Remove it
-    await store.remove('test-channel', BigInt(1));
+    await store.remove('test-channel', 'test-key', BigInt(1));
 
     // Verify it's gone
-    found = await store.find('test-channel', BigInt(1));
+    found = await store.find('test-channel', 'test-key', BigInt(1));
     expect(found).toBeNull();
   });
 
@@ -88,7 +88,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
     await store.save(subRAV2);
 
     // Manually set old timestamp for one of them
-    (store as any).proposals.set('channel-1:1', {
+    (store as any).proposals.set('channel-1:key-1:1', {
       subRAV: subRAV1,
       timestamp: Date.now() - (35 * 60 * 1000) // 35 minutes ago
     });
@@ -99,8 +99,8 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
     expect(cleanedCount).toBe(1);
 
     // Verify only the new one remains
-    const found1 = await store.find('channel-1', BigInt(1));
-    const found2 = await store.find('channel-2', BigInt(1));
+    const found1 = await store.find('channel-1', 'key-1', BigInt(1));
+    const found2 = await store.find('channel-2', 'key-1', BigInt(1));
     expect(found1).toBeNull();
     expect(found2).toBeDefined();
   });

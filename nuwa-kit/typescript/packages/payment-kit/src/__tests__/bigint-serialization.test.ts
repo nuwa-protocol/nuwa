@@ -25,7 +25,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
         accumulatedAmount: 1000000000n, // BigInt - 1 RGas
         nonce: 5n // BigInt
       },
-      isHandshakeComplete: true,
       lastUpdated: new Date().toISOString()
     };
 
@@ -40,7 +39,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
     // 验证基本结构
     expect(retrievedState).toBeDefined();
     expect(retrievedState!.channelId).toBe(testState.channelId);
-    expect(retrievedState!.isHandshakeComplete).toBe(testState.isHandshakeComplete);
     expect(retrievedState!.pendingSubRAV).toBeDefined();
 
     const originalSubRAV = testState.pendingSubRAV!;
@@ -68,7 +66,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
   test('should handle states without pendingSubRAV', async () => {
     const testState: PersistedHttpClientState = {
       channelId: 'test-channel-456',
-      isHandshakeComplete: false,
       lastUpdated: new Date().toISOString()
     };
 
@@ -79,7 +76,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
 
     expect(retrievedState).toBeDefined();
     expect(retrievedState!.channelId).toBe(testState.channelId);
-    expect(retrievedState!.isHandshakeComplete).toBe(testState.isHandshakeComplete);
     expect(retrievedState!.pendingSubRAV).toBeUndefined();
   });
 
@@ -92,7 +88,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
         channelId: 'test-channel',
         vmIdFragment: 'account-key',
       },
-      isHandshakeComplete: 'not-a-boolean', // 错误的类型
     } as any;
 
     const host = 'invalid.example.com';
@@ -104,7 +99,6 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
   test('should maintain legacy store sync', async () => {
     const testState: PersistedHttpClientState = {
       channelId: 'legacy-channel-789',
-      isHandshakeComplete: true,
     };
 
     const host = 'legacy.example.com';

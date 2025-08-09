@@ -10,20 +10,20 @@ import type { PendingSubRAVStats } from '../types/pagination';
 export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
   private proposals = new Map<string, { subRAV: SubRAV; timestamp: number }>();
 
-  private getKey(channelId: string, nonce: bigint): string {
-    return `${channelId}:${nonce}`;
+  private getKey(channelId: string, vmIdFragment: string, nonce: bigint): string {
+    return `${channelId}:${vmIdFragment}:${nonce}`;
   }
 
   async save(subRAV: SubRAV): Promise<void> {
-    const key = this.getKey(subRAV.channelId, subRAV.nonce);
+    const key = this.getKey(subRAV.channelId, subRAV.vmIdFragment, subRAV.nonce);
     this.proposals.set(key, {
       subRAV: { ...subRAV }, // Deep copy to avoid mutations
       timestamp: Date.now(),
     });
   }
 
-  async find(channelId: string, nonce: bigint): Promise<SubRAV | null> {
-    const key = this.getKey(channelId, nonce);
+  async find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
+    const key = this.getKey(channelId, vmIdFragment, nonce);
     const entry = this.proposals.get(key);
     
     if (!entry) {
@@ -33,12 +33,12 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
     return { ...entry.subRAV }; // Return copy to avoid mutations
   }
 
-  async findLatestByChannel(channelId: string): Promise<SubRAV | null> {
+  async findLatestBySubChannel(channelId: string, vmIdFragment: string): Promise<SubRAV | null> {
     let latestSubRAV: SubRAV | null = null;
     let maxNonce = BigInt(-1);
 
     for (const [key, entry] of this.proposals) {
-      if (key.startsWith(`${channelId}:`)) {
+      if (key.startsWith(`${channelId}:${vmIdFragment}:`)) {
         const subRAV = entry.subRAV;
         if (subRAV.nonce > maxNonce) {
           maxNonce = subRAV.nonce;
@@ -50,8 +50,8 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
     return latestSubRAV ? { ...latestSubRAV } : null; // Return copy to avoid mutations
   }
 
-  async remove(channelId: string, nonce: bigint): Promise<void> {
-    const key = this.getKey(channelId, nonce);
+  async remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
+    const key = this.getKey(channelId, vmIdFragment, nonce);
     this.proposals.delete(key);
   }
 

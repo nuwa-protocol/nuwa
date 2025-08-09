@@ -15,6 +15,8 @@ import type {
  */
 export interface DIDAuthInfo {
   did: string;
+  /** Full DID key id, e.g., did:xxx#key-1 */
+  keyId: string;
 }
 
 /**

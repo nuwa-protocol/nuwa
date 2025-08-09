@@ -360,15 +360,15 @@ export class HttpBillingMiddleware {
   /**
    * Find pending SubRAV proposal
    */
-  async findPendingProposal(channelId: string, nonce: bigint): Promise<any> {
-    return await this.processor.findPendingProposal(channelId, nonce);
+  async findPendingProposal(channelId: string, vmIdFragment: string, nonce: bigint): Promise<any> {
+    return await this.processor.findPendingProposal(channelId, vmIdFragment, nonce);
   }
 
   /**
    * Find the latest pending SubRAV proposal for a channel
    */
-  async findLatestPendingProposal(channelId: string): Promise<any> {
-    return await this.processor.findLatestPendingProposal(channelId);
+  async findLatestPendingProposal(channelId: string, vmIdFragment: string): Promise<any> {
+    return await this.processor.findLatestPendingProposal(channelId, vmIdFragment);
   }
 
   /**

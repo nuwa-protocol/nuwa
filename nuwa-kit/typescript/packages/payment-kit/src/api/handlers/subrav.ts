@@ -18,7 +18,7 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
     
     // Check if user is authenticated
     const internalReq = req as InternalSubRavRequest;
-    if (!internalReq.didInfo || !internalReq.didInfo.did) {
+    if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
       throw new PaymentKitError(
         ErrorCode.UNAUTHORIZED,
         'DID authentication required',
@@ -44,7 +44,18 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
       );
     }
     
-    const subRAV = await ctx.middleware.findPendingProposal(req.channelId, BigInt(req.nonce));
+    // Extract vmIdFragment from DID keyId (format: did:...#fragment)
+    // Extract vmIdFragment from DID keyId (format: did:...#fragment)
+    const keyParts = internalReq.didInfo.keyId.split('#');
+    const vmIdFragment = keyParts.length > 1 ? keyParts[1] : '';
+    if (!vmIdFragment) {
+      throw new PaymentKitError(
+        ErrorCode.BAD_REQUEST,
+        'Invalid DID keyId: missing fragment',
+        400
+      );
+    }
+    const subRAV = await ctx.middleware.findPendingProposal(req.channelId, vmIdFragment, BigInt(req.nonce));
     
     if (subRAV) {
       if (ctx.config.debug) {
