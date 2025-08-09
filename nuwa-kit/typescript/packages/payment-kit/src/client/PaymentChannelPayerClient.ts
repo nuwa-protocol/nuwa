@@ -295,51 +295,27 @@ export class PaymentChannelPayerClient {
     // 3. Verify nonce progression and check amount limit using delta amount
     const payerDid = await this.signer.getDid();
     const keyId = `${payerDid}#${subRAV.vmIdFragment}`;
-    
-    // Check if this is a handshake SubRAV (nonce=0, amount=0)
-    const isHandshake = subRAV.nonce === BigInt(0) && subRAV.accumulatedAmount === BigInt(0);
-    
-    if (isHandshake) {
-      // Handshake SubRAV - always allowed, no sequence validation needed
-      // This allows for re-handshaking after clearPendingSubRAV() or other resets
-      
-      // For handshake, maxAmount check is not applicable since amount is always 0
-      return; // Skip further validation for handshake
-    }
-    
-    // Non-handshake SubRAV - need to validate sequence and amount
-    const prevState = await this.channelRepo.getSubChannelState(subRAV.channelId, keyId);
-    
-    // Check if this appears to be the first real payment (stored state is still default)
-    const isFirstPayment = prevState.nonce === BigInt(0) && prevState.accumulatedAmount === BigInt(0);
-    
-    if (isFirstPayment) {
-      // First payment after handshake - should have nonce=1
-      if (subRAV.nonce !== BigInt(1)) {
-        throw new Error(`First payment SubRAV must have nonce 1, got ${subRAV.nonce}`);
-      }
-      
-      // Check delta amount against maximum amount limit for first payment
-      if (maxAmount && maxAmount > 0n) {
-        const deltaAmount = subRAV.accumulatedAmount - prevState.accumulatedAmount;
-        if (deltaAmount > maxAmount) {
-          throw new Error(`Delta amount ${deltaAmount} exceeds maximum allowed ${maxAmount}`);
-        }
-      }
-    } else {
-      // Subsequent payments - verify progression using shared util (no zero-cost allowed here)
-      assertSubRavProgression(
-        { nonce: prevState.nonce, accumulatedAmount: prevState.accumulatedAmount },
-        { nonce: subRAV.nonce, accumulatedAmount: subRAV.accumulatedAmount },
-        true,
-      );
 
-      // Check delta amount against maximum amount limit
-      if (maxAmount && maxAmount > 0n) {
-        const deltaAmount = subRAV.accumulatedAmount - prevState.accumulatedAmount;
-        if (deltaAmount > maxAmount) {
-          throw new Error(`Delta amount ${deltaAmount} exceeds maximum allowed ${maxAmount}`);
-        }
+    // When the subchannel is created, the nonce is 0
+    if (subRAV.nonce === BigInt(0)) {
+      throw new Error(`SubRAV nonce cannot be 0`);
+    }
+    //TODO we should get the previous rav from the rav repository
+    // - need to validate sequence and amount
+    const prevState = await this.channelRepo.getSubChannelState(subRAV.channelId, keyId);
+      
+    // Subsequent payments - verify progression using shared util (no zero-cost allowed here)
+    assertSubRavProgression(
+      { nonce: prevState.nonce, accumulatedAmount: prevState.accumulatedAmount },
+      { nonce: subRAV.nonce, accumulatedAmount: subRAV.accumulatedAmount },
+      true,
+    );
+
+    // Check delta amount against maximum amount limit
+    if (maxAmount && maxAmount > 0n) {
+      const deltaAmount = subRAV.accumulatedAmount - prevState.accumulatedAmount;
+      if (deltaAmount > maxAmount) {
+        throw new Error(`Delta amount ${deltaAmount} exceeds maximum allowed ${maxAmount}`);
       }
     }
 

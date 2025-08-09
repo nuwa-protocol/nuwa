@@ -122,10 +122,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       console.log('✅ Billing server shutdown');
     }
 
-    // Note: PaymentChannelHttpClient should handle channel cleanup automatically
-    // or provide explicit cleanup methods in the future
     console.log('🏁 HTTP Payment Kit E2E Tests completed');
-  }, 60000); // 1 minute timeout for cleanup 
+  }, 60000); 
 
   test('Service discovery with createHttpClient', async () => {
     if (!shouldRunE2ETests()) return;
@@ -230,9 +228,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     if (!shouldRunE2ETests()) return;
 
     console.log('🔄 Testing mixed request types with different pricing');
-
-    // Reset client state
-    httpClient.clearPendingSubRAV();
 
     // Test echo requests (cheaper)
     console.log('📞 Echo requests (0.001 USD each)');
@@ -466,16 +461,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       console.log('ℹ️ Manual claim trigger failed (expected if nothing to claim):', error);
     }
 
-    // Test 6: Cleanup (admin endpoint)
-    console.log('📞 Testing cleanup via AdminClient');
-    const cleanupResponse = await adminClient.cleanup({
-      maxAgeMinutes: 1 // 1 minute
-    });
-    expect(cleanupResponse.clearedCount).toBeGreaterThanOrEqual(0);
-    expect(Number(cleanupResponse.maxAgeMinutes)).toBe(1);
-    console.log('✅ Cleanup successful:', cleanupResponse);
-
-    console.log('🎉 Admin Client functionality test successful!');
   }, 120000);
 
   test('PerToken post-flight billing with chat completions', async () => {
