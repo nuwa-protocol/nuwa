@@ -127,10 +127,7 @@ describe('PaymentChannelIntegration', () => {
 
     // Step 4: Payer signs the SubRAV to authorize payment
     console.log('✍️ Step 4: Payer signs SubRAV to authorize payment');
-    const signedSubRAV = await payerClient.signSubRAV(subRAV, {
-      validateBeforeSigning: true,
-      maxAmount: BigInt(100000), // 0.001 RGas max
-    });
+    const signedSubRAV = await payerClient.signSubRAV(subRAV);
 
     expect(signedSubRAV.subRav).toEqual(subRAV);
     expect(signedSubRAV.signature).toBeTruthy();

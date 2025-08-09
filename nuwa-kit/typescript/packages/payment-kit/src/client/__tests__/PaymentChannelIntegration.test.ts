@@ -173,10 +173,7 @@ describe('PaymentChannelIntegration (Real Blockchain)', () => {
 
     // Step 5: Payer signs the SubRAV
     console.log('✍️ Step 5: Payer signs SubRAV');
-    const signedSubRAV = await payerClient.signSubRAV(subRAV, {
-      validateBeforeSigning: true,
-      maxAmount: BigInt(100000000), // 1 RGas max
-    });
+    const signedSubRAV = await payerClient.signSubRAV(subRAV);
 
     expect(signedSubRAV.subRav).toEqual(subRAV);
     expect(signedSubRAV.signature).toBeTruthy();
