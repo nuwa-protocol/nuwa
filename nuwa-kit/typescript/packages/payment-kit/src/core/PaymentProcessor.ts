@@ -19,6 +19,8 @@ import { HttpPaymentCodec } from '../middlewares/http/HttpPaymentCodec';
 import type { ClaimScheduler } from './ClaimScheduler';
 import { PaymentUtils } from './PaymentUtils';
 import { deriveChannelId } from '../rooch/ChannelUtils';
+  import { verify as verifyRav } from './RavVerifier';
+import type { DIDResolver } from '@nuwa-ai/identity-kit';
 
   
   /**
@@ -33,20 +35,24 @@ import { deriveChannelId } from '../rooch/ChannelUtils';
 
     /** Rate provider for asset conversion */
     rateProvider: RateProvider;
+
+    /** DID resolver used for signature verification (avoid accessing payeeClient internals) */
+    didResolver: DIDResolver;
+
+    /** Store for pending unsigned SubRAV proposals */
+    pendingSubRAVStore: PendingSubRAVRepository;
+    /** Repository for persisted SignedSubRAVs to retrieve latest baseline */
+    ravRepository: RAVRepository;
     
     /** Default asset ID if not provided in request context */
     defaultAssetId?: string;
-    
-    /** Store for pending unsigned SubRAV proposals */
-    pendingSubRAVStore?: PendingSubRAVRepository;
-    /** Repository for persisted SignedSubRAVs to retrieve latest baseline */
-    ravRepository?: RAVRepository;
     
     /** Optional claim scheduler for automated claiming */
     claimScheduler?: ClaimScheduler;
     
     /** Debug logging */
     debug?: boolean;
+   
   }
   
 
@@ -78,7 +84,7 @@ export interface PaymentVerificationResult extends VerificationResult {
   export class PaymentProcessor {
     private config: PaymentProcessorConfig;
     private pendingSubRAVStore: PendingSubRAVRepository;
-    private ravRepository?: RAVRepository;
+    private ravRepository: RAVRepository;
     private stats: PaymentProcessingStats;
   
     constructor(config: PaymentProcessorConfig) {
@@ -111,109 +117,99 @@ export interface PaymentVerificationResult extends VerificationResult {
     }
 
     try {
-      // Step 1: Check pending proposal priority (§4.1 of rav-handling.md)
-      this.log('🔍 Checking pending proposal priority for operation:', ctx.meta.operation);
-      const pendingCheckResult = await this.checkPendingProposalPriority(ctx);
-      if (pendingCheckResult.shouldReturnEarly) {
-        this.log('⚠️ Returning early from preProcess due to pending proposal check');
+      // Step 0: Prefetch channel context (channelInfo, baseline, chainId)
+      // Determine channelId and vmIdFragment (must exist)
+      let channelId: string | undefined;
+      let vmIdFragment: string | undefined;
+
+      if (ctx.meta.signedSubRav) {
+        channelId = ctx.meta.signedSubRav.subRav.channelId;
+        vmIdFragment = ctx.meta.signedSubRav.subRav.vmIdFragment;
+      } else {
+        const didAuth = await this.tryDIDAuthFallback(ctx);
+        if (didAuth) {
+          channelId = didAuth.channelId;
+          vmIdFragment = didAuth.vmIdFragment;
+        }
+      }
+
+      if (!channelId || !vmIdFragment) {
+        throw new Error('CHANNEL_CONTEXT_MISSING: channelId or vmIdFragment not derivable. Check DID authentication.');
+      }
+
+      // Fetch channelInfo (must exist)
+      const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
+      if (!channelInfo) {
+        ctx.state.error = { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` } as any;
         return ctx;
       }
-      this.log('✅ Pending proposal check passed, continuing with normal processing');
+      ctx.state.channelInfo = channelInfo;
 
-      // Extract SignedSubRAV from context
-      const signedSubRAV = ctx.meta.signedSubRav;
+      // Use assetId from channelInfo instead of ctx.assetId
+      const assetId = channelInfo.assetId;
 
-      if (signedSubRAV) {
-        const verification = await this.confirmDeferredPayment(signedSubRAV);
-        if (!verification.isValid) {
-          this.stats.failedPayments++;
-          ctx.state.signedSubRavVerified = false;
-          return ctx;
-        } else {
-          this.stats.successfulPayments++;
-        }
-        ctx.state.signedSubRavVerified = true;
-      } else {
-        ctx.state.signedSubRavVerified = true;
+      // Latest signed RAV from repository
+      const latest = await this.ravRepository.getLatest(channelId, vmIdFragment);
+      if (latest) ctx.state.latestSignedSubRav = latest;
+
+      const subState = await this.config.payeeClient.getSubChannelState(channelId, vmIdFragment);
+      if (!subState) {
+        ctx.state.error = { code: 'SUBCHANNEL_NOT_AUTHORIZED', message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}` } as any;
+        return ctx;
+      }
+      ctx.state.subChannelState = subState;
+
+      // Fetch and cache chainId for proposal generation
+      ctx.state.chainId = await this.config.payeeClient.getContract().getChainId();
+
+      // Single-entry verification using prefetched context
+      const ravResult = await verifyRav(ctx, {
+        pendingRepo: this.pendingSubRAVStore,
+        ravRepo: this.ravRepository,
+        debug: this.config.debug,
+        didResolver: this.config.didResolver,
+      });
+
+      // Handle early-return decisions
+      if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
+        if (!ctx.state) ctx.state = {};
+        ctx.state.error = ravResult.error as any;
+        this.log('⚠️ Early return from preProcess due to decision:', ravResult.decision, ravResult.error);
+        return ctx;
       }
 
-      // Step 2: If needed, resolve sub-channel baseline (latest SignedSubRAV) to support sync settle
-      try {
-        // Derive (channelId, vmIdFragment)
-        let channelId: string | undefined;
-        let vmIdFragment: string | undefined;
-
-        if (ctx.meta.signedSubRav) {
-          channelId = ctx.meta.signedSubRav.subRav.channelId;
-          vmIdFragment = ctx.meta.signedSubRav.subRav.vmIdFragment;
-          this.log('📋 Using channelId/vmIdFragment from signedSubRav:', { channelId, vmIdFragment });
-        } else {
-          const didAuthResult = await this.tryDIDAuthFallback(ctx);
-          if (didAuthResult) {
-            channelId = didAuthResult.channelId;
-            vmIdFragment = didAuthResult.vmIdFragment;
-            this.log('📋 Using channelId/vmIdFragment from DIDAuth fallback:', { channelId, vmIdFragment });
-          } else {
-            this.log('❌ Failed to derive channelId/vmIdFragment - no signedSubRav and DIDAuth fallback failed');
-          }
+      // Persist verification flags and apply side-effects on success
+      ctx.state.signedSubRavVerified = ravResult.signedVerified;
+      if (ravResult.pendingMatched && ravResult.signedVerified && ctx.meta.signedSubRav) {
+        try {
+          await this.pendingSubRAVStore.remove(
+            ctx.meta.signedSubRav.subRav.channelId,
+            ctx.meta.signedSubRav.subRav.vmIdFragment,
+            ctx.meta.signedSubRav.subRav.nonce,
+          );
+        } catch (e) {
+          this.log('⚠️ Failed to remove matched pending:', e);
         }
-
-        if (channelId && vmIdFragment) {
-          // Latest signed RAV from storage (if repo available)
-          if (this.ravRepository) {
-            const latest = await this.ravRepository.getLatest(channelId, vmIdFragment);
-            if (latest) {
-              ctx.state.latestSignedSubRav = latest;
-              this.log('📋 Found latest signed RAV in repository:', { nonce: latest.subRav.nonce, accumulatedAmount: latest.subRav.accumulatedAmount });
-            } else {
-              this.log('📋 No latest signed RAV found in repository');
-            }
-          } else {
-            this.log('📋 No RAV repository configured');
-          }
-
-          // If no latest RAV, fetch sub-channel state cursor via ChannelRepository
-          if (!ctx.state.latestSignedSubRav) {
-            try {
-              this.log('📋 Attempting to fetch sub-channel state via ChannelRepository...');
-              const subState = await this.config.payeeClient.getSubChannelState(channelId, vmIdFragment);
-              if (subState) {
-                ctx.state.subChannelState = subState;
-                this.log('📋 Successfully fetched sub-channel state:', { nonce: subState.nonce, accumulatedAmount: subState.accumulatedAmount });
-              } else {
-                this.log('📋 No local sub-channel state found');
-              }
-              // Cache chainId to avoid later async
-              try {
-                const chainId = await this.config.payeeClient.getContract().getChainId();
-                ctx.state.chainId = chainId;
-              } catch (e) {
-                // non-fatal
-              }
-            } catch (e) {
-              // If the channel doesn't exist, signal error so settle can short-circuit
-              this.log('❌ Failed to fetch sub-channel state:', e);
-              ctx.state.error = { code: 'CHANNEL_NOT_FOUND', message: String(e) } as any;
-            }
-          }
-        } else {
-          this.log('❌ No channelId/vmIdFragment available for baseline lookup');
+        try {
+          await this.ravRepository?.save(ctx.meta.signedSubRav);
+        } catch (e) {
+          this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
         }
-      } catch (e) {
-        this.log('Failed to fetch latest SignedSubRAV baseline:', e);
-        // Non-fatal; settle will handle missing baseline appropriately
       }
+
+      // Populate baseline into state
+      // No baseline passthrough from RavVerifier; ctx.state already contains prefetched context
 
       // Step 3: Prefetch exchange rate only (no cost calculation here)
-      if (ctx.assetId) {
+      {
         try {
-          const price = await this.config.rateProvider.getPricePicoUSD(ctx.assetId);
-          const timestamp = this.config.rateProvider.getLastUpdated(ctx.assetId) ?? Date.now();
+          const price = await this.config.rateProvider.getPricePicoUSD(assetId);
+          const timestamp = this.config.rateProvider.getLastUpdated(assetId) ?? Date.now();
           const exchangeRate: RateResult = {
             price,
             timestamp,
             provider: 'rate-provider',
-            assetId: ctx.assetId,
+            assetId,
           };
           ctx.state.exchangeRate = exchangeRate;
         } catch (e) {
@@ -377,17 +373,17 @@ export interface PaymentVerificationResult extends VerificationResult {
           // Require a baseline: SignedSubRAV, latestSignedSubRav, or subChannelState
           const hasSigned = !!ctx.meta.signedSubRav;
           const hasLatest = !!(ctx.state && ctx.state.latestSignedSubRav);
-          const hasCursor = !!(ctx.state && ctx.state.subChannelState);
+          const hasSubState = !!(ctx.state && (ctx.state as any).subChannelState);
           
           this.log('🔍 Baseline check:', {
             hasSigned,
             hasLatest,
-            hasCursor,
+            hasSubState,
             hasState: !!ctx.state,
             stateKeys: ctx.state ? Object.keys(ctx.state) : []
           });
           
-          if (!hasSigned && !hasLatest && !hasCursor) {
+          if (!hasSigned && !hasLatest && !hasSubState) {
             const err = { code: 'MISSING_CHANNEL_CONTEXT', message: 'No baseline SubRAV found to advance nonce' } as any;
             ctx.state.error = err;
             try {

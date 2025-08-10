@@ -120,6 +120,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       rateProvider: this.rateProvider,
       ruleProvider: this.billableRouter,
       serviceId: config.serviceId,
+      pendingSubRAVStore: payeeClient.getPendingSubRAVRepository(),
+      ravRepository: payeeClient.getRAVRepository(),
+      didResolver: payeeClient.getDidResolver(),
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
       debug: config.debug || false,
       claimScheduler: this.claimScheduler

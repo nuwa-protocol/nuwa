@@ -145,6 +145,10 @@ export class PaymentChannelPayeeClient {
     return this.ravRepo;
   }
 
+  getDidResolver(): DIDResolver {
+    return this.didResolver;
+  }
+
   /**
    * Get the contract instance used by this client
    * This is needed for ClaimScheduler to perform claims

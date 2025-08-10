@@ -5,7 +5,7 @@
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
-import type { SignedSubRAV, SubRAV, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelState } from '../../core/types';
 import type { RateResult } from '../rate/types';
 
 export interface BillingContext {
@@ -16,7 +16,7 @@ export interface BillingContext {
      * is injected into `BillingEngine`, costs will automatically be converted
      * from picoUSD to the asset's smallest unit.
      */
-    assetId?: string;
+    assetId?: string; // deprecated: use channelInfo.assetId in ctx.state (to be removed in Phase 2)
     /** All billing-related context information (input only) */
     meta: {
       /** Business operation identifier (e.g., "POST:/api/chat/completions") */
@@ -44,7 +44,9 @@ export interface BillingContext {
       latestSignedSubRav?: SignedSubRAV;
       /** Latest sub-channel state cursor (from ChannelRepository) */
       subChannelState?: SubChannelState;
-      /** Chain ID cached for synchronous proposal generation */
+      /** Channel info (must exist for verification) */
+      channelInfo?: ChannelInfo;
+      /** Cached chain ID for synchronous proposal building (to be removed when all paths use channelInfo.chainId) */
       chainId?: bigint;
       
       // Step B: Charging
