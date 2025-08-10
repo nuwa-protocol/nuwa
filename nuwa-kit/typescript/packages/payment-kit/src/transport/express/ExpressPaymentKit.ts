@@ -15,6 +15,7 @@ import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelCon
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
+import { registerBuiltinStrategies } from '../../billing/strategies';
 
 /**
  * Configuration for creating ExpressPaymentKit
@@ -88,6 +89,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     this.payeeClient = payeeClient;
     this.rateProvider = rateProvider;
     this.serviceDid = serviceDid;
+    // Ensure built-in billing strategies are registered when server starts
+    registerBuiltinStrategies();
     
     // Create single billable router for all routes (business + built-in)
     this.billableRouter = new BillableRouter({

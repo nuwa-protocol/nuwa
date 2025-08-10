@@ -10,8 +10,8 @@ import type {
 import { getStrategy } from '../billing/core/strategy-registry';
 import { convertUsdToAssetUsingPrice } from '../billing/core/converter';
 import type { RateProvider, RateResult } from '../billing/rate/types';
-// Ensure built-in strategies are registered
-import '../billing/strategies';
+// Ensure built-in strategies are registered explicitly (no side-effect import)
+import { registerBuiltinStrategies } from '../billing/strategies';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import type { RAVRepository } from '../storage/interfaces/RAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
@@ -83,6 +83,8 @@ export interface PaymentVerificationResult extends VerificationResult {
   
     constructor(config: PaymentProcessorConfig) {
       this.config = config;
+    // Register built-in billing strategies explicitly
+    try { registerBuiltinStrategies(); } catch {}
       this.pendingSubRAVStore = config.pendingSubRAVStore || createPendingSubRAVRepo({ backend: 'memory' });
       // Default to the same RAV repository as the payee client if not provided
       this.ravRepository = config.ravRepository || config.payeeClient.getRAVRepository();
