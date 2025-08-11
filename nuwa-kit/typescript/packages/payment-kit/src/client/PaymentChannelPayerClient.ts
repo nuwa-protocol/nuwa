@@ -174,8 +174,9 @@ export class PaymentChannelPayerClient {
     await this.channelRepo.updateSubChannelState(result.channelId, useFragment, {
       channelId: result.channelId,
       epoch: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0),
+      vmIdFragment: useFragment,
+      lastClaimedAmount: BigInt(0),
+      lastConfirmedNonce: BigInt(0),
       lastUpdated: Date.now(),
     });
 
@@ -207,8 +208,9 @@ export class PaymentChannelPayerClient {
     await this.channelRepo.updateSubChannelState(params.channelId, useFragment, {
       channelId: params.channelId,
       epoch: BigInt(0),
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0),
+      vmIdFragment: useFragment,
+      lastClaimedAmount: BigInt(0),
+      lastConfirmedNonce: BigInt(0),
       lastUpdated: Date.now(),
     });
   }

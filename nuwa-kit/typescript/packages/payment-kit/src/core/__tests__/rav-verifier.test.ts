@@ -18,8 +18,8 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   const subChannelState: SubChannelState & { vmIdFragment: string } = {
     channelId,
     epoch,
-    accumulatedAmount: 0n,
-    nonce: 1n,
+    lastClaimedAmount: 0n,
+    lastConfirmedNonce: 1n,
     lastUpdated: Date.now(),
     vmIdFragment: vmId,
   };

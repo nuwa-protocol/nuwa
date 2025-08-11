@@ -12,6 +12,7 @@ export type {
   ClaimResult,
   CloseParams,
   ChannelStatusParams,
+  SubChannelInfo,
 } from '../contracts/IPaymentChannelContract';
 
 /**
@@ -58,23 +59,10 @@ export interface ChannelInfo {
   // separately by querying the payment hub and individual sub-channels as needed
 }
 
-/**
- * Sub-channel state tracking
- */
-export interface SubChannelState {
-  /** Associated channel ID */
-  channelId: string;
-  /** Channel epoch */
-  epoch: bigint;
-  /** DID verification method fragment (e.g., "key-1") */
-  vmIdFragment: string;
-  /** Current accumulated amount for this sub-channel */
-  accumulatedAmount: bigint;
-  /** Current nonce for this sub-channel */
-  nonce: bigint;
-  /** Last update timestamp */
-  lastUpdated: number;
-}
+// Backward-compatibility alias: use SubChannelInfo as the canonical type
+// Import type for alias without creating runtime dependency
+import type { SubChannelInfo as _SubChannelInfo } from '../contracts/IPaymentChannelContract';
+export type SubChannelState = _SubChannelInfo;
 
 /**
  * Transaction result from blockchain operations

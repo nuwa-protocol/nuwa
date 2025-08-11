@@ -181,8 +181,8 @@ export class PaymentChannelPayeeClient {
         channelId,
         epoch: channelInfo.epoch,
         vmIdFragment: subInfo.vmIdFragment,
-        accumulatedAmount: subInfo.lastClaimedAmount,
-        nonce: subInfo.lastConfirmedNonce,
+        lastClaimedAmount: subInfo.lastClaimedAmount,
+        lastConfirmedNonce: subInfo.lastConfirmedNonce,
         lastUpdated: Date.now(),
       };
 
@@ -227,8 +227,9 @@ export class PaymentChannelPayeeClient {
     const subChannelState = (await this.channelRepo.getSubChannelState(channelId, vmIdFragment)) ?? {
       channelId,
       epoch: channelInfo.epoch,
-      accumulatedAmount: BigInt(0),
-      nonce: BigInt(0),
+      vmIdFragment,
+      lastClaimedAmount: BigInt(0),
+      lastConfirmedNonce: BigInt(0),
       lastUpdated: Date.now(),
     };
 
@@ -238,8 +239,8 @@ export class PaymentChannelPayeeClient {
     }
 
     // Calculate new values
-    const newNonce = subChannelState.nonce + BigInt(1);
-    const newAccumulatedAmount = subChannelState.accumulatedAmount + amount;
+    const newNonce = subChannelState.lastConfirmedNonce + BigInt(1);
+    const newAccumulatedAmount = subChannelState.lastClaimedAmount + amount;
 
     // vmIdFragment already extracted above
 

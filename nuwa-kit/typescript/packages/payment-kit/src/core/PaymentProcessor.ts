@@ -501,11 +501,11 @@ export interface PaymentVerificationResult extends VerificationResult {
     } {
       const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      const current = params.signedSubRAV?.subRav ?? params.latestSignedSubRav?.subRav ?? {
+        const current = params.signedSubRAV?.subRav ?? params.latestSignedSubRav?.subRav ?? {
         channelId: params.subChannelState.channelId,
         vmIdFragment: params.subChannelState.vmIdFragment,
-        nonce: params.subChannelState.nonce,
-        accumulatedAmount: params.subChannelState.accumulatedAmount,
+        nonce: params.subChannelState.lastConfirmedNonce,
+        accumulatedAmount: params.subChannelState.lastClaimedAmount,
         chainId: params.chainId,
         channelEpoch: params.subChannelState.epoch,
         version: 1,

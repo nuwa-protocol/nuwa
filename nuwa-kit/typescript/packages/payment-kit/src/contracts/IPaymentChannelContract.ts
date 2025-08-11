@@ -105,11 +105,21 @@ export interface SubChannelParams {
  * Sub-channel information and status
  */
 export interface SubChannelInfo {
+  /** Associated channel ID */
+  channelId: string;
+  /** Channel epoch */
+  epoch: bigint;
   vmIdFragment: string;
-  publicKey: string;
-  methodType: string;
+  /** Optional public key for the verification method */
+  publicKey?: string;
+  /** Optional DID method type for the verification method */
+  methodType?: string;
+  /** Last on-chain claimed amount for this sub-channel */
   lastClaimedAmount: bigint;
+  /** Last on-chain confirmed nonce for this sub-channel */
   lastConfirmedNonce: bigint;
+  /** Optional last updated timestamp (ms) for local caches */
+  lastUpdated?: number;
 }
 
 /**

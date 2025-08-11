@@ -129,27 +129,27 @@ describe('Repository-Based Storage Layer', () => {
         // Set different states for the same keyId in different channels
         await channelRepo.updateSubChannelState(CHANNEL_1, VM_ID, {
           channelId: CHANNEL_1,
-          accumulatedAmount: BigInt(1000),
-          nonce: BigInt(1),
-        });
+          lastClaimedAmount: BigInt(1000),
+          lastConfirmedNonce: BigInt(1),
+        } as any);
 
         await channelRepo.updateSubChannelState(CHANNEL_2, VM_ID, {
           channelId: CHANNEL_2,
-          accumulatedAmount: BigInt(2000),
-          nonce: BigInt(2),
-        });
+          lastClaimedAmount: BigInt(2000),
+          lastConfirmedNonce: BigInt(2),
+        } as any);
 
         // Verify they are isolated
         const state1 = await channelRepo.getSubChannelState(CHANNEL_1, VM_ID);
         const state2 = await channelRepo.getSubChannelState(CHANNEL_2, VM_ID);
 
         expect(state1!.channelId).toBe(CHANNEL_1);
-        expect(state1!.accumulatedAmount).toBe(BigInt(1000));
-        expect(state1!.nonce).toBe(BigInt(1));
+        expect((state1 as any)!.lastClaimedAmount).toBe(BigInt(1000));
+        expect((state1 as any)!.lastConfirmedNonce).toBe(BigInt(1));
 
         expect(state2!.channelId).toBe(CHANNEL_2);
-        expect(state2!.accumulatedAmount).toBe(BigInt(2000));
-        expect(state2!.nonce).toBe(BigInt(2));
+        expect((state2 as any)!.lastClaimedAmount).toBe(BigInt(2000));
+        expect((state2 as any)!.lastConfirmedNonce).toBe(BigInt(2));
       });
 
       it('should list sub-channel states for a specific channel', async () => {
@@ -158,37 +158,37 @@ describe('Repository-Based Storage Layer', () => {
 
         // Add states for channel 1
         await channelRepo.updateSubChannelState(CHANNEL_1, KEY_1, {
-          accumulatedAmount: BigInt(100),
-          nonce: BigInt(1),
-        });
+          lastClaimedAmount: BigInt(100),
+          lastConfirmedNonce: BigInt(1),
+        } as any);
 
         await channelRepo.updateSubChannelState(CHANNEL_1, KEY_2, {
-          accumulatedAmount: BigInt(200),
-          nonce: BigInt(2),
-        });
+          lastClaimedAmount: BigInt(200),
+          lastConfirmedNonce: BigInt(2),
+        } as any);
 
         // Add states for channel 2 (should not appear in channel 1 results)
         await channelRepo.updateSubChannelState(CHANNEL_2, KEY_1, {
-          accumulatedAmount: BigInt(300),
-          nonce: BigInt(3),
-        });
+          lastClaimedAmount: BigInt(300),
+          lastConfirmedNonce: BigInt(3),
+        } as any);
 
         const channel1States = await channelRepo.listSubChannelStates(CHANNEL_1);
         
         expect(Object.keys(channel1States)).toHaveLength(2);
-        expect(channel1States[KEY_1].accumulatedAmount).toBe(BigInt(100));
-        expect(channel1States[KEY_2].accumulatedAmount).toBe(BigInt(200));
+        expect((channel1States[KEY_1] as any).lastClaimedAmount).toBe(BigInt(100));
+        expect((channel1States[KEY_2] as any).lastClaimedAmount).toBe(BigInt(200));
         
         // Verify channel 2 state is not included
-        expect(channel1States[KEY_1].accumulatedAmount).not.toBe(BigInt(300));
+        expect((channel1States[KEY_1] as any).lastClaimedAmount).not.toBe(BigInt(300));
       });
 
       it('should remove sub-channel state with proper isolation', async () => {
         const KEY_1 = 'account-key';
 
         // Add states to both channels
-        await channelRepo.updateSubChannelState(CHANNEL_1, KEY_1, { accumulatedAmount: BigInt(100) });
-        await channelRepo.updateSubChannelState(CHANNEL_2, KEY_1, { accumulatedAmount: BigInt(200) });
+        await channelRepo.updateSubChannelState(CHANNEL_1, KEY_1, { lastClaimedAmount: BigInt(100) } as any);
+        await channelRepo.updateSubChannelState(CHANNEL_2, KEY_1, { lastClaimedAmount: BigInt(200) } as any);
 
         // Remove from channel 1 only
         await channelRepo.removeSubChannelState(CHANNEL_1, KEY_1);
@@ -198,7 +198,7 @@ describe('Repository-Based Storage Layer', () => {
         const state2 = await channelRepo.getSubChannelState(CHANNEL_2, KEY_1);
 
         expect(state1).toBeNull();
-        expect(state2!.accumulatedAmount).toBe(BigInt(200));
+        expect((state2 as any)!.lastClaimedAmount).toBe(BigInt(200));
       });
 
       it('should return null for non-existent sub-channel', async () => {
@@ -219,8 +219,8 @@ describe('Repository-Based Storage Layer', () => {
           status: 'active',
         });
 
-        await channelRepo.updateSubChannelState('ch1', 'vm1', { accumulatedAmount: BigInt(100) });
-        await channelRepo.updateSubChannelState('ch1', 'vm2', { accumulatedAmount: BigInt(200) });
+        await channelRepo.updateSubChannelState('ch1', 'vm1', { lastClaimedAmount: BigInt(100) } as any);
+        await channelRepo.updateSubChannelState('ch1', 'vm2', { lastClaimedAmount: BigInt(200) } as any);
 
         const stats = await channelRepo.getStats();
         
@@ -240,7 +240,7 @@ describe('Repository-Based Storage Layer', () => {
           status: 'active',
         });
 
-        await channelRepo.updateSubChannelState('test', 'key', { accumulatedAmount: BigInt(100) });
+        await channelRepo.updateSubChannelState('test', 'key', { lastClaimedAmount: BigInt(100) } as any);
 
         // Clear and verify
         await channelRepo.clear();

@@ -443,6 +443,8 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       return {
+        channelId: params.channelId,
+        epoch: channelData.channel_epoch,
         vmIdFragment: params.vmIdFragment,
         publicKey: subChannelData.pk_multibase,
         methodType: subChannelData.method_type,

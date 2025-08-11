@@ -105,12 +105,12 @@ export async function verify(
           //we check the signed subrav with the subchannel state
           if(signed.subRav.channelId === params.subChannelState.channelId &&
             signed.subRav.vmIdFragment === params.subChannelState.vmIdFragment &&
-            signed.subRav.nonce > params.subChannelState.nonce &&
-            signed.subRav.accumulatedAmount > params.subChannelState.accumulatedAmount) {
+            signed.subRav.nonce > params.subChannelState.lastConfirmedNonce &&
+            signed.subRav.accumulatedAmount > params.subChannelState.lastClaimedAmount) {
             result.decision = 'ALLOW';
           }else {
             result.decision = 'CONFLICT';
-            result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelState.nonce}, received: ${signed.subRav.nonce})` };
+            result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelState.lastConfirmedNonce}, received: ${signed.subRav.nonce})` };
             return finalize();
           }
         }

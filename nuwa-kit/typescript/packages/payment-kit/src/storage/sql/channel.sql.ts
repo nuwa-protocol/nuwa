@@ -71,13 +71,13 @@ export class SqlChannelRepository implements ChannelRepository {
       // Create sub-channel states table
       await client.query(`
         CREATE TABLE IF NOT EXISTS ${this.subChannelStatesTable} (
-          channel_id        TEXT NOT NULL,
-          vm_id_fragment   TEXT NOT NULL,
-          channel_id_ref   TEXT NOT NULL,
-          epoch            NUMERIC(78,0) NOT NULL DEFAULT 0,
-          nonce            NUMERIC(78,0) NOT NULL DEFAULT 0,
-          accumulated_amount NUMERIC(78,0) NOT NULL DEFAULT 0,
-          last_update_time BIGINT NOT NULL,
+          channel_id          TEXT NOT NULL,
+          vm_id_fragment      TEXT NOT NULL,
+          channel_id_ref      TEXT NOT NULL,
+          epoch               NUMERIC(78,0) NOT NULL DEFAULT 0,
+          last_confirmed_nonce NUMERIC(78,0) NOT NULL DEFAULT 0,
+          last_claimed_amount NUMERIC(78,0) NOT NULL DEFAULT 0,
+          last_update_time    BIGINT NOT NULL,
           PRIMARY KEY(channel_id, vm_id_fragment)
         )
       `);
@@ -252,7 +252,7 @@ export class SqlChannelRepository implements ChannelRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT channel_id_ref, epoch, nonce, accumulated_amount, last_update_time
+        SELECT channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time, vm_id_fragment
         FROM ${this.subChannelStatesTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2
       `, [channelId, vmIdFragment]);
@@ -266,10 +266,10 @@ export class SqlChannelRepository implements ChannelRepository {
         channelId: row.channel_id_ref,
         vmIdFragment: row.vm_id_fragment,
         epoch: BigInt(row.epoch),
-        nonce: BigInt(row.nonce),
-        accumulatedAmount: BigInt(row.accumulated_amount),
+        lastConfirmedNonce: BigInt(row.last_confirmed_nonce),
+        lastClaimedAmount: BigInt(row.last_claimed_amount),
         lastUpdated: parseInt(row.last_update_time),
-      };
+      } as any;
     } finally {
       client.release();
     }
@@ -281,39 +281,40 @@ export class SqlChannelRepository implements ChannelRepository {
       // First, get current state or create default
       const current = await this.getSubChannelState(channelId, vmIdFragment) || {
         channelId,
+        vmIdFragment,
         epoch: BigInt(0),
-        nonce: BigInt(0),
-        accumulatedAmount: BigInt(0),
+        lastConfirmedNonce: BigInt(0),
+        lastClaimedAmount: BigInt(0),
         lastUpdated: Date.now(),
-      };
+      } as any;
       
       // Apply updates
-      const newState = {
-        channelId: updates.channelId ?? current.channelId,
-        epoch: updates.epoch ?? current.epoch,
-        nonce: updates.nonce ?? current.nonce,
-        accumulatedAmount: updates.accumulatedAmount ?? current.accumulatedAmount,
-        lastUpdated: updates.lastUpdated ?? Date.now(),
+      const newState: any = {
+        channelId: (updates as any).channelId ?? current.channelId,
+        epoch: (updates as any).epoch ?? current.epoch,
+        lastConfirmedNonce: (updates as any).lastConfirmedNonce ?? current.lastConfirmedNonce,
+        lastClaimedAmount: (updates as any).lastClaimedAmount ?? current.lastClaimedAmount,
+        lastUpdated: (updates as any).lastUpdated ?? Date.now(),
       };
 
       await client.query(`
         INSERT INTO ${this.subChannelStatesTable} 
-        (channel_id, vm_id_fragment, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time)
+        (channel_id, vm_id_fragment, channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (channel_id, vm_id_fragment) 
         DO UPDATE SET
           channel_id_ref = EXCLUDED.channel_id_ref,
           epoch = EXCLUDED.epoch,
-          nonce = EXCLUDED.nonce,
-          accumulated_amount = EXCLUDED.accumulated_amount,
+          last_confirmed_nonce = EXCLUDED.last_confirmed_nonce,
+          last_claimed_amount = EXCLUDED.last_claimed_amount,
           last_update_time = EXCLUDED.last_update_time
       `, [
         channelId,
         vmIdFragment,
         newState.channelId,
         newState.epoch.toString(),
-        newState.nonce.toString(),
-        newState.accumulatedAmount.toString(),
+        newState.lastConfirmedNonce.toString(),
+        newState.lastClaimedAmount.toString(),
         newState.lastUpdated.toString(),
       ]);
     } finally {
@@ -325,7 +326,7 @@ export class SqlChannelRepository implements ChannelRepository {
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
-        SELECT vm_id_fragment, channel_id_ref, epoch, nonce, accumulated_amount, last_update_time
+        SELECT vm_id_fragment, channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time
         FROM ${this.subChannelStatesTable}
         WHERE channel_id = $1
       `, [channelId]);
@@ -337,10 +338,10 @@ export class SqlChannelRepository implements ChannelRepository {
           channelId: row.channel_id_ref,
           vmIdFragment: row.vm_id_fragment,
           epoch: BigInt(row.epoch),
-          nonce: BigInt(row.nonce),
-          accumulatedAmount: BigInt(row.accumulated_amount),
+          lastConfirmedNonce: BigInt(row.last_confirmed_nonce),
+          lastClaimedAmount: BigInt(row.last_claimed_amount),
           lastUpdated: parseInt(row.last_update_time),
-        };
+        } as any;
       }
 
       return states;

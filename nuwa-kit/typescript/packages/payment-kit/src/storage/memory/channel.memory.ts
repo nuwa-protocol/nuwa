@@ -97,8 +97,8 @@ export class MemoryChannelRepository implements ChannelRepository {
       channelId,
       vmIdFragment,
       epoch: BigInt(0),
-      nonce: BigInt(0),
-      accumulatedAmount: BigInt(0),
+      lastConfirmedNonce: BigInt(0),
+      lastClaimedAmount: BigInt(0),
       lastUpdated: Date.now(),
     };
 

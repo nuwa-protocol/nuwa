@@ -22,6 +22,8 @@ import type { SignerInterface } from '@nuwa-ai/identity-kit';
 class MockPaymentChannelContract implements IPaymentChannelContract {
   async getSubChannel(params: SubChannelParams): Promise<SubChannelInfo> {
     return {
+      channelId: '0x1234567890abcdef1234567890abcdef12345678',
+      epoch: BigInt(0),
       vmIdFragment: 'test-key-1',
       publicKey: 'test-key-1',
       methodType: 'secp256k1',

@@ -151,9 +151,9 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     if (existing) {
       return {
         ...existing,
-        nonce: BigInt((existing as any).nonce),
-        accumulatedAmount: BigInt((existing as any).accumulatedAmount),
-      };
+        lastConfirmedNonce: BigInt((existing as any).lastConfirmedNonce ?? (existing as any).nonce ?? 0),
+        lastClaimedAmount: BigInt((existing as any).lastClaimedAmount ?? (existing as any).accumulatedAmount ?? 0),
+      } as any;
     }
     
     return null;
@@ -179,10 +179,10 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       channelId,
       vmIdFragment,
       epoch: BigInt(0),
-      nonce: BigInt(0),
-      accumulatedAmount: BigInt(0),
+      lastConfirmedNonce: BigInt(0),
+      lastClaimedAmount: BigInt(0),
       lastUpdated: Date.now(),
-    };
+    } as any;
 
     const updated = {
       ...baseState,
@@ -191,8 +191,8 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       vmIdFragment,
       lastUpdated: Date.now(),
       // Convert bigints to strings for storage
-      nonce: (updates.nonce || baseState.nonce).toString(),
-      accumulatedAmount: (updates.accumulatedAmount || baseState.accumulatedAmount).toString(),
+      lastConfirmedNonce: (updates as any).lastConfirmedNonce?.toString() || (baseState as any).lastConfirmedNonce?.toString() || '0',
+      lastClaimedAmount: (updates as any).lastClaimedAmount?.toString() || (baseState as any).lastClaimedAmount?.toString() || '0',
     };
 
     await new Promise<void>((resolve, reject) => {
@@ -219,9 +219,9 @@ export class IndexedDBChannelRepository implements ChannelRepository {
           const state = cursor.value as any;
           result[state.vmIdFragment] = {
             ...state,
-            nonce: BigInt(state.nonce),
-            accumulatedAmount: BigInt(state.accumulatedAmount),
-          };
+            lastConfirmedNonce: BigInt((state as any).lastConfirmedNonce ?? state.nonce ?? 0),
+            lastClaimedAmount: BigInt((state as any).lastClaimedAmount ?? state.accumulatedAmount ?? 0),
+          } as any;
           cursor.continue();
         } else {
           resolve();

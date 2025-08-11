@@ -153,7 +153,11 @@ export class MockContract implements IPaymentChannelContract {
   }
 
   async getSubChannel(params: any): Promise<any> {
+    const ch = this.channels.get(params.channelId);
+    const epoch = ch?.epoch ?? BigInt(0);
     return {
+      channelId: params.channelId,
+      epoch,
       vmIdFragment: params.vmIdFragment,
       publicKey: 'mock-public-key',
       methodType: 'EcdsaSecp256k1VerificationKey2019',
