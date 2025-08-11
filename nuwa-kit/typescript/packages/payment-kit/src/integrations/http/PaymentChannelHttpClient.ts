@@ -40,6 +40,7 @@ import {
 import type { z } from 'zod';
 import { PaymentHubClient } from '../../client/PaymentHubClient';
 import type { ChannelRepository } from '../../storage';
+import { PaymentErrorCode } from '../../errors/codes';
 
 /**
  * HTTP Client State enum for internal state management
@@ -740,7 +741,7 @@ export class PaymentChannelHttpClient {
             this.clientState.pendingSubRAV = undefined;
             await this.persistClientState();
             pendingRequest.reject(err);
-            return; // Skip success path processing
+            return; // Let requestWithPayment await the rejected promise
           }
 
           // Fallback: no clientTxRef in header – try to resolve uniquely
@@ -885,12 +886,17 @@ export class PaymentChannelHttpClient {
       }
     }
 
-    // Handle payment-related status codes
+    // Handle payment-related status codes when no protocol header is present.
+    // Prefer header-defined error code when available; otherwise map by HTTP status.
     if (response.status === 402) {
       this.log('Payment required (402) - clearing cache and retrying');
       this.clientState.pendingSubRAV = undefined;
       await this.persistClientState();
-      throw new Error('Payment required - insufficient balance or invalid proposal');
+      throw new PaymentKitError(
+        PaymentErrorCode.PAYMENT_REQUIRED,
+        'Payment required - insufficient balance or invalid proposal',
+        402
+      );
     }
 
     if (response.status === 409) {
@@ -898,7 +904,11 @@ export class PaymentChannelHttpClient {
       this.clientState.pendingSubRAV = undefined;
       this.state = ClientState.READY;
       await this.persistClientState();
-      throw new Error('SubRAV conflict - cleared pending proposal');
+      throw new PaymentKitError(
+        PaymentErrorCode.RAV_CONFLICT,
+        'SubRAV conflict - cleared pending proposal',
+        409
+      );
     }
   }
 
