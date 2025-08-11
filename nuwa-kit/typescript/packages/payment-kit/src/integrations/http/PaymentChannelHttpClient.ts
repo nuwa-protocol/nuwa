@@ -39,6 +39,7 @@ import {
 } from '../../schema';
 import type { z } from 'zod';
 import { PaymentHubClient } from '../../client/PaymentHubClient';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../../storage';
 import { PaymentErrorCode } from '../../errors/codes';
 
@@ -73,6 +74,7 @@ export class PaymentChannelHttpClient {
   private clientState: HttpClientState;
   private discoveredBasePath?: string;
   private cachedDiscoveryInfo?: DiscoveryResponse;
+  private logger: DebugLogger;
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -99,6 +101,8 @@ export class PaymentChannelHttpClient {
       pendingPayments: new Map(),
     };
 
+    this.logger = DebugLogger.get('PaymentChannelHttpClient');
+    this.logger.setLevel(this.options.debug ? 'debug' : 'info');
     this.log('PaymentChannelHttpClient initialized for host:', this.host);
   }
 
@@ -319,7 +323,6 @@ export class PaymentChannelHttpClient {
       });
 
       if (!response.ok) {
-        console.log('Response error:', response);
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
@@ -926,7 +929,6 @@ export class PaymentChannelHttpClient {
 
     // Handle non-ok HTTP status first
     if (!response.ok) {
-      console.log('Response error:', response);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -982,7 +984,6 @@ export class PaymentChannelHttpClient {
 
     // Handle non-ok HTTP status first
     if (!response.ok) {
-      console.log('Response error:', response);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -1034,9 +1035,7 @@ export class PaymentChannelHttpClient {
       this.options.onError(new Error(errorMessage));
     }
 
-    if (this.options.debug) {
-      console.error('PaymentChannelHttpClient error:', errorMessage);
-    }
+    // Error is routed via onError; avoid console
   }
 
   /**
@@ -1158,9 +1157,7 @@ export class PaymentChannelHttpClient {
    * Debug logging
    */
   private log(...args: any[]): void {
-    if (this.options.debug) {
-      console.log('[PaymentChannelHttpClient]', ...args);
-    }
+    this.logger.debug(...args);
   }
 
   /**

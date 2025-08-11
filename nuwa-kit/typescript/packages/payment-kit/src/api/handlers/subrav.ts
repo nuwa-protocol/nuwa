@@ -12,21 +12,11 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
  */
 export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async (ctx, req) => {
   try {
-    if (ctx.config.debug) {
-      console.log('📥 /subrav request received:', {
-        nonce: req?.nonce,
-        hasDidInfo: !!(req as any)?.didInfo,
-        did: (req as any)?.didInfo?.did,
-        keyId: (req as any)?.didInfo?.keyId,
-      });
-    }
+    // Keep handler free of direct console logging
 
     // Check if user is authenticated
     const internalReq = req as InternalSubRavRequest;
     if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
-      if (ctx.config.debug) {
-        console.log('❌ /subrav missing didInfo, returning 401');
-      }
       throw new PaymentKitError(ErrorCode.UNAUTHORIZED, 'DID authentication required', 401);
     }
 
@@ -35,10 +25,6 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
     // Derive the expected channelId for this user
     const defaultAssetId = ctx.config.defaultAssetId ?? '0x3::gas_coin::RGas';
     const channelId = deriveChannelId(clientDid, ctx.config.serviceDid, defaultAssetId);
-
-    if (ctx.config.debug) {
-      console.log('📋 SubRAV Query: Getting SubRAV for channel:', channelId, 'nonce:', req.nonce);
-    }
 
     // Extract vmIdFragment from DID keyId (format: did:...#fragment)
     // Extract vmIdFragment from DID keyId (format: did:...#fragment)
@@ -50,31 +36,13 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
     const subRAV = await ctx.ravRepository.get(channelId, vmIdFragment, BigInt(req.nonce));
 
     if (subRAV) {
-      if (ctx.config.debug) {
-        console.log('✅ SubRAV Query: SubRAV found:', subRAV);
-      }
-
       return createSuccessResponse(subRAV);
     } else {
-      if (ctx.config.debug) {
-        console.log(
-          '❌ SubRAV Query: SubRAV not found for channel:',
-          channelId,
-          'nonce:',
-          req.nonce
-        );
-      }
-
       throw new PaymentKitError(ErrorCode.NOT_FOUND, 'SubRAV not found', 404);
     }
   } catch (error) {
     if (error instanceof PaymentKitError) {
       throw error;
-    }
-
-    if (ctx.config.debug) {
-      console.error('❌ SubRAV Query: Failed to get SubRAV:', error);
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
 
     throw new PaymentKitError(

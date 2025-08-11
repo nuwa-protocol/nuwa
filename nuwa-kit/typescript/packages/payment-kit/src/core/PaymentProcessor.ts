@@ -16,6 +16,7 @@ import { PaymentUtils } from './PaymentUtils';
 import { deriveChannelId } from '../rooch/ChannelUtils';
 import { verify as verifyRav } from './RavVerifier';
 import type { DIDResolver } from '@nuwa-ai/identity-kit';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 /**
  * Configuration for PaymentProcessor
@@ -80,6 +81,7 @@ export class PaymentProcessor {
   private pendingSubRAVStore: PendingSubRAVRepository;
   private ravRepository: RAVRepository;
   private stats: PaymentProcessingStats;
+  private logger: DebugLogger;
 
   constructor(config: PaymentProcessorConfig) {
     this.config = config;
@@ -95,6 +97,9 @@ export class PaymentProcessor {
       failedPayments: 0,
       autoClaimsTriggered: 0,
     };
+
+    this.logger = DebugLogger.get('PaymentProcessor');
+    this.logger.setLevel(config.debug ? 'debug' : 'info');
   }
 
   getServiceId(): string {
@@ -637,8 +642,6 @@ export class PaymentProcessor {
    * Debug logging
    */
   private log(...args: any[]): void {
-    if (this.config.debug) {
-      console.log('[PaymentProcessor]', ...args);
-    }
+    this.logger.debug(...args);
   }
 }

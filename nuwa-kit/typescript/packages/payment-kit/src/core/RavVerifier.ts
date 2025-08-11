@@ -132,10 +132,7 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
   return finalize();
 
   function finalize(): RavVerifyResult {
-    if (params.debug) {
-      // eslint-disable-next-line no-console
-      console.log('[RavVerifier]', result);
-    }
+    // Leave detailed logging to caller using DebugLogger
     return result;
   }
 }

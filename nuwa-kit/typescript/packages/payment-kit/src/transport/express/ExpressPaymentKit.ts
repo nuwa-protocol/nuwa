@@ -209,7 +209,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       try {
         this.claimScheduler.start();
       } catch (e) {
-        console.error('Failed to start ClaimScheduler:', e);
+        // Use DebugLogger in ClaimScheduler internally; avoid console here
       }
     }
   }
@@ -319,30 +319,12 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       try {
         // Step 1: Find matching billing rule to determine auth and billing requirements
         const rule = this.billableRouter.findRule(req.method, req.path);
-        if (this.config.debug) {
-          console.log(`🔍 Found rule for ${req.method} ${req.path}:`, rule);
-        }
 
         // Step 2: Authentication (based on rule configuration)
         const needAuth = rule?.authRequired ?? false;
         const needAdminAuth = rule?.adminOnly ?? false;
-        if (this.config.debug) {
-          console.log(
-            `🔐 Auth required for ${req.method} ${req.path}: ${needAuth}, Admin: ${needAdminAuth}`
-          );
-        }
 
         if (needAuth || needAdminAuth) {
-          if (this.config.debug) {
-            const hasAuth = !!req.headers.authorization;
-            console.log(
-              `🔐 DIDAuth check for ${req.method} ${req.path}: has Authorization header = ${hasAuth}`
-            );
-            if (hasAuth) {
-              const value = String(req.headers.authorization);
-              console.log(`🔐 Authorization prefix ok = ${value.startsWith('DIDAuthV1 ')}`);
-            }
-          }
           await this.performDIDAuth(req, res);
         }
 
@@ -352,13 +334,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
         // Step 3: Apply billing middleware (for all registered routes)
         if (rule) {
-          if (this.config.debug) {
-            console.log(
-              `💰 Applying billing for ${req.method} ${req.path} with rule:`,
-              rule.strategy.type
-            );
-          }
-
           // Create response adapter for framework-agnostic billing
           const resAdapter = this.createResponseAdapter(res);
 
@@ -367,9 +342,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
           if (!billingContext) {
             // No billing rule matched - proceed without payment
-            if (this.config.debug) {
-              console.log(`⏭️ No billing rule for ${req.method} ${req.path}`);
-            }
+
             return next();
           }
 
@@ -403,9 +376,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               const units =
                 typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1;
               this.middleware.settleBillingSync(billingContext, units, resAdapter);
-            } catch (error) {
-              console.error('🚨 Billing header error:', error);
-            }
+            } catch (error) {}
           });
 
           // Persist after response is sent
@@ -416,28 +387,15 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
               if (billingContext.state?.unsignedSubRav) {
                 await this.middleware.persistBilling(billingContext);
               }
-            } catch (error) {
-              console.error('🚨 Billing persistence error:', error);
-            }
+            } catch (error) {}
           });
 
           return next();
         } else {
-          if (this.config.debug) {
-            console.log(`⏭️ Skipping billing for ${req.method} ${req.path} (unregistered route)`);
-          }
         }
 
         next();
       } catch (error) {
-        console.error('🚨 Billing wrapper error:', error);
-        console.error('Error details:', {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          url: req.path,
-          method: req.method,
-          headers: req.headers,
-        });
         res.status(500).json({
           error: 'Payment processing failed',
           details: error instanceof Error ? error.message : String(error),
@@ -474,7 +432,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         console.log(`✅ Admin authorization successful for DID: ${signerDid}`);
       }
     } catch (error) {
-      console.error('🚨 Admin authorization failed:', error);
       throw new Error(
         `Admin authorization failed: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -515,14 +472,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         did: verifyResult.signedObject.signature.signer_did,
         keyId: verifyResult.signedObject.signature.key_id,
       };
-
-      if (this.config.debug) {
-        console.log(
-          `✅ DIDAuth success: did=${(req as any).didInfo.did}, keyId=${(req as any).didInfo.keyId}`
-        );
-      }
     } catch (error) {
-      console.error('🚨 DID authentication failed:', error);
       throw new Error(
         `DID authentication failed: ${error instanceof Error ? error.message : String(error)}`
       );

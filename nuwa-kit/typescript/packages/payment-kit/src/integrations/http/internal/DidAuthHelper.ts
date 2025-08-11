@@ -49,7 +49,6 @@ export class DidAuthHelper {
       const authHeader = DIDAuth.v1.toAuthorizationHeader(signedObject);
       return authHeader;
     } catch (error) {
-      console.error('Failed to generate DID auth header:', error);
       return undefined;
     }
   }

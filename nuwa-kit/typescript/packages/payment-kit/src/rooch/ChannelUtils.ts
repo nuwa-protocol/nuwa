@@ -487,7 +487,6 @@ export function safeBalanceToBigint(balanceValue: any): bigint {
   } else if (typeof balanceValue === 'bigint') {
     return balanceValue;
   } else {
-    console.warn('Unexpected balance value type:', typeof balanceValue);
     return BigInt(0);
   }
 }

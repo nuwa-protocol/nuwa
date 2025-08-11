@@ -90,7 +90,6 @@ export function registerHandlersWithBillableRouter(
 
     // Skip handlers without path (they're not REST endpoints)
     if (!path) {
-      console.log(`⏩ Skipped handler '${handlerName}': no REST path defined`);
       return;
     }
 
@@ -113,9 +112,6 @@ export function registerHandlersWithBillableRouter(
     // Use handlerName as ruleId for clearer billing rule identification
     billableRouter[methodName](fullPath, routeOptions, expressHandler, handlerName);
 
-    console.log(
-      `📝 Registered handler '${handlerName}': ${httpMethod.toUpperCase()} ${fullPath} with options:`,
-      routeOptions
-    );
+    // Registered successfully
   });
 }

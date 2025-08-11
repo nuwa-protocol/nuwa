@@ -117,7 +117,6 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       // Then validate and transform with Zod (handles BigInt conversion)
       return PersistedHttpClientStateSchema.parse(parsedData);
     } catch (error) {
-      console.warn('Failed to parse stored client state:', error);
       return undefined;
     }
   }

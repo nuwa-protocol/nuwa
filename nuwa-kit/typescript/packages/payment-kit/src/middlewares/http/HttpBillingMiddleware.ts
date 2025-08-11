@@ -23,7 +23,7 @@ import { findRule } from '../../billing/core/rule-matcher';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 import type { RAVRepository } from '../../storage/interfaces/RAVRepository';
-import { DIDResolver } from '@nuwa-ai/identity-kit';
+import { DIDResolver, DebugLogger } from '@nuwa-ai/identity-kit';
 import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 
 // Generic HTTP interfaces (framework-agnostic)
@@ -84,12 +84,15 @@ export class HttpBillingMiddleware {
   private processor: PaymentProcessor;
   private codec: HttpPaymentCodec;
   private config: HttpBillingMiddlewareConfig;
+  private logger: DebugLogger;
 
   constructor(config: HttpBillingMiddlewareConfig) {
     this.config = config;
     this.processor = config.processor;
     // Initialize HTTP codec
     this.codec = new HttpPaymentCodec();
+    this.logger = DebugLogger.get('HttpBillingMiddleware');
+    this.logger.setLevel(config.debug ? 'debug' : 'info');
   }
 
   /**
@@ -318,9 +321,7 @@ export class HttpBillingMiddleware {
    * Debug logging
    */
   private log(...args: any[]): void {
-    if (this.config.debug) {
-      console.log('[HttpBillingMiddleware]', ...args);
-    }
+    this.logger.debug(...args);
   }
 
   /**

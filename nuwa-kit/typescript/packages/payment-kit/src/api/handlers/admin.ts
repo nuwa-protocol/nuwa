@@ -18,19 +18,8 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
   req
 ) => {
   try {
-    if (ctx.config.debug) {
-      console.log('📊 Admin: Getting claims status...');
-    }
-
     const claimsStatus = ctx.claimScheduler.getStatus();
-    if (ctx.config.debug) {
-      console.log('📊 Claims status:', claimsStatus);
-    }
-
     const processingStats = ctx.processor.getProcessingStats();
-    if (ctx.config.debug) {
-      console.log('📊 Processing stats:', processingStats);
-    }
 
     const result: ClaimsStatusResponse = {
       claimsStatus,
@@ -38,17 +27,8 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
       timestamp: new Date().toISOString(),
     };
 
-    if (ctx.config.debug) {
-      console.log('✅ Admin: Claims data retrieved successfully');
-    }
-
     return createSuccessResponse(result);
   } catch (error) {
-    if (ctx.config.debug) {
-      console.error('❌ Admin: Failed to get claims status:', error);
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    }
-
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to retrieve claims status',
@@ -68,23 +48,10 @@ export const handleAdminClaimTrigger: Handler<
   ClaimTriggerResponse
 > = async (ctx, req) => {
   try {
-    if (ctx.config.debug) {
-      console.log('🚀 Admin: Triggering claim for channel:', req.channelId);
-    }
-
     const results = await ctx.claimScheduler.triggerClaim(req.channelId);
-
-    if (ctx.config.debug) {
-      console.log('✅ Admin: Claim trigger result:', results);
-    }
 
     return createSuccessResponse({ results, channelId: req.channelId });
   } catch (error) {
-    if (ctx.config.debug) {
-      console.error('❌ Admin: Failed to trigger claim:', error);
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    }
-
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to trigger claim',

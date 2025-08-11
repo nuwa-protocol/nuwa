@@ -135,16 +135,9 @@ export async function createHttpClient(
   // Automatically perform service discovery
   try {
     const serviceInfo = await client.discoverService();
-    if (httpPayerOptions.debug) {
-      console.log('[PaymentChannelHttpClient] Service discovery completed:', serviceInfo);
-    }
+    // Optional debug handled by client's logger
   } catch (error) {
-    if (httpPayerOptions.debug) {
-      console.warn(
-        '[PaymentChannelHttpClient] Service discovery failed, will retry when needed:',
-        error
-      );
-    }
+    // Client will retry when needed
     // Continue anyway - the client will attempt discovery again when needed
   }
 

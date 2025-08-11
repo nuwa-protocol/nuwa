@@ -205,7 +205,6 @@ export class PaymentChannelPayeeClient {
         results.push(result);
       } catch (error) {
         // Continue with other claims even if one fails
-        console.warn(`Failed to claim SubRAV for channel ${signedSubRAV.subRav.channelId}:`, error);
         throw error;
       }
     }
@@ -272,7 +271,6 @@ export class PaymentChannelPayeeClient {
       if (!forceRefresh) {
         const staleMetadata = await this.channelRepo.getChannelMetadata(channelId);
         if (staleMetadata) {
-          console.warn(`Chain call failed for channel ${channelId}, using stale cache`);
           return staleMetadata;
         }
       }
@@ -304,9 +302,7 @@ export class PaymentChannelPayeeClient {
       try {
         const info = await this.getChannelInfoCached(metadata.channelId);
         channelInfos.push(info);
-      } catch (error) {
-        console.warn(`Failed to get status for channel ${metadata.channelId}:`, error);
-      }
+      } catch (error) {}
     }
 
     return channelInfos;
@@ -320,9 +316,7 @@ export class PaymentChannelPayeeClient {
     try {
       // Force refresh from chain and update cache
       await this.getChannelInfoCached(channelId, true);
-      console.log(`Synced channel ${channelId} state from blockchain`);
     } catch (error) {
-      console.error(`Failed to sync channel ${channelId}:`, error);
       throw error;
     }
   }

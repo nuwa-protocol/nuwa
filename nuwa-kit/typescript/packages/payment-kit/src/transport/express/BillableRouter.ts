@@ -152,7 +152,7 @@ export class BillableRouter implements RuleProvider {
     handler: RequestHandler,
     id?: string
   ) {
-    console.log(`🔧 Registering route: ${method.toUpperCase()} ${path} with options:`, options);
+    // Route registration
 
     // Normalize options to RouteOptions
     let routeOptions: RouteOptions;
@@ -231,33 +231,30 @@ export class BillableRouter implements RuleProvider {
       paymentRequired,
     };
 
-    console.log(`📝 Created rule:`, rule);
+    // Rule created
 
     // Insert rule with proper ordering:
     // 1. Specific rules (non-default) should be added in registration order
     // 2. Default rules should always be at the end
     if (rule.default) {
       // Keep default pricing rule at the end
-      console.log(`📌 Adding default rule to end:`, rule.id);
+      // Keep default rule at end
       this.rules.push(rule);
     } else {
       // Find the position to insert: before the first default rule, or at the end
       const firstDefaultIndex = this.rules.findIndex(r => r.default);
       if (firstDefaultIndex >= 0) {
         // Insert before the first default rule
-        console.log(`📌 Adding specific rule before default rules:`, rule.id);
+        // Insert before default
         this.rules.splice(firstDefaultIndex, 0, rule);
       } else {
         // No default rules yet, add to the end
-        console.log(`📌 Adding specific rule to end:`, rule.id);
+        // Add to end
         this.rules.push(rule);
       }
     }
 
-    console.log(
-      `📋 Total rules after registration: ${this.rules.length}`,
-      this.rules.map(r => r.id)
-    );
+    // Registration done
 
     // Delegate to Express Router
     (this.router as any)[method](path, handler);

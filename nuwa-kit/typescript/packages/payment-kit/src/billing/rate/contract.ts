@@ -1,5 +1,6 @@
 import { BaseRateProvider, RateProviderError, RateNotFoundError } from './types';
 import { AssetInfo } from '../../core/types';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 
 /**
@@ -10,6 +11,7 @@ import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelCon
  */
 export class ContractRateProvider extends BaseRateProvider {
   private contract: IPaymentChannelContract;
+  private logger: DebugLogger;
 
   constructor(
     contract: IPaymentChannelContract,
@@ -17,6 +19,7 @@ export class ContractRateProvider extends BaseRateProvider {
   ) {
     super(cacheTimeoutMs);
     this.contract = contract;
+    this.logger = DebugLogger.get('ContractRateProvider');
   }
 
   async getPricePicoUSD(assetId: string): Promise<bigint> {
@@ -42,7 +45,7 @@ export class ContractRateProvider extends BaseRateProvider {
       try {
         assetInfo = await this.contract.getAssetInfo(assetId);
       } catch (error) {
-        console.warn(`Failed to get asset info for ${assetId}, using price only:`, error);
+        this.logger.warn(`Failed to get asset info for ${assetId}, using price only:`, error);
       }
 
       // Cache the result
@@ -53,7 +56,7 @@ export class ContractRateProvider extends BaseRateProvider {
       // Try to return stale cache as fallback
       const staleCache = this.cache.get(assetId);
       if (staleCache) {
-        console.warn(`Using stale contract price cache for ${assetId} due to error:`, error);
+        this.logger.warn(`Using stale contract price cache for ${assetId} due to error:`, error);
         return staleCache.price;
       }
 
@@ -79,7 +82,7 @@ export class ContractRateProvider extends BaseRateProvider {
       this.updateCache(assetId, cached?.price || 0n, info);
       return info;
     } catch (error) {
-      console.warn(`Failed to get asset info for ${assetId}:`, error);
+      this.logger.warn(`Failed to get asset info for ${assetId}:`, error);
       throw error;
     }
   }
