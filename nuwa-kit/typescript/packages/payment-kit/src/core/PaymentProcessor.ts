@@ -156,7 +156,9 @@ export class PaymentProcessor {
         vmIdFragment
       );
       if (!subChannelState) {
-        return this.fail(pctx, Errors.subchannelNotAuthorized(channelId, vmIdFragment), { attachHeader: false });
+        return this.fail(pctx, Errors.subchannelNotAuthorized(channelId, vmIdFragment), {
+          attachHeader: false,
+        });
       }
 
       // Latest signed RAV from repository
@@ -167,7 +169,9 @@ export class PaymentProcessor {
 
       const payerDidDoc = await this.config.didResolver.resolveDID(channelInfo.payerDid);
       if (!payerDidDoc) {
-        return this.fail(pctx, Errors.didResolveFailed(channelInfo.payerDid), { attachHeader: false });
+        return this.fail(pctx, Errors.didResolveFailed(channelInfo.payerDid), {
+          attachHeader: false,
+        });
       }
 
       // Single-entry verification using prefetched context
@@ -532,7 +536,7 @@ export class PaymentProcessor {
       nonce: nextNonce,
       accumulatedAmount: newAccumulatedAmount,
     };
-  } 
+  }
 
   /**
    * Try to locate sub-channel using DIDAuth fallback (§4.4 of rav-handling.md)

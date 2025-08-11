@@ -52,7 +52,10 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
     const ok = await SubRAVSigner.verify(signed, { didDocument: params.payerDidDoc });
     result.signedVerified = !!ok;
     if (!ok) {
-      result.error = { code: PaymentErrorCode.INVALID_SIGNATURE, message: `Invalid signature for signed SubRAV` } as any;
+      result.error = {
+        code: PaymentErrorCode.INVALID_SIGNATURE,
+        message: `Invalid signature for signed SubRAV`,
+      } as any;
       return finalize();
     }
   }
