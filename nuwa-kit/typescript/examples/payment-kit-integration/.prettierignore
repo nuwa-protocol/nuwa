@@ -1,0 +1,12 @@
+dist
+node_modules
+coverage
+*.log
+.turbo
+.cache
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.DS_Store
+
+

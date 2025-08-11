@@ -98,9 +98,9 @@ pnpm dev:client channel                 # Show channel info
 
 ### Payment-Enabled Endpoints
 
-- `GET /api/echo?message=<text>` - Echo service (0.002 USD fixed)
-- `POST /api/process` - Text processing (0.0001 USD per character)
-- `POST /api/chat/completions` - AI chat completion (0.00005 USD per token)
+- `GET /echo?message=<text>` - Echo service (0.002 USD fixed)
+- `POST /process` - Text processing (0.0005 USD per request)
+- `POST /chat/completions` - AI chat completion (0.00005 USD per token, post-billing)
 
 ### Management Endpoints
 
@@ -190,7 +190,7 @@ $ pnpm dev:client process "hello world"
   Nonce: 2
 ```
 
-### 4. Chat Completion
+### 4. Chat Completion (Post-billing)
 ```bash
 $ pnpm dev:client chat "What is blockchain?"
 
@@ -198,7 +198,7 @@ $ pnpm dev:client chat "What is blockchain?"
 ✅ Chat Completion Response:
   Response: This is a mock AI response to: "What is blockchain?..."
   Tokens Used: 75 (prompt: 25, completion: 50)
-  Cost: 3750000 (3.750000 RGas)
+  Cost: 3750000 (3.750000 RGas) - calculated after response based on actual token usage
   Nonce: 3
 ```
 
@@ -252,7 +252,9 @@ pnpm build
 
 ### ExpressPaymentKit (Server)
 - Automatic billing middleware integration
-- Multiple pricing strategies (fixed, per-token, custom)
+- Multiple pricing strategies:
+  - **Pre-billing**: Fixed price strategies (PerRequest) - calculated before request execution
+  - **Post-billing**: Usage-based strategies (PerToken) - calculated after request execution using actual usage data
 - Built-in admin and recovery endpoints
 - DID-based authentication
 

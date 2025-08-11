@@ -9,7 +9,7 @@ import type { Request, Response } from 'express';
 
 /**
  * Simple HTTP server demonstrating Payment Kit integration
- * 
+ *
  * This example shows how to:
  * 1. Set up ExpressPaymentKit for billing functionality
  * 2. Define routes with different pricing strategies
@@ -36,8 +36,8 @@ async function createPaymentServer(config: ServerConfig): Promise<{
     method: 'rooch',
     vdrOptions: {
       rpcUrl: process.env.ROOCH_NODE_URL,
-      network: process.env.ROOCH_NETWORK || 'test'
-    }
+      network: process.env.ROOCH_NETWORK || 'test',
+    },
   });
 
   let keyManager = env.keyManager;
@@ -45,7 +45,7 @@ async function createPaymentServer(config: ServerConfig): Promise<{
   if (!serviceKey) {
     throw new Error('SERVICE_KEY environment variable is required');
   }
-  
+
   // Import the service key first
   const importedKey = await keyManager.importKeyFromString(serviceKey);
   console.log('🔑 Imported service key:', importedKey.keyId);
@@ -62,13 +62,13 @@ async function createPaymentServer(config: ServerConfig): Promise<{
     defaultAssetId: config.defaultAssetId,
     defaultPricePicoUSD: '1000000000', // 0.001 USD default
     adminDid: config.adminDid,
-    debug: config.debug
+    debug: config.debug,
   });
 
   console.log('💳 Payment Kit initialized');
 
   // Set debug level after PaymentKit is initialized
-  if(config.debug) {
+  if (config.debug) {
     console.log('🔍 Setting debug level to debug');
     DebugLogger.setGlobalLevel('debug');
   }
@@ -76,89 +76,98 @@ async function createPaymentServer(config: ServerConfig): Promise<{
   // Note: Service info is provided by ExpressPaymentKit at /payment-channel/info
 
   // Simple echo endpoint - fixed price per request
-  billing.get('/echo', '2000000000', (req: Request, res: Response) => { // 0.002 USD
-    const paymentResult = (req as any).paymentResult;
+  billing.get('/echo', { pricing: '2000000000' }, (req: Request, res: Response) => {
+    // 0.002 USD
     const message = req.query.message || 'Hello, World!';
-    
+
+    // Clean business response - payment info is in headers
     res.json({
       echo: message,
       timestamp: new Date().toISOString(),
-      cost: paymentResult?.cost?.toString(),
-      nonce: paymentResult?.subRav?.nonce?.toString()
     });
   });
 
   // Text processing endpoint - fixed price per request
-  billing.post('/process', '500000000', (req: Request, res: Response) => { // 0.0005 USD per request
-    const paymentResult = (req as any).paymentResult;
+  billing.post('/process', { pricing: '500000000' }, (req: Request, res: Response) => {
+    // 0.0005 USD per request
     const text = req.body.text || '';
     const characters = text.length;
-    
+
     // Simple text processing (uppercase)
     const processed = text.toUpperCase();
-    
+
+    // Clean business response - payment info is in headers
     res.json({
       input: text,
       output: processed,
       characters,
       timestamp: new Date().toISOString(),
-      cost: paymentResult?.cost?.toString(),
-      nonce: paymentResult?.subRav?.nonce?.toString()
     });
   });
 
-  // Chat completion endpoint - fixed price per request (similar to OpenAI API)
-  billing.post('/chat/completions', '1000000000', (req: Request, res: Response) => { // 0.001 USD per request
-    const paymentResult = (req as any).paymentResult;
-    const { messages, max_tokens = 100 } = req.body;
-    
-    // Mock AI response and usage calculation
-    const prompt = messages?.map((m: any) => m.content).join(' ') || '';
-    const prompt_tokens = Math.ceil(prompt.length / 4); // rough estimate
-    const completion_tokens = Math.min(max_tokens, 50); // mock response
-    const total_tokens = prompt_tokens + completion_tokens;
-    
-    const mockResponse = `This is a mock AI response to: "${prompt.substring(0, 50)}..."`;
-    
-    res.json({
-      id: `chatcmpl-${Date.now()}`,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: 'mock-gpt',
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: mockResponse
-        },
-        finish_reason: 'stop'
-      }],
-      usage: {
-        prompt_tokens,
-        completion_tokens,
-        total_tokens
+  // Chat completion endpoint - per-token pricing with post-billing (similar to OpenAI API)
+  billing.post(
+    '/chat/completions',
+    {
+      pricing: {
+        type: 'PerToken',
+        unitPricePicoUSD: '50000000', // 0.00005 USD per token
+        usageKey: 'usage.total_tokens',
       },
-      // Payment information
-      cost: paymentResult?.cost?.toString(),
-      nonce: paymentResult?.subRav?.nonce?.toString()
-    });
-  });
+    },
+    (req: Request, res: Response) => {
+      const { messages, max_tokens = 100 } = req.body;
 
-  // Mount recovery routes (public endpoints like /info and /price)
-  app.use('/payment-channel', billing.recoveryRouter());
-  app.use('/payment-channel/admin', billing.adminRouter());
+      // Mock AI response and usage calculation
+      const prompt = messages?.map((m: any) => m.content).join(' ') || '';
+      const prompt_tokens = Math.ceil(prompt.length / 4); // rough estimate
+      const completion_tokens = Math.min(max_tokens, 50); // mock response
+      const total_tokens = prompt_tokens + completion_tokens;
 
-  // Mount billing routes only for API paths (exclude payment-channel routes)
-  app.use('/api', billing.router);
+      const mockResponse = `This is a mock AI response to: "${prompt.substring(0, 50)}..."`;
 
-  // Health check
-  app.get('/health', (req: Request, res: Response) => {
-    res.json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      service: config.serviceId
-    });
-  });
+      // IMPORTANT: Attach usage data to res.locals for post-billing calculation
+      // The PerToken strategy will use this data to calculate the final cost
+      (res as any).locals = (res as any).locals || {};
+      (res as any).locals.usage = {
+        usage: {
+          prompt_tokens,
+          completion_tokens,
+          total_tokens,
+        },
+      };
+
+      // The final cost will be calculated after this response based on actual token usage
+      // Final cost = unitPricePicoUSD (50000000) × total_tokens
+      // Payment info will be automatically added to response headers by PaymentKit
+      res.json({
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: 'mock-gpt',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: mockResponse,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens,
+          completion_tokens,
+          total_tokens,
+        },
+        // Note: Clean business response - payment info is in headers
+      });
+    }
+  );
+
+  // Mount the ExpressPaymentKit router
+  // This provides both payment-channel endpoints and the billable business routes
+  app.use(billing.router);
 
   // Error handling
   app.use((err: any, req: Request, res: Response, next: any) => {
@@ -167,11 +176,11 @@ async function createPaymentServer(config: ServerConfig): Promise<{
     console.error('Request headers:', JSON.stringify(req.headers, null, 2));
     console.error('Error details:', err);
     console.error('Error stack:', err.stack);
-    
+
     res.status(500).json({
       error: 'Internal server error',
       message: err.message,
-      ...(config.debug && { stack: err.stack })
+      ...(config.debug && { stack: err.stack }),
     });
   });
 
@@ -184,7 +193,7 @@ async function main() {
     serviceId: process.env.SERVICE_ID || 'payment-example',
     defaultAssetId: process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
     adminDid: process.env.ADMIN_DID?.split(',') || [],
-    debug: process.env.DEBUG === 'true'
+    debug: process.env.DEBUG === 'true',
   };
 
   try {
@@ -192,8 +201,8 @@ async function main() {
 
     const server = app.listen(config.port, () => {
       console.log(`🚀 Payment server running on port ${config.port}`);
-      console.log(`📖 Service info: http://localhost:${config.port}/payment-channel/info`);
-      console.log(`🔍 Health check: http://localhost:${config.port}/health`);
+      console.log(`📖 Service info: http://localhost:${config.port}/.well-known/nuwa-payment/info`);
+      console.log(`🔍 Health check: http://localhost:${config.port}/payment-channel/health`);
       console.log(`💰 Admin panel: http://localhost:${config.port}/payment-channel/admin/claims`);
     });
 
@@ -213,7 +222,6 @@ async function main() {
         process.exit(0);
       });
     });
-
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
