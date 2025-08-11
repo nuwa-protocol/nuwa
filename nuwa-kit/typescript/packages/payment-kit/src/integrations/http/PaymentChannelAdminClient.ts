@@ -1,11 +1,11 @@
-import type { 
+import type {
   HealthResponse,
   ClaimsStatusResponse,
   ClaimTriggerRequest,
   ClaimTriggerResponse,
   SubRavRequest,
   CleanupRequest,
-  CleanupResponse
+  CleanupResponse,
 } from '../../schema';
 import type { PaymentResult } from '../../core/types';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
@@ -13,11 +13,11 @@ import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 /**
  * PaymentChannelAdminClient provides a simplified interface for calling
  * Payment Kit admin endpoints.
- * 
+ *
  * This is a lightweight wrapper around PaymentChannelHttpClient that
- * provides type-safe admin API calls without the complexity of payment 
+ * provides type-safe admin API calls without the complexity of payment
  * channel management.
- * 
+ *
  * Features:
  * - Type-safe admin API calls
  * - Reuses existing PaymentChannelHttpClient functionality
@@ -49,7 +49,9 @@ export class PaymentChannelAdminClient {
    * Get claims status and processing statistics (admin only)
    */
   async getClaimsStatus(): Promise<ClaimsStatusResponse> {
-    const result = await this.httpClient.get<ClaimsStatusResponse>(this.buildPaymentUrl('/admin/claims'));
+    const result = await this.httpClient.get<ClaimsStatusResponse>(
+      this.buildPaymentUrl('/admin/claims')
+    );
     return result.data;
   }
 
@@ -57,7 +59,10 @@ export class PaymentChannelAdminClient {
    * Manually trigger a claim for a specific channel (admin only)
    */
   async triggerClaim(request: ClaimTriggerRequest): Promise<ClaimTriggerResponse> {
-    const result = await this.httpClient.post<ClaimTriggerResponse>(this.buildPaymentUrl('/admin/claim-trigger'), request);
+    const result = await this.httpClient.post<ClaimTriggerResponse>(
+      this.buildPaymentUrl('/admin/claim-trigger'),
+      request
+    );
     return result.data;
   }
 
@@ -76,10 +81,15 @@ export class PaymentChannelAdminClient {
   async cleanup(request?: CleanupRequest): Promise<CleanupResponse> {
     // Use POST and JSON body for cleanup
     if (request && Object.keys(request).length > 0) {
-      const result = await this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'), request);
+      const result = await this.httpClient.post<CleanupResponse>(
+        this.buildPaymentUrl('/admin/cleanup'),
+        request
+      );
       return result.data;
     }
-    const result = await this.httpClient.post<CleanupResponse>(this.buildPaymentUrl('/admin/cleanup'));
+    const result = await this.httpClient.post<CleanupResponse>(
+      this.buildPaymentUrl('/admin/cleanup')
+    );
     return result.data;
   }
 
@@ -89,7 +99,6 @@ export class PaymentChannelAdminClient {
   async discoverService(): Promise<any> {
     return this.httpClient.discoverService();
   }
-
 }
 
 /**

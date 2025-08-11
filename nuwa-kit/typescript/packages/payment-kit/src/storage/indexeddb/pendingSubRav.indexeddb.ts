@@ -13,11 +13,11 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
   private async getDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
-      
+
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
-      
-      request.onupgradeneeded = (event) => {
+
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
         const oldVersion = (event as any).oldVersion as number | undefined;
 
@@ -32,7 +32,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
         }
 
         const store = db.createObjectStore('pendingSubRAVs', {
-          keyPath: ['channelId', 'vmIdFragment', 'nonce']
+          keyPath: ['channelId', 'vmIdFragment', 'nonce'],
         });
         store.createIndex('channelId', 'channelId', { unique: false });
         store.createIndex('subChannel', ['channelId', 'vmIdFragment'], { unique: false });
@@ -45,7 +45,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');
     const store = tx.objectStore('pendingSubRAVs');
-    
+
     const record = {
       channelId: subRAV.channelId,
       vmIdFragment: subRAV.vmIdFragment,
@@ -57,7 +57,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
       },
       timestamp: Date.now(),
     };
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.put(record);
       request.onsuccess = () => resolve();
@@ -69,7 +69,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readonly');
     const store = tx.objectStore('pendingSubRAVs');
-    
+
     const record = await new Promise<any>((resolve, reject) => {
       const request = store.get([channelId, vmIdFragment, nonce.toString()]);
       request.onsuccess = () => resolve(request.result);
@@ -93,13 +93,13 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const tx = db.transaction(['pendingSubRAVs'], 'readonly');
     const store = tx.objectStore('pendingSubRAVs');
     const subChannelIndex = store.index('subChannel');
-    
+
     let latestSubRAV: SubRAV | null = null;
     let maxNonce = BigInt(-1);
 
     // Use cursor to iterate through all records for this channel
     const cursorRequest = subChannelIndex.openCursor(IDBKeyRange.only([channelId, vmIdFragment]));
-    
+
     await new Promise<void>((resolve, reject) => {
       cursorRequest.onsuccess = () => {
         const cursor = cursorRequest.result;
@@ -110,18 +110,23 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
             nonce: BigInt(record.subRAVData.nonce),
             accumulatedAmount: BigInt(record.subRAVData.accumulatedAmount),
           };
-          
+
           if (subRAV.nonce > maxNonce) {
             maxNonce = subRAV.nonce;
             latestSubRAV = subRAV;
           }
-          
+
           cursor.continue();
         } else {
           resolve();
         }
       };
-      cursorRequest.onerror = () => reject(new Error(`Failed to iterate through pending SubRAVs for channel '${channelId}': ${cursorRequest.error?.message || 'Unknown error'}`));
+      cursorRequest.onerror = () =>
+        reject(
+          new Error(
+            `Failed to iterate through pending SubRAVs for channel '${channelId}': ${cursorRequest.error?.message || 'Unknown error'}`
+          )
+        );
     });
 
     return latestSubRAV;
@@ -131,7 +136,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');
     const store = tx.objectStore('pendingSubRAVs');
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.delete([channelId, vmIdFragment, nonce.toString()]);
       request.onsuccess = () => resolve();
@@ -144,13 +149,13 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');
     const store = tx.objectStore('pendingSubRAVs');
     const index = store.index('timestamp');
-    
+
     const cutoff = Date.now() - maxAgeMs;
     let cleanedCount = 0;
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = index.openCursor(IDBKeyRange.upperBound(cutoff));
-      
+
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
@@ -161,7 +166,7 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
           resolve();
         }
       };
-      
+
       request.onerror = () => reject(request.error);
     });
 
@@ -172,36 +177,36 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readonly');
     const store = tx.objectStore('pendingSubRAVs');
-    
+
     const byChannel: Record<string, number> = {};
     let oldestTimestamp: number | undefined;
     let newestTimestamp: number | undefined;
     let totalCount = 0;
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.openCursor();
-      
+
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
           const record = cursor.value;
           totalCount++;
-          
+
           byChannel[record.channelId] = (byChannel[record.channelId] || 0) + 1;
-          
+
           if (oldestTimestamp === undefined || record.timestamp < oldestTimestamp) {
             oldestTimestamp = record.timestamp;
           }
           if (newestTimestamp === undefined || record.timestamp > newestTimestamp) {
             newestTimestamp = record.timestamp;
           }
-          
+
           cursor.continue();
         } else {
           resolve();
         }
       };
-      
+
       request.onerror = () => reject(request.error);
     });
 
@@ -217,11 +222,11 @@ export class IndexedDBPendingSubRAVRepository implements PendingSubRAVRepository
     const db = await this.getDB();
     const tx = db.transaction(['pendingSubRAVs'], 'readwrite');
     const store = tx.objectStore('pendingSubRAVs');
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.clear();
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   }
-} 
+}

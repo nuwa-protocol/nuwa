@@ -30,4 +30,4 @@ export interface RAVRepository {
 
   /** Cleanup old or processed RAVs (optional) */
   cleanup?(): Promise<number>;
-} 
+}

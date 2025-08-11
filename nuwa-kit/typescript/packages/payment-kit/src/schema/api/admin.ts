@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { 
+import {
   ClaimsStatusSchema,
   ClaimTriggerRequestSchema as CoreClaimTriggerRequestSchema,
   ClaimTriggerResponseSchema as CoreClaimTriggerResponseSchema,
   CleanupRequestSchema as CoreCleanupRequestSchema,
-  CleanupResponseSchema as CoreCleanupResponseSchema
+  CleanupResponseSchema as CoreCleanupResponseSchema,
 } from '../core';
 
 /**

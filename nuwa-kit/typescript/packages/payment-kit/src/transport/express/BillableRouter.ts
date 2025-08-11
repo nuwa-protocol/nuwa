@@ -57,20 +57,23 @@ export class BillableRouter implements RuleProvider {
 
     // Add default rule if provided
     if (opts.defaultPricePicoUSD !== undefined) {
-      const pricing = typeof opts.defaultPricePicoUSD === 'string' ? BigInt(opts.defaultPricePicoUSD) : opts.defaultPricePicoUSD;
+      const pricing =
+        typeof opts.defaultPricePicoUSD === 'string'
+          ? BigInt(opts.defaultPricePicoUSD)
+          : opts.defaultPricePicoUSD;
       const authRequired = pricing > 0n;
       const paymentRequired = pricing > 0n;
-      
+
       this.rules.push({
         id: 'default-pricing',
         default: true,
         strategy: {
           type: 'PerRequest',
-          price: opts.defaultPricePicoUSD.toString()
+          price: opts.defaultPricePicoUSD.toString(),
         },
         authRequired,
         adminOnly: false,
-        paymentRequired
+        paymentRequired,
       });
     }
   }
@@ -79,23 +82,48 @@ export class BillableRouter implements RuleProvider {
   // Public helpers for HTTP verbs
   // ---------------------------------------------------------------------
 
-  get(path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  get(
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     return this.register('get', path, options, handler, id);
   }
 
-  post(path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  post(
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     return this.register('post', path, options, handler, id);
   }
 
-  put(path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  put(
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     return this.register('put', path, options, handler, id);
   }
 
-  delete(path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  delete(
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     return this.register('delete', path, options, handler, id);
   }
 
-  patch(path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  patch(
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     return this.register('patch', path, options, handler, id);
   }
 
@@ -117,9 +145,15 @@ export class BillableRouter implements RuleProvider {
   // ---------------------------------------------------------------------
   // Internal helper to collect rule + register to Express
   // ---------------------------------------------------------------------
-  private register(method: string, path: string, options: RouteOptions | bigint | string | StrategyConfig, handler: RequestHandler, id?: string) {
+  private register(
+    method: string,
+    path: string,
+    options: RouteOptions | bigint | string | StrategyConfig,
+    handler: RequestHandler,
+    id?: string
+  ) {
     console.log(`🔧 Registering route: ${method.toUpperCase()} ${path} with options:`, options);
-    
+
     // Normalize options to RouteOptions
     let routeOptions: RouteOptions;
     if (typeof options === 'object' && 'pricing' in options) {
@@ -127,7 +161,7 @@ export class BillableRouter implements RuleProvider {
       routeOptions = options as RouteOptions;
     } else {
       // Legacy usage: pricing only (bigint, string, or StrategyConfig)
-      routeOptions = { pricing: options as (bigint | string | StrategyConfig) };
+      routeOptions = { pricing: options as bigint | string | StrategyConfig };
     }
 
     // Determine strategy config
@@ -139,21 +173,26 @@ export class BillableRouter implements RuleProvider {
       // It's a fixed price, create PerRequest strategy
       strategy = {
         type: 'PerRequest',
-        price: routeOptions.pricing.toString()
+        price: routeOptions.pricing.toString(),
       };
     }
 
     // Validate and determine auth and payment requirements
     const adminOnly = routeOptions.adminOnly || false;
     let authRequired = routeOptions.authRequired;
-    
+
     // Validation: adminOnly implies authRequired
     if (adminOnly && authRequired === false) {
-      throw new Error(`Route ${method.toUpperCase()} ${path}: adminOnly requires authRequired to be true or undefined`);
+      throw new Error(
+        `Route ${method.toUpperCase()} ${path}: adminOnly requires authRequired to be true or undefined`
+      );
     }
-    
+
     // Auto-determine payment requirement based on pricing strategy
-    const pricing = typeof routeOptions.pricing === 'string' ? BigInt(routeOptions.pricing) : routeOptions.pricing;
+    const pricing =
+      typeof routeOptions.pricing === 'string'
+        ? BigInt(routeOptions.pricing)
+        : routeOptions.pricing;
     let paymentRequired: boolean;
     if (typeof pricing === 'bigint') {
       // Fixed price: only require payment if price > 0
@@ -162,7 +201,7 @@ export class BillableRouter implements RuleProvider {
       // Dynamic strategy: always require payment
       paymentRequired = true;
     }
-    
+
     // Determine final auth requirement
     if (authRequired === undefined) {
       if (adminOnly) {
@@ -184,16 +223,16 @@ export class BillableRouter implements RuleProvider {
       id: id || `${method}:${path}`,
       when: {
         path,
-        method: method.toUpperCase()
+        method: method.toUpperCase(),
       },
       strategy,
       authRequired,
       adminOnly,
-      paymentRequired
+      paymentRequired,
     };
-    
+
     console.log(`📝 Created rule:`, rule);
-    
+
     // Insert rule with proper ordering:
     // 1. Specific rules (non-default) should be added in registration order
     // 2. Default rules should always be at the end
@@ -215,7 +254,10 @@ export class BillableRouter implements RuleProvider {
       }
     }
 
-    console.log(`📋 Total rules after registration: ${this.rules.length}`, this.rules.map(r => r.id));
+    console.log(
+      `📋 Total rules after registration: ${this.rules.length}`,
+      this.rules.map(r => r.id)
+    );
 
     // Delegate to Express Router
     (this.router as any)[method](path, handler);
@@ -224,4 +266,4 @@ export class BillableRouter implements RuleProvider {
 }
 
 // Re-export express so consumers don’t have to import twice
-export { express as _express }; 
+export { express as _express };

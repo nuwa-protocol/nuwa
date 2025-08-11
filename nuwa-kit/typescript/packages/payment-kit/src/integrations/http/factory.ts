@@ -74,34 +74,36 @@ export interface CreateHttpPayerClientOptions {
 /**
  * Create PaymentChannelHttpClient with IdentityEnv (recommended approach)
  * Automatically performs service discovery and uses optimal defaults
- * 
+ *
  * @param options - Simple configuration options with IdentityEnv
  * @returns Promise resolving to configured PaymentChannelHttpClient instance
- * 
+ *
  * @example
  * ```typescript
  * import { bootstrapIdentityEnv, createHttpClient } from '@nuwa-ai/payment-kit';
- * 
+ *
  * // 1. Set up identity environment (once per app)
  * const env = await bootstrapIdentityEnv({
  *   method: 'rooch',
  *   vdrOptions: { rpcUrl: 'https://testnet.rooch.network', network: 'test' }
  * });
- * 
+ *
  * // 2. Create HTTP client with automatic service discovery
  * const client = await createHttpClient({
  *   baseUrl: 'https://api.llm-gateway.com',
  *   env,
  *   maxAmount: BigInt('500000000000'), // 50 cents USD
  * });
- * 
+ *
  * // 3. Use it!
  * const result = await client.get('/v1/echo?q=hello');
  * ```
  */
-export async function createHttpClient(options: CreateHttpClientOptions): Promise<PaymentChannelHttpClient> {
+export async function createHttpClient(
+  options: CreateHttpClientOptions
+): Promise<PaymentChannelHttpClient> {
   const chainConfig = getChainConfigFromEnv(options.env);
-  
+
   const httpPayerOptions: HttpPayerOptions = {
     baseUrl: options.baseUrl,
     chainConfig,
@@ -112,7 +114,7 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
     onError: options.onError,
     fetchImpl: options.fetchImpl,
     mappingStore: options.mappingStore,
-    channelRepo: options.channelRepo
+    channelRepo: options.channelRepo,
   };
 
   // If caller did not explicitly provide a keyId, pick the first available from the KeyManager
@@ -129,7 +131,7 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
   }
 
   const client = new PaymentChannelHttpClient(httpPayerOptions);
-  
+
   // Automatically perform service discovery
   try {
     const serviceInfo = await client.discoverService();
@@ -138,10 +140,13 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
     }
   } catch (error) {
     if (httpPayerOptions.debug) {
-      console.warn('[PaymentChannelHttpClient] Service discovery failed, will retry when needed:', error);
+      console.warn(
+        '[PaymentChannelHttpClient] Service discovery failed, will retry when needed:',
+        error
+      );
     }
     // Continue anyway - the client will attempt discovery again when needed
   }
-  
+
   return client;
 }

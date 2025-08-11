@@ -33,7 +33,7 @@ export * from './types/api';
 export * from './errors';
 
 // Zod schemas for validation and serialization (core/api)
-export { 
+export {
   PersistedHttpClientStateSchema,
   ServiceDiscoverySchema,
   ClaimsStatusSchema,
@@ -56,18 +56,16 @@ export {
 } from './schema';
 
 // Utilities
-export { 
-  generateNonce, 
-  extractFragment, 
-  isValidHex, 
+export {
+  generateNonce,
+  extractFragment,
+  isValidHex,
   formatAmount,
   generateChannelId,
   bigintToString,
   stringToBigint,
-  DebugLogger 
+  DebugLogger,
 } from './utils';
 
 // IdentityEnv helpers
 export { getChainConfigFromEnv } from './helpers/fromIdentityEnv';
-
-

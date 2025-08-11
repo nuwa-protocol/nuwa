@@ -1,9 +1,4 @@
-import type { 
-  AssetInfo,
-  SubRAV, 
-  SignedSubRAV,
-  ChannelInfo,
-} from '../core/types';
+import type { AssetInfo, SubRAV, SignedSubRAV, ChannelInfo } from '../core/types';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 /**
@@ -124,13 +119,13 @@ export interface SubChannelInfo {
 
 /**
  * Chain-agnostic payment channel contract interface
- * 
+ *
  * This interface abstracts payment channel operations across different blockchains,
  * providing a unified API for channel management, asset information, and pricing.
  */
 export interface IPaymentChannelContract {
   // -------- Channel CRUD Operations --------
-  
+
   /**
    * Open a new payment channel between payer and payee
    */
@@ -237,7 +232,11 @@ export interface IPaymentChannelContract {
  */
 export type IPaymentHubContract = Pick<
   IPaymentChannelContract,
-  'depositToHub' | 'withdrawFromHub' | 'getHubBalance' | 'getAllHubBalances' | 'getActiveChannelsCounts'
+  | 'depositToHub'
+  | 'withdrawFromHub'
+  | 'getHubBalance'
+  | 'getAllHubBalances'
+  | 'getActiveChannelsCounts'
 >;
 
 // -------- PaymentHub Parameters --------

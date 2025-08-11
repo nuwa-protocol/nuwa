@@ -8,12 +8,12 @@ The `PaymentChannel` struct in Move corresponds to the following TypeScript inte
 
 ```typescript
 interface PaymentChannelData {
-  sender: string;           // Payer DID address (without 'did:rooch:' prefix)
-  receiver: string;         // Payee DID address (without 'did:rooch:' prefix)
-  coin_type: string;        // Asset type (e.g., '0x3::gas_coin::RGas')
-  sub_channels: string;     // ObjectID of Table<String, SubChannel>
-  status: number;           // 0: Active, 1: Cancelling, 2: Closed
-  channel_epoch: bigint;    // Incremented each time channel is closed/reopened
+  sender: string; // Payer DID address (without 'did:rooch:' prefix)
+  receiver: string; // Payee DID address (without 'did:rooch:' prefix)
+  coin_type: string; // Asset type (e.g., '0x3::gas_coin::RGas')
+  sub_channels: string; // ObjectID of Table<String, SubChannel>
+  status: number; // 0: Active, 1: Cancelling, 2: Closed
+  channel_epoch: bigint; // Incremented each time channel is closed/reopened
   cancellation_info: CancellationInfo | null; // Present during cancellation process
 }
 ```
@@ -24,8 +24,8 @@ Each authorized device/VM has a corresponding `SubChannel` entry:
 
 ```typescript
 interface SubChannel {
-  pk_multibase: string;       // Public key in multibase format
-  method_type: string;        // Verification method type
+  pk_multibase: string; // Public key in multibase format
+  method_type: string; // Verification method type
   last_claimed_amount: bigint; // Last amount claimed from this sub-channel
   last_confirmed_nonce: bigint; // Last confirmed nonce for replay protection
 }
@@ -55,6 +55,7 @@ console.log(`Sub-channels table: ${channelData.sub_channels}`);
 ## Implementation Status
 
 ### ✅ Completed
+
 - BCS schema definitions for all PaymentChannel structs
 - Direct parsing of PaymentChannel data from object state
 - Channel status and epoch extraction from parsed data
@@ -62,6 +63,7 @@ console.log(`Sub-channels table: ${channelData.sub_channels}`);
 - **Asset price implementation for RGas with fixed pricing**
 
 ### 🚧 TODO
+
 - Sub-channel data querying from Table (requires field access API)
 - Total collateral calculation from PaymentHub
 - Claimed amount aggregation across sub-channels
@@ -79,7 +81,9 @@ console.log(price); // 100n (100 pUSD per smallest RGas unit)
 
 // Supports both short and full addresses
 const priceShort = await contract.getAssetPrice('0x3::gas_coin::RGas');
-const priceFull = await contract.getAssetPrice('0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas');
+const priceFull = await contract.getAssetPrice(
+  '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas'
+);
 // Both return the same value
 
 // Calculate RGas value in USD
@@ -90,6 +94,7 @@ console.log(`100 RGas = $${totalValueUSD}`); // "100 RGas = $1"
 ```
 
 ### Supported Assets
+
 - **RGas** (`0x3::gas_coin::RGas`): Fixed price of 0.01 USD per RGas
 
 ## Chain Information
@@ -103,7 +108,7 @@ console.log(`Connected to chain: ${chainId}`);
 
 // Chain ID mapping:
 // 1 = Rooch Mainnet
-// 2 = Rooch Testnet  
+// 2 = Rooch Testnet
 // 3 = Rooch Devnet
 // 4 = Rooch Local
 ```
@@ -113,23 +118,23 @@ console.log(`Connected to chain: ${chainId}`);
 ```typescript
 const contract = new RoochPaymentChannelContract({
   network: 'test',
-  debug: true
+  debug: true,
 });
 
 // Get chain ID dynamically
 const chainId = await contract.getChainId();
 
 // Get channel status - no view functions needed!
-const status = await contract.getChannelStatus({ 
-  channelId: '0x...' 
+const status = await contract.getChannelStatus({
+  channelId: '0x...',
 });
 
 console.log({
-  epoch: status.epoch,           // From parsed channelData.channel_epoch
-  status: status.status,         // Converted from channelData.status
-  payer: status.payerDid,       // From channelData.sender
-  payee: status.payeeDid,       // From channelData.receiver
-  asset: status.asset.assetId   // From channelData.coin_type
+  epoch: status.epoch, // From parsed channelData.channel_epoch
+  status: status.status, // Converted from channelData.status
+  payer: status.payerDid, // From channelData.sender
+  payee: status.payeeDid, // From channelData.receiver
+  asset: status.asset.assetId, // From channelData.coin_type
 });
 
 // Get asset pricing
@@ -140,8 +145,9 @@ console.log(`RGas price: ${rgasPrice} pUSD per smallest unit`);
 ## Move Contract Reference
 
 The implementation matches the Move contract structures in:
+
 - `rooch_framework::payment_channel::PaymentChannel`
-- `rooch_framework::payment_channel::SubChannel` 
+- `rooch_framework::payment_channel::SubChannel`
 - `rooch_framework::payment_channel::CancellationInfo`
 
-All BCS schemas are kept in sync with the Move contract definitions to ensure compatibility. 
+All BCS schemas are kept in sync with the Move contract definitions to ensure compatibility.

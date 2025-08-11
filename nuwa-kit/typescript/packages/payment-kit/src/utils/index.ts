@@ -34,23 +34,23 @@ export function isValidHex(hex: string, expectedLength?: number): boolean {
   if (!hex || typeof hex !== 'string') {
     return false;
   }
-  
+
   if (!hex.startsWith('0x')) {
     return false;
   }
-  
+
   const hexPart = hex.substring(2);
-  
+
   // Check if it contains only valid hex characters
   if (!/^[0-9a-fA-F]*$/.test(hexPart)) {
     return false;
   }
-  
+
   // Check expected length if provided
   if (expectedLength !== undefined && hexPart.length !== expectedLength) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -61,11 +61,11 @@ export function formatAmount(amount: bigint, decimals: number = 18): string {
   const divisor = BigInt(10 ** decimals);
   const whole = amount / divisor;
   const remainder = amount % divisor;
-  
+
   if (remainder === 0n) {
     return whole.toString();
   }
-  
+
   const remainderStr = remainder.toString().padStart(decimals, '0');
   return `${whole}.${remainderStr.replace(/0+$/, '')}`;
 }

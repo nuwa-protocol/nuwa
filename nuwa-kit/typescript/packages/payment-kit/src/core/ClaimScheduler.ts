@@ -12,16 +12,16 @@ import { DebugLogger } from '@nuwa-ai/identity-kit';
 export interface ClaimPolicy {
   /** Minimum accumulated amount to trigger claim (in smallest unit) */
   minClaimAmount: bigint;
-  
+
   /** Maximum interval between claims in milliseconds */
   maxIntervalMs: number;
-  
+
   /** Maximum number of concurrent claim operations */
   maxConcurrentClaims?: number;
-  
+
   /** Retry attempts for failed claims */
   maxRetries?: number;
-  
+
   /** Delay between retries in milliseconds */
   retryDelayMs?: number;
 }
@@ -29,19 +29,19 @@ export interface ClaimPolicy {
 export interface ClaimSchedulerOptions {
   /** RAV storage instance */
   store: RAVRepository;
-  
+
   /** Payment channel contract instance */
   contract: IPaymentChannelContract;
-  
+
   /** Signer for claim transactions */
   signer: SignerInterface;
-  
+
   /** Claiming policy configuration */
   policy: ClaimPolicy;
-  
+
   /** Polling interval in milliseconds (default: 30s) */
   pollIntervalMs?: number;
-  
+
   /** Enable debug logging */
   debug?: boolean;
 }
@@ -65,7 +65,7 @@ export interface ClaimAttempt {
 
 /**
  * Automated claim scheduler for Payee
- * 
+ *
  * Responsibilities:
  * 1. Poll for unclaimed RAVs periodically
  * 2. Apply claim policies (amount threshold, time threshold)
@@ -131,7 +131,7 @@ export class ClaimScheduler {
     }
 
     this.isRunning = false;
-    
+
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = undefined;
@@ -145,16 +145,16 @@ export class ClaimScheduler {
    */
   async triggerClaim(channelId: string, vmIdFragment?: string): Promise<ScheduledClaimResult[]> {
     this.logger.debug('Manual claim trigger', { channelId, vmIdFragment });
-    
-          if (vmIdFragment) {
-        // Claim specific sub-channel
-        const latest = await this.store.getLatest(channelId, vmIdFragment);
-        if (!latest) {
-          return [];
-        }
-        const unclaimedRAVs = new Map([[vmIdFragment, latest]]);
-        return this.processClaims(channelId, unclaimedRAVs, true);
-      } else {
+
+    if (vmIdFragment) {
+      // Claim specific sub-channel
+      const latest = await this.store.getLatest(channelId, vmIdFragment);
+      if (!latest) {
+        return [];
+      }
+      const unclaimedRAVs = new Map([[vmIdFragment, latest]]);
+      return this.processClaims(channelId, unclaimedRAVs, true);
+    } else {
       // Claim all unclaimed RAVs for channel
       const unclaimedRAVs = await this.store.getUnclaimedRAVs(channelId);
       return this.processClaims(channelId, unclaimedRAVs, true);
@@ -167,78 +167,78 @@ export class ClaimScheduler {
     }
 
     this.pollTimer = setTimeout(() => {
-      this.pollAndProcess().catch(error => {
-        this.logger.error('Poll error:', error);
-      }).finally(() => {
-        this.scheduleNextPoll();
-      });
+      this.pollAndProcess()
+        .catch(error => {
+          this.logger.error('Poll error:', error);
+        })
+        .finally(() => {
+          this.scheduleNextPoll();
+        });
     }, this.pollIntervalMs);
   }
 
   private async pollAndProcess(): Promise<void> {
     try {
       this.logger.debug('Polling for unclaimed RAVs');
-      
+
       // Get all channels with unclaimed RAVs
       // Note: This is a simplified approach. In production, you might want to
       // maintain a list of active channels or use database queries to find them.
       const channelIds = await this.getActiveChannels();
-      
+
       for (const channelId of channelIds) {
         const unclaimedRAVs = await this.store.getUnclaimedRAVs(channelId);
-        
+
         if (unclaimedRAVs.size > 0) {
           await this.processClaims(channelId, unclaimedRAVs, false);
         }
       }
-      
+
       // Process retry queue
       await this.processRetries();
-      
     } catch (error) {
       this.logger.error('Error in poll cycle:', error);
     }
   }
 
   private async processClaims(
-    channelId: string, 
+    channelId: string,
     unclaimedRAVs: Map<string, SignedSubRAV>,
     forceAllClaims: boolean
   ): Promise<ScheduledClaimResult[]> {
     const results: ScheduledClaimResult[] = [];
-    
+
     for (const [vmIdFragment, rav] of unclaimedRAVs) {
       if (!rav) continue;
-      
+
       const key = this.getClaimKey(channelId, vmIdFragment);
-      
+
       // Skip if already processing this sub-channel
       if (this.activeClaims.has(key)) {
         this.logger.debug('Skipping claim - already in progress', { channelId, vmIdFragment });
         continue;
       }
-      
+
       // Check if we've hit concurrent claim limit
       if (this.activeClaims.size >= this.policy.maxConcurrentClaims!) {
         this.logger.debug('Skipping claim - concurrent limit reached');
         break;
       }
-      
+
       // Apply claim policies
       if (!forceAllClaims && !this.shouldClaim(channelId, vmIdFragment, rav)) {
         continue;
       }
-      
+
       // Execute claim
       try {
         this.activeClaims.add(key);
         const result = await this.executeClaim(channelId, vmIdFragment, rav);
         results.push(result);
-        
+
         // Update tracking
         this.lastClaimTimes.set(key, Date.now());
         this.failedAttempts.delete(key);
-        
       } catch (error) {
         this.logger.error('Claim failed', { channelId, vmIdFragment, error });
         this.handleClaimFailure(channelId, vmIdFragment, rav, error);
@@ -246,14 +246,14 @@ export class ClaimScheduler {
         this.activeClaims.delete(key);
       }
     }
-    
+
     return results;
   }
 
   private shouldClaim(channelId: string, vmIdFragment: string, rav: SignedSubRAV): boolean {
     const key = this.getClaimKey(channelId, vmIdFragment);
     const now = Date.now();
-    
+
     // Check amount threshold
     if (rav.subRav.accumulatedAmount < this.policy.minClaimAmount) {
       this.logger.debug('Amount below threshold', {
@@ -264,11 +264,11 @@ export class ClaimScheduler {
       });
       return false;
     }
-    
+
     // Check time threshold
     const lastClaimTime = this.lastClaimTimes.get(key) || 0;
     const timeSinceLastClaim = now - lastClaimTime;
-    
+
     if (timeSinceLastClaim < this.policy.maxIntervalMs) {
       this.logger.debug('Time threshold not met', {
         channelId,
@@ -278,13 +278,13 @@ export class ClaimScheduler {
       });
       return false;
     }
-    
+
     return true;
   }
 
   private async executeClaim(
-    channelId: string, 
-    vmIdFragment: string, 
+    channelId: string,
+    vmIdFragment: string,
     rav: SignedSubRAV
   ): Promise<ScheduledClaimResult> {
     this.logger.info('Executing claim', {
@@ -293,15 +293,15 @@ export class ClaimScheduler {
       nonce: rav.subRav.nonce.toString(),
       amount: rav.subRav.accumulatedAmount.toString(),
     });
-    
+
     const result = await this.contract.claimFromChannel({
       signedSubRAV: rav,
       signer: this.signer,
     });
-    
+
     // Mark as claimed in store
     await this.store.markAsClaimed(channelId, vmIdFragment, rav.subRav.nonce);
-    
+
     const claimResult: ScheduledClaimResult = {
       channelId,
       vmIdFragment,
@@ -309,7 +309,7 @@ export class ClaimScheduler {
       txHash: result.txHash,
       timestamp: Date.now(),
     };
-    
+
     this.logger.info('Claim successful', claimResult);
     return claimResult;
   }
@@ -323,10 +323,10 @@ export class ClaimScheduler {
     const key = this.getClaimKey(channelId, vmIdFragment);
     const existing = this.failedAttempts.get(key);
     const attempt = (existing?.attempt || 0) + 1;
-    
+
     if (attempt <= this.policy.maxRetries!) {
       const nextRetryAt = Date.now() + this.policy.retryDelayMs!;
-      
+
       this.failedAttempts.set(key, {
         channelId,
         vmIdFragment,
@@ -335,7 +335,7 @@ export class ClaimScheduler {
         lastError: error.message || 'Unknown error',
         nextRetryAt,
       });
-      
+
       this.logger.warn('Claim failed, will retry', {
         channelId,
         vmIdFragment,
@@ -350,7 +350,7 @@ export class ClaimScheduler {
         maxRetries: this.policy.maxRetries,
         error: error.message,
       });
-      
+
       // Remove from retry queue
       this.failedAttempts.delete(key);
     }
@@ -359,18 +359,18 @@ export class ClaimScheduler {
   private async processRetries(): Promise<void> {
     const now = Date.now();
     const readyRetries: ClaimAttempt[] = [];
-    
+
     for (const [key, attempt] of this.failedAttempts.entries()) {
       if (attempt.nextRetryAt && attempt.nextRetryAt <= now) {
         readyRetries.push(attempt);
       }
     }
-    
+
     for (const retry of readyRetries) {
       if (this.activeClaims.size >= this.policy.maxConcurrentClaims!) {
         break;
       }
-      
+
       const rav = await this.store.getLatest(retry.channelId, retry.vmIdFragment);
       if (rav && rav.subRav.nonce === retry.nonce) {
         // Retry the claim
@@ -393,7 +393,7 @@ export class ClaimScheduler {
     // 1. Maintain a registry of active channels
     // 2. Query the database for channels with recent activity
     // 3. Listen to blockchain events for new channels
-    
+
     // For now, return empty array - channels will be processed via manual triggers
     return [];
   }
@@ -417,4 +417,4 @@ export class ClaimScheduler {
   getFailedAttempts(): ClaimAttempt[] {
     return Array.from(this.failedAttempts.values());
   }
-} 
+}

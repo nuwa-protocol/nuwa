@@ -28,17 +28,17 @@ serviceId: my-service
 rules:
   - id: upload-pricing
     when:
-      path: "/upload"
-      method: "POST"
+      path: '/upload'
+      method: 'POST'
     strategy:
       type: PerRequest
-      price: "5000000000000000"  # 0.005 RAV units
+      price: '5000000000000000' # 0.005 RAV units
 
   - id: default-pricing
     default: true
     strategy:
       type: PerRequest
-      price: "1000000000000000"  # 0.001 RAV units
+      price: '1000000000000000' # 0.001 RAV units
 ```
 
 ### 3. Use in Your Service
@@ -57,8 +57,8 @@ const context: BillingContext = {
   meta: {
     path: '/upload',
     method: 'POST',
-    fileSize: 1024000
-  }
+    fileSize: 1024000,
+  },
 };
 
 const cost = await billingEngine.calcCost(context);
@@ -74,10 +74,11 @@ Charges a fixed amount per request, regardless of request content.
 ```yaml
 strategy:
   type: PerRequest
-  price: "1000000000000000"  # Price in smallest RAV units
+  price: '1000000000000000' # Price in smallest RAV units
 ```
 
 Configuration:
+
 - `price`: Fixed price per request (string, number, or bigint)
 
 ## Rule Matching
@@ -101,7 +102,7 @@ If no rules match, you must have a rule marked with `default: true`:
   default: true
   strategy:
     type: PerRequest
-    price: "0"
+    price: '0'
 ```
 
 ## API Reference
@@ -117,8 +118,8 @@ const engine = new BillingEngine(configLoader);
 const cost = await engine.calcCost(context);
 
 // Clear cache
-engine.clearCache('service-id');  // Clear specific service
-engine.clearCache();              // Clear all services
+engine.clearCache('service-id'); // Clear specific service
+engine.clearCache(); // Clear all services
 
 // Preload strategy
 await engine.preloadStrategy('service-id');
@@ -144,15 +145,16 @@ Context information for billing calculation:
 
 ```typescript
 interface BillingContext {
-  serviceId: string;    // Service identifier
-  operation: string;    // Operation name
-  meta: Record<string, any>;  // Additional metadata
+  serviceId: string; // Service identifier
+  operation: string; // Operation name
+  meta: Record<string, any>; // Additional metadata
 }
 ```
 
 ## Error Handling
 
 The billing system throws descriptive errors for:
+
 - Missing configuration files
 - Invalid YAML syntax
 - Missing required fields
@@ -188,5 +190,6 @@ npm test -- src/billing
 ## Examples
 
 See the `examples/` directory for complete usage examples:
+
 - `billing-config.yaml`: Example configuration file
-- `billing-usage.ts`: Usage examples and Express.js integration 
+- `billing-usage.ts`: Usage examples and Express.js integration

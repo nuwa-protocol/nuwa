@@ -4,7 +4,7 @@ import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelCon
 
 /**
  * Contract-based rate provider that uses on-chain oracle/swap prices
- * 
+ *
  * This provider leverages the payment channel contract's getAssetPrice() method
  * to fetch real-time prices from on-chain sources like oracles or DEX pools.
  */
@@ -29,9 +29,12 @@ export class ContractRateProvider extends BaseRateProvider {
     try {
       // Get price from contract (already in picoUSD)
       const pricePicoUsd = await this.contract.getAssetPrice(assetId);
-      
+
       if (pricePicoUsd <= 0n) {
-        throw new RateNotFoundError(`Contract returned invalid price for ${assetId}: ${pricePicoUsd}`, assetId);
+        throw new RateNotFoundError(
+          `Contract returned invalid price for ${assetId}: ${pricePicoUsd}`,
+          assetId
+        );
       }
 
       // Get asset info for caching
@@ -71,7 +74,7 @@ export class ContractRateProvider extends BaseRateProvider {
     try {
       // Get asset info from contract
       const info = await this.contract.getAssetInfo(assetId);
-      
+
       // Cache the result
       this.updateCache(assetId, cached?.price || 0n, info);
       return info;
@@ -79,7 +82,7 @@ export class ContractRateProvider extends BaseRateProvider {
       console.warn(`Failed to get asset info for ${assetId}:`, error);
       throw error;
     }
-  } 
+  }
 
   /**
    * Force refresh price from contract (bypass cache)
@@ -95,4 +98,4 @@ export class ContractRateProvider extends BaseRateProvider {
   async getChainId(): Promise<bigint> {
     return this.contract.getChainId();
   }
-} 
+}

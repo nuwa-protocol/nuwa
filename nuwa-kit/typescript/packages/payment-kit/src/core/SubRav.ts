@@ -2,7 +2,13 @@
  * SubRAV encoding, decoding, signing and verification utilities
  */
 
-import type { SignerInterface, DIDResolver, DIDDocument, KeyType, VerificationMethod } from '@nuwa-ai/identity-kit';
+import type {
+  SignerInterface,
+  DIDResolver,
+  DIDDocument,
+  KeyType,
+  VerificationMethod,
+} from '@nuwa-ai/identity-kit';
 import { CryptoUtils, MultibaseCodec } from '@nuwa-ai/identity-kit';
 import { bcs, type BcsType } from '@roochnetwork/rooch-sdk';
 import type { SubRAV, SignedSubRAV } from './types';
@@ -51,7 +57,9 @@ export class SubRAVCodec {
 
       return SubRAVSchema.serialize(bcsSubRAV).toBytes();
     } catch (error) {
-      throw new Error(`Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -72,7 +80,9 @@ export class SubRAVCodec {
         nonce: BigInt(bcsSubRAV.nonce),
       };
     } catch (error) {
-      throw new Error(`Failed to decode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to decode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -81,9 +91,12 @@ export class SubRAVCodec {
    */
   static toHex(subRav: SubRAV): string {
     const bytes = this.encode(subRav);
-    return '0x' + Array.from(bytes)
-      .map(byte => byte.toString(16).padStart(2, '0'))
-      .join('');
+    return (
+      '0x' +
+      Array.from(bytes)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('')
+    );
   }
 
   /**
@@ -91,9 +104,7 @@ export class SubRAVCodec {
    */
   static fromHex(hex: string): SubRAV {
     const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
-    const bytes = new Uint8Array(
-      cleanHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-    );
+    const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
     return this.decode(bytes);
   }
 }
@@ -105,11 +116,7 @@ export class SubRAVSigner {
   /**
    * Sign a SubRAV using the provided signer and key
    */
-  static async sign(
-    subRav: SubRAV,
-    signer: SignerInterface,
-    keyId: string
-  ): Promise<SignedSubRAV> {
+  static async sign(subRav: SubRAV, signer: SignerInterface, keyId: string): Promise<SignedSubRAV> {
     const bytes = SubRAVCodec.encode(subRav);
     const signature = await signer.signWithKeyId(bytes, keyId);
     return { subRav, signature };
@@ -120,16 +127,18 @@ export class SubRAVSigner {
    */
   static async verify(
     signedSubRAV: SignedSubRAV,
-    verificationMethod: {
-      publicKey: Uint8Array;
-      keyType: KeyType;
-    } | {
-      didDocument: DIDDocument;
-    }
+    verificationMethod:
+      | {
+          publicKey: Uint8Array;
+          keyType: KeyType;
+        }
+      | {
+          didDocument: DIDDocument;
+        }
   ): Promise<boolean> {
     try {
       const bytes = SubRAVCodec.encode(signedSubRAV.subRav);
-      
+
       let publicKey: Uint8Array;
       let keyType: KeyType;
 
@@ -139,16 +148,18 @@ export class SubRAVSigner {
         keyType = verificationMethod.keyType;
       } else {
         // DID document verification
-        const {didDocument} = verificationMethod;
-        
+        const { didDocument } = verificationMethod;
+
         // Construct keyId from didDocument.id and vmIdFragment from SubRAV
         const keyId = `${didDocument.id}#${signedSubRAV.subRav.vmIdFragment}`;
-        
-        const vm = didDocument.verificationMethod?.find((vm: VerificationMethod) => vm.id === keyId);
+
+        const vm = didDocument.verificationMethod?.find(
+          (vm: VerificationMethod) => vm.id === keyId
+        );
         if (!vm) return false;
-        
+
         keyType = vm.type as KeyType;
-        
+
         // Get public key material
         if (vm.publicKeyMultibase) {
           publicKey = MultibaseCodec.decodeBase58btc(vm.publicKeyMultibase);
@@ -160,7 +171,7 @@ export class SubRAVSigner {
           return false; // No supported key format
         }
       }
-      
+
       // Verify signature
       return CryptoUtils.verify(bytes, signedSubRAV.signature, publicKey, keyType);
     } catch (error) {
@@ -180,7 +191,7 @@ export class SubRAVSigner {
       // Resolve DID document
       const didDocument = await resolver.resolveDID(payerDid);
       if (!didDocument) return false;
-      
+
       // Use the flexible verify method
       return this.verify(signedSubRAV, { didDocument });
     } catch (error) {
@@ -206,7 +217,9 @@ export class SubRAVValidator {
 
     // For now, only support version 1
     if (subRav.version !== SUBRAV_VERSION_1) {
-      errors.push(`Unsupported SubRAV version: ${subRav.version}. Supported versions: ${SUBRAV_VERSION_1}`);
+      errors.push(
+        `Unsupported SubRAV version: ${subRav.version}. Supported versions: ${SUBRAV_VERSION_1}`
+      );
     }
 
     // Check required fields
@@ -243,7 +256,10 @@ export class SubRAVValidator {
   /**
    * Validate SubRAV sequence (for checking monotonicity)
    */
-  static validateSequence(prev: SubRAV | null, current: SubRAV): { valid: boolean; errors: string[] } {
+  static validateSequence(
+    prev: SubRAV | null,
+    current: SubRAV
+  ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (prev) {
@@ -280,7 +296,7 @@ export class SubRAVValidator {
       errors,
     };
   }
-} 
+}
 
 /**
  * Helper functions for creating SubRAV instances
@@ -307,4 +323,4 @@ export class SubRAVUtils {
   static isSupportedVersion(version: number): boolean {
     return version === SUBRAV_VERSION_1;
   }
-} 
+}

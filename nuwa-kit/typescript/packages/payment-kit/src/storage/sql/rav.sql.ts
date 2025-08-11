@@ -21,7 +21,7 @@ export interface SqlRAVRepositoryOptions {
 
 /**
  * PostgreSQL/Supabase implementation of RAVRepository
- * 
+ *
  * Compatible with both self-hosted Postgres and Supabase
  * Uses standard SQL that works across both platforms
  */
@@ -36,18 +36,18 @@ export class SqlRAVRepository implements RAVRepository {
     this.tablePrefix = options.tablePrefix || 'nuwa_';
     this.autoMigrate = options.autoMigrate ?? true;
     this.allowUnsafeAutoMigrateInProd = options.allowUnsafeAutoMigrateInProd ?? false;
-    
+
     // Only auto-migrate in development or when explicitly allowed in production
     if (this.autoMigrate) {
       if (process.env.NODE_ENV === 'production' && this.allowUnsafeAutoMigrateInProd) {
         console.warn(
-          "WARNING: Unsafe auto-migration is enabled in production. This may lead to data loss or schema conflicts. " +
-          "Ensure you understand the risks before proceeding."
+          'WARNING: Unsafe auto-migration is enabled in production. This may lead to data loss or schema conflicts. ' +
+            'Ensure you understand the risks before proceeding.'
         );
       } else if (process.env.NODE_ENV === 'production') {
         throw new Error(
           "Auto-migration is disabled in production by default. To enable it, set 'allowUnsafeAutoMigrateInProd' to true " +
-          "and acknowledge the risks."
+            'and acknowledge the risks.'
         );
       }
       this.initialize().catch(console.error);
@@ -105,7 +105,6 @@ export class SqlRAVRepository implements RAVRepository {
           PRIMARY KEY(channel_id, vm_id_fragment)
         )
       `);
-
     } finally {
       client.release();
     }
@@ -117,21 +116,24 @@ export class SqlRAVRepository implements RAVRepository {
       // Encode SubRAV using BCS serialization
       const subRavBcs = encodeSubRAV(rav.subRav);
       const signature = Buffer.from(rav.signature);
-      
-      await client.query(`
+
+      await client.query(
+        `
         INSERT INTO ${this.ravsTable} 
         (channel_id, vm_id_fragment, nonce, accumulated_amount, sub_rav_bcs, signature)
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (channel_id, vm_id_fragment, nonce) 
         DO NOTHING
-      `, [
-        rav.subRav.channelId,
-        rav.subRav.vmIdFragment,
-        rav.subRav.nonce.toString(),
-        rav.subRav.accumulatedAmount.toString(),
-        subRavBcs,
-        signature
-      ]);
+      `,
+        [
+          rav.subRav.channelId,
+          rav.subRav.vmIdFragment,
+          rav.subRav.nonce.toString(),
+          rav.subRav.accumulatedAmount.toString(),
+          subRavBcs,
+          signature,
+        ]
+      );
     } finally {
       client.release();
     }
@@ -140,13 +142,16 @@ export class SqlRAVRepository implements RAVRepository {
   async getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT sub_rav_bcs, signature 
         FROM ${this.ravsTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2
         ORDER BY nonce DESC
         LIMIT 1
-      `, [channelId, vmIdFragment]);
+      `,
+        [channelId, vmIdFragment]
+      );
 
       if (result.rows.length === 0) {
         return null;
@@ -154,7 +159,7 @@ export class SqlRAVRepository implements RAVRepository {
 
       const subRavBcs = result.rows[0].sub_rav_bcs as Buffer;
       const signature = result.rows[0].signature as Buffer;
-      
+
       const subRav = decodeSubRAV(subRavBcs);
       return {
         subRav,
@@ -168,17 +173,20 @@ export class SqlRAVRepository implements RAVRepository {
   async *list(channelId: string): AsyncIterable<SignedSubRAV> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT sub_rav_bcs, signature
         FROM ${this.ravsTable}
         WHERE channel_id = $1
         ORDER BY vm_id_fragment, nonce
-      `, [channelId]);
+      `,
+        [channelId]
+      );
 
       for (const row of result.rows) {
         const subRavBcs = row.sub_rav_bcs as Buffer;
         const signature = row.signature as Buffer;
-        
+
         const subRav = decodeSubRAV(subRavBcs);
         yield {
           subRav,
@@ -193,7 +201,8 @@ export class SqlRAVRepository implements RAVRepository {
   async getUnclaimedRAVs(channelId: string): Promise<Map<string, SignedSubRAV>> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT DISTINCT ON (r.vm_id_fragment) 
                r.vm_id_fragment, r.sub_rav_bcs, r.signature
         FROM ${this.ravsTable} r
@@ -203,20 +212,22 @@ export class SqlRAVRepository implements RAVRepository {
         WHERE r.channel_id = $1 
           AND (c.claimed_nonce IS NULL OR r.nonce > c.claimed_nonce)
         ORDER BY r.vm_id_fragment, r.nonce DESC
-      `, [channelId]);
+      `,
+        [channelId]
+      );
 
       const unclaimedRAVs = new Map<string, SignedSubRAV>();
-      
+
       for (const row of result.rows) {
         const subRavBcs = row.sub_rav_bcs as Buffer;
         const signature = row.signature as Buffer;
-        
+
         const subRav = decodeSubRAV(subRavBcs);
         const signedSubRAV = {
           subRav,
           signature: new Uint8Array(signature),
         };
-        
+
         unclaimedRAVs.set(row.vm_id_fragment, signedSubRAV);
       }
 
@@ -229,7 +240,8 @@ export class SqlRAVRepository implements RAVRepository {
   async markAsClaimed(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO ${this.claimsTable} 
         (channel_id, vm_id_fragment, claimed_nonce)
         VALUES ($1, $2, $3)
@@ -237,7 +249,9 @@ export class SqlRAVRepository implements RAVRepository {
         DO UPDATE SET 
           claimed_nonce = GREATEST(${this.claimsTable}.claimed_nonce, EXCLUDED.claimed_nonce),
           claimed_at = NOW()
-      `, [channelId, vmIdFragment, nonce.toString()]);
+      `,
+        [channelId, vmIdFragment, nonce.toString()]
+      );
     } finally {
       client.release();
     }
@@ -287,4 +301,4 @@ export class SqlRAVRepository implements RAVRepository {
       client.release();
     }
   }
-} 
+}

@@ -3,7 +3,11 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { CloseProofSchema, CloseProofsSchema, RoochPaymentChannelContract } from '../RoochPaymentChannelContract';
+import {
+  CloseProofSchema,
+  CloseProofsSchema,
+  RoochPaymentChannelContract,
+} from '../RoochPaymentChannelContract';
 
 describe('RoochPaymentChannelContract BCS Serialization', () => {
   describe('CloseProofs serialization', () => {
@@ -22,7 +26,7 @@ describe('RoochPaymentChannelContract BCS Serialization', () => {
 
       // Decode back to CloseProof
       const decoded = CloseProofSchema.parse(encoded);
-      
+
       // Verify all fields match
       expect(decoded.vm_id_fragment).toBe(sampleCloseProof.vm_id_fragment);
       expect(decoded.accumulated_amount).toBe(sampleCloseProof.accumulated_amount);
@@ -55,12 +59,13 @@ describe('RoochPaymentChannelContract BCS Serialization', () => {
 
       // Decode back to CloseProofs
       const decoded = CloseProofsSchema.parse(encoded);
-      
+
       // Verify all fields match
       expect(decoded.proofs).toHaveLength(2);
       expect(decoded.proofs[0].vm_id_fragment).toBe(sampleCloseProofs.proofs[0].vm_id_fragment);
-      expect(decoded.proofs[1].accumulated_amount).toBe(sampleCloseProofs.proofs[1].accumulated_amount);
+      expect(decoded.proofs[1].accumulated_amount).toBe(
+        sampleCloseProofs.proofs[1].accumulated_amount
+      );
     });
   });
-
-}); 
+});

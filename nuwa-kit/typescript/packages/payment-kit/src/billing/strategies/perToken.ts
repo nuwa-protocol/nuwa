@@ -11,7 +11,7 @@ export interface PerTokenConfig {
 
 /**
  * Per-token billing strategy
- * 
+ *
  * Calculates cost based on token usage: unitPricePicoUSD × tokens
  */
 export class PerTokenStrategy extends BaseStrategy {
@@ -19,9 +19,8 @@ export class PerTokenStrategy extends BaseStrategy {
    * PerToken strategy requires execution results (usage data) from LLM calls
    */
   readonly deferred: boolean = true;
-  
+
   private readonly unitPrice: bigint;
-  
 
   constructor(config: PerTokenConfig) {
     super();
@@ -32,4 +31,4 @@ export class PerTokenStrategy extends BaseStrategy {
     const tokenCount = Number.isFinite(units) && units > 0 ? Math.floor(units) : 1;
     return this.unitPrice * BigInt(tokenCount);
   }
-} 
+}

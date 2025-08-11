@@ -17,7 +17,7 @@ import { createRAVRepo, SqlRAVRepository } from '@nuwa-ai/payment-kit/storage';
 
 // Using factory function (recommended)
 const pool = new Pool({
-  connectionString: 'postgresql://user:pass@localhost/db'
+  connectionString: 'postgresql://user:pass@localhost/db',
 });
 
 const ravRepo = createRAVRepo({
@@ -53,15 +53,17 @@ const repos = createStorageRepositories({
 ### Production (Manual Migration)
 
 1. Disable auto-migration in production:
+
 ```typescript
 const repos = createStorageRepositories({
-  backend: 'sql', 
+  backend: 'sql',
   pool,
   autoMigrate: false, // Disabled in production
 });
 ```
 
 2. Run schema files manually:
+
 ```bash
 psql -d mydb -f nuwa-kit/typescript/packages/payment-kit/src/storage/sql/schemas/001_init.sql
 ```
@@ -76,7 +78,7 @@ import { encodeSignedSubRAV, decodeSignedSubRAV, getSubRAVHex } from '@nuwa-ai/p
 // Encode for storage
 const buffer = encodeSignedSubRAV(signedSubRAV);
 
-// Decode from storage  
+// Decode from storage
 const restored = decodeSignedSubRAV(buffer);
 
 // Get BCS hex for contract calls
@@ -96,8 +98,9 @@ const hex = getSubRAVHex(signedSubRAV);
 ### Indexes
 
 Optimized indexes are created for efficient queries:
+
 - Channel-based lookups
-- VM fragment filtering  
+- VM fragment filtering
 - Claim status checking
 - Cleanup operations
 
@@ -118,4 +121,4 @@ ALLOW_UNSAFE_AUTO_MIGRATE=false  # Extra safety in production
 2. **Staging**: Test with `autoMigrate: false` and manual schema files
 3. **Production**: Always use manual migrations with proper review process
 4. **Monitoring**: Track table sizes and query performance
-5. **Backup**: Regular backups especially before schema changes 
+5. **Backup**: Regular backups especially before schema changes

@@ -15,7 +15,9 @@ export function encodeSubRAV(subRav: SubRAV): Buffer {
     const bytes = SubRAVCodec.encode(subRav);
     return Buffer.from(bytes);
   } catch (error) {
-    throw new Error(`Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -27,7 +29,9 @@ export function decodeSubRAV(buffer: Buffer): SubRAV {
     const bytes = new Uint8Array(buffer);
     return SubRAVCodec.decode(bytes);
   } catch (error) {
-    throw new Error(`Failed to decode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to decode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 

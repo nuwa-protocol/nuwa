@@ -1,6 +1,6 @@
 /**
  * Rooch Payment Channel Contract Implementation
- * 
+ *
  * Implementation of IPaymentChannelContract for Rooch blockchain.
  * Provides concrete implementation of payment channel operations using Rooch SDK.
  */
@@ -21,7 +21,7 @@ import {
 } from '@roochnetwork/rooch-sdk';
 import { bcs } from '@roochnetwork/rooch-sdk';
 
-import type { 
+import type {
   IPaymentChannelContract,
   OpenChannelParams,
   OpenChannelResult,
@@ -37,16 +37,11 @@ import type {
   DepositParams,
   WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
-import type { 
-  AssetInfo,
-  SignedSubRAV,
-  SubRAV,
-  ChannelInfo,
-} from '../core/types';
+import type { AssetInfo, SignedSubRAV, SubRAV, ChannelInfo } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
-import { 
-  calcChannelObjectId, 
-  normalizeAssetId, 
+import {
+  calcChannelObjectId,
+  normalizeAssetId,
   calculatePaymentHubId,
   deriveFieldKeyFromString,
   deriveCoinTypeFieldKey,
@@ -95,7 +90,8 @@ export const CancelProofsSchema: any = bcs.struct('CancelProofs', {
 
 // BCS Schema definitions are now in ChannelUtils.ts
 
-const RGAS_CANONICAL_TAG: string = '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
+const RGAS_CANONICAL_TAG: string =
+  '0x0000000000000000000000000000000000000000000000000000000000000003::gas_coin::RGas';
 
 /**
  * Default contract address for Rooch payment channels
@@ -104,7 +100,7 @@ const DEFAULT_PAYMENT_CHANNEL_MODULE = '0x3::payment_channel';
 
 /**
  * Rooch implementation of the Payment Channel Contract
- * 
+ *
  * This implementation provides complete functionality for payment channels
  * using the Rooch blockchain and corresponding Move contracts.
  */
@@ -118,31 +114,31 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     this.client = new RoochClient({ url: rpcUrl });
     this.contractAddress = options.contractAddress || DEFAULT_PAYMENT_CHANNEL_MODULE;
     this.logger = DebugLogger.get('RoochPaymentChannelContract');
-    
+
     if (options.debug) {
       this.logger.setLevel('debug');
     }
-    
+
     this.logger.debug(`RoochPaymentChannelContract initialized with rpcUrl: ${rpcUrl}`);
   }
 
   async openChannel(params: OpenChannelParams): Promise<OpenChannelResult> {
     try {
       this.logger.debug('Opening payment channel with params:', params);
-      
+
       // Parse and validate DIDs first
       const payerParsed = parseDid(params.payerDid);
       const payeeParsed = parseDid(params.payeeDid);
-      
+
       if (payerParsed.method !== 'rooch') {
         throw new Error(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
       }
       if (payeeParsed.method !== 'rooch') {
         throw new Error(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
       }
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       // Create transaction to open channel
       const transaction = this.createTransaction();
       transaction.callFunction({
@@ -153,7 +149,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       this.logger.debug('Executing openChannel transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -166,8 +162,12 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
-      
+      const channelId = calcChannelObjectId(
+        payerParsed.identifier,
+        payeeParsed.identifier,
+        params.assetId
+      );
+
       return {
         channelId,
         txHash: result.execution_info.tx_hash || '',
@@ -180,37 +180,36 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
   }
 
-  async openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
+  async openChannelWithSubChannel(
+    params: OpenChannelWithSubChannelParams
+  ): Promise<OpenChannelResult> {
     try {
       this.logger.debug('Opening payment channel with sub-channel in one step:', params);
-      
+
       // Parse and validate DIDs first
       const payerParsed = parseDid(params.payerDid);
       const payeeParsed = parseDid(params.payeeDid);
-      
+
       if (payerParsed.method !== 'rooch') {
         throw new Error(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
       }
       if (payeeParsed.method !== 'rooch') {
         throw new Error(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
       }
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       // Create transaction to open channel with sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::open_channel_with_sub_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
-        args: [
-          Args.address(payeeParsed.identifier),
-          Args.string(params.vmIdFragment),
-        ],
+        args: [Args.address(payeeParsed.identifier), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
 
       this.logger.debug('Executing openChannelWithSubChannel transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -223,8 +222,12 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Calculate the expected channel ID deterministically
-      const channelId = calcChannelObjectId(payerParsed.identifier, payeeParsed.identifier, params.assetId);
-      
+      const channelId = calcChannelObjectId(
+        payerParsed.identifier,
+        payeeParsed.identifier,
+        params.assetId
+      );
+
       return {
         channelId,
         txHash: result.execution_info.tx_hash || '',
@@ -240,22 +243,19 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async authorizeSubChannel(params: AuthorizeSubChannelParams): Promise<TxResult> {
     try {
       this.logger.debug('Authorizing sub-channel with params:', params);
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       // Create transaction to authorize sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::authorize_sub_channel_entry`,
-        args: [
-          Args.objectId(params.channelId),
-          Args.string(params.vmIdFragment),
-        ],
+        args: [Args.objectId(params.channelId), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
 
       this.logger.debug('Executing authorizeSubChannel transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -281,10 +281,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async claimFromChannel(params: ClaimParams): Promise<ClaimResult> {
     try {
       this.logger.debug('Claiming from channel with params:', params);
-      
+
       const signer = await this.convertSigner(params.signer);
       const { subRav, signature } = params.signedSubRAV;
-      
+
       // Create transaction to claim from channel
       const transaction = this.createTransaction();
       transaction.callFunction({
@@ -300,7 +300,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       this.logger.debug('Executing claimFromChannel transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -330,21 +330,18 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async closeChannel(params: CloseParams): Promise<TxResult> {
     try {
       this.logger.debug('Closing channel with params:', params);
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       const transaction = this.createTransaction();
-      
+
       if (params.cooperative && params.closeProofs) {
         // Cooperative close with proofs
         const serializedProofs = CloseProofsSchema.serialize(params.closeProofs).toBytes();
-        
+
         transaction.callFunction({
           target: `${this.contractAddress}::close_channel_entry`,
-          args: [
-            Args.objectId(params.channelId),
-            Args.vec('u8', serializedProofs),
-          ],
+          args: [Args.objectId(params.channelId), Args.vec('u8', serializedProofs)],
           maxGas: 100000000,
         });
       } else {
@@ -357,7 +354,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       this.logger.debug('Executing closeChannel transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -383,7 +380,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getChannelStatus(params: ChannelStatusParams): Promise<ChannelInfo> {
     try {
       this.logger.debug('Getting channel status for channel:', params.channelId);
-      
+
       // Get channel state from blockchain
       const channelObject = await this.client.getObjectStates({
         ids: [params.channelId],
@@ -394,13 +391,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       const channelState = channelObject[0];
-      
+
       // Parse channel data from BCS - no need for view functions anymore
       const channelData = parsePaymentChannelData(channelState.value);
-      
+
       // Convert status number to string
       const statusString = this.convertChannelStatus(channelData.status);
-      
+
       const channel_sender = new RoochAddress(channelData.sender);
       const channel_receiver = new RoochAddress(channelData.receiver);
       return {
@@ -420,7 +417,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getSubChannel(params: SubChannelParams): Promise<SubChannelInfo> {
     try {
       this.logger.debug('Getting sub-channel info for:', params);
-      
+
       // First get the channel to obtain the sub_channels table ID
       const channelObject = await this.client.getObjectStates({
         ids: [params.channelId],
@@ -431,7 +428,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       const channelData = parsePaymentChannelData(channelObject[0].value);
-      
+
       // Get the sub-channel data from the sub_channels Table
       const subChannelData = await this.getSubChannelData(
         channelData.sub_channels,
@@ -439,7 +436,9 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       );
 
       if (!subChannelData) {
-        throw new Error(`Sub-channel ${params.vmIdFragment} not found in channel ${params.channelId}`);
+        throw new Error(
+          `Sub-channel ${params.vmIdFragment} not found in channel ${params.channelId}`
+        );
       }
 
       return {
@@ -475,10 +474,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getAssetPrice(assetId: string): Promise<bigint> {
     try {
       this.logger.debug('Getting asset price for:', assetId);
-      
+
       // Normalize asset ID to canonical string
       const canonicalAssetId = normalizeAssetId(assetId);
-      
+
       //Currently only support RGas
       if (canonicalAssetId === RGAS_CANONICAL_TAG) {
         // RGas pricing calculation:
@@ -489,7 +488,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         // - Therefore: 1 base unit = 10,000,000,000 pUSD / 10^8 = 100 pUSD
         return BigInt(100); // 100 pUSD per smallest RGas unit
       }
-      
+
       // Unknown asset type
       throw new Error(`Unsupported asset type: ${assetId}`);
     } catch (error) {
@@ -501,7 +500,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getChainId(): Promise<bigint> {
     try {
       this.logger.debug('Getting chain ID');
-      
+
       // Use RoochClient's getChainId method
       const chainId = await this.client.getChainId();
       return BigInt(chainId);
@@ -514,29 +513,26 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async depositToHub(params: DepositParams): Promise<TxResult> {
     try {
       this.logger.debug('Depositing to payment hub with params:', params);
-      
+
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
       if (ownerParsed.method !== 'rooch') {
         throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
       }
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       // Create transaction to deposit to hub
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::deposit_to_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
-        args: [
-          Args.address(ownerParsed.identifier),
-          Args.u256(params.amount),
-        ],
+        args: [Args.address(ownerParsed.identifier), Args.u256(params.amount)],
         maxGas: 100000000,
       });
 
       this.logger.debug('Executing depositToHub transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -562,28 +558,26 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async withdrawFromHub(params: WithdrawParams): Promise<TxResult> {
     try {
       this.logger.debug('Withdrawing from payment hub with params:', params);
-      
+
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
       if (ownerParsed.method !== 'rooch') {
         throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
       }
-      
+
       const signer = await this.convertSigner(params.signer);
-      
+
       // Create transaction to withdraw from hub
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.contractAddress}::withdraw_from_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
-        args: [
-          Args.u256(params.amount),
-        ],
+        args: [Args.u256(params.amount)],
         maxGas: 100000000,
       });
 
       this.logger.debug('Executing withdrawFromHub transaction');
-      
+
       // Execute transaction
       const result = await this.client.signAndExecuteTransaction({
         transaction,
@@ -609,40 +603,43 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getHubBalance(ownerDid: string, assetId: string): Promise<bigint> {
     try {
       this.logger.debug('Getting hub balance for DID:', ownerDid, 'asset:', assetId);
-      
+
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
         this.logger.debug('PaymentHub not found for owner:', ownerDid);
         return BigInt(0);
       }
-      
+
       this.logger.debug('MultiCoinStore ID extracted:', paymentHub.multi_coin_store);
       // Query the specific field for this coin type in the multi_coin_store
       const fieldKey = deriveCoinTypeFieldKey(assetId);
-      const fieldStates = await this.client.getFieldStates({ 
-        objectId: paymentHub.multi_coin_store, 
-        fieldKey: [fieldKey] 
+      const fieldStates = await this.client.getFieldStates({
+        objectId: paymentHub.multi_coin_store,
+        fieldKey: [fieldKey],
       });
-      
+
       if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
         // Asset not found in the store, balance is 0
         this.logger.debug('Asset not found in multi_coin_store:', assetId);
         return BigInt(0);
       }
-      
+
       // Parse the DynamicField<String, CoinStoreField> to get balance
       const fieldState = fieldStates[0];
       const fieldValue = fieldState.value;
-      
+
       if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
         // Parse BCS bytes using DynamicFieldCoinStoreSchema
         try {
-          this.logger.debug('Parsing DynamicField<String, CoinStoreField> from BCS hex:', fieldValue);
+          this.logger.debug(
+            'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
+            fieldValue
+          );
           const parsed = parseDynamicFieldCoinStore(fieldValue);
-          
+
           this.logger.debug('Parsed DynamicField:', parsed);
-          
+
           // Extract balance from the parsed CoinStoreField and ensure it's bigint
           return safeBalanceToBigint(parsed.value.balance.value);
         } catch (parseError) {
@@ -656,10 +653,9 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           return BigInt(coinStoreField.balance as string);
         }
       }
-      
+
       this.logger.warn('Could not parse balance from field state');
       return BigInt(0);
-      
     } catch (error) {
       this.logger.error('Error getting hub balance:', error);
       // Return 0 instead of throwing for balance queries
@@ -670,75 +666,80 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
     try {
       this.logger.debug('Getting all hub balances for DID:', ownerDid);
-      
+
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
         this.logger.debug('PaymentHub not found for owner:', ownerDid);
         return {};
       }
-      
-      this.logger.debug('MultiCoinStore ID extracted for all balances:', paymentHub.multi_coin_store);
-      
+
+      this.logger.debug(
+        'MultiCoinStore ID extracted for all balances:',
+        paymentHub.multi_coin_store
+      );
+
       // List all field states in multi_coin_store to get all coin types and balances
       const balances: Record<string, bigint> = {};
       let cursor = null;
       // We only need to get the first 100 fields for now
       const pageSize = 100;
-      
+
       // while (true) {
-        const fieldStates = await this.client.listFieldStates({
-          objectId: paymentHub.multi_coin_store,
-          cursor,
-          limit: pageSize.toString()
-        });
-        
-        if (!fieldStates || !fieldStates.data) {
-          return balances;
-        }
-        
-        for (const state of fieldStates.data) {
-          try {
-            // Parse DynamicField<String, CoinStoreField>
-            const fieldValue = state.state.value;
-            
-            if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
-              // Parse BCS bytes using DynamicFieldCoinStoreSchema
-              try {
-                this.logger.debug('Parsing DynamicField<String, CoinStoreField> from BCS hex:', fieldValue);
-                const parsed = parseDynamicFieldCoinStore(fieldValue);
-                
-                this.logger.debug('Parsed DynamicField:', parsed);
-                
-                // Extract coin type and balance from the parsed data
-                const coinType = parsed.name;
-                const balance = safeBalanceToBigint(parsed.value.balance.value);
-                
-                if (coinType && balance > 0) {
-                  balances[coinType] = balance;
-                }
-              } catch (parseError) {
-                this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
-                continue;
+      const fieldStates = await this.client.listFieldStates({
+        objectId: paymentHub.multi_coin_store,
+        cursor,
+        limit: pageSize.toString(),
+      });
+
+      if (!fieldStates || !fieldStates.data) {
+        return balances;
+      }
+
+      for (const state of fieldStates.data) {
+        try {
+          // Parse DynamicField<String, CoinStoreField>
+          const fieldValue = state.state.value;
+
+          if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
+            // Parse BCS bytes using DynamicFieldCoinStoreSchema
+            try {
+              this.logger.debug(
+                'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
+                fieldValue
+              );
+              const parsed = parseDynamicFieldCoinStore(fieldValue);
+
+              this.logger.debug('Parsed DynamicField:', parsed);
+
+              // Extract coin type and balance from the parsed data
+              const coinType = parsed.name;
+              const balance = safeBalanceToBigint(parsed.value.balance.value);
+
+              if (coinType && balance > 0) {
+                balances[coinType] = balance;
               }
-            } else{
-              this.logger.warn('Could not parse balance from field state');
-              throw new Error('Could not parse balance from field state');
+            } catch (parseError) {
+              this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
+              continue;
             }
-            
-          } catch (parseError) {
-            this.logger.warn('Failed to parse field state for balance:', parseError);
-            continue;
+          } else {
+            this.logger.warn('Could not parse balance from field state');
+            throw new Error('Could not parse balance from field state');
           }
+        } catch (parseError) {
+          this.logger.warn('Failed to parse field state for balance:', parseError);
+          continue;
         }
-        
+      }
+
       // if (!fieldStates.has_next_page) {
       //   break;
       // }
       // }
       // cursor = fieldStates.next_cursor;
       // }
-      
+
       return balances;
     } catch (error) {
       this.logger.error('Error getting all hub balances:', error);
@@ -750,47 +751,47 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
     try {
       this.logger.debug('Getting active channels counts for DID:', ownerDid);
-      
+
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
         this.logger.debug('PaymentHub not found for owner:', ownerDid);
         return {};
       }
-      
+
       this.logger.debug('Active channels table ID:', paymentHub.active_channels);
-      
+
       // List all field states in active_channels table to get all coin types and their counts
       const channelCounts: Record<string, number> = {};
       let cursor = null;
       const pageSize = 100;
-      
+
       const fieldStates = await this.client.listFieldStates({
         objectId: paymentHub.active_channels,
         cursor,
-        limit: pageSize.toString()
+        limit: pageSize.toString(),
       });
-        
+
       if (!fieldStates || !fieldStates.data) {
         return channelCounts;
       }
-        
+
       for (const state of fieldStates.data) {
         try {
           // Parse DynamicField<String, u64> for active channels counts
           const fieldValue = state.state.value;
-          
+
           // Parse BCS bytes using DynamicFieldU64Schema
           try {
             this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
             const parsed = parseDynamicFieldU64(fieldValue);
-            
+
             this.logger.debug('Parsed DynamicField:', parsed);
-            
+
             // Extract coin type and count from the parsed data
             const coinType = parsed.name;
             const count = parsed.value;
-            
+
             if (coinType && count > 0) {
               channelCounts[coinType] = count;
             }
@@ -798,18 +799,17 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
             this.logger.warn('Failed to parse u64 BCS data:', parseError);
             continue;
           }
-          
         } catch (parseError) {
           this.logger.warn('Failed to parse field state for active channels count:', parseError);
           continue;
         }
       }
-        
-        // if (!fieldStates.has_next_page) {
-        //   break;
-        // }
-        // cursor = fieldStates.next_cursor;
-      
+
+      // if (!fieldStates.has_next_page) {
+      //   break;
+      // }
+      // cursor = fieldStates.next_cursor;
+
       return channelCounts;
     } catch (error) {
       this.logger.error('Error getting active channels counts:', error);
@@ -824,7 +824,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   private async getPaymentHub(ownerDid: string): Promise<PaymentHub | null> {
     try {
       this.logger.debug('Getting PaymentHub for DID:', ownerDid);
-      
+
       // Parse and validate owner DID
       const ownerParsed = parseDid(ownerDid);
       if (ownerParsed.method !== 'rooch') {
@@ -833,28 +833,28 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
       // Calculate hub ID
       const hubId = calculatePaymentHubId(ownerParsed.identifier);
-      
+
       // Get PaymentHub object state
       const hubObjectViews = await this.client.getObjectStates({ ids: [hubId] });
-      
+
       if (!hubObjectViews || hubObjectViews.length === 0 || !hubObjectViews[0]) {
         this.logger.debug('PaymentHub not found for owner:', ownerDid);
         return null;
       }
 
       const hubObjectView = hubObjectViews[0];
-      
+
       // Parse PaymentHub using BCS deserialization
       try {
         const hubValue = hubObjectView.value;
-        
+
         if (typeof hubValue === 'string' && hubValue.startsWith('0x')) {
           // Parse BCS bytes using PaymentHubSchema
           this.logger.debug('Parsing PaymentHub from BCS hex:', hubValue);
           const parsed = parsePaymentHubData(hubValue);
-          
+
           this.logger.debug('Parsed PaymentHub:', parsed);
-          
+
           return parsed;
         } else {
           throw new Error('Unexpected PaymentHub value format');
@@ -869,8 +869,6 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
   }
 
-
-
   // Helper methods
   private async convertSigner(signer: SignerInterface): Promise<Signer> {
     if (signer instanceof Signer) {
@@ -878,8 +876,6 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     }
     return DidAccountSigner.create(signer);
   }
-
-
 
   private createTransaction(): Transaction {
     return new Transaction();
@@ -908,12 +904,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         // Parse the channel_id from event data using BCS
         try {
           // The event data contains the channel_id field
-          const eventDataHex = event.event_data.startsWith('0x') ? 
-            event.event_data.slice(2) : event.event_data;
+          const eventDataHex = event.event_data.startsWith('0x')
+            ? event.event_data.slice(2)
+            : event.event_data;
           const eventDataBytes = new Uint8Array(
             eventDataHex.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
           );
-          
+
           // For now, extract channel_id manually - this would need proper BCS schema
           // The PaymentChannelOpenedEvent should contain channel_id as first field
           return event.event_data; // Return the raw event data for now
@@ -951,13 +948,18 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
    * @param vmIdFragment The VM ID fragment to query
    * @returns SubChannel data or null if not found
    */
-  private async getSubChannelData(subChannelsTableId: string, vmIdFragment: string): Promise<SubChannel | null> {
+  private async getSubChannelData(
+    subChannelsTableId: string,
+    vmIdFragment: string
+  ): Promise<SubChannel | null> {
     try {
-      this.logger.debug(`Getting sub-channel data for: ${vmIdFragment} from table: ${subChannelsTableId}`);
-      
+      this.logger.debug(
+        `Getting sub-channel data for: ${vmIdFragment} from table: ${subChannelsTableId}`
+      );
+
       // Create field key from vm_id_fragment - this follows Rooch's FieldKey::derive_from_string logic
       const fieldKey = deriveFieldKeyFromString(vmIdFragment);
-      
+
       // Query specific field by key using getFieldStates API
       const fieldStates = await this.client.getFieldStates({
         objectId: subChannelsTableId,
@@ -970,10 +972,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       const fieldState = fieldStates[0];
-      
+
       // Parse the DynamicField<String, SubChannel> from BCS
       const dynamicField = parseDynamicFieldSubChannel(fieldState.value);
-      
+
       return dynamicField.value;
     } catch (error) {
       this.logger.error('Error getting sub-channel data:', error);
@@ -983,10 +985,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   private convertChannelStatus(status: number): 'active' | 'closing' | 'closed' {
     switch (status) {
-      case 0: return 'active';
-      case 1: return 'closing';
-      case 2: return 'closed';
-      default: return 'closed';
+      case 0:
+        return 'active';
+      case 1:
+        return 'closing';
+      case 2:
+        return 'closed';
+      default:
+        return 'closed';
     }
   }
 
@@ -996,5 +1002,4 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     const parts = assetId.split('::');
     return parts[parts.length - 1] || 'UNKNOWN';
   }
-
-} 
+}

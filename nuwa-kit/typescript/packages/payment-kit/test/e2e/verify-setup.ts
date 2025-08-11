@@ -44,18 +44,20 @@ async function verifySetup() {
         channelEpoch: BigInt(1),
         vmIdFragment: 'test-fragment',
         accumulatedAmount: BigInt('1000000'),
-        nonce: BigInt(1)
+        nonce: BigInt(1),
       },
       amountDebited: BigInt('1000000'),
       serviceTxRef: 'test-tx-ref',
       errorCode: 0,
-      message: 'Test message'
+      message: 'Test message',
     };
 
     const encoded = HttpPaymentCodec.buildResponseHeader(testPayload);
     const decoded = HttpPaymentCodec.parseResponseHeader(encoded);
-    
-    console.log(`  Encode/decode test: ${decoded.message === 'Test message' ? '✅ PASS' : '❌ FAIL'}`);
+
+    console.log(
+      `  Encode/decode test: ${decoded.message === 'Test message' ? '✅ PASS' : '❌ FAIL'}`
+    );
 
     // Test fetch availability
     console.log('🌐 Testing fetch availability...');
@@ -85,4 +87,4 @@ if (require.main === module) {
   });
 }
 
-export { verifySetup }; 
+export { verifySetup };

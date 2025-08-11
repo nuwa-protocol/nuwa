@@ -54,16 +54,16 @@ export function createRAVRepo(options: RAVRepositoryOptions = {}): RAVRepository
       if (!options.pool) {
         throw new Error('SQL backend requires a PostgreSQL connection pool');
       }
-      
+
       const sqlOptions: SqlRAVRepositoryOptions = {
         pool: options.pool,
         tablePrefix: options.tablePrefix,
         autoMigrate: options.autoMigrate,
         allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
       };
-      
+
       return new SqlRAVRepository(sqlOptions);
-      
+
     default:
       throw new Error(`Unknown backend type: ${backend}`);
   }

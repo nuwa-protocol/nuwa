@@ -23,14 +23,14 @@ export interface HttpPayerOptions {
   /** Optional specific channelId. If empty, will auto-create or find active channel for current host */
   channelId?: string;
 
-  /** 
-   * Optional DID for generating Authorization header. 
+  /**
+   * Optional DID for generating Authorization header.
    * If not provided, will be derived from signer.getDid()
    */
   payerDid?: string;
 
-  /** 
-   * Optional payee DID for channel creation. 
+  /**
+   * Optional payee DID for channel creation.
    * In production, this should be obtained from service discovery.
    * If not provided, will use payerDid as a fallback for testing.
    */
@@ -38,7 +38,6 @@ export interface HttpPayerOptions {
 
   /** Default asset ID for channel operations (defaults to RGas) */
   defaultAssetId?: string;
-
 
   /** Default maximum amount to accept per request, refuse payment if exceeded */
   maxAmount?: bigint;
@@ -61,10 +60,9 @@ export interface HttpPayerOptions {
 
   /** Custom fetch implementation (defaults to global fetch) */
   fetchImpl?: FetchLike;
-
 }
 
-// PersistedHttpClientState is now imported from schema/core to ensure 
+// PersistedHttpClientState is now imported from schema/core to ensure
 // consistency with Zod validation and avoid type duplication
 // Re-export for convenience and backward compatibility
 export type { PersistedHttpClientState };
@@ -78,7 +76,7 @@ export interface HostChannelMappingStore {
   get(host: string): Promise<string | undefined>;
   set(host: string, channelId: string): Promise<void>;
   delete(host: string): Promise<void>;
-  
+
   // New methods for full state management
   getState?(host: string): Promise<PersistedHttpClientState | undefined>;
   setState?(host: string, state: PersistedHttpClientState): Promise<void>;

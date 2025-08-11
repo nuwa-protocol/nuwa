@@ -21,7 +21,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'test-key',
       accumulatedAmount: BigInt(100),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     await store.save(subRAV);
@@ -46,11 +46,11 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'test-key',
       accumulatedAmount: BigInt(100),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     await store.save(subRAV);
-    
+
     // Verify it exists
     let found = await store.find('test-channel', 'test-key', BigInt(1));
     expect(found).toBeDefined();
@@ -71,7 +71,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'key-1',
       accumulatedAmount: BigInt(100),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     const subRAV2: SubRAV = {
@@ -81,7 +81,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'key-1',
       accumulatedAmount: BigInt(200),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     await store.save(subRAV1);
@@ -90,7 +90,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
     // Manually set old timestamp for one of them
     (store as any).proposals.set('channel-1:key-1:1', {
       subRAV: subRAV1,
-      timestamp: Date.now() - (35 * 60 * 1000) // 35 minutes ago
+      timestamp: Date.now() - 35 * 60 * 1000, // 35 minutes ago
     });
 
     // Cleanup expired (older than 30 minutes)
@@ -113,7 +113,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'key-1',
       accumulatedAmount: BigInt(100),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     const subRAV2: SubRAV = {
@@ -123,7 +123,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'key-1',
       accumulatedAmount: BigInt(200),
-      nonce: BigInt(2)
+      nonce: BigInt(2),
     };
 
     const subRAV3: SubRAV = {
@@ -133,7 +133,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'key-1',
       accumulatedAmount: BigInt(150),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     await store.save(subRAV1);
@@ -157,7 +157,7 @@ describe('PendingSubRAVRepository Memory Implementation', () => {
       channelEpoch: BigInt(1),
       vmIdFragment: 'test-key',
       accumulatedAmount: BigInt(100),
-      nonce: BigInt(1)
+      nonce: BigInt(1),
     };
 
     await store.save(subRAV);

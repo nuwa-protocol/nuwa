@@ -38,11 +38,10 @@ function prepareRequestData(req: Request): any {
  * This adapter bridges the gap between PaymentKit's abstract Handler interface
  * and Express's concrete RequestHandler interface
  */
-export function toExpressHandler<
-  Ctx extends ApiContext,
-  Req, 
-  Res
->(ctx: Ctx, handler: Handler<Ctx, Req, Res>): RequestHandler {
+export function toExpressHandler<Ctx extends ApiContext, Req, Res>(
+  ctx: Ctx,
+  handler: Handler<Ctx, Req, Res>
+): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Prepare request data from Express request
@@ -57,7 +56,7 @@ export function toExpressHandler<
       // Convert to API error and pass to Express error handler
       const apiError = toApiError(error);
       const errorResponse = createErrorResponse(apiError);
-      
+
       res.status(apiError.httpStatus || 500);
       sendJsonResponse(res, errorResponse);
     }
@@ -88,33 +87,35 @@ export function registerHandlersWithBillableRouter(
     // Now handlerName is a semantic name (e.g., 'recovery', 'commit')
     // and path is a property of config
     const { method, path, options: routeOptions, handler } = config;
-    
+
     // Skip handlers without path (they're not REST endpoints)
     if (!path) {
       console.log(`⏩ Skipped handler '${handlerName}': no REST path defined`);
       return;
     }
-    
+
     // Build full path with prefix
     const fullPath = prefix ? `${prefix}/${path.replace(/^\//, '')}` : path;
-    
+
     // Convert PaymentKit Handler to Express RequestHandler
     const expressHandler = toExpressHandler(context, handler);
-    
+
     // Get the HTTP method in lowercase for BillableRouter
     const httpMethod = method || 'GET'; // Default to GET if not specified
-    const methodName = httpMethod.toLowerCase() as 
-      | 'get' | 'post' | 'put' | 'delete' | 'patch';
-    
+    const methodName = httpMethod.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
+
     // Validate method is supported
     if (!billableRouter[methodName]) {
       throw new Error(`Unsupported HTTP method: ${httpMethod}`);
     }
-    
+
     // Register directly with BillableRouter using the public API
     // Use handlerName as ruleId for clearer billing rule identification
     billableRouter[methodName](fullPath, routeOptions, expressHandler, handlerName);
-    
-    console.log(`📝 Registered handler '${handlerName}': ${httpMethod.toUpperCase()} ${fullPath} with options:`, routeOptions);
+
+    console.log(
+      `📝 Registered handler '${handlerName}': ${httpMethod.toUpperCase()} ${fullPath} with options:`,
+      routeOptions
+    );
   });
 }

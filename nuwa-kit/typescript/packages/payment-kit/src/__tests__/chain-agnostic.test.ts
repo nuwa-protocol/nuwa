@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import type { 
-  IPaymentChannelContract, 
-  OpenChannelParams, 
+import type {
+  IPaymentChannelContract,
+  OpenChannelParams,
   OpenChannelResult,
   ClaimParams,
   ClaimResult,
@@ -40,7 +40,9 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     };
   }
 
-  async openChannelWithSubChannel(params: OpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
+  async openChannelWithSubChannel(
+    params: OpenChannelWithSubChannelParams
+  ): Promise<OpenChannelResult> {
     return {
       channelId: '0x1234567890abcdef1234567890abcdef12345678',
       txHash: '0xonestep1234567890abcdef1234567890abcdef',
@@ -219,7 +221,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
         chain: 'rooch',
         rpcUrl: 'https://test-seed.rooch.network',
       });
-      
+
       expect(contract).toBeDefined();
       // Should implement IPaymentChannelContract interface
       expect(typeof contract.openChannel).toBe('function');
@@ -238,7 +240,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
           channelRepo: new MemoryChannelRepository(),
         },
       });
-      
+
       expect(factoryClient).toBeInstanceOf(PaymentChannelPayerClient);
     });
   });
@@ -261,7 +263,7 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
 describe('Chain Integration Examples', () => {
   it('should demonstrate multi-chain support concept', async () => {
     // This test shows how the same client code can work with different chains
-    
+
     // Mock Rooch implementation
     const roochContract = new MockPaymentChannelContract();
     const roochClient = new PaymentChannelPayerClient({
@@ -296,4 +298,4 @@ describe('Chain Integration Examples', () => {
     expect(typeof roochPrice).toBe('bigint');
     expect(typeof evmPrice).toBe('bigint');
   });
-}); 
+});

@@ -40,15 +40,18 @@ export interface RateProvider {
  * Base rate provider with common functionality
  */
 export abstract class BaseRateProvider implements RateProvider {
-  protected cache = new Map<string, {
-    price: bigint;
-    timestamp: number;
-    assetInfo?: AssetInfo;
-  }>();
+  protected cache = new Map<
+    string,
+    {
+      price: bigint;
+      timestamp: number;
+      assetInfo?: AssetInfo;
+    }
+  >();
   protected cacheTimeout: number;
 
   constructor(
-    cacheTimeoutMs = 60000, // 1 minute default
+    cacheTimeoutMs = 60000 // 1 minute default
   ) {
     this.cacheTimeout = cacheTimeoutMs;
   }
@@ -89,7 +92,6 @@ export abstract class BaseRateProvider implements RateProvider {
     if (!cached || !this.isCacheValid(assetId)) return null;
     return cached.price;
   }
-
 }
 
 /**
@@ -147,11 +149,7 @@ export class RateNotFoundError extends RateProviderError {
 
 export class RateStaleError extends RateProviderError {
   constructor(assetId: string, provider: string, lastUpdated?: number) {
-    super(
-      `Rate for asset ${assetId} is stale (last updated: ${lastUpdated})`,
-      assetId,
-      provider
-    );
+    super(`Rate for asset ${assetId} is stale (last updated: ${lastUpdated})`, assetId, provider);
     this.name = 'RateStaleError';
   }
-} 
+}

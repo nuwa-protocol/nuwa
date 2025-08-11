@@ -25,4 +25,4 @@ export class PerRequestStrategy extends BaseStrategy {
     const u = Number.isFinite(units) && units > 0 ? Math.floor(units) : 1;
     return this.price * BigInt(u);
   }
-} 
+}

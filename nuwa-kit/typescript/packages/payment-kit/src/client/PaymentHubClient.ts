@@ -1,6 +1,6 @@
 /**
  * PaymentHub Client
- * 
+ *
  * This client provides a unified interface for payment hub operations,
  * focusing solely on deposit, withdraw, and balance management.
  * It's designed to be created from PaymentChannelPayerClient or PaymentChannelPayeeClient
@@ -31,12 +31,12 @@ export interface HasBalanceOptions extends BalanceOptions {
 
 /**
  * Chain-agnostic Payment Hub Client
- * 
+ *
  * Provides high-level APIs for payment hub operations:
  * - Depositing funds to hub
- * - Withdrawing funds from hub  
+ * - Withdrawing funds from hub
  * - Querying hub balances
- * 
+ *
  * This client operates independently of specific channels or VM keys,
  * focusing purely on the DID-level hub management.
  */
@@ -58,7 +58,7 @@ export class PaymentHubClient {
    */
   async deposit(assetId: string, amount: bigint): Promise<{ txHash: string }> {
     const ownerDid = await this.signer.getDid();
-    
+
     const params: DepositParams = {
       ownerDid,
       assetId,
@@ -76,13 +76,9 @@ export class PaymentHubClient {
    * @param amount Amount to withdraw (0 = withdraw all)
    * @param recipient Optional recipient address/DID (defaults to owner's account)
    */
-  async withdraw(
-    assetId: string, 
-    amount: bigint, 
-    recipient?: string
-  ): Promise<{ txHash: string }> {
+  async withdraw(assetId: string, amount: bigint, recipient?: string): Promise<{ txHash: string }> {
     const ownerDid = await this.signer.getDid();
-    
+
     const params: WithdrawParams = {
       ownerDid,
       assetId,
@@ -99,7 +95,7 @@ export class PaymentHubClient {
    * Get balance of a specific asset in the payment hub
    */
   async getBalance(options: BalanceOptions = {}): Promise<bigint> {
-    const ownerDid = options.ownerDid || await this.signer.getDid();
+    const ownerDid = options.ownerDid || (await this.signer.getDid());
     const assetId = options.assetId || this.defaultAssetId;
     return this.contract.getHubBalance(ownerDid, assetId);
   }

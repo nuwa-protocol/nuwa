@@ -1,7 +1,11 @@
 import type { HostChannelMappingStore, PersistedHttpClientState } from '../types';
 import { PersistedHttpClientStateSchema } from '../../../schema/core';
 import { serializeJson, parseJson } from '../../../utils/json';
-import { ChannelRepository, IndexedDBChannelRepository, MemoryChannelRepository } from '../../../storage';
+import {
+  ChannelRepository,
+  IndexedDBChannelRepository,
+  MemoryChannelRepository,
+} from '../../../storage';
 
 /**
  * Memory-based implementation of HostChannelMappingStore
@@ -33,7 +37,7 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
   async setState(host: string, state: PersistedHttpClientState): Promise<void> {
     // Validate with Zod schema to ensure data integrity
     const validatedState = PersistedHttpClientStateSchema.parse(state);
-    
+
     this.stateStore.set(host, validatedState);
     // Keep legacy store in sync
     if (validatedState.channelId) {
@@ -68,7 +72,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     const value = localStorage.getItem(key);
     return value || undefined;
@@ -78,7 +82,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     localStorage.setItem(key, channelId);
   }
@@ -87,7 +91,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
     localStorage.removeItem(channelKey);
@@ -99,14 +103,14 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const key = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
     const value = localStorage.getItem(key);
-    
+
     if (!value) {
       return undefined;
     }
-    
+
     try {
       // Parse JSON with lossless-json first
       const parsedData = parseJson(value);
@@ -122,21 +126,21 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
     const stateWithTimestamp = {
       ...state,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
-    
+
     // Validate and transform with Zod (ensures proper structure)
     const validatedState = PersistedHttpClientStateSchema.parse(stateWithTimestamp);
-    
+
     // Use lossless-json for proper BigInt serialization
     const serializedState = serializeJson(validatedState);
-    
+
     localStorage.setItem(stateKey, serializedState);
-    
+
     // Keep legacy store in sync
     if (state.channelId) {
       const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
@@ -148,7 +152,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
     localStorage.removeItem(channelKey);
@@ -162,18 +166,19 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     if (typeof localStorage === 'undefined') {
       throw new Error('localStorage is not available');
     }
-    
+
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (
-        key.startsWith(LocalStorageHostChannelMappingStore.CHANNEL_PREFIX) ||
-        key.startsWith(LocalStorageHostChannelMappingStore.STATE_PREFIX)
-      )) {
+      if (
+        key &&
+        (key.startsWith(LocalStorageHostChannelMappingStore.CHANNEL_PREFIX) ||
+          key.startsWith(LocalStorageHostChannelMappingStore.STATE_PREFIX))
+      ) {
         keysToRemove.push(key);
       }
     }
-    
+
     keysToRemove.forEach(key => localStorage.removeItem(key));
   }
 }
@@ -186,7 +191,7 @@ export function createDefaultMappingStore(): HostChannelMappingStore {
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     return new LocalStorageHostChannelMappingStore();
   }
-  
+
   // Fall back to memory store for Node.js or environments without localStorage
   return new MemoryHostChannelMappingStore();
 }

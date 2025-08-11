@@ -2,53 +2,55 @@ import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../t
 import { createSuccessResponse, PaymentKitError } from '../../errors';
 import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
-import type { 
-  HealthResponse, 
+import type {
+  HealthResponse,
   ClaimsStatusResponse,
   ClaimTriggerRequest,
   ClaimTriggerResponse,
   CleanupRequest,
-  CleanupResponse
+  CleanupResponse,
 } from '../../schema';
-
 
 /**
  * Handle admin claims status endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = async (ctx, req) => {
+export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = async (
+  ctx,
+  req
+) => {
   try {
     if (ctx.config.debug) {
       console.log('📊 Admin: Getting claims status...');
     }
-    
+
     const claimsStatus = ctx.middleware.getClaimStatus();
     if (ctx.config.debug) {
       console.log('📊 Claims status:', claimsStatus);
     }
-    
+
     const processingStats = ctx.middleware.getProcessingStats();
     if (ctx.config.debug) {
       console.log('📊 Processing stats:', processingStats);
     }
-    
-    const result: ClaimsStatusResponse = { 
+
+    const result: ClaimsStatusResponse = {
       claimsStatus,
       processingStats,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     if (ctx.config.debug) {
       console.log('✅ Admin: Claims data retrieved successfully');
     }
-    
+
     return createSuccessResponse(result);
   } catch (error) {
     if (ctx.config.debug) {
       console.error('❌ Admin: Failed to get claims status:', error);
       console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
-    
+
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to retrieve claims status',
@@ -62,25 +64,29 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
  * Handle admin claim trigger endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaimTrigger: Handler<ApiContext, ClaimTriggerRequest, ClaimTriggerResponse> = async (ctx, req) => {
+export const handleAdminClaimTrigger: Handler<
+  ApiContext,
+  ClaimTriggerRequest,
+  ClaimTriggerResponse
+> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
       console.log('🚀 Admin: Triggering claim for channel:', req.channelId);
     }
-    
+
     const success = await ctx.middleware.manualClaim(req.channelId);
-    
+
     if (ctx.config.debug) {
       console.log('✅ Admin: Claim trigger result:', success);
     }
-    
+
     return createSuccessResponse({ success, channelId: req.channelId });
   } catch (error) {
     if (ctx.config.debug) {
       console.error('❌ Admin: Failed to trigger claim:', error);
       console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
-    
+
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to trigger claim',
@@ -94,27 +100,30 @@ export const handleAdminClaimTrigger: Handler<ApiContext, ClaimTriggerRequest, C
  * Handle admin cleanup endpoint requests
  * Admin only endpoint
  */
-export const handleAdminCleanup: Handler<ApiContext, CleanupRequest, CleanupResponse> = async (ctx, req) => {
+export const handleAdminCleanup: Handler<ApiContext, CleanupRequest, CleanupResponse> = async (
+  ctx,
+  req
+) => {
   try {
     const maxAge = req.maxAgeMinutes || 30;
-    
+
     if (ctx.config.debug) {
       console.log('🧹 Admin: Cleaning up expired proposals, max age:', maxAge, 'minutes');
     }
-    
+
     const clearedCount = await ctx.middleware.clearExpiredProposals(maxAge);
-    
+
     if (ctx.config.debug) {
       console.log('✅ Admin: Cleanup completed, cleared count:', clearedCount);
     }
-    
+
     return createSuccessResponse({ clearedCount, maxAgeMinutes: maxAge });
   } catch (error) {
     if (ctx.config.debug) {
       console.error('❌ Admin: Failed to cleanup expired proposals:', error);
       console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
-    
+
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to cleanup expired proposals',

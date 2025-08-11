@@ -54,14 +54,14 @@ export function createChannelRepo(options: ChannelRepositoryOptions = {}): Chann
       if (!options.pool) {
         throw new Error('SQL backend requires a PostgreSQL connection pool');
       }
-      
+
       const sqlOptions: SqlChannelRepositoryOptions = {
         pool: options.pool,
         tablePrefix: options.tablePrefix,
         autoMigrate: options.autoMigrate,
         allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
       };
-      
+
       return new SqlChannelRepository(sqlOptions);
 
     default:

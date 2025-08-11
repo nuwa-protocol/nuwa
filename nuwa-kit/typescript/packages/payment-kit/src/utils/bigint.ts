@@ -1,6 +1,6 @@
 /**
  * BigInt serialization utilities
- * 
+ *
  * This module provides unified BigInt handling for JSON serialization
  * across the entire Payment Kit codebase.
  */
@@ -13,15 +13,15 @@ export function serializeBigInt(obj: any): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
-  
+
   if (typeof obj === 'bigint') {
     return obj.toString();
   }
-  
+
   if (Array.isArray(obj)) {
     return obj.map(item => serializeBigInt(item));
   }
-  
+
   if (typeof obj === 'object') {
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -29,7 +29,7 @@ export function serializeBigInt(obj: any): any {
     }
     return result;
   }
-  
+
   return obj;
 }
 

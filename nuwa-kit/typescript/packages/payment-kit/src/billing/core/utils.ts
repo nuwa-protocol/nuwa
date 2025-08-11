@@ -49,24 +49,21 @@ export class BillingUtils {
       assetId,
       meta: {
         operation,
-        ...additionalMeta
-      }
+        ...additionalMeta,
+      },
     };
   }
 
   /**
    * Enhance existing billing context with additional metadata
    */
-  static enhance(
-    context: BillingContext,
-    additionalMeta: Record<string, any>
-  ): BillingContext {
+  static enhance(context: BillingContext, additionalMeta: Record<string, any>): BillingContext {
     return {
       ...context,
       meta: {
         ...context.meta,
-        ...additionalMeta
-      }
+        ...additionalMeta,
+      },
     };
   }
 
@@ -81,10 +78,10 @@ export class BillingUtils {
     if (!signedSubRav) {
       return {};
     }
-    
+
     return {
       channelId: signedSubRav.subRav.channelId,
-      vmIdFragment: signedSubRav.subRav.vmIdFragment
+      vmIdFragment: signedSubRav.subRav.vmIdFragment,
     };
   }
 }

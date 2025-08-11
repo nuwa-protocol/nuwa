@@ -8,10 +8,7 @@ import { BillingRule } from './types';
  * rule that satisfies the matching conditions. If no rule matches it returns
  * `undefined`.
  */
-export function findRule(
-  meta: Record<string, any>,
-  rules: BillingRule[],
-): BillingRule | undefined {
+export function findRule(meta: Record<string, any>, rules: BillingRule[]): BillingRule | undefined {
   for (const rule of rules) {
     if (matchesRule(meta, rule)) {
       return rule;

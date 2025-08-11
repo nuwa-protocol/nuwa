@@ -11,7 +11,7 @@ export function assertRavProgression(
   prevAccumulatedAmount: bigint,
   nextNonce: bigint,
   nextAccumulatedAmount: bigint,
-  allowSameAccumulated: boolean = false,
+  allowSameAccumulated: boolean = false
 ): void {
   const expectedNonce = prevNonce + 1n;
   if (nextNonce !== expectedNonce) {
@@ -20,11 +20,15 @@ export function assertRavProgression(
 
   if (allowSameAccumulated) {
     if (nextAccumulatedAmount < prevAccumulatedAmount) {
-      throw new Error(`Amount must not decrease: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`);
+      throw new Error(
+        `Amount must not decrease: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`
+      );
     }
   } else {
     if (nextAccumulatedAmount <= prevAccumulatedAmount) {
-      throw new Error(`Amount must increase: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`);
+      throw new Error(
+        `Amount must increase: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`
+      );
     }
   }
 }
@@ -35,9 +39,13 @@ export function assertRavProgression(
 export function assertSubRavProgression(
   prev: Pick<SubRAV, 'nonce' | 'accumulatedAmount'>,
   next: Pick<SubRAV, 'nonce' | 'accumulatedAmount'>,
-  allowSameAccumulated: boolean = false,
+  allowSameAccumulated: boolean = false
 ): void {
-  assertRavProgression(prev.nonce, prev.accumulatedAmount, next.nonce, next.accumulatedAmount, allowSameAccumulated);
+  assertRavProgression(
+    prev.nonce,
+    prev.accumulatedAmount,
+    next.nonce,
+    next.accumulatedAmount,
+    allowSameAccumulated
+  );
 }
-
-

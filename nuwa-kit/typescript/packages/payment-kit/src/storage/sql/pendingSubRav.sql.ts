@@ -33,9 +33,12 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     this.tablePrefix = options.tablePrefix || 'nuwa_';
     this.autoMigrate = options.autoMigrate ?? true;
     this.allowUnsafeAutoMigrateInProd = options.allowUnsafeAutoMigrateInProd ?? false;
-    
+
     // Only auto-migrate in development or when explicitly allowed in production
-    if (this.autoMigrate && (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)) {
+    if (
+      this.autoMigrate &&
+      (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)
+    ) {
       this.initialize().catch(console.error);
     }
   }
@@ -71,7 +74,6 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
         CREATE INDEX IF NOT EXISTS idx_${this.tablePrefix}pending_sub_ravs_sub_channel 
         ON ${this.pendingSubRAVsTable}(channel_id, vm_id_fragment)
       `);
-
     } finally {
       client.release();
     }
@@ -82,8 +84,9 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     try {
       // Encode SubRAV using BCS serialization
       const subRavBcs = encodeSubRAV(subRAV);
-      
-      await client.query(`
+
+      await client.query(
+        `
         INSERT INTO ${this.pendingSubRAVsTable} 
         (channel_id, vm_id_fragment, nonce, sub_rav_bcs)
         VALUES ($1, $2, $3, $4)
@@ -91,12 +94,9 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
         DO UPDATE SET 
           sub_rav_bcs = EXCLUDED.sub_rav_bcs,
           created_at = NOW()
-      `, [
-        subRAV.channelId,
-        subRAV.vmIdFragment,
-        subRAV.nonce.toString(),
-        subRavBcs
-      ]);
+      `,
+        [subRAV.channelId, subRAV.vmIdFragment, subRAV.nonce.toString(), subRavBcs]
+      );
     } finally {
       client.release();
     }
@@ -105,11 +105,14 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
   async find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT sub_rav_bcs 
         FROM ${this.pendingSubRAVsTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2 AND nonce = $3
-      `, [channelId, vmIdFragment, nonce.toString()]);
+      `,
+        [channelId, vmIdFragment, nonce.toString()]
+      );
 
       if (result.rows.length === 0) {
         return null;
@@ -125,13 +128,16 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
   async findLatestBySubChannel(channelId: string, vmIdFragment: string): Promise<SubRAV | null> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT sub_rav_bcs 
         FROM ${this.pendingSubRAVsTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2
         ORDER BY nonce DESC
         LIMIT 1
-      `, [channelId, vmIdFragment]);
+      `,
+        [channelId, vmIdFragment]
+      );
 
       if (result.rows.length === 0) {
         return null;
@@ -147,10 +153,13 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
   async remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query(`
+      await client.query(
+        `
         DELETE FROM ${this.pendingSubRAVsTable} 
         WHERE channel_id = $1 AND vm_id_fragment = $2 AND nonce = $3
-      `, [channelId, vmIdFragment, nonce.toString()]);
+      `,
+        [channelId, vmIdFragment, nonce.toString()]
+      );
     } finally {
       client.release();
     }
@@ -158,12 +167,12 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
 
   /**
    * Clean up expired pending SubRAVs
-   * 
+   *
    * Note: This method uses database server time (NOW()) instead of client time
    * to avoid issues with time drift between client and database server.
    * This ensures that cleanup works correctly even when client and server
    * clocks are not perfectly synchronized.
-   * 
+   *
    * @param maxAgeMs Maximum age in milliseconds (default: 30 minutes)
    * @returns Number of records deleted
    */
@@ -171,10 +180,13 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
     const client = await this.pool.connect();
     try {
       // Use database server time to avoid client-server time drift issues
-      const result = await client.query(`
+      const result = await client.query(
+        `
         DELETE FROM ${this.pendingSubRAVsTable} 
         WHERE created_at < NOW() - (make_interval(secs => $1 / 1000))
-      `, [maxAgeMs]);
+      `,
+        [maxAgeMs]
+      );
 
       return result.rowCount || 0;
     } finally {
@@ -197,7 +209,7 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
         FROM ${this.pendingSubRAVsTable}
         GROUP BY channel_id
       `);
-      
+
       const byChannel: Record<string, number> = {};
       for (const row of byChannelResult.rows) {
         byChannel[row.channel_id] = parseInt(row.count);
@@ -210,9 +222,13 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
           MAX(EXTRACT(EPOCH FROM created_at) * 1000) as newest
         FROM ${this.pendingSubRAVsTable}
       `);
-      
-      const oldestTimestamp = timestampResult.rows[0].oldest ? parseInt(timestampResult.rows[0].oldest) : undefined;
-      const newestTimestamp = timestampResult.rows[0].newest ? parseInt(timestampResult.rows[0].newest) : undefined;
+
+      const oldestTimestamp = timestampResult.rows[0].oldest
+        ? parseInt(timestampResult.rows[0].oldest)
+        : undefined;
+      const newestTimestamp = timestampResult.rows[0].newest
+        ? parseInt(timestampResult.rows[0].newest)
+        : undefined;
 
       return {
         totalCount,
@@ -233,4 +249,4 @@ export class SqlPendingSubRAVRepository implements PendingSubRAVRepository {
       client.release();
     }
   }
-} 
+}

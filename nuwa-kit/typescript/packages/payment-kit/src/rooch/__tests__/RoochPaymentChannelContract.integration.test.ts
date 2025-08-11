@@ -31,7 +31,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
   let payer: CreateSelfDidResult;
   let payee: CreateSelfDidResult;
   let testAsset: AssetInfo;
-  let channelId: string|undefined;
+  let channelId: string | undefined;
 
   beforeEach(async () => {
     if (!shouldRunIntegrationTests()) {
@@ -58,13 +58,13 @@ describe('RoochPaymentChannelContract Integration Test', () => {
     // Create payer DID using test helper
     payer = await createSelfDid(env, {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
-      skipFunding: false
+      skipFunding: false,
     });
 
     // Create payee DID using test helper
     payee = await createSelfDid(env, {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
-      skipFunding: false
+      skipFunding: false,
     });
 
     channelId = undefined;
@@ -74,7 +74,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       assetId: '0x3::gas_coin::RGas',
       decimals: 8,
     };
-
 
     console.log(`Test setup completed:
       Payer DID: ${payer.did}
@@ -88,7 +87,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const assetInfo = await contract.getAssetInfo(testAsset.assetId);
-      
+
       expect(assetInfo).toBeDefined();
       expect(assetInfo.assetId).toBe(normalizeAssetId(testAsset.assetId));
       expect(assetInfo.symbol).toBe('RGas');
@@ -98,7 +97,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const price = await contract.getAssetPrice(testAsset.assetId);
-      
+
       expect(price).toBeDefined();
       expect(typeof price).toBe('bigint');
       expect(price).toBeGreaterThan(BigInt(0));
@@ -110,23 +109,21 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const chainId = await contract.getChainId();
-      
+
       expect(chainId).toBeDefined();
       expect(typeof chainId).toBe('bigint');
       expect(chainId).toBeGreaterThan(BigInt(0));
-      
+
       // Rooch network chain IDs:
       // Local: 4, Dev: 3, Test: 2, Main: 1
       // The test should work with any of these
       expect([BigInt(1), BigInt(2), BigInt(3), BigInt(4)]).toContain(chainId);
-      
+
       console.log(`Chain ID retrieved: ${chainId}`);
     });
-
   });
 
   describe('Payment Hub Operations', () => {
-    
     it('should get hub balance after deposit', async () => {
       if (!shouldRunIntegrationTests()) return;
 
@@ -144,7 +141,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       // Check hub balance
       const balance = await contract.getHubBalance(payer.did, testAsset.assetId);
-      
+
       expect(balance).toBeGreaterThanOrEqual(depositAmount);
       expect(typeof balance).toBe('bigint');
 
@@ -162,18 +159,21 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       // Get all balances
       const allBalances = await contract.getAllHubBalances(payer.did);
-      
+
       expect(allBalances).toBeDefined();
       expect(typeof allBalances).toBe('object');
-      
+
       // Should have at least one balance (RGas)
       const normalizedAssetId = normalizeAssetId(testAsset.assetId);
       expect(allBalances[normalizedAssetId]).toBeDefined();
       expect(allBalances[normalizedAssetId]).toBeGreaterThan(BigInt(0));
 
-      console.log(`All hub balances retrieved:
+      console.log(
+        `All hub balances retrieved:
         Owner DID: ${payer.did}
-        Balances:`, allBalances);
+        Balances:`,
+        allBalances
+      );
     });
 
     it('should get active channels counts', async () => {
@@ -185,10 +185,10 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       // Get active channels counts
       const channelCounts = await contract.getActiveChannelsCounts(payer.did);
-      
+
       expect(channelCounts).toBeDefined();
       expect(typeof channelCounts).toBe('object');
-      
+
       // Should have at least one active channel for RGas
       const normalizedAssetId = normalizeAssetId(testAsset.assetId);
       if (channelCounts[normalizedAssetId]) {
@@ -196,9 +196,12 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         expect(typeof channelCounts[normalizedAssetId]).toBe('number');
       }
 
-      console.log(`Active channels counts retrieved:
+      console.log(
+        `Active channels counts retrieved:
         Owner DID: ${payer.did}
-        Channel Counts:`, channelCounts);
+        Channel Counts:`,
+        channelCounts
+      );
     });
 
     it('should verify PaymentHub BCS parsing with real data', async () => {
@@ -218,12 +221,15 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       // Test getActiveChannelsCounts - this will exercise DynamicField<String, u64> parsing
       const channelCounts = await contract.getActiveChannelsCounts(payer.did);
-      
+
       // Log detailed parsing results for verification
       console.log(`PaymentHub BCS parsing verification:
         Single balance query: ${balance}
-        All balances: ${JSON.stringify(allBalances, (key, value) => 
-          typeof value === 'bigint' ? value.toString() : value, 2)}
+        All balances: ${JSON.stringify(
+          allBalances,
+          (key, value) => (typeof value === 'bigint' ? value.toString() : value),
+          2
+        )}
         Channel counts: ${JSON.stringify(channelCounts, null, 2)}`);
 
       // Verify consistency between single and batch balance queries
@@ -239,7 +245,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       // Create a new DID that has no PaymentHub yet
       const emptyPayer = await createSelfDid(env, {
         keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
-        skipFunding: false
+        skipFunding: false,
       });
 
       // Test balance queries on empty hub
@@ -284,7 +290,9 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const hasEnoughBalance = await hubClient.hasBalance({ requiredAmount: BigInt(100000000) }); // 1 RGas
       expect(hasEnoughBalance).toBe(true);
 
-      const hasInsufficientBalance = await hubClient.hasBalance({ requiredAmount: BigInt(10000000000) }); // 100 RGas
+      const hasInsufficientBalance = await hubClient.hasBalance({
+        requiredAmount: BigInt(10000000000),
+      }); // 100 RGas
       expect(hasInsufficientBalance).toBe(false);
 
       // Open a channel to test getActiveChannelsCounts
@@ -294,17 +302,18 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       console.log(`PaymentHubClient integration test results:
         Deposit Amount: ${depositAmount}
         Current Balance: ${balance}
-        All Balances: ${JSON.stringify(allBalances, (key, value) => 
-          typeof value === 'bigint' ? value.toString() : value, 2)}
+        All Balances: ${JSON.stringify(
+          allBalances,
+          (key, value) => (typeof value === 'bigint' ? value.toString() : value),
+          2
+        )}
         Has Enough Balance (1 RGas): ${hasEnoughBalance}
         Has Insufficient Balance (100 RGas): ${hasInsufficientBalance}
         Active Channels Counts: ${JSON.stringify(channelCounts, null, 2)}`);
     });
-
   });
 
   describe('Payment Channel Operations', () => {
-    
     it('should deposit to payment hub', async () => {
       if (!shouldRunIntegrationTests()) return;
 
@@ -318,7 +327,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       };
 
       const depositResult = await contract.depositToHub(depositParams);
-      
+
       expect(depositResult).toBeDefined();
       expect(depositResult.txHash).toBeDefined();
       expect(depositResult.txHash.length).toBeGreaterThan(0);
@@ -345,12 +354,12 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       };
 
       const result = await contract.openChannelWithSubChannel(openWithSubChannelParams);
-      
+
       expect(result).toBeDefined();
       expect(result.channelId).toBeDefined();
       expect(result.txHash).toBeDefined();
       expect(result.txHash.length).toBeGreaterThan(0);
-      
+
       // Store the channel ID for potential use in other tests
       const oneStepChannelId = result.channelId;
 
@@ -404,7 +413,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       // Create a different payee to avoid channel collision
       const payee2 = await createSelfDid(env, {
         keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
-        skipFunding: false
+        skipFunding: false,
       });
 
       const separateOpenParams: OpenChannelParams = {
@@ -464,7 +473,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       };
 
       const channelInfo = await contract.getChannelStatus(statusParams);
-      
+
       expect(channelInfo).toBeDefined();
       expect(channelInfo.channelId).toBe(channelId);
       expect(channelInfo.payerDid).toBe(payer.did);
@@ -490,7 +499,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       };
 
       const subChannelInfo = await contract.getSubChannel(subChannelParams);
-      
+
       expect(subChannelInfo).toBeDefined();
       expect(subChannelInfo.vmIdFragment).toBe(payer.vmIdFragment);
       expect(subChannelInfo.publicKey).toBeDefined();
@@ -511,10 +520,10 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
       // Get channel info for creating SubRAV
       const channelInfo = await contract.getChannelStatus({ channelId: channelId! });
-      
+
       // Get chain ID from the contract instead of hardcoding
       const chainId = await contract.getChainId();
-      
+
       // Create a SubRAV for claiming
       const claimAmount = BigInt(5000000); // 0.05 RGas (5M smallest units)
       const subRav: SubRAV = {
@@ -530,7 +539,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       // Get the payer's key ID for signing
       const payerKeyIds = await payer.keyManager.listKeyIds();
       const payerKeyId = payerKeyIds[0];
-      
+
       // Sign the SubRAV
       const signedSubRAV = await SubRAVSigner.sign(subRav, payer.keyManager, payerKeyId);
 
@@ -541,7 +550,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       };
 
       const claimResult = await contract.claimFromChannel(claimParams);
-      
+
       expect(claimResult).toBeDefined();
       expect(claimResult.txHash).toBeDefined();
       expect(claimResult.txHash.length).toBeGreaterThan(0);
@@ -577,7 +586,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         signer: payer.signer,
         storageOptions: {
           channelRepo: new MemoryChannelRepository(),
-        },  
+        },
       });
 
       // Get HubClient from PayerClient
@@ -644,7 +653,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
     const payerKeyInfo = await payer.keyManager.getKeyInfo(
       (await payer.keyManager.listKeyIds())[0]
     );
-    
+
     if (!payerKeyInfo) {
       throw new Error('Could not get payer key info');
     }
@@ -657,4 +666,4 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
     await contract.authorizeSubChannel(authParams);
   }
-}); 
+});

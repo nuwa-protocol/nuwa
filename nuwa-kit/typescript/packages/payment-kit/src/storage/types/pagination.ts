@@ -67,4 +67,4 @@ export interface PendingSubRAVStats {
   oldestTimestamp?: number;
   /** Newest proposal timestamp */
   newestTimestamp?: number;
-} 
+}

@@ -21,6 +21,7 @@ src/schema/
 ## Design Principles
 
 ### 1. Core Schema First
+
 Core business objects are defined once in `core/index.ts` and reused across API endpoints:
 
 ```typescript
@@ -33,27 +34,32 @@ export const RecoveryResponseSchema = z.object({
 
 // ❌ Avoid: Duplicating field definitions
 export const RecoveryResponseSchema = z.object({
-  pendingSubRav: z.object({
-    version: z.number(),
-    chainId: createBigIntSchema(),
-    // ... duplicate SubRAV fields
-  }).nullable(),
+  pendingSubRav: z
+    .object({
+      version: z.number(),
+      chainId: createBigIntSchema(),
+      // ... duplicate SubRAV fields
+    })
+    .nullable(),
 });
 ```
 
 ### 2. BigInt Support
+
 All schemas automatically handle BigInt conversion from multiple input types:
 
 ```typescript
-const createBigIntSchema = () => z.union([
-  z.bigint(),                    // Native BigInt
-  z.string().transform(BigInt),  // String from JSON
-  z.number().transform(BigInt),  // Small numbers
-  z.instanceof(LosslessNumber).transform(val => BigInt(val.toString())), // lossless-json
-]);
+const createBigIntSchema = () =>
+  z.union([
+    z.bigint(), // Native BigInt
+    z.string().transform(BigInt), // String from JSON
+    z.number().transform(BigInt), // Small numbers
+    z.instanceof(LosslessNumber).transform(val => BigInt(val.toString())), // lossless-json
+  ]);
 ```
 
 ### 3. Type Alignment
+
 Schema types are designed to match the core TypeScript interfaces:
 
 ```typescript
@@ -124,7 +130,7 @@ const validateSubRAV = (data: unknown) => {
 ## Core Schemas Available
 
 - **`SubRAVSchema`** - Core SubRAV structure with BigInt fields
-- **`SignedSubRAVSchema`** - SubRAV with signature fields  
+- **`SignedSubRAVSchema`** - SubRAV with signature fields
 - **`ChannelInfoSchema`** - Channel state information
 - **`AssetInfoSchema`** - Asset metadata
 - **`ServiceDiscoverySchema`** - Service discovery information

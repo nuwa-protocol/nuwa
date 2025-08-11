@@ -25,7 +25,7 @@ export class PaymentKitError extends Error {
       code: this.code,
       message: this.message,
       details: this.details,
-      httpStatus: this.httpStatus
+      httpStatus: this.httpStatus,
     };
   }
 }
@@ -43,14 +43,14 @@ export function toApiError(error: unknown): ApiError {
       code: ErrorCode.INTERNAL_ERROR,
       message: error.message,
       details: error.stack,
-      httpStatus: 500
+      httpStatus: 500,
     };
   }
 
   return {
     code: ErrorCode.INTERNAL_ERROR,
     message: String(error),
-    httpStatus: 500
+    httpStatus: 500,
   };
 }
 
@@ -61,17 +61,21 @@ export function createSuccessResponse<T>(data: T): { success: true; data: T; tim
   return {
     success: true,
     data,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 }
 
 /**
  * Create an error response
  */
-export function createErrorResponse(error: ApiError): { success: false; error: ApiError; timestamp: string } {
+export function createErrorResponse(error: ApiError): {
+  success: false;
+  error: ApiError;
+  timestamp: string;
+} {
   return {
     success: false,
     error,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 }

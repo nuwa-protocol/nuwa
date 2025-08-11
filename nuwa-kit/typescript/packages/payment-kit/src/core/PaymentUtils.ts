@@ -25,7 +25,7 @@ export class PaymentUtils {
       subRAV1.nonce === subRAV2.nonce
     );
   }
-  
+
   /**
    * Generate unique ID for tracking
    */
@@ -43,5 +43,4 @@ export class PaymentUtils {
     if (a > b) return 1;
     return 0;
   }
-
-} 
+}

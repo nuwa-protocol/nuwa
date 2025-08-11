@@ -23,8 +23,8 @@ const env = await bootstrapIdentityEnv({
   method: 'rooch',
   vdrOptions: {
     rpcUrl: 'https://testnet.rooch.network',
-    network: 'test'
-  }
+    network: 'test',
+  },
 });
 
 // 2. 创建支付客户端 (自动服务发现)
@@ -38,7 +38,7 @@ const client = await createHttpClient({
 const result = await client.get('/v1/echo?q=hello');
 const response = await client.post('/v1/chat', {
   message: 'Hello, how are you?',
-  model: 'gpt-3.5-turbo'
+  model: 'gpt-3.5-turbo',
 });
 ```
 
@@ -47,16 +47,16 @@ const response = await client.post('/v1/chat', {
 ```typescript
 // 一次创建多个服务的客户端
 const clients = await createMultipleHttpClients(env, [
-  { 
-    name: 'llm', 
-    baseUrl: 'https://api.llm-gateway.com', 
-    maxAmount: BigInt('500000000000') // 50 cents
+  {
+    name: 'llm',
+    baseUrl: 'https://api.llm-gateway.com',
+    maxAmount: BigInt('500000000000'), // 50 cents
   },
-  { 
-    name: 'storage', 
-    baseUrl: 'https://api.storage.com', 
-    maxAmount: BigInt('100000000000') // 10 cents
-  }
+  {
+    name: 'storage',
+    baseUrl: 'https://api.storage.com',
+    maxAmount: BigInt('100000000000'), // 10 cents
+  },
 ]);
 
 // 使用不同的服务
@@ -87,20 +87,22 @@ const client = await createHttpPayerClientWithDiscovery({
 #### `createHttpClient` (推荐)
 
 ```typescript
-async function createHttpClient(options: CreateHttpClientOptions): Promise<PaymentChannelHttpClient>
+async function createHttpClient(
+  options: CreateHttpClientOptions
+): Promise<PaymentChannelHttpClient>;
 ```
 
 ##### CreateHttpClientOptions
 
-| 参数 | 类型 | 必需 | 描述 |
-|-----|------|------|------|
-| `baseUrl` | `string` | ✅ | 目标服务根地址 |
-| `env` | `IdentityEnv` | ✅ | 预配置的身份环境 (包含 VDR 注册表、KeyManager 和链配置) |
-| `maxAmount` | `bigint` | ❌ | 每次请求的最大金额 (默认: 50 cents USD) |
-| `debug` | `boolean` | ❌ | 调试模式 (默认继承自 IdentityEnv) |
-| `onError` | `(err: unknown) => void` | ❌ | 自定义错误处理器 |
-| `fetchImpl` | `FetchLike` | ❌ | 自定义 fetch 实现 |
-| `mappingStore` | `HostChannelMappingStore` | ❌ | 主机到频道映射存储 |
+| 参数           | 类型                      | 必需 | 描述                                                    |
+| -------------- | ------------------------- | ---- | ------------------------------------------------------- |
+| `baseUrl`      | `string`                  | ✅   | 目标服务根地址                                          |
+| `env`          | `IdentityEnv`             | ✅   | 预配置的身份环境 (包含 VDR 注册表、KeyManager 和链配置) |
+| `maxAmount`    | `bigint`                  | ❌   | 每次请求的最大金额 (默认: 50 cents USD)                 |
+| `debug`        | `boolean`                 | ❌   | 调试模式 (默认继承自 IdentityEnv)                       |
+| `onError`      | `(err: unknown) => void`  | ❌   | 自定义错误处理器                                        |
+| `fetchImpl`    | `FetchLike`               | ❌   | 自定义 fetch 实现                                       |
+| `mappingStore` | `HostChannelMappingStore` | ❌   | 主机到频道映射存储                                      |
 
 #### `createMultipleHttpClients` (多服务)
 
@@ -108,7 +110,7 @@ async function createHttpClient(options: CreateHttpClientOptions): Promise<Payme
 async function createMultipleHttpClients<T extends string>(
   env: IdentityEnv,
   services: Array<{ name: T; baseUrl: string; maxAmount?: bigint; debug?: boolean }>
-): Promise<Record<T, PaymentChannelHttpClient>>
+): Promise<Record<T, PaymentChannelHttpClient>>;
 ```
 
 ### 高级构造函数
@@ -121,20 +123,20 @@ new PaymentChannelHttpClient(options: HttpPayerOptions)
 
 ##### HttpPayerOptions
 
-| 参数 | 类型 | 必需 | 描述 |
-|-----|------|------|------|
-| `baseUrl` | `string` | ✅ | 目标服务根地址 |
-| `chainConfig` | `ChainConfig` | ✅ | 区块链配置（链设置） |
-| `signer` | `SignerInterface` | ✅ | 支付通道操作和 DID 认证的签名器 |
-| `keyId` | `string` | ❌ | 签名操作的密钥ID（可选，不指定时使用第一个可用密钥） |
-| `storageOptions` | `PaymentChannelPayerClientOptions['storageOptions']` | ❌ | 支付通道数据存储选项 |
-| `channelId` | `string` | ❌ | 指定通道ID，为空时自动创建 |
-| `payerDid` | `string` | ❌ | 用于生成 Authorization 头的 DID（不提供时从 signer 获取） |
-| `maxAmount` | `bigint` | ❌ | 每次请求接受的最大费用 |
-| `debug` | `boolean` | ❌ | 是否打印调试日志 |
-| `onError` | `(err: unknown) => void` | ❌ | 自定义错误处理函数 |
-| `mappingStore` | `HostChannelMappingStore` | ❌ | Host 与 channelId 映射存储 |
-| `fetchImpl` | `FetchLike` | ❌ | 自定义 fetch 实现 |
+| 参数             | 类型                                                 | 必需 | 描述                                                      |
+| ---------------- | ---------------------------------------------------- | ---- | --------------------------------------------------------- |
+| `baseUrl`        | `string`                                             | ✅   | 目标服务根地址                                            |
+| `chainConfig`    | `ChainConfig`                                        | ✅   | 区块链配置（链设置）                                      |
+| `signer`         | `SignerInterface`                                    | ✅   | 支付通道操作和 DID 认证的签名器                           |
+| `keyId`          | `string`                                             | ❌   | 签名操作的密钥ID（可选，不指定时使用第一个可用密钥）      |
+| `storageOptions` | `PaymentChannelPayerClientOptions['storageOptions']` | ❌   | 支付通道数据存储选项                                      |
+| `channelId`      | `string`                                             | ❌   | 指定通道ID，为空时自动创建                                |
+| `payerDid`       | `string`                                             | ❌   | 用于生成 Authorization 头的 DID（不提供时从 signer 获取） |
+| `maxAmount`      | `bigint`                                             | ❌   | 每次请求接受的最大费用                                    |
+| `debug`          | `boolean`                                            | ❌   | 是否打印调试日志                                          |
+| `onError`        | `(err: unknown) => void`                             | ❌   | 自定义错误处理函数                                        |
+| `mappingStore`   | `HostChannelMappingStore`                            | ❌   | Host 与 channelId 映射存储                                |
+| `fetchImpl`      | `FetchLike`                                          | ❌   | 自定义 fetch 实现                                         |
 
 ### 主要方法
 
@@ -180,10 +182,12 @@ getChannelId(): string | undefined
 ### 2. 请求流程
 
 1. **准备 Header**：
+
    - 添加 DIDAuth 认证头（如果配置了 `payerDid` 和 `keyManager`）
    - 添加支付通道数据头
 
 2. **生成支付数据**：
+
    - 首次请求：创建握手 SubRAV（nonce=0, amount=0）
    - 后续请求：签名服务器提供的 unsigned SubRAV
 
@@ -215,7 +219,7 @@ const customStore = new LocalStorageHostChannelMappingStore();
 
 const client = new PaymentChannelHttpClient({
   // ... 其他配置
-  mappingStore: customStore
+  mappingStore: customStore,
 });
 ```
 
@@ -231,11 +235,11 @@ const client = new PaymentChannelHttpClient({
 ```typescript
 const client = new PaymentChannelHttpClient({
   // ... 其他配置
-  onError: (error) => {
+  onError: error => {
     console.error('Payment error:', error);
     // 集成错误跟踪服务
     errorTracking.report(error);
-  }
+  },
 });
 ```
 
@@ -249,10 +253,10 @@ const client = new PaymentChannelHttpClient({
   fetchImpl: async (input, init) => {
     // 添加自定义逻辑
     console.log('Making request to:', input);
-    
+
     // 可以添加重试、超时等逻辑
     return fetch(input, init);
-  }
+  },
 });
 ```
 
@@ -264,7 +268,7 @@ const pending = client.getPendingSubRAV();
 if (pending) {
   console.log('Next payment will be:', {
     nonce: pending.nonce.toString(),
-    amount: pending.accumulatedAmount.toString()
+    amount: pending.accumulatedAmount.toString(),
   });
 }
 
@@ -315,8 +319,8 @@ console.log('SubRAV committed:', result.success);
 
 ## 与现有组件的关系
 
-| 角色 | 组件 | 说明 |
-|------|------|------|
-| Payer 业务代码 | **PaymentChannelHttpClient** | HTTP 交互与支付头封装 |
-| Payer 支付逻辑 | `PaymentChannelPayerClient` | 链无关支付操作 |
-| Payee 服务端 | `ExpressPaymentKit` | 服务端中间件与恢复路由 |
+| 角色           | 组件                         | 说明                   |
+| -------------- | ---------------------------- | ---------------------- |
+| Payer 业务代码 | **PaymentChannelHttpClient** | HTTP 交互与支付头封装  |
+| Payer 支付逻辑 | `PaymentChannelPayerClient`  | 链无关支付操作         |
+| Payee 服务端   | `ExpressPaymentKit`          | 服务端中间件与恢复路由 |

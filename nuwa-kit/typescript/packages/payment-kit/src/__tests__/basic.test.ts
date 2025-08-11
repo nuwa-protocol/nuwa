@@ -1,13 +1,13 @@
 /**
  * Basic functionality tests for Payment Kit
- * 
+ *
  * These tests verify core functionality without requiring external dependencies
  * like databases or blockchain connections.
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { 
-  SubRAVCodec, 
+import {
+  SubRAVCodec,
   SubRAVValidator,
   HttpPaymentCodec,
   generateNonce,
@@ -159,4 +159,4 @@ describe('Payment Kit Basic Tests', () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
   });
-}); 
+});

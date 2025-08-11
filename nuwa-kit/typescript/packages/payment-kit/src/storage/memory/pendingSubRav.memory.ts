@@ -25,7 +25,7 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
   async find(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SubRAV | null> {
     const key = this.getKey(channelId, vmIdFragment, nonce);
     const entry = this.proposals.get(key);
-    
+
     if (!entry) {
       return null;
     }
@@ -98,4 +98,4 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
   async clear(): Promise<void> {
     this.proposals.clear();
   }
-} 
+}

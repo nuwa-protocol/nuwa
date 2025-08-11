@@ -13,13 +13,9 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
   try {
     const internalReq = req as InternalRecoveryRequest;
     if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
-      throw new PaymentKitError(
-        ErrorCode.UNAUTHORIZED,
-        'DID authentication required',
-        401
-      );
+      throw new PaymentKitError(ErrorCode.UNAUTHORIZED, 'DID authentication required', 401);
     }
-    
+
     const clientDid = internalReq.didInfo.did;
 
     // Derive channelId deterministically using ChannelUtils
@@ -43,9 +39,9 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
     const response: RecoveryResponse = {
       channel: channel ?? null,
       pendingSubRav: pending ?? null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     return createSuccessResponse(response);
   } catch (error) {
     if (error instanceof PaymentKitError) {

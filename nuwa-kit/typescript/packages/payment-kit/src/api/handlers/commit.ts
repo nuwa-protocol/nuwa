@@ -8,25 +8,20 @@ import type { CommitResponse, CommitRequest } from '../../schema';
  * Handle commit endpoint requests
  * Requires DID authentication
  */
-export const handleCommit: Handler<ApiContext, CommitRequest, CommitResponse> = async (ctx, req) => {
+export const handleCommit: Handler<ApiContext, CommitRequest, CommitResponse> = async (
+  ctx,
+  req
+) => {
   try {
     if (!req.subRav) {
-      throw new PaymentKitError(
-        ErrorCode.BAD_REQUEST,
-        'subRav required',
-        400
-      );
+      throw new PaymentKitError(ErrorCode.BAD_REQUEST, 'subRav required', 400);
     }
 
     try {
       await ctx.payeeClient.processSignedSubRAV(req.subRav);
       return createSuccessResponse({ success: true });
     } catch (e) {
-      throw new PaymentKitError(
-        ErrorCode.CONFLICT,
-        (e as Error).message,
-        409
-      );
+      throw new PaymentKitError(ErrorCode.CONFLICT, (e as Error).message, 409);
     }
   } catch (error) {
     if (error instanceof PaymentKitError) {

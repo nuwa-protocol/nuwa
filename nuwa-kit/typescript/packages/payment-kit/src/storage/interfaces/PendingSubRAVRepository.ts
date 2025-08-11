@@ -51,4 +51,4 @@ export interface PendingSubRAVRepository {
    * Clear all pending proposals (for testing/cleanup)
    */
   clear(): Promise<void>;
-} 
+}

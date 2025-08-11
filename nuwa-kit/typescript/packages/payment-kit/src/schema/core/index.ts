@@ -5,8 +5,8 @@ import { LosslessNumber } from 'lossless-json';
  * Helper to create a schema that accepts either BigInt, string, number, or LosslessNumber
  * and transforms it to BigInt for our internal use
  */
-export const createBigIntSchema = () => z
-  .union([
+export const createBigIntSchema = () =>
+  z.union([
     z.bigint(),
     z.string().transform(BigInt),
     z.number().transform(BigInt),
@@ -249,12 +249,12 @@ export const ErrorCodeSchema = z.enum([
   // Authentication & Authorization
   'UNAUTHORIZED',
   'FORBIDDEN',
-  
+
   // Payment related
   'PAYMENT_REQUIRED',
   'INSUFFICIENT_FUNDS',
   'CONFLICT',
-  
+
   // General errors
   'NOT_FOUND',
   'BAD_REQUEST',

@@ -1,8 +1,6 @@
 import { BillingRule, Strategy, StrategyConfig } from './types';
 
-export type StrategyBuilder<T extends StrategyConfig = StrategyConfig> = (
-  cfg: T,
-) => Strategy;
+export type StrategyBuilder<T extends StrategyConfig = StrategyConfig> = (cfg: T) => Strategy;
 
 const registry = new Map<string, StrategyBuilder>();
 // Use WeakMap keyed by BillingRule object reference to avoid collisions when
@@ -32,7 +30,9 @@ export function getStrategy(rule: BillingRule): Strategy {
 
   const builder = registry.get(rule.strategy.type);
   if (!builder) {
-    throw new Error(`Unknown billing strategy type '${rule.strategy.type}'. Make sure it has been registered.`);
+    throw new Error(
+      `Unknown billing strategy type '${rule.strategy.type}'. Make sure it has been registered.`
+    );
   }
 
   const strategy = builder(rule.strategy);

@@ -7,7 +7,7 @@ import { RateProvider, ConversionResult, RateProviderError, RateResult } from '.
 export async function convertUsdToAsset(
   usdCost: bigint,
   assetId: string,
-  rateProvider: RateProvider,
+  rateProvider: RateProvider
 ): Promise<ConversionResult> {
   if (usdCost === 0n) {
     return {
@@ -50,10 +50,7 @@ export async function convertUsdToAsset(
 /**
  * Convert using a pre-fetched price (synchronous, no I/O)
  */
-export function convertUsdToAssetUsingPrice(
-  usdCost: bigint,
-  rate: RateResult,
-): ConversionResult {
+export function convertUsdToAssetUsingPrice(usdCost: bigint, rate: RateResult): ConversionResult {
   if (usdCost === 0n) {
     return {
       assetCost: 0n,
@@ -66,7 +63,11 @@ export function convertUsdToAssetUsingPrice(
   }
 
   if (rate.price <= 0n) {
-    throw new RateProviderError(`Invalid price for asset ${rate.assetId}: ${rate.price}`, rate.assetId, rate.provider);
+    throw new RateProviderError(
+      `Invalid price for asset ${rate.assetId}: ${rate.price}`,
+      rate.assetId,
+      rate.provider
+    );
   }
 
   const assetCost = (usdCost + rate.price - 1n) / rate.price;

@@ -13,29 +13,35 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
 export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
-      console.log('📋 SubRAV Query: Getting SubRAV for channel:', req.channelId, 'nonce:', req.nonce);
-    }
-    
-    // Check if user is authenticated
-    const internalReq = req as InternalSubRavRequest;
-    if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
-      throw new PaymentKitError(
-        ErrorCode.UNAUTHORIZED,
-        'DID authentication required',
-        401
+      console.log(
+        '📋 SubRAV Query: Getting SubRAV for channel:',
+        req.channelId,
+        'nonce:',
+        req.nonce
       );
     }
 
+    // Check if user is authenticated
+    const internalReq = req as InternalSubRavRequest;
+    if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
+      throw new PaymentKitError(ErrorCode.UNAUTHORIZED, 'DID authentication required', 401);
+    }
+
     const clientDid = internalReq.didInfo.did;
-    
+
     // Derive the expected channelId for this user
     const defaultAssetId = ctx.config.defaultAssetId ?? '0x3::gas_coin::RGas';
     const expectedChannelId = deriveChannelId(clientDid, ctx.config.serviceDid, defaultAssetId);
-    
+
     // Check if user is trying to access their own channel
     if (req.channelId !== expectedChannelId) {
       if (ctx.config.debug) {
-        console.log('❌ SubRAV Query: Access denied. User channel:', expectedChannelId, 'Requested:', req.channelId);
+        console.log(
+          '❌ SubRAV Query: Access denied. User channel:',
+          expectedChannelId,
+          'Requested:',
+          req.channelId
+        );
       }
       throw new PaymentKitError(
         ErrorCode.FORBIDDEN,
@@ -43,47 +49,48 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
         403
       );
     }
-    
+
     // Extract vmIdFragment from DID keyId (format: did:...#fragment)
     // Extract vmIdFragment from DID keyId (format: did:...#fragment)
     const keyParts = internalReq.didInfo.keyId.split('#');
     const vmIdFragment = keyParts.length > 1 ? keyParts[1] : '';
     if (!vmIdFragment) {
-      throw new PaymentKitError(
-        ErrorCode.BAD_REQUEST,
-        'Invalid DID keyId: missing fragment',
-        400
-      );
+      throw new PaymentKitError(ErrorCode.BAD_REQUEST, 'Invalid DID keyId: missing fragment', 400);
     }
-    const subRAV = await ctx.middleware.findPendingProposal(req.channelId, vmIdFragment, BigInt(req.nonce));
-    
+    const subRAV = await ctx.middleware.findPendingProposal(
+      req.channelId,
+      vmIdFragment,
+      BigInt(req.nonce)
+    );
+
     if (subRAV) {
       if (ctx.config.debug) {
         console.log('✅ SubRAV Query: SubRAV found:', subRAV);
       }
-      
+
       return createSuccessResponse(subRAV);
     } else {
       if (ctx.config.debug) {
-        console.log('❌ SubRAV Query: SubRAV not found for channel:', req.channelId, 'nonce:', req.nonce);
+        console.log(
+          '❌ SubRAV Query: SubRAV not found for channel:',
+          req.channelId,
+          'nonce:',
+          req.nonce
+        );
       }
-      
-      throw new PaymentKitError(
-        ErrorCode.NOT_FOUND,
-        'SubRAV not found',
-        404
-      );
+
+      throw new PaymentKitError(ErrorCode.NOT_FOUND, 'SubRAV not found', 404);
     }
   } catch (error) {
     if (error instanceof PaymentKitError) {
       throw error;
     }
-    
+
     if (ctx.config.debug) {
       console.error('❌ SubRAV Query: Failed to get SubRAV:', error);
       console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
-    
+
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
       'Failed to retrieve SubRAV',

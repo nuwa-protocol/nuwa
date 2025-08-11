@@ -1,6 +1,6 @@
 /**
  * SQL Storage Integration Tests
- * 
+ *
  * Tests for PostgreSQL/Supabase implementations of storage repositories
  * Requires a test database to run
  */
@@ -9,7 +9,10 @@ import { jest, describe, it, expect, beforeAll, afterAll, beforeEach } from '@je
 import { Pool } from 'pg';
 import { SqlRAVRepository, type SqlRAVRepositoryOptions } from '../rav.sql';
 import { SqlChannelRepository, type SqlChannelRepositoryOptions } from '../channel.sql';
-import { SqlPendingSubRAVRepository, type SqlPendingSubRAVRepositoryOptions } from '../pendingSubRav.sql';
+import {
+  SqlPendingSubRAVRepository,
+  type SqlPendingSubRAVRepositoryOptions,
+} from '../pendingSubRav.sql';
 import { SubRAVUtils } from '../../../core/SubRav';
 import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../../core/types';
 
@@ -17,31 +20,35 @@ import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../.
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL;
 
 // Test configuration
-const TEST_DB_CONFIG: any = SUPABASE_DB_URL ? {
-  connectionString: SUPABASE_DB_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 3,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,
-  statement_timeout: 60000,
-} : {
-  host: process.env.TEST_DB_HOST || 'localhost',
-  port: parseInt(process.env.TEST_DB_PORT || '5432'),
-  database: process.env.TEST_DB_NAME || 'nuwa_test',
-  user: process.env.TEST_DB_USER || 'postgres',
-  password: process.env.TEST_DB_PASSWORD || 'password',
-  max: 3, // Increase connection pool size
-  idleTimeoutMillis: 30000,
-  // Supabase specific settings
-  // Enable SSL for Supabase hosts
-  ssl: process.env.TEST_DB_HOST?.includes('supabase') ? {
-    rejectUnauthorized: false
-  } : false,
-  // Connection timeout
-  connectionTimeoutMillis: 30000,
-  // Statement timeout
-  statement_timeout: 60000,
-};
+const TEST_DB_CONFIG: any = SUPABASE_DB_URL
+  ? {
+      connectionString: SUPABASE_DB_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 3,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 30000,
+      statement_timeout: 60000,
+    }
+  : {
+      host: process.env.TEST_DB_HOST || 'localhost',
+      port: parseInt(process.env.TEST_DB_PORT || '5432'),
+      database: process.env.TEST_DB_NAME || 'nuwa_test',
+      user: process.env.TEST_DB_USER || 'postgres',
+      password: process.env.TEST_DB_PASSWORD || 'password',
+      max: 3, // Increase connection pool size
+      idleTimeoutMillis: 30000,
+      // Supabase specific settings
+      // Enable SSL for Supabase hosts
+      ssl: process.env.TEST_DB_HOST?.includes('supabase')
+        ? {
+            rejectUnauthorized: false,
+          }
+        : false,
+      // Connection timeout
+      connectionTimeoutMillis: 30000,
+      // Statement timeout
+      statement_timeout: 60000,
+    };
 
 // Check if PostgreSQL is available
 function isPostgreSQLAvailable(): boolean {
@@ -54,15 +61,19 @@ function isPostgreSQLAvailable(): boolean {
   }
 
   // Check if required environment variables are set
-  const hasRequiredEnv = !!(process.env.SUPABASE_DB_URL ||
-                        process.env.TEST_DB_NAME || 
-                        process.env.TEST_DB_HOST || 
-                        process.env.TEST_DB_USER || 
-                        process.env.TEST_DB_PASSWORD);
+  const hasRequiredEnv = !!(
+    process.env.SUPABASE_DB_URL ||
+    process.env.TEST_DB_NAME ||
+    process.env.TEST_DB_HOST ||
+    process.env.TEST_DB_USER ||
+    process.env.TEST_DB_PASSWORD
+  );
 
   if (!hasRequiredEnv) {
     console.log('Skipping SQL tests - no PostgreSQL environment variables configured');
-    console.log('Set SUPABASE_DB_URL, or TEST_DB_NAME/TEST_DB_HOST/TEST_DB_USER/TEST_DB_PASSWORD to enable');
+    console.log(
+      'Set SUPABASE_DB_URL, or TEST_DB_NAME/TEST_DB_HOST/TEST_DB_USER/TEST_DB_PASSWORD to enable'
+    );
     return false;
   }
 
@@ -114,7 +125,7 @@ describe('SQL Storage Repositories', () => {
 
     try {
       pool = new Pool(TEST_DB_CONFIG as any);
-      
+
       // Test connection
       const client = await pool.connect();
       client.release();
@@ -132,7 +143,9 @@ describe('SQL Storage Repositories', () => {
       // Create new instances each time to ensure initialize() runs
       ravRepo = new SqlRAVRepository(repoOptions);
       channelRepo = new SqlChannelRepository(repoOptions as SqlChannelRepositoryOptions);
-      pendingRepo = new SqlPendingSubRAVRepository(repoOptions as SqlPendingSubRAVRepositoryOptions);
+      pendingRepo = new SqlPendingSubRAVRepository(
+        repoOptions as SqlPendingSubRAVRepositoryOptions
+      );
 
       // Wait for tables to be created
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -284,7 +297,7 @@ describe('SQL Storage Repositories', () => {
 
       // Add some RAVs
       await ravRepo.save(testSignedSubRAV);
-      
+
       stats = await ravRepo.getStats();
       expect(stats.totalRAVs).toBe(1);
       expect(stats.unclaimedRAVs).toBe(1);
@@ -294,7 +307,7 @@ describe('SQL Storage Repositories', () => {
       if (!ravRepo) return;
 
       await ravRepo.save(testSignedSubRAV);
-      
+
       // Mark as claimed
       await ravRepo.markAsClaimed(
         testSignedSubRAV.subRav.channelId,
@@ -356,25 +369,25 @@ describe('SQL Storage Repositories', () => {
       expect(retrieved!.status).toBe('closed');
     });
 
-        it('should manage sub-channel states', async () => {
+    it('should manage sub-channel states', async () => {
       if (!channelRepo) return;
 
-          const vmIdFragment = 'key-1';
-        
-          // Initially should be null
-          let state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
-          expect(state).toBeNull();
+      const vmIdFragment = 'key-1';
+
+      // Initially should be null
+      let state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
+      expect(state).toBeNull();
 
       // Update state
-          await channelRepo.updateSubChannelState(testChannel.channelId, vmIdFragment, {
+      await channelRepo.updateSubChannelState(testChannel.channelId, vmIdFragment, {
         lastConfirmedNonce: BigInt(5),
         lastClaimedAmount: BigInt(5000000),
       } as any);
 
       // Verify update
-          state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
-          expect((state as any)!.lastConfirmedNonce).toBe(BigInt(5));
-          expect((state as any)!.lastClaimedAmount).toBe(BigInt(5000000));
+      state = await channelRepo.getSubChannelState(testChannel.channelId, vmIdFragment);
+      expect((state as any)!.lastConfirmedNonce).toBe(BigInt(5));
+      expect((state as any)!.lastClaimedAmount).toBe(BigInt(5000000));
     }, 60000); // 60 second timeout for this specific test
 
     it('should list channels with pagination', async () => {
@@ -440,7 +453,11 @@ describe('SQL Storage Repositories', () => {
 
       await pendingRepo.save(testSubRAV);
 
-      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
+      const found = await pendingRepo.find(
+        testSubRAV.channelId,
+        testSubRAV.vmIdFragment,
+        testSubRAV.nonce
+      );
       expect(found).not.toBeNull();
       expect(found!.channelId).toBe(testSubRAV.channelId);
       expect(found!.nonce).toBe(testSubRAV.nonce);
@@ -450,16 +467,24 @@ describe('SQL Storage Repositories', () => {
       if (!pendingRepo) return;
 
       await pendingRepo.save(testSubRAV);
-      
+
       // Verify it exists
-      let found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
+      let found = await pendingRepo.find(
+        testSubRAV.channelId,
+        testSubRAV.vmIdFragment,
+        testSubRAV.nonce
+      );
       expect(found).not.toBeNull();
 
       // Remove it
       await pendingRepo.remove(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
 
       // Verify it's gone
-      found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
+      found = await pendingRepo.find(
+        testSubRAV.channelId,
+        testSubRAV.vmIdFragment,
+        testSubRAV.nonce
+      );
       expect(found).toBeNull();
     });
 
@@ -495,7 +520,11 @@ describe('SQL Storage Repositories', () => {
       expect(deletedCount).toBe(1);
 
       // Verify it's gone
-      const found = await pendingRepo.find(testSubRAV.channelId, testSubRAV.vmIdFragment, testSubRAV.nonce);
+      const found = await pendingRepo.find(
+        testSubRAV.channelId,
+        testSubRAV.vmIdFragment,
+        testSubRAV.nonce
+      );
       expect(found).toBeNull();
     });
   });
@@ -531,4 +560,4 @@ describe('SQL Storage Repositories', () => {
 // Helper to run SQL tests conditionally
 export function runSqlTests(): boolean {
   return isPostgreSQLAvailable();
-} 
+}

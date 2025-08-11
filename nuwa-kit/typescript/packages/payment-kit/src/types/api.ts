@@ -1,6 +1,6 @@
 /**
  * Framework-level API types for Payment Kit
- * 
+ *
  * This file contains types for the API framework itself (handlers, context, etc.)
  * rather than specific data models which are defined in schema/.
  */
@@ -26,12 +26,12 @@ export const ErrorCode = {
   // Authentication & Authorization
   UNAUTHORIZED: 'UNAUTHORIZED' as const,
   FORBIDDEN: 'FORBIDDEN' as const,
-  
+
   // Payment related
   PAYMENT_REQUIRED: 'PAYMENT_REQUIRED' as const,
   INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS' as const,
   CONFLICT: 'CONFLICT' as const,
-  
+
   // General errors
   NOT_FOUND: 'NOT_FOUND' as const,
   BAD_REQUEST: 'BAD_REQUEST' as const,
@@ -64,5 +64,7 @@ export interface ApiContext {
  * Framework-agnostic handler signature
  * All API handlers must conform to this signature
  */
-export type Handler<Ctx = ApiContext, Req = any, Res = any> =
-  (ctx: Ctx, req: Req) => Promise<ApiResponse<Res>>;
+export type Handler<Ctx = ApiContext, Req = any, Res = any> = (
+  ctx: Ctx,
+  req: Req
+) => Promise<ApiResponse<Res>>;

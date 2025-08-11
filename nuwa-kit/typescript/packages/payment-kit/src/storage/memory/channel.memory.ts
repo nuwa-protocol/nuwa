@@ -5,7 +5,12 @@
 
 import type { ChannelInfo, SubChannelState } from '../../core/types';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
-import type { PaginationParams, ChannelFilter, PaginatedResult, CacheStats } from '../types/pagination';
+import type {
+  PaginationParams,
+  ChannelFilter,
+  PaginatedResult,
+  CacheStats,
+} from '../types/pagination';
 
 export class MemoryChannelRepository implements ChannelRepository {
   private channelMetadata = new Map<string, ChannelInfo>();
@@ -55,7 +60,7 @@ export class MemoryChannelRepository implements ChannelRepository {
     }
 
     const totalCount = channels.length;
-    
+
     // Apply pagination
     const offset = pagination?.offset || 0;
     const limit = pagination?.limit || 50;
@@ -74,15 +79,18 @@ export class MemoryChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+  async getSubChannelState(
+    channelId: string,
+    vmIdFragment: string
+  ): Promise<SubChannelState | null> {
     const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key);
-    
+
     if (existing) {
       this.hitCount++;
       return { ...existing };
     }
-    
+
     this.missCount++;
     return null;
   }
@@ -113,7 +121,7 @@ export class MemoryChannelRepository implements ChannelRepository {
 
   async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>> {
     const result: Record<string, SubChannelState> = {};
-    
+
     for (const [key, state] of this.subChannelStates.entries()) {
       if (key.startsWith(channelId + ':')) {
         // Extract vmIdFragment from the key (format: channelId:vmIdFragment)
@@ -121,7 +129,7 @@ export class MemoryChannelRepository implements ChannelRepository {
         result[vmIdFragment] = { ...state };
       }
     }
-    
+
     return result;
   }
 
@@ -134,7 +142,7 @@ export class MemoryChannelRepository implements ChannelRepository {
 
   async getStats(): Promise<CacheStats> {
     const totalAccess = this.hitCount + this.missCount;
-    
+
     return {
       channelCount: this.channelMetadata.size,
       subChannelCount: this.subChannelStates.size,
@@ -153,7 +161,7 @@ export class MemoryChannelRepository implements ChannelRepository {
   private estimateSize(): number {
     // Rough estimation of memory usage (avoiding BigInt serialization issues)
     let size = 0;
-    
+
     for (const channel of this.channelMetadata.values()) {
       // Simple estimation without JSON.stringify to avoid BigInt issues
       size += channel.channelId.length * 2;
@@ -162,13 +170,13 @@ export class MemoryChannelRepository implements ChannelRepository {
       size += channel.assetId.length * 2;
       size += 100; // Rough estimate for bigint and other fields
     }
-    
+
     for (const state of this.subChannelStates.values()) {
       // Simple estimation without JSON.stringify to avoid BigInt issues
       size += state.channelId.length * 2;
       size += 200; // Rough estimate for bigint fields and numbers
     }
-    
+
     return size;
   }
-} 
+}

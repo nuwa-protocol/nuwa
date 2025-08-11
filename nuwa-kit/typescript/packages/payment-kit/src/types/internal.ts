@@ -3,12 +3,7 @@
  * These types are NOT exported to clients and contain server-side context
  */
 
-import type { 
-  RecoveryRequest, 
-  CommitRequest, 
-  SubRavRequest, 
-  ClaimTriggerRequest 
-} from '../schema';
+import type { RecoveryRequest, CommitRequest, SubRavRequest, ClaimTriggerRequest } from '../schema';
 
 /**
  * Authentication information added by DID authentication middleware

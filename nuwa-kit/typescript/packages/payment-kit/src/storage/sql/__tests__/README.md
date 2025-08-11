@@ -5,12 +5,14 @@ This directory contains comprehensive tests for the SQL storage implementations 
 ## Test Types
 
 ### 1. Unit Tests (`sql-unit.test.ts`)
+
 - **Purpose**: Test business logic and SQL query generation without real database
 - **Dependencies**: None (uses mocked database connections)
 - **Speed**: Fast (~500ms)
 - **Coverage**: SQL repository methods, error handling, parameter validation
 
 ### 2. Integration Tests (`sql-storage.test.ts`)
+
 - **Purpose**: Test actual database operations and data persistence
 - **Dependencies**: PostgreSQL database
 - **Speed**: Medium (~5-10s)
@@ -28,6 +30,7 @@ Use the provided script to run all SQL tests with a temporary database:
 ```
 
 This script will:
+
 1. Start a PostgreSQL test database using Docker
 2. Run all SQL-related tests
 3. Clean up the test environment
@@ -37,10 +40,11 @@ This script will:
 #### Prerequisites
 
 1. **PostgreSQL Database**:
+
    ```bash
    # Option 1: Docker Compose (recommended)
    docker-compose -f docker-compose.test.yml up -d postgres-test
-   
+
    # Option 2: Local PostgreSQL installation
    createdb nuwa_test
    ```
@@ -83,11 +87,11 @@ For continuous integration, use the provided setup:
 - name: Start PostgreSQL
   run: |
     docker-compose -f docker-compose.test.yml up -d postgres-test
-    
+
 - name: Wait for PostgreSQL
   run: |
     timeout 60 bash -c 'until docker-compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U test_user -d nuwa_test; do sleep 2; done'
-    
+
 - name: Run SQL tests
   run: npm test -- --testPathPattern="sql.*test"
   env:
@@ -102,18 +106,19 @@ For continuous integration, use the provided setup:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TEST_DB_HOST` | `localhost` | PostgreSQL host |
-| `TEST_DB_PORT` | `5433` | PostgreSQL port |
-| `TEST_DB_NAME` | `nuwa_test` | Test database name |
-| `TEST_DB_USER` | `test_user` | Database user |
-| `TEST_DB_PASSWORD` | `test_password` | Database password |
-| `SKIP_SQL_TESTS` | `false` | Skip SQL tests entirely |
+| Variable           | Default         | Description             |
+| ------------------ | --------------- | ----------------------- |
+| `TEST_DB_HOST`     | `localhost`     | PostgreSQL host         |
+| `TEST_DB_PORT`     | `5433`          | PostgreSQL port         |
+| `TEST_DB_NAME`     | `nuwa_test`     | Test database name      |
+| `TEST_DB_USER`     | `test_user`     | Database user           |
+| `TEST_DB_PASSWORD` | `test_password` | Database password       |
+| `SKIP_SQL_TESTS`   | `false`         | Skip SQL tests entirely |
 
 ### Test Database Schema
 
 The tests use the same schema as production but with a `test_` prefix for table names:
+
 - `test_ravs` - Signed SubRAV storage
 - `test_claims` - Claim tracking
 - `test_channels` - Channel metadata
@@ -123,6 +128,7 @@ The tests use the same schema as production but with a `test_` prefix for table 
 ## Test Scenarios
 
 ### RAV Repository Tests
+
 - ✅ Save and retrieve signed SubRAVs with BCS serialization
 - ✅ Handle multiple RAVs per channel/VM fragment
 - ✅ Track claimed vs unclaimed RAVs
@@ -130,18 +136,21 @@ The tests use the same schema as production but with a `test_` prefix for table 
 - ✅ Concurrent access and transaction safety
 
 ### Channel Repository Tests
+
 - ✅ Channel metadata CRUD operations
 - ✅ Sub-channel state management
 - ✅ Pagination and filtering
 - ✅ Concurrent updates and consistency
 
 ### Pending SubRAV Repository Tests
+
 - ✅ Temporary proposal storage
 - ✅ Automatic cleanup of expired proposals
 - ✅ Statistics and monitoring
 - ✅ JSON serialization integrity
 
 ### Error Handling Tests
+
 - ✅ Database connection failures
 - ✅ Transaction rollbacks
 - ✅ Resource cleanup (connection pooling)
@@ -150,12 +159,14 @@ The tests use the same schema as production but with a `test_` prefix for table 
 ## Performance Benchmarks
 
 The tests include performance benchmarks for:
+
 - Bulk RAV insertion (1000+ records)
 - Large-scale pagination queries
 - Complex filtering operations
 - Cleanup operations on large datasets
 
 Example performance targets:
+
 - Save 1000 RAVs: < 2 seconds
 - Query with pagination: < 100ms
 - Statistics calculation: < 500ms
@@ -163,12 +174,14 @@ Example performance targets:
 ## Debugging
 
 ### Enable SQL Query Logging
+
 ```bash
 export DEBUG=nuwa:sql
 npm test -- --testPathPattern="sql.*test"
 ```
 
 ### Test Database Inspection
+
 ```bash
 # Connect to test database
 docker-compose -f docker-compose.test.yml exec postgres-test psql -U test_user -d nuwa_test
@@ -183,11 +196,13 @@ SELECT * FROM test_ravs LIMIT 5;
 ### Common Issues
 
 1. **Database connection timeout**:
+
    - Ensure PostgreSQL is running
    - Check firewall and network settings
    - Verify connection parameters
 
 2. **Permission errors**:
+
    - Ensure database user has CREATE/DROP privileges
    - Check password authentication
 
@@ -205,6 +220,7 @@ When adding new SQL storage features:
 4. **Add performance benchmarks** for operations handling large datasets
 
 Example test structure:
+
 ```typescript
 describe('NewFeature', () => {
   it('should handle basic operations', async () => {
@@ -213,15 +229,15 @@ describe('NewFeature', () => {
     // Verify results
     // Check side effects
   });
-  
+
   it('should handle edge cases', async () => {
     // Test boundary conditions
     // Test error scenarios
   });
-  
+
   it('should maintain data consistency', async () => {
     // Test concurrent operations
     // Verify transaction isolation
   });
 });
-``` 
+```

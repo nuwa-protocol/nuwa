@@ -9,5 +9,3 @@ export * from './api';
 
 // Node-only: SQL storage aggregator (provided via subpath as well)
 export * from './storage/sql';
-
-

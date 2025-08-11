@@ -23,9 +23,9 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
         channelEpoch: 0n, // BigInt
         vmIdFragment: 'account-key',
         accumulatedAmount: 1000000000n, // BigInt - 1 RGas
-        nonce: 5n // BigInt
+        nonce: 5n, // BigInt
       },
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
 
     const host = 'test.example.com';
@@ -66,7 +66,7 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
   test('should handle states without pendingSubRAV', async () => {
     const testState: PersistedHttpClientState = {
       channelId: 'test-channel-456',
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
 
     const host = 'test2.example.com';
@@ -104,7 +104,7 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
     const host = 'legacy.example.com';
 
     await store.setState(host, testState);
-    
+
     // 验证 legacy get 方法也能获取到 channelId
     const legacyChannelId = await store.get(host);
     expect(legacyChannelId).toBe(testState.channelId);

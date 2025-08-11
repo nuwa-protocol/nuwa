@@ -1,19 +1,13 @@
 /**
  * Chain-agnostic Payment Channel Payer Client
- * 
+ *
  * This client provides a unified interface for payment channel operations
  * from the Payer perspective, using the IPaymentChannelContract abstraction.
  */
 
+import type { AssetInfo, SubChannelState, ChannelInfo, SignedSubRAV, SubRAV } from '../core/types';
 import type {
-  AssetInfo,
-  SubChannelState,
-  ChannelInfo,
-  SignedSubRAV,
-  SubRAV,
-} from '../core/types';
-import type { 
-  IPaymentChannelContract, 
+  IPaymentChannelContract,
   OpenChannelResult,
   OpenChannelParams as ContractOpenChannelParams,
   OpenChannelWithSubChannelParams as ContractOpenChannelWithSubChannelParams,
@@ -60,12 +54,12 @@ export interface SignSubRAVOptions {
 
 /**
  * Chain-agnostic Payment Channel Payer Client
- * 
+ *
  * Provides high-level APIs for payment channel operations from the Payer perspective:
  * - Opening channels and authorizing sub-channels
  * - Generating and managing SubRAVs
  * - Multi-channel support with flexible switching
- * 
+ *
  * Uses composite keys (channelId:keyId) to avoid conflicts between channels.
  * Supports both single-channel (auto-select first active) and multi-channel usage.
  */
@@ -82,7 +76,7 @@ export class PaymentChannelPayerClient {
     this.contract = options.contract;
     this.signer = options.signer;
     this.keyId = options.keyId;
-    this.defaultAssetId = "0x3::gas_coin::RGas";
+    this.defaultAssetId = '0x3::gas_coin::RGas';
     // Initialize storage
     this.channelRepo = options.storageOptions.channelRepo;
   }
@@ -94,7 +88,7 @@ export class PaymentChannelPayerClient {
    */
   async openChannel(params: PayerOpenChannelParams): Promise<ChannelInfo> {
     const payerDid = await this.signer.getDid();
-    
+
     const openParams: ContractOpenChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
@@ -115,22 +109,24 @@ export class PaymentChannelPayerClient {
 
     // Cache channel metadata using channelId as key
     await this.channelRepo.setChannelMetadata(result.channelId, channelInfo);
-    
+
     // Set as active channel if no active channel is set
     if (!this.activeChannelId) {
       this.activeChannelId = result.channelId;
     }
-    
+
     return channelInfo;
   }
 
   /**
    * Open a payment channel with a sub-channel in one transaction
    */
-  async openChannelWithSubChannel(params: PayerOpenChannelWithSubChannelParams): Promise<OpenChannelResult> {
+  async openChannelWithSubChannel(
+    params: PayerOpenChannelWithSubChannelParams
+  ): Promise<OpenChannelResult> {
     const payerDid = await this.signer.getDid();
     const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
-    
+
     const openParams: ContractOpenChannelWithSubChannelParams = {
       payerDid,
       payeeDid: params.payeeDid,
@@ -174,13 +170,10 @@ export class PaymentChannelPayerClient {
   /**
    * Authorize a sub-channel for an existing channel
    */
-  async authorizeSubChannel(params: {
-    channelId: string;
-    vmIdFragment?: string;
-  }): Promise<void> {
+  async authorizeSubChannel(params: { channelId: string; vmIdFragment?: string }): Promise<void> {
     const payerDid = await this.signer.getDid();
     const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
-    
+
     await this.contract.authorizeSubChannel({
       channelId: params.channelId,
       vmIdFragment: useFragment,
@@ -211,7 +204,7 @@ export class PaymentChannelPayerClient {
     if (metadata.status !== 'active') {
       throw new Error(`Channel ${channelId} is not active (status: ${metadata.status})`);
     }
-    
+
     this.activeChannelId = channelId;
   }
 
@@ -227,10 +220,10 @@ export class PaymentChannelPayerClient {
     // Determine which key to use for signing
     const payerDid = await this.signer.getDid();
     const expectedKeyId = `${payerDid}#${subRAV.vmIdFragment}`;
-    
+
     // Use the keyId that matches the SubRAV's vmIdFragment
     const useKeyId = this.keyId || expectedKeyId;
-    
+
     // Verify that our keyId matches the SubRAV
     const ourFragment = this.extractFragment(useKeyId);
     if (ourFragment !== subRAV.vmIdFragment) {
@@ -243,31 +236,31 @@ export class PaymentChannelPayerClient {
     return signedSubRAV;
   }
 
-
   /**
    * Validate a SubRAV via on chain information
    */
   private async validateSubRAV(subRAV: SubRAV): Promise<void> {
     // 1. Verify channel exists and is active
     const channelInfo = await this.contract.getChannelStatus({ channelId: subRAV.channelId });
-    
+
     // 2. Verify epoch matches
     if (channelInfo.epoch !== subRAV.channelEpoch) {
-      throw new Error(`Epoch mismatch: channel ${channelInfo.epoch}, SubRAV ${subRAV.channelEpoch}`);
+      throw new Error(
+        `Epoch mismatch: channel ${channelInfo.epoch}, SubRAV ${subRAV.channelEpoch}`
+      );
     }
 
     // When the subchannel is created, the nonce is 0
     if (subRAV.nonce === BigInt(0)) {
       throw new Error(`SubRAV nonce cannot be 0`);
     }
-    
+
     const expectedChainId = await this.getChainId();
     if (subRAV.chainId !== expectedChainId) {
       throw new Error(`Chain ID mismatch: expected ${expectedChainId}, got ${subRAV.chainId}`);
     }
   }
 
- 
   /**
    * Get a PaymentHubClient instance that reuses this client's contract and signer
    * This is the recommended way to access payment hub operations
@@ -351,7 +344,7 @@ export class PaymentChannelPayerClient {
   }
 
   // -------- Private Helpers --------
-  
+
   /**
    * Extract fragment from full key ID
    */
@@ -359,5 +352,4 @@ export class PaymentChannelPayerClient {
     const parts = keyId.split('#');
     return parts[parts.length - 1] || keyId;
   }
-
 }

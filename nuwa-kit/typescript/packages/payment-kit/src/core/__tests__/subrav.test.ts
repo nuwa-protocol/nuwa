@@ -3,20 +3,20 @@
  */
 
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { 
-  SubRAVCodec, 
-  SubRAVUtils, 
-  SubRAVValidator, 
+import {
+  SubRAVCodec,
+  SubRAVUtils,
+  SubRAVValidator,
   SubRAVSigner,
   CURRENT_SUBRAV_VERSION,
-  SUBRAV_VERSION_1 
+  SUBRAV_VERSION_1,
 } from '../SubRav';
 import type { SubRAV, SignedSubRAV } from '../types';
 import type { DIDDocument } from '@nuwa-ai/identity-kit';
-import { 
-  TestSignerFactory, 
-  MockDIDResolver, 
-  createTestEnvironment 
+import {
+  TestSignerFactory,
+  MockDIDResolver,
+  createTestEnvironment,
 } from '../../test-helpers/mocks';
 
 describe('SubRAV BCS Serialization', () => {
@@ -38,7 +38,7 @@ describe('SubRAV BCS Serialization', () => {
 
     // Decode back to SubRAV
     const decoded = SubRAVCodec.decode(encoded);
-    
+
     // Verify all fields match
     expect(decoded.version).toBe(sampleSubRAV.version);
     expect(decoded.chainId).toBe(sampleSubRAV.chainId);
@@ -61,7 +61,9 @@ describe('SubRAV BCS Serialization', () => {
     const largeSubRAV: SubRAV = {
       ...sampleSubRAV,
       chainId: BigInt('18446744073709551615'), // max u64
-      accumulatedAmount: BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935'), // max u256
+      accumulatedAmount: BigInt(
+        '115792089237316195423570985008687907853269984665640564039457584007913129639935'
+      ), // max u256
       nonce: BigInt('18446744073709551615'), // max u64
     };
 
@@ -107,63 +109,83 @@ describe('SubRAV Signing and Verification', () => {
   });
 
   test('should sign SubRAV correctly', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
+    const signedSubRAV = await SubRAVSigner.sign(
+      sampleSubRAV,
+      testEnv.payerSigner,
+      testEnv.payerKeyId
+    );
+
     expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
     expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
     expect(signedSubRAV.signature.length).toBe(64);
   });
 
   test('should verify SubRAV with DID document', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
+    const signedSubRAV = await SubRAVSigner.sign(
+      sampleSubRAV,
+      testEnv.payerSigner,
+      testEnv.payerKeyId
+    );
+
     const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
     const isValid = await SubRAVSigner.verify(signedSubRAV, {
       didDocument: didDocument!,
     });
-    
+
     expect(isValid).toBe(true);
   });
 
   test('should verify SubRAV with DID resolver', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
+    const signedSubRAV = await SubRAVSigner.sign(
+      sampleSubRAV,
+      testEnv.payerSigner,
+      testEnv.payerKeyId
+    );
+
     const isValid = await SubRAVSigner.verifyWithResolver(
       signedSubRAV,
       testEnv.payerDid,
       testEnv.didResolver
     );
-    
+
     expect(isValid).toBe(true);
   });
 
   test('should reject invalid signature', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
+    const signedSubRAV = await SubRAVSigner.sign(
+      sampleSubRAV,
+      testEnv.payerSigner,
+      testEnv.payerKeyId
+    );
+
     // Modify signature to make it invalid
-    signedSubRAV.signature[0] = signedSubRAV.signature[0] ^ 0xFF;
-    
+    signedSubRAV.signature[0] = signedSubRAV.signature[0] ^ 0xff;
+
     const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
     const isValid = await SubRAVSigner.verify(signedSubRAV, {
       didDocument: didDocument!,
     });
-    
+
     expect(isValid).toBe(false);
   });
 
   test('should handle verification errors gracefully', async () => {
-    const signedSubRAV = await SubRAVSigner.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
+    const signedSubRAV = await SubRAVSigner.sign(
+      sampleSubRAV,
+      testEnv.payerSigner,
+      testEnv.payerKeyId
+    );
+
     const emptyDIDDoc: DIDDocument = {
       '@context': ['https://www.w3.org/ns/did/v1'],
       id: testEnv.payerDid,
-      verificationMethod: [] // Empty verification methods
+      verificationMethod: [], // Empty verification methods
     };
-    
+
     const isValid = await SubRAVSigner.verify(signedSubRAV, {
       didDocument: emptyDIDDoc,
     });
-    
+
     expect(isValid).toBe(false);
   });
 });
@@ -268,4 +290,4 @@ describe('SubRAVValidator', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('Accumulated amount cannot decrease'))).toBe(true);
   });
-}); 
+});

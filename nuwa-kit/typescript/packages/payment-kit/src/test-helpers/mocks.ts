@@ -1,12 +1,12 @@
 /**
  * Test helper module with mock implementations for payment channel testing
- * 
+ *
  * This module provides reusable mock implementations that can be used across
  * different test suites to ensure consistent testing behavior.
  */
 
-import type { 
-  IPaymentChannelContract, 
+import type {
+  IPaymentChannelContract,
   OpenChannelResult,
   AuthorizeSubChannelParams,
   ClaimParams,
@@ -50,7 +50,7 @@ export class MockContract implements IPaymentChannelContract {
       status: 'active',
     };
     this.channels.set(channelId, channelInfo);
-    
+
     return {
       channelId,
       txHash: `tx-${channelId}-${Date.now()}`,
@@ -93,7 +93,7 @@ export class MockContract implements IPaymentChannelContract {
     const balanceKey = `${params.ownerDid}:${params.assetId}`;
     const currentBalance = this.hubBalances.get(balanceKey) || BigInt(0);
     this.hubBalances.set(balanceKey, currentBalance + params.amount);
-    
+
     return {
       txHash: `deposit-tx-${Date.now()}`,
       blockHeight: BigInt(500),
@@ -104,14 +104,14 @@ export class MockContract implements IPaymentChannelContract {
     // Update hub balance for testing
     const balanceKey = `${params.ownerDid}:${params.assetId}`;
     const currentBalance = this.hubBalances.get(balanceKey) || BigInt(0);
-    
+
     const withdrawAmount = params.amount === BigInt(0) ? currentBalance : params.amount;
     if (currentBalance < withdrawAmount) {
       throw new Error(`Insufficient balance: have ${currentBalance}, need ${withdrawAmount}`);
     }
-    
+
     this.hubBalances.set(balanceKey, currentBalance - withdrawAmount);
-    
+
     return {
       txHash: `withdraw-tx-${Date.now()}`,
       blockHeight: BigInt(600),
@@ -125,14 +125,14 @@ export class MockContract implements IPaymentChannelContract {
 
   async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
     const balances: Record<string, bigint> = {};
-    
+
     for (const [key, balance] of this.hubBalances.entries()) {
       if (key.startsWith(`${ownerDid}:`)) {
         const assetId = key.substring(ownerDid.length + 1);
         balances[assetId] = balance;
       }
     }
-    
+
     return balances;
   }
 
@@ -218,13 +218,13 @@ export class MockDIDResolver implements DIDResolver {
     // Generate real verification methods from the signer's keys
     const keyIds = await signer.listKeyIds();
     const verificationMethod = [];
-    
+
     for (const keyId of keyIds) {
       const keyInfo = await signer.getKeyInfo(keyId);
       if (keyInfo) {
         // Convert public key to multibase format (simplified for testing)
         const publicKeyMultibase = this.uint8ArrayToMultibase(keyInfo.publicKey);
-        
+
         verificationMethod.push({
           id: keyId,
           type: this.keyTypeToVerificationMethodType(keyInfo.type),
@@ -287,21 +287,24 @@ export class TestSignerFactory {
    * @param keyFragment Optional key fragment (defaults to 'account-key')
    * @returns Configured KeyStoreSigner and the key ID
    */
-  async createSigner(did: string, keyFragment: string = 'account-key'): Promise<{
+  async createSigner(
+    did: string,
+    keyFragment: string = 'account-key'
+  ): Promise<{
     signer: KeyStoreSigner;
     keyId: string;
     didResolver: MockDIDResolver;
   }> {
     const keyStore = new MemoryKeyStore();
     const signer = new KeyStoreSigner(keyStore, did);
-    
+
     // Use KeyManager to generate keys
     const keyManager = new KeyManager({
       store: keyStore,
       did,
       defaultKeyType: KeyType.ED25519,
     });
-    
+
     // Generate a key for the signer
     const storedKey = await keyManager.generateKey(keyFragment, KeyType.ED25519);
     const keyId = storedKey.keyId;
@@ -377,10 +380,10 @@ export async function createTestEnvironment(testId?: string): Promise<{
   const id = testId || createTestId();
   const payerDid = `did:test:payer-${id}`;
   const payeeDid = `did:test:payee-${id}`;
-  
+
   const contract = new MockContract();
   const signerFactory = new TestSignerFactory();
-  
+
   const signerPair = await signerFactory.createSignerPair(payerDid, payeeDid);
 
   return {
@@ -395,4 +398,4 @@ export async function createTestEnvironment(testId?: string): Promise<{
     didResolver: signerPair.didResolver,
     asset: TEST_ASSET,
   };
-} 
+}

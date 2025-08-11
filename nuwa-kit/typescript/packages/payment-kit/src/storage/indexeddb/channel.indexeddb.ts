@@ -1,10 +1,15 @@
- /**
+/**
  * Browser IndexedDB-based ChannelRepository implementation
  */
 
 import type { ChannelInfo, SubChannelState } from '../../core/types';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
-import type { PaginationParams, ChannelFilter, PaginatedResult, CacheStats } from '../types/pagination';
+import type {
+  PaginationParams,
+  ChannelFilter,
+  PaginatedResult,
+  CacheStats,
+} from '../types/pagination';
 
 export class IndexedDBChannelRepository implements ChannelRepository {
   private dbName = 'nuwa-payment-kit-channels';
@@ -13,13 +18,13 @@ export class IndexedDBChannelRepository implements ChannelRepository {
   private async getDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
-      
+
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
-      
-      request.onupgradeneeded = (event) => {
+
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
-        
+
         // Channel metadata store
         if (!db.objectStoreNames.contains('channels')) {
           const store = db.createObjectStore('channels', { keyPath: 'channelId' });
@@ -27,11 +32,11 @@ export class IndexedDBChannelRepository implements ChannelRepository {
           store.createIndex('payeeDid', 'payeeDid', { unique: false });
           store.createIndex('status', 'status', { unique: false });
         }
-        
+
         // Sub-channel states store
         if (!db.objectStoreNames.contains('subChannelStates')) {
-          const store = db.createObjectStore('subChannelStates', { 
-            keyPath: ['channelId', 'vmIdFragment'] 
+          const store = db.createObjectStore('subChannelStates', {
+            keyPath: ['channelId', 'vmIdFragment'],
           });
           store.createIndex('channelId', 'channelId', { unique: false });
         }
@@ -45,7 +50,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readonly');
     const store = tx.objectStore('channels');
-    
+
     return new Promise((resolve, reject) => {
       const request = store.get(channelId);
       request.onsuccess = () => resolve(request.result || null);
@@ -57,7 +62,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readwrite');
     const store = tx.objectStore('channels');
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.put({ ...metadata, channelId });
       request.onsuccess = () => resolve();
@@ -72,17 +77,17 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readonly');
     const store = tx.objectStore('channels');
-    
+
     const channels: ChannelInfo[] = [];
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.openCursor();
-      
+
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
           const channel = cursor.value as ChannelInfo;
-          
+
           // Apply filters
           let includeChannel = true;
           if (filter) {
@@ -95,22 +100,22 @@ export class IndexedDBChannelRepository implements ChannelRepository {
             // if (filter.createdAfter && channel.createdAt < filter.createdAfter) includeChannel = false;
             // if (filter.createdBefore && channel.createdAt > filter.createdBefore) includeChannel = false;
           }
-          
+
           if (includeChannel) {
             channels.push(channel);
           }
-          
+
           cursor.continue();
         } else {
           resolve();
         }
       };
-      
+
       request.onerror = () => reject(request.error);
     });
 
     const totalCount = channels.length;
-    
+
     // Apply pagination
     const offset = pagination?.offset || 0;
     const limit = pagination?.limit || 50;
@@ -127,7 +132,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['channels'], 'readwrite');
     const store = tx.objectStore('channels');
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.delete(channelId);
       request.onsuccess = () => resolve();
@@ -137,25 +142,32 @@ export class IndexedDBChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+  async getSubChannelState(
+    channelId: string,
+    vmIdFragment: string
+  ): Promise<SubChannelState | null> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readonly');
     const store = tx.objectStore('subChannelStates');
-    
+
     const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
       const request = store.get([channelId, vmIdFragment]);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
-    
+
     if (existing) {
       return {
         ...existing,
-        lastConfirmedNonce: BigInt((existing as any).lastConfirmedNonce ?? (existing as any).nonce ?? 0),
-        lastClaimedAmount: BigInt((existing as any).lastClaimedAmount ?? (existing as any).accumulatedAmount ?? 0),
+        lastConfirmedNonce: BigInt(
+          (existing as any).lastConfirmedNonce ?? (existing as any).nonce ?? 0
+        ),
+        lastClaimedAmount: BigInt(
+          (existing as any).lastClaimedAmount ?? (existing as any).accumulatedAmount ?? 0
+        ),
       } as any;
     }
-    
+
     return null;
   }
 
@@ -167,7 +179,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readwrite');
     const store = tx.objectStore('subChannelStates');
-    
+
     // Get existing state first
     const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
       const request = store.get([channelId, vmIdFragment]);
@@ -175,14 +187,16 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       request.onerror = () => reject(request.error);
     });
 
-    const baseState = existing || {
-      channelId,
-      vmIdFragment,
-      epoch: BigInt(0),
-      lastConfirmedNonce: BigInt(0),
-      lastClaimedAmount: BigInt(0),
-      lastUpdated: Date.now(),
-    } as any;
+    const baseState =
+      existing ||
+      ({
+        channelId,
+        vmIdFragment,
+        epoch: BigInt(0),
+        lastConfirmedNonce: BigInt(0),
+        lastClaimedAmount: BigInt(0),
+        lastUpdated: Date.now(),
+      } as any);
 
     const updated = {
       ...baseState,
@@ -191,8 +205,14 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       vmIdFragment,
       lastUpdated: Date.now(),
       // Convert bigints to strings for storage
-      lastConfirmedNonce: (updates as any).lastConfirmedNonce?.toString() || (baseState as any).lastConfirmedNonce?.toString() || '0',
-      lastClaimedAmount: (updates as any).lastClaimedAmount?.toString() || (baseState as any).lastClaimedAmount?.toString() || '0',
+      lastConfirmedNonce:
+        (updates as any).lastConfirmedNonce?.toString() ||
+        (baseState as any).lastConfirmedNonce?.toString() ||
+        '0',
+      lastClaimedAmount:
+        (updates as any).lastClaimedAmount?.toString() ||
+        (baseState as any).lastClaimedAmount?.toString() ||
+        '0',
     };
 
     await new Promise<void>((resolve, reject) => {
@@ -207,12 +227,12 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const tx = db.transaction(['subChannelStates'], 'readonly');
     const store = tx.objectStore('subChannelStates');
     const index = store.index('channelId');
-    
+
     const result: Record<string, SubChannelState> = {};
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = index.openCursor(IDBKeyRange.only(channelId));
-      
+
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor) {
@@ -220,17 +240,19 @@ export class IndexedDBChannelRepository implements ChannelRepository {
           result[state.vmIdFragment] = {
             ...state,
             lastConfirmedNonce: BigInt((state as any).lastConfirmedNonce ?? state.nonce ?? 0),
-            lastClaimedAmount: BigInt((state as any).lastClaimedAmount ?? state.accumulatedAmount ?? 0),
+            lastClaimedAmount: BigInt(
+              (state as any).lastClaimedAmount ?? state.accumulatedAmount ?? 0
+            ),
           } as any;
           cursor.continue();
         } else {
           resolve();
         }
       };
-      
+
       request.onerror = () => reject(request.error);
     });
-    
+
     return result;
   }
 
@@ -238,7 +260,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readwrite');
     const store = tx.objectStore('subChannelStates');
-    
+
     await new Promise<void>((resolve, reject) => {
       const request = store.delete([channelId, vmIdFragment]);
       request.onsuccess = () => resolve();
@@ -250,12 +272,12 @@ export class IndexedDBChannelRepository implements ChannelRepository {
 
   async getStats(): Promise<CacheStats> {
     const db = await this.getDB();
-    
+
     const channelCount = await new Promise<number>((resolve, reject) => {
       const tx = db.transaction(['channels'], 'readonly');
       const store = tx.objectStore('channels');
       const request = store.count();
-      
+
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -264,7 +286,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
       const tx = db.transaction(['subChannelStates'], 'readonly');
       const store = tx.objectStore('subChannelStates');
       const request = store.count();
-      
+
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -280,7 +302,7 @@ export class IndexedDBChannelRepository implements ChannelRepository {
   async clear(): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['channels', 'subChannelStates'], 'readwrite');
-    
+
     await Promise.all([
       new Promise<void>((resolve, reject) => {
         const request = tx.objectStore('channels').clear();

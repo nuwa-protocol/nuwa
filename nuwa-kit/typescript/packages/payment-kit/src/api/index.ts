@@ -11,12 +11,12 @@ import {
   handleAdminClaims,
   handleAdminClaimTrigger,
   handleAdminCleanup,
-  handleSubRavQuery
+  handleSubRavQuery,
 } from './handlers';
 
 import { createValidatedHandler } from './utils';
-import { 
-  RecoveryRequestSchema, 
+import {
+  RecoveryRequestSchema,
   RecoveryResponseSchema,
   CommitRequestSchema,
   CommitResponseSchema,
@@ -53,7 +53,6 @@ export interface ApiHandlerConfig {
 export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   // Note: Discovery endpoint is handled directly in ExpressPaymentKit at root level
   // to comply with well-known URI RFC specifications
-  
 
   // Core payment operations
   recovery: {
@@ -67,9 +66,9 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'GET',
     path: '/recovery',
     options: { pricing: '0', authRequired: true },
-    description: 'Recover channel state and pending SubRAV'
+    description: 'Recover channel state and pending SubRAV',
   },
-  
+
   commit: {
     handler: createValidatedHandler({
       schema: {
@@ -81,9 +80,9 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'POST',
     path: '/commit',
     options: { pricing: '0', authRequired: true },
-    description: 'Commit a signed SubRAV to the service'
+    description: 'Commit a signed SubRAV to the service',
   },
-  
+
   // System operations
   health: {
     handler: createValidatedHandler({
@@ -96,7 +95,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'GET',
     path: '/health',
     options: { pricing: '0', authRequired: false },
-    description: 'Health check endpoint (public)'
+    description: 'Health check endpoint (public)',
   },
 
   subravQuery: {
@@ -110,9 +109,9 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'GET',
     path: '/subrav',
     options: { pricing: '0', authRequired: true },
-    description: 'Get SubRAV details (requires auth, users can only query their own)'
+    description: 'Get SubRAV details (requires auth, users can only query their own)',
   },
-  
+
   // Admin operations
   adminClaims: {
     handler: createValidatedHandler({
@@ -125,7 +124,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'GET',
     path: '/admin/claims',
     options: { pricing: '0', adminOnly: true },
-    description: 'Get claims status and statistics (admin only)'
+    description: 'Get claims status and statistics (admin only)',
   },
 
   adminClaimTrigger: {
@@ -139,7 +138,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'POST',
     path: '/admin/claim-trigger',
     options: { pricing: '0', adminOnly: true },
-    description: 'Manually trigger claim for a specific channel (admin only)'
+    description: 'Manually trigger claim for a specific channel (admin only)',
   },
 
   adminCleanup: {
@@ -153,7 +152,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     method: 'POST',
     path: '/admin/cleanup',
     options: { pricing: '0', adminOnly: true },
-    description: 'Clean up old processed SubRAVs (admin only)'
+    description: 'Clean up old processed SubRAVs (admin only)',
   },
 } as const;
 

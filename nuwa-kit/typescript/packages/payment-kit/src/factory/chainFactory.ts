@@ -1,14 +1,20 @@
 /**
  * Chain Factory for Payment Channel Contracts
- * 
+ *
  * Provides factory methods to create chain-specific contract implementations
  * and payment channel clients based on configuration.
  */
 
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../contracts/IPaymentChannelContract';
-import { PaymentChannelPayerClient, type PaymentChannelPayerClientOptions } from '../client/PaymentChannelPayerClient';
-import { RoochPaymentChannelContract, type RoochContractOptions } from '../rooch/RoochPaymentChannelContract';
+import {
+  PaymentChannelPayerClient,
+  type PaymentChannelPayerClientOptions,
+} from '../client/PaymentChannelPayerClient';
+import {
+  RoochPaymentChannelContract,
+  type RoochContractOptions,
+} from '../rooch/RoochPaymentChannelContract';
 
 /**
  * Supported blockchain networks
@@ -57,7 +63,7 @@ export class PaymentChannelFactory {
           contractAddress: config.contractAddress,
           debug: config.debug,
         });
-      
+
       default:
         throw new Error(`Unsupported chain: ${(config as any).chain}`);
     }
@@ -68,7 +74,7 @@ export class PaymentChannelFactory {
    */
   static createClient(options: PaymentChannelFactoryOptions): PaymentChannelPayerClient {
     const contract = this.createContract(options.chainConfig);
-    
+
     return new PaymentChannelPayerClient({
       contract,
       signer: options.signer,
@@ -76,12 +82,13 @@ export class PaymentChannelFactory {
       storageOptions: options.storageOptions,
     });
   }
-
 }
 
 /**
  * Convenience function to create a payment channel client
  */
-export function createPaymentChannelClient(options: PaymentChannelFactoryOptions): PaymentChannelPayerClient {
+export function createPaymentChannelClient(
+  options: PaymentChannelFactoryOptions
+): PaymentChannelPayerClient {
   return PaymentChannelFactory.createClient(options);
 }

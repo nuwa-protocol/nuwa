@@ -1,6 +1,6 @@
 /**
  * JSON utilities with BigInt support using lossless-json
- * 
+ *
  * This module provides unified JSON serialization/deserialization
  * that properly handles BigInt values without manual field conversion.
  */
@@ -64,7 +64,11 @@ export async function parseJsonResponse<T = any>(response: Response): Promise<T>
  * Useful for logging and debugging
  */
 export function safeStringify(value: any, space?: string | number): string {
-  return JSON.stringify(value, (key, val) => {
-    return typeof val === 'bigint' ? val.toString() : val;
-  }, space);
+  return JSON.stringify(
+    value,
+    (key, val) => {
+      return typeof val === 'bigint' ? val.toString() : val;
+    },
+    space
+  );
 }

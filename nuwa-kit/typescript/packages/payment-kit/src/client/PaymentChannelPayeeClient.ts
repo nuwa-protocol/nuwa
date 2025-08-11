@@ -1,17 +1,11 @@
 /**
  * Chain-agnostic Payment Channel Payee Client
- * 
+ *
  * This client provides a unified interface for payment channel operations
  * from the Payee perspective, using the IPaymentChannelContract abstraction.
  */
 
-import type {
-  AssetInfo,
-  SubChannelState,
-  ChannelInfo,
-  SignedSubRAV,
-  SubRAV,
-} from '../core/types';
+import type { AssetInfo, SubChannelState, ChannelInfo, SignedSubRAV, SubRAV } from '../core/types';
 import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
@@ -66,13 +60,13 @@ export interface ListChannelsOptions {
 
 /**
  * Chain-agnostic Payment Channel Payee Client
- * 
+ *
  * Provides high-level APIs for payment channel operations from the Payee perspective:
  * - Verifying received SubRAVs
  * - Claiming payments from channels
  * - Managing channel lifecycle from payee side
  * - Monitoring channel states and balances
- * 
+ *
  * This client is designed to be used by service providers who need to:
  * 1. Validate incoming payment receipts (SubRAVs)
  * 2. Submit claims to retrieve payments
@@ -92,8 +86,8 @@ export class PaymentChannelPayeeClient {
     this.contract = options.contract;
     this.signer = options.signer;
     this.didResolver = options.didResolver;
-    this.defaultAssetId = "0x3::gas_coin::RGas";
-    
+    this.defaultAssetId = '0x3::gas_coin::RGas';
+
     // Initialize repositories
     this.channelRepo = options.storageOptions.channelRepo;
     this.ravRepo = options.storageOptions.ravRepo;
@@ -133,7 +127,10 @@ export class PaymentChannelPayeeClient {
    * Get sub-channel state by (channelId, vmIdFragment)
    * If not found locally, try deriving from on-chain and sync into repository.
    */
-  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+  async getSubChannelState(
+    channelId: string,
+    vmIdFragment: string
+  ): Promise<SubChannelState | null> {
     // 1) Try local repository first (no side effects)
     const local = await this.channelRepo.getSubChannelState(channelId, vmIdFragment);
     if (local) return local;
@@ -175,7 +172,7 @@ export class PaymentChannelPayeeClient {
    */
   getPendingSubRAVRepository(): PendingSubRAVRepository {
     return this.pendingSubRAVRepo;
-  } 
+  }
 
   // -------- Claims Management --------
 
@@ -201,7 +198,7 @@ export class PaymentChannelPayeeClient {
    */
   async batchClaimFromChannels(signedSubRAVs: SignedSubRAV[]): Promise<ClaimResult[]> {
     const results: ClaimResult[] = [];
-    
+
     for (const signedSubRAV of signedSubRAVs) {
       try {
         const result = await this.claimFromChannel({ signedSubRAV });
@@ -249,7 +246,10 @@ export class PaymentChannelPayeeClient {
    * Get channel info with caching using ChannelRepository
    * This checks local storage first, then falls back to chain if not found or stale
    */
-  private async getChannelInfoCached(channelId: string, forceRefresh: boolean = false): Promise<ChannelInfo> {
+  private async getChannelInfoCached(
+    channelId: string,
+    forceRefresh: boolean = false
+  ): Promise<ChannelInfo> {
     // Try to get from local storage first (unless forced refresh)
     if (!forceRefresh) {
       const cachedMetadata = await this.channelRepo.getChannelMetadata(channelId);
@@ -258,14 +258,14 @@ export class PaymentChannelPayeeClient {
         return cachedMetadata;
       }
     }
-    
+
     // Fetch from chain and cache
     try {
       const channelInfo = await this.contract.getChannelStatus({ channelId });
-      
+
       // Store in cache as ChannelMetadata
       await this.channelRepo.setChannelMetadata(channelId, channelInfo);
-      
+
       return channelInfo;
     } catch (error) {
       // If chain call fails and we have stale cache, use it
@@ -285,12 +285,12 @@ export class PaymentChannelPayeeClient {
    */
   async listActiveChannels(options: ListChannelsOptions = {}): Promise<ChannelInfo[]> {
     const payeeDid = await this.signer.getDid();
-    
+
     // Get channels from storage first
     const storageResult = await this.channelRepo.listChannelMetadata(
-      { 
-        payeeDid, 
-        status: options.status || 'active' 
+      {
+        payeeDid,
+        status: options.status || 'active',
       },
       {
         offset: options.offset || 0,
@@ -351,7 +351,9 @@ export class PaymentChannelPayeeClient {
   private extractVmIdFragment(keyId: string): string {
     const parts = keyId.split('#');
     if (parts.length !== 2) {
-      throw new Error(`Invalid keyId format: ${keyId}. Expected format: "did:example:payer#fragment"`);
+      throw new Error(
+        `Invalid keyId format: ${keyId}. Expected format: "did:example:payer#fragment"`
+      );
     }
     return parts[1];
   }
@@ -388,36 +390,36 @@ export class PaymentChannelPayeeClient {
     pendingClaims: number;
   }> {
     const issues: string[] = [];
-    
+
     try {
       const channelInfo = await this.getChannelInfoCached(channelId);
-      
+
       // Check if channel is closed
       if (channelInfo.status === 'closed') {
         issues.push('Channel is closed');
       }
-      
+
       // Check if channel is closing
       if (channelInfo.status === 'closing') {
         issues.push('Channel is in closing state');
       }
-      
+
       // In production, add more health checks like:
       // - Check for stuck transactions
       // - Monitor claim success rates
       // - Check for unusual nonce gaps
-      
+
       return {
         isHealthy: issues.length === 0,
         issues,
-        pendingClaims: 0 // Would query from contract/storage
+        pendingClaims: 0, // Would query from contract/storage
       };
     } catch (error) {
       return {
         isHealthy: false,
         issues: [`Channel access failed: ${error}`],
-        pendingClaims: 0
+        pendingClaims: 0,
       };
     }
   }
-} 
+}

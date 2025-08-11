@@ -5,7 +5,12 @@
 import type { Pool, PoolClient } from 'pg';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
 import type { ChannelInfo, SubChannelState } from '../../core/types';
-import type { PaginationParams, ChannelFilter, PaginatedResult, CacheStats } from '../types/pagination';
+import type {
+  PaginationParams,
+  ChannelFilter,
+  PaginatedResult,
+  CacheStats,
+} from '../types/pagination';
 
 export interface SqlChannelRepositoryOptions {
   /** PostgreSQL connection pool */
@@ -32,9 +37,12 @@ export class SqlChannelRepository implements ChannelRepository {
     this.tablePrefix = options.tablePrefix || 'nuwa_';
     this.autoMigrate = options.autoMigrate ?? true;
     this.allowUnsafeAutoMigrateInProd = options.allowUnsafeAutoMigrateInProd ?? false;
-    
+
     // Only auto-migrate in development or when explicitly allowed in production
-    if (this.autoMigrate && (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)) {
+    if (
+      this.autoMigrate &&
+      (process.env.NODE_ENV !== 'production' || this.allowUnsafeAutoMigrateInProd)
+    ) {
       this.initialize().catch(console.error);
     }
   }
@@ -92,7 +100,6 @@ export class SqlChannelRepository implements ChannelRepository {
         CREATE INDEX IF NOT EXISTS idx_${this.tablePrefix}channels_payee 
         ON ${this.channelsTable}(payee_did)
       `);
-
     } finally {
       client.release();
     }
@@ -103,11 +110,14 @@ export class SqlChannelRepository implements ChannelRepository {
   async getChannelMetadata(channelId: string): Promise<ChannelInfo | null> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT channel_id, payer_did, payee_did, asset_id, status, balance, created_at, updated_at, metadata
         FROM ${this.channelsTable}
         WHERE channel_id = $1
-      `, [channelId]);
+      `,
+        [channelId]
+      );
 
       if (result.rows.length === 0) {
         return null;
@@ -135,7 +145,8 @@ export class SqlChannelRepository implements ChannelRepository {
         // Add any other metadata fields that aren't in the main columns
       };
 
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO ${this.channelsTable} 
         (channel_id, payer_did, payee_did, asset_id, status, balance, created_at, updated_at, metadata)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -148,23 +159,28 @@ export class SqlChannelRepository implements ChannelRepository {
           balance = EXCLUDED.balance,
           updated_at = EXCLUDED.updated_at,
           metadata = EXCLUDED.metadata
-      `, [
-        channelId,
-        metadata.payerDid,
-        metadata.payeeDid,
-        metadata.assetId,
-        metadata.status,
-        '0', // balance not in ChannelInfo
-        Date.now().toString(), // created_at
-        Date.now().toString(), // updated_at
-        JSON.stringify(metadataJson)
-      ]);
+      `,
+        [
+          channelId,
+          metadata.payerDid,
+          metadata.payeeDid,
+          metadata.assetId,
+          metadata.status,
+          '0', // balance not in ChannelInfo
+          Date.now().toString(), // created_at
+          Date.now().toString(), // updated_at
+          JSON.stringify(metadataJson),
+        ]
+      );
     } finally {
       client.release();
     }
   }
 
-  async listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>> {
+  async listChannelMetadata(
+    filter?: ChannelFilter,
+    pagination?: PaginationParams
+  ): Promise<PaginatedResult<ChannelInfo>> {
     const client = await this.pool.connect();
     try {
       let whereClause = '';
@@ -174,17 +190,17 @@ export class SqlChannelRepository implements ChannelRepository {
       // Build WHERE clause from filter
       if (filter) {
         const conditions: string[] = [];
-        
+
         if (filter.payerDid) {
           conditions.push(`payer_did = $${paramIndex++}`);
           params.push(filter.payerDid);
         }
-        
+
         if (filter.payeeDid) {
           conditions.push(`payee_did = $${paramIndex++}`);
           params.push(filter.payeeDid);
         }
-        
+
         if (filter.status) {
           conditions.push(`status = $${paramIndex++}`);
           params.push(filter.status);
@@ -198,7 +214,7 @@ export class SqlChannelRepository implements ChannelRepository {
       // Build pagination
       const limit = pagination?.limit || 50;
       const offset = pagination?.offset || 0;
-      
+
       // Get total count
       const countQuery = `SELECT COUNT(*) as total FROM ${this.channelsTable} ${whereClause}`;
       const countResult = await client.query(countQuery, params);
@@ -213,7 +229,7 @@ export class SqlChannelRepository implements ChannelRepository {
         LIMIT $${paramIndex++} OFFSET $${paramIndex++}
       `;
       params.push(limit, offset);
-      
+
       const dataResult = await client.query(dataQuery, params);
 
       const items = dataResult.rows.map(row => ({
@@ -238,9 +254,12 @@ export class SqlChannelRepository implements ChannelRepository {
   async removeChannelMetadata(channelId: string): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query(`
+      await client.query(
+        `
         DELETE FROM ${this.channelsTable} WHERE channel_id = $1
-      `, [channelId]);
+      `,
+        [channelId]
+      );
     } finally {
       client.release();
     }
@@ -248,14 +267,20 @@ export class SqlChannelRepository implements ChannelRepository {
 
   // -------- Sub-Channel State Operations --------
 
-  async getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null> {
+  async getSubChannelState(
+    channelId: string,
+    vmIdFragment: string
+  ): Promise<SubChannelState | null> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time, vm_id_fragment
         FROM ${this.subChannelStatesTable}
         WHERE channel_id = $1 AND vm_id_fragment = $2
-      `, [channelId, vmIdFragment]);
+      `,
+        [channelId, vmIdFragment]
+      );
 
       if (result.rows.length === 0) {
         return null;
@@ -275,19 +300,25 @@ export class SqlChannelRepository implements ChannelRepository {
     }
   }
 
-  async updateSubChannelState(channelId: string, vmIdFragment: string, updates: Partial<SubChannelState>): Promise<void> {
+  async updateSubChannelState(
+    channelId: string,
+    vmIdFragment: string,
+    updates: Partial<SubChannelState>
+  ): Promise<void> {
     const client = await this.pool.connect();
     try {
       // First, get current state or create default
-      const current = await this.getSubChannelState(channelId, vmIdFragment) || {
-        channelId,
-        vmIdFragment,
-        epoch: BigInt(0),
-        lastConfirmedNonce: BigInt(0),
-        lastClaimedAmount: BigInt(0),
-        lastUpdated: Date.now(),
-      } as any;
-      
+      const current =
+        (await this.getSubChannelState(channelId, vmIdFragment)) ||
+        ({
+          channelId,
+          vmIdFragment,
+          epoch: BigInt(0),
+          lastConfirmedNonce: BigInt(0),
+          lastClaimedAmount: BigInt(0),
+          lastUpdated: Date.now(),
+        } as any);
+
       // Apply updates
       const newState: any = {
         channelId: (updates as any).channelId ?? current.channelId,
@@ -297,7 +328,8 @@ export class SqlChannelRepository implements ChannelRepository {
         lastUpdated: (updates as any).lastUpdated ?? Date.now(),
       };
 
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO ${this.subChannelStatesTable} 
         (channel_id, vm_id_fragment, channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -308,15 +340,17 @@ export class SqlChannelRepository implements ChannelRepository {
           last_confirmed_nonce = EXCLUDED.last_confirmed_nonce,
           last_claimed_amount = EXCLUDED.last_claimed_amount,
           last_update_time = EXCLUDED.last_update_time
-      `, [
-        channelId,
-        vmIdFragment,
-        newState.channelId,
-        newState.epoch.toString(),
-        newState.lastConfirmedNonce.toString(),
-        newState.lastClaimedAmount.toString(),
-        newState.lastUpdated.toString(),
-      ]);
+      `,
+        [
+          channelId,
+          vmIdFragment,
+          newState.channelId,
+          newState.epoch.toString(),
+          newState.lastConfirmedNonce.toString(),
+          newState.lastClaimedAmount.toString(),
+          newState.lastUpdated.toString(),
+        ]
+      );
     } finally {
       client.release();
     }
@@ -325,14 +359,17 @@ export class SqlChannelRepository implements ChannelRepository {
   async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>> {
     const client = await this.pool.connect();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT vm_id_fragment, channel_id_ref, epoch, last_confirmed_nonce, last_claimed_amount, last_update_time
         FROM ${this.subChannelStatesTable}
         WHERE channel_id = $1
-      `, [channelId]);
+      `,
+        [channelId]
+      );
 
       const states: Record<string, SubChannelState> = {};
-      
+
       for (const row of result.rows) {
         states[row.vm_id_fragment] = {
           channelId: row.channel_id_ref,
@@ -353,10 +390,13 @@ export class SqlChannelRepository implements ChannelRepository {
   async removeSubChannelState(channelId: string, vmIdFragment: string): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query(`
+      await client.query(
+        `
         DELETE FROM ${this.subChannelStatesTable} 
         WHERE channel_id = $1 AND vm_id_fragment = $2
-      `, [channelId, vmIdFragment]);
+      `,
+        [channelId, vmIdFragment]
+      );
     } finally {
       client.release();
     }
@@ -370,7 +410,7 @@ export class SqlChannelRepository implements ChannelRepository {
       const channelResult = await client.query(`
         SELECT COUNT(*) as total_channels FROM ${this.channelsTable}
       `);
-      
+
       const subChannelResult = await client.query(`
         SELECT COUNT(*) as total_sub_channels FROM ${this.subChannelStatesTable}
       `);
@@ -395,4 +435,4 @@ export class SqlChannelRepository implements ChannelRepository {
       client.release();
     }
   }
-} 
+}

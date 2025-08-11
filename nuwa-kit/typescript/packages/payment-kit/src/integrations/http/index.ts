@@ -8,7 +8,7 @@ export type {
   HostChannelMappingStore,
   FetchLike,
   HttpClientState,
-  PaymentRequestContext
+  PaymentRequestContext,
 } from './types';
 
 // Store implementations
@@ -16,14 +16,12 @@ export {
   MemoryHostChannelMappingStore,
   LocalStorageHostChannelMappingStore,
   createDefaultMappingStore,
-  extractHost
+  extractHost,
 } from './internal/LocalStore';
 
 // Utilities
 export { DidAuthHelper } from './internal/DidAuthHelper';
 
 // Factory functions (recommended: use createHttpClient with IdentityEnv)
-export { 
-  createHttpClient,
-} from './factory';
+export { createHttpClient } from './factory';
 export type { CreateHttpClientOptions } from './factory';

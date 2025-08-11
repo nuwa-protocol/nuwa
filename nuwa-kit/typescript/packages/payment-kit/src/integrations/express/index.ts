@@ -5,8 +5,8 @@
 
 console.warn(
   '[DEPRECATION WARNING] Importing from "integrations/express" is deprecated. ' +
-  'Please update your imports to use "transport/express" instead. ' +
-  'This path will be removed in a future major version.'
+    'Please update your imports to use "transport/express" instead. ' +
+    'This path will be removed in a future major version.'
 );
 
 export * from '../../transport/express';

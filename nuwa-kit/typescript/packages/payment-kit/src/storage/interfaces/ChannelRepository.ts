@@ -4,19 +4,24 @@
  */
 
 import type { ChannelInfo, SubChannelState } from '../../core/types';
-import type { PaginationParams, ChannelFilter, PaginatedResult, CacheStats } from '../types/pagination';
+import type {
+  PaginationParams,
+  ChannelFilter,
+  PaginatedResult,
+  CacheStats,
+} from '../types/pagination';
 
 /**
  * Repository interface for channel data persistence
  */
 export interface ChannelRepository {
   // -------- Channel Metadata Operations --------
-  
+
   /**
    * Get channel metadata by channel ID
    */
   getChannelMetadata(channelId: string): Promise<ChannelInfo | null>;
-  
+
   /**
    * Set/update channel metadata
    */
@@ -27,7 +32,10 @@ export interface ChannelRepository {
    * @param filter - Optional filter criteria
    * @param pagination - Optional pagination parameters
    */
-  listChannelMetadata(filter?: ChannelFilter, pagination?: PaginationParams): Promise<PaginatedResult<ChannelInfo>>;
+  listChannelMetadata(
+    filter?: ChannelFilter,
+    pagination?: PaginationParams
+  ): Promise<PaginatedResult<ChannelInfo>>;
 
   /**
    * Remove channel metadata
@@ -43,7 +51,7 @@ export interface ChannelRepository {
    * @returns Sub-channel state if present; null if no local information
    */
   getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null>;
-  
+
   /**
    * Update sub-channel state
    * Only used when synchronizing data from the blockchain.
@@ -51,7 +59,11 @@ export interface ChannelRepository {
    * @param vmIdFragment - DID verification method fragment (e.g., "key-1")
    * @param updates - Partial updates to apply
    */
-  updateSubChannelState(channelId: string, vmIdFragment: string, updates: Partial<SubChannelState>): Promise<void>;
+  updateSubChannelState(
+    channelId: string,
+    vmIdFragment: string,
+    updates: Partial<SubChannelState>
+  ): Promise<void>;
 
   /**
    * List all sub-channel states for a channel
@@ -73,8 +85,8 @@ export interface ChannelRepository {
    */
   getStats(): Promise<CacheStats>;
 
-  /** 
-   * Clear all stored data 
+  /**
+   * Clear all stored data
    */
   clear(): Promise<void>;
-} 
+}

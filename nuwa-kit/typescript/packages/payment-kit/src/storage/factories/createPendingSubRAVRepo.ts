@@ -6,7 +6,10 @@ import type { Pool } from 'pg';
 import type { PendingSubRAVRepository } from '../interfaces/PendingSubRAVRepository';
 import { MemoryPendingSubRAVRepository } from '../memory/pendingSubRav.memory';
 import { IndexedDBPendingSubRAVRepository } from '../indexeddb/pendingSubRav.indexeddb';
-import { SqlPendingSubRAVRepository, type SqlPendingSubRAVRepositoryOptions } from '../sql/pendingSubRav.sql';
+import {
+  SqlPendingSubRAVRepository,
+  type SqlPendingSubRAVRepositoryOptions,
+} from '../sql/pendingSubRav.sql';
 
 export interface PendingSubRAVRepositoryOptions {
   /** Backend type to use */
@@ -26,7 +29,9 @@ export interface PendingSubRAVRepositoryOptions {
 /**
  * Create a PendingSubRAVRepository instance based on the specified backend
  */
-export function createPendingSubRAVRepo(options: PendingSubRAVRepositoryOptions = {}): PendingSubRAVRepository {
+export function createPendingSubRAVRepo(
+  options: PendingSubRAVRepositoryOptions = {}
+): PendingSubRAVRepository {
   const { backend = 'memory' } = options;
 
   switch (backend) {
@@ -54,14 +59,14 @@ export function createPendingSubRAVRepo(options: PendingSubRAVRepositoryOptions 
       if (!options.pool) {
         throw new Error('SQL backend requires a PostgreSQL connection pool');
       }
-      
+
       const sqlOptions: SqlPendingSubRAVRepositoryOptions = {
         pool: options.pool,
         tablePrefix: options.tablePrefix,
         autoMigrate: options.autoMigrate,
         allowUnsafeAutoMigrateInProd: options.allowUnsafeAutoMigrateInProd,
       };
-      
+
       return new SqlPendingSubRAVRepository(sqlOptions);
 
     default:

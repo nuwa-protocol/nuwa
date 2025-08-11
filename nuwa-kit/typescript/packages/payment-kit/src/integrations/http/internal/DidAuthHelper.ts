@@ -22,7 +22,7 @@ export class DidAuthHelper {
   ): Promise<string | undefined> {
     try {
       let selectedKeyId = keyId;
-      
+
       if (!selectedKeyId) {
         // Get available key IDs
         const keyIds = await keyManager.listKeyIds();
@@ -34,12 +34,12 @@ export class DidAuthHelper {
 
       // Create a signed object with proper payload structure
       const signedObject = await DIDAuth.v1.createSignature(
-        { 
+        {
           operation: 'http_request',
-          params: { 
+          params: {
             uri: requestUrl,
-            method: method.toUpperCase()
-          }
+            method: method.toUpperCase(),
+          },
         },
         keyManager,
         selectedKeyId
@@ -70,12 +70,12 @@ export class DidAuthHelper {
   ): Promise<string> {
     // Create a signed object with proper payload structure
     const signedObject = await DIDAuth.v1.createSignature(
-      { 
+      {
         operation: 'http_request',
-        params: { 
+        params: {
           uri: requestUrl,
-          method: method.toUpperCase()
-        }
+          method: method.toUpperCase(),
+        },
       },
       keyManager,
       keyId

@@ -33,7 +33,7 @@ afterAll(async () => {
   }
 
   console.log('🏁 Payment Kit E2E Test Suite completed');
-  
+
   // Wait a bit for any pending async operations to complete
   await new Promise(resolve => setTimeout(resolve, 1000));
 });
@@ -45,7 +45,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Error handling for uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   console.error('Uncaught Exception:', error);
   // Don't exit the process in tests, just log
-}); 
+});

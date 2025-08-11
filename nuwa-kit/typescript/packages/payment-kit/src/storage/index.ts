@@ -1,6 +1,6 @@
 /**
  * Payment Kit Storage Layer
- * 
+ *
  * Unified storage abstractions for channels, RAVs, and pending SubRAVs
  * with support for multiple backends (memory, IndexedDB, SQL)
  */
@@ -20,15 +20,9 @@ export type { RAVRepository } from './interfaces/RAVRepository';
 export type { PendingSubRAVRepository } from './interfaces/PendingSubRAVRepository';
 
 // ==================== Factory Function Exports ====================
-export {
-  createChannelRepo,
-  type ChannelRepositoryOptions,
-} from './factories/createChannelRepo';
+export { createChannelRepo, type ChannelRepositoryOptions } from './factories/createChannelRepo';
 
-export {
-  createRAVRepo,
-  type RAVRepositoryOptions,
-} from './factories/createRAVRepo';
+export { createRAVRepo, type RAVRepositoryOptions } from './factories/createRAVRepo';
 
 export {
   createPendingSubRAVRepo,
@@ -43,43 +37,27 @@ export { MemoryChannelRepository } from './memory/channel.memory';
 export { MemoryRAVRepository } from './memory/rav.memory';
 export { MemoryPendingSubRAVRepository } from './memory/pendingSubRav.memory';
 
-// IndexedDB implementations  
+// IndexedDB implementations
 export { IndexedDBChannelRepository } from './indexeddb/channel.indexeddb';
 export { IndexedDBRAVRepository } from './indexeddb/rav.indexeddb';
 export { IndexedDBPendingSubRAVRepository } from './indexeddb/pendingSubRav.indexeddb';
 
 // SQL implementations
-export { 
-  SqlChannelRepository,
-  type SqlChannelRepositoryOptions,
-} from './sql/channel.sql';
-export { 
-  SqlRAVRepository,
-  type SqlRAVRepositoryOptions,
-} from './sql/rav.sql';
-export { 
+export { SqlChannelRepository, type SqlChannelRepositoryOptions } from './sql/channel.sql';
+export { SqlRAVRepository, type SqlRAVRepositoryOptions } from './sql/rav.sql';
+export {
   SqlPendingSubRAVRepository,
   type SqlPendingSubRAVRepositoryOptions,
 } from './sql/pendingSubRav.sql';
 
 // SQL serialization utilities
-export {
-  encodeSubRAV,
-  decodeSubRAV,
-  getSubRAVHex,
-} from './sql/serialization';
+export { encodeSubRAV, decodeSubRAV, getSubRAVHex } from './sql/serialization';
 
 // ==================== Convenience Functions ====================
 
-import { 
-  createChannelRepo as _createChannelRepo,
-} from './factories/createChannelRepo';
-import { 
-  createRAVRepo as _createRAVRepo,
-} from './factories/createRAVRepo';
-import { 
-  createPendingSubRAVRepo as _createPendingSubRAVRepo,
-} from './factories/createPendingSubRAVRepo';
+import { createChannelRepo as _createChannelRepo } from './factories/createChannelRepo';
+import { createRAVRepo as _createRAVRepo } from './factories/createRAVRepo';
+import { createPendingSubRAVRepo as _createPendingSubRAVRepo } from './factories/createPendingSubRAVRepo';
 
 // Optionally create a single Pool when connectionString is provided
 let PoolRef: any;
@@ -103,7 +81,8 @@ export function createStorageRepositories(options: {
 }) {
   const opts: any = { ...options };
   if (opts.backend === 'sql' && !opts.pool && opts.connectionString && PoolRef) {
-    const isSupabase = typeof opts.connectionString === 'string' && opts.connectionString.includes('supabase');
+    const isSupabase =
+      typeof opts.connectionString === 'string' && opts.connectionString.includes('supabase');
     opts.pool = new PoolRef({
       connectionString: opts.connectionString,
       ssl: isSupabase ? { rejectUnauthorized: false } : false,

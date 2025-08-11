@@ -36,5 +36,3 @@ describe('convertUsdToAssetUsingPrice', () => {
     expect(() => convertUsdToAssetUsingPrice(10n, badRate)).toThrow('Invalid price');
   });
 });
-
-

@@ -23,7 +23,16 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     lastUpdated: Date.now(),
     vmIdFragment: vmId,
   };
-  const payerDidDoc: any = { id: 'did:example:payer', verificationMethod: [{ id: `did:example:payer#${vmId}`, type: 'Ed25519VerificationKey2020', publicKeyMultibase: 'z...' }] };
+  const payerDidDoc: any = {
+    id: 'did:example:payer',
+    verificationMethod: [
+      {
+        id: `did:example:payer#${vmId}`,
+        type: 'Ed25519VerificationKey2020',
+        publicKeyMultibase: 'z...',
+      },
+    ],
+  };
 
   function createSignedSubRav(nonce: bigint, amount: bigint): SignedSubRAV {
     return {
@@ -69,14 +78,30 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   test('pending exists but signed nonce mismatches → CONFLICT', async () => {
     jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
     const signed = createSignedSubRav(3n, 10n);
-    const res = await verifyRav({ channelInfo, subChannelState, billingRule, payerDidDoc, signedSubRav: signed, latestPendingSubRav: { ...signed.subRav, nonce: 2n } as any, debug: false });
+    const res = await verifyRav({
+      channelInfo,
+      subChannelState,
+      billingRule,
+      payerDidDoc,
+      signedSubRav: signed,
+      latestPendingSubRav: { ...signed.subRav, nonce: 2n } as any,
+      debug: false,
+    });
     expect(res.decision).toBe('CONFLICT');
   });
 
   test('pending exists and signed matches → pendingMatched=true', async () => {
     jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
     const signed = createSignedSubRav(2n, 10n);
-    const res = await verifyRav({ channelInfo, subChannelState, billingRule, payerDidDoc, signedSubRav: signed, latestPendingSubRav: signed.subRav, debug: false });
+    const res = await verifyRav({
+      channelInfo,
+      subChannelState,
+      billingRule,
+      payerDidDoc,
+      signedSubRav: signed,
+      latestPendingSubRav: signed.subRav,
+      debug: false,
+    });
     expect(res.decision).toBe('ALLOW');
     expect(res.pendingMatched).toBe(true);
   });
@@ -84,7 +109,14 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   test('signature verification via didResolver succeeds (payerDid from didInfo)', async () => {
     const signed = createSignedSubRav(1n, 0n);
     const verifySpy = jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
-    const res = await verifyRav({ channelInfo, subChannelState, billingRule, payerDidDoc, signedSubRav: signed, debug: false });
+    const res = await verifyRav({
+      channelInfo,
+      subChannelState,
+      billingRule,
+      payerDidDoc,
+      signedSubRav: signed,
+      debug: false,
+    });
     expect(verifySpy).toHaveBeenCalled();
     expect(res.signedVerified).toBe(true);
   });
@@ -92,7 +124,14 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   test('signature verification via didResolver uses channelInfo.payerDid if didInfo missing', async () => {
     const signed = createSignedSubRav(1n, 0n);
     const verifySpy = jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
-    const res = await verifyRav({ channelInfo, subChannelState, billingRule, payerDidDoc, signedSubRav: signed, debug: false });
+    const res = await verifyRav({
+      channelInfo,
+      subChannelState,
+      billingRule,
+      payerDidDoc,
+      signedSubRav: signed,
+      debug: false,
+    });
     expect(verifySpy).toHaveBeenCalled();
     expect(res.signedVerified).toBe(true);
   });
@@ -100,9 +139,14 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   test('no didResolver provided → signature step skipped (Phase 1 compatible)', async () => {
     jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
     const signed = createSignedSubRav(1n, 0n);
-    const res = await verifyRav({ channelInfo, subChannelState, billingRule, payerDidDoc, signedSubRav: signed, debug: false });
+    const res = await verifyRav({
+      channelInfo,
+      subChannelState,
+      billingRule,
+      payerDidDoc,
+      signedSubRav: signed,
+      debug: false,
+    });
     expect(res.signedVerified).toBe(true);
   });
 });
-
-

@@ -10,7 +10,6 @@ export * from './core/ClaimScheduler';
 export * from './core/PaymentProcessor';
 export * from './core/PaymentUtils';
 
-
 // Payment codecs
 // export * from './codecs/PaymentCodec';
 
@@ -35,14 +34,14 @@ export * from './middlewares/http/HttpBillingMiddleware';
 export * from './rooch/RoochPaymentChannelContract';
 
 // Core SubRAV utilities for advanced use cases
-export { 
-  SubRAVSigner, 
-  SubRAVCodec, 
-  SubRAVUtils, 
-  SubRAVValidator, 
+export {
+  SubRAVSigner,
+  SubRAVCodec,
+  SubRAVUtils,
+  SubRAVValidator,
   SubRAVSchema,
-  CURRENT_SUBRAV_VERSION, 
-  SUBRAV_VERSION_1 
+  CURRENT_SUBRAV_VERSION,
+  SUBRAV_VERSION_1,
 } from './core/SubRav';
 
 // HTTP Transport
@@ -55,15 +54,15 @@ export { HttpBillingMiddleware } from './middlewares/http/HttpBillingMiddleware'
 export * from './billing';
 
 // Utility functions
-export { 
-  generateNonce, 
-  extractFragment, 
-  isValidHex, 
+export {
+  generateNonce,
+  extractFragment,
+  isValidHex,
   formatAmount,
   generateChannelId,
   bigintToString,
   stringToBigint,
-  DebugLogger 
+  DebugLogger,
 } from './utils';
 
 // HTTP Payer Client integration
@@ -81,7 +80,7 @@ export * from './types/api';
 export * from './errors';
 
 // Zod schemas for validation and serialization (avoiding duplicates)
-export { 
+export {
   // Core schemas only for serialization
   PersistedHttpClientStateSchema,
   // Other essential schemas not conflicting with core types
