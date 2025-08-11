@@ -8,7 +8,6 @@ import {
   SubRAVUtils, 
   SubRAVValidator, 
   SubRAVSigner,
-  SubRAVManager,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1 
 } from '../SubRav';
@@ -166,66 +165,6 @@ describe('SubRAV Signing and Verification', () => {
     });
     
     expect(isValid).toBe(false);
-  });
-});
-
-describe('SubRAVManager', () => {
-  const sampleSubRAV: SubRAV = {
-    version: SUBRAV_VERSION_1,
-    chainId: BigInt(4),
-    channelId: '0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c',
-    channelEpoch: BigInt(0),
-    vmIdFragment: 'account-key',
-    accumulatedAmount: BigInt(10000),
-    nonce: BigInt(1),
-  };
-
-  let testEnv: any;
-
-  beforeEach(async () => {
-    testEnv = await createTestEnvironment('subrav-manager-test');
-  });
-
-  test('should sign through manager', async () => {
-    const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
-    expect(signedSubRAV.subRav).toEqual(sampleSubRAV);
-    expect(signedSubRAV.signature).toBeInstanceOf(Uint8Array);
-  });
-
-  test('should verify through manager with DID document', async () => {
-    const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
-    const didDocument = await testEnv.didResolver.resolveDID(testEnv.payerDid);
-    const isValid = await manager.verify(signedSubRAV, {
-      didDocument: didDocument!,
-      payerDid: testEnv.payerDid,
-    });
-    
-    expect(isValid).toBe(true);
-  });
-
-  test('should verify through manager with resolver', async () => {
-    const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
-    const isValid = await manager.verifyWithResolver(
-      signedSubRAV,
-      testEnv.payerDid,
-      testEnv.didResolver
-    );
-    
-    expect(isValid).toBe(true);
-  });
-
-  test('should validate SubRAV business logic', async () => {
-    const manager = new SubRAVManager();
-    const signedSubRAV = await manager.sign(sampleSubRAV, testEnv.payerSigner, testEnv.payerKeyId);
-    
-    const isValid = await manager.validate(signedSubRAV);
-    expect(isValid).toBe(true);
   });
 });
 

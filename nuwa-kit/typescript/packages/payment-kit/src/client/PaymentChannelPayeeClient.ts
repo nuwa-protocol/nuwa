@@ -16,7 +16,7 @@ import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPayment
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
 import { createChannelRepoAuto, createRAVRepoAuto, createPendingSubRAVRepoAuto } from '../storage';
-import { SubRAVManager, SubRAVUtils } from '../core/SubRav';
+import { SubRAVUtils } from '../core/SubRav';
 import { PaymentUtils } from '../core/PaymentUtils';
 import { PaymentHubClient } from './PaymentHubClient';
 
@@ -93,7 +93,6 @@ export class PaymentChannelPayeeClient {
   private channelRepo: ChannelRepository;
   private ravRepo: RAVRepository;
   private pendingSubRAVRepo: PendingSubRAVRepository;
-  private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
   private defaultAssetId: string;
 
@@ -131,7 +130,6 @@ export class PaymentChannelPayeeClient {
       });
     }
     
-    this.ravManager = new SubRAVManager();
   }
 
   // -------- Public accessors for internal components --------
@@ -256,123 +254,6 @@ export class PaymentChannelPayeeClient {
     });
     
     return subRAV;
-  }
- 
-  // -------- SubRAV Verification --------
-
-  /**
-   * Verify a SubRAV received from a payer
-   * This performs comprehensive validation including signature verification
-   */
-  async verifySubRAV(signedSubRAV: SignedSubRAV): Promise<VerificationResult> {
-    const result: VerificationResult = {
-      isValid: false,
-      details: {
-        signatureValid: false,
-        channelExists: false,
-        epochMatches: false,
-        nonceProgression: false,
-        amountValid: false,
-      },
-    };
-
-    try {
-      // 1. Check if channel exists and get current state first
-      let channelInfo: ChannelInfo;
-      try {
-        channelInfo = await this.getChannelInfoCached(signedSubRAV.subRav.channelId);
-        result.details!.channelExists = true;
-      } catch (error) {
-        result.error = `Channel ${signedSubRAV.subRav.channelId} not found`;
-        return result;
-      }
-
-      // 2. Verify signature using DID from channel info
-      try {
-        // Use payerDid from channel info to verify signature
-        const signatureValid = await this.ravManager.verifyWithResolver(
-          signedSubRAV, 
-          channelInfo.payerDid, 
-          this.didResolver
-        );
-        result.details!.signatureValid = signatureValid;
-        
-        if (!signatureValid) {
-          result.error = 'Invalid SubRAV signature';
-          return result;
-        }
-      } catch (error) {
-        result.error = `Signature verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        return result;
-      }
-
-      // 3. Verify channel epoch matches
-      const epochMatches = channelInfo.epoch === signedSubRAV.subRav.channelEpoch;
-      result.details!.epochMatches = epochMatches;
-      
-      if (!epochMatches) {
-        result.error = `Epoch mismatch: expected ${channelInfo.epoch}, got ${signedSubRAV.subRav.channelEpoch}`;
-        return result;
-      }
-
-      // 4. Verify nonce progression (if we have previous state)
-      const vmIdFragmentPrev = signedSubRAV.subRav.vmIdFragment;
-      const prevState = await this.channelRepo.getSubChannelState(signedSubRAV.subRav.channelId, vmIdFragmentPrev);
-
-      if (prevState) {
-        // Allow same nonce if it's the exact same SubRAV (same amount and other fields)
-        const isSameSubRAV = signedSubRAV.subRav.nonce === prevState.nonce && 
-                             signedSubRAV.subRav.accumulatedAmount === prevState.accumulatedAmount &&
-                             signedSubRAV.subRav.channelEpoch === prevState.epoch;
-
-        // Allow handshake reset: nonce 0 with amount 0 is always valid as a reset
-        const isHandshakeReset = signedSubRAV.subRav.nonce === BigInt(0) && 
-                                 signedSubRAV.subRav.accumulatedAmount === BigInt(0);
-
-        const nonceProgression = signedSubRAV.subRav.nonce > prevState.nonce || isSameSubRAV || isHandshakeReset;
-        result.details!.nonceProgression = nonceProgression;
-        
-        if (!nonceProgression) {
-          result.error = `Invalid nonce progression: expected > ${prevState.nonce}, got ${signedSubRAV.subRav.nonce}`;
-          return result;
-        }
-
-        // Verify amount is not decreasing (unless it's the same SubRAV or handshake reset)
-        const amountValid = signedSubRAV.subRav.accumulatedAmount >= prevState.accumulatedAmount || isHandshakeReset;
-        result.details!.amountValid = amountValid;
-        
-        if (!amountValid) {
-          result.error = `Amount cannot decrease: expected >= ${prevState.accumulatedAmount}, got ${signedSubRAV.subRav.accumulatedAmount}`;
-          return result;
-        }
-      } else {
-        // No previous state found - this is the first SubRAV for this sub-channel
-        // Allow nonce 0 (handshake) or nonce 1 (first payment)
-        const isHandshake = signedSubRAV.subRav.nonce === BigInt(0) && signedSubRAV.subRav.accumulatedAmount === BigInt(0);
-        const isFirstPayment = signedSubRAV.subRav.nonce === BigInt(1) && signedSubRAV.subRav.accumulatedAmount > BigInt(0);
-        
-        result.details!.nonceProgression = isHandshake || isFirstPayment;
-        result.details!.amountValid = isHandshake || signedSubRAV.subRav.accumulatedAmount > BigInt(0);
-        
-        if (!result.details!.nonceProgression) {
-          result.error = `First SubRAV must have nonce 0 (handshake) or nonce 1 (first payment), got ${signedSubRAV.subRav.nonce}`;
-          return result;
-        }
-        
-        if (!result.details!.amountValid) {
-          result.error = `First payment SubRAV must have positive amount, got ${signedSubRAV.subRav.accumulatedAmount}`;
-          return result;
-        }
-      }
-
-      // All validations passed
-      result.isValid = true;
-      return result;
-
-    } catch (error) {
-      result.error = `Verification failed: ${error instanceof Error ? error.message : String(error)}`;
-      return result;
-    }
   }
 
   // -------- Claims Management --------

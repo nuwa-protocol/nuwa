@@ -77,7 +77,6 @@ export async function createRoochPaymentChannelClient(opts: {
 
 // Core SubRAV utilities for advanced use cases
 export { 
-  SubRAVManager,
   SubRAVSigner, 
   SubRAVCodec, 
   SubRAVUtils, 

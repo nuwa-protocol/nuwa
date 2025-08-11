@@ -21,7 +21,7 @@ import type {
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
-import { SubRAVManager } from '../core/SubRav';
+import { SubRAVSigner } from '../core/SubRav';
 import { assertSubRavProgression } from '../core/SubRavValidator';
 import { PaymentHubClient } from './PaymentHubClient';
 
@@ -83,7 +83,6 @@ export class PaymentChannelPayerClient {
   private signer: SignerInterface;
   private keyId?: string;
   private channelRepo: ChannelRepository;
-  private ravManager: SubRAVManager;
   private chainIdCache?: bigint;
   private activeChannelId?: string;
   private defaultAssetId: string;
@@ -103,7 +102,6 @@ export class PaymentChannelPayerClient {
       });
     }
     
-    this.ravManager = new SubRAVManager();
   }
 
   // -------- Channel Management --------
@@ -255,8 +253,7 @@ export class PaymentChannelPayerClient {
     }
 
     // Sign the SubRAV
-    const signedSubRAV = await this.ravManager.sign(subRAV, this.signer, useKeyId);
-
+    const signedSubRAV = SubRAVSigner.sign(subRAV, this.signer, useKeyId);
 
     return signedSubRAV;
   }
