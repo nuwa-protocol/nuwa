@@ -22,19 +22,16 @@ export type { PendingSubRAVRepository } from './interfaces/PendingSubRAVReposito
 // ==================== Factory Function Exports ====================
 export {
   createChannelRepo,
-  createChannelRepoAuto,
   type ChannelRepositoryOptions,
 } from './factories/createChannelRepo';
 
 export {
   createRAVRepo,
-  createRAVRepoAuto,
   type RAVRepositoryOptions,
 } from './factories/createRAVRepo';
 
 export {
   createPendingSubRAVRepo,
-  createPendingSubRAVRepoAuto,
   type PendingSubRAVRepositoryOptions,
 } from './factories/createPendingSubRAVRepo';
 
@@ -76,16 +73,23 @@ export {
 
 import { 
   createChannelRepo as _createChannelRepo,
-  createChannelRepoAuto as _createChannelRepoAuto 
 } from './factories/createChannelRepo';
 import { 
   createRAVRepo as _createRAVRepo,
-  createRAVRepoAuto as _createRAVRepoAuto 
 } from './factories/createRAVRepo';
 import { 
   createPendingSubRAVRepo as _createPendingSubRAVRepo,
-  createPendingSubRAVRepoAuto as _createPendingSubRAVRepoAuto 
 } from './factories/createPendingSubRAVRepo';
+
+// Optionally create a single Pool when connectionString is provided
+let PoolRef: any;
+try {
+  // Lazy require; avoid bundling 'pg' in browser
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  PoolRef = require('pg').Pool;
+} catch (_) {
+  PoolRef = undefined;
+}
 
 /**
  * Create all repositories with the same backend configuration
@@ -93,27 +97,21 @@ import {
 export function createStorageRepositories(options: {
   backend?: 'memory' | 'indexeddb' | 'sql';
   pool?: any; // Pool from 'pg'
+  connectionString?: string; // e.g., SUPABASE_DB_URL
   tablePrefix?: string;
   autoMigrate?: boolean;
 }) {
+  const opts: any = { ...options };
+  if (opts.backend === 'sql' && !opts.pool && opts.connectionString && PoolRef) {
+    const isSupabase = typeof opts.connectionString === 'string' && opts.connectionString.includes('supabase');
+    opts.pool = new PoolRef({
+      connectionString: opts.connectionString,
+      ssl: isSupabase ? { rejectUnauthorized: false } : false,
+    });
+  }
   return {
-    channelRepo: _createChannelRepo(options),
-    ravRepo: _createRAVRepo(options),
-    pendingSubRAVRepo: _createPendingSubRAVRepo(options),
-  };
-}
-
-/**
- * Auto-detect and create all repositories with optimal backend for current environment
- */
-export function createStorageRepositoriesAuto(options: {
-  pool?: any; // Pool from 'pg'
-  tablePrefix?: string;
-  autoMigrate?: boolean;
-} = {}) {
-  return {
-    channelRepo: _createChannelRepoAuto(options),
-    ravRepo: _createRAVRepoAuto(options),
-    pendingSubRAVRepo: _createPendingSubRAVRepoAuto(options),
+    channelRepo: _createChannelRepo(opts),
+    ravRepo: _createRAVRepo(opts),
+    pendingSubRAVRepo: _createPendingSubRAVRepo(opts),
   };
 }

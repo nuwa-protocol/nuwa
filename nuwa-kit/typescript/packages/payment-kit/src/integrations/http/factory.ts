@@ -27,6 +27,9 @@ export interface CreateHttpClientOptions {
 
   /** Optional mapping store */
   mappingStore?: HttpPayerOptions['mappingStore'];
+
+  /** Optional channel repository */
+  channelRepo?: HttpPayerOptions['channelRepo'];
 }
 
 /**
@@ -108,7 +111,8 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
     debug: options.debug ?? chainConfig.debug,
     onError: options.onError,
     fetchImpl: options.fetchImpl,
-    mappingStore: options.mappingStore
+    mappingStore: options.mappingStore,
+    channelRepo: options.channelRepo
   };
 
   // If caller did not explicitly provide a keyId, pick the first available from the KeyManager
@@ -140,134 +144,4 @@ export async function createHttpClient(options: CreateHttpClientOptions): Promis
   }
   
   return client;
-}
-
-/**
- * Create PaymentChannelHttpClient with manual configuration (advanced users)
- * Most users should prefer createHttpClient() with IdentityEnv
- * 
- * @param options - Detailed configuration options
- * @returns Configured PaymentChannelHttpClient instance
- */
-export function createHttpPayerClient(options: CreateHttpPayerClientOptions): PaymentChannelHttpClient {
-  const httpPayerOptions: HttpPayerOptions = {
-    baseUrl: options.baseUrl,
-    chainConfig: {
-      chain: 'rooch',
-      rpcUrl: options.rpcUrl || 'http://localhost:6767',
-      network: options.network || 'local'
-    },
-    signer: options.signer,
-    keyId: options.keyId,
-    payerDid: options.payerDid,
-    maxAmount: options.maxAmount,
-    debug: options.debug,
-    onError: options.onError,
-    fetchImpl: options.fetchImpl,
-    mappingStore: options.mappingStore
-  };
-
-  return new PaymentChannelHttpClient(httpPayerOptions);
-}
-
-/**
- * Create PaymentChannelHttpClient with manual configuration and automatic service discovery
- * Most users should prefer createHttpClient() with IdentityEnv
- * 
- * @param options - Detailed configuration options
- * @returns Promise resolving to configured PaymentChannelHttpClient instance
- */
-export async function createHttpPayerClientWithDiscovery(options: CreateHttpPayerClientOptions): Promise<PaymentChannelHttpClient> {
-  const client = createHttpPayerClient(options);
-  
-  // Perform service discovery
-  try {
-    const serviceInfo = await client.discoverService();
-    if (options.debug) {
-      console.log('[PaymentChannelHttpClient] Service discovery completed:', serviceInfo);
-    }
-  } catch (error) {
-    if (options.debug) {
-      console.warn('[PaymentChannelHttpClient] Service discovery failed:', error);
-    }
-  }
-  
-  return client;
-}
-
-/**
- * Create multiple HTTP clients for different services with shared IdentityEnv (recommended)
- * 
- * @param env - Shared IdentityEnv instance
- * @param services - Array of service configurations
- * @returns Promise resolving to map of service name to PaymentChannelHttpClient
- * 
- * @example
- * ```typescript
- * const env = await bootstrapIdentityEnv({ method: 'rooch', vdrOptions: { ... } });
- * 
- * const clients = await createMultipleHttpClients(env, [
- *   { name: 'llm', baseUrl: 'https://api.llm-gateway.com', maxAmount: BigInt('500000000000') },
- *   { name: 'storage', baseUrl: 'https://api.storage.com', maxAmount: BigInt('100000000000') }
- * ]);
- * 
- * await clients.llm.post('/v1/chat', { message: 'hello' });
- * await clients.storage.post('/v1/upload', fileData);
- * ```
- */
-export async function createMultipleHttpClients<T extends string>(
-  env: IdentityEnv,
-  services: Array<{
-    name: T;
-    baseUrl: string;
-    maxAmount?: bigint;
-    debug?: boolean;
-  }>
-): Promise<Record<T, PaymentChannelHttpClient>> {
-  const clients = {} as Record<T, PaymentChannelHttpClient>;
-
-  // Create all clients in parallel with service discovery
-  await Promise.all(
-    services.map(async (service) => {
-      clients[service.name] = await createHttpClient({
-        env,
-        baseUrl: service.baseUrl,
-        maxAmount: service.maxAmount,
-        debug: service.debug
-      });
-    })
-  );
-
-  return clients;
-}
-
-/**
- * Create multiple HTTP payer clients for different services with manual configuration (advanced)
- * Most users should prefer createMultipleHttpClients() with IdentityEnv
- * 
- * @param baseOptions - Common configuration options
- * @param services - Array of service configurations
- * @returns Map of service name to PaymentChannelHttpClient
- */
-export function createMultipleHttpPayerClients<T extends string>(
-  baseOptions: Omit<CreateHttpPayerClientOptions, 'baseUrl'>,
-  services: Array<{
-    name: T;
-    baseUrl: string;
-    maxAmount?: bigint;
-    debug?: boolean;
-  }>
-): Record<T, PaymentChannelHttpClient> {
-  const clients = {} as Record<T, PaymentChannelHttpClient>;
-
-  for (const service of services) {
-    clients[service.name] = createHttpPayerClient({
-      ...baseOptions,
-      baseUrl: service.baseUrl,
-      maxAmount: service.maxAmount ?? baseOptions.maxAmount,
-      debug: service.debug ?? baseOptions.debug
-    });
-  }
-
-  return clients;
 }

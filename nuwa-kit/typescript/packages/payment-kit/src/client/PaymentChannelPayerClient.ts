@@ -20,9 +20,7 @@ import type {
 } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
-import { createChannelRepoAuto } from '../storage/factories/createChannelRepo';
 import { SubRAVSigner } from '../core/SubRav';
-import { assertSubRavProgression } from '../core/SubRavValidator';
 import { PaymentHubClient } from './PaymentHubClient';
 
 export interface PayerOpenChannelParams {
@@ -40,21 +38,14 @@ export interface PayerOpenChannelWithSubChannelParams {
  * Storage options for PaymentChannelPayerClient
  */
 export interface PayerStorageOptions {
-  /** Storage type selection */
-  backend?: 'memory' | 'indexeddb' | 'sql';
-  /** Custom storage implementation */
-  customChannelRepo?: ChannelRepository;
-  /** PostgreSQL connection pool for SQL backend */
-  pool?: any;
-  /** Table name prefix for SQL backends */
-  tablePrefix?: string;
+  channelRepo: ChannelRepository;
 }
 
 export interface PaymentChannelPayerClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   keyId?: string;
-  storageOptions?: PayerStorageOptions;
+  storageOptions: PayerStorageOptions;
 }
 
 export interface NextSubRAVOptions {
@@ -93,15 +84,7 @@ export class PaymentChannelPayerClient {
     this.keyId = options.keyId;
     this.defaultAssetId = "0x3::gas_coin::RGas";
     // Initialize storage
-    if (options.storageOptions?.customChannelRepo) {
-      this.channelRepo = options.storageOptions.customChannelRepo;
-    } else {
-      this.channelRepo = createChannelRepoAuto({
-        pool: options.storageOptions?.pool,
-        tablePrefix: options.storageOptions?.tablePrefix,
-      });
-    }
-    
+    this.channelRepo = options.storageOptions.channelRepo;
   }
 
   // -------- Channel Management --------

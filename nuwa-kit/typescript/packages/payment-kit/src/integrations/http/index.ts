@@ -17,7 +17,7 @@ export {
   LocalStorageHostChannelMappingStore,
   createDefaultMappingStore,
   extractHost
-} from './internal/HostChannelMappingStore';
+} from './internal/LocalStore';
 
 // Utilities
 export { DidAuthHelper } from './internal/DidAuthHelper';
@@ -25,14 +25,5 @@ export { DidAuthHelper } from './internal/DidAuthHelper';
 // Factory functions (recommended: use createHttpClient with IdentityEnv)
 export { 
   createHttpClient,
-  createMultipleHttpClients,
-  createHttpPayerClient, 
-  createHttpPayerClientWithDiscovery,
-  createMultipleHttpPayerClients 
 } from './factory';
-export type { 
-  CreateHttpClientOptions,
-  CreateHttpPayerClientOptions 
-} from './factory';
-
-// Note: createHttpClientFromEnv has been replaced by createHttpClient
+export type { CreateHttpClientOptions } from './factory';

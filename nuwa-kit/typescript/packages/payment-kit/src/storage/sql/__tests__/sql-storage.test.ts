@@ -13,8 +13,18 @@ import { SqlPendingSubRAVRepository, type SqlPendingSubRAVRepositoryOptions } fr
 import { SubRAVUtils } from '../../../core/SubRav';
 import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../../core/types';
 
+// Prefer SUPABASE_DB_URL if provided
+const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL;
+
 // Test configuration
-const TEST_DB_CONFIG = {
+const TEST_DB_CONFIG: any = SUPABASE_DB_URL ? {
+  connectionString: SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 3,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 30000,
+  statement_timeout: 60000,
+} : {
   host: process.env.TEST_DB_HOST || 'localhost',
   port: parseInt(process.env.TEST_DB_PORT || '5432'),
   database: process.env.TEST_DB_NAME || 'nuwa_test',
@@ -23,7 +33,8 @@ const TEST_DB_CONFIG = {
   max: 3, // Increase connection pool size
   idleTimeoutMillis: 30000,
   // Supabase specific settings
-  ssl: process.env.TEST_DB_HOST?.includes('supabase.com') ? {
+  // Enable SSL for Supabase hosts
+  ssl: process.env.TEST_DB_HOST?.includes('supabase') ? {
     rejectUnauthorized: false
   } : false,
   // Connection timeout
@@ -43,14 +54,15 @@ function isPostgreSQLAvailable(): boolean {
   }
 
   // Check if required environment variables are set
-  const hasRequiredEnv = process.env.TEST_DB_NAME || 
+  const hasRequiredEnv = !!(process.env.SUPABASE_DB_URL ||
+                        process.env.TEST_DB_NAME || 
                         process.env.TEST_DB_HOST || 
                         process.env.TEST_DB_USER || 
-                        process.env.TEST_DB_PASSWORD;
+                        process.env.TEST_DB_PASSWORD);
 
   if (!hasRequiredEnv) {
     console.log('Skipping SQL tests - no PostgreSQL environment variables configured');
-    console.log('Set TEST_DB_NAME, TEST_DB_HOST, TEST_DB_USER, or TEST_DB_PASSWORD to enable');
+    console.log('Set SUPABASE_DB_URL, or TEST_DB_NAME/TEST_DB_HOST/TEST_DB_USER/TEST_DB_PASSWORD to enable');
     return false;
   }
 
@@ -101,7 +113,7 @@ describe('SQL Storage Repositories', () => {
     }
 
     try {
-      pool = new Pool(TEST_DB_CONFIG);
+      pool = new Pool(TEST_DB_CONFIG as any);
       
       // Test connection
       const client = await pool.connect();

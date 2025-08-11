@@ -18,6 +18,7 @@ import type { AssetInfo, PaymentInfo } from '../../src/core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
 import { PaymentHubClient } from '../../src/client/PaymentHubClient';
+import { MemoryChannelRepository } from '../../src/storage';
 
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
@@ -305,6 +306,12 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     const channelId = httpClient.getChannelId();
     expect(channelId).toBeTruthy();
 
+    const payerClient = httpClient.getPayerClient();
+
+    const clientChannelInfo = await payerClient.getChannelInfo(channelId!);
+
+    console.log('🔄 Channel info:', clientChannelInfo);
+
     // Create a direct contract instance to access blockchain
     const contract = new RoochPaymentChannelContract({
       rpcUrl: env.rpcUrl,
@@ -312,24 +319,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: false,
     });
 
-    // Create a temporary client for channel info
-    const tempPayerClient = PaymentChannelFactory.createClient({
-      chainConfig: {
-        chain: 'rooch',
-        rpcUrl: env.rpcUrl,
-        network: 'local'
-      },
-      signer: payer.keyManager,
-      keyId: `${payer.did}#${payer.vmIdFragment}`
-    });
 
     // Get channel info from blockchain
     const blockchainChannelInfo = await contract.getChannelStatus({
       channelId: channelId!,
     });
-
-    // Get channel info from client
-    const clientChannelInfo = await tempPayerClient.getChannelInfo(channelId!);
 
     // Verify consistency
     expect(clientChannelInfo.channelId).toBe(blockchainChannelInfo.channelId);

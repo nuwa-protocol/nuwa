@@ -34,47 +34,6 @@ export * from './middlewares/http/HttpBillingMiddleware';
 // Rooch implementation
 export * from './rooch/RoochPaymentChannelContract';
 
-// Import after exports to avoid circular issue
-import { PaymentChannelPayerClient } from './client/PaymentChannelPayerClient';
-import { createRoochPaymentChannelClient as factoryCreateRoochClient } from './factory/chainFactory';
-
-/**
- * Helper to create a PaymentChannelPayerClient for Rooch from an IdentityKit instance.
- * If `rpcUrl` is omitted, it will be inferred from the registered RoochVDR
- * that was configured during `IdentityKit.bootstrap()`.
- */
-export async function createRoochPaymentChannelClient(opts: {
-  kit: IdentityKit;
-  keyId?: string;
-  contractAddress?: string;
-  debug?: boolean;
-  rpcUrl?: string;
-}): Promise<PaymentChannelPayerClient> {
-  const signer = opts.kit.getSigner();
-
-  // Infer RPC URL from RoochVDR when not supplied
-  let rpcUrl = opts.rpcUrl;
-  if (!rpcUrl) {
-    const vdr = VDRRegistry.getInstance().getVDR('rooch') as any;
-    if (vdr && vdr.options && vdr.options.rpcUrl) {
-      rpcUrl = vdr.options.rpcUrl as string;
-    }
-  }
-
-  if (!rpcUrl) {
-    throw new Error('rpcUrl not provided and could not be inferred from the IdentityKit environment');
-  }
-
-  // Use factory to create client
-  return factoryCreateRoochClient({
-    signer,
-    keyId: opts.keyId,
-    contractAddress: opts.contractAddress,
-    debug: opts.debug,
-    rpcUrl,
-  });
-}
-
 // Core SubRAV utilities for advanced use cases
 export { 
   SubRAVSigner, 

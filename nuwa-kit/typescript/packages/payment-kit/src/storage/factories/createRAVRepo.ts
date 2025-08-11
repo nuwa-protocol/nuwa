@@ -40,6 +40,17 @@ export function createRAVRepo(options: RAVRepositoryOptions = {}): RAVRepository
       return new IndexedDBRAVRepository();
 
     case 'sql':
+      // Lazy-create pool from connection string if provided
+      if (!options.pool && options.connectionString) {
+        // Lazy require to avoid bundling 'pg' in browser builds
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const pg = require('pg');
+        const isSupabase = options.connectionString.includes('supabase');
+        options.pool = new pg.Pool({
+          connectionString: options.connectionString,
+          ssl: isSupabase ? { rejectUnauthorized: false } : false,
+        }) as Pool;
+      }
       if (!options.pool) {
         throw new Error('SQL backend requires a PostgreSQL connection pool');
       }
@@ -56,22 +67,4 @@ export function createRAVRepo(options: RAVRepositoryOptions = {}): RAVRepository
     default:
       throw new Error(`Unknown backend type: ${backend}`);
   }
-}
-
-/**
- * Auto-detect the best available backend for the current environment
- */
-export function createRAVRepoAuto(options: Omit<RAVRepositoryOptions, 'backend'> = {}): RAVRepository {
-  // If pool is provided, use SQL
-  if (options.pool) {
-    return createRAVRepo({ ...options, backend: 'sql' });
-  }
-
-  // If in browser and IndexedDB is available, use IndexedDB
-  if (typeof window !== 'undefined' && window.indexedDB) {
-    return createRAVRepo({ ...options, backend: 'indexeddb' });
-  }
-
-  // Fallback to memory
-  return createRAVRepo({ ...options, backend: 'memory' });
 }

@@ -25,8 +25,9 @@ import { HttpPaymentCodec } from './internal/codec';
 import { 
   createDefaultMappingStore, 
   extractHost,
+  createDefaultChannelRepo,
   MemoryHostChannelMappingStore 
-} from './internal/HostChannelMappingStore';
+} from './internal/LocalStore';
 import { parseJsonResponse, serializeJson } from '../../utils/json';
 import { 
   RecoveryResponseSchema,
@@ -38,6 +39,7 @@ import {
 } from '../../schema';
 import type { z } from 'zod';
 import { PaymentHubClient } from '../../client/PaymentHubClient';
+import type { ChannelRepository } from '../../storage';
 
 /**
  * HTTP Client State enum for internal state management
@@ -64,6 +66,7 @@ export class PaymentChannelHttpClient {
   private options: HttpPayerOptions;
   private fetchImpl: FetchLike;
   private mappingStore: HostChannelMappingStore;
+  private channelRepo: ChannelRepository;
   private host: string;
   private state: ClientState = ClientState.INIT;
   private clientState: HttpClientState;
@@ -75,6 +78,7 @@ export class PaymentChannelHttpClient {
     this.fetchImpl = options.fetchImpl || ((globalThis as any).fetch?.bind(globalThis));
     this.mappingStore = options.mappingStore || createDefaultMappingStore();
     this.host = extractHost(options.baseUrl);
+    this.channelRepo = options.channelRepo || createDefaultChannelRepo();
     
     if (!this.fetchImpl) {
       throw new Error('fetch implementation not available. Please provide fetchImpl option.');
@@ -85,7 +89,9 @@ export class PaymentChannelHttpClient {
       chainConfig: options.chainConfig,
       signer: options.signer,
       keyId: options.keyId,
-      storageOptions: options.storageOptions
+      storageOptions: {
+        channelRepo: this.channelRepo
+      }
     });
     
     this.clientState = {
@@ -242,6 +248,10 @@ export class PaymentChannelHttpClient {
    */
   getChannelId(): string | undefined {
     return this.clientState.channelId;
+  }
+
+  getPayerClient(): PaymentChannelPayerClient {
+    return this.payerClient;
   }
 
   getHubClient(): PaymentHubClient {

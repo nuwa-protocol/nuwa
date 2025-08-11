@@ -7,7 +7,12 @@ import { RateProvider } from '../../billing';
 import { ContractRateProvider } from '../../billing/rate/contract';
 import { PaymentChannelPayeeClient } from '../../client/PaymentChannelPayeeClient';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
-import { MemoryChannelRepository } from '../../storage';
+import {
+  createStorageRepositories,
+  type ChannelRepository,
+  type PendingSubRAVRepository,
+  type RAVRepository,
+} from '../../storage';
 import { ClaimScheduler } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
@@ -78,20 +83,45 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly rateProvider: RateProvider;
   private readonly serviceDid: string;
   private readonly claimScheduler: ClaimScheduler;
+  // Hold storage repositories explicitly for reuse across components
+  private readonly channelRepo: ChannelRepository;
+  private readonly ravRepo: RAVRepository;
+  private readonly pendingSubRAVRepo: PendingSubRAVRepository;
 
   constructor(
     config: ExpressPaymentKitOptions,
-    payeeClient: PaymentChannelPayeeClient,
-    rateProvider: RateProvider,
-    serviceDid: string
+    deps: {
+      contract: IPaymentChannelContract;
+      signer: SignerInterface;
+      didResolver: DIDResolver;
+      rateProvider: RateProvider;
+      serviceDid: string;
+    }
   ) {
     this.config = config;
-    this.payeeClient = payeeClient;
-    this.rateProvider = rateProvider;
-    this.serviceDid = serviceDid;
+    this.rateProvider = deps.rateProvider;
+    this.serviceDid = deps.serviceDid;
     // Ensure built-in billing strategies are registered when server starts
     registerBuiltinStrategies();
     
+    // Resolve storage repositories from environment
+    const storage = this.resolveStorageFromEnv();
+    this.channelRepo = storage.channelRepo;
+    this.ravRepo = storage.ravRepo;
+    this.pendingSubRAVRepo = storage.pendingSubRAVRepo;
+
+    // Create PayeeClient inside impl to ensure shared storage
+    this.payeeClient = new PaymentChannelPayeeClient({
+      contract: deps.contract,
+      signer: deps.signer,
+      didResolver: deps.didResolver,
+      storageOptions: {
+        channelRepo: this.channelRepo,
+        ravRepo: this.ravRepo,
+        pendingSubRAVRepo: this.pendingSubRAVRepo,
+      },
+    });
+
     // Create single billable router for all routes (business + built-in)
     this.billableRouter = new BillableRouter({
       serviceId: config.serviceId,
@@ -100,8 +130,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // Create ClaimScheduler for automated claiming
     this.claimScheduler = new ClaimScheduler({
-      store: payeeClient.getRAVRepository(),
-      contract: payeeClient.getContract(),
+      store: this.ravRepo,
+      contract: this.payeeClient.getContract(),
       signer: config.signer,
       policy: {
         minClaimAmount: BigInt('10000000'), // 1 RGas minimum
@@ -116,13 +146,13 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // Create HTTP billing middleware with ClaimScheduler
     this.middleware = new HttpBillingMiddleware({
-      payeeClient,
+      payeeClient: this.payeeClient,
       rateProvider: this.rateProvider,
       ruleProvider: this.billableRouter,
       serviceId: config.serviceId,
-      pendingSubRAVStore: payeeClient.getPendingSubRAVRepository(),
-      ravRepository: payeeClient.getRAVRepository(),
-      didResolver: payeeClient.getDidResolver(),
+      pendingSubRAVStore: this.pendingSubRAVRepo,
+      ravRepository: this.ravRepo,
+      didResolver: this.payeeClient.getDidResolver(),
       defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
       debug: config.debug || false,
       claimScheduler: this.claimScheduler
@@ -133,6 +163,37 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     
     // Set up discovery endpoint and routes
     this.setupRoutes();
+  }
+
+  /**
+   * Resolve storage repositories based on environment variables.
+   * Priority: PAYMENTKIT_CONNECTION_STRING > SUPABASE_DB_URL > DATABASE_URL.
+   * Backend selection: PAYMENTKIT_BACKEND or infer from connection string.
+   */
+  private resolveStorageFromEnv(): {
+    channelRepo: ChannelRepository;
+    ravRepo: RAVRepository;
+    pendingSubRAVRepo: PendingSubRAVRepository;
+  } {
+    const connectionString =
+      process.env.PAYMENTKIT_CONNECTION_STRING ||
+      process.env.SUPABASE_DB_URL ||
+      process.env.DATABASE_URL;
+
+    const backendEnv = process.env.PAYMENTKIT_BACKEND as 'sql' | 'memory' | undefined;
+    const backend: 'sql' | 'memory' = backendEnv || (connectionString ? 'sql' : 'memory');
+
+    const tablePrefix = process.env.PAYMENTKIT_TABLE_PREFIX || 'nuwa_';
+    const autoMigrate = process.env.PAYMENTKIT_AUTO_MIGRATE === 'true' || (process.env.NODE_ENV !== 'production');
+
+    const { channelRepo, ravRepo, pendingSubRAVRepo } = createStorageRepositories({
+      backend,
+      connectionString,
+      tablePrefix,
+      autoMigrate,
+    });
+
+    return { channelRepo, ravRepo, pendingSubRAVRepo };
   }
 
   /**
@@ -534,20 +595,19 @@ export async function createExpressPaymentKit(config: ExpressPaymentKitOptions):
   const vdrRegistry = VDRRegistry.getInstance();
   vdrRegistry.registerVDR(roochVDR);
 
-  // Create PayeeClient
-  const payeeClient = new PaymentChannelPayeeClient({
-    contract,
-    signer: config.signer,
-    didResolver: vdrRegistry,
-    storageOptions: {
-      customChannelRepo: new MemoryChannelRepository(),
-    },
-  });
-
   // Create default ContractRateProvider
   const rateProvider = new ContractRateProvider(contract, 30_000);
 
-  return new ExpressPaymentKitImpl(config, payeeClient, rateProvider, serviceDid);
+  return new ExpressPaymentKitImpl(
+    config,
+    {
+      contract,
+      signer: config.signer,
+      didResolver: vdrRegistry,
+      rateProvider,
+      serviceDid,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------

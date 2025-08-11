@@ -1,6 +1,7 @@
 import type { HostChannelMappingStore, PersistedHttpClientState } from '../types';
 import { PersistedHttpClientStateSchema } from '../../../schema/core';
 import { serializeJson, parseJson } from '../../../utils/json';
+import { ChannelRepository, IndexedDBChannelRepository, MemoryChannelRepository } from '../../../storage';
 
 /**
  * Memory-based implementation of HostChannelMappingStore
@@ -188,6 +189,13 @@ export function createDefaultMappingStore(): HostChannelMappingStore {
   
   // Fall back to memory store for Node.js or environments without localStorage
   return new MemoryHostChannelMappingStore();
+}
+
+export function createDefaultChannelRepo(): ChannelRepository {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    return new IndexedDBChannelRepository();
+  }
+  return new MemoryChannelRepository();
 }
 
 /**

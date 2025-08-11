@@ -38,7 +38,7 @@ export interface PaymentChannelFactoryOptions {
   chainConfig: ChainConfig;
   signer: SignerInterface;
   keyId?: string;
-  storageOptions?: PaymentChannelPayerClientOptions['storageOptions'];
+  storageOptions: PaymentChannelPayerClientOptions['storageOptions'];
 }
 
 /**
@@ -77,31 +77,6 @@ export class PaymentChannelFactory {
     });
   }
 
-  /**
-   * Convenience method to create a Rooch payment channel client
-   */
-  static createRoochClient(options: {
-    signer: SignerInterface;
-    keyId?: string;
-    rpcUrl?: string;
-    network?: 'local' | 'dev' | 'test' | 'main';
-    contractAddress?: string;
-    debug?: boolean;
-    storageOptions?: PaymentChannelPayerClientOptions['storageOptions'];
-  }): PaymentChannelPayerClient {
-    return this.createClient({
-      chainConfig: {
-        chain: 'rooch',
-        rpcUrl: options.rpcUrl,
-        network: options.network,
-        contractAddress: options.contractAddress,
-        debug: options.debug,
-      },
-      signer: options.signer,
-      keyId: options.keyId,
-      storageOptions: options.storageOptions,
-    });
-  }
 }
 
 /**
@@ -110,17 +85,3 @@ export class PaymentChannelFactory {
 export function createPaymentChannelClient(options: PaymentChannelFactoryOptions): PaymentChannelPayerClient {
   return PaymentChannelFactory.createClient(options);
 }
-
-/**
- * Convenience function to create a Rooch payment channel client
- */
-export function createRoochPaymentChannelClient(options: {
-  signer: SignerInterface;
-  keyId?: string;
-  rpcUrl?: string;
-  network?: 'local' | 'dev' | 'test' | 'main';
-  contractAddress?: string;
-  debug?: boolean;
-}): PaymentChannelPayerClient {
-  return PaymentChannelFactory.createRoochClient(options);
-} 

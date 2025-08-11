@@ -15,7 +15,6 @@ import type {
 import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
-import { createChannelRepoAuto, createRAVRepoAuto, createPendingSubRAVRepoAuto } from '../storage';
 import { SubRAVUtils } from '../core/SubRav';
 import { PaymentUtils } from '../core/PaymentUtils';
 import { PaymentHubClient } from './PaymentHubClient';
@@ -24,23 +23,16 @@ import { PaymentHubClient } from './PaymentHubClient';
  * Storage options for PaymentChannelPayeeClient
  */
 export interface PayeeStorageOptions {
-  /** Storage backend type */
-  backend?: 'memory' | 'indexeddb' | 'sql';
-  /** Custom repository implementations */
-  customChannelRepo?: ChannelRepository;
-  customRAVRepo?: RAVRepository;
-  customPendingSubRAVRepo?: PendingSubRAVRepository;
-  /** PostgreSQL connection pool for SQL backend */
-  pool?: any;
-  /** Table name prefix for SQL backends */
-  tablePrefix?: string;
+  channelRepo: ChannelRepository;
+  ravRepo: RAVRepository;
+  pendingSubRAVRepo: PendingSubRAVRepository;
 }
 
 export interface PaymentChannelPayeeClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   didResolver: DIDResolver; // Required for signature verification
-  storageOptions?: PayeeStorageOptions;
+  storageOptions: PayeeStorageOptions;
 }
 
 export interface VerificationResult {
@@ -103,33 +95,9 @@ export class PaymentChannelPayeeClient {
     this.defaultAssetId = "0x3::gas_coin::RGas";
     
     // Initialize repositories
-    if (options.storageOptions?.customChannelRepo) {
-      this.channelRepo = options.storageOptions.customChannelRepo;
-    } else {
-      this.channelRepo = createChannelRepoAuto({
-        pool: options.storageOptions?.pool,
-        tablePrefix: options.storageOptions?.tablePrefix,
-      });
-    }
-    
-    if (options.storageOptions?.customRAVRepo) {
-      this.ravRepo = options.storageOptions.customRAVRepo;
-    } else {
-      this.ravRepo = createRAVRepoAuto({
-        pool: options.storageOptions?.pool,
-        tablePrefix: options.storageOptions?.tablePrefix,
-      });
-    }
-    
-    if (options.storageOptions?.customPendingSubRAVRepo) {
-      this.pendingSubRAVRepo = options.storageOptions.customPendingSubRAVRepo;
-    } else {
-      this.pendingSubRAVRepo = createPendingSubRAVRepoAuto({
-        pool: options.storageOptions?.pool,
-        tablePrefix: options.storageOptions?.tablePrefix,
-      });
-    }
-    
+    this.channelRepo = options.storageOptions.channelRepo;
+    this.ravRepo = options.storageOptions.ravRepo;
+    this.pendingSubRAVRepo = options.storageOptions.pendingSubRAVRepo;
   }
 
   // -------- Public accessors for internal components --------

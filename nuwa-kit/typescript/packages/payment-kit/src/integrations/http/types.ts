@@ -1,8 +1,8 @@
 import type { ChainConfig } from '../../factory/chainFactory';
-import type { PaymentChannelPayerClientOptions } from '../../client/PaymentChannelPayerClient';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { SubRAV, PaymentInfo, SignedSubRAV } from '../../core/types';
 import type { PersistedHttpClientState } from '../../schema/core';
+import type { ChannelRepository } from '../../storage';
 
 /**
  * Configuration options for PaymentChannelHttpClient
@@ -19,9 +19,6 @@ export interface HttpPayerOptions {
 
   /** Key ID for signing operations (optional, will use first available if not specified) */
   keyId?: string;
-
-  /** Storage options for payment channel data */
-  storageOptions?: PaymentChannelPayerClientOptions['storageOptions'];
 
   /** Optional specific channelId. If empty, will auto-create or find active channel for current host */
   channelId?: string;
@@ -58,6 +55,9 @@ export interface HttpPayerOptions {
    * Node runtime: optional FileStore or RedisStore.
    */
   mappingStore?: HostChannelMappingStore;
+
+  /** Channel repository for storing payment channel data */
+  channelRepo?: ChannelRepository;
 
   /** Custom fetch implementation (defaults to global fetch) */
   fetchImpl?: FetchLike;
