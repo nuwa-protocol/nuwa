@@ -264,6 +264,7 @@ export class SqlChannelRepository implements ChannelRepository {
       const row = result.rows[0];
       return {
         channelId: row.channel_id_ref,
+        vmIdFragment: row.vm_id_fragment,
         epoch: BigInt(row.epoch),
         nonce: BigInt(row.nonce),
         accumulatedAmount: BigInt(row.accumulated_amount),
@@ -334,6 +335,7 @@ export class SqlChannelRepository implements ChannelRepository {
       for (const row of result.rows) {
         states[row.vm_id_fragment] = {
           channelId: row.channel_id_ref,
+          vmIdFragment: row.vm_id_fragment,
           epoch: BigInt(row.epoch),
           nonce: BigInt(row.nonce),
           accumulatedAmount: BigInt(row.accumulated_amount),

@@ -1,15 +1,14 @@
-import type { SignedSubRAV } from './types';
-import type { BillingContext } from '../billing';
+import type { ChannelInfo, SignedSubRAV, SubChannelState, SubRAV } from './types';
+import type { BillingContext, BillingRule } from '../billing';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import type { RAVRepository } from '../storage/interfaces/RAVRepository';
-import type { DIDResolver } from '@nuwa-ai/identity-kit';
+import type { DIDDocument} from '@nuwa-ai/identity-kit';
 import { SubRAVSigner } from './SubRav';
 
 export interface RavVerifyDeps {
   pendingRepo: PendingSubRAVRepository;
-  ravRepo?: RAVRepository; // kept for compatibility if needed later
+  ravRepo: RAVRepository; 
   debug?: boolean;
-  didResolver?: DIDResolver; // optional direct signature verification
 }
 
 export type RavDecision =
@@ -23,115 +22,110 @@ export interface RavVerifyResult {
   signedVerified: boolean;
   pendingMatched: boolean;
   error?: { code: string; message: string };
-  debugTrace: Array<{ step: string; info?: unknown }>;
+}
+
+export interface RavVerifyParams {
+  channelInfo: ChannelInfo;
+  subChannelState: SubChannelState;
+  billingRule: BillingRule;
+  payerDidDoc: DIDDocument;
+  /** Signed SubRAV from client (optional in FREE mode) */
+  signedSubRav?: SignedSubRAV;
+  /** Latest pending SubRAV from pending repository, it should match the signed SubRAV */
+  latestPendingSubRav?: SubRAV;
+  /** Latest signed SubRAV from repository, it is the previous version of the signed SubRAV */
+  latestSignedSubRav?: SignedSubRAV;
+  /** Debug mode */
+  debug?: boolean;
 }
 
 export async function verify(
-  ctx: BillingContext,
-  deps: RavVerifyDeps
+  params: RavVerifyParams,
 ): Promise<RavVerifyResult> {
-  const trace: Array<{ step: string; info?: unknown }> = [];
   const result: RavVerifyResult = {
     decision: 'ALLOW',
-    signedVerified: !ctx.meta.signedSubRav, // default to true if no signedSubRav is provided
+    signedVerified: !params.signedSubRav, // default to true if no signedSubRav is provided
     pendingMatched: false,
-    debugTrace: trace,
   };
 
-  try {
-    const signed = ctx.meta.signedSubRav;
-    const billingRule = ctx.meta.billingRule;
+
+    const signed = params.signedSubRav;
+    const billingRule = params.billingRule;
     const isFreeRoute = !!billingRule && billingRule.paymentRequired === false;
-
-    // 1) determine channelId / vmIdFragment using provided context/state
-    let channelId: string | undefined;
-    let vmIdFragment: string | undefined;
-
-    if (signed) {
-      channelId = signed.subRav.channelId;
-      vmIdFragment = signed.subRav.vmIdFragment;
-      trace.push({ step: 'channel.fromSigned', info: { channelId, vmIdFragment } });
-    } else {
-      // Try from state baselines first (pre-fetched in preProcess)
-      channelId = ctx.state?.subChannelState?.channelId
-        || ctx.state?.latestSignedSubRav?.subRav?.channelId
-        || ctx.state?.channelInfo?.channelId
-        || undefined;
-      if (ctx.meta.didInfo?.keyId) {
-        const keyId = ctx.meta.didInfo.keyId;
-        const parts = keyId.split('#');
-        if (parts.length === 2) vmIdFragment = parts[1];
-      }
-      trace.push({ step: 'channel.fromStateOrDid', info: { channelId, vmIdFragment } });
-    }
-
-    // 2) pending priority check
-    if (channelId && vmIdFragment) {
-      const latestPending = await deps.pendingRepo.findLatestBySubChannel(channelId, vmIdFragment);
-      if (latestPending) {
-        trace.push({ step: 'pending.found', info: { nonce: latestPending.nonce.toString() } });
-
-        if (!signed) {
-          if (!isFreeRoute) {
-            result.decision = 'REQUIRE_SIGNATURE_402';
-            result.error = { code: 'PAYMENT_REQUIRED', message: `Signature required for pending proposal (channel: ${channelId}, nonce: ${latestPending.nonce})` };
-            return finalize();
-          }
-        } else {
-          const matches =
-            signed.subRav.channelId === channelId &&
-            signed.subRav.vmIdFragment === vmIdFragment &&
-            signed.subRav.nonce === latestPending.nonce;
-          if (!matches) {
-            result.decision = 'CONFLICT';
-            result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match pending proposal (expected nonce: ${latestPending.nonce}, received: ${signed.subRav.nonce})` };
-            return finalize();
-          }
-          result.pendingMatched = true;
-        }
-      } else {
-        trace.push({ step: 'pending.none', info: {} });
-      }
-    }
-
+ 
     // 3) signature verification (if SignedSubRAV is provided)
     if (signed) {
-      try {
-        if (deps.didResolver) {
-          const payerDid = ctx.meta.didInfo?.did || ctx.state?.channelInfo?.payerDid;
-          if (payerDid) {
-            const ok = await SubRAVSigner.verifyWithResolver(signed, payerDid, deps.didResolver);
-            result.signedVerified = !!ok;
-            trace.push({ step: 'signature.verify.resolver', info: { ok } });
-            if (!ok) return finalize();
-          } else {
-            // No payerDid available to verify
-            result.signedVerified = true; // do not fail verification in Phase 1
-            trace.push({ step: 'signature.verify.skipped.noPayerDid' });
-          }
-        } else {
-          // No resolver provided: skip signature check to preserve Phase 1 behavior
-          result.signedVerified = true;
-          trace.push({ step: 'signature.verify.skipped.noResolver' });
-        }
-      } catch (e) {
-        result.signedVerified = false;
-        trace.push({ step: 'signature.exception', info: String(e) });
+      const ok = await SubRAVSigner.verify(signed, { didDocument: params.payerDidDoc });
+      result.signedVerified = !!ok;
+      if (!ok) {
+        result.error = { code: 'INVALID_SIGNATURE', message: `Invalid signature for signed SubRAV` };
         return finalize();
       }
     }
 
-    return finalize();
+    // 2) pending priority check
+    
+    if (params.latestPendingSubRav) {
 
-  } catch (e) {
-    trace.push({ step: 'verify.exception', info: String(e) });
+      if (!signed) {
+        if (!isFreeRoute) {
+          result.decision = 'REQUIRE_SIGNATURE_402';
+          result.error = { code: 'PAYMENT_REQUIRED', message: `Signature required for pending proposal (channel: ${params.channelInfo.channelId}, nonce: ${params.latestPendingSubRav.nonce})` };
+          return finalize();
+        }
+      } else {
+        const matches =
+          signed.subRav.channelId === params.channelInfo.channelId &&
+          signed.subRav.vmIdFragment === params.subChannelState.vmIdFragment &&
+          signed.subRav.nonce === params.latestPendingSubRav.nonce;
+        if (!matches) {
+          result.decision = 'CONFLICT';
+          result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match pending proposal (expected nonce: ${params.latestPendingSubRav.nonce}, received: ${signed.subRav.nonce})` };
+          return finalize();
+        }
+        result.pendingMatched = true;
+      }
+    }else {
+      //if no pending, it means the server lost the pending proposal.
+      //we check the signed subrav with the latest signed subrav or subchannel state
+      if(signed) {
+        if(params.latestSignedSubRav) {
+          if(signed.subRav.channelId === params.latestSignedSubRav.subRav.channelId &&
+            signed.subRav.vmIdFragment === params.latestSignedSubRav.subRav.vmIdFragment &&
+            signed.subRav.nonce > params.latestSignedSubRav.subRav.nonce &&
+            signed.subRav.accumulatedAmount > params.latestSignedSubRav.subRav.accumulatedAmount) {
+            result.decision = 'ALLOW';
+          }else {
+            result.decision = 'CONFLICT';
+            result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match latest signed SubRAV (expected nonce: ${params.latestSignedSubRav.subRav.nonce}, received: ${signed.subRav.nonce})` };
+            return finalize();
+          }
+        }else {
+          //there no latestSignedSubRav, it means the server lost the signed subrav.
+          //we check the signed subrav with the subchannel state
+          if(signed.subRav.channelId === params.subChannelState.channelId &&
+            signed.subRav.vmIdFragment === params.subChannelState.vmIdFragment &&
+            signed.subRav.nonce > params.subChannelState.nonce &&
+            signed.subRav.accumulatedAmount > params.subChannelState.accumulatedAmount) {
+            result.decision = 'ALLOW';
+          }else {
+            result.decision = 'CONFLICT';
+            result.error = { code: 'SUBRAV_CONFLICT', message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelState.nonce}, received: ${signed.subRav.nonce})` };
+            return finalize();
+          }
+        }
+      }
+    }
+    
+
+    
+
     return finalize();
-  }
 
   function finalize(): RavVerifyResult {
-    if (deps.debug) {
+    if (params.debug) {
       // eslint-disable-next-line no-console
-      console.log('[RavVerifier]', ...trace.map(t => ({ [t.step]: t.info })));
+      console.log('[RavVerifier]', result);
     }
     return result;
   }

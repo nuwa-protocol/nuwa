@@ -95,6 +95,7 @@ export class MemoryChannelRepository implements ChannelRepository {
     const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key) || {
       channelId,
+      vmIdFragment,
       epoch: BigInt(0),
       nonce: BigInt(0),
       accumulatedAmount: BigInt(0),

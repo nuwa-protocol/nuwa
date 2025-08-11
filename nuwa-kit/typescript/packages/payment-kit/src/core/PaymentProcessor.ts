@@ -143,32 +143,42 @@ export interface PaymentVerificationResult extends VerificationResult {
         ctx.state.error = { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` } as any;
         return ctx;
       }
-      ctx.state.channelInfo = channelInfo;
+      
 
-      // Use assetId from channelInfo instead of ctx.assetId
-      const assetId = channelInfo.assetId;
-
-      // Latest signed RAV from repository
-      const latest = await this.ravRepository.getLatest(channelId, vmIdFragment);
-      if (latest) ctx.state.latestSignedSubRav = latest;
-
-      const subState = await this.config.payeeClient.getSubChannelState(channelId, vmIdFragment);
-      if (!subState) {
+      const subChannelState = await this.config.payeeClient.getSubChannelState(channelId, vmIdFragment);
+      if (!subChannelState) {
         ctx.state.error = { code: 'SUBCHANNEL_NOT_AUTHORIZED', message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}` } as any;
         return ctx;
       }
-      ctx.state.subChannelState = subState;
+      
+
+      // Latest signed RAV from repository
+      const latestSignedSubRav = await this.ravRepository.getLatest(channelId, vmIdFragment);
+      
 
       // Fetch and cache chainId for proposal generation
       ctx.state.chainId = await this.config.payeeClient.getContract().getChainId();
 
+      const payerDidDoc = await this.config.didResolver.resolveDID(channelInfo.payerDid);
+      if (!payerDidDoc) {
+        ctx.state.error = { code: 'DID_RESOLVE_FAILED', message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}` } as any;
+        return ctx;
+      }
+
       // Single-entry verification using prefetched context
-      const ravResult = await verifyRav(ctx, {
-        pendingRepo: this.pendingSubRAVStore,
-        ravRepo: this.ravRepository,
+      const ravResult = await verifyRav({
+        channelInfo,
+        subChannelState,
+        billingRule: ctx.meta.billingRule!,
+        payerDidDoc,
+        signedSubRav: ctx.meta.signedSubRav,
+        latestSignedSubRav: latestSignedSubRav || undefined,
         debug: this.config.debug,
-        didResolver: this.config.didResolver,
       });
+
+      ctx.state.channelInfo = channelInfo;
+      ctx.state.subChannelState = subChannelState;
+      ctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
 
       // Handle early-return decisions
       if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
@@ -196,10 +206,8 @@ export interface PaymentVerificationResult extends VerificationResult {
           this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
         }
       }
-
-      // Populate baseline into state
-      // No baseline passthrough from RavVerifier; ctx.state already contains prefetched context
-
+      
+      const assetId = channelInfo.assetId;
       // Step 3: Prefetch exchange rate only (no cost calculation here)
       {
         try {

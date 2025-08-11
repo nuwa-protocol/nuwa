@@ -180,6 +180,7 @@ export class PaymentChannelPayeeClient {
       const derived: SubChannelState = {
         channelId,
         epoch: channelInfo.epoch,
+        vmIdFragment: subInfo.vmIdFragment,
         accumulatedAmount: subInfo.lastClaimedAmount,
         nonce: subInfo.lastConfirmedNonce,
         lastUpdated: Date.now(),

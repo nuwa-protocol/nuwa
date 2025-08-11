@@ -66,6 +66,8 @@ export interface SubChannelState {
   channelId: string;
   /** Channel epoch */
   epoch: bigint;
+  /** DID verification method fragment (e.g., "key-1") */
+  vmIdFragment: string;
   /** Current accumulated amount for this sub-channel */
   accumulatedAmount: bigint;
   /** Current nonce for this sub-channel */
