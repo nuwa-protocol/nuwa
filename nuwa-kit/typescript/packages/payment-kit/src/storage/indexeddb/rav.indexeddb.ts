@@ -67,7 +67,17 @@ export class IndexedDBRAVRepository implements RAVRepository {
 
     return new Promise((resolve, reject) => {
       const request = index.get(IDBKeyRange.only([channelId, vmIdFragment]));
-      request.onsuccess = () => resolve(request.result);
+
+    return new Promise((resolve, reject) => {
+      const key = [channelId, vmIdFragment, nonce.toString()];
+      const request = store.get(key);
+      request.onsuccess = () => {
+        if (request.result) {
+          resolve(request.result.ravData);
+        } else {
+          resolve(null);
+        }
+      };
       request.onerror = () => reject(request.error);
     });
   }
