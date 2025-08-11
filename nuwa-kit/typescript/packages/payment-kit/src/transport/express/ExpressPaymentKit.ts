@@ -16,7 +16,8 @@ import {
   type PendingSubRAVRepository,
   type RAVRepository,
 } from '../../storage';
-import { ClaimScheduler } from '../../core/ClaimScheduler';
+import { ClaimScheduler, DEFAULT_CLAIM_POLICY } from '../../core/ClaimScheduler';
+import type { ClaimPolicy } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
@@ -55,6 +56,18 @@ export interface ExpressPaymentKitOptions {
   adminDid?: string | string[];
   /** Debug logging */
   debug?: boolean;
+
+  /** Optional ClaimScheduler configuration */
+  claimScheduler?: {
+    /** Override claiming policy; only set fields you want to change */
+    policy?: Partial<ClaimPolicy> & { minClaimAmount?: bigint | string };
+    /** Polling interval in milliseconds (default: 30s) */
+    pollIntervalMs?: number;
+    /** Enable detailed debug logs for scheduler */
+    debug?: boolean;
+    /** Auto start the scheduler on kit initialization (default: true) */
+    autoStart?: boolean;
+  };
 }
 
 /**
@@ -132,20 +145,36 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       defaultPricePicoUSD: config.defaultPricePicoUSD,
     });
 
-    // Create ClaimScheduler for automated claiming
+    // Create ClaimScheduler for automated claiming (configurable)
+    const defaultPolicy: ClaimPolicy = DEFAULT_CLAIM_POLICY;
+    const userPolicy = config.claimScheduler?.policy || {};
+    const normalizedUserPolicy: Partial<ClaimPolicy> = {
+      ...userPolicy,
+      // Allow string for minClaimAmount in config and normalize to bigint
+      minClaimAmount:
+        typeof userPolicy.minClaimAmount === 'string'
+          ? BigInt(userPolicy.minClaimAmount)
+          : userPolicy.minClaimAmount,
+    } as Partial<ClaimPolicy>;
+
+    const schedulerPolicy: ClaimPolicy = {
+      ...defaultPolicy,
+      ...normalizedUserPolicy,
+    } as ClaimPolicy;
+    const schedulerPollMs =
+      typeof config.claimScheduler?.pollIntervalMs === 'number'
+        ? config.claimScheduler!.pollIntervalMs!
+        : 30_000;
+    const schedulerDebug = config.claimScheduler?.debug ?? config.debug ?? false;
+
     this.claimScheduler = new ClaimScheduler({
       store: this.ravRepo,
       contract: this.payeeClient.getContract(),
       signer: config.signer,
-      policy: {
-        minClaimAmount: BigInt('10000000'), // 1 RGas minimum
-        maxIntervalMs: 24 * 60 * 60 * 1000, // 24 hours maximum
-        maxConcurrentClaims: 5,
-        maxRetries: 3,
-        retryDelayMs: 60_000, // 1 minute
-      },
-      pollIntervalMs: 30_000, // 30 seconds
-      debug: config.debug || false,
+      channelRepo: this.channelRepo,
+      policy: schedulerPolicy,
+      pollIntervalMs: schedulerPollMs,
+      debug: schedulerDebug,
     });
 
     // Create HTTP billing middleware with ClaimScheduler
@@ -167,6 +196,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
     // Set up discovery endpoint and routes
     this.setupRoutes();
+
+    // Start background claim scheduler by default (configurable)
+    const autoStart = config.claimScheduler?.autoStart ?? true;
+    if (autoStart) {
+      try {
+        this.claimScheduler.start();
+      } catch (e) {
+        console.error('Failed to start ClaimScheduler:', e);
+      }
+    }
   }
 
   /**

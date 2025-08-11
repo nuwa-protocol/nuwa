@@ -106,7 +106,6 @@ export class HttpBillingMiddleware {
       rateProvider: config.rateProvider,
       pendingSubRAVStore: config.pendingSubRAVStore,
       ravRepository: config.ravRepository,
-      claimScheduler: config.claimScheduler,
       didResolver: config.didResolver,
       debug: config.debug,
     });

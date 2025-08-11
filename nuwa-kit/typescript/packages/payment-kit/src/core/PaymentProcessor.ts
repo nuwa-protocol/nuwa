@@ -12,7 +12,6 @@ import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRA
 import type { RAVRepository } from '../storage/interfaces/RAVRepository';
 import { createPendingSubRAVRepo } from '../storage/factories/createPendingSubRAVRepo';
 import { HttpPaymentCodec } from '../middlewares/http/HttpPaymentCodec';
-import type { ClaimScheduler } from './ClaimScheduler';
 import { PaymentUtils } from './PaymentUtils';
 import { deriveChannelId } from '../rooch/ChannelUtils';
 import { verify as verifyRav } from './RavVerifier';
@@ -41,9 +40,6 @@ export interface PaymentProcessorConfig {
 
   /** Default asset ID if not provided in request context */
   defaultAssetId?: string;
-
-  /** Optional claim scheduler for automated claiming */
-  claimScheduler?: ClaimScheduler;
 
   /** Debug logging */
   debug?: boolean;
@@ -91,10 +87,8 @@ export class PaymentProcessor {
     try {
       registerBuiltinStrategies();
     } catch {}
-    this.pendingSubRAVStore =
-      config.pendingSubRAVStore || createPendingSubRAVRepo({ backend: 'memory' });
-    // Default to the same RAV repository as the payee client if not provided
-    this.ravRepository = config.ravRepository || config.payeeClient.getRAVRepository();
+    this.pendingSubRAVStore = config.pendingSubRAVStore;
+    this.ravRepository = config.ravRepository;
     this.stats = {
       totalRequests: 0,
       successfulPayments: 0,
@@ -169,6 +163,11 @@ export class PaymentProcessor {
           attachHeader: false,
         });
       }
+      // Latest pending SubRAV from pending repository
+      const latestPendingSubRav = await this.pendingSubRAVStore.findLatestBySubChannel(
+        channelId,
+        vmIdFragment
+      );
 
       // Single-entry verification using prefetched context
       const ravResult = await verifyRav({
@@ -178,12 +177,14 @@ export class PaymentProcessor {
         payerDidDoc,
         signedSubRav: ctx.meta.signedSubRav,
         latestSignedSubRav: latestSignedSubRav || undefined,
+        latestPendingSubRav: latestPendingSubRav || undefined,
         debug: this.config.debug,
       });
 
       pctx.state.channelInfo = channelInfo;
       pctx.state.subChannelState = subChannelState;
       pctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
+      pctx.state.latestPendingSubRav = latestPendingSubRav || undefined;
 
       // Handle early-return decisions
       if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
@@ -204,18 +205,25 @@ export class PaymentProcessor {
 
       // Persist verification flags and apply side-effects on success
       pctx.state.signedSubRavVerified = ravResult.signedVerified;
-      if (ravResult.pendingMatched && ravResult.signedVerified && pctx.meta.signedSubRav) {
-        try {
-          await this.pendingSubRAVStore.remove(
-            pctx.meta.signedSubRav.subRav.channelId,
-            pctx.meta.signedSubRav.subRav.vmIdFragment,
-            pctx.meta.signedSubRav.subRav.nonce
-          );
-        } catch (e) {
-          this.log('⚠️ Failed to remove matched pending:', e);
+      if (ravResult.signedVerified && pctx.meta.signedSubRav) {
+        this.log('🗑️ Removing matched pending SubRAV and persisting verified SignedSubRAV:', {
+          channelId: pctx.meta.signedSubRav.subRav.channelId,
+          vmIdFragment: pctx.meta.signedSubRav.subRav.vmIdFragment,
+          nonce: pctx.meta.signedSubRav.subRav.nonce.toString(),
+        });
+        if (ravResult.pendingMatched) {
+          try {
+            await this.pendingSubRAVStore.remove(
+              pctx.meta.signedSubRav.subRav.channelId,
+              pctx.meta.signedSubRav.subRav.vmIdFragment,
+              pctx.meta.signedSubRav.subRav.nonce
+            );
+          } catch (e) {
+            this.log('⚠️ Failed to remove matched pending:', e);
+          }
         }
         try {
-          await this.ravRepository?.save(pctx.meta.signedSubRav);
+          await this.ravRepository.save(pctx.meta.signedSubRav);
         } catch (e) {
           this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
         }
@@ -398,24 +406,25 @@ export class PaymentProcessor {
 
       const newSubRAV = pctx.state.unsignedSubRav;
 
+      // the previous pending SubRAV is removed in the preProcess step.
       // Clean up previous pending SubRAV (nonce - 1) to prevent accumulation
-      if (newSubRAV.nonce > 1n) {
-        const prevNonce = newSubRAV.nonce - 1n;
-        try {
-          await this.pendingSubRAVStore.remove(
-            newSubRAV.channelId,
-            newSubRAV.vmIdFragment,
-            prevNonce
-          );
-          this.log('🗑️ Removed previous pending SubRAV:', {
-            channelId: newSubRAV.channelId,
-            nonce: prevNonce.toString(),
-          });
-        } catch (error) {
-          this.log('⚠️ Failed to remove previous pending SubRAV:', error);
-          // Don't fail the entire operation for cleanup errors
-        }
-      }
+      // if (newSubRAV.nonce > 1n) {
+      //   const prevNonce = newSubRAV.nonce - 1n;
+      //   try {
+      //     await this.pendingSubRAVStore.remove(
+      //       newSubRAV.channelId,
+      //       newSubRAV.vmIdFragment,
+      //       prevNonce
+      //     );
+      //     this.log('🗑️ Removed previous pending SubRAV:', {
+      //       channelId: newSubRAV.channelId,
+      //       nonce: prevNonce.toString(),
+      //     });
+      //   } catch (error) {
+      //     this.log('⚠️ Failed to remove previous pending SubRAV:', error);
+      //     // Don't fail the entire operation for cleanup errors
+      //   }
+      // }
 
       // Store the new unsigned SubRAV for future verification
       await this.pendingSubRAVStore.save(newSubRAV);

@@ -5,6 +5,7 @@
 
 import type { SignedSubRAV } from './types';
 import type { RAVRepository } from '../storage/interfaces/RAVRepository';
+import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import type { IPaymentChannelContract } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
@@ -36,6 +37,9 @@ export interface ClaimSchedulerOptions {
   /** Signer for claim transactions */
   signer: SignerInterface;
 
+  /** Channel repository for enumerating active channels and sub-channel state */
+  channelRepo: ChannelRepository;
+
   /** Claiming policy configuration */
   policy: ClaimPolicy;
 
@@ -64,6 +68,20 @@ export interface ClaimAttempt {
 }
 
 /**
+ * Default claim policy used when fields are not specified by the caller
+ */
+export const DEFAULT_CLAIM_POLICY: ClaimPolicy = {
+  // 1 RGas minimum (10,000,000 base units)
+  minClaimAmount: BigInt('10000000'),
+  // Claim at least every 24 hours
+  maxIntervalMs: 24 * 60 * 60 * 1000,
+  // Concurrency and retry defaults
+  maxConcurrentClaims: 5,
+  maxRetries: 3,
+  retryDelayMs: 60_000,
+};
+
+/**
  * Automated claim scheduler for Payee
  *
  * Responsibilities:
@@ -80,6 +98,7 @@ export class ClaimScheduler {
   private policy: ClaimPolicy;
   private pollIntervalMs: number;
   private logger: DebugLogger;
+  private channelRepo: ChannelRepository;
 
   private isRunning = false;
   private pollTimer?: NodeJS.Timeout;
@@ -91,12 +110,8 @@ export class ClaimScheduler {
     this.store = options.store;
     this.contract = options.contract;
     this.signer = options.signer;
-    this.policy = {
-      maxConcurrentClaims: 5,
-      maxRetries: 3,
-      retryDelayMs: 60_000, // 1 minute
-      ...options.policy,
-    };
+    this.channelRepo = options.channelRepo;
+    this.policy = { ...DEFAULT_CLAIM_POLICY, ...options.policy };
     this.pollIntervalMs = options.pollIntervalMs || 30_000; // 30 seconds
     this.logger = DebugLogger.get('ClaimScheduler');
     if (options.debug) {
@@ -186,9 +201,14 @@ export class ClaimScheduler {
       // maintain a list of active channels or use database queries to find them.
       const channelIds = await this.getActiveChannels();
 
+      this.logger.debug('Found channels with unclaimed RAVs', { channelIds });
+
       for (const channelId of channelIds) {
         const unclaimedRAVs = await this.store.getUnclaimedRAVs(channelId);
-
+        this.logger.debug('Processing claims for channel', {
+          channelId,
+          count: unclaimedRAVs.size,
+        });
         if (unclaimedRAVs.size > 0) {
           await this.processClaims(channelId, unclaimedRAVs, false);
         }
@@ -226,7 +246,7 @@ export class ClaimScheduler {
       }
 
       // Apply claim policies
-      if (!forceAllClaims && !this.shouldClaim(channelId, vmIdFragment, rav)) {
+      if (!forceAllClaims && !(await this.shouldClaim(channelId, vmIdFragment, rav))) {
         continue;
       }
 
@@ -250,16 +270,21 @@ export class ClaimScheduler {
     return results;
   }
 
-  private shouldClaim(channelId: string, vmIdFragment: string, rav: SignedSubRAV): boolean {
+  private async shouldClaim(
+    channelId: string,
+    vmIdFragment: string,
+    rav: SignedSubRAV
+  ): Promise<boolean> {
     const key = this.getClaimKey(channelId, vmIdFragment);
     const now = Date.now();
 
-    // Check amount threshold
-    if (rav.subRav.accumulatedAmount < this.policy.minClaimAmount) {
-      this.logger.debug('Amount below threshold', {
+    // Check amount threshold using delta = accumulated - lastClaimedOnChain
+    const delta = await this.getIncrementalUnclaimedAmount(channelId, vmIdFragment, rav);
+    if (delta < this.policy.minClaimAmount) {
+      this.logger.debug('Delta below threshold', {
         channelId,
         vmIdFragment,
-        amount: rav.subRav.accumulatedAmount.toString(),
+        delta: delta.toString(),
         threshold: this.policy.minClaimAmount.toString(),
       });
       return false;
@@ -280,6 +305,33 @@ export class ClaimScheduler {
     }
 
     return true;
+  }
+
+  /**
+   * Compute incremental unclaimed amount against on-chain lastClaimedAmount.
+   * Prefer local ChannelRepository state; fallback to contract.getSubChannel.
+   */
+  private async getIncrementalUnclaimedAmount(
+    channelId: string,
+    vmIdFragment: string,
+    rav: SignedSubRAV
+  ): Promise<bigint> {
+    try {
+      // We directly get the on-chain lastClaimedAmount from the contract
+      // Because the local repo is not updated in time.
+      // TODO we should watch the on chain event and update the local repo.
+      const sub = await this.contract.getSubChannel({ channelId, vmIdFragment });
+      const delta = rav.subRav.accumulatedAmount - sub.lastClaimedAmount;
+      return delta >= 0 ? delta : 0n;
+    } catch (e) {
+      // As a conservative fallback, treat entire accumulated as delta
+      this.logger.debug('Failed to fetch on-chain lastClaimedAmount, using accumulated as delta', {
+        channelId,
+        vmIdFragment,
+        error: (e as any)?.message,
+      });
+      return rav.subRav.accumulatedAmount;
+    }
   }
 
   private async executeClaim(
@@ -388,14 +440,24 @@ export class ClaimScheduler {
   }
 
   private async getActiveChannels(): Promise<string[]> {
-    // This is a placeholder implementation
-    // In practice, you might want to:
-    // 1. Maintain a registry of active channels
-    // 2. Query the database for channels with recent activity
-    // 3. Listen to blockchain events for new channels
+    try {
+      if (!this.channelRepo) {
+        this.logger.debug('No ChannelRepository provided - active channels cannot be enumerated');
+        return [];
+      }
 
-    // For now, return empty array - channels will be processed via manual triggers
-    return [];
+      const payeeDid = await this.signer.getDid();
+      const page = await this.channelRepo.listChannelMetadata(
+        { payeeDid, status: 'active' },
+        { offset: 0, limit: 1000 }
+      );
+      const ids = page.items.map(c => c.channelId);
+      // Deduplicate if necessary
+      return Array.from(new Set(ids));
+    } catch (e) {
+      this.logger.error('Failed to list active channels:', e);
+      return [];
+    }
   }
 
   /**

@@ -74,8 +74,8 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
       }
     } else {
       const matches =
-        signed.subRav.channelId === params.channelInfo.channelId &&
-        signed.subRav.vmIdFragment === params.subChannelState.vmIdFragment &&
+        signed.subRav.channelId === params.latestPendingSubRav.channelId &&
+        signed.subRav.vmIdFragment === params.latestPendingSubRav.vmIdFragment &&
         signed.subRav.nonce === params.latestPendingSubRav.nonce;
       if (!matches) {
         result.decision = 'CONFLICT';

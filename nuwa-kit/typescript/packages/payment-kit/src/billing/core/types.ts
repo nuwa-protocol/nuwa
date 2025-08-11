@@ -46,6 +46,8 @@ export interface BillingContext {
     signedSubRavVerified?: boolean;
     /** Latest SignedSubRAV from storage for this sub-channel (fetched during preProcess) */
     latestSignedSubRav?: SignedSubRAV;
+    /** Latest pending SubRAV from pending repository, it should match the signed SubRAV */
+    latestPendingSubRav?: SubRAV;
     /** Latest sub-channel state cursor (from ChannelRepository) */
     subChannelState?: SubChannelState;
     /** Channel info (must exist for verification) */
