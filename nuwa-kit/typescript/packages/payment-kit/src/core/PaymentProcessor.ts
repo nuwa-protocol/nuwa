@@ -1,5 +1,6 @@
 import type { 
   SignedSubRAV,
+  SubChannelState,
   SubRAV 
 } from './types';
 import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
@@ -206,7 +207,7 @@ export interface PaymentVerificationResult extends VerificationResult {
           this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
         }
       }
-      
+
       const assetId = channelInfo.assetId;
       // Step 3: Prefetch exchange rate only (no cost calculation here)
       {
@@ -278,51 +279,37 @@ export interface PaymentVerificationResult extends VerificationResult {
         this.log('📊 Processing billing rule:', rule.id, 'paymentRequired:', rule.paymentRequired);
         const usageUnits = Number.isFinite(units) && (units as number) > 0 ? Math.floor(units as number) : 1;
 
-        // Strict requirement: clientTxRef must be present to allow client-side resolution
-        if (!ctx.meta.clientTxRef) {
-          const err = { code: 'CLIENT_TX_REF_MISSING', message: 'clientTxRef is required in request header' } as any;
-          ctx.state.error = err;
-          try {
-            const errorPayload = {
-              error: err,
-              clientTxRef: undefined,
-            serviceTxRef: ctx.state.serviceTxRef,
-            version: 1
-          } as any;
-            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-          } catch (e) {
-            this.log('Failed to build error header:', e);
-        }
-        return ctx;
-      }
-
         const strategy = getStrategy(rule);
         const usdCost = strategy.evaluate(ctx, usageUnits);
 
         // Convert to asset units if asset settlement is requested
         let finalCost = usdCost;
-        if (ctx.assetId) {
-          const rate = ctx.state.exchangeRate;
-          if (!rate) {
-            // Missing rate is a hard error as required
-            const err = { code: 'RATE_NOT_AVAILABLE', message: `Missing exchange rate for asset ${ctx.assetId}` } as any;
-            ctx.state.error = err;
-            try {
-              const errorPayload = {
-                error: err,
-                clientTxRef: ctx.meta.clientTxRef,
-                serviceTxRef: ctx.state.serviceTxRef,
-                version: 1
-              } as any;
-              ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-            } catch (e) {
-              this.log('Failed to build error header:', e);
-            }
-            return ctx;
-          }
-          const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
-          finalCost = conversion.assetCost;
+        const assetId = ctx.state?.channelInfo?.assetId;
+        if (!assetId) {
+          throw new Error('CHANNEL_INFO_MISSING: assetId not derivable. Check channelInfo.');
         }
+      
+        const rate = ctx.state.exchangeRate;
+        if (!rate) {
+          // Missing rate is a hard error as required
+          const err = { code: 'RATE_NOT_AVAILABLE', message: `Missing exchange rate for asset ${ctx.assetId}` } as any;
+          ctx.state.error = err;
+          try {
+            const errorPayload = {
+              error: err,
+              clientTxRef: ctx.meta.clientTxRef,
+              serviceTxRef: ctx.state.serviceTxRef,
+              version: 1
+            } as any;
+            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
+          } catch (e) {
+            this.log('Failed to build error header:', e);
+          }
+          return ctx;
+        }
+        const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
+        finalCost = conversion.assetCost;
+        
 
         ctx.state.cost = finalCost;
 
@@ -356,21 +343,7 @@ export interface PaymentVerificationResult extends VerificationResult {
             // Don't generate unsignedSubRav or headerValue for free routes
           } else if (ctx.meta.signedSubRav && finalCost > 0n) {
             // This shouldn't happen - free routes should have cost=0
-            this.log('⚠️ Free route with non-zero cost:', finalCost);
-            const err = { code: 'BILLING_CONFIG_ERROR', message: `Free route has non-zero cost: ${finalCost}` } as any;
-            ctx.state.error = err;
-            try {
-              const errorPayload = {
-                error: err,
-                clientTxRef: ctx.meta.clientTxRef,
-                serviceTxRef: ctx.state.serviceTxRef,
-                version: 1
-              } as any;
-              ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-            } catch (e) {
-              this.log('Failed to build error header:', e);
-            }
-            return ctx;
+            throw new Error('FREE_ROUTE_WITH_COST: free routes should have cost=0');
           } else {
             // Free route without SignedSubRAV - normal free processing
             this.log('📝 Free route without SignedSubRAV - no payment processing needed');
@@ -409,7 +382,14 @@ export interface PaymentVerificationResult extends VerificationResult {
           }
 
           this.log('🔧 Generating SubRAV with finalCost:', finalCost);
-          const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateSubRAVSync(ctx, finalCost);
+          const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateNextSubRAV({
+            signedSubRAV: ctx.meta.signedSubRav,
+            latestSignedSubRav: ctx.state?.latestSignedSubRav,
+            subChannelState: ctx.state?.subChannelState!,
+            chainId: ctx.state?.chainId!,
+            clientTxRef: ctx.meta.clientTxRef,
+            cost: finalCost,
+          });
           this.log('🔧 Generated SubRAV:', { nonce: unsignedSubRAV.nonce, accumulatedAmount: unsignedSubRAV.accumulatedAmount, headerValue: !!headerValue });
         ctx.state.unsignedSubRav = unsignedSubRAV;
         ctx.state.serviceTxRef = serviceTxRef;
@@ -507,79 +487,63 @@ export interface PaymentVerificationResult extends VerificationResult {
     /**
      * Generate SubRAV and header synchronously for post-flight billing
      */
-    private generateSubRAVSync(ctx: BillingContext, cost: bigint): {
+    private generateNextSubRAV(params: {
+      signedSubRAV?: SignedSubRAV,
+      latestSignedSubRav?: SignedSubRAV,
+      subChannelState: SubChannelState,
+      chainId: bigint,
+      clientTxRef: string,
+      cost: bigint}
+    ): {
       unsignedSubRAV: SubRAV;
       serviceTxRef: string;
       headerValue: string;
     } {
-      const signedSubRAV = ctx.meta.signedSubRav || (ctx.state ? ctx.state.latestSignedSubRav : undefined);
       const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const clientTxRef = ctx.meta.clientTxRef || crypto.randomUUID();
-      // Ensure clientTxRef is persisted back to context for consistent echoing
-      if (!ctx.meta.clientTxRef) {
-        ctx.meta.clientTxRef = clientTxRef;
-      }
 
-      let unsignedSubRAV: SubRAV;
+      const current = params.signedSubRAV?.subRav ?? params.latestSignedSubRav?.subRav ?? {
+        channelId: params.subChannelState.channelId,
+        vmIdFragment: params.subChannelState.vmIdFragment,
+        nonce: params.subChannelState.nonce,
+        accumulatedAmount: params.subChannelState.accumulatedAmount,
+        chainId: params.chainId,
+        channelEpoch: params.subChannelState.epoch,
+        version: 1,
+      };
+
+      const next = this.buildNextUnsigned(current, params.cost);
       
-      if (signedSubRAV) {
-        // Normal case: build follow-up from existing SignedSubRAV
-        unsignedSubRAV = this.buildFollowUpUnsigned(signedSubRAV, cost);
-      } else {
-        // Use sub-channel cursor from ChannelRepository (pre-fetched in preProcess)
-        const cursor = ctx.state?.subChannelState;
-        const chainId = ctx.state?.chainId ?? 0n;
-        if (!cursor) {
-          throw new Error('No baseline SubRAV found to advance nonce');
-        }
-        const vmIdFragment = ctx.meta.signedSubRav?.subRav.vmIdFragment || ((): string => {
-          const didInfo = ctx.meta.didInfo;
-          if (!didInfo?.keyId) throw new Error('vmIdFragment not available');
-          const parts = didInfo.keyId.split('#');
-          if (parts.length !== 2) throw new Error('Invalid keyId');
-          return parts[1];
-        })();
-        unsignedSubRAV = {
-          version: 1,
-          chainId,
-          channelId: cursor.channelId,
-          channelEpoch: cursor.epoch,
-          vmIdFragment,
-          nonce: cursor.nonce + 1n,
-          accumulatedAmount: cursor.accumulatedAmount + cost,
-        };
-      }
-
+      
       // Generate header using HttpPaymentCodec (new payload shape)
       const responsePayload = {
-        subRav: unsignedSubRAV,
-        cost,
-        clientTxRef,
+        subRav: next,
+        cost: params.cost,
+        clientTxRef: params.clientTxRef,
         serviceTxRef,
         version: 1
       } as any;
 
       const headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
 
-      return { unsignedSubRAV, serviceTxRef, headerValue };
+      return { unsignedSubRAV: next, serviceTxRef, headerValue };
     }
  
 
   /**
    * Build next unsigned SubRAV following the prior signed SubRAV, reused by async/sync paths.
    */
-  private buildFollowUpUnsigned(signedSubRAV: SignedSubRAV, cost: bigint): SubRAV {
-    const channelId = signedSubRAV.subRav.channelId;
-    const vmIdFragment = signedSubRAV.subRav.vmIdFragment;
-    const currentNonce = signedSubRAV.subRav.nonce;
+  private buildNextUnsigned(current: SubRAV, cost: bigint): SubRAV {
+    const channelId = current.channelId;
+    const vmIdFragment = current.vmIdFragment;
+    const currentNonce = current.nonce;
     const nextNonce = currentNonce + 1n;
-    const newAccumulatedAmount = signedSubRAV.subRav.accumulatedAmount + cost;
+    const newAccumulatedAmount = current.accumulatedAmount + cost;
 
     return {
       version: 1,
-      chainId: signedSubRAV.subRav.chainId,
+      chainId: current.chainId,
       channelId,
-      channelEpoch: signedSubRAV.subRav.channelEpoch,
+      channelEpoch: current.channelEpoch,
       vmIdFragment,
       nonce: nextNonce,
       accumulatedAmount: newAccumulatedAmount

@@ -30,7 +30,7 @@ export interface BillingContext {
       /** Signed SubRAV for payment verification (contains channelId and vmIdFragment) */
       signedSubRav?: SignedSubRAV;
       /** Client transaction reference for tracking and idempotency */
-      clientTxRef?: string;
+      clientTxRef: string;
       /** Maximum amount limit for this request */
       maxAmount?: bigint;
       /** Additional arbitrary metadata */

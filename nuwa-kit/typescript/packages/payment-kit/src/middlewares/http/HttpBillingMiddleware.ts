@@ -269,7 +269,6 @@ export class HttpBillingMiddleware {
   private buildBillingContext(req: GenericHttpRequest, paymentData?: PaymentHeaderPayload, billingRule?: BillingRule): BillingContext {
     return {
       serviceId: this.config.serviceId,
-      assetId: this.config.defaultAssetId,
       meta: {
         operation: `${req.method.toLowerCase()}:${req.path}`,
         
@@ -279,7 +278,7 @@ export class HttpBillingMiddleware {
         // Payment data from HTTP headers
         maxAmount: paymentData?.maxAmount,
         signedSubRav: paymentData?.signedSubRav,
-        clientTxRef: paymentData?.clientTxRef,
+        clientTxRef: paymentData?.clientTxRef || crypto.randomUUID(),
         // DIDAuth (ExpressPaymentKit attaches didInfo onto req)
         didInfo: (req as any).didInfo,
         
