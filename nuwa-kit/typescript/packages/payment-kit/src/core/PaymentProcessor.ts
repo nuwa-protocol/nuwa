@@ -1,7 +1,7 @@
 import type { SignedSubRAV, SubChannelState, SubRAV } from './types';
 import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
-import type { BillingContext } from '../billing';
+import type { BillingContext, PaymentError } from '../billing';
 import { getStrategy } from '../billing/core/strategy-registry';
 import { convertUsdToAssetUsingPrice } from '../billing/core/converter';
 import type { RateProvider, RateResult } from '../billing/rate/types';
@@ -65,6 +65,27 @@ export interface PaymentProcessingStats {
   autoClaimsTriggered: number;
 }
 
+// Strongly typed non-null state after preProcess
+type PaymentState = NonNullable<BillingContext['state']>;
+type PreprocessedBillingContext = BillingContext & { state: PaymentState };
+
+// Common error factories for consistency
+const Errors = {
+  rateNotAvailable: (assetId: string): PaymentError => ({
+    code: 'RATE_NOT_AVAILABLE',
+    message: `Missing exchange rate for asset ${assetId}`,
+  }),
+  maxAmountExceeded: (finalCost: bigint, max: bigint): PaymentError => ({
+    code: 'MAX_AMOUNT_EXCEEDED',
+    message: `Cost ${finalCost} exceeds maxAmount ${max}`,
+    details: { finalCost: finalCost.toString(), max: max.toString() },
+  }),
+  internal: (msg: string): PaymentError => ({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: msg,
+  }),
+} as const;
+
 /**
  * PaymentProcessor - Protocol-agnostic payment negotiation component
  *
@@ -100,7 +121,7 @@ export class PaymentProcessor {
    * Step A: Pre-process request - complete all I/O operations and verification
    * Returns context with state populated for both pre-flight and post-flight
    */
-  async preProcess(ctx: BillingContext): Promise<BillingContext> {
+  async preProcess(ctx: BillingContext): Promise<PreprocessedBillingContext> {
     this.stats.totalRequests++;
 
     this.log('Pre-processing payment for operation:', ctx.meta.operation);
@@ -111,6 +132,13 @@ export class PaymentProcessor {
     }
 
     try {
+      const pctx = ctx as PreprocessedBillingContext;
+      const rule = pctx.meta.billingRule;
+      // For free routes without a SignedSubRAV, skip verification entirely in preProcess
+      if (rule && rule.paymentRequired === false && !pctx.meta.signedSubRav) {
+        this.log('Free route without SignedSubRAV - skipping preProcess verification');
+        return pctx;
+      }
       // Step 0: Prefetch channel context (channelInfo, baseline, chainId)
       // Determine channelId and vmIdFragment (must exist)
       let channelId: string | undefined;
@@ -128,19 +156,13 @@ export class PaymentProcessor {
       }
 
       if (!channelId || !vmIdFragment) {
-        throw new Error(
-          'CHANNEL_CONTEXT_MISSING: channelId or vmIdFragment not derivable. Check DID authentication.'
-        );
+        return this.fail(pctx, { code: 'CHANNEL_CONTEXT_MISSING', message: 'channelId or vmIdFragment not derivable. Check DID authentication.' }, { attachHeader: false });
       }
 
       // Fetch channelInfo (must exist)
       const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
       if (!channelInfo) {
-        ctx.state.error = {
-          code: 'CHANNEL_NOT_FOUND',
-          message: `CHANNEL_NOT_FOUND: ${channelId}`,
-        } as any;
-        return ctx;
+        return this.fail(pctx, { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` }, { attachHeader: false });
       }
 
       const subChannelState = await this.config.payeeClient.getSubChannelState(
@@ -148,26 +170,18 @@ export class PaymentProcessor {
         vmIdFragment
       );
       if (!subChannelState) {
-        ctx.state.error = {
-          code: 'SUBCHANNEL_NOT_AUTHORIZED',
-          message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}`,
-        } as any;
-        return ctx;
+        return this.fail(pctx, { code: 'SUBCHANNEL_NOT_AUTHORIZED', message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}` }, { attachHeader: false });
       }
 
       // Latest signed RAV from repository
       const latestSignedSubRav = await this.ravRepository.getLatest(channelId, vmIdFragment);
 
       // Fetch and cache chainId for proposal generation
-      ctx.state.chainId = await this.config.payeeClient.getContract().getChainId();
+      pctx.state.chainId = await this.config.payeeClient.getContract().getChainId();
 
       const payerDidDoc = await this.config.didResolver.resolveDID(channelInfo.payerDid);
       if (!payerDidDoc) {
-        ctx.state.error = {
-          code: 'DID_RESOLVE_FAILED',
-          message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}`,
-        } as any;
-        return ctx;
+        return this.fail(pctx, { code: 'DID_RESOLVE_FAILED', message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}` }, { attachHeader: false });
       }
 
       // Single-entry verification using prefetched context
@@ -181,36 +195,26 @@ export class PaymentProcessor {
         debug: this.config.debug,
       });
 
-      ctx.state.channelInfo = channelInfo;
-      ctx.state.subChannelState = subChannelState;
-      ctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
+      pctx.state.channelInfo = channelInfo;
+      pctx.state.subChannelState = subChannelState;
+      pctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
 
       // Handle early-return decisions
       if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
-        if (!ctx.state) ctx.state = {};
-        ctx.state.error = ravResult.error as any;
-        this.log(
-          '⚠️ Early return from preProcess due to decision:',
-          ravResult.decision,
-          ravResult.error
-        );
-        return ctx;
+        this.log('⚠️ Early return from preProcess due to decision:', ravResult.decision, ravResult.error);
+        return this.fail(pctx, { code: (ravResult.error?.code as PaymentError['code']) ?? 'INTERNAL_SERVER_ERROR', message: ravResult.error?.message ?? 'Verification decision error' }, { attachHeader: false });
       }
 
       // Persist verification flags and apply side-effects on success
-      ctx.state.signedSubRavVerified = ravResult.signedVerified;
-      if (ravResult.pendingMatched && ravResult.signedVerified && ctx.meta.signedSubRav) {
+      pctx.state.signedSubRavVerified = ravResult.signedVerified;
+      if (ravResult.pendingMatched && ravResult.signedVerified && pctx.meta.signedSubRav) {
         try {
-          await this.pendingSubRAVStore.remove(
-            ctx.meta.signedSubRav.subRav.channelId,
-            ctx.meta.signedSubRav.subRav.vmIdFragment,
-            ctx.meta.signedSubRav.subRav.nonce
-          );
+          await this.pendingSubRAVStore.remove(pctx.meta.signedSubRav.subRav.channelId, pctx.meta.signedSubRav.subRav.vmIdFragment, pctx.meta.signedSubRav.subRav.nonce);
         } catch (e) {
           this.log('⚠️ Failed to remove matched pending:', e);
         }
         try {
-          await this.ravRepository?.save(ctx.meta.signedSubRav);
+          await this.ravRepository?.save(pctx.meta.signedSubRav);
         } catch (e) {
           this.log('⚠️ Failed to persist verified SignedSubRAV:', e);
         }
@@ -228,19 +232,19 @@ export class PaymentProcessor {
             provider: 'rate-provider',
             assetId,
           };
-          ctx.state.exchangeRate = exchangeRate;
+          pctx.state.exchangeRate = exchangeRate;
         } catch (e) {
-          ctx.state.error = { code: 'RATE_FETCH_FAILED', message: String(e) } as any;
+          pctx.state.error = { code: 'RATE_FETCH_FAILED', message: String(e) } as PaymentError;
         }
       }
 
       this.log('✅ Pre-processing completed');
-      return ctx;
+      return pctx;
     } catch (error) {
       this.log('🚨 Pre-processing error:', error);
       if (!ctx.state) ctx.state = {};
-      ctx.state.signedSubRavVerified = false;
-      return ctx;
+      (ctx as PreprocessedBillingContext).state.signedSubRavVerified = false;
+      return this.fail(ctx as PreprocessedBillingContext, Errors.internal(String(error)), { attachHeader: false });
     }
   }
 
@@ -253,32 +257,25 @@ export class PaymentProcessor {
    * For Pre-flight: essentially no-op (already completed in preProcess)
    * For Post-flight: calculate cost based on usage and generate header
    */
-  settle(ctx: BillingContext, units?: number): BillingContext {
+  // Overloads to allow external call sites to pass BillingContext while we enforce state internally
+  settle(ctx: PreprocessedBillingContext, units?: number): PreprocessedBillingContext;
+  settle(ctx: BillingContext, units?: number): BillingContext;
+  settle(
+    ctx: BillingContext | PreprocessedBillingContext,
+    units?: number
+  ): BillingContext | PreprocessedBillingContext {
     this.log('🔄 Settling billing with units:', units);
 
-    if (!ctx.state) {
-      ctx.state = {};
-    }
+    const pctx = this.asPreprocessed(ctx as BillingContext);
 
     // Settling uses numeric units; no structured usage is attached to state
 
     try {
-      const rule = ctx.meta.billingRule;
+      const rule = pctx.meta.billingRule;
 
       // If a protocol-level error was set during preProcess or earlier, generate error header now
-      if (ctx.state?.error) {
-        try {
-          const errorPayload = {
-            error: ctx.state.error,
-            clientTxRef: ctx.meta.clientTxRef,
-            serviceTxRef: ctx.state.serviceTxRef,
-            version: 1,
-          } as any;
-          ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-        } catch (e) {
-          this.log('Failed to build error header:', e);
-        }
-        return ctx;
+      if (pctx.state.error) {
+        return this.fail(pctx, pctx.state.error);
       }
 
       // Unified synchronous calculation for both pre-flight and post-flight
@@ -288,154 +285,102 @@ export class PaymentProcessor {
           Number.isFinite(units) && (units as number) > 0 ? Math.floor(units as number) : 1;
 
         const strategy = getStrategy(rule);
-        const usdCost = strategy.evaluate(ctx, usageUnits);
+        const usdCost = strategy.evaluate(pctx, usageUnits);
 
         // Convert to asset units if asset settlement is requested
         let finalCost = usdCost;
-        const assetId = ctx.state?.channelInfo?.assetId;
+        const assetId = pctx.state?.channelInfo?.assetId;
         if (!assetId) {
           throw new Error('CHANNEL_INFO_MISSING: assetId not derivable. Check channelInfo.');
         }
 
-        const rate = ctx.state.exchangeRate;
+        const rate = pctx.state.exchangeRate;
         if (!rate) {
           // Missing rate is a hard error as required
-          const err = {
-            code: 'RATE_NOT_AVAILABLE',
-            message: `Missing exchange rate for asset ${ctx.assetId}`,
-          } as any;
-          ctx.state.error = err;
-          try {
-            const errorPayload = {
-              error: err,
-              clientTxRef: ctx.meta.clientTxRef,
-              serviceTxRef: ctx.state.serviceTxRef,
-              version: 1,
-            } as any;
-            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-          } catch (e) {
-            this.log('Failed to build error header:', e);
-          }
-          return ctx;
+          return this.fail(pctx, Errors.rateNotAvailable(String(assetId)));
         }
         const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
         finalCost = conversion.assetCost;
 
-        ctx.state.cost = finalCost;
+        pctx.state.cost = finalCost;
 
         // Check maxAmount limit
-        if (ctx.meta.maxAmount && ctx.meta.maxAmount > 0n && finalCost > ctx.meta.maxAmount) {
-          this.log(`Cost ${finalCost} exceeds maxAmount ${ctx.meta.maxAmount}`);
-          const err = {
-            code: 'MAX_AMOUNT_EXCEEDED',
-            message: `Cost ${finalCost} exceeds maxAmount ${ctx.meta.maxAmount}`,
-          } as any;
-          ctx.state.error = err;
-          // Build error header now
-          try {
-            const errorPayload = {
-              error: err,
-              clientTxRef: ctx.meta.clientTxRef,
-              serviceTxRef: ctx.state.serviceTxRef,
-              version: 1,
-            } as any;
-            ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-          } catch (e) {
-            this.log('Failed to build error header:', e);
-          }
-          return ctx;
+        if (pctx.meta.maxAmount && pctx.meta.maxAmount > 0n && finalCost > pctx.meta.maxAmount) {
+          this.log(`Cost ${finalCost} exceeds maxAmount ${pctx.meta.maxAmount}`);
+          return this.fail(pctx, Errors.maxAmountExceeded(finalCost, pctx.meta.maxAmount));
         }
 
         // Special handling for free routes (§4.3 of rav-handling.md)
         if (rule.paymentRequired === false) {
           // Free route: if client sent SignedSubRAV, verify but don't generate unsigned
-          if (ctx.meta.signedSubRav && finalCost === 0n) {
-            this.log(
-              '📝 Free route with SignedSubRAV - verified but not generating unsigned SubRAV'
-            );
+          if (pctx.meta.signedSubRav && finalCost === 0n) {
+            this.log('📝 Free route with SignedSubRAV - verified but not generating unsigned SubRAV');
             // Set minimal response state for free routes
-            ctx.state.cost = finalCost;
+            pctx.state.cost = finalCost;
             // Don't generate unsignedSubRav or headerValue for free routes
-          } else if (ctx.meta.signedSubRav && finalCost > 0n) {
+          } else if (pctx.meta.signedSubRav && finalCost > 0n) {
             // This shouldn't happen - free routes should have cost=0
             throw new Error('FREE_ROUTE_WITH_COST: free routes should have cost=0');
           } else {
             // Free route without SignedSubRAV - normal free processing
             this.log('📝 Free route without SignedSubRAV - no payment processing needed');
-            ctx.state.cost = finalCost;
+            pctx.state.cost = finalCost;
           }
         } else {
           // Paid route: always generate SubRAV and header (even if cost=0 per §4.2)
           // Require a baseline: SignedSubRAV, latestSignedSubRav, or subChannelState
-          const hasSigned = !!ctx.meta.signedSubRav;
-          const hasLatest = !!(ctx.state && ctx.state.latestSignedSubRav);
-          const hasSubState = !!(ctx.state && (ctx.state as any).subChannelState);
+          const hasSigned = !!pctx.meta.signedSubRav;
+          const hasLatest = !!pctx.state && !!pctx.state.latestSignedSubRav;
+          const hasSubState = !!pctx.state && !!(pctx.state as any).subChannelState;
 
           this.log('🔍 Baseline check:', {
             hasSigned,
             hasLatest,
             hasSubState,
-            hasState: !!ctx.state,
-            stateKeys: ctx.state ? Object.keys(ctx.state) : [],
+            hasState: !!pctx.state,
+            stateKeys: pctx.state ? Object.keys(pctx.state) : [],
           });
 
           if (!hasSigned && !hasLatest && !hasSubState) {
-            const err = {
-              code: 'MISSING_CHANNEL_CONTEXT',
-              message: 'No baseline SubRAV found to advance nonce',
-            } as any;
-            ctx.state.error = err;
-            try {
-              const errorPayload = {
-                error: err,
-                clientTxRef: ctx.meta.clientTxRef,
-                serviceTxRef: ctx.state.serviceTxRef,
-                version: 1,
-              } as any;
-              ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(errorPayload);
-            } catch (e) {
-              this.log('Failed to build error header:', e);
-            }
-            return ctx;
+            return this.fail(pctx, { code: 'MISSING_CHANNEL_CONTEXT', message: 'No baseline SubRAV found to advance nonce' });
           }
 
           this.log('🔧 Generating SubRAV with finalCost:', finalCost);
           const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateNextSubRAV({
-            signedSubRAV: ctx.meta.signedSubRav,
-            latestSignedSubRav: ctx.state?.latestSignedSubRav,
-            subChannelState: ctx.state?.subChannelState!,
-            chainId: ctx.state?.chainId!,
-            clientTxRef: ctx.meta.clientTxRef,
+            signedSubRAV: pctx.meta.signedSubRav,
+            latestSignedSubRav: pctx.state?.latestSignedSubRav,
+            subChannelState: pctx.state?.subChannelState!,
+            chainId: pctx.state?.chainId!,
+            clientTxRef: pctx.meta.clientTxRef,
             cost: finalCost,
           });
-          this.log('🔧 Generated SubRAV:', {
-            nonce: unsignedSubRAV.nonce,
-            accumulatedAmount: unsignedSubRAV.accumulatedAmount,
-            headerValue: !!headerValue,
-          });
-          ctx.state.unsignedSubRav = unsignedSubRAV;
-          ctx.state.serviceTxRef = serviceTxRef;
-          ctx.state.nonce = unsignedSubRAV.nonce;
-          ctx.state.headerValue = headerValue;
+          this.log('🔧 Generated SubRAV:', { nonce: unsignedSubRAV.nonce, accumulatedAmount: unsignedSubRAV.accumulatedAmount, headerValue: !!headerValue });
+          pctx.state.unsignedSubRav = unsignedSubRAV;
+          pctx.state.serviceTxRef = serviceTxRef;
+          pctx.state.nonce = unsignedSubRAV.nonce;
+          pctx.state.headerValue = headerValue;
         }
 
         this.log('✅ Billing settled successfully');
       }
 
-      return ctx;
+      return pctx as typeof ctx;
     } catch (error) {
       this.log('🚨 Billing settlement error:', error);
-      if (!ctx.state) ctx.state = {};
-      ctx.state.cost = 0n;
-      return ctx;
+      const p = this.asPreprocessed(ctx as BillingContext);
+      p.state.cost = 0n;
+      return this.fail(p, Errors.internal(String(error)));
     }
   }
 
   /**
    * Step D: Persist billing state to storage
    */
-  async persist(ctx: BillingContext): Promise<void> {
-    if (!ctx.state?.unsignedSubRav) {
+  async persist(ctx: PreprocessedBillingContext): Promise<void>;
+  async persist(ctx: BillingContext): Promise<void>;
+  async persist(ctx: BillingContext | PreprocessedBillingContext): Promise<void> {
+    const pctx = this.asPreprocessed(ctx as BillingContext);
+    if (!pctx.state?.unsignedSubRav) {
       this.log('⚠️ No unsignedSubRAV to persist');
       return;
     }
@@ -443,7 +388,7 @@ export class PaymentProcessor {
     try {
       this.log('💾 Persisting billing state');
 
-      const newSubRAV = ctx.state.unsignedSubRav;
+      const newSubRAV = pctx.state.unsignedSubRav;
 
       // Clean up previous pending SubRAV (nonce - 1) to prevent accumulation
       if (newSubRAV.nonce > 1n) {
@@ -468,7 +413,7 @@ export class PaymentProcessor {
       await this.pendingSubRAVStore.save(newSubRAV);
 
       // Mark as persisted
-      ctx.state.persisted = true;
+      pctx.state.persisted = true;
 
       this.log('✅ Billing state persisted successfully');
     } catch (error) {
@@ -707,6 +652,43 @@ export class PaymentProcessor {
       this.log('Error in DIDAuth fallback:', error);
       return null;
     }
+  }
+
+  // ---------- Internal helpers ----------
+
+  private asPreprocessed(ctx: BillingContext): PreprocessedBillingContext {
+    if (!ctx.state) {
+      ctx.state = {};
+    }
+    return ctx as PreprocessedBillingContext;
+  }
+
+  private attachErrorHeader(ctx: PreprocessedBillingContext, error: PaymentError): void {
+    try {
+      if (!ctx.state.serviceTxRef) {
+        ctx.state.serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      }
+      ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader({
+        error,
+        clientTxRef: ctx.meta.clientTxRef,
+        serviceTxRef: ctx.state.serviceTxRef,
+        version: 1,
+      } as any);
+    } catch (e) {
+      this.log('Failed to build error header:', e);
+    }
+  }
+
+  private fail(
+    ctx: PreprocessedBillingContext,
+    error: PaymentError,
+    options?: { attachHeader?: boolean }
+  ): PreprocessedBillingContext {
+    ctx.state.error = error;
+    if (options?.attachHeader !== false) {
+      this.attachErrorHeader(ctx, error);
+    }
+    return ctx;
   }
 
   /**

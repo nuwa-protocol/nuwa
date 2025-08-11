@@ -8,6 +8,26 @@
 import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelState } from '../../core/types';
 import type { RateResult } from '../rate/types';
 
+/**
+ * Unified protocol-level error type for billing/payment processing
+ */
+export interface PaymentError {
+  code:
+    | 'CHANNEL_CONTEXT_MISSING'
+    | 'CHANNEL_NOT_FOUND'
+    | 'SUBCHANNEL_NOT_AUTHORIZED'
+    | 'DID_RESOLVE_FAILED'
+    | 'RATE_FETCH_FAILED'
+    | 'RATE_NOT_AVAILABLE'
+    | 'MAX_AMOUNT_EXCEEDED'
+    | 'MISSING_CHANNEL_CONTEXT'
+    | 'PAYMENT_REQUIRED'
+    | 'SUBRAV_CONFLICT'
+    | 'INTERNAL_SERVER_ERROR';
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 export interface BillingContext {
   /** Service identifier (e.g. "llm-gateway", "mcp-server") */
   serviceId: string;
@@ -61,10 +81,7 @@ export interface BillingContext {
     nonce?: bigint;
 
     // Protocol-level error (used to short-circuit response with error header)
-    error?: {
-      code: string;
-      message?: string;
-    };
+    error?: PaymentError;
 
     // Step D: Persistence
     persisted?: boolean;

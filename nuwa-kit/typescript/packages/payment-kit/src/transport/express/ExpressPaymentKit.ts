@@ -318,48 +318,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           res.locals.billingContext = billingContext;
 
           // If processor marked a protocol-level error, short-circuit and return immediately
+          // Note: This is the error short-circuit from the pre-processing stage. The header writing in onHeaders is the unified exit for the settlement stage.
           if (billingContext.state?.error) {
             const err = billingContext.state.error as { code: string; message?: string };
-            // Map to HTTP status
-            let status = 500;
-            switch (err.code) {
-              case 'PAYMENT_REQUIRED':
-              case 'INSUFFICIENT_FUNDS':
-                status = 402;
-                break;
-              case 'INVALID_PAYMENT':
-              case 'UNKNOWN_SUBRAV':
-              case 'TAMPERED_SUBRAV':
-              case 'CHANNEL_CLOSED':
-              case 'EPOCH_MISMATCH':
-              case 'MAX_AMOUNT_EXCEEDED':
-              case 'CLIENT_TX_REF_MISSING':
-                status = 400;
-                break;
-              case 'SUBRAV_CONFLICT':
-                status = 409;
-                break;
-              case 'RATE_NOT_AVAILABLE':
-              case 'BILLING_CONFIG_ERROR':
-              default:
-                status = 500;
-                break;
-            }
-
-            // Build protocol error header
-            let clientTxRef: string | undefined;
-            try {
-              const headerValueIn = HttpPaymentCodec.extractPaymentHeader(req.headers as any);
-              if (headerValueIn) {
-                const payload = HttpPaymentCodec.parseRequestHeader(headerValueIn);
-                clientTxRef = payload.clientTxRef;
-              }
-            } catch {}
-            const headerValue = HttpPaymentCodec.buildResponseHeader({
-              error: { code: err.code, message: err.message },
-              clientTxRef,
-              version: 1,
-            } as any);
+            const status = this.mapErrorCodeToHttpStatus(err.code);
+            const headerValue = this.buildProtocolErrorHeader(req, err);
             res.setHeader('X-Payment-Channel-Data', headerValue);
 
             return res.status(status).json({
@@ -372,6 +335,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           let headerWritten = false;
 
           // Intercept headers to write payment header synchronously
+          // Note: This is the unified exit for the settlement stage, which writes the success/failure payment header; it is complementary to the pre-processing error short-circuit rather than redundant.
           onHeaders(res, () => {
             if (headerWritten) return;
             headerWritten = true;
@@ -566,6 +530,53 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         return this.createResponseAdapter(res);
       },
     };
+  }
+
+  /**
+   * Map PaymentError code to HTTP status code (shared by preProcess short-circuit)
+   */
+  private mapErrorCodeToHttpStatus(code?: string): number {
+    switch (code) {
+      case 'PAYMENT_REQUIRED':
+      case 'INSUFFICIENT_FUNDS':
+        return 402; // Payment Required
+      case 'INVALID_PAYMENT':
+      case 'UNKNOWN_SUBRAV':
+      case 'TAMPERED_SUBRAV':
+      case 'CHANNEL_CLOSED':
+      case 'EPOCH_MISMATCH':
+      case 'MAX_AMOUNT_EXCEEDED':
+      case 'CLIENT_TX_REF_MISSING':
+        return 400; // Bad Request
+      case 'SUBRAV_CONFLICT':
+        return 409; // Conflict
+      case 'RATE_NOT_AVAILABLE':
+      case 'BILLING_CONFIG_ERROR':
+      default:
+        return 500; // Internal Server Error
+    }
+  }
+
+  /**
+   * Build protocol error header consistently from request headers and error
+   */
+  private buildProtocolErrorHeader(
+    req: Request,
+    err: { code: string; message?: string }
+  ): string {
+    let clientTxRef: string | undefined;
+    try {
+      const headerValueIn = HttpPaymentCodec.extractPaymentHeader(req.headers as any);
+      if (headerValueIn) {
+        const payload = HttpPaymentCodec.parseRequestHeader(headerValueIn);
+        clientTxRef = payload.clientTxRef;
+      }
+    } catch {}
+    return HttpPaymentCodec.buildResponseHeader({
+      error: { code: err.code, message: err.message },
+      clientTxRef,
+      version: 1,
+    } as any);
   }
 
   /**
