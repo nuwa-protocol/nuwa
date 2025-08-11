@@ -19,7 +19,6 @@ import {
   createRAVRepo,
   createPendingSubRAVRepo,
   createStorageRepositories,
-  createStorageRepositoriesAuto
 } from '..';
 import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../core/types';
 
@@ -451,14 +450,7 @@ describe('Factory Functions and Multi-Backend Support', () => {
       expect(repos.ravRepo).toBeDefined();
       expect(repos.pendingSubRAVRepo).toBeDefined();
     });
-
-    it('should auto-detect optimal backend', () => {
-      const repos = createStorageRepositoriesAuto();
-      
-      expect(repos.channelRepo).toBeDefined();
-      expect(repos.ravRepo).toBeDefined();
-      expect(repos.pendingSubRAVRepo).toBeDefined();
-    });
+ 
   });
 
   describe('Backend Compatibility', () => {
