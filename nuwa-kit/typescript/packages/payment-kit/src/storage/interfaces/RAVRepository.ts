@@ -6,12 +6,15 @@
 import type { SignedSubRAV } from '../../core/types';
 
 /**
- * RAV storage interface for Payee (服务端收款方)
+ * RAV storage interface for Payee
  * Responsible for persisting and retrieving SignedSubRAVs
  */
 export interface RAVRepository {
   /** Save a new RAV (idempotent operation) */
   save(rav: SignedSubRAV): Promise<void>;
+
+  /** Get a specific RAV by channelId, vmIdFragment, and nonce */
+  get(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SignedSubRAV | null>;
 
   /** Get the latest RAV for a specific sub-channel */
   getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null>;

@@ -32,9 +32,9 @@ export {
 
 export {
   SubRavRequestSchema,
-  SubRavQueryResponseSchema,
+  SubRavResponseSchema,
   type SubRavRequest,
-  type SubRavQueryResponse,
+  type SubRavResponse,
 } from './api/subrav';
 
 export {

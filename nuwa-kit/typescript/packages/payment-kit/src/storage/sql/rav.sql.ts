@@ -139,6 +139,35 @@ export class SqlRAVRepository implements RAVRepository {
     }
   }
 
+  async get(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SignedSubRAV | null> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `
+        SELECT sub_rav_bcs, signature 
+        FROM ${this.ravsTable}
+        WHERE channel_id = $1 AND vm_id_fragment = $2 AND nonce = $3
+      `,
+        [channelId, vmIdFragment, nonce.toString()]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const subRavBcs = result.rows[0].sub_rav_bcs as Buffer;
+      const signature = result.rows[0].signature as Buffer;
+
+      const subRav = decodeSubRAV(subRavBcs);
+      return {
+        subRav,
+        signature: new Uint8Array(signature),
+      };
+    } finally {
+      client.release();
+    }
+  }
+
   async getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null> {
     const client = await this.pool.connect();
     try {

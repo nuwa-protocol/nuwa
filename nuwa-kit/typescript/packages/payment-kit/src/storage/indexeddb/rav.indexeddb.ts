@@ -59,6 +59,19 @@ export class IndexedDBRAVRepository implements RAVRepository {
     });
   }
 
+  async get(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SignedSubRAV | null> {
+    const db = await this.getDB();
+    const tx = db.transaction(['ravs'], 'readonly');
+    const store = tx.objectStore('ravs');
+    const index = store.index('channel_vm');
+
+    return new Promise((resolve, reject) => {
+      const request = index.get(IDBKeyRange.only([channelId, vmIdFragment]));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null> {
     const db = await this.getDB();
     const tx = db.transaction(['ravs'], 'readonly');

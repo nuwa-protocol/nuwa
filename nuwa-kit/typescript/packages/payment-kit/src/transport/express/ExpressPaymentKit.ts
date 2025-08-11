@@ -26,6 +26,7 @@ import type { ApiContext } from '../../types/api';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
+import { PaymentProcessor } from '../../core/PaymentProcessor';
 
 /**
  * Configuration for creating ExpressPaymentKit
@@ -104,6 +105,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly channelRepo: ChannelRepository;
   private readonly ravRepo: RAVRepository;
   private readonly pendingSubRAVRepo: PendingSubRAVRepository;
+  private readonly processor: PaymentProcessor;
 
   constructor(
     config: ExpressPaymentKitOptions,
@@ -177,18 +179,22 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       debug: schedulerDebug,
     });
 
-    // Create HTTP billing middleware with ClaimScheduler
-    this.middleware = new HttpBillingMiddleware({
+    // Initialize PaymentProcessor with config
+    this.processor = new PaymentProcessor({
       payeeClient: this.payeeClient,
-      rateProvider: this.rateProvider,
-      ruleProvider: this.billableRouter,
       serviceId: config.serviceId,
+      defaultAssetId: config.defaultAssetId,
+      rateProvider: this.rateProvider,
       pendingSubRAVStore: this.pendingSubRAVRepo,
       ravRepository: this.ravRepo,
       didResolver: this.payeeClient.getDidResolver(),
-      defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
-      debug: config.debug || false,
-      claimScheduler: this.claimScheduler,
+      debug: config.debug,
+    });
+
+    // Create HTTP billing middleware with ClaimScheduler
+    this.middleware = new HttpBillingMiddleware({
+      processor: this.processor,
+      ruleProvider: this.billableRouter,
     });
 
     // Create main router
@@ -258,8 +264,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       },
       payeeClient: this.payeeClient,
       rateProvider: this.rateProvider,
-      middleware: this.middleware,
       claimScheduler: this.claimScheduler,
+      processor: this.processor,
+      ravRepository: this.ravRepo,
+      channelRepo: this.channelRepo,
+      pendingSubRAVStore: this.pendingSubRAVRepo,
     };
 
     // 1. Discovery endpoint (well-known, completely public - no middleware)
@@ -324,6 +333,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         }
 
         if (needAuth || needAdminAuth) {
+          if (this.config.debug) {
+            const hasAuth = !!req.headers.authorization;
+            console.log(
+              `🔐 DIDAuth check for ${req.method} ${req.path}: has Authorization header = ${hasAuth}`
+            );
+            if (hasAuth) {
+              const value = String(req.headers.authorization);
+              console.log(`🔐 Authorization prefix ok = ${value.startsWith('DIDAuthV1 ')}`);
+            }
+          }
           await this.performDIDAuth(req, res);
         }
 
@@ -472,6 +491,14 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     try {
       const authHeader = req.headers.authorization;
 
+      if (this.config.debug) {
+        console.log(
+          `🔐 performDIDAuth: Authorization present=${!!authHeader}, startsWithDIDAuthV1=${
+            !!authHeader && authHeader.startsWith(HEADER_PREFIX)
+          }`
+        );
+      }
+
       if (!authHeader || !authHeader.startsWith(HEADER_PREFIX)) {
         throw new Error('Missing or invalid Authorization header');
       }
@@ -488,6 +515,12 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         did: verifyResult.signedObject.signature.signer_did,
         keyId: verifyResult.signedObject.signature.key_id,
       };
+
+      if (this.config.debug) {
+        console.log(
+          `✅ DIDAuth success: did=${(req as any).didInfo.did}, keyId=${(req as any).didInfo.keyId}`
+        );
+      }
     } catch (error) {
       console.error('🚨 DID authentication failed:', error);
       throw new Error(

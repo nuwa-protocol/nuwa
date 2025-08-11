@@ -97,7 +97,7 @@ export {
   HealthRequestSchema,
   HealthResponseSchema,
   SubRavRequestSchema,
-  SubRavQueryResponseSchema,
+  SubRavResponseSchema,
   AdminRequestSchema,
   ClaimsStatusResponseSchema,
   DiscoveryRequestSchema,

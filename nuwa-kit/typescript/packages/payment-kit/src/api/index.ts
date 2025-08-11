@@ -10,7 +10,6 @@ import {
   handleHealth,
   handleAdminClaims,
   handleAdminClaimTrigger,
-  handleAdminCleanup,
   handleSubRavQuery,
 } from './handlers';
 
@@ -23,14 +22,12 @@ import {
   HealthRequestSchema,
   HealthResponseSchema,
   SubRavRequestSchema,
-  SubRavQueryResponseSchema,
+  SubRavResponseSchema,
   AdminRequestSchema,
   ClaimsStatusResponseSchema,
   // Import admin schemas from core since they're the same
   ClaimTriggerRequestSchema,
   ClaimTriggerResponseSchema,
-  CleanupRequestSchema,
-  CleanupResponseSchema,
 } from '../schema';
 
 /**
@@ -102,7 +99,7 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     handler: createValidatedHandler({
       schema: {
         request: SubRavRequestSchema,
-        response: SubRavQueryResponseSchema,
+        response: SubRavResponseSchema,
       },
       handler: handleSubRavQuery,
     }),
@@ -139,20 +136,6 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
     path: '/admin/claim-trigger',
     options: { pricing: '0', adminOnly: true },
     description: 'Manually trigger claim for a specific channel (admin only)',
-  },
-
-  adminCleanup: {
-    handler: createValidatedHandler({
-      schema: {
-        request: CleanupRequestSchema,
-        response: CleanupResponseSchema,
-      },
-      handler: handleAdminCleanup,
-    }),
-    method: 'POST',
-    path: '/admin/cleanup',
-    options: { pricing: '0', adminOnly: true },
-    description: 'Clean up old processed SubRAVs (admin only)',
   },
 } as const;
 

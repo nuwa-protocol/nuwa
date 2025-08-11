@@ -33,7 +33,7 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
     const keyParts = internalReq.didInfo.keyId.split('#');
     const vmIdFragment = keyParts.length > 1 ? keyParts[1] : '';
     const pending = vmIdFragment
-      ? await ctx.middleware.findLatestPendingProposal(channelId, vmIdFragment)
+      ? await ctx.pendingSubRAVStore.findLatestBySubChannel(channelId, vmIdFragment)
       : null;
 
     const response: RecoveryResponse = {

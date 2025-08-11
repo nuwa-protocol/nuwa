@@ -448,10 +448,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     try {
       // Query a SubRAV that should exist
       const subRavResponse = await adminClient.querySubRav({
-        channelId: channelId!,
         nonce: '1',
       });
       console.log('✅ SubRAV query successful:', subRavResponse);
+      expect(subRavResponse.nonce).toBe(BigInt(1));
     } catch (error) {
       // It's OK if SubRAV doesn't exist or user doesn't have permission
       console.log('ℹ️ SubRAV query failed (expected if no SubRAV exists):', error);

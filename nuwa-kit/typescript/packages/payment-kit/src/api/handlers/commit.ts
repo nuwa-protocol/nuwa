@@ -18,8 +18,9 @@ export const handleCommit: Handler<ApiContext, CommitRequest, CommitResponse> = 
     }
 
     try {
-      await ctx.payeeClient.processSignedSubRAV(req.subRav);
-      return createSuccessResponse({ success: true });
+      //await ctx.payeeClient.processSignedSubRAV(req.subRav);
+      //TODO: Implement commit
+      return createSuccessResponse({ success: false });
     } catch (e) {
       throw new PaymentKitError(ErrorCode.CONFLICT, (e as Error).message, 409);
     }

@@ -97,6 +97,10 @@ export class PaymentProcessor {
     };
   }
 
+  getServiceId(): string {
+    return this.config.serviceId;
+  }
+
   /**
    * Step A: Pre-process request - complete all I/O operations and verification
    * Returns context with state populated for both pre-flight and post-flight
@@ -297,20 +301,29 @@ export class PaymentProcessor {
         const strategy = getStrategy(rule);
         const usdCost = strategy.evaluate(pctx, usageUnits);
 
-        // Convert to asset units if asset settlement is requested
+        // Convert to asset units only when needed
         let finalCost = usdCost;
-        const assetId = pctx.state?.channelInfo?.assetId;
-        if (!assetId) {
-          throw new Error('CHANNEL_INFO_MISSING: assetId not derivable. Check channelInfo.');
+        // Free routes: don't require channel context or exchange rate
+        if (rule.paymentRequired !== false) {
+          if (usdCost > 0n) {
+            const assetId = pctx.state?.channelInfo?.assetId;
+            if (!assetId) {
+              throw new Error('CHANNEL_INFO_MISSING: assetId not derivable. Check channelInfo.');
+            }
+            const rate = pctx.state.exchangeRate;
+            if (!rate) {
+              return this.fail(pctx, Errors.rateNotAvailable(String(assetId)));
+            }
+            const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
+            finalCost = conversion.assetCost;
+          } else {
+            // Zero-cost paid route still generates SubRAV; cost stays 0
+            finalCost = 0n;
+          }
+        } else {
+          // Free route: ensure cost is zero regardless of USD price
+          finalCost = 0n;
         }
-
-        const rate = pctx.state.exchangeRate;
-        if (!rate) {
-          // Missing rate is a hard error as required
-          return this.fail(pctx, Errors.rateNotAvailable(String(assetId)));
-        }
-        const conversion = convertUsdToAssetUsingPrice(usdCost, rate);
-        finalCost = conversion.assetCost;
 
         pctx.state.cost = finalCost;
 

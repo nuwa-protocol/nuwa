@@ -52,24 +52,14 @@ interface ExpressResponse {
  * Configuration for the HTTP billing middleware
  */
 export interface HttpBillingMiddlewareConfig {
-  /** Payee client for payment operations */
-  payeeClient: PaymentChannelPayeeClient;
+  /** Payment processor for handling billing */
+  processor: PaymentProcessor;
+
   /** Rule provider for pre-matching billing rules (V2 optimization) */
   ruleProvider: RuleProvider;
-  /** Rate provider for asset conversion (preferred path) */
-  rateProvider: RateProvider;
-  /** Service ID for billing configuration */
-  serviceId: string;
-  /** Default asset ID if not provided in request context */
-  defaultAssetId?: string;
+
   /** Debug logging */
   debug?: boolean;
-  /** Store for pending unsigned SubRAV proposals */
-  pendingSubRAVStore: PendingSubRAVRepository;
-  /** Repository for persisted SignedSubRAVs to retrieve latest baseline */
-  ravRepository: RAVRepository;
-  /** DID resolver for signature verification */
-  didResolver: DIDResolver;
   /** Optional claim scheduler for automated claiming */
   claimScheduler?: ClaimScheduler;
 }
@@ -97,19 +87,7 @@ export class HttpBillingMiddleware {
 
   constructor(config: HttpBillingMiddlewareConfig) {
     this.config = config;
-
-    // Initialize PaymentProcessor with config
-    this.processor = new PaymentProcessor({
-      payeeClient: config.payeeClient,
-      serviceId: config.serviceId,
-      defaultAssetId: config.defaultAssetId,
-      rateProvider: config.rateProvider,
-      pendingSubRAVStore: config.pendingSubRAVStore,
-      ravRepository: config.ravRepository,
-      didResolver: config.didResolver,
-      debug: config.debug,
-    });
-
+    this.processor = config.processor;
     // Initialize HTTP codec
     this.codec = new HttpPaymentCodec();
   }
@@ -260,7 +238,7 @@ export class HttpBillingMiddleware {
     billingRule?: BillingRule
   ): BillingContext {
     return {
-      serviceId: this.config.serviceId,
+      serviceId: this.processor.getServiceId(),
       meta: {
         operation: `${req.method.toLowerCase()}:${req.path}`,
 
@@ -300,36 +278,6 @@ export class HttpBillingMiddleware {
    */
   getProcessingStats() {
     return this.processor.getProcessingStats();
-  }
-
-  /**
-   * Get claim status from processor
-   */
-  getClaimStatus() {
-    if (this.config.claimScheduler) {
-      return this.config.claimScheduler.getStatus();
-    }
-    return { isRunning: false, activeClaims: 0, failedAttempts: 0 };
-  }
-
-  /**
-   * Manually trigger claim for a channel
-   */
-  async manualClaim(channelId: string): Promise<boolean> {
-    if (this.config.claimScheduler) {
-      const results = await this.config.claimScheduler.triggerClaim(channelId);
-      return results.length > 0;
-    }
-
-    this.log('No ClaimScheduler configured - manual claim not available');
-    return false;
-  }
-
-  /**
-   * Clear expired pending SubRAV proposals
-   */
-  async clearExpiredProposals(maxAgeMinutes: number = 30): Promise<number> {
-    return await this.processor.clearExpiredProposals(maxAgeMinutes);
   }
 
   /**

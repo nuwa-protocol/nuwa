@@ -5,7 +5,14 @@
  * rather than specific data models which are defined in schema/.
  */
 
+import { RAVRepository } from '../storage/interfaces/RAVRepository';
 import type { ErrorCodeType, ApiError } from '../schema/core';
+import { ChannelRepository } from '../storage/interfaces/ChannelRepository';
+import { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
+import { ClaimScheduler } from '../core/ClaimScheduler';
+import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
+import { RateProvider } from '../billing';
+import { PaymentProcessor } from '../core/PaymentProcessor';
 
 /**
  * Standard API response envelope
@@ -54,10 +61,13 @@ export interface ApiContext {
     adminDid?: string | string[];
     debug?: boolean;
   };
-  payeeClient: any; // PaymentChannelPayeeClient
-  rateProvider: any; // RateProvider
-  middleware: any; // HttpBillingMiddleware
-  claimScheduler?: any; // ClaimScheduler
+  payeeClient: PaymentChannelPayeeClient;
+  rateProvider: RateProvider;
+  claimScheduler: ClaimScheduler;
+  processor: PaymentProcessor;
+  ravRepository: RAVRepository;
+  channelRepo: ChannelRepository;
+  pendingSubRAVStore: PendingSubRAVRepository;
 }
 
 /**

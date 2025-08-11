@@ -343,6 +343,13 @@ export class PaymentChannelPayerClient {
     return this.chainIdCache;
   }
 
+  /**
+   * Get on-chain sub-channel info (state) for the specified vmIdFragment
+   */
+  async getSubChannelInfo(channelId: string, vmIdFragment: string): Promise<SubChannelState> {
+    return this.contract.getSubChannel({ channelId, vmIdFragment });
+  }
+
   // -------- Private Helpers --------
 
   /**

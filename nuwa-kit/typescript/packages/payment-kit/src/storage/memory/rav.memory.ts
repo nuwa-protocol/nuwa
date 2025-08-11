@@ -34,6 +34,20 @@ export class MemoryRAVRepository implements RAVRepository {
     ravList.sort((a, b) => Number(a.subRav.nonce - b.subRav.nonce));
   }
 
+  async get(channelId: string, vmIdFragment: string, nonce: bigint): Promise<SignedSubRAV | null> {
+    const key = this.getKey(channelId, vmIdFragment);
+    const ravList = this.ravs.get(key);
+    if (!ravList) {
+      return null;
+    }
+
+    const rav = ravList.find(r => r.subRav.nonce === nonce);
+    if (!rav) {
+      return null;
+    }
+    return rav;
+  }
+
   async getLatest(channelId: string, vmIdFragment: string): Promise<SignedSubRAV | null> {
     const key = this.getKey(channelId, vmIdFragment);
     const ravList = this.ravs.get(key);

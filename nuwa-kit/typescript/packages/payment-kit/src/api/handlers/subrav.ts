@@ -13,17 +13,20 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
 export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async (ctx, req) => {
   try {
     if (ctx.config.debug) {
-      console.log(
-        '📋 SubRAV Query: Getting SubRAV for channel:',
-        req.channelId,
-        'nonce:',
-        req.nonce
-      );
+      console.log('📥 /subrav request received:', {
+        nonce: req?.nonce,
+        hasDidInfo: !!(req as any)?.didInfo,
+        did: (req as any)?.didInfo?.did,
+        keyId: (req as any)?.didInfo?.keyId,
+      });
     }
 
     // Check if user is authenticated
     const internalReq = req as InternalSubRavRequest;
     if (!internalReq.didInfo || !internalReq.didInfo.did || !internalReq.didInfo.keyId) {
+      if (ctx.config.debug) {
+        console.log('❌ /subrav missing didInfo, returning 401');
+      }
       throw new PaymentKitError(ErrorCode.UNAUTHORIZED, 'DID authentication required', 401);
     }
 
@@ -31,23 +34,10 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
 
     // Derive the expected channelId for this user
     const defaultAssetId = ctx.config.defaultAssetId ?? '0x3::gas_coin::RGas';
-    const expectedChannelId = deriveChannelId(clientDid, ctx.config.serviceDid, defaultAssetId);
+    const channelId = deriveChannelId(clientDid, ctx.config.serviceDid, defaultAssetId);
 
-    // Check if user is trying to access their own channel
-    if (req.channelId !== expectedChannelId) {
-      if (ctx.config.debug) {
-        console.log(
-          '❌ SubRAV Query: Access denied. User channel:',
-          expectedChannelId,
-          'Requested:',
-          req.channelId
-        );
-      }
-      throw new PaymentKitError(
-        ErrorCode.FORBIDDEN,
-        'Access denied: You can only query your own SubRAVs',
-        403
-      );
+    if (ctx.config.debug) {
+      console.log('📋 SubRAV Query: Getting SubRAV for channel:', channelId, 'nonce:', req.nonce);
     }
 
     // Extract vmIdFragment from DID keyId (format: did:...#fragment)
@@ -57,11 +47,7 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
     if (!vmIdFragment) {
       throw new PaymentKitError(ErrorCode.BAD_REQUEST, 'Invalid DID keyId: missing fragment', 400);
     }
-    const subRAV = await ctx.middleware.findPendingProposal(
-      req.channelId,
-      vmIdFragment,
-      BigInt(req.nonce)
-    );
+    const subRAV = await ctx.ravRepository.get(channelId, vmIdFragment, BigInt(req.nonce));
 
     if (subRAV) {
       if (ctx.config.debug) {
@@ -73,7 +59,7 @@ export const handleSubRavQuery: Handler<ApiContext, SubRavRequest, any> = async 
       if (ctx.config.debug) {
         console.log(
           '❌ SubRAV Query: SubRAV not found for channel:',
-          req.channelId,
+          channelId,
           'nonce:',
           req.nonce
         );

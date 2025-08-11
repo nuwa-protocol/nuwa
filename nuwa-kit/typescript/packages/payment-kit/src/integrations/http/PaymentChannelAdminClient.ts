@@ -4,10 +4,8 @@ import type {
   ClaimTriggerRequest,
   ClaimTriggerResponse,
   SubRavRequest,
-  CleanupRequest,
-  CleanupResponse,
+  SubRavResponse,
 } from '../../schema';
-import type { PaymentResult } from '../../core/types';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 
 /**
@@ -69,27 +67,9 @@ export class PaymentChannelAdminClient {
   /**
    * Query SubRAV details (requires auth, users can only query their own)
    */
-  async querySubRav(request: SubRavRequest): Promise<any> {
-    const queryPath = `/subrav?channelId=${encodeURIComponent(request.channelId)}&nonce=${encodeURIComponent(request.nonce)}`;
-    const result = await this.httpClient.get<any>(this.buildPaymentUrl(queryPath));
-    return result.data;
-  }
-
-  /**
-   * Clean up old SubRAV proposals (admin only)
-   */
-  async cleanup(request?: CleanupRequest): Promise<CleanupResponse> {
-    // Use POST and JSON body for cleanup
-    if (request && Object.keys(request).length > 0) {
-      const result = await this.httpClient.post<CleanupResponse>(
-        this.buildPaymentUrl('/admin/cleanup'),
-        request
-      );
-      return result.data;
-    }
-    const result = await this.httpClient.post<CleanupResponse>(
-      this.buildPaymentUrl('/admin/cleanup')
-    );
+  async querySubRav(request: SubRavRequest): Promise<SubRavResponse> {
+    const queryPath = `/subrav?nonce=${encodeURIComponent(request.nonce)}`;
+    const result = await this.httpClient.get<SubRavResponse>(this.buildPaymentUrl(queryPath));
     return result.data;
   }
 

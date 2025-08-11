@@ -40,11 +40,11 @@ export type SubRAV = z.infer<typeof SubRAVSchema>;
  * SignedSubRAV schema that includes signature fields
  * This matches the SignedSubRAV interface from core/types.ts
  */
-export const SignedSubRAVSchema = SubRAVSchema.extend({
+export const SignedSubRAVSchema = z.object({
+  /** SubRAV */
+  subRav: SubRAVSchema,
   /** Cryptographic signature over the SubRAV */
   signature: z.string(),
-  /** Recovery ID for signature verification (optional) */
-  recoveryId: z.number().optional(),
 });
 
 export type SignedSubRAV = z.infer<typeof SignedSubRAVSchema>;
@@ -176,8 +176,6 @@ export const PaymentProcessingStatsSchema = z.object({
   successfulPayments: z.number(),
   /** Number of failed payments */
   failedPayments: z.number(),
-  /** Number of handshakes completed */
-  handshakes: z.number(),
   /** Number of auto claims triggered */
   autoClaimsTriggered: z.number(),
 });
@@ -208,39 +206,28 @@ export const ClaimTriggerRequestSchema = z.object({
 
 export type ClaimTriggerRequest = z.infer<typeof ClaimTriggerRequestSchema>;
 
+export const ScheduledClaimResultSchema = z.object({
+  /** VM ID fragment that was processed */
+  vmIdFragment: z.string(),
+  /** Amount claimed */
+  claimedAmount: createBigIntSchema(),
+  /** Transaction hash of the claim */
+  txHash: z.string(),
+  /** Timestamp of the claim */
+  timestamp: z.number(),
+});
+
 /**
  * Claim trigger response schema
  */
 export const ClaimTriggerResponseSchema = z.object({
-  /** Operation success status */
-  success: z.boolean(),
   /** Channel identifier that was processed */
   channelId: z.string(),
+  /** Results of the claim trigger operation */
+  results: z.array(ScheduledClaimResultSchema),
 });
 
 export type ClaimTriggerResponse = z.infer<typeof ClaimTriggerResponseSchema>;
-
-/**
- * Cleanup request schema
- */
-export const CleanupRequestSchema = z.object({
-  /** Maximum age in minutes (optional) */
-  maxAgeMinutes: z.number().optional(),
-});
-
-export type CleanupRequest = z.infer<typeof CleanupRequestSchema>;
-
-/**
- * Cleanup response schema
- */
-export const CleanupResponseSchema = z.object({
-  /** Number of items cleared */
-  clearedCount: z.number(),
-  /** Maximum age in minutes that was used */
-  maxAgeMinutes: z.number(),
-});
-
-export type CleanupResponse = z.infer<typeof CleanupResponseSchema>;
 
 /**
  * Standard error codes enumeration - kept here as it's used for validating error responses

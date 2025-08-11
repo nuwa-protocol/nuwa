@@ -31,8 +31,15 @@ export function createValidatedHandler<Req, Res>(params: {
     // 1️⃣ Validate & transform the incoming request.
     const req = schema.request.parse(rawReq);
 
+    // Preserve auth context injected by middleware (e.g., didInfo) that
+    // may be stripped by schema parsing. Handlers may read it via Internal*Request.
+    const enrichedReq: any = { ...req };
+    if ((rawReq as any) && (rawReq as any).didInfo) {
+      enrichedReq.didInfo = (rawReq as any).didInfo;
+    }
+
     // 2️⃣ Execute business logic.
-    const rawRes = await handler(ctx, req);
+    const rawRes = await handler(ctx, enrichedReq as any);
 
     // TODO: 3️⃣ Response validation once migration is complete.
     return rawRes;
