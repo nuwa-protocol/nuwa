@@ -2,7 +2,7 @@
  * Test BigInt serialization in HostChannelMappingStore
  */
 
-import { MemoryHostChannelMappingStore } from '../integrations/http/internal/HostChannelMappingStore';
+import { MemoryHostChannelMappingStore } from '../integrations/http/internal/LocalStore';
 import type { PersistedHttpClientState } from '../schema/core';
 
 describe('BigInt Serialization in HostChannelMappingStore', () => {

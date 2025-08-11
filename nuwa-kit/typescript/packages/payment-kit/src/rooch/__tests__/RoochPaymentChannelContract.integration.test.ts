@@ -18,6 +18,7 @@ import { TestEnv, createSelfDid, CreateSelfDidResult } from '@nuwa-ai/identity-k
 import { DebugLogger, MultibaseCodec, parseDid } from '@nuwa-ai/identity-kit';
 import { SubRAVSigner, SUBRAV_VERSION_1 } from '../../core/SubRav';
 import { normalizeAssetId } from '../ChannelUtils';
+import { MemoryChannelRepository } from '../../storage';
 
 // Check if we should run integration tests
 const shouldRunIntegrationTests = () => {
@@ -574,6 +575,9 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const payerClient = new PaymentChannelPayerClient({
         contract,
         signer: payer.signer,
+        storageOptions: {
+          channelRepo: new MemoryChannelRepository(),
+        },  
       });
 
       // Get HubClient from PayerClient

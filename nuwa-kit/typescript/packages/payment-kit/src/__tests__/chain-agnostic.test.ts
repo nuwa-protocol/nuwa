@@ -17,6 +17,7 @@ import type { AssetInfo } from '../core/types';
 import { PaymentChannelPayerClient } from '../client/PaymentChannelPayerClient';
 import { PaymentChannelFactory } from '../factory/chainFactory';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
+import { MemoryChannelRepository } from '../storage';
 
 // Mock implementation of IPaymentChannelContract for testing
 class MockPaymentChannelContract implements IPaymentChannelContract {
@@ -153,6 +154,9 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
       contract: mockContract,
       signer: mockSigner,
       keyId: 'test-key-1',
+      storageOptions: {
+        channelRepo: new MemoryChannelRepository(),
+      },
     });
   });
 
@@ -230,6 +234,9 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
         },
         signer: mockSigner,
         keyId: 'test-key',
+        storageOptions: {
+          channelRepo: new MemoryChannelRepository(),
+        },
       });
       
       expect(factoryClient).toBeInstanceOf(PaymentChannelPayerClient);
@@ -260,6 +267,9 @@ describe('Chain Integration Examples', () => {
     const roochClient = new PaymentChannelPayerClient({
       contract: roochContract,
       signer: mockSigner,
+      storageOptions: {
+        channelRepo: new MemoryChannelRepository(),
+      },
     });
 
     // Mock future EVM implementation (same interface)
@@ -267,6 +277,9 @@ describe('Chain Integration Examples', () => {
     const evmClient = new PaymentChannelPayerClient({
       contract: evmContract,
       signer: mockSigner,
+      storageOptions: {
+        channelRepo: new MemoryChannelRepository(),
+      },
     });
 
     // Same operations work on both chains
