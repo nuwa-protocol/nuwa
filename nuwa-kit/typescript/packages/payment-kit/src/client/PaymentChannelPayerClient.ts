@@ -377,15 +377,4 @@ export class PaymentChannelPayerClient {
     return parts[parts.length - 1] || keyId;
   }
 
-  /**
-   * Get first active channel ID (fallback for auto-selection)
-   */
-  private async getFirstActiveChannelId(): Promise<string | null> {
-    const result = await this.channelRepo.listChannelMetadata(
-      { status: 'active' }, 
-      { offset: 0, limit: 1 }
-    );
-    
-    return result.items.length > 0 ? result.items[0].channelId : null;
-  }
 }

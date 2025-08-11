@@ -207,56 +207,7 @@ export class PaymentChannelPayeeClient {
    */
   getPendingSubRAVRepository(): PendingSubRAVRepository {
     return this.pendingSubRAVRepo;
-  }
-
-  // -------- SubRAV Generation (for API services) --------
-
-  /**
-   * Generate an unsigned SubRAV for a consumption charge
-   * This is used by API services (like LLM Gateway) to create payment requests
-   * after calculating the actual consumption cost
-   */
-  async generateSubRAV(params: GenerateSubRAVParams): Promise<SubRAV> {
-    const { channelId, payerKeyId, amount } = params;
-
-    // Get channel info to validate (using cache to ensure local storage is updated)
-    const channelInfo = await this.getChannelInfoCached(channelId);
-    
-    // Get current sub-channel state or compute baseline in-memory if first time
-    const vmIdFragment = this.extractVmIdFragment(payerKeyId);
-    const subChannelState = (await this.channelRepo.getSubChannelState(channelId, vmIdFragment)) ?? {
-      channelId,
-      epoch: channelInfo.epoch,
-      vmIdFragment,
-      lastClaimedAmount: BigInt(0),
-      lastConfirmedNonce: BigInt(0),
-      lastUpdated: Date.now(),
-    };
-
-    // Validate that epoch matches
-    if (subChannelState.epoch !== channelInfo.epoch) {
-      throw new Error(`Epoch mismatch: local ${subChannelState.epoch}, chain ${channelInfo.epoch}`);
-    }
-
-    // Calculate new values
-    const newNonce = subChannelState.lastConfirmedNonce + BigInt(1);
-    const newAccumulatedAmount = subChannelState.lastClaimedAmount + amount;
-
-    // vmIdFragment already extracted above
-
-    const chainId = await this.getChainId();
-
-    const subRAV: SubRAV = SubRAVUtils.create({
-      chainId: chainId,
-      channelId: channelId,
-      channelEpoch: channelInfo.epoch,
-      vmIdFragment: vmIdFragment,
-      accumulatedAmount: newAccumulatedAmount,
-      nonce: newNonce,
-    });
-    
-    return subRAV;
-  }
+  } 
 
   // -------- Claims Management --------
 
