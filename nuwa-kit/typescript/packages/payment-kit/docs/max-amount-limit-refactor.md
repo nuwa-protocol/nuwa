@@ -23,10 +23,10 @@
 
 ## 2. 目标
 
-* 修正比较逻辑 → 使用 **增量值** (`deltaAmount`) 而不是累计值。  
-* 将 `maxAmount` 随 Header 一并发送，让 **Payee 可提前判断**。  
-* 提炼协议无关的数据结构 `PaymentHeaderPayload`，统一多协议编解码。  
-* 明确 `maxAmount` 单位：**资产最小计量单位**。
+- 修正比较逻辑 → 使用 **增量值** (`deltaAmount`) 而不是累计值。
+- 将 `maxAmount` 随 Header 一并发送，让 **Payee 可提前判断**。
+- 提炼协议无关的数据结构 `PaymentHeaderPayload`，统一多协议编解码。
+- 明确 `maxAmount` 单位：**资产最小计量单位**。
 
 ---
 
@@ -53,23 +53,25 @@ export type HttpRequestPayload = PaymentHeaderPayload;
 
 ### 3.2 Codec 调整
 
-* **HttpPaymentCodec**
-  * `encode()`⇒ `encode(payload: PaymentHeaderPayload)`
-  * `decode()` 返回 `PaymentHeaderPayload`
-  * Header 名仍为 `X-Payment-Channel-Data`
-* 未来其他协议（MCP、WebSocket…）编写各自 `*PaymentCodec` 时，也直接读写 `PaymentHeaderPayload`。
+- **HttpPaymentCodec**
+  - `encode()`⇒ `encode(payload: PaymentHeaderPayload)`
+  - `decode()` 返回 `PaymentHeaderPayload`
+  - Header 名仍为 `X-Payment-Channel-Data`
+- 未来其他协议（MCP、WebSocket…）编写各自 `*PaymentCodec` 时，也直接读写 `PaymentHeaderPayload`。
 
 ### 3.3 Payer 侧修改
 
-| 位置 | 变更 |
-|------|------|
-| `PaymentChannelHttpClient.addPaymentChannelHeader()` | ```ts
+| 位置                                                 | 变更  |
+| ---------------------------------------------------- | ----- |
+| `PaymentChannelHttpClient.addPaymentChannelHeader()` | ```ts |
+
 const headerValue = codec.encode({
-  signedSubRav,
-  maxAmount: this.options.maxAmount,
-  clientTxRef: uuidv4(), // 可选
+signedSubRav,
+maxAmount: this.options.maxAmount,
+clientTxRef: uuidv4(), // 可选
 });
-``` |
+
+````|
 | `PaymentChannelPayerClient.validateSubRAVForSigning()` | 计算 `deltaAmount = subRAV.accumulatedAmount ‑ prevState.accumulatedAmount`，并与 `maxAmount` 比较。 |
 
 ### 3.4 Payee 侧修改
@@ -77,7 +79,8 @@ const headerValue = codec.encode({
 1. **HttpBillingMiddleware.buildRequestMetadata**
    ```ts
    maxAmount: paymentData?.maxAmount
-   ```
+````
+
 2. **PaymentProcessor.processPayment** 在计费完成后加入：
    ```ts
    if (cost > maxAmount) {
@@ -110,24 +113,24 @@ graph LR
 
 ## 5. 版本策略与迁移
 
-1. 客户端 **必须** 在 `PaymentHeaderPayload` 中发送 `maxAmount` 与 `version` 字段。  
-2. 发布 **minor 版本**（例如 `0.x.+1`）。  
-3. 客户端侧：  
-   * 升级依赖后需保证 `maxAmount` 单位为 token。  
-   * 建议使用 `/payment-channel/price` API 将预算 USD ⇒ token。
+1. 客户端 **必须** 在 `PaymentHeaderPayload` 中发送 `maxAmount` 与 `version` 字段。
+2. 发布 **minor 版本**（例如 `0.x.+1`）。
+3. 客户端侧：
+   - 升级依赖后需保证 `maxAmount` 单位为 token。
+   - 建议使用 `/payment-channel/price` API 将预算 USD ⇒ token。
 
 ---
 
 ## 6. 待办
 
-- [ ] 修改 `core/types.ts` 引入 `PaymentHeaderPayload`。  
-- [ ] 重构 `HttpPaymentCodec`。  
-- [ ] 客户端：`PaymentChannelHttpClient` 发送新 payload。  
-- [ ] 客户端：`PaymentChannelPayerClient` 增量检查。  
-- [ ] Payee：`HttpBillingMiddleware`、`PaymentProcessor` 使用 `maxAmount`。  
+- [ ] 修改 `core/types.ts` 引入 `PaymentHeaderPayload`。
+- [ ] 重构 `HttpPaymentCodec`。
+- [ ] 客户端：`PaymentChannelHttpClient` 发送新 payload。
+- [ ] 客户端：`PaymentChannelPayerClient` 增量检查。
+- [ ] Payee：`HttpBillingMiddleware`、`PaymentProcessor` 使用 `maxAmount`。
 - [ ] 单元 / E2E 测试覆盖：
-  * over-budget 被拒绝
-  * 满足预算正常签完
+  - over-budget 被拒绝
+  - 满足预算正常签完
 - [ ] 文档 & 示例更新。
 
 ---

@@ -2,21 +2,21 @@
 
 > **Status**: Proposal – to be implemented in the next minor release (`v0.x.+1`).
 
-During the recent refactor we standardised the *request* side of the HTTP
+During the recent refactor we standardised the _request_ side of the HTTP
 payment protocol by renaming `HttpRequestPayload` to `PaymentRequestPayload` and
 adding a mandatory `version` field.
 
-This document proposes an equivalent standardisation for the *response* side
+This document proposes an equivalent standardisation for the _response_ side
 and the associated codec interfaces.
 
 ---
 
 ## 1. Rename `HttpRequestPayload` / `HttpResponsePayload`
 
-| Current name             | Proposed name            | Rationale                                             |
-|--------------------------|--------------------------|-------------------------------------------------------|
-| `HttpRequestPayload`     | `PaymentRequestPayload`  | – Removes protocol-specific prefix.<br/>– Aligns with response naming. |
-| `HttpResponsePayload`    | `PaymentResponsePayload` | – Removes protocol-specific prefix.<br/>– Symmetry with `PaymentRequestPayload`. |
+| Current name          | Proposed name            | Rationale                                                                        |
+| --------------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| `HttpRequestPayload`  | `PaymentRequestPayload`  | – Removes protocol-specific prefix.<br/>– Aligns with response naming.           |
+| `HttpResponsePayload` | `PaymentResponsePayload` | – Removes protocol-specific prefix.<br/>– Symmetry with `PaymentRequestPayload`. |
 
 Both legacy types will be kept for **one minor version** as type aliases to
 avoid breaking downstream code immediately:
@@ -38,13 +38,13 @@ in the subsequent **major** release.
 
 ### 2.1 Versioning
 
-* Add a **required** `version: number` field (default `1`). This mirrors the
+- Add a **required** `version: number` field (default `1`). This mirrors the
   request side and makes future schema evolution explicit.
 
 ### 2.2 Cost/Amount nomenclature
 
-* Rename `amountDebited` → `cost` for clarity and brevity.
-* Type remains `bigint`.
+- Rename `amountDebited` → `cost` for clarity and brevity.
+- Type remains `bigint`.
 
 ### 2.3 Error handling strategy
 
@@ -53,15 +53,16 @@ in the subsequent **major** release.
 动机：验证/计费上下文阶段（例如 `maxAmount` 检查）可能在业务处理前发生，且业务层响应体结构不统一，SDK 很难通用解析。将错误摘要放入统一的支付协议响应头，可保证客户端在任何业务响应体下都能稳定获知错误并做出正确恢复（例如清理 `pendingSubRAV`、重握手等）。
 
 建议：
+
 - 成功：返回 2xx，并在响应头携带成功的 `PaymentResponsePayload`（含 `subRav` 与 `cost`）。
 - 失败（协议级错误，如 `MAX_AMOUNT_EXCEEDED`、`INVALID_PAYMENT`、`INSUFFICIENT_FUNDS` 等）：返回合适的 HTTP status（400 / 402 / 409 / 500），并在响应头附带 `PaymentResponsePayload.error`；此时可不包含 `subRav` 与 `cost`。
 - 业务错误是否在 body 返回，自由决定；SDK 仅依赖响应头完成支付协议层解析与恢复，不依赖业务 body 结构。
 
 ### 2.4 Transaction references
 
-* Keep both `clientTxRef?` and `serviceTxRef?` – they are actively used for
+- Keep both `clientTxRef?` and `serviceTxRef?` – they are actively used for
   idempotency and audit-trail.
-* No renaming required.
+- No renaming required.
 
 ### 2.5 Fields to **remove**
 
@@ -84,8 +85,8 @@ export interface PaymentResponsePayload {
 
   /** Protocol-level error info. Present on error responses. */
   error?: {
-    code: string;      // e.g. 'MAX_AMOUNT_EXCEEDED', 'INVALID_PAYMENT', 'INSUFFICIENT_FUNDS'
-    message?: string;  // human-readable message
+    code: string; // e.g. 'MAX_AMOUNT_EXCEEDED', 'INVALID_PAYMENT', 'INSUFFICIENT_FUNDS'
+    message?: string; // human-readable message
   };
 
   /** Payload schema version (default: 1) */
@@ -99,7 +100,7 @@ export interface PaymentResponsePayload {
 
 ### 3.1 `PaymentCodec`
 
-The **protocol-agnostic** codec currently only supports *request* encoding
+The **protocol-agnostic** codec currently only supports _request_ encoding
 (`encode/decode`). We extend it to cover the response path and to make the
 method names explicit:
 
@@ -136,11 +137,11 @@ Key changes:
 
 ### 3.3 Migration strategy
 
-| Release | Change                                                     |
-|---------|------------------------------------------------------------|
-| v0.x.+1 | Add new types + codec methods；`HttpResponsePayload` 作为 `PaymentResponsePayload` 的别名保留；`amountDebited`/`errorCode` 读兼容。|
-| v0.x.+2 | 对旧 API 使用打 `@deprecated` 警告；SDK 在响应中优先解析 `error` 字段；测试覆盖错误分支。|
-| v1.0.0  | 删除别名与旧字段写入路径，仅保留新结构。|
+| Release | Change                                                                                                                              |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| v0.x.+1 | Add new types + codec methods；`HttpResponsePayload` 作为 `PaymentResponsePayload` 的别名保留；`amountDebited`/`errorCode` 读兼容。 |
+| v0.x.+2 | 对旧 API 使用打 `@deprecated` 警告；SDK 在响应中优先解析 `error` 字段；测试覆盖错误分支。                                           |
+| v1.0.0  | 删除别名与旧字段写入路径，仅保留新结构。                                                                                            |
 
 CI will fail on usage of deprecated APIs starting **v0.x.+2** to encourage
 migration before the major release.
@@ -162,4 +163,3 @@ migration before the major release.
 6. **Docs** – 实现后更新 HTTP 集成文档与示例代码片段。
 
 Contributions and feedback are welcome. Please open an issue or a PR.
-

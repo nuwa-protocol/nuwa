@@ -47,14 +47,14 @@ payment-kit/
 
 ## 分层架构
 
-| 层级 | 目录 | 职责 | 关键文件 |
-|------|-------|------|----------|
-| **框架层** | `src/types/` | 定义通用 Handler、Context、ErrorCode 等基础设施类型 | `api.ts` |
-| **数据层** | `src/schema/` | 使用 **Zod** 声明可序列化的数据结构 & 运行时验证；`z.infer` 自动生成 TS 类型 | `core/index.ts`, `api/*.ts` |
-| **业务层** | `src/api/` | 将业务 Handler 与 Schema 关联，组成 **BuiltInApiHandlers** 注册表；支持 REST/MCP/JSON-RPC 等多协议 | `handlers/*.ts`, `index.ts` |
-| **适配层** | `src/transport/` | 将业务 Handler 适配到具体传输协议（HTTP、gRPC、MCP…） | `express/*` |
-| **核心协议** | `src/core/` | NIP-4 支付协议核心逻辑，与区块链无关 | `subrav.ts`, `types.ts` |
-| **链适配** | `src/rooch/` | Rooch 链特定合约调用、客户端封装 | `contract.ts`, `client.ts` |
+| 层级         | 目录             | 职责                                                                                               | 关键文件                    |
+| ------------ | ---------------- | -------------------------------------------------------------------------------------------------- | --------------------------- |
+| **框架层**   | `src/types/`     | 定义通用 Handler、Context、ErrorCode 等基础设施类型                                                | `api.ts`                    |
+| **数据层**   | `src/schema/`    | 使用 **Zod** 声明可序列化的数据结构 & 运行时验证；`z.infer` 自动生成 TS 类型                       | `core/index.ts`, `api/*.ts` |
+| **业务层**   | `src/api/`       | 将业务 Handler 与 Schema 关联，组成 **BuiltInApiHandlers** 注册表；支持 REST/MCP/JSON-RPC 等多协议 | `handlers/*.ts`, `index.ts` |
+| **适配层**   | `src/transport/` | 将业务 Handler 适配到具体传输协议（HTTP、gRPC、MCP…）                                              | `express/*`                 |
+| **核心协议** | `src/core/`      | NIP-4 支付协议核心逻辑，与区块链无关                                                               | `subrav.ts`, `types.ts`     |
+| **链适配**   | `src/rooch/`     | Rooch 链特定合约调用、客户端封装                                                                   | `contract.ts`, `client.ts`  |
 
 ### 💡 关键设计原则
 
@@ -94,12 +94,12 @@ export const BuiltInApiHandlers = {
 
 ### 3. `src/transport/express/`
 
-| 文件 | 职责 |
-|------|------|
-| `BillableRouter.ts` | 维护计费规则 & 路由统一入口 |
-| `HandlerRestAdapter.ts` | **核心适配器**：把 PaymentKit Handler ➜ Express RequestHandler |
-| `PaymentKitExpressAdapter.ts` | 协调 `BuiltInApiHandlers` 与 `BillableRouter`，注册所有路由 |
-| `ExpressPaymentKit.ts` | 封装为可直接挂载的 Express App 组件 |
+| 文件                          | 职责                                                           |
+| ----------------------------- | -------------------------------------------------------------- |
+| `BillableRouter.ts`           | 维护计费规则 & 路由统一入口                                    |
+| `HandlerRestAdapter.ts`       | **核心适配器**：把 PaymentKit Handler ➜ Express RequestHandler |
+| `PaymentKitExpressAdapter.ts` | 协调 `BuiltInApiHandlers` 与 `BillableRouter`，注册所有路由    |
+| `ExpressPaymentKit.ts`        | 封装为可直接挂载的 Express App 组件                            |
 
 ### 4. `src/integrations/http/`
 

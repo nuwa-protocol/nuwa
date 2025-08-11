@@ -55,25 +55,25 @@ export class McpPaymentCodec implements PaymentCodec {
       id: this.generateId(),
       data: {
         signedSubRAV,
-        metadata
-      }
+        metadata,
+      },
     };
     return JSON.stringify(frame);
   }
-  
+
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     const frame: McpPaymentFrame = JSON.parse(encoded);
-    
+
     if (frame.type !== 'payment') {
       throw new Error(`Expected payment frame, got ${frame.type}`);
     }
-    
+
     return {
       signedSubRAV: frame.data.signedSubRAV,
-      metadata: frame.data.metadata
+      metadata: frame.data.metadata,
     };
   }
-  
+
   private generateId(): string {
     return `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -106,40 +106,33 @@ export class McpBillingMiddleware {
     try {
       // 1. 提取支付数据
       const paymentData = this.extractPaymentData(request);
-      
+
       // 2. 构建请求元数据
       const requestMeta = this.buildRequestMetadata(request, paymentData);
-      
+
       // 3. 处理支付
-      const result = await this.processor.processPayment(
-        requestMeta,
-        paymentData?.signedSubRAV
-      );
-      
+      const result = await this.processor.processPayment(requestMeta, paymentData?.signedSubRAV);
+
       // 4. 处理失败情况
       if (!result.success) {
         return this.buildErrorResponse(request.id, result);
       }
-      
+
       // 5. 执行业务逻辑
       const businessResponse = await this.executeBusiness(request);
-      
+
       // 6. 添加支付提案到响应
       if (result.unsignedSubRAV) {
         this.addPaymentProposal(businessResponse, result);
       }
-      
+
       return businessResponse;
-      
     } catch (error) {
-      return this.buildErrorResponse(
-        request.id, 
-        { 
-          success: false, 
-          error: `MCP billing error: ${error}`,
-          errorCode: 'MCP_BILLING_ERROR'
-        }
-      );
+      return this.buildErrorResponse(request.id, {
+        success: false,
+        error: `MCP billing error: ${error}`,
+        errorCode: 'MCP_BILLING_ERROR',
+      });
     }
   }
 
@@ -165,24 +158,24 @@ export class McpBillingMiddleware {
    * 构建协议无关的请求元数据
    */
   private buildRequestMetadata(
-    request: McpRequest, 
+    request: McpRequest,
     paymentData?: { signedSubRAV: SignedSubRAV }
   ): RequestMetadata {
     return {
       operation: `mcp:${request.method}`,
-      
+
       // 从 MCP 参数中提取业务信息
       model: request.params?.model,
       assetId: request.params?.assetId,
-      
+
       // 从支付数据中提取通道信息
       channelId: paymentData?.signedSubRAV.subRav.channelId,
       vmIdFragment: paymentData?.signedSubRAV.subRav.vmIdFragment,
-      
+
       // MCP 特定信息
       mcpMethod: request.method,
       mcpParams: request.params,
-      mcpId: request.id
+      mcpId: request.id,
     };
   }
 
@@ -204,10 +197,7 @@ export class McpBillingMiddleware {
   /**
    * 添加支付提案到响应
    */
-  private addPaymentProposal(
-    response: McpResponse, 
-    paymentResult: PaymentProcessingResult
-  ): void {
+  private addPaymentProposal(response: McpResponse, paymentResult: PaymentProcessingResult): void {
     if (!paymentResult.unsignedSubRAV) return;
 
     const proposalFrame: McpPaymentResponse = {
@@ -216,8 +206,8 @@ export class McpBillingMiddleware {
       data: {
         subRAV: paymentResult.unsignedSubRAV,
         amountDebited: paymentResult.cost.toString(),
-        serviceTxRef: paymentResult.serviceTxRef || ''
-      }
+        serviceTxRef: paymentResult.serviceTxRef || '',
+      },
     };
 
     // 将支付提案添加到响应中
@@ -229,7 +219,7 @@ export class McpBillingMiddleware {
    * 构建错误响应
    */
   private buildErrorResponse(
-    requestId: string, 
+    requestId: string,
     result: { error?: string; errorCode?: string }
   ): McpResponse {
     return {
@@ -240,9 +230,9 @@ export class McpBillingMiddleware {
         message: result.error || 'Payment required',
         data: {
           errorCode: result.errorCode,
-          type: 'payment_error'
-        }
-      }
+          type: 'payment_error',
+        },
+      },
     };
   }
 
@@ -251,11 +241,16 @@ export class McpBillingMiddleware {
    */
   private mapErrorCode(errorCode?: string): number {
     switch (errorCode) {
-      case 'PAYMENT_REQUIRED': return -32600; // Invalid Request
-      case 'INVALID_PAYMENT': return -32602; // Invalid params
-      case 'UNKNOWN_SUBRAV': return -32602;
-      case 'TAMPERED_SUBRAV': return -32602;
-      default: return -32603; // Internal error
+      case 'PAYMENT_REQUIRED':
+        return -32600; // Invalid Request
+      case 'INVALID_PAYMENT':
+        return -32602; // Invalid params
+      case 'UNKNOWN_SUBRAV':
+        return -32602;
+      case 'TAMPERED_SUBRAV':
+        return -32602;
+      default:
+        return -32603; // Internal error
     }
   }
 }
@@ -274,20 +269,18 @@ export interface CreateMcpBillingOptions {
   debug?: boolean;
 }
 
-export function createMcpBillingMiddleware(
-  options: CreateMcpBillingOptions
-): McpBillingMiddleware {
+export function createMcpBillingMiddleware(options: CreateMcpBillingOptions): McpBillingMiddleware {
   const processor = new PaymentProcessor({
     payeeClient: options.payeeClient,
     billingEngine: options.billingEngine,
     serviceId: options.serviceId,
     defaultAssetId: options.defaultAssetId,
-    debug: options.debug
+    debug: options.debug,
   });
 
   return new McpBillingMiddleware({
     paymentProcessor: processor,
-    debug: options.debug
+    debug: options.debug,
   });
 }
 ```
@@ -317,17 +310,14 @@ export class McpPaymentClient {
     }
 
     // 签名上次的提案并添加到请求
-    const paymentData = await this.payerClient.signAndEncode(
-      this.lastProposal,
-      this.codec
-    );
+    const paymentData = await this.payerClient.signAndEncode(this.lastProposal, this.codec);
 
     return {
       ...request,
       params: {
         ...request.params,
-        payment: JSON.parse(paymentData)
-      }
+        payment: JSON.parse(paymentData),
+      },
     };
   }
 
@@ -347,18 +337,15 @@ export class McpPaymentClient {
   async handshake(channelId: string): Promise<McpRequest> {
     // 创建握手 SubRAV (nonce=0, amount=0)
     const handshakeSubRAV = await this.payerClient.createHandshake(channelId);
-    const paymentData = await this.payerClient.signAndEncode(
-      handshakeSubRAV,
-      this.codec
-    );
+    const paymentData = await this.payerClient.signAndEncode(handshakeSubRAV, this.codec);
 
     return {
       jsonrpc: '2.0',
       id: 'handshake_' + Date.now(),
       method: 'payment/handshake',
       params: {
-        payment: JSON.parse(paymentData)
-      }
+        payment: JSON.parse(paymentData),
+      },
     };
   }
 }
@@ -395,15 +382,15 @@ export class A2aPaymentCodec implements PaymentCodec {
   encode(signedSubRAV: SignedSubRAV, metadata?: any): string {
     return JSON.stringify({
       signedSubRAV,
-      metadata
+      metadata,
     });
   }
-  
+
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     const parsed = JSON.parse(encoded);
     return {
       signedSubRAV: parsed.signedSubRAV,
-      metadata: parsed.metadata
+      metadata: parsed.metadata,
     };
   }
 }
@@ -428,7 +415,7 @@ export class A2aBillingMiddleware {
 
     // 提取支付数据
     const paymentData = message.payment;
-    
+
     // 构建请求元数据
     const requestMeta: RequestMetadata = {
       operation: `a2a:${message.service}:${message.method}`,
@@ -436,14 +423,11 @@ export class A2aBillingMiddleware {
       method: message.method,
       channelId: paymentData?.signedSubRAV.subRav.channelId,
       vmIdFragment: paymentData?.signedSubRAV.subRav.vmIdFragment,
-      a2aMessageId: message.id
+      a2aMessageId: message.id,
     };
 
     // 处理支付
-    const result = await this.processor.processPayment(
-      requestMeta,
-      paymentData?.signedSubRAV
-    );
+    const result = await this.processor.processPayment(requestMeta, paymentData?.signedSubRAV);
 
     if (!result.success) {
       return {
@@ -453,8 +437,8 @@ export class A2aBillingMiddleware {
         method: message.method,
         payload: {
           error: result.error,
-          code: result.errorCode
-        }
+          code: result.errorCode,
+        },
       };
     }
 
@@ -466,7 +450,7 @@ export class A2aBillingMiddleware {
       businessResult.payment = {
         subRAV: result.unsignedSubRAV,
         cost: result.cost.toString(),
-        txRef: result.serviceTxRef || ''
+        txRef: result.serviceTxRef || '',
       };
     }
 
@@ -480,7 +464,7 @@ export class A2aBillingMiddleware {
       type: 'response',
       service: message.service,
       method: message.method,
-      payload: { success: true }
+      payload: { success: true },
     };
   }
 }
@@ -498,7 +482,7 @@ describe('McpBillingMiddleware', () => {
   beforeEach(() => {
     mockProcessor = createMockPaymentProcessor();
     middleware = new McpBillingMiddleware({
-      paymentProcessor: mockProcessor
+      paymentProcessor: mockProcessor,
     });
   });
 
@@ -509,18 +493,20 @@ describe('McpBillingMiddleware', () => {
       method: 'llm/generate',
       params: {
         model: 'gpt-4',
-        payment: { /* payment frame */ }
-      }
+        payment: {
+          /* payment frame */
+        },
+      },
     };
 
     mockProcessor.processPayment.mockResolvedValue({
       success: true,
       cost: BigInt(100),
-      assetId: 'USDC'
+      assetId: 'USDC',
     });
 
     const response = await middleware.handleRequest(request);
-    
+
     expect(response.error).toBeUndefined();
     expect(mockProcessor.processPayment).toHaveBeenCalled();
   });
@@ -546,7 +532,7 @@ describe('MCP Billing Integration', () => {
       jsonrpc: '2.0',
       id: 'test-1',
       method: 'llm/generate',
-      params: { model: 'gpt-4' }
+      params: { model: 'gpt-4' },
     });
 
     const response = await middleware.handleRequest(request);
@@ -597,13 +583,13 @@ static getProcessor(serviceId: string): PaymentProcessor {
 // 添加协议特定的监控
 private async handleWithMetrics(request: ProtocolRequest): Promise<ProtocolResponse> {
   const startTime = Date.now();
-  
+
   try {
     const result = await this.processor.processPayment(/* ... */);
-    
+
     // 记录成功指标
     this.metrics.recordPaymentSuccess(request.method, Date.now() - startTime);
-    
+
     return result;
   } catch (error) {
     // 记录失败指标
@@ -620,7 +606,7 @@ export interface ProtocolBillingConfig {
   serviceId: string;
   payeeClient: PaymentChannelPayeeClient;
   billingEngine: CostCalculator;
-  
+
   // 协议特定配置
   protocolOptions: {
     timeout?: number;

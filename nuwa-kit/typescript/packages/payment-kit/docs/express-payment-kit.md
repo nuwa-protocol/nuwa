@@ -1,6 +1,6 @@
 # ExpressPaymentKit —— 一站式计费集成
 
-> ⚠️  当前 `@nuwa-ai/payment-kit` 尚未正式发布，API 仍可能调整。
+> ⚠️ 当前 `@nuwa-ai/payment-kit` 尚未正式发布，API 仍可能调整。
 >
 > 本文档介绍 **ExpressPaymentKit** —— 将 `BillableRouter` 与 `HttpBillingMiddleware` 封装到一起，提供"三行代码"即可完成计费／支付接入的高阶封装。
 
@@ -17,9 +17,9 @@
 
 这造成了**样板代码多、容易出错**。`ExpressPaymentKit` 的目标是：
 
-* **一步可用**——最小化"胶水"代码；
-* **灵活可插拔**——高级用户仍能替换策略、存储等实现；
-* **按需生效**——只对通过 Kit 注册的路由做计费，不影响其它中间件。
+- **一步可用**——最小化"胶水"代码；
+- **灵活可插拔**——高级用户仍能替换策略、存储等实现；
+- **按需生效**——只对通过 Kit 注册的路由做计费，不影响其它中间件。
 
 ---
 
@@ -38,7 +38,7 @@ app.use(express.json());
 const payment = await createExpressPaymentKit({
   serviceId: 'llm-gateway',                                  // 服务标识
   signer: KeyManager.fromPrivateKey(process.env.SERVICE_PRIVATE_KEY!), // 服务私钥
-  
+
   // 可选配置
   rpcUrl: 'https://rooch.dev.node',                          // 默认取 env.ROOCH_NODE_URL
   network: 'dev',                                            // 默认 'local'
@@ -80,16 +80,16 @@ app.listen(3000);
 ```ts
 interface ExpressPaymentKitOptions {
   // 必需参数
-  serviceId: string;                     // 服务 ID，用于生成计费规则
-  signer: SignerInterface;               // 服务签名器（包含私钥）
+  serviceId: string; // 服务 ID，用于生成计费规则
+  signer: SignerInterface; // 服务签名器（包含私钥）
 
   // 可选参数
-  rpcUrl?: string;                       // Rooch RPC 节点地址
+  rpcUrl?: string; // Rooch RPC 节点地址
   network?: 'local' | 'dev' | 'test' | 'main';
-  defaultAssetId?: string;               // 默认结算资产
+  defaultAssetId?: string; // 默认结算资产
   defaultPricePicoUSD?: string | bigint; // 兜底价格（皮USD）
-  didAuth?: boolean;                     // 是否启用 DID 认证
-  debug?: boolean;                       // 调试模式
+  didAuth?: boolean; // 是否启用 DID 认证
+  debug?: boolean; // 调试模式
 }
 ```
 
@@ -99,18 +99,18 @@ interface ExpressPaymentKitOptions {
 interface ExpressPaymentKit {
   // Express Router（挂载到你的应用）
   readonly router: Router;
-  
+
   // HTTP 动词方法（类似 Express 但支持定价）
   get(path: string, pricing: PricingStrategy, handler: RequestHandler): this;
   post(path: string, pricing: PricingStrategy, handler: RequestHandler): this;
   put(path: string, pricing: PricingStrategy, handler: RequestHandler): this;
   delete(path: string, pricing: PricingStrategy, handler: RequestHandler): this;
   patch(path: string, pricing: PricingStrategy, handler: RequestHandler): this;
-  
+
   // 管理和恢复功能
-  recoveryRouter(): Router;              // 客户端数据恢复
+  recoveryRouter(): Router; // 客户端数据恢复
   adminRouter(options?: AdminOptions): Router; // 运营管理接口
-  
+
   // 高级功能
   getPayeeClient(): PaymentChannelPayeeClient;
 }
@@ -125,40 +125,48 @@ interface ExpressPaymentKit {
 ### 1. 固定价格
 
 ```ts
-payment.get('/v1/status', '1000000000', handler);  // 0.001 USD
+payment.get('/v1/status', '1000000000', handler); // 0.001 USD
 payment.post('/v1/simple', 500_000_000n, handler); // 0.0005 USD（BigInt）
 ```
 
 ### 2. 按 Token 计费
 
 ```ts
-payment.post('/v1/chat/completions', {
-  type: 'PerToken',
-  unitPricePicoUSD: '20000',           // 每 token 价格
-  usageKey: 'usage.total_tokens'       // 从 res.locals.usage 提取用量
-}, (req, res) => {
-  // 你的业务逻辑
-  const result = await openai.chat.completions.create(req.body);
-  
-  // 🔑 关键：设置用量到 res.locals，Kit 会自动计费
-  res.locals.usage = result.usage;
-  
-  res.json(result);
-});
+payment.post(
+  '/v1/chat/completions',
+  {
+    type: 'PerToken',
+    unitPricePicoUSD: '20000', // 每 token 价格
+    usageKey: 'usage.total_tokens', // 从 res.locals.usage 提取用量
+  },
+  (req, res) => {
+    // 你的业务逻辑
+    const result = await openai.chat.completions.create(req.body);
+
+    // 🔑 关键：设置用量到 res.locals，Kit 会自动计费
+    res.locals.usage = result.usage;
+
+    res.json(result);
+  }
+);
 ```
 
 ### 3. 分层定价
 
 ```ts
-payment.post('/v1/analyze', {
-  type: 'Tiered',
-  tiers: [
-    { threshold: 1000, unitPricePicoUSD: '10000' },    // 前 1k tokens: 0.00001 USD/token
-    { threshold: 10000, unitPricePicoUSD: '8000' },    // 1k-10k tokens: 0.000008 USD/token
-    { threshold: Infinity, unitPricePicoUSD: '5000' }   // 10k+ tokens: 0.000005 USD/token
-  ],
-  usageKey: 'usage.total_tokens'
-}, handler);
+payment.post(
+  '/v1/analyze',
+  {
+    type: 'Tiered',
+    tiers: [
+      { threshold: 1000, unitPricePicoUSD: '10000' }, // 前 1k tokens: 0.00001 USD/token
+      { threshold: 10000, unitPricePicoUSD: '8000' }, // 1k-10k tokens: 0.000008 USD/token
+      { threshold: Infinity, unitPricePicoUSD: '5000' }, // 10k+ tokens: 0.000005 USD/token
+    ],
+    usageKey: 'usage.total_tokens',
+  },
+  handler
+);
 ```
 
 ---
@@ -169,8 +177,8 @@ payment.post('/v1/analyze', {
 
 `ExpressPaymentKit` 默认对以下路径**跳过计费**：
 
-* `/admin/*` —— 管理接口
-* `/health` —— 健康检查
+- `/admin/*` —— 管理接口
+- `/health` —— 健康检查
 
 对于通过 Kit 注册的路由，会自动应用：
 
@@ -182,7 +190,7 @@ payment.post('/v1/analyze', {
 ### 错误处理
 
 - **认证失败** → 401 Unauthorized
-- **支付信息无效** → 400 Bad Request  
+- **支付信息无效** → 400 Bad Request
 - **余额不足** → 402 Payment Required
 - **内部错误** → 500 Internal Server Error
 
@@ -195,23 +203,26 @@ payment.post('/v1/analyze', {
 ### 管理路由 (`adminRouter()`)
 
 ```ts
-app.use('/admin', payment.adminRouter({
-  auth: (req, res, next) => {
-    // 可选：添加管理员认证逻辑
-    if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    next();
-  }
-}));
+app.use(
+  '/admin',
+  payment.adminRouter({
+    auth: (req, res, next) => {
+      // 可选：添加管理员认证逻辑
+      if (req.headers.authorization !== `Bearer ${ADMIN_TOKEN}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      next();
+    },
+  })
+);
 ```
 
 可用端点：
 
-* `GET /admin/claims` —— 查看结算状态和统计
-* `POST /admin/claim/:channelId` —— 手动触发特定通道的结算
-* `GET /admin/subrav/:channelId/:nonce` —— 查看指定 SubRAV
-* `DELETE /admin/cleanup?maxAge=30` —— 清理过期提案（默认 30 分钟）
+- `GET /admin/claims` —— 查看结算状态和统计
+- `POST /admin/claim/:channelId` —— 手动触发特定通道的结算
+- `GET /admin/subrav/:channelId/:nonce` —— 查看指定 SubRAV
+- `DELETE /admin/cleanup?maxAge=30` —— 清理过期提案（默认 30 分钟）
 
 ### 恢复路由 (`recoveryRouter()`)
 
@@ -221,8 +232,8 @@ app.use('/payment', payment.recoveryRouter());
 
 客户端数据恢复端点：
 
-* `GET /payment/pending` —— 获取待签名的 SubRAV（需要通道认证头）
-* `GET /payment/price/:assetId` —— 查询资产当前价格
+- `GET /payment/pending` —— 获取待签名的 SubRAV（需要通道认证头）
+- `GET /payment/price/:assetId` —— 查询资产当前价格
 
 ---
 
@@ -260,6 +271,7 @@ NODE_ENV=production
 ```
 
 生产环境建议：
+
 - 启用 DID 认证（`didAuth: true`）
 - 关闭调试日志（`debug: false`）
 - 使用 KMS 管理私钥
@@ -271,10 +283,12 @@ NODE_ENV=production
 ### 常见问题
 
 1. **"Missing X-Payment-Channel-Data header"**
+
    - 客户端未提供支付通道信息
    - 检查客户端是否正确集成 PaymentKit
 
-2. **"DID authentication failed"**  
+2. **"DID authentication failed"**
+
    - Authorization 头格式错误或签名无效
    - 确认客户端 DID 签名逻辑
 
@@ -319,8 +333,8 @@ billableRouter.post('/v1/chat', '1000000000', handler);
 app.use('/api', (req, res, next) => {
   // 手动处理路径跳过逻辑
   if (req.path === '/health') return next();
-  
-  middleware.createExpressMiddleware()(req, res, (err) => {
+
+  middleware.createExpressMiddleware()(req, res, err => {
     if (err) return res.status(500).json({ error: err.message });
     next();
   });
@@ -356,4 +370,4 @@ app.use('/api', payment.router);
 
 ---
 
-这就是 `ExpressPaymentKit` 的完整使用指南。它将复杂的支付集成简化为三行代码，同时保留了足够的灵活性供高级用户自定义。 
+这就是 `ExpressPaymentKit` 的完整使用指南。它将复杂的支付集成简化为三行代码，同时保留了足够的灵活性供高级用户自定义。

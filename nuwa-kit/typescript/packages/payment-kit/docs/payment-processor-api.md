@@ -12,22 +12,22 @@
 export interface PaymentProcessorConfig {
   /** Payee client for payment operations */
   payeeClient: PaymentChannelPayeeClient;
-  
+
   /** Billing engine for cost calculation */
   billingEngine: CostCalculator;
-  
+
   /** Service ID for billing configuration */
   serviceId: string;
-  
+
   /** Default asset ID if not provided in request context */
   defaultAssetId?: string;
-  
+
   /** Store for pending unsigned SubRAV proposals */
   pendingSubRAVStore?: PendingSubRAVStore;
-  
+
   /** Optional claim scheduler for automated claiming */
   claimScheduler?: ClaimScheduler;
-  
+
   /** Debug logging */
   debug?: boolean;
 }
@@ -39,15 +39,15 @@ export interface PaymentProcessorConfig {
 export interface RequestMetadata {
   /** Business operation identifier (e.g., "POST:/api/chat/completions") */
   operation: string;
-  
+
   /** Optional business parameters */
   model?: string;
   assetId?: string;
-  
+
   /** Payment channel information (extracted from signed SubRAV) */
   channelId?: string;
   vmIdFragment?: string;
-  
+
   /** Protocol-specific additional metadata */
   [key: string]: any;
 }
@@ -59,34 +59,34 @@ export interface RequestMetadata {
 export interface PaymentProcessingResult {
   /** Whether payment was processed successfully */
   success: boolean;
-  
+
   /** Cost calculated for this request */
   cost: bigint;
-  
+
   /** Asset ID used for calculation */
   assetId: string;
-  
+
   /** Generated unsigned SubRAV for next request */
   unsignedSubRAV?: SubRAV;
-  
+
   /** Signed SubRAV received from client */
   signedSubRAV?: SignedSubRAV;
-  
+
   /** Whether auto-claim was triggered */
   autoClaimTriggered?: boolean;
-  
+
   /** Whether this was a handshake request */
   isHandshake?: boolean;
-  
+
   /** Error message if failed */
   error?: string;
-  
+
   /** Error code for client handling */
   errorCode?: string;
-  
+
   /** Payer key ID extracted from payment verification */
   payerKeyId?: string;
-  
+
   /** Service transaction reference */
   serviceTxRef?: string;
 }
@@ -119,10 +119,12 @@ async processPayment(
 4. 可选地触发自动 claim
 
 **参数：**
+
 - `requestMeta`: 协议无关的请求元数据
 - `signedSubRAV`: 客户端发送的已签名 SubRAV（可选）
 
 **返回：**
+
 - `PaymentProcessingResult`: 包含处理结果和新的 SubRAV 提案
 
 **使用示例：**
@@ -132,7 +134,7 @@ const processor = new PaymentProcessor({
   payeeClient,
   billingEngine,
   serviceId: 'llm-gateway',
-  defaultAssetId: 'USDC'
+  defaultAssetId: 'USDC',
 });
 
 // HTTP middleware 中的使用
@@ -141,18 +143,15 @@ const requestMeta: RequestMetadata = {
   model: req.body?.model,
   assetId: req.body?.assetId,
   channelId: paymentData?.signedSubRav.subRav.channelId,
-  vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment
+  vmIdFragment: paymentData?.signedSubRav.subRav.vmIdFragment,
 };
 
-const result = await processor.processPayment(
-  requestMeta, 
-  paymentData?.signedSubRav
-);
+const result = await processor.processPayment(requestMeta, paymentData?.signedSubRav);
 
 if (!result.success) {
-  return res.status(402).json({ 
+  return res.status(402).json({
     error: result.error,
-    code: result.errorCode 
+    code: result.errorCode,
   });
 }
 
@@ -168,9 +167,11 @@ async verifyHandshake(signedSubRAV: SignedSubRAV): Promise<VerificationResult>
 验证握手请求（nonce=0, amount=0）。
 
 **参数：**
+
 - `signedSubRAV`: 握手用的已签名 SubRAV
 
 **返回：**
+
 - `VerificationResult`: 验证结果
 
 #### confirmDeferredPayment
@@ -182,16 +183,18 @@ async confirmDeferredPayment(signedSubRAV: SignedSubRAV): Promise<VerificationRe
 确认延迟支付（验证之前生成的 SubRAV 提案）。
 
 **参数：**
+
 - `signedSubRAV`: 客户端签名返回的 SubRAV
 
 **返回：**
+
 - `VerificationResult`: 验证结果
 
 #### generateProposal
 
 ```typescript
 async generateProposal(
-  context: BillingContext, 
+  context: BillingContext,
   amount: bigint
 ): Promise<SubRAV>
 ```
@@ -199,10 +202,12 @@ async generateProposal(
 生成新的 SubRAV 提案供客户端签名。
 
 **参数：**
+
 - `context`: 计费上下文
 - `amount`: 支付金额
 
 **返回：**
+
 - `SubRAV`: 未签名的 SubRAV 提案
 
 ### Utility Methods
@@ -227,7 +232,7 @@ getProcessingStats(): PaymentProcessingStats
 
 ```typescript
 async findPendingProposal(
-  channelId: string, 
+  channelId: string,
   nonce: bigint
 ): Promise<SubRAV | null>
 ```
@@ -300,10 +305,7 @@ async signAndEncode(
 ```typescript
 // HTTP 客户端
 const httpCodec = new HttpPaymentCodec();
-const encodedPayment = await payerClient.signAndEncode(
-  receivedSubRAV, 
-  httpCodec
-);
+const encodedPayment = await payerClient.signAndEncode(receivedSubRAV, httpCodec);
 
 // 添加到下一个请求的 header
 req.headers['X-Payment-Channel-Data'] = encodedPayment;
@@ -342,7 +344,7 @@ export class BillingContextBuilder {
     requestMeta: RequestMetadata,
     defaultAssetId?: string
   ): BillingContext;
-  
+
   static fromHttpRequest(
     serviceId: string,
     req: Request,
@@ -360,16 +362,18 @@ export class HttpPaymentCodec implements PaymentCodec {
   encode(signedSubRAV: SignedSubRAV, metadata?: any): string {
     const payload: HttpRequestPayload = {
       signedSubRav: signedSubRAV,
-      ...metadata
+      ...metadata,
     };
     return HttpHeaderCodec.buildRequestHeader(payload);
   }
-  
+
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     const payload = HttpHeaderCodec.parseRequestHeader(encoded);
     return {
       signedSubRAV: payload.signedSubRav,
-      metadata: { /* additional fields */ }
+      metadata: {
+        /* additional fields */
+      },
     };
   }
 }
@@ -384,16 +388,16 @@ export class McpPaymentCodec implements PaymentCodec {
     return JSON.stringify({
       type: 'payment',
       data: signedSubRAV,
-      metadata
+      metadata,
     });
   }
-  
+
   decode(encoded: string): { signedSubRAV: SignedSubRAV; metadata?: any } {
     // MCP-specific decoding
     const parsed = JSON.parse(encoded);
     return {
       signedSubRAV: parsed.data,
-      metadata: parsed.metadata
+      metadata: parsed.metadata,
     };
   }
 }
@@ -409,34 +413,29 @@ const processor = new PaymentProcessor(config);
 app.use(async (req, res, next) => {
   // 1. Extract payment data from headers
   const paymentData = extractPaymentData(req.headers);
-  
+
   // 2. Build request metadata
-  const requestMeta = BillingContextBuilder.fromHttpRequest(
-    serviceId, req, paymentData
-  );
-  
+  const requestMeta = BillingContextBuilder.fromHttpRequest(serviceId, req, paymentData);
+
   // 3. Process payment
-  const result = await processor.processPayment(
-    requestMeta, 
-    paymentData?.signedSubRav
-  );
-  
+  const result = await processor.processPayment(requestMeta, paymentData?.signedSubRav);
+
   // 4. Handle result
   if (!result.success) {
     return res.status(402).json({ error: result.error });
   }
-  
+
   // 5. Add proposal to response
   if (result.unsignedSubRAV) {
     const responsePayload = {
       subRav: result.unsignedSubRAV,
       amountDebited: result.cost,
-      serviceTxRef: result.serviceTxRef
+      serviceTxRef: result.serviceTxRef,
     };
     const headerValue = HttpHeaderCodec.buildResponseHeader(responsePayload);
     res.setHeader('X-Payment-Channel-Data', headerValue);
   }
-  
+
   // 6. Continue to business logic
   req.paymentResult = result;
   next();
@@ -451,20 +450,14 @@ const httpCodec = new HttpPaymentCodec();
 
 // In client request interceptor
 if (lastResponseSubRAV) {
-  const paymentHeader = await payerClient.signAndEncode(
-    lastResponseSubRAV, 
-    httpCodec
-  );
+  const paymentHeader = await payerClient.signAndEncode(lastResponseSubRAV, httpCodec);
   request.headers['X-Payment-Channel-Data'] = paymentHeader;
 }
 
 // In client response interceptor
 const responseHeader = response.headers['X-Payment-Channel-Data'];
 if (responseHeader) {
-  const { subRAV } = await payerClient.decodeAndValidate(
-    responseHeader, 
-    httpCodec
-  );
+  const { subRAV } = await payerClient.decodeAndValidate(responseHeader, httpCodec);
   // Store for next request
   lastResponseSubRAV = subRAV;
 }
@@ -483,7 +476,7 @@ export enum PaymentErrorCode {
   PAYMENT_ERROR = 'PAYMENT_ERROR',
   INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS',
   CHANNEL_CLOSED = 'CHANNEL_CLOSED',
-  EPOCH_MISMATCH = 'EPOCH_MISMATCH'
+  EPOCH_MISMATCH = 'EPOCH_MISMATCH',
 }
 ```
 
@@ -520,7 +513,7 @@ describe('PaymentProcessor', () => {
     processor = new PaymentProcessor({
       payeeClient: mockPayeeClient,
       billingEngine: mockBillingEngine,
-      serviceId: 'test-service'
+      serviceId: 'test-service',
     });
   });
 
@@ -529,14 +522,11 @@ describe('PaymentProcessor', () => {
     mockPayeeClient.verifyHandshake.mockResolvedValue({ isValid: true });
     mockBillingEngine.calcCost.mockResolvedValue(BigInt(100));
 
-    const result = await processor.processPayment(
-      { operation: 'POST:/test' },
-      handshakeSubRAV
-    );
+    const result = await processor.processPayment({ operation: 'POST:/test' }, handshakeSubRAV);
 
     expect(result.success).toBe(true);
     expect(result.isHandshake).toBe(true);
     expect(result.cost).toBe(BigInt(100));
   });
 });
-``` 
+```

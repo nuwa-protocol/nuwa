@@ -24,7 +24,7 @@ const payment = await createExpressPaymentKit({
   serviceId: 'my-llm-service',
   signer: keyManager,
   useAutoBilling: true, // 启用 V2 自动计费
-  debug: true
+  debug: true,
 });
 ```
 
@@ -36,47 +36,55 @@ payment.get('/health', { pricing: '0' }, (req, res) => {
   res.json({ status: 'ok' });
 });
 
-payment.post('/upload', { 
-  pricing: '5000000000000', // 5 picoUSD per request
-  paymentRequired: true 
-}, (req, res) => {
-  // 费用已在请求前计算并验证
-  const result = processUpload(req.body);
-  res.json({ result });
-});
+payment.post(
+  '/upload',
+  {
+    pricing: '5000000000000', // 5 picoUSD per request
+    paymentRequired: true,
+  },
+  (req, res) => {
+    // 费用已在请求前计算并验证
+    const result = processUpload(req.body);
+    res.json({ result });
+  }
+);
 
 // 后置计费：基于使用量，请求后计算
-payment.post('/chat', {
-  strategy: {
-    type: 'PerToken',
-    unitPricePicoUSD: '2000000000', // 2 picoUSD per token
-    usageKey: 'usage.total_tokens'
+payment.post(
+  '/chat',
+  {
+    strategy: {
+      type: 'PerToken',
+      unitPricePicoUSD: '2000000000', // 2 picoUSD per token
+      usageKey: 'usage.total_tokens',
+    },
+    paymentRequired: true,
   },
-  paymentRequired: true
-}, async (req, res) => {
-  // 业务逻辑执行
-  const chatResponse = await callLLM(req.body);
-  
-  // 重要：将使用量数据附加到 res.locals.usage
-  // 这将触发后置计费
-  res.locals.usage = {
-    usage: {
-      total_tokens: chatResponse.usage.total_tokens,
-      prompt_tokens: chatResponse.usage.prompt_tokens,
-      completion_tokens: chatResponse.usage.completion_tokens
-    }
-  };
-  
-  res.json({
-    response: chatResponse.response,
-    usage: chatResponse.usage
-  });
-  
-  // 响应结束后，中间件会自动：
-  // 1. 提取 res.locals.usage 数据
-  // 2. 使用 PerToken 策略计算最终费用
-  // 3. 生成并添加 SubRAV 提案到响应头
-});
+  async (req, res) => {
+    // 业务逻辑执行
+    const chatResponse = await callLLM(req.body);
+
+    // 重要：将使用量数据附加到 res.locals.usage
+    // 这将触发后置计费
+    res.locals.usage = {
+      usage: {
+        total_tokens: chatResponse.usage.total_tokens,
+        prompt_tokens: chatResponse.usage.prompt_tokens,
+        completion_tokens: chatResponse.usage.completion_tokens,
+      },
+    };
+
+    res.json({
+      response: chatResponse.response,
+      usage: chatResponse.usage,
+    });
+
+    // 响应结束后，中间件会自动：
+    // 1. 提取 res.locals.usage 数据
+    // 2. 使用 PerToken 策略计算最终费用
+    // 3. 生成并添加 SubRAV 提案到响应头
+  }
+);
 ```
 
 ## 策略配置
@@ -87,16 +95,16 @@ payment.post('/chat', {
 # config/billing.yaml
 rules:
   - id: health-check
-    when: { path: "/health" }
+    when: { path: '/health' }
     strategy:
       type: PerRequest
-      price: "0"
-    
+      price: '0'
+
   - id: file-upload
-    when: { path: "/upload", method: "POST" }
+    when: { path: '/upload', method: 'POST' }
     strategy:
       type: PerRequest
-      price: "5000000000000"  # 5 picoUSD
+      price: '5000000000000' # 5 picoUSD
     paymentRequired: true
 ```
 
@@ -105,19 +113,19 @@ rules:
 ```yaml
 rules:
   - id: chat-completion
-    when: { path: "/chat", method: "POST" }
+    when: { path: '/chat', method: 'POST' }
     strategy:
       type: PerToken
-      unitPricePicoUSD: "2000000000"  # 2 picoUSD per token
-      usageKey: "usage.total_tokens"
+      unitPricePicoUSD: '2000000000' # 2 picoUSD per token
+      usageKey: 'usage.total_tokens'
     paymentRequired: true
-    
+
   - id: text-generation
-    when: { pathRegex: "^/generate" }
+    when: { pathRegex: '^/generate' }
     strategy:
       type: PerToken
-      unitPricePicoUSD: "1500000000"  # 1.5 picoUSD per token
-      usageKey: "usage.total_tokens"
+      unitPricePicoUSD: '1500000000' # 1.5 picoUSD per token
+      usageKey: 'usage.total_tokens'
     paymentRequired: true
 ```
 
@@ -129,87 +137,99 @@ rules:
 app.use('/api', payment.router);
 
 // 使用 V2 自动计费的 LLM 聊天接口
-payment.post('/api/chat', {
-  strategy: {
-    type: 'PerToken',
-    unitPricePicoUSD: '2000000000',
-    usageKey: 'usage.total_tokens'
+payment.post(
+  '/api/chat',
+  {
+    strategy: {
+      type: 'PerToken',
+      unitPricePicoUSD: '2000000000',
+      usageKey: 'usage.total_tokens',
+    },
+    paymentRequired: true,
   },
-  paymentRequired: true
-}, async (req, res) => {
-  try {
-    const { messages, model } = req.body;
-    
-    // 调用 LLM
-    const response = await openai.chat.completions.create({
-      model: model || 'gpt-3.5-turbo',
-      messages,
-    });
-    
-    // 关键：将使用量数据设置到 res.locals.usage
-    // 这将在响应完成后触发后置计费
-    res.locals.usage = {
-      usage: {
-        total_tokens: response.usage?.total_tokens || 0,
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0
-      },
-      model: response.model
-    };
-    
-    res.json({
-      id: response.id,
-      choices: response.choices,
-      usage: response.usage,
-      model: response.model
-    });
-  } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: 'Chat failed' });
+  async (req, res) => {
+    try {
+      const { messages, model } = req.body;
+
+      // 调用 LLM
+      const response = await openai.chat.completions.create({
+        model: model || 'gpt-3.5-turbo',
+        messages,
+      });
+
+      // 关键：将使用量数据设置到 res.locals.usage
+      // 这将在响应完成后触发后置计费
+      res.locals.usage = {
+        usage: {
+          total_tokens: response.usage?.total_tokens || 0,
+          prompt_tokens: response.usage?.prompt_tokens || 0,
+          completion_tokens: response.usage?.completion_tokens || 0,
+        },
+        model: response.model,
+      };
+
+      res.json({
+        id: response.id,
+        choices: response.choices,
+        usage: response.usage,
+        model: response.model,
+      });
+    } catch (error) {
+      console.error('Chat error:', error);
+      res.status(500).json({ error: 'Chat failed' });
+    }
   }
-});
+);
 ```
 
 ### 混合计费场景
 
 ```typescript
 // 前置计费：文件上传基础费用
-payment.post('/api/analyze-document', {
-  pricing: '10000000000000', // 10 picoUSD base fee
-  paymentRequired: true
-}, async (req, res) => {
-  // 基础费用已在请求前收取
-  
-  const document = req.body;
-  const analysis = await analyzeDocument(document);
-  
-  // 如果使用了 LLM 进行分析，还可以有额外的基于 token 的费用
-  // 但这需要通过另一个 PerToken 规则处理
-  
-  res.json({ analysis });
-});
+payment.post(
+  '/api/analyze-document',
+  {
+    pricing: '10000000000000', // 10 picoUSD base fee
+    paymentRequired: true,
+  },
+  async (req, res) => {
+    // 基础费用已在请求前收取
+
+    const document = req.body;
+    const analysis = await analyzeDocument(document);
+
+    // 如果使用了 LLM 进行分析，还可以有额外的基于 token 的费用
+    // 但这需要通过另一个 PerToken 规则处理
+
+    res.json({ analysis });
+  }
+);
 
 // 后置计费：基于分析复杂度的额外费用
-payment.post('/api/deep-analyze', {
-  strategy: {
-    type: 'PerToken',
-    unitPricePicoUSD: '5000000000',
-    usageKey: 'analysis.complexity_score'
+payment.post(
+  '/api/deep-analyze',
+  {
+    strategy: {
+      type: 'PerToken',
+      unitPricePicoUSD: '5000000000',
+      usageKey: 'analysis.complexity_score',
+    },
+    paymentRequired: true,
   },
-  paymentRequired: true
-}, async (req, res) => {
-  const document = req.body;
-  const result = await performDeepAnalysis(document);
-  
-  // 设置基于复杂度的计费数据
-  res.locals.usage = {
-    analysis: {
-      complexity_score: result.complexityScore
-    }
-  };
-  
-  res.json(result);
-});
+  async (req, res) => {
+    const document = req.body;
+    const result = await performDeepAnalysis(document);
+
+    // 设置基于复杂度的计费数据
+    res.locals.usage = {
+      analysis: {
+        complexity_score: result.complexityScore,
+      },
+    };
+
+    res.json(result);
+  }
+);
 ```
 
 ## 调试和监控
@@ -221,11 +241,12 @@ const payment = await createExpressPaymentKit({
   serviceId: 'my-service',
   signer: keyManager,
   useAutoBilling: true,
-  debug: true  // 启用详细日志
+  debug: true, // 启用详细日志
 });
 ```
 
 调试日志示例：
+
 ```
 🔍 Processing HTTP payment request with auto-detection: POST /chat
 ⏳ Post-flight billing detected - preparing payment session
@@ -254,18 +275,20 @@ app.get('/admin/claim-status', (req, res) => {
 ### 从 V1 迁移到 V2
 
 1. **更新配置**：
+
    ```typescript
    // V1
    const payment = await createExpressPaymentKit({ ... });
-   
+
    // V2
-   const payment = await createExpressPaymentKit({ 
-     ..., 
-     useAutoBilling: true 
+   const payment = await createExpressPaymentKit({
+     ...,
+     useAutoBilling: true
    });
    ```
 
 2. **更新后置计费处理器**：
+
    ```typescript
    // V1: 手动管理前置/后置
    app.post('/chat', middleware.preCheck, async (req, res) => {
@@ -273,7 +296,7 @@ app.get('/admin/claim-status', (req, res) => {
      await middleware.postBill(req, res, result.usage);
      res.json(result);
    });
-   
+
    // V2: 自动检测
    payment.post('/chat', { strategy: { type: 'PerToken', ... } }, async (req, res) => {
      const result = await callLLM(req.body);

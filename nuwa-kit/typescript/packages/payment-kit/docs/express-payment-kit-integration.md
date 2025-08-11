@@ -9,6 +9,7 @@ The ExpressPaymentKit provides a streamlined approach to integrating payment bil
 ### 1. Simplified Configuration
 
 Previously, you had to manually create:
+
 - `RoochPaymentChannelContract`
 - `RoochVDR` and register it with `VDRRegistry`
 - `PaymentChannelPayeeClient` with proper storage configuration
@@ -57,7 +58,7 @@ const payment = await createExpressPaymentKit({
   defaultAssetId: '0x3::gas_coin::RGas',
   defaultPricePicoUSD: '1000000000',
   didAuth: true,
-  debug: process.env.NODE_ENV !== 'production'
+  debug: process.env.NODE_ENV !== 'production',
 });
 
 // Register routes with pricing
@@ -65,15 +66,19 @@ payment.get('/api/echo', '500000000', (req, res) => {
   res.json({ echo: req.query.message });
 });
 
-payment.post('/api/chat', {
-  type: 'PerToken',
-  unitPricePicoUSD: '20000',
-  usageKey: 'usage.total_tokens'
-}, (req, res) => {
-  // Your LLM API logic here
-  res.locals.usage = { total_tokens: 150 };
-  res.json({ response: 'Hello!' });
-});
+payment.post(
+  '/api/chat',
+  {
+    type: 'PerToken',
+    unitPricePicoUSD: '20000',
+    usageKey: 'usage.total_tokens',
+  },
+  (req, res) => {
+    // Your LLM API logic here
+    res.locals.usage = { total_tokens: 150 };
+    res.json({ response: 'Hello!' });
+  }
+);
 
 // Mount the router
 app.use(payment.router);
@@ -123,7 +128,7 @@ const payment = await createExpressPaymentKit({
   defaultAssetId: '0x3::gas_coin::RGas',
   defaultPricePicoUSD: '100000000', // 0.0001 USD
   didAuth: true, // Always enable in production
-  debug: false   // Disable debug logs in production
+  debug: false, // Disable debug logs in production
 });
 ```
 
@@ -136,7 +141,7 @@ const payment = await createExpressPaymentKit({
 payment.get('/api/status', '1000000000', statusHandler); // 0.001 USD
 
 // Different prices for different methods
-payment.get('/api/info', '500000000', infoHandler);     // 0.0005 USD
+payment.get('/api/info', '500000000', infoHandler); // 0.0005 USD
 payment.post('/api/process', '2000000000', processHandler); // 0.002 USD
 ```
 
@@ -144,29 +149,37 @@ payment.post('/api/process', '2000000000', processHandler); // 0.002 USD
 
 ```typescript
 // Per-token pricing for LLM APIs
-payment.post('/api/chat/completions', {
-  type: 'PerToken',
-  unitPricePicoUSD: '20000', // 0.00002 USD per token
-  usageKey: 'usage.total_tokens'
-}, async (req, res) => {
-  const result = await llm.complete(req.body);
-  
-  // Set usage for billing calculation
-  res.locals.usage = result.usage;
-  
-  res.json(result);
-});
+payment.post(
+  '/api/chat/completions',
+  {
+    type: 'PerToken',
+    unitPricePicoUSD: '20000', // 0.00002 USD per token
+    usageKey: 'usage.total_tokens',
+  },
+  async (req, res) => {
+    const result = await llm.complete(req.body);
+
+    // Set usage for billing calculation
+    res.locals.usage = result.usage;
+
+    res.json(result);
+  }
+);
 
 // Tiered pricing
-payment.post('/api/analyze', {
-  type: 'Tiered',
-  tiers: [
-    { threshold: 1000, unitPricePicoUSD: '10000' },
-    { threshold: 10000, unitPricePicoUSD: '8000' },
-    { threshold: Infinity, unitPricePicoUSD: '5000' }
-  ],
-  usageKey: 'analysis.complexity_score'
-}, analyzeHandler);
+payment.post(
+  '/api/analyze',
+  {
+    type: 'Tiered',
+    tiers: [
+      { threshold: 1000, unitPricePicoUSD: '10000' },
+      { threshold: 10000, unitPricePicoUSD: '8000' },
+      { threshold: Infinity, unitPricePicoUSD: '5000' },
+    ],
+    usageKey: 'analysis.complexity_score',
+  },
+  analyzeHandler
+);
 ```
 
 ### Custom Rule IDs
@@ -188,12 +201,12 @@ app.use((err, req, res, next) => {
     res.status(402).json({
       error: 'Payment Required',
       details: 'Insufficient channel balance or invalid payment data',
-      channelInfo: err.channelInfo
+      channelInfo: err.channelInfo,
     });
   } else if (err.code === 'DID_AUTH_FAILED') {
     res.status(401).json({
       error: 'Authentication Failed',
-      details: 'Invalid DID signature or authorization header'
+      details: 'Invalid DID signature or authorization header',
     });
   } else {
     next(err);
@@ -232,7 +245,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version
+    version: process.env.npm_package_version,
   });
 });
 
@@ -241,18 +254,18 @@ app.get('/health/detailed', async (req, res) => {
   try {
     const payeeClient = payment.getPayeeClient();
     const channels = await payeeClient.listChannels();
-    
+
     res.json({
       status: 'ok',
       payment: {
         channels: channels.length,
         // Add more payment system metrics
-      }
+      },
     });
   } catch (error) {
     res.status(503).json({
       status: 'error',
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -269,8 +282,8 @@ const mockSigner = {
   listKeyIds: async () => ['test-key'],
   derivePublicKey: async () => ({
     keyType: 'EcdsaSecp256k1VerificationKey2019',
-    publicKeyMultibase: 'z...'
-  })
+    publicKeyMultibase: 'z...',
+  }),
 } as SignerInterface;
 
 const payment = await createExpressPaymentKit({
@@ -279,7 +292,7 @@ const payment = await createExpressPaymentKit({
   rpcUrl: 'http://localhost:6767', // Local Rooch node
   network: 'local',
   didAuth: false, // Disable for easier testing
-  debug: true
+  debug: true,
 });
 ```
 
@@ -290,36 +303,34 @@ import request from 'supertest';
 
 describe('Payment Integration', () => {
   let app;
-  
+
   beforeAll(async () => {
     const payment = await createExpressPaymentKit({
       serviceId: 'test',
       signer: mockSigner,
-      didAuth: false
+      didAuth: false,
     });
-    
+
     payment.get('/test', '1000000000', (req, res) => {
       res.json({ success: true });
     });
-    
+
     app = express();
     app.use(payment.router);
   });
-  
+
   it('should require payment headers', async () => {
-    const response = await request(app)
-      .get('/test')
-      .expect(400);
-      
+    const response = await request(app).get('/test').expect(400);
+
     expect(response.body.error).toContain('Payment');
   });
-  
+
   it('should process valid payment', async () => {
     const response = await request(app)
       .get('/test')
       .set('X-Payment-Channel-Data', validPaymentData)
       .expect(200);
-      
+
     expect(response.body.success).toBe(true);
   });
 });
@@ -335,12 +346,12 @@ If you're migrating from manual BillableRouter + HttpBillingMiddleware setup:
 // Old approach - lots of boilerplate
 const contract = new RoochPaymentChannelContract({
   rpcUrl: process.env.ROOCH_NODE_URL,
-  network: 'dev'
+  network: 'dev',
 });
 
 const roochVDR = new RoochVDR({
   rpcUrl: process.env.ROOCH_NODE_URL,
-  network: 'dev'
+  network: 'dev',
 });
 
 const vdrRegistry = VDRRegistry.getInstance();
@@ -351,24 +362,21 @@ const payeeClient = new PaymentChannelPayeeClient({
   signer: keyManager,
   didResolver: vdrRegistry,
   storageOptions: {
-    customChannelRepo: new MemoryChannelRepository()
-  }
+    customChannelRepo: new MemoryChannelRepository(),
+  },
 });
 
 const billableRouter = new BillableRouter({
-  serviceId: 'my-service'
+  serviceId: 'my-service',
 });
 
 const rateProvider = new ContractRateProvider(contract, 30000);
-const billingEngine = new UsdBillingEngine(
-  billableRouter.getConfigLoader(),
-  rateProvider
-);
+const billingEngine = new UsdBillingEngine(billableRouter.getConfigLoader(), rateProvider);
 
 const middleware = new HttpBillingMiddleware({
   payeeClient,
   billingEngine,
-  serviceId: 'my-service'
+  serviceId: 'my-service',
 });
 
 // Manual middleware setup...
@@ -382,7 +390,7 @@ const payment = await createExpressPaymentKit({
   serviceId: 'my-service',
   signer: keyManager,
   rpcUrl: process.env.ROOCH_NODE_URL,
-  network: 'dev'
+  network: 'dev',
 });
 
 // That's it! Everything is set up automatically.
@@ -398,4 +406,4 @@ const payment = await createExpressPaymentKit({
 6. **Performance**: Use appropriate cache settings for rate providers
 7. **Logging**: Enable debug mode in development, disable in production
 
-This integration approach reduces setup complexity by ~80% while maintaining full flexibility for advanced use cases. 
+This integration approach reduces setup complexity by ~80% while maintaining full flexibility for advanced use cases.

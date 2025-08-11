@@ -36,7 +36,6 @@ export interface HttpPayerOptions {
   /** 目标服务根地址，如 https://api.example.com */
   baseUrl: string;
 
-
   /** 指定 channelId（可选）。如果为空将自动为当前 host 创建或查找活跃通道 */
   channelId?: string;
 
@@ -106,30 +105,33 @@ export class PaymentChannelHttpClient {
 ### 4.1 请求流程
 
 0. **确保通道可用**
+
    1. 提取 `host`，查询 `mappingStore` 是否已有 `channelId`。
    2. 若无记录或通道已关闭，则使用内部 `PaymentChannelPayerClient` 自动调用 `openChannelWithSubChannel()` 创建新通道，并写回 `mappingStore`。
 
 1. **准备 Header**
-   * `Authorization`（可选）：调用 `DidAuthHelper` 基于 `payerDid` 生成 DIDAuthV1 头。
-   * `X-Payment-Channel-Data`：
-     * 若缓存的 `pendingSubRAV` 存在，则由内部 `payerClient.signSubRAV()` 签名并封装。
-     * 若是第一次向该 host 发送请求（Handshake 场景）：构造 nonce=0、amount=0 的 SubRAV 并签名封装。
+
+   - `Authorization`（可选）：调用 `DidAuthHelper` 基于 `payerDid` 生成 DIDAuthV1 头。
+   - `X-Payment-Channel-Data`：
+     - 若缓存的 `pendingSubRAV` 存在，则由内部 `payerClient.signSubRAV()` 签名并封装。
+     - 若是第一次向该 host 发送请求（Handshake 场景）：构造 nonce=0、amount=0 的 SubRAV 并签名封装。
 
 2. **发送请求**
-   * 底层使用可注入的 `fetch`（默认全局 fetch）发起 HTTP 请求。
+
+   - 底层使用可注入的 `fetch`（默认全局 fetch）发起 HTTP 请求。
 
 3. **处理响应**
-   * 读取响应 Header 中的 `X-Payment-Channel-Data`（如果有）。
-   * 若包含新的 unsigned `SubRAV`：
-     * 保存到 `pendingSubRAV` 缓存，供下一次请求签名使用。
-     * 可选：根据策略触发自动 commit（调用 service 的 `/payment/commit`）。
-   * 返回解析后的业务 JSON（或原始 Response，取决于调用方法）。
+
+   - 读取响应 Header 中的 `X-Payment-Channel-Data`（如果有）。
+   - 若包含新的 unsigned `SubRAV`：
+     - 保存到 `pendingSubRAV` 缓存，供下一次请求签名使用。
+     - 可选：根据策略触发自动 commit（调用 service 的 `/payment/commit`）。
+   - 返回解析后的业务 JSON（或原始 Response，取决于调用方法）。
 
 4. **错误处理**
-   * HTTP 402：余额不足 / 提案无效 -> 清理缓存并重试或抛错。
-   * HTTP 409：SubRAV 冲突 -> 重新握手：清空 `pendingSubRAV` 并重发。
-   * 其它网络或解析错误通过 `onError` 回调统一处理。
-
+   - HTTP 402：余额不足 / 提案无效 -> 清理缓存并重试或抛错。
+   - HTTP 409：SubRAV 冲突 -> 重新握手：清空 `pendingSubRAV` 并重发。
+   - 其它网络或解析错误通过 `onError` 回调统一处理。
 
 ### 4.2 内部状态机
 
@@ -145,26 +147,26 @@ export class PaymentChannelHttpClient {
                               └──────────────┘
 ```
 
-* INIT：启动阶段，还未查询映射存储。 
-* OPENING：为目标 host 创建或恢复活跃通道。
-* HANDSHAKE：通道就绪后，发送 nonce=0 的 SubRAV 与服务端完成首次绑定。
-* READY：进入正常付款循环，每次消费后等待下一轮 unsigned SubRAV，若收到 409/重置指令则回到 HANDSHAKE。
+- INIT：启动阶段，还未查询映射存储。
+- OPENING：为目标 host 创建或恢复活跃通道。
+- HANDSHAKE：通道就绪后，发送 nonce=0 的 SubRAV 与服务端完成首次绑定。
+- READY：进入正常付款循环，每次消费后等待下一轮 unsigned SubRAV，若收到 409/重置指令则回到 HANDSHAKE。
 
 ### 4.3 Host → ChannelId 映射策略
 
-| 场景 | 建议实现 |
-|------|----------|
-| 浏览器 | `IndexedDBMappingStore`：持久化到 IndexedDB，优点是异步、容量大，缺点是实现稍复杂 |
-| Node.js 小型脚本 | `MemoryMappingStore`：进程内 Map 实现，简单但不持久 |
-| Server 端长期运行 | `FileMappingStore` 或 `RedisMappingStore`：落盘或集中式缓存，支持多实例共享 |
+| 场景              | 建议实现                                                                          |
+| ----------------- | --------------------------------------------------------------------------------- |
+| 浏览器            | `IndexedDBMappingStore`：持久化到 IndexedDB，优点是异步、容量大，缺点是实现稍复杂 |
+| Node.js 小型脚本  | `MemoryMappingStore`：进程内 Map 实现，简单但不持久                               |
+| Server 端长期运行 | `FileMappingStore` 或 `RedisMappingStore`：落盘或集中式缓存，支持多实例共享       |
 
 > **默认**：如果未传 `mappingStore`，内部将根据运行环境自动选择 Memory（Node）或 IndexedDB（浏览器）。
 
 **流程**：
+
 1. 创建实例时，根据 `baseUrl` 提取 host，查询 `mappingStore.get(host)`。
 2. 若有缓存的 `channelId`，验证该通道状态是否 `active`；如已关闭则删掉缓存。
 3. 若无缓存或验证失败，则调用 `payerClient.openChannelWithSubChannel()` 创建新通道，并 `mappingStore.set(host, channelId)`。
-
 
 ## 5. 代码示例
 
@@ -189,11 +191,11 @@ console.log(result);
 
 ## 6. 与现有组件的关系
 
-| 角色 | 组件 | 说明 |
-|------|------|------|
-| Payer 业务代码 | **PaymentChannelHttpClient (新)** | 负责 HTTP 交互与支付头封装 |
-| Payer 支付逻辑 | `PaymentChannelPayerClient` | 链无关支付操作，如开/关通道、签 SubRAV 等 |
-| Payee 服务端 | `ExpressPaymentKit` | 已提供 Billing Middleware 与恢复路由 |
+| 角色           | 组件                              | 说明                                      |
+| -------------- | --------------------------------- | ----------------------------------------- |
+| Payer 业务代码 | **PaymentChannelHttpClient (新)** | 负责 HTTP 交互与支付头封装                |
+| Payer 支付逻辑 | `PaymentChannelPayerClient`       | 链无关支付操作，如开/关通道、签 SubRAV 等 |
+| Payee 服务端   | `ExpressPaymentKit`               | 已提供 Billing Middleware 与恢复路由      |
 
 ## 7. 未来扩展
 

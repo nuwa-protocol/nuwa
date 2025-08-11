@@ -8,8 +8,8 @@
 
 当前 `PaymentChannel` 的实现假定 **每个 DID 对应一个独立的 PaymentHub**。多个通道共享该 Hub 中的资产。
 
-* 在 `PaymentChannelPayerClient` 中已有 `depositToHub` 方法，`withdraw` 尚未补齐；
-* `openChannel` 的 `channelCollateral` 参数在此模型下不会生效；
+- 在 `PaymentChannelPayerClient` 中已有 `depositToHub` 方法，`withdraw` 尚未补齐；
+- `openChannel` 的 `channelCollateral` 参数在此模型下不会生效；
 
 导致的问题：
 
@@ -73,7 +73,7 @@ export type IPaymentHubContract = Pick<
 
 ```typescript
 export interface PaymentHubClientOptions {
-  contract: IPaymentChannelContract;  // 复用同一实例
+  contract: IPaymentChannelContract; // 复用同一实例
   signer: SignerInterface;
 }
 
@@ -88,11 +88,11 @@ export class PaymentHubClient {
 
 ### 3.3 现有 Client 的改动
 
-| 模块 | 变更 |
-|------|------|
-| `PaymentChannelPayerClient` | 1) `depositToHub` 标记 `@deprecated`；2) 新增 `getHubClient()` 快捷方法。|
-| `PaymentChannelPayeeClient` | 新增 `getHubClient()`（主要用于余额查询或协助提现）。|
-| `openChannel` 合约/方法 | 移除 `channelCollateral` 参数。|
+| 模块                        | 变更                                                                      |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `PaymentChannelPayerClient` | 1) `depositToHub` 标记 `@deprecated`；2) 新增 `getHubClient()` 快捷方法。 |
+| `PaymentChannelPayeeClient` | 新增 `getHubClient()`（主要用于余额查询或协助提现）。                     |
+| `openChannel` 合约/方法     | 移除 `channelCollateral` 参数。                                           |
 
 ---
 
@@ -125,18 +125,18 @@ sequenceDiagram
 ## 5. 迁移路线
 
 1. **阶段 1（当前）**
-   * 为 `IPaymentChannelContract` 增加 Hub 方法；
-   * `PaymentHubClient` 实现落地，并在两侧 Client 提供 `getHubClient()`；
-   * `depositToHub` 在 PayerClient 中改为：
+   - 为 `IPaymentChannelContract` 增加 Hub 方法；
+   - `PaymentHubClient` 实现落地，并在两侧 Client 提供 `getHubClient()`；
+   - `depositToHub` 在 PayerClient 中改为：
      ```ts
      /** @deprecated 请使用 getHubClient().deposit */
      depositToHub(...) { return this.getHubClient().deposit(...); }
      ```
 2. **阶段 2（两个 Minor 版本后）**
-   * 编译期废弃 `depositToHub`；
-   * `openChannel` 移除 `channelCollateral` 参数。
+   - 编译期废弃 `depositToHub`；
+   - `openChannel` 移除 `channelCollateral` 参数。
 3. **阶段 3（下一个 Major）**
-   * 删除所有废弃接口。
+   - 删除所有废弃接口。
 
 ---
 
@@ -162,9 +162,9 @@ await payerClient.openChannel({
 
 ## 7. 潜在扩展
 
-* **多资产 Hub**：单 DID 多币种余额；
-* **策略插件**：最小余额、自动补仓等；
-* **授权提取**：DID 授权第三方操作 Hub 余额。
+- **多资产 Hub**：单 DID 多币种余额；
+- **策略插件**：最小余额、自动补仓等；
+- **授权提取**：DID 授权第三方操作 Hub 余额。
 
 ---
 
@@ -172,7 +172,7 @@ await payerClient.openChannel({
 
 通过将 Hub 资金管理能力 **聚合到现有 `IPaymentChannelContract`**，并在 Client 层提供 `getHubClient()` 视图，我们实现了：
 
-* 单合约实例，零重复实现；
-* Channel 与 Hub 责任边界清晰；
-* 平滑迁移旧接口；
-* 更易于未来功能扩展。
+- 单合约实例，零重复实现；
+- Channel 与 Hub 责任边界清晰；
+- 平滑迁移旧接口；
+- 更易于未来功能扩展。

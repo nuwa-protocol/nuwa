@@ -12,7 +12,7 @@
 ┌─────────────────────────────────────────────┐
 │           协议适配层 (Protocol Layer)        │
 │  HttpBillingMiddleware                      │
-│  McpBillingMiddleware (未来)                │  
+│  McpBillingMiddleware (未来)                │
 │  A2aBillingMiddleware (未来)                │
 ├─────────────────────────────────────────────┤
 │         支付协商层 (Payment Negotiation)     │
@@ -31,11 +31,13 @@
 **保留在各自 middleware 的逻辑：**
 
 - **请求/响应解析与注入**
+
   - HTTP: `req.headers`、`res.setHeader()`、Express `next()`
   - MCP: Frame 解析/构建
   - A2A: 消息载体处理
 
 - **协议特定的错误映射**
+
   - HTTP: 状态码 (402, 400, 500)
   - MCP: Error frames
   - A2A: 错误响应格式
@@ -50,11 +52,13 @@
 **新增 `PaymentProcessor` 组件，负责：**
 
 - **延迟支付模型协调**
+
   - 握手验证 (handshake verification)
   - 延迟支付确认 (deferred payment confirmation)
   - SubRAV 提案生成 (proposal generation)
 
 - **支付状态管理**
+
   - 待签 SubRAV 存储与对账
   - 支付历史跟踪
   - 异常检测与安全检查
@@ -90,15 +94,15 @@ export interface PaymentProcessorConfig {
 export interface RequestMetadata {
   // 业务操作标识
   operation: string;
-  
+
   // 可选的业务参数
   model?: string;
   assetId?: string;
-  
+
   // 支付通道信息 (从已签名 SubRAV 中提取)
   channelId?: string;
   vmIdFragment?: string;
-  
+
   // 协议特定的额外元数据
   [key: string]: any;
 }
@@ -107,26 +111,26 @@ export interface PaymentProcessingResult {
   success: boolean;
   cost: bigint;
   assetId: string;
-  
+
   // 支付数据
   unsignedSubRAV?: SubRAV;
   signedSubRAV?: SignedSubRAV;
-  
+
   // 操作结果
   autoClaimTriggered?: boolean;
   isHandshake?: boolean;
-  
+
   // 错误信息
   error?: string;
   errorCode?: string;
-  
+
   // 支付方信息
   payerKeyId?: string;
 }
 
 export class PaymentProcessor {
   constructor(config: PaymentProcessorConfig);
-  
+
   /**
    * 处理支付请求的核心方法
    * @param requestMeta 协议无关的请求元数据
@@ -137,7 +141,7 @@ export class PaymentProcessor {
     requestMeta: RequestMetadata,
     signedSubRAV?: SignedSubRAV
   ): Promise<PaymentProcessingResult>;
-  
+
   // 辅助方法
   async verifyHandshake(signedSubRAV: SignedSubRAV): Promise<VerificationResult>;
   async confirmDeferredPayment(signedSubRAV: SignedSubRAV): Promise<VerificationResult>;
@@ -152,12 +156,12 @@ export class PaymentProcessor {
 ```typescript
 export class PaymentChannelPayeeClient {
   // 现有方法保持不变...
-  
+
   /**
    * 验证握手请求 (nonce=0, amount=0)
    */
   async verifyHandshake(signedSubRAV: SignedSubRAV): Promise<VerificationResult>;
-  
+
   /**
    * 确认已签名的提案
    * 集成 pending store 验证 + 签名验证 + 状态更新
@@ -166,7 +170,7 @@ export class PaymentChannelPayeeClient {
     signedSubRAV: SignedSubRAV,
     pendingStore: PendingSubRAVStore
   ): Promise<VerificationResult>;
-  
+
   /**
    * 生成支付提案的高级方法
    * 自动处理 payerKeyId 拼装
@@ -192,7 +196,7 @@ export interface PaymentCodec {
 
 export class PaymentChannelPayerClient {
   // 现有方法保持不变...
-  
+
   /**
    * 协议无关的签名和编码
    */
@@ -201,7 +205,7 @@ export class PaymentChannelPayerClient {
     codec: PaymentCodec,
     options?: SignSubRAVOptions
   ): Promise<string>;
-  
+
   /**
    * 解码并验证服务端响应
    */
@@ -217,6 +221,7 @@ export class PaymentChannelPayerClient {
 ### 阶段 1: 创建 PaymentProcessor
 
 1. **创建 `PaymentProcessor` 类**
+
    - 从 `HttpBillingMiddleware` 提取通用逻辑
    - 实现协议无关的支付处理流程
 
@@ -227,6 +232,7 @@ export class PaymentChannelPayerClient {
 ### 阶段 2: 增强 PayeeClient
 
 1. **添加高级验证方法**
+
    - `verifyHandshake()`
    - `confirmSignedProposal()`
    - `generateProposal()`
@@ -238,6 +244,7 @@ export class PaymentChannelPayerClient {
 ### 阶段 3: 增强 PayerClient
 
 1. **添加编解码支持**
+
    - `signAndEncode()`
    - `decodeAndValidate()`
 
@@ -249,6 +256,7 @@ export class PaymentChannelPayerClient {
 ### 阶段 4: 重构 HttpBillingMiddleware
 
 1. **简化 HttpBillingMiddleware**
+
    - 保留 HTTP 特定逻辑
    - 委托支付处理给 `PaymentProcessor`
 
@@ -296,10 +304,12 @@ nuwa-kit/typescript/packages/payment-kit/src/
 为了保持向后兼容，重构过程中：
 
 1. **保持现有 API 不变**
+
    - `HttpBillingMiddleware` 的公共接口保持不变
    - 内部实现逐步迁移到 `PaymentProcessor`
 
 2. **渐进式迁移**
+
    - 先创建新组件，再逐步迁移现有功能
    - 保持现有测试通过
 
@@ -313,4 +323,4 @@ nuwa-kit/typescript/packages/payment-kit/src/
 2. **架构清晰**: 职责分离明确，便于维护和测试
 3. **扩展性强**: 新增协议支持只需实现协议适配层
 4. **可测试性**: 核心逻辑独立，便于单元测试
-5. **向后兼容**: 现有代码无需修改即可继续工作 
+5. **向后兼容**: 现有代码无需修改即可继续工作

@@ -73,24 +73,24 @@ serviceId: my-service
 rules:
   - id: api-call
     when:
-      path: "/v1/chat/completions"
-      method: "POST"
+      path: '/v1/chat/completions'
+      method: 'POST'
     strategy:
       type: PerRequest
-      price: "1000000000"  # 0.001 USD
-  
+      price: '1000000000' # 0.001 USD
+
   - id: expensive-operation
     when:
-      path: "/v1/process"
+      path: '/v1/process'
     strategy:
       type: PerRequest
-      price: "10000000000"  # 0.01 USD
-      
+      price: '10000000000' # 0.01 USD
+
   - id: default-pricing
     default: true
     strategy:
       type: PerRequest
-      price: "500000000"   # 0.0005 USD
+      price: '500000000' # 0.0005 USD
 ```
 
 ## 示例：完整工作流程
@@ -98,10 +98,10 @@ rules:
 ### 1. 初始化
 
 ```typescript
-import { 
-  UsdBillingEngine, 
+import {
+  UsdBillingEngine,
   ContractRateProvider,
-  FileConfigLoader 
+  FileConfigLoader,
 } from '@nuwa-ai/payment-kit/billing';
 import { PaymentChannelPayeeClient } from '@nuwa-ai/payment-kit/client';
 
@@ -113,13 +113,9 @@ const rateProvider = new ContractRateProvider(contract, 30_000);
 
 // 创建 USD 计费引擎
 const configLoader = new FileConfigLoader('./config/billing');
-const billingEngine = new UsdBillingEngine(
-  configLoader,
-  rateProvider,
-  {
-    '0x3::gas_coin::RGas': { decimals: 8 }
-  }
-);
+const billingEngine = new UsdBillingEngine(configLoader, rateProvider, {
+  '0x3::gas_coin::RGas': { decimals: 8 },
+});
 ```
 
 ### 2. 计费计算
@@ -131,8 +127,8 @@ const context = {
   assetId: '0x3::gas_coin::RGas',
   meta: {
     model: 'gpt-4',
-    tokens: 1000
-  }
+    tokens: 1000,
+  },
 };
 
 // 计算成本（包含汇率转换）
@@ -156,7 +152,7 @@ const middleware = new HttpBillingMiddleware({
   billingEngine, // 使用 UsdBillingEngine
   serviceId: 'api-gateway',
   defaultAssetId: '0x3::gas_coin::RGas',
-  debug: true
+  debug: true,
 });
 
 app.use(middleware.createExpressMiddleware());
@@ -177,11 +173,13 @@ app.use(middleware.createExpressMiddleware());
 ### 示例计算
 
 假设：
+
 - RGAS 价格：100 picoUSD 每最小单位
 - RGAS 精度：8 位小数
 - API 调用成本：0.001 USD (1,000,000,000 picoUSD)
 
 计算过程：
+
 ```
 tokenCost = ceil(1,000,000,000 * 10^8 / 100)
          = ceil(1,000,000,000 * 100,000,000 / 100)
@@ -202,6 +200,7 @@ tokenCost = ceil(1,000,000,000 * 10^8 / 100)
 要支持新的区块链和资产：
 
 1. **实现合约接口**：
+
    ```typescript
    class CustomPaymentChannelContract implements IPaymentChannelContract {
      async getAssetPrice(assetId: string): Promise<bigint> {
@@ -213,7 +212,7 @@ tokenCost = ceil(1,000,000,000 * 10^8 / 100)
 2. **配置资产信息**：
    ```typescript
    const assetConfigs = {
-     'your-asset-id': { decimals: 18 }
+     'your-asset-id': { decimals: 18 },
    };
    ```
 
@@ -266,19 +265,21 @@ class MockContract implements IPaymentChannelContract {
 ### 从 Token 计价迁移到 USD 计价
 
 1. **更新配置文件**：
+
    ```yaml
    # 旧配置（Token 单位）
    price: "1000000"  # 0.01 RGAS
-   
+
    # 新配置（USD 单位）
    price: "1000000000"  # 0.001 USD
    ```
 
 2. **替换计费引擎**：
+
    ```typescript
    // 旧方式
    const engine = new BillingEngine(configLoader);
-   
+
    // 新方式
    const engine = new UsdBillingEngine(configLoader, rateProvider);
    ```
@@ -292,10 +293,12 @@ class MockContract implements IPaymentChannelContract {
 ### 常见问题
 
 1. **汇率获取失败**
+
    - 检查合约 `getAssetPrice()` 实现
    - 确认链上 oracle 正常工作
 
 2. **价格计算异常**
+
    - 验证资产精度配置
    - 检查 picoUSD 单位使用
 
@@ -317,4 +320,4 @@ console.log(`Current rate: ${price} picoUSD per unit`);
 
 ---
 
-通过这套 USD 计价和 Token 结算机制，Payment Kit 为去中心化应用提供了灵活、透明且易于审计的计费解决方案。 
+通过这套 USD 计价和 Token 结算机制，Payment Kit 为去中心化应用提供了灵活、透明且易于审计的计费解决方案。

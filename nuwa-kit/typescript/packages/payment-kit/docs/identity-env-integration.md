@@ -86,6 +86,7 @@ Extracts chain configuration from IdentityEnv's registered VDRs.
 **Location:** `@nuwa-ai/payment-kit` (main export) or `@nuwa-ai/payment-kit/helpers`
 
 **Parameters:**
+
 - `env`: IdentityEnv instance with registered VDRs
 
 **Returns:** ChainConfig for payment channel operations
@@ -99,6 +100,7 @@ Creates PaymentChannelHttpClient using IdentityEnv's KeyManager and chain config
 **Location:** `@nuwa-ai/payment-kit` (main export) or `@nuwa-ai/payment-kit/http`
 
 **Parameters:**
+
 - `env`: IdentityEnv instance
 - `opts`: HttpPayerOptions without signer and chainConfig (provided by env)
   - `baseUrl`: Target service base URL (required)
@@ -119,6 +121,7 @@ Creates ExpressPaymentKit using IdentityEnv's KeyManager and chain config.
 **Location:** `@nuwa-ai/payment-kit` (main export) or `@nuwa-ai/payment-kit/express`
 
 **Parameters:**
+
 - `env`: IdentityEnv instance
 - `opts`: ExpressPaymentKitOptions without signer, rpcUrl, and network (provided by env)
   - `serviceId`: Service identifier (required)
@@ -159,7 +162,7 @@ const env = await bootstrapIdentityEnv({
   method: 'rooch',
   vdrOptions: {
     rpcUrl: process.env.ROOCH_RPC_URL,
-    network: process.env.ROOCH_NETWORK as any || 'test',
+    network: (process.env.ROOCH_NETWORK as any) || 'test',
   },
   keyStore: customKeyStore, // FileKeyStore, KMSKeyStore, etc.
 });

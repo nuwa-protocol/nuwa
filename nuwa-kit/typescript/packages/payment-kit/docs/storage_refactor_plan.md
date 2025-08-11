@@ -12,12 +12,12 @@
 
 ## Problems Found
 
-| No | Issue | Impact |
-|----|-------|--------|
-| 1 | Interfaces and multiple implementations share the same files (`BaseStorage.ts`, etc.). | Hard to tree-shake & navigate. |
-| 2 | Channel / RAV / PendingSubRAV storage code scattered across files with inconsistent naming (`Store`, `Storage`, `Cache`). | Cognitive overhead, duplicate patterns. |
-| 3 | SQL implementation lives in `sql-storage.ts` beside browser code. | Mixed runtime concerns. |
-| 4 | Node-only code (`pg`, `Buffer`) is bundled with browser libraries. | Larger browser bundles, runtime errors in non-Node env. |
+| No  | Issue                                                                                                                     | Impact                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | Interfaces and multiple implementations share the same files (`BaseStorage.ts`, etc.).                                    | Hard to tree-shake & navigate.                          |
+| 2   | Channel / RAV / PendingSubRAV storage code scattered across files with inconsistent naming (`Store`, `Storage`, `Cache`). | Cognitive overhead, duplicate patterns.                 |
+| 3   | SQL implementation lives in `sql-storage.ts` beside browser code.                                                         | Mixed runtime concerns.                                 |
+| 4   | Node-only code (`pg`, `Buffer`) is bundled with browser libraries.                                                        | Larger browser bundles, runtime errors in non-Node env. |
 
 ---
 
@@ -52,17 +52,18 @@ src/storage/
 
 ### Naming Conventions
 
-* Use **`Repository`** (or `Repo`) for the main persistence abstraction.
-* Implementation files follow `name.<datasource>.ts` pattern.
-* New data sources (e.g. Redis) get their own sub-folder.
-* `interfaces/` contain zero runtime code – fully tree-shakable.
- Protocol-level domain types (`SubRAV`, `ChannelInfo`, etc.) stay under **`src/core/types`** (already exists) because they are reused well beyond the storage layer.
+- Use **`Repository`** (or `Repo`) for the main persistence abstraction.
+- Implementation files follow `name.<datasource>.ts` pattern.
+- New data sources (e.g. Redis) get their own sub-folder.
+- `interfaces/` contain zero runtime code – fully tree-shakable.
+  Protocol-level domain types (`SubRAV`, `ChannelInfo`, etc.) stay under **`src/core/types`** (already exists) because they are reused well beyond the storage layer.
 
 ---
 
 ## Interface Definitions
 
 ### ChannelRepository
+
 ```ts
 getChannelMetadata();
 setChannelMetadata();
@@ -77,6 +78,7 @@ clear();
 ```
 
 ### RAVRepository
+
 ```ts
 save();
 getLatest();
@@ -88,6 +90,7 @@ cleanup?();
 ```
 
 ### PendingSubRAVRepository
+
 ```ts
 save();
 find();
@@ -119,7 +122,7 @@ Business code depends **only** on interfaces + factories, remaining agnostic of 
 
 ## Migration Plan
 
-1. **Extract interfaces** to `src/storage/interfaces` (copy-paste, no logic changes).  Storage-specific helper types (e.g., `PaginationParams`, `PaginatedResult<T>`) live in `src/storage/types`.  Domain/protocol model types remain in `src/core/types` and are imported where needed.
+1. **Extract interfaces** to `src/storage/interfaces` (copy-paste, no logic changes). Storage-specific helper types (e.g., `PaginationParams`, `PaginatedResult<T>`) live in `src/storage/types`. Domain/protocol model types remain in `src/core/types` and are imported where needed.
 2. **Move implementations** into `memory/`, `indexeddb/`, `sql/` sub-folders.
 3. Implement factory functions & new `storage/index.ts` barrel.
 4. Update application imports to `create*Repo` factories.
@@ -129,16 +132,16 @@ Business code depends **only** on interfaces + factories, remaining agnostic of 
 
 ## Optional Enhancements
 
-* Shared bigint/serialization helpers (`serialization.ts`).
-* Abstract base classes for common logic (size estimation, TTL).
-* Jest test suites per data-source implementation.
-* Documentation update: “Storage architecture” chapter with examples.
+- Shared bigint/serialization helpers (`serialization.ts`).
+- Abstract base classes for common logic (size estimation, TTL).
+- Jest test suites per data-source implementation.
+- Documentation update: “Storage architecture” chapter with examples.
 
 ---
 
 ## Expected Benefits
 
-* **Discoverability** – file names self-describe both *domain* & *data-source*.
-* **Bundle Size** – browser builds exclude Node-only code (e.g. `pg`).
-* **Maintainability** – adding a new backend touches a single directory.
-* **Business Decoupling** – calling code is fully insulated from persistence details.
+- **Discoverability** – file names self-describe both _domain_ & _data-source_.
+- **Bundle Size** – browser builds exclude Node-only code (e.g. `pg`).
+- **Maintainability** – adding a new backend touches a single directory.
+- **Business Decoupling** – calling code is fully insulated from persistence details.

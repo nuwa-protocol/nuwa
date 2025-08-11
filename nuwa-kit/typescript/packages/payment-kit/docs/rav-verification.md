@@ -26,8 +26,9 @@
 ## 2. 输入与输出（RAV 验证器）
 
 输入（一次 HTTP/API 请求的验证上下文）：
+
 - routePolicy: { paymentRequired: boolean }
-- didAuth (可选): { did: string, keyId: string }  // 仅用于定位子通道（无签名时）
+- didAuth (可选): { did: string, keyId: string } // 仅用于定位子通道（无签名时）
 - signedSubRAV (可选): SignedSubRAV
 - pendingRepo: 只读接口：findLatestBySubChannel(channelId, vmIdFragment)
 - baselineProvider: 只读接口：
@@ -38,23 +39,26 @@
 - defaultAssetId: 用于 DIDAuth 推导 channelId（见 rav-handling.md §4.4）
 
 输出（验证结果）：
+
 - decision: ALLOW | REQUIRE_SIGNATURE_402 | CONFLICT | INVALID_SIGNATURE | CHANNEL_NOT_FOUND
-- baseline: { latestSigned?, subCursor?, chainId? }  // 用于后续生成下一条 unsigned
-- pendingMatched: boolean  // 是否与 pending 完全匹配
+- baseline: { latestSigned?, subCursor?, chainId? } // 用于后续生成下一条 unsigned
+- pendingMatched: boolean // 是否与 pending 完全匹配
 - debugTrace: 验证步骤日志（可选，用于排查）
 
 ---
 
 ## 3. 总体流程（抽象算法）
 
-1) 确定 (channelId, vmIdFragment)
+1. 确定 (channelId, vmIdFragment)
+
 - 若有 signedSubRAV：直接取 subRav.channelId / vmIdFragment
 - 否则使用 didAuth：
   - vmIdFragment = keyId.split('#')[1]
   - channelId = deriveChannelId(didAuth.did, serviceDid, defaultAssetId)
 - 若仍无法确定 → decision=CHANNEL_NOT_FOUND（或保守 ALLOW/402，取决于服务策略）
 
-2) Pending 优先级（rav-handling.md §4.1）
+2. Pending 优先级（rav-handling.md §4.1）
+
 - 查找 pendingRepo.findLatestBySubChannel(channelId, vmIdFragment)
 - 若存在 pending：
   - 无 signedSubRAV：
@@ -62,7 +66,8 @@
     - 兼容实现（Phase 1）可放行 ALLOW（不建议用于新实现）
   - 有 signedSubRAV：必须完全匹配 pending（channelId, vmIdFragment, nonce 相同），否则 CONFLICT
 
-3) 签名与结构校验
+3. 签名与结构校验
+
 - 若提供 didResolver：
   - 获取 payerDid：
     - 优先 didAuth.did；否则 channelInfoProvider.getChannelInfo(channelId).payerDid
@@ -75,7 +80,8 @@
   - channelId 格式
   - 非负字段（chainId/epoch/amount/nonce）
 
-4) Epoch 与单调性（相对 Baseline）
+4. Epoch 与单调性（相对 Baseline）
+
 - 基线解析：baseline = latestSigned or subChannelState
 - Epoch 检查：
   - 若 baseline 存在：subRav.channelEpoch == baseline.epoch
@@ -87,7 +93,8 @@
     - accumulatedAmount 不下降
   - 策略扩展（推荐）：仅在 cost=0 场景允许 amount 持平（由路由与计费策略提供上下文）
 
-5) 结果
+5. 结果
+
 - 满足以上检查 → ALLOW
 - 同时设置 pendingMatched、baseline（供后续生成下一条 unsigned）。
 

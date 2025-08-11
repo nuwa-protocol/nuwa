@@ -473,9 +473,10 @@ export class PaymentChannelPayerClient {
     // 更新本地状态
     await this.stateStorage.updateSubChannelState(subRAV.channelId, useKeyId, {
       channelId: subRAV.channelId,
+      vmIdFragment: useKeyId,
       epoch: subRAV.channelEpoch,
-      accumulatedAmount: subRAV.accumulatedAmount,
-      nonce: subRAV.nonce,
+      lastClaimedAmount: subRAV.accumulatedAmount,
+      lastConfirmedNonce: subRAV.nonce,
       lastUpdated: Date.now(),
     });
 
@@ -546,10 +547,11 @@ export class PaymentChannelPayeeClient {
       subChannelState = {
         channelId,
         epoch: channelInfo.epoch,
-        accumulatedAmount: BigInt(0),
-        nonce: BigInt(0),
+        vmIdFragment: payerKeyId,
+        lastClaimedAmount: BigInt(0),
+        lastConfirmedNonce: BigInt(0),
         lastUpdated: Date.now(),
-      };
+      } as any;
       
       await this.stateStorage.updateSubChannelState(channelId, payerKeyId, subChannelState);
     }
@@ -560,8 +562,8 @@ export class PaymentChannelPayeeClient {
     }
 
     // 计算新值
-    const newNonce = subChannelState.nonce + BigInt(1);
-    const newAccumulatedAmount = subChannelState.accumulatedAmount + amount;
+    const newNonce = (subChannelState as any).lastConfirmedNonce + BigInt(1);
+    const newAccumulatedAmount = (subChannelState as any).lastClaimedAmount + amount;
 
     const vmIdFragment = this.extractVmIdFragment(payerKeyId);
     const chainId = await this.contract.getChainId();
@@ -579,10 +581,10 @@ export class PaymentChannelPayeeClient {
     // 乐观更新本地状态
     await this.stateStorage.updateSubChannelState(channelId, payerKeyId, {
       ...subChannelState,
-      accumulatedAmount: newAccumulatedAmount,
-      nonce: newNonce,
+      lastClaimedAmount: newAccumulatedAmount,
+      lastConfirmedNonce: newNonce,
       lastUpdated: Date.now(),
-    });
+    } as any);
 
     return subRAV;
   }
