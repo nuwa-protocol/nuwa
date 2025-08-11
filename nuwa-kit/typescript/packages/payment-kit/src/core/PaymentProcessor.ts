@@ -156,13 +156,24 @@ export class PaymentProcessor {
       }
 
       if (!channelId || !vmIdFragment) {
-        return this.fail(pctx, { code: 'CHANNEL_CONTEXT_MISSING', message: 'channelId or vmIdFragment not derivable. Check DID authentication.' }, { attachHeader: false });
+        return this.fail(
+          pctx,
+          {
+            code: 'CHANNEL_CONTEXT_MISSING',
+            message: 'channelId or vmIdFragment not derivable. Check DID authentication.',
+          },
+          { attachHeader: false }
+        );
       }
 
       // Fetch channelInfo (must exist)
       const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
       if (!channelInfo) {
-        return this.fail(pctx, { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` }, { attachHeader: false });
+        return this.fail(
+          pctx,
+          { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` },
+          { attachHeader: false }
+        );
       }
 
       const subChannelState = await this.config.payeeClient.getSubChannelState(
@@ -170,7 +181,14 @@ export class PaymentProcessor {
         vmIdFragment
       );
       if (!subChannelState) {
-        return this.fail(pctx, { code: 'SUBCHANNEL_NOT_AUTHORIZED', message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}` }, { attachHeader: false });
+        return this.fail(
+          pctx,
+          {
+            code: 'SUBCHANNEL_NOT_AUTHORIZED',
+            message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}`,
+          },
+          { attachHeader: false }
+        );
       }
 
       // Latest signed RAV from repository
@@ -181,7 +199,11 @@ export class PaymentProcessor {
 
       const payerDidDoc = await this.config.didResolver.resolveDID(channelInfo.payerDid);
       if (!payerDidDoc) {
-        return this.fail(pctx, { code: 'DID_RESOLVE_FAILED', message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}` }, { attachHeader: false });
+        return this.fail(
+          pctx,
+          { code: 'DID_RESOLVE_FAILED', message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}` },
+          { attachHeader: false }
+        );
       }
 
       // Single-entry verification using prefetched context
@@ -201,15 +223,30 @@ export class PaymentProcessor {
 
       // Handle early-return decisions
       if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
-        this.log('⚠️ Early return from preProcess due to decision:', ravResult.decision, ravResult.error);
-        return this.fail(pctx, { code: (ravResult.error?.code as PaymentError['code']) ?? 'INTERNAL_SERVER_ERROR', message: ravResult.error?.message ?? 'Verification decision error' }, { attachHeader: false });
+        this.log(
+          '⚠️ Early return from preProcess due to decision:',
+          ravResult.decision,
+          ravResult.error
+        );
+        return this.fail(
+          pctx,
+          {
+            code: (ravResult.error?.code as PaymentError['code']) ?? 'INTERNAL_SERVER_ERROR',
+            message: ravResult.error?.message ?? 'Verification decision error',
+          },
+          { attachHeader: false }
+        );
       }
 
       // Persist verification flags and apply side-effects on success
       pctx.state.signedSubRavVerified = ravResult.signedVerified;
       if (ravResult.pendingMatched && ravResult.signedVerified && pctx.meta.signedSubRav) {
         try {
-          await this.pendingSubRAVStore.remove(pctx.meta.signedSubRav.subRav.channelId, pctx.meta.signedSubRav.subRav.vmIdFragment, pctx.meta.signedSubRav.subRav.nonce);
+          await this.pendingSubRAVStore.remove(
+            pctx.meta.signedSubRav.subRav.channelId,
+            pctx.meta.signedSubRav.subRav.vmIdFragment,
+            pctx.meta.signedSubRav.subRav.nonce
+          );
         } catch (e) {
           this.log('⚠️ Failed to remove matched pending:', e);
         }
@@ -244,7 +281,9 @@ export class PaymentProcessor {
       this.log('🚨 Pre-processing error:', error);
       if (!ctx.state) ctx.state = {};
       (ctx as PreprocessedBillingContext).state.signedSubRavVerified = false;
-      return this.fail(ctx as PreprocessedBillingContext, Errors.internal(String(error)), { attachHeader: false });
+      return this.fail(ctx as PreprocessedBillingContext, Errors.internal(String(error)), {
+        attachHeader: false,
+      });
     }
   }
 
@@ -314,7 +353,9 @@ export class PaymentProcessor {
         if (rule.paymentRequired === false) {
           // Free route: if client sent SignedSubRAV, verify but don't generate unsigned
           if (pctx.meta.signedSubRav && finalCost === 0n) {
-            this.log('📝 Free route with SignedSubRAV - verified but not generating unsigned SubRAV');
+            this.log(
+              '📝 Free route with SignedSubRAV - verified but not generating unsigned SubRAV'
+            );
             // Set minimal response state for free routes
             pctx.state.cost = finalCost;
             // Don't generate unsignedSubRav or headerValue for free routes
@@ -342,7 +383,10 @@ export class PaymentProcessor {
           });
 
           if (!hasSigned && !hasLatest && !hasSubState) {
-            return this.fail(pctx, { code: 'MISSING_CHANNEL_CONTEXT', message: 'No baseline SubRAV found to advance nonce' });
+            return this.fail(pctx, {
+              code: 'MISSING_CHANNEL_CONTEXT',
+              message: 'No baseline SubRAV found to advance nonce',
+            });
           }
 
           this.log('🔧 Generating SubRAV with finalCost:', finalCost);
@@ -354,7 +398,11 @@ export class PaymentProcessor {
             clientTxRef: pctx.meta.clientTxRef,
             cost: finalCost,
           });
-          this.log('🔧 Generated SubRAV:', { nonce: unsignedSubRAV.nonce, accumulatedAmount: unsignedSubRAV.accumulatedAmount, headerValue: !!headerValue });
+          this.log('🔧 Generated SubRAV:', {
+            nonce: unsignedSubRAV.nonce,
+            accumulatedAmount: unsignedSubRAV.accumulatedAmount,
+            headerValue: !!headerValue,
+          });
           pctx.state.unsignedSubRav = unsignedSubRAV;
           pctx.state.serviceTxRef = serviceTxRef;
           pctx.state.nonce = unsignedSubRAV.nonce;

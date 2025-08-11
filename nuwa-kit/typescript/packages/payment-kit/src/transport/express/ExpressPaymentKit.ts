@@ -560,10 +560,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   /**
    * Build protocol error header consistently from request headers and error
    */
-  private buildProtocolErrorHeader(
-    req: Request,
-    err: { code: string; message?: string }
-  ): string {
+  private buildProtocolErrorHeader(req: Request, err: { code: string; message?: string }): string {
     let clientTxRef: string | undefined;
     try {
       const headerValueIn = HttpPaymentCodec.extractPaymentHeader(req.headers as any);
