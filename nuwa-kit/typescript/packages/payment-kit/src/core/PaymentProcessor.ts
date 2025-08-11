@@ -112,13 +112,9 @@ export class PaymentProcessor {
 
     this.log('Pre-processing payment for operation:', ctx.meta.operation);
 
-    // Initialize state if not present
-    if (!ctx.state) {
-      ctx.state = {};
-    }
+    const pctx = this.asPreprocessed(ctx);
 
     try {
-      const pctx = ctx as PreprocessedBillingContext;
       const rule = pctx.meta.billingRule;
       // For free routes without a SignedSubRAV, skip verification entirely in preProcess
       if (rule && rule.paymentRequired === false && !pctx.meta.signedSubRav) {
@@ -247,9 +243,8 @@ export class PaymentProcessor {
       return pctx;
     } catch (error) {
       this.log('🚨 Pre-processing error:', error);
-      if (!ctx.state) ctx.state = {};
-      (ctx as PreprocessedBillingContext).state.signedSubRavVerified = false;
-      return this.fail(ctx as PreprocessedBillingContext, Errors.internal(String(error)), {
+      pctx.state.signedSubRavVerified = false;
+      return this.fail(pctx, Errors.internal(String(error)), {
         attachHeader: false,
       });
     }
