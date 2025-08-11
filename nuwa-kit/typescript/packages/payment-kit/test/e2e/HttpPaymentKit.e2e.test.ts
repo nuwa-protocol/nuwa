@@ -451,7 +451,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
         nonce: '1',
       });
       console.log('✅ SubRAV query successful:', subRavResponse);
-      expect(subRavResponse.nonce).toBe(BigInt(1));
+      expect(subRavResponse.subRav.nonce).toBe(BigInt(1));
     } catch (error) {
       // It's OK if SubRAV doesn't exist or user doesn't have permission
       console.log('ℹ️ SubRAV query failed (expected if no SubRAV exists):', error);
@@ -463,8 +463,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       const triggerResponse = await adminClient.triggerClaim({
         channelId: channelId!,
       });
-      expect(triggerResponse.success).toBe(true);
-      expect(triggerResponse.channelId).toBe(channelId);
+      expect(triggerResponse.results).toBeTruthy();
       console.log('✅ Manual claim trigger successful:', triggerResponse);
     } catch (error) {
       // It's OK if there's nothing to claim
