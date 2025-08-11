@@ -88,8 +88,6 @@ export {
   ClaimsStatusSchema,
   ClaimTriggerRequestSchema,
   ClaimTriggerResponseSchema,
-  CleanupRequestSchema,
-  CleanupResponseSchema,
   RecoveryRequestSchema,
   RecoveryResponseSchema,
   CommitRequestSchema,
