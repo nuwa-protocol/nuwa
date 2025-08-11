@@ -1,5 +1,6 @@
 import type { ChannelInfo, SignedSubRAV, SubChannelState, SubRAV } from './types';
 import type { BillingContext, BillingRule } from '../billing';
+import { PaymentErrorCode } from '../errors/codes';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
 import type { RAVRepository } from '../storage/interfaces/RAVRepository';
 import type { DIDDocument } from '@nuwa-ai/identity-kit';
@@ -51,7 +52,7 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
     const ok = await SubRAVSigner.verify(signed, { didDocument: params.payerDidDoc });
     result.signedVerified = !!ok;
     if (!ok) {
-      result.error = { code: 'INVALID_SIGNATURE', message: `Invalid signature for signed SubRAV` };
+      result.error = { code: PaymentErrorCode.INVALID_SIGNATURE, message: `Invalid signature for signed SubRAV` } as any;
       return finalize();
     }
   }
@@ -63,9 +64,9 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
       if (!isFreeRoute) {
         result.decision = 'REQUIRE_SIGNATURE_402';
         result.error = {
-          code: 'PAYMENT_REQUIRED',
+          code: PaymentErrorCode.PAYMENT_REQUIRED,
           message: `Signature required for pending proposal (channel: ${params.channelInfo.channelId}, nonce: ${params.latestPendingSubRav.nonce})`,
-        };
+        } as any;
         return finalize();
       }
     } else {
@@ -76,9 +77,9 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
       if (!matches) {
         result.decision = 'CONFLICT';
         result.error = {
-          code: 'SUBRAV_CONFLICT',
+          code: PaymentErrorCode.RAV_CONFLICT,
           message: `SignedSubRAV does not match pending proposal (expected nonce: ${params.latestPendingSubRav.nonce}, received: ${signed.subRav.nonce})`,
-        };
+        } as any;
         return finalize();
       }
       result.pendingMatched = true;
@@ -98,9 +99,9 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
         } else {
           result.decision = 'CONFLICT';
           result.error = {
-            code: 'SUBRAV_CONFLICT',
+            code: PaymentErrorCode.RAV_CONFLICT,
             message: `SignedSubRAV does not match latest signed SubRAV (expected nonce: ${params.latestSignedSubRav.subRav.nonce}, received: ${signed.subRav.nonce})`,
-          };
+          } as any;
           return finalize();
         }
       } else {
@@ -116,9 +117,9 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
         } else {
           result.decision = 'CONFLICT';
           result.error = {
-            code: 'SUBRAV_CONFLICT',
+            code: PaymentErrorCode.RAV_CONFLICT,
             message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelState.lastConfirmedNonce}, received: ${signed.subRav.nonce})`,
-          };
+          } as any;
           return finalize();
         }
       }

@@ -1,7 +1,8 @@
 import type { SignedSubRAV, SubChannelState, SubRAV } from './types';
 import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
-import type { BillingContext, PaymentError } from '../billing';
+import type { BillingContext } from '../billing';
+import { Errors, type PaymentError } from '../errors/codes';
 import { getStrategy } from '../billing/core/strategy-registry';
 import { convertUsdToAssetUsingPrice } from '../billing/core/converter';
 import type { RateProvider, RateResult } from '../billing/rate/types';
@@ -69,22 +70,7 @@ export interface PaymentProcessingStats {
 type PaymentState = NonNullable<BillingContext['state']>;
 type PreprocessedBillingContext = BillingContext & { state: PaymentState };
 
-// Common error factories for consistency
-const Errors = {
-  rateNotAvailable: (assetId: string): PaymentError => ({
-    code: 'RATE_NOT_AVAILABLE',
-    message: `Missing exchange rate for asset ${assetId}`,
-  }),
-  maxAmountExceeded: (finalCost: bigint, max: bigint): PaymentError => ({
-    code: 'MAX_AMOUNT_EXCEEDED',
-    message: `Cost ${finalCost} exceeds maxAmount ${max}`,
-    details: { finalCost: finalCost.toString(), max: max.toString() },
-  }),
-  internal: (msg: string): PaymentError => ({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: msg,
-  }),
-} as const;
+// Use centralized error factories from errors/codes
 
 /**
  * PaymentProcessor - Protocol-agnostic payment negotiation component
@@ -156,24 +142,13 @@ export class PaymentProcessor {
       }
 
       if (!channelId || !vmIdFragment) {
-        return this.fail(
-          pctx,
-          {
-            code: 'CHANNEL_CONTEXT_MISSING',
-            message: 'channelId or vmIdFragment not derivable. Check DID authentication.',
-          },
-          { attachHeader: false }
-        );
+        return this.fail(pctx, Errors.channelContextMissing(), { attachHeader: false });
       }
 
       // Fetch channelInfo (must exist)
       const channelInfo = await this.config.payeeClient.getChannelInfo(channelId);
       if (!channelInfo) {
-        return this.fail(
-          pctx,
-          { code: 'CHANNEL_NOT_FOUND', message: `CHANNEL_NOT_FOUND: ${channelId}` },
-          { attachHeader: false }
-        );
+        return this.fail(pctx, Errors.channelNotFound(channelId), { attachHeader: false });
       }
 
       const subChannelState = await this.config.payeeClient.getSubChannelState(
@@ -181,14 +156,7 @@ export class PaymentProcessor {
         vmIdFragment
       );
       if (!subChannelState) {
-        return this.fail(
-          pctx,
-          {
-            code: 'SUBCHANNEL_NOT_AUTHORIZED',
-            message: `SUBCHANNEL_NOT_AUTHORIZED: ${channelId}#${vmIdFragment}`,
-          },
-          { attachHeader: false }
-        );
+        return this.fail(pctx, Errors.subchannelNotAuthorized(channelId, vmIdFragment), { attachHeader: false });
       }
 
       // Latest signed RAV from repository
@@ -199,11 +167,7 @@ export class PaymentProcessor {
 
       const payerDidDoc = await this.config.didResolver.resolveDID(channelInfo.payerDid);
       if (!payerDidDoc) {
-        return this.fail(
-          pctx,
-          { code: 'DID_RESOLVE_FAILED', message: `DID_RESOLVE_FAILED: ${channelInfo.payerDid}` },
-          { attachHeader: false }
-        );
+        return this.fail(pctx, Errors.didResolveFailed(channelInfo.payerDid), { attachHeader: false });
       }
 
       // Single-entry verification using prefetched context
@@ -271,7 +235,7 @@ export class PaymentProcessor {
           };
           pctx.state.exchangeRate = exchangeRate;
         } catch (e) {
-          pctx.state.error = { code: 'RATE_FETCH_FAILED', message: String(e) } as PaymentError;
+          pctx.state.error = Errors.rateFetchFailed(e);
         }
       }
 
@@ -383,10 +347,7 @@ export class PaymentProcessor {
           });
 
           if (!hasSigned && !hasLatest && !hasSubState) {
-            return this.fail(pctx, {
-              code: 'MISSING_CHANNEL_CONTEXT',
-              message: 'No baseline SubRAV found to advance nonce',
-            });
+            return this.fail(pctx, Errors.channelContextMissing());
           }
 
           this.log('🔧 Generating SubRAV with finalCost:', finalCost);

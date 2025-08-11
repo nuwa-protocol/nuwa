@@ -24,6 +24,7 @@ import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSu
 import type { ClaimScheduler } from '../../core/ClaimScheduler';
 import type { RAVRepository } from '../../storage/interfaces/RAVRepository';
 import { DIDResolver } from '@nuwa-ai/identity-kit';
+import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 
 // Generic HTTP interfaces (framework-agnostic)
 export interface GenericHttpRequest {
@@ -76,22 +77,9 @@ export interface HttpBillingMiddlewareConfig {
 /**
  * HTTP-specific error codes mapped to HTTP status codes
  */
-export enum HttpPaymentErrorCode {
-  PAYMENT_REQUIRED = 'PAYMENT_REQUIRED', // 402
-  SUBRAV_CONFLICT = 'SUBRAV_CONFLICT', // 409
-  MISSING_CHANNEL_CONTEXT = 'MISSING_CHANNEL_CONTEXT', // 409
-  INVALID_PAYMENT = 'INVALID_PAYMENT', // 400
-  UNKNOWN_SUBRAV = 'UNKNOWN_SUBRAV', // 400
-  TAMPERED_SUBRAV = 'TAMPERED_SUBRAV', // 400
-  PAYMENT_ERROR = 'PAYMENT_ERROR', // 500
-  INSUFFICIENT_FUNDS = 'INSUFFICIENT_FUNDS', // 402
-  CHANNEL_CLOSED = 'CHANNEL_CLOSED', // 400
-  EPOCH_MISMATCH = 'EPOCH_MISMATCH', // 400
-  MAX_AMOUNT_EXCEEDED = 'MAX_AMOUNT_EXCEEDED', // 400
-  CLIENT_TX_REF_MISSING = 'CLIENT_TX_REF_MISSING', // 400
-  RATE_NOT_AVAILABLE = 'RATE_NOT_AVAILABLE', // 500
-  BILLING_CONFIG_ERROR = 'BILLING_CONFIG_ERROR', // 500
-}
+// Deprecated: Use PaymentErrorCode from errors/codes
+// Keeping the name for potential external imports, but aligned to centralized enum
+export const HttpPaymentErrorCode = PaymentErrorCode;
 
 /**
  * Refactored HTTP Billing Middleware
@@ -305,30 +293,7 @@ export class HttpBillingMiddleware {
    * Map error code to HTTP status code
    */
   private mapErrorToHttpStatus(errorCode?: string): number {
-    switch (errorCode) {
-      case HttpPaymentErrorCode.PAYMENT_REQUIRED:
-      case HttpPaymentErrorCode.INSUFFICIENT_FUNDS:
-        return 402; // Payment Required
-
-      case HttpPaymentErrorCode.SUBRAV_CONFLICT:
-      case HttpPaymentErrorCode.MISSING_CHANNEL_CONTEXT:
-        return 409; // Conflict
-
-      case HttpPaymentErrorCode.INVALID_PAYMENT:
-      case HttpPaymentErrorCode.UNKNOWN_SUBRAV:
-      case HttpPaymentErrorCode.TAMPERED_SUBRAV:
-      case HttpPaymentErrorCode.CHANNEL_CLOSED:
-      case HttpPaymentErrorCode.EPOCH_MISMATCH:
-      case HttpPaymentErrorCode.MAX_AMOUNT_EXCEEDED:
-      case HttpPaymentErrorCode.CLIENT_TX_REF_MISSING:
-        return 400; // Bad Request
-
-      case HttpPaymentErrorCode.PAYMENT_ERROR:
-      case HttpPaymentErrorCode.RATE_NOT_AVAILABLE:
-      case HttpPaymentErrorCode.BILLING_CONFIG_ERROR:
-      default:
-        return 500; // Internal Server Error
-    }
+    return httpStatusFor(errorCode as PaymentErrorCode);
   }
 
   /**

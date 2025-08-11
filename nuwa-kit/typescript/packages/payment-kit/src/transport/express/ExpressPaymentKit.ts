@@ -23,6 +23,7 @@ import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelCon
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
+import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 
 /**
@@ -536,25 +537,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
    * Map PaymentError code to HTTP status code (shared by preProcess short-circuit)
    */
   private mapErrorCodeToHttpStatus(code?: string): number {
-    switch (code) {
-      case 'PAYMENT_REQUIRED':
-      case 'INSUFFICIENT_FUNDS':
-        return 402; // Payment Required
-      case 'INVALID_PAYMENT':
-      case 'UNKNOWN_SUBRAV':
-      case 'TAMPERED_SUBRAV':
-      case 'CHANNEL_CLOSED':
-      case 'EPOCH_MISMATCH':
-      case 'MAX_AMOUNT_EXCEEDED':
-      case 'CLIENT_TX_REF_MISSING':
-        return 400; // Bad Request
-      case 'SUBRAV_CONFLICT':
-        return 409; // Conflict
-      case 'RATE_NOT_AVAILABLE':
-      case 'BILLING_CONFIG_ERROR':
-      default:
-        return 500; // Internal Server Error
-    }
+    return httpStatusFor(code as PaymentErrorCode);
   }
 
   /**
