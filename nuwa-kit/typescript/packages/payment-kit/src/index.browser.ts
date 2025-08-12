@@ -62,6 +62,7 @@ export {
   generateChannelId,
   bigintToString,
   stringToBigint,
+  formatUsdAmount,
   DebugLogger,
 } from './utils';
 

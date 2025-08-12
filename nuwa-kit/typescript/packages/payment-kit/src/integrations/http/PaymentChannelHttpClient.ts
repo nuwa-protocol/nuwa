@@ -40,7 +40,7 @@ import {
 import type { z } from 'zod';
 import { PaymentHubClient } from '../../client/PaymentHubClient';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
-import type { ChannelRepository } from '../../storage';
+import { MemoryChannelRepository, type ChannelRepository } from '../../storage';
 import { PaymentErrorCode } from '../../errors/codes';
 
 /**
@@ -103,7 +103,9 @@ export class PaymentChannelHttpClient {
 
     this.logger = DebugLogger.get('PaymentChannelHttpClient');
     this.logger.setLevel(this.options.debug ? 'debug' : 'info');
-    this.log('PaymentChannelHttpClient initialized for host:', this.host);
+    const mappingStoreType = this.mappingStore instanceof MemoryHostChannelMappingStore ? 'Memory' : 'LocalStorage';
+    const channelRepoType = this.channelRepo instanceof MemoryChannelRepository ? 'Memory' : 'IndexedDB';
+    this.logger.debug('PaymentChannelHttpClient initialized for host:', this.host, 'using', mappingStoreType, 'mapping store', 'and', channelRepoType, 'channel repo');
   }
 
   /**
@@ -797,15 +799,12 @@ export class PaymentChannelHttpClient {
             // Clear the timeout to prevent memory leak
             clearTimeout(pendingRequest.timeoutId);
 
-            // Calculate USD cost with fallback to 0
+            // Prefer server-provided picoUSD to avoid client/server drift; fallback to local conversion
             let costUsd: bigint = BigInt(0);
-            try {
-              const assetPrice = await this.payerClient.getAssetPrice(pendingRequest.assetId);
-              //TODO: Overflow check
-              costUsd = responsePayload.cost * assetPrice;
-            } catch (error) {
-              this.log('Failed to calculate USD cost, using 0:', error);
-              // Keep costUsd as 0 if price lookup fails
+            if (responsePayload.costUsd !== undefined) {
+              costUsd = responsePayload.costUsd as bigint;
+            } else {
+              this.log('No picoUSD provided in response');
             }
 
             // Early local validation using shared util (allowSameAccumulated=true for admin/claims or zero-cost endpoints)

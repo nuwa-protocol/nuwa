@@ -188,6 +188,9 @@ export class HttpPaymentCodec implements PaymentCodec {
     if (payload.subRav && payload.cost !== undefined) {
       serializable.subRav = this.serializeSubRAV(payload.subRav);
       serializable.cost = payload.cost.toString();
+      if (payload.costUsd !== undefined) {
+        serializable.costUsd = payload.costUsd.toString();
+      }
     }
 
     if (payload.error) {
@@ -218,6 +221,9 @@ export class HttpPaymentCodec implements PaymentCodec {
         // Support old amountDebited for early servers
         const costStr = data.cost ?? data.amountDebited;
         payload.cost = costStr !== undefined ? BigInt(costStr) : undefined;
+        if (data.costUsd !== undefined) {
+          payload.costUsd = BigInt(data.costUsd);
+        }
       }
 
       // Error path

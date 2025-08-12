@@ -111,6 +111,8 @@ export interface PaymentResponsePayload {
   subRav?: SubRAV;
   /** Cost of this request (in asset's base unit). Present on success. */
   cost?: bigint;
+  /** Cost of this request in picoUSD for display consistency (server-calculated). Present on success. */
+  costUsd?: bigint;
 
   /** Client transaction reference (echoed back from request) */
   clientTxRef?: string;

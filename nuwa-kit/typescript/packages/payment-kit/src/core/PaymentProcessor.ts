@@ -383,6 +383,7 @@ export class PaymentProcessor {
             chainId: pctx.state?.chainId!,
             clientTxRef: pctx.meta.clientTxRef,
             cost: finalCost,
+            costUsd: usdCost,
           });
           this.log('🔧 Generated SubRAV:', {
             nonce: unsignedSubRAV.nonce,
@@ -505,6 +506,7 @@ export class PaymentProcessor {
     chainId: bigint;
     clientTxRef: string;
     cost: bigint;
+    costUsd: bigint;
   }): {
     unsignedSubRAV: SubRAV;
     serviceTxRef: string;
@@ -529,6 +531,7 @@ export class PaymentProcessor {
     const responsePayload = {
       subRav: next,
       cost: params.cost,
+      costUsd: params.costUsd,
       clientTxRef: params.clientTxRef,
       serviceTxRef,
       version: 1,
