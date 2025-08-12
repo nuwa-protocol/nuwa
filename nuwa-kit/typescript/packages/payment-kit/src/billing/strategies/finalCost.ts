@@ -28,5 +28,3 @@ export class FinalCostStrategy extends BaseStrategy {
     return BigInt(value);
   }
 }
-
-

@@ -253,7 +253,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         connectionString: connectionString!,
         tablePrefix,
         autoMigrate,
-        allowUnsafeAutoMigrateInProd: process.env.PAYMENTKIT_ALLOW_UNSAFE_AUTO_MIGRATE_IN_PROD === 'true',
+        allowUnsafeAutoMigrateInProd:
+          process.env.PAYMENTKIT_ALLOW_UNSAFE_AUTO_MIGRATE_IN_PROD === 'true',
       });
       // If it returned a Promise (ESM dynamic factory), this will be a thenable
       if (typeof repos.then === 'function') {
@@ -659,11 +660,13 @@ export async function createExpressPaymentKit(
   const rateProvider = new ContractRateProvider(contract, 30_000);
 
   // Optionally prebuild SQL storage repos via dynamic import so callers don't need changes
-  let prebuiltStorage: {
-    channelRepo: ChannelRepository;
-    ravRepo: RAVRepository;
-    pendingSubRAVRepo: PendingSubRAVRepository;
-  } | undefined;
+  let prebuiltStorage:
+    | {
+        channelRepo: ChannelRepository;
+        ravRepo: RAVRepository;
+        pendingSubRAVRepo: PendingSubRAVRepository;
+      }
+    | undefined;
 
   try {
     const backendEnv = process.env.PAYMENTKIT_BACKEND as 'sql' | 'memory' | undefined;

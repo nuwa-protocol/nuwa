@@ -60,6 +60,9 @@ export interface HttpPayerOptions {
 
   /** Custom fetch implementation (defaults to global fetch) */
   fetchImpl?: FetchLike;
+
+  /** Timeout for pending payment resolution in milliseconds (default: 30000ms) */
+  timeoutMs?: number;
 }
 
 // PersistedHttpClientState is now imported from schema/core to ensure
@@ -129,4 +132,21 @@ export interface PaymentRequestContext {
   url: string;
   headers: Record<string, string>;
   body?: any;
+}
+
+/**
+ * A handle that exposes both the HTTP response promise and the correlated payment resolution promise.
+ * Useful for advanced tracking/debugging without changing the existing high-level API.
+ */
+export interface PaymentRequestHandle<TResponse = Response> {
+  /** Correlation id for this request */
+  clientTxRef: string;
+  /** The HTTP response promise (from fetchImpl) */
+  response: Promise<TResponse>;
+  /** The payment resolution promise (resolved when service replies with protocol header, or undefined on free endpoints) */
+  payment: Promise<PaymentInfo | undefined>;
+  /** A convenience promise that resolves when both response and payment are available */
+  done: Promise<{ data: TResponse; payment: PaymentInfo | undefined }>;
+  /** Attempt to abort the underlying HTTP request and reject the pending payment */
+  abort?: () => void;
 }
