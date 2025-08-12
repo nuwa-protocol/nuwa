@@ -88,13 +88,14 @@ async function createPaymentServer(config: ServerConfig): Promise<{
   });
 
   // Text processing endpoint - fixed price per request
-  billing.post('/process', { pricing: { type: "FinalCost" } }, (req: Request, res: Response) => {
+  billing.post('/process', { pricing: { type: 'FinalCost' } }, (req: Request, res: Response) => {
     const text = req.body.text || '';
     const characters = text.length;
+    const PICO_USD_PER_CHARACTER = 50000000;
 
     // Simple text processing (uppercase)
     const processed = text.toUpperCase();
-    (res as any).locals.usage = characters * 50000000;
+    (res as any).locals.usage = characters * PICO_USD_PER_CHARACTER;
     // Clean business response - payment info is in headers
     res.json({
       input: text,
