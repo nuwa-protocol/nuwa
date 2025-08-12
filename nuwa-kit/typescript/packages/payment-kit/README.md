@@ -2,104 +2,185 @@
 
 > SDK for NIP-4 Unidirectional Payment Channels on Rooch and other ledgers
 
-基于《NIP-4 Unidirectional Payment Channel Core》规范以及 Rooch 链上支付通道合约的 TypeScript/JavaScript SDK。
+TypeScript/JavaScript SDK based on the “NIP-4 Unidirectional Payment Channel Core” specification and Rooch on-chain payment channel contracts.
 
-## ✨ 功能特性
+[English]|[中文](./README.zh-CN.md)
 
-- **NIP-4 兼容**: 完整实现 SubRAV (Sub-channel Receipt And Voucher) 协议
-- **版本化协议**: 支持 SubRAV 版本控制，确保向后兼容性和协议演进
-- **BCS 序列化**: 使用 Rooch 原生 BCS 序列化，确保与链上合约的完全兼容
-- **多设备支持**: 支持单一通道内的多个子通道，每个绑定不同的验证方法
-- **链兼容**: 抽象化设计，当前支持 Rooch，未来可扩展到其他区块链
-- **HTTP Gateway**: 内置 `X-Payment-Channel-Data` 头处理，支持 HTTP 服务集成
-- **类型安全**: 100% TypeScript 实现，提供完整的类型定义
+## ✨ Features
 
-## 📦 安装
+- **NIP-4 Compatible**: Full implementation of SubRAV (Sub-channel Receipt And Voucher)
+- **Versioned Protocol**: SubRAV versioning for backward compatibility and evolution
+- **BCS Serialization**: Native Rooch BCS serialization for on-chain compatibility
+- **Multi-device Support**: Multiple sub-channels under one channel, each bound to a verification method
+- **Chain Agnostic**: Abstract design; Rooch supported today, extensible to others
+- **HTTP Client**: `PaymentChannelHttpClient` handles `X-Payment-Channel-Data`, channel lifecycle, and payment tracking
+- **API Server Integration**: `ExpressPaymentKit` mounts payment and billing with one line (built-in per-request/per-usage strategies, auto-settlement, and admin endpoints)
+- **Type-safe**: 100% TypeScript with complete typings
+
+## 📦 Installation
 
 ```bash
 npm install @nuwa-ai/payment-kit @nuwa-ai/identity-kit @roochnetwork/rooch-sdk
 ```
 
-## 🚀 快速开始
+## 🚀 Getting Started
 
-### 基本用法
+### Client Integration (HTTP)
+
+> Recommended: Use `PaymentChannelHttpClient` or `createHttpClient` for HTTP integration. It automatically initializes channels, signs, injects/reads headers, and tracks payments.
 
 ```typescript
 import { IdentityKit } from '@nuwa-ai/identity-kit';
-import { createRoochPaymentChannelClient } from '@nuwa-ai/payment-kit';
+import { createHttpClient } from '@nuwa-ai/payment-kit';
 
-// 1) 初始化身份环境（已确定 Rooch 网络和 rpcUrl）
+// 1) Initialize identity environment (Rooch network and rpcUrl)
 const env = await IdentityKit.bootstrap({
   method: 'rooch',
-  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network' },
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network', network: 'test' },
 });
 
-const kit = await env.loadDid('did:rooch:0xabc...');
-const keyId = (await kit.getAvailableKeyIds()).authentication![0];
-
-// 2) 使用 helper 一步创建支付通道客户端（无需显式 rpcUrl）
-const pcClient = await createRoochPaymentChannelClient({
-  kit,
-  keyId,
+// 2) Create HTTP client (auto-manages channel and payments)
+const http = await createHttpClient({
+  baseUrl: 'http://localhost:3003',
+  env,
+  maxAmount: BigInt('10000000000'), // max acceptable per-request amount (asset minimum unit)
+  debug: true,
 });
 
-// 3) 开通道并授权子通道
-await pcClient.openChannel({
-  payeeDid: 'did:rooch:0xdef...',
-  asset: { assetId: '0x3::gas_coin::RGas', symbol: 'RGAS' },
-  collateral: BigInt('1000000000000000000'), // 1 RGAS
-});
-
-await pcClient.authorizeSubChannel({
-  vmIdFragment: 'laptop-key'
-});
-
-// 4) 生成支付收据
-const subRAV = await pcClient.nextSubRAV(BigInt('5000000000000000')); // 0.005 RGAS
-console.log('Payment created:', subRAV);
-
-// 5) 验证和提取
-const isValid = await SubRAVSigner.verify(subRAV, resolver);
-if (isValid) {
-  await pcClient.submitClaim(subRAV);
-}
+// 3) Make payment-enabled request (auto add/parse X-Payment-Channel-Data)
+const { data, payment } = await http.get('/echo?message=hello');
+console.log('Echo:', data);
+console.log('Payment cost (asset units):', payment?.cost.toString());
 ```
 
-### HTTP Gateway 集成
+You can also initialize the lower-level class directly:
 
 ```typescript
-import { HttpHeaderCodec } from '@nuwa-ai/payment-kit';
+import { PaymentChannelHttpClient } from '@nuwa-ai/payment-kit';
 
-// 客户端: 构建请求头
-const requestHeader = HttpHeaderCodec.buildRequestHeader({
-  channelId: '0x1234...',
-  signedSubRav: latestSubRAV,
-  maxAmount: BigInt('10000000000000000'),
-  clientTxRef: 'client-req-001'
+const client = new PaymentChannelHttpClient({
+  baseUrl: 'http://localhost:3003',
+  chainConfig: { chain: 'rooch', network: 'test', rpcUrl: 'https://test-seed.rooch.network' },
+  signer,       // IdentityKit-compatible SignerInterface
+  keyId,        // recommended to set explicitly
+  payerDid,     // optional, defaults to signer.getDid()
+  defaultAssetId: '0x3::gas_coin::RGas',
+  maxAmount: BigInt('10000000000'),
+  debug: true,
 });
 
-// HTTP 请求
-fetch('/api/service', {
-  headers: {
-    'X-Payment-Channel-Data': requestHeader,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({ query: 'data' })
-});
-
-// 服务端: 解析和响应
-const parsed = HttpHeaderCodec.parseRequestHeader(requestHeader);
-// ... 处理业务逻辑 ...
-const responseHeader = HttpHeaderCodec.buildResponseHeader({
-  signedSubRav: updatedSubRAV,
-  amountDebited: BigInt('5000000000000000'),
-  serviceTxRef: 'srv-resp-001'
-});
+const result = await client.post('/process', { text: 'hello world' });
+console.log(result.data, result.payment);
 ```
 
-## 🛠️ API 参考
+### API Server Integration (Express)
 
-### 核心类型
+> Recommended: Use `createExpressPaymentKit` / `createExpressPaymentKitFromEnv` to add payment and billing to an existing Express app. You declare routes and pricing strategies; the framework handles verification, billing, response headers, persistence, and auto-claim.
+
+```typescript
+import express from 'express';
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+import { createExpressPaymentKitFromEnv } from '@nuwa-ai/payment-kit';
+
+// 1) Bootstrap Identity environment
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network', network: 'test' },
+});
+
+// 2) Create and configure Payment Kit (default price, asset, admin DID, etc.)
+const billing = await createExpressPaymentKitFromEnv(env, {
+  serviceId: 'payment-example',
+  defaultAssetId: '0x3::gas_coin::RGas',
+  defaultPricePicoUSD: '1000000000', // 0.001 USD default
+  adminDid: 'did:rooch:...',
+  debug: true,
+});
+
+// 3) Declare business routes and pricing (per request)
+billing.get('/echo', { pricing: '2000000000' }, (req, res) => {
+  res.json({ echo: req.query.message || 'Hello, World!', timestamp: new Date().toISOString() });
+});
+
+// 4) Post-billing by usage (tokens): write usage to res.locals
+billing.post(
+  '/chat/completions',
+  { pricing: { type: 'PerToken', unitPricePicoUSD: '50000000' } },
+  (req, res) => {
+    const { messages = [], max_tokens = 100 } = req.body || {};
+    const prompt = messages.map((m: any) => m.content).join(' ');
+    const prompt_tokens = Math.ceil(prompt.length / 4);
+    const completion_tokens = Math.min(max_tokens, 50);
+    const total_tokens = prompt_tokens + completion_tokens;
+    (res as any).locals.usage = total_tokens; // used by strategy for final cost
+    res.json({ choices: [{ message: { role: 'assistant', content: 'mock response' } }], usage: { prompt_tokens, completion_tokens, total_tokens } });
+  }
+);
+
+// 5) Mount router (includes payment-channel admin endpoints and business routes)
+const app = express();
+app.use(express.json());
+app.use(billing.router);
+app.listen(3000);
+```
+
+#### Service Key Configuration (SERVICE_KEY)
+
+The server needs a signing key for DID identity and on-chain operations. Inject it via environment variable and import on startup:
+
+```bash
+# Recommended: configure via .env or deployment platform
+export SERVICE_KEY="<your-service-private-key>"
+```
+
+```typescript
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network', network: 'test' },
+});
+
+const serviceKey = process.env.SERVICE_KEY;
+if (!serviceKey) throw new Error('SERVICE_KEY is required');
+
+// Import server private key (string format must match your deployment)
+const imported = await env.keyManager.importKeyFromString(serviceKey);
+const serviceDid = await env.keyManager.getDid();
+
+// Then create ExpressPaymentKit (see example above)
+```
+
+Note: The `SERVICE_KEY` format must match `IdentityKit.importKeyFromString` (e.g., keys managed via CADOP or locally generated Ed25519 private key encoding).
+
+Recommended way to obtain `SERVICE_KEY`:
+
+- Visit the CADOP test site: [CADOP Test ID](https://test-id.nuwa.dev/)
+- In your DID configuration, choose “Add Authentication Method”
+- Select a key type (Ed25519 recommended), then securely save the private key string (compatible with `importKeyFromString`)
+- Set that private key string as the `SERVICE_KEY` environment variable in your deployment
+
+You can also review the deep-link authorization flow in the example (`../../examples/payment-kit-integration/src/client-cli.ts`, function `connectToCadop`) to understand how keys are associated with DIDs.
+
+Admin and Discovery endpoints (provided automatically by the framework):
+
+- `/.well-known/nuwa-payment/info` — service info and discovery
+- `/payment-channel/health` — health check
+- `/payment-channel/admin/claims` — claim scheduler status and trigger
+
+Client can call these via `PaymentChannelAdminClient`:
+
+```typescript
+import { PaymentChannelAdminClient } from '@nuwa-ai/payment-kit';
+
+const admin = new PaymentChannelAdminClient(httpClient);
+await admin.getClaimsStatus();
+await admin.triggerClaim({ channelId: '0x...' });
+```
+
+## 🛠️ API Reference
+
+### Core Types
 
 ```typescript
 interface SubRAV {
@@ -118,30 +199,11 @@ interface SignedSubRAV {
 }
 ```
 
-### RoochPaymentChannelClient
+### HTTP Client and Server Notes
 
-```typescript
-class RoochPaymentChannelClient {
-  constructor(options: {
-    rpcUrl: string;
-    signer: SignerInterface;
-    keyId?: string;
-  });
-
-  // 通道生命周期
-  openChannel(params: OpenChannelParams): Promise<ChannelMetadata>;
-  authorizeSubChannel(params: AuthorizeParams): Promise<void>;
-  closeChannel(cooperative?: boolean): Promise<void>;
-
-  // 支付操作
-  nextSubRAV(deltaAmount: bigint): Promise<SignedSubRAV>;
-  submitClaim(signedSubRAV: SignedSubRAV): Promise<TransactionResult>;
-
-  // 状态查询
-  getChannelStatus(): Promise<ChannelStatus>;
-  getSubChannelStatus(vmIdFragment: string): Promise<SubChannelStatus>;
-}
-```
+- **`PaymentChannelHttpClient`**: Handles signing, header injection, payment tracking, channel state caching and recovery.
+- **`ExpressPaymentKit`**: Declare per-route billing (`PerRequest`/`PerToken`/`FinalCost`), automatically generates next SubRAV proposal on success or protocol error header on failure.
+- **`PaymentChannelAdminClient`**: Access admin endpoints (query/trigger claim, SubRAV queries, etc.).
 
 ### SubRAVSigner
 
@@ -160,12 +222,12 @@ class SubRAVSigner {
 }
 ```
 
-### SubRAV BCS 序列化
+### SubRAV BCS Serialization
 
 ```typescript
 import { SubRAVCodec, SubRAVUtils } from '@nuwa-ai/payment-kit';
 
-// 创建 SubRAV (自动使用当前版本)
+// Create SubRAV (uses current protocol version)
 const subRav = SubRAVUtils.create({
   chainId: BigInt(4),
   channelId: '0x1234...',
@@ -175,59 +237,43 @@ const subRav = SubRAVUtils.create({
   nonce: BigInt(1),
 });
 
-// BCS 序列化
+// BCS encode
 const encoded = SubRAVCodec.encode(subRav);
 const hex = SubRAVCodec.toHex(subRav);
 
-// 反序列化
+// Decode
 const decoded = SubRAVCodec.decode(encoded);
 const fromHex = SubRAVCodec.fromHex(hex);
 ```
 
-## 📁 项目结构
+## 🔧 Development
 
-```
-src/
-├── core/                   # 链无关的协议实现
-│   ├── types.ts           # 核心类型定义
-│   ├── subrav.ts          # SubRAV BCS 序列化、生成和验证
-│   └── http-header.ts     # HTTP Gateway Profile 实现
-├── rooch/                 # Rooch 链特定实现
-│   ├── contract.ts        # Move 合约调用封装
-│   └── client.ts          # 高层次客户端 API
-├── utils/                 # 工具函数
-└── __tests__/             # 测试文件
-```
-
-## 🔧 开发
-
-### 构建
+### Build
 
 ```bash
 cd nuwa-kit/typescript/packages/payment-kit
-npm run build
+pnpm build
 ```
 
-### 测试
+### Test
 
 ```bash
-# 单元测试
-npm test
-
-# 集成测试 (需要本地 Rooch 节点)
-npm run test:integration
+# Unit tests
+pnpm test
 ```
 
-### 依赖的 Move 合约
+## 📄 Design Docs
 
-本 SDK 依赖部署在 Rooch 链上的支付通道 Move 合约。合约源码位于 `contracts/move/` 目录。
+See [DESIGN.md](./DESIGN.md)
 
-## 📄 设计文档
+### 📚 Examples
 
-详细的设计文档请参考：[DESIGN.md](./DESIGN.md)
+- Example project: `nuwa-kit/typescript/examples/payment-kit-integration`
+  - Client CLI: `src/client-cli.ts` (demonstrates `PaymentChannelHttpClient` and `PaymentChannelAdminClient`)
+  - Server: `src/server.ts` (demonstrates `createExpressPaymentKitFromEnv` with multiple billing strategies)
 
-## 📄 许可证
+## 📄 License
 
 Apache-2.0
 
-```
+
