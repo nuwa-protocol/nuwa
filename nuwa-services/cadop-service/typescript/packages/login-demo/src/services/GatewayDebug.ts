@@ -1,8 +1,10 @@
-import { DIDAuth } from '@nuwa-ai/identity-kit';
+import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { useAuth } from '../App';
 
 const STORAGE_KEY = 'nuwa-login-demo:gateway-url';
 const DEFAULT_GATEWAY_URL = 'https://test-llm.nuwa.dev';
+
+DebugLogger.setGlobalLevel('debug');
 
 export function getGatewayUrl(): string {
   return localStorage.getItem(STORAGE_KEY) || DEFAULT_GATEWAY_URL;
@@ -25,6 +27,9 @@ export async function sendSignedRequest(
   options: GatewayRequestOptions,
   sign: ReturnType<typeof useAuth>['sign']
 ): Promise<{ status: number; headers: Record<string, string>; body: string }> {
+  // Prefer payment-channel HTTP client – we need sdk from the hook caller context.
+  // Here we cannot access sdk; so we fall back to plain DIDAuth path.
+
   const payload = {
     operation: 'gateway-debug',
     params: { method: options.method, path: options.path },

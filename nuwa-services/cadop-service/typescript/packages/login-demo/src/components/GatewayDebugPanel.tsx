@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { getGatewayUrl, setGatewayUrl, sendSignedRequest } from '../services/GatewayDebug';
+import { getGatewayUrl, setGatewayUrl } from '../services/GatewayDebug';
 import { useAuth } from '../App';
+import { requestWithPayment, resetPaymentClient } from '../services/PaymentClient';
+import { formatUsdAmount } from '@nuwa-ai/payment-kit';
 
 export function GatewayDebugPanel() {
-  const { sign } = useAuth();
+  const { sdk } = useAuth();
   const [gatewayUrl, setGatewayUrlState] = useState(getGatewayUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
@@ -18,9 +20,12 @@ export function GatewayDebugPanel() {
   const [responseText, setResponseText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [payment, setPayment] = useState<any | null>(null);
+  const [paymentNote, setPaymentNote] = useState<string | null>(null);
 
   const handleSaveGateway = () => {
     setGatewayUrl(gatewayUrl);
+    resetPaymentClient(gatewayUrl); // reset per-host client when base URL changes
   };
 
   const handleSend = async () => {
@@ -33,11 +38,18 @@ export function GatewayDebugPanel() {
         additionalHeaders['X-LLM-Provider'] = provider;
       }
 
-      const res = await sendSignedRequest(
-        gatewayUrl,
-        { method, path: apiPath, body: requestBody, headers: additionalHeaders },
-        sign
-      );
+      // Send via Payment Channel client using sdk
+      if (!sdk) throw new Error('SDK not initialized');
+      const parsedBody = method !== 'GET' && method !== 'DELETE' && requestBody ? JSON.parse(requestBody) : undefined;
+      const { data, payment } = await requestWithPayment(sdk, gatewayUrl, method, apiPath, parsedBody, additionalHeaders);
+      
+      //console.log('payment', payment);
+      if (!payment) {
+        setPaymentNote('No payment info from server.');
+      } else {
+        // Capture payment info if returned by PaymentKit client
+        setPayment(payment);
+      }
 
       // Helper: pretty-print response and parse nested JSON in `body` field if present
       const formatResponse = (response: any): string => {
@@ -81,7 +93,7 @@ export function GatewayDebugPanel() {
         }
       };
 
-      setResponseText(formatResponse(res));
+      setResponseText(formatResponse(data));
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
@@ -151,6 +163,52 @@ export function GatewayDebugPanel() {
         >
           {responseText}
         </pre>
+      )}
+
+      {paymentNote && (
+        <div style={{ marginTop: '0.5rem', color: '#555' }}>{paymentNote}</div>
+      )}
+
+      {payment && (
+        <div style={{ marginTop: '1rem' }}>
+          <h3>Payment</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: 160, fontWeight: 600 }}>Channel ID</td>
+                <td>{payment.channelId}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Asset</td>
+                <td>{payment.assetId}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Nonce</td>
+                <td>{String(payment.nonce ?? '')}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Cost (asset units)</td>
+                <td>{String(payment.cost ?? '')}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Cost (USD)</td>
+                <td>{formatUsdAmount(payment.costUsd)}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Tx Ref (client)</td>
+                <td>{payment.clientTxRef}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Tx Ref (service)</td>
+                <td>{payment.serviceTxRef ?? ''}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: 600 }}>Timestamp</td>
+                <td>{payment.timestamp}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

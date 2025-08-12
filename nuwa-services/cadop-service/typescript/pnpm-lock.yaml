@@ -418,11 +418,14 @@ importers:
   packages/login-demo:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.3.1
-        version: 0.3.1(typescript@5.8.3)
+        specifier: ^0.3.6
+        version: 0.3.6(typescript@5.8.3)
       '@nuwa-ai/identity-kit-web':
-        specifier: ^0.3.1
-        version: 0.3.1(react@18.3.1)(typescript@5.8.3)
+        specifier: ^0.3.5
+        version: 0.3.5(react@18.3.1)(typescript@5.8.3)
+      '@nuwa-ai/payment-kit':
+        specifier: file:../../../../../nuwa-kit/typescript/packages/payment-kit
+        version: file:../../../nuwa-kit/typescript/packages/payment-kit(express@4.21.2)(typescript@5.8.3)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1395,8 +1398,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nuwa-ai/identity-kit-web@0.3.1':
-    resolution: {integrity: sha512-5GKcLzJfqRLPfB7ycRiyc8/cAWJbE9d75LZngSp+ZfuSByMobcfCiSuiN1PTjpIQ7D5UwNbgJlGQxY14LpNtVw==}
+  '@nuwa-ai/identity-kit-web@0.3.5':
+    resolution: {integrity: sha512-egjSXMiGfDxzPW8l496PRGF2b0MGN+KbTY8m1oRmcnffSWei7A3gvrzHBvKyeHTB93mPbzYck7ca1/09Wclp4A==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0
     peerDependenciesMeta:
@@ -1408,6 +1411,26 @@ packages:
 
   '@nuwa-ai/identity-kit@0.3.2':
     resolution: {integrity: sha512-XtIOaEhs77WcXjp6JAQWJ0OrcGB4i6QQLHxeO6PBQn//Pdp7oWlpoqhSgSfOPiwZ8suISE2cF3YgEprqldlQNg==}
+
+  '@nuwa-ai/identity-kit@0.3.4':
+    resolution: {integrity: sha512-Lty7wuKmEuriLmGd15EM1IRPvDTuHvm/Px/BXb3i1O/l2sB6ZlYxybL++KU694I0tY2TZznuc3tNJUJfkYyIfA==}
+
+  '@nuwa-ai/identity-kit@0.3.6':
+    resolution: {integrity: sha512-eVhgOQja2YiXVuBnCb16xrdF5uHcmBZWPZdBLKU97aaQ4R5pIvPbE26MbgHy2s4F+ZC2rthpJcd5zthGZGXgqQ==}
+
+  '@nuwa-ai/identity-kit@file:../../../nuwa-kit/typescript/packages/identity-kit':
+    resolution: {directory: ../../../nuwa-kit/typescript/packages/identity-kit, type: directory}
+
+  '@nuwa-ai/payment-kit@file:../../../nuwa-kit/typescript/packages/payment-kit':
+    resolution: {directory: ../../../nuwa-kit/typescript/packages/payment-kit, type: directory}
+    peerDependencies:
+      express: '>=4'
+      pg: '>=8'
+    peerDependenciesMeta:
+      express:
+        optional: true
+      pg:
+        optional: true
 
   '@paralleldrive/cuid2@2.2.2':
     resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
@@ -2109,6 +2132,9 @@ packages:
     resolution: {integrity: sha512-Zw33oQNAvDdAN9b0IE5stH0y2MylYvtU7VVTKEJPxhyM2q57CVaNJhtJW258ah24NRtaiA23tptUmVn3dmTKpw==}
     deprecated: This is a stub types definition. js-base64 provides its own type definitions, so you do not need this installed.
 
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -2132,6 +2158,9 @@ packages:
 
   '@types/node@22.15.32':
     resolution: {integrity: sha512-3jigKqgSjsH6gYZv2nEsqdXfZqIFGAV36XYYjf9KGZ3PSG+IhLecqPnI310RvjutyMwifE2hhhNEklOUrvx/wA==}
+
+  '@types/pg@8.15.5':
+    resolution: {integrity: sha512-LF7lF6zWEKxuT3/OR8wAZGzkg4ENGXFNyiV/JeOt9z5B+0ZVwbql9McqX5c/WStFq1GaGso7H1AzP/qSzmlCKQ==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -3885,6 +3914,9 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
+  lossless-json@4.1.1:
+    resolution: {integrity: sha512-HusN80C0ohtT9kOHQH7EuUaqzRQsnekpa+2ot8OzvW0iC08dq/YtM/7uKwwajldQsCrHyC8q9fz3t3L+TmDltA==}
+
   loupe@2.3.7:
     resolution: {integrity: sha512-zSMINGVYkdpYSOBmLi0D1Uo7JU9nVdQKrHxC8eYlV+9YKK9WePqAlL7lSlorG/U2Fw1w0hTBmaa/jrQ3UbPHtA==}
 
@@ -4133,6 +4165,10 @@ packages:
     resolution: {integrity: sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==}
     engines: {node: '>= 0.8'}
 
+  on-headers@1.1.0:
+    resolution: {integrity: sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==}
+    engines: {node: '>= 0.8'}
+
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
@@ -4233,6 +4269,17 @@ packages:
   pathval@1.1.1:
     resolution: {integrity: sha512-Dp6zGqpTdETdR63lehJYPeIOqpiNBNtc7BpWSLrOje7UaIsE5aY92r/AunQA7rsXvet3lrJ3JnZX29UPTKXyKQ==}
 
+  pg-int8@1.0.1:
+    resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
+    engines: {node: '>=4.0.0'}
+
+  pg-protocol@1.10.3:
+    resolution: {integrity: sha512-6DIBgBQaTKDJyxnXaLiLR8wBpQQcGWuAESkRBX/t6OwA8YsqP+iVSiond2EDy6Y/dsGk8rh/jtax3js5NeV7JQ==}
+
+  pg-types@2.2.0:
+    resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
+    engines: {node: '>=4'}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -4307,6 +4354,22 @@ packages:
   postcss@8.5.6:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
+
+  postgres-array@2.0.0:
+    resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
+    engines: {node: '>=4'}
+
+  postgres-bytea@1.0.0:
+    resolution: {integrity: sha512-xy3pmLuQqRBZBXDULy7KbaitYqLcmxigw14Q5sj8QBVLqEwXfeybIKVWiqAXTlcvdvb0+xkOtDbfQMOf4lST1w==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-date@1.0.7:
+    resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-interval@1.2.0:
+    resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
+    engines: {node: '>=0.10.0'}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -5186,6 +5249,10 @@ packages:
   write-file-atomic@5.0.1:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
+  xtend@4.0.2:
+    resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
+    engines: {node: '>=0.4'}
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
@@ -6098,9 +6165,9 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@nuwa-ai/identity-kit-web@0.3.1(react@18.3.1)(typescript@5.8.3)':
+  '@nuwa-ai/identity-kit-web@0.3.5(react@18.3.1)(typescript@5.8.3)':
     dependencies:
-      '@nuwa-ai/identity-kit': 0.3.1(typescript@5.8.3)
+      '@nuwa-ai/identity-kit': 0.3.4(typescript@5.8.3)
     optionalDependencies:
       react: 18.3.1
     transitivePeerDependencies:
@@ -6123,6 +6190,52 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@4.9.5)
       multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.3.4(typescript@5.8.3)':
+    dependencies:
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.3.6(typescript@5.8.3)':
+    dependencies:
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@file:../../../nuwa-kit/typescript/packages/identity-kit(typescript@5.8.3)':
+    dependencies:
+      '@noble/curves': 1.9.2
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/payment-kit@file:../../../nuwa-kit/typescript/packages/payment-kit(express@4.21.2)(typescript@5.8.3)':
+    dependencies:
+      '@nuwa-ai/identity-kit': file:../../../nuwa-kit/typescript/packages/identity-kit(typescript@5.8.3)
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      '@types/js-yaml': 4.0.9
+      '@types/pg': 8.15.5
+      js-yaml: 4.1.0
+      lossless-json: 4.1.1
+      on-headers: 1.1.0
+      zod: 3.25.67
+    optionalDependencies:
+      express: 4.21.2
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -6889,6 +7002,8 @@ snapshots:
     dependencies:
       js-base64: 3.7.7
 
+  '@types/js-yaml@4.0.9': {}
+
   '@types/json-schema@7.0.15': {}
 
   '@types/jsonwebtoken@9.0.10':
@@ -6911,6 +7026,12 @@ snapshots:
   '@types/node@22.15.32':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/pg@8.15.5':
+    dependencies:
+      '@types/node': 20.19.1
+      pg-protocol: 1.10.3
+      pg-types: 2.2.0
 
   '@types/prop-types@15.7.15': {}
 
@@ -9351,6 +9472,8 @@ snapshots:
     dependencies:
       js-tokens: 4.0.0
 
+  lossless-json@4.1.1: {}
+
   loupe@2.3.7:
     dependencies:
       get-func-name: 2.0.2
@@ -9577,6 +9700,8 @@ snapshots:
     dependencies:
       ee-first: 1.1.1
 
+  on-headers@1.1.0: {}
+
   once@1.4.0:
     dependencies:
       wrappy: 1.0.2
@@ -9670,6 +9795,18 @@ snapshots:
 
   pathval@1.1.1: {}
 
+  pg-int8@1.0.1: {}
+
+  pg-protocol@1.10.3: {}
+
+  pg-types@2.2.0:
+    dependencies:
+      pg-int8: 1.0.1
+      postgres-array: 2.0.0
+      postgres-bytea: 1.0.0
+      postgres-date: 1.0.7
+      postgres-interval: 1.2.0
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.1: {}
@@ -9735,6 +9872,16 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres-array@2.0.0: {}
+
+  postgres-bytea@1.0.0: {}
+
+  postgres-date@1.0.7: {}
+
+  postgres-interval@1.2.0:
+    dependencies:
+      xtend: 4.0.2
 
   prelude-ls@1.2.1: {}
 
@@ -10776,6 +10923,8 @@ snapshots:
     dependencies:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
+
+  xtend@4.0.2: {}
 
   y18n@5.0.8: {}
 
