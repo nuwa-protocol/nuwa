@@ -88,14 +88,13 @@ async function createPaymentServer(config: ServerConfig): Promise<{
   });
 
   // Text processing endpoint - fixed price per request
-  billing.post('/process', { pricing: '500000000' }, (req: Request, res: Response) => {
-    // 0.0005 USD per request
+  billing.post('/process', { pricing: { type: "FinalCost" } }, (req: Request, res: Response) => {
     const text = req.body.text || '';
     const characters = text.length;
 
     // Simple text processing (uppercase)
     const processed = text.toUpperCase();
-
+    (res as any).locals.usage = characters * 50000000;
     // Clean business response - payment info is in headers
     res.json({
       input: text,
@@ -112,7 +111,6 @@ async function createPaymentServer(config: ServerConfig): Promise<{
       pricing: {
         type: 'PerToken',
         unitPricePicoUSD: '50000000', // 0.00005 USD per token
-        usageKey: 'usage.total_tokens',
       },
     },
     (req: Request, res: Response) => {
@@ -129,13 +127,7 @@ async function createPaymentServer(config: ServerConfig): Promise<{
       // IMPORTANT: Attach usage data to res.locals for post-billing calculation
       // The PerToken strategy will use this data to calculate the final cost
       (res as any).locals = (res as any).locals || {};
-      (res as any).locals.usage = {
-        usage: {
-          prompt_tokens,
-          completion_tokens,
-          total_tokens,
-        },
-      };
+      (res as any).locals.usage = total_tokens;
 
       // The final cost will be calculated after this response based on actual token usage
       // Final cost = unitPricePicoUSD (50000000) × total_tokens

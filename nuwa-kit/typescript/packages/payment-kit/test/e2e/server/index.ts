@@ -78,12 +78,18 @@ export async function createBillingServer(config: BillingServerConfig) {
 
   billing.post(
     '/process',
-    { pricing: '10000000000' },
+    {
+      pricing: {
+        type: 'FinalCost',
+      },
+    },
     (req: Request, res: Response, next: NextFunction) => {
-      // 0.01 USD = 10,000,000,000 picoUSD
+      // External provider already computes final USD cost; we pass picoUSD post-flight
       try {
         // Business logic should not depend on payment information
         // Payment info is automatically handled by middleware and sent via headers
+        // For testing, set external picoUSD cost for this request (0.01 USD)
+        res.locals.usage = 10_000_000_000; // picoUSD
         res.json({
           processed: req.body,
           timestamp: Date.now(),
@@ -110,7 +116,6 @@ export async function createBillingServer(config: BillingServerConfig) {
       pricing: {
         type: 'PerToken',
         unitPricePicoUSD: '20000000', // 20,000,000 picoUSD (0.00002 USD) per token
-        usageKey: 'usage.total_tokens',
       },
       authRequired: true, // paymentRequired is implied when pricing > 0
     },
