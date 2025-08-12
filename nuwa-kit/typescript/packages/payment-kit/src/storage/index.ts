@@ -59,16 +59,6 @@ import { createChannelRepo as _createChannelRepo } from './factories/createChann
 import { createRAVRepo as _createRAVRepo } from './factories/createRAVRepo';
 import { createPendingSubRAVRepo as _createPendingSubRAVRepo } from './factories/createPendingSubRAVRepo';
 
-// Optionally create a single Pool when connectionString is provided
-let PoolRef: any;
-try {
-  // Lazy require; avoid bundling 'pg' in browser
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  PoolRef = require('pg').Pool;
-} catch (_) {
-  PoolRef = undefined;
-}
-
 /**
  * Create all repositories with the same backend configuration
  */
@@ -80,14 +70,7 @@ export function createStorageRepositories(options: {
   autoMigrate?: boolean;
 }) {
   const opts: any = { ...options };
-  if (opts.backend === 'sql' && !opts.pool && opts.connectionString && PoolRef) {
-    const isSupabase =
-      typeof opts.connectionString === 'string' && opts.connectionString.includes('supabase');
-    opts.pool = new PoolRef({
-      connectionString: opts.connectionString,
-      ssl: isSupabase ? { rejectUnauthorized: false } : false,
-    });
-  }
+  // Note: keep this module browser-safe; do not load 'pg' here.
   return {
     channelRepo: _createChannelRepo(opts),
     ravRepo: _createRAVRepo(opts),

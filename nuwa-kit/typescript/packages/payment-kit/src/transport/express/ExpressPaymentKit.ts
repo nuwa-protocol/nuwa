@@ -115,6 +115,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       didResolver: DIDResolver;
       rateProvider: RateProvider;
       serviceDid: string;
+    },
+    prebuiltStorage?: {
+      channelRepo: ChannelRepository;
+      ravRepo: RAVRepository;
+      pendingSubRAVRepo: PendingSubRAVRepository;
     }
   ) {
     this.config = config;
@@ -123,8 +128,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Ensure built-in billing strategies are registered when server starts
     registerBuiltinStrategies();
 
-    // Resolve storage repositories from environment
-    const storage = this.resolveStorageFromEnv();
+    // Resolve storage repositories
+    const storage = prebuiltStorage ?? this.resolveStorageFromEnv();
     this.channelRepo = storage.channelRepo;
     this.ravRepo = storage.ravRepo;
     this.pendingSubRAVRepo = storage.pendingSubRAVRepo;
@@ -224,24 +229,46 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     ravRepo: RAVRepository;
     pendingSubRAVRepo: PendingSubRAVRepository;
   } {
-    const connectionString =
-      process.env.PAYMENTKIT_CONNECTION_STRING ||
-      process.env.SUPABASE_DB_URL ||
-      process.env.DATABASE_URL;
-
     const backendEnv = process.env.PAYMENTKIT_BACKEND as 'sql' | 'memory' | undefined;
-    const backend: 'sql' | 'memory' = backendEnv || (connectionString ? 'sql' : 'memory');
+    const backend: 'sql' | 'memory' = backendEnv === 'sql' ? 'sql' : 'memory';
+    const connectionString =
+      backend === 'sql'
+        ? process.env.PAYMENTKIT_CONNECTION_STRING ||
+          process.env.SUPABASE_DB_URL ||
+          process.env.DATABASE_URL
+        : undefined;
 
     const tablePrefix = process.env.PAYMENTKIT_TABLE_PREFIX || 'nuwa_';
     const autoMigrate =
       process.env.PAYMENTKIT_AUTO_MIGRATE === 'true' || process.env.NODE_ENV !== 'production';
 
-    const { channelRepo, ravRepo, pendingSubRAVRepo } = createStorageRepositories({
-      backend,
-      connectionString,
-      tablePrefix,
-      autoMigrate,
-    });
+    let channelRepo: ChannelRepository;
+    let ravRepo: RAVRepository;
+    let pendingSubRAVRepo: PendingSubRAVRepository;
+    if (backend === 'sql') {
+      // Defer Pool creation to runtime via dynamic import factory
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const sql = require('../../storage/sql/index');
+      const repos = sql.createSqlStorageRepositories({
+        connectionString: connectionString!,
+        tablePrefix,
+        autoMigrate,
+        allowUnsafeAutoMigrateInProd: process.env.PAYMENTKIT_ALLOW_UNSAFE_AUTO_MIGRATE_IN_PROD === 'true',
+      });
+      // If it returned a Promise (ESM dynamic factory), this will be a thenable
+      if (typeof repos.then === 'function') {
+        throw new Error(
+          'createSqlStorageRepositories() is async; use the async factory to build ExpressPaymentKit or pre-create repositories and inject'
+        );
+      }
+      ({ channelRepo, ravRepo, pendingSubRAVRepo } = repos);
+    } else {
+      ({ channelRepo, ravRepo, pendingSubRAVRepo } = createStorageRepositories({
+        backend: 'memory',
+        tablePrefix,
+        autoMigrate,
+      }));
+    }
 
     return { channelRepo, ravRepo, pendingSubRAVRepo };
   }
@@ -631,13 +658,53 @@ export async function createExpressPaymentKit(
   // Create default ContractRateProvider
   const rateProvider = new ContractRateProvider(contract, 30_000);
 
-  return new ExpressPaymentKitImpl(config, {
-    contract,
-    signer: config.signer,
-    didResolver: vdrRegistry,
-    rateProvider,
-    serviceDid,
-  });
+  // Optionally prebuild SQL storage repos via dynamic import so callers don't need changes
+  let prebuiltStorage: {
+    channelRepo: ChannelRepository;
+    ravRepo: RAVRepository;
+    pendingSubRAVRepo: PendingSubRAVRepository;
+  } | undefined;
+
+  try {
+    const backendEnv = process.env.PAYMENTKIT_BACKEND as 'sql' | 'memory' | undefined;
+    if (backendEnv === 'sql') {
+      const connectionString =
+        process.env.PAYMENTKIT_CONNECTION_STRING ||
+        process.env.SUPABASE_DB_URL ||
+        process.env.DATABASE_URL;
+      if (!connectionString) {
+        throw new Error(
+          'PAYMENTKIT_BACKEND=sql requires PAYMENTKIT_CONNECTION_STRING (or SUPABASE_DB_URL / DATABASE_URL)'
+        );
+      }
+      const { createSqlStorageRepositories }: any = await import('../../storage/sql/index');
+      prebuiltStorage = await createSqlStorageRepositories({
+        connectionString,
+        tablePrefix: process.env.PAYMENTKIT_TABLE_PREFIX || 'nuwa_',
+        autoMigrate:
+          process.env.PAYMENTKIT_AUTO_MIGRATE === 'true' || process.env.NODE_ENV !== 'production',
+        allowUnsafeAutoMigrateInProd:
+          process.env.PAYMENTKIT_ALLOW_UNSAFE_AUTO_MIGRATE_IN_PROD === 'true',
+      });
+    }
+  } catch (e) {
+    // If SQL setup fails, surface meaningful error; otherwise continue with memory backend
+    if ((process.env.PAYMENTKIT_BACKEND as string) === 'sql') {
+      throw e;
+    }
+  }
+
+  return new ExpressPaymentKitImpl(
+    config,
+    {
+      contract,
+      signer: config.signer,
+      didResolver: vdrRegistry,
+      rateProvider,
+      serviceDid,
+    },
+    prebuiltStorage
+  );
 }
 
 // ---------------------------------------------------------------------------
