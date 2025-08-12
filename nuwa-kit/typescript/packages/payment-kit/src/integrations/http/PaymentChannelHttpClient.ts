@@ -188,6 +188,16 @@ export class PaymentChannelHttpClient {
     // Execute request (defer await to keep both promises available to caller)
     const responsePromise = this.executeRequest(requestContext, init);
 
+    this.log(
+      '[request.start]',
+      method,
+      fullUrl,
+      'clientTxRef=',
+      clientTxRef,
+      'channelId=',
+      this.clientState.channelId
+    );
+
     // Couple: when response promise rejects, clear the pending payment to avoid dangling
     responsePromise.catch(() => {
       this.clientState.pendingPayments?.delete(clientTxRef);
@@ -220,20 +230,7 @@ export class PaymentChannelHttpClient {
       abort,
     };
   }
-
-  /**
-   * Legacy method for backward compatibility
-   * @deprecated Use requestWithPayment for payment info or convenience methods
-   */
-  async request(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
-    path: string,
-    init?: RequestInit
-  ): Promise<Response> {
-    const result = await this.requestWithPayment(method, path, init);
-    return result.data;
-  }
-
+ 
   /**
    * Convenience methods for common HTTP verbs with payment info
    */
@@ -649,6 +646,7 @@ export class PaymentChannelHttpClient {
       const timeoutId = setTimeout(() => {
         if (this.clientState.pendingPayments?.has(clientTxRef)) {
           this.clientState.pendingPayments.delete(clientTxRef);
+          this.log('[payment.timeout]', 'clientTxRef=', clientTxRef, 'url=', requestContext.url);
           reject(new Error('Payment resolution timeout'));
         }
       }, this.requestTimeoutMs);
@@ -664,6 +662,18 @@ export class PaymentChannelHttpClient {
         sendedSubRav: sentedSubRav,
         requestContext,
       });
+
+      this.log(
+        '[payment.pending.create]',
+        'clientTxRef=',
+        clientTxRef,
+        'url=',
+        requestContext.url,
+        'channelId=',
+        this.clientState.channelId,
+        'signedSubRav=',
+        !!sentedSubRav
+      );
     });
   }
 
@@ -673,6 +683,7 @@ export class PaymentChannelHttpClient {
     clearTimeout(pending.timeoutId);
     pending.resolve(info);
     this.clientState.pendingPayments?.delete(clientTxRef);
+    this.log('[payment.pending.resolve]', 'clientTxRef=', clientTxRef, 'info=', info);
     return true;
   }
 
@@ -682,16 +693,28 @@ export class PaymentChannelHttpClient {
     clearTimeout(pending.timeoutId);
     pending.reject(err);
     this.clientState.pendingPayments?.delete(clientTxRef);
+    this.log('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
     return true;
   }
 
   private resolveAllPendingAsFree(): void {
     if (!this.clientState.pendingPayments) return;
+    const keys: string[] = [];
     for (const [key, pending] of this.clientState.pendingPayments.entries()) {
       clearTimeout(pending.timeoutId);
       pending.resolve(undefined);
       this.clientState.pendingPayments.delete(key);
+      keys.push(key);
     }
+    if (keys.length > 0) {
+      this.log('[payment.pending.free]', 'resolved', keys.length, 'requests as free', 'keys=', keys);
+    }
+  }
+
+  private pendingKeys(): string[] {
+    return this.clientState.pendingPayments
+      ? Array.from(this.clientState.pendingPayments.keys())
+      : [];
   }
 
   /**
@@ -739,6 +762,18 @@ export class PaymentChannelHttpClient {
 
     // Add payment channel header with clientTxRef and return the actual SubRAV used
     const sentedSubRav = await this.addPaymentChannelHeader(headers, clientTxRef);
+
+    this.log(
+      '[request.headers]',
+      method,
+      fullUrl,
+      'clientTxRef=',
+      clientTxRef,
+      'channelId=',
+      this.clientState.channelId,
+      'signedSubRav=',
+      !!sentedSubRav
+    );
 
     return { headers, sentedSubRav };
   }
@@ -810,6 +845,31 @@ export class PaymentChannelHttpClient {
    */
   private async handleResponse(response: Response): Promise<void> {
     const protocol = this.parseProtocolFromHeaders(response);
+    if (protocol.type !== 'none') {
+      this.log(
+        '[response.header]',
+        'type=',
+        protocol.type,
+        'clientTxRef=',
+        (protocol as any).clientTxRef,
+        'status=',
+        response.status
+      );
+    } else {
+      const visibleHeaderNames: string[] = [];
+      try {
+        response.headers.forEach((_, k) => visibleHeaderNames.push(k));
+      } catch {}
+      this.log(
+        '[response.no-header]',
+        'status=',
+        response.status,
+        'pendingKeys=',
+        this.pendingKeys(),
+        'visibleHeaders=',
+        visibleHeaderNames
+      );
+    }
 
     if (protocol.type === 'error') {
       await this.handleProtocolError(protocol);
@@ -837,7 +897,12 @@ export class PaymentChannelHttpClient {
         costUsd?: bigint;
         serviceTxRef?: string;
       } {
-    const paymentHeader = response.headers.get(HttpPaymentCodec.getHeaderName());
+    // Ensure case-insensitive lookup: try exact, then lowercase
+    const headerName = HttpPaymentCodec.getHeaderName();
+    let paymentHeader = response.headers.get(headerName);
+    if (!paymentHeader) {
+      paymentHeader = response.headers.get(headerName.toLowerCase());
+    }
     if (!paymentHeader) return { type: 'none' };
     try {
       const payload = this.parsePaymentHeader(paymentHeader) as any;
