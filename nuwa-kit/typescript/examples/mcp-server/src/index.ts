@@ -62,6 +62,21 @@ server.addTool({
   },
 });
 
+server.addTool({
+	name: "get_did",
+	description: "Get the DID of the user.",
+	parameters: z.object({}),
+	async execute(
+		args: unknown,
+		context: { session: { did: string } | undefined },
+	) {
+		if (!context.session) {
+			return "No session found";
+		}
+		return context.session.did;
+	},
+});
+
 // -----------------------------------------------------------------------------
 // Example prompt – shout (returns upper-cased text)
 // -----------------------------------------------------------------------------
