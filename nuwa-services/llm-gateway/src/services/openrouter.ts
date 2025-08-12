@@ -307,6 +307,10 @@ class OpenRouterService {
         headers,
         responseType: isStream ? "stream" : "json",
       });
+      try {
+        const u = (response.headers || {})['x-usage'];
+        if (u) console.log('[openrouter] x-usage header:', u);
+      } catch {}
 
       return response;
     } catch (error: any) {
@@ -359,7 +363,48 @@ class OpenRouterService {
   // Parse non-stream response
   parseResponse(response: AxiosResponse): any {
     try {
-      return response.data;
+      const data: any = response.data;
+      // Try to augment usage.cost (USD) from provider headers when not present in body
+      const headers = (response.headers || {}) as Record<string, string>;
+
+      const usage = (data && typeof data === 'object' && data.usage) ? { ...data.usage } : {} as any;
+
+      if (usage.cost == null) {
+        // Heuristics for OpenRouter usage header
+        // Common: 'x-usage' header containing JSON: { total_cost: "0.000001234", ... }
+        const usageHeader = (headers['x-usage'] as any) || (headers['X-Usage'] as any);
+        let parsedCost: number | undefined;
+        if (typeof usageHeader === 'string' && usageHeader.length > 0) {
+          try {
+            const parsed = JSON.parse(usageHeader);
+            const raw =
+              parsed?.total_cost ??
+              parsed?.total_cost_usd ??
+              parsed?.cost ??
+              parsed?.usd;
+            if (raw != null) {
+              const n = Number(raw);
+              if (Number.isFinite(n)) parsedCost = n;
+            }
+          } catch {
+            // Fallback: try to extract number from a simple "key=value" string format
+            const m = usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) || usageHeader.match(/cost=([0-9.]+)/i);
+            if (m && m[1]) {
+              const n = Number(m[1]);
+              if (Number.isFinite(n)) parsedCost = n;
+            }
+          }
+        }
+
+        if (parsedCost != null) {
+          usage.cost = parsedCost;
+        }
+      }
+
+      if (Object.keys(usage).length > 0) {
+        return { ...data, usage };
+      }
+      return data;
     } catch (error) {
       console.error("Error parsing OpenRouter response:", error);
       return null;

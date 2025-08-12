@@ -20,6 +20,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { llmRoutes } from "./routes/llm.js";
 import { usageRoutes } from "./routes/usage.js";
+import { initPaymentKitAndRegisterRoutes } from './paymentKit.js';
 
 const app = express();
 
@@ -37,9 +38,17 @@ async function start() {
     app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ extended: true }));
 
-    // 注册路由
-    app.use("/api/v1", llmRoutes);
-    app.use("/usage", usageRoutes);
+    // 支付通道计费开关
+    const enablePaymentKit = (process.env.ENABLE_PAYMENT_KIT || 'false') === 'true';
+
+    if (enablePaymentKit) {
+      // 将现有非流式 LLM 转发逻辑桥接为计费路由
+      await initPaymentKitAndRegisterRoutes(app);
+    } else {
+      // 旧路由（灰度/回滚路径）
+      app.use("/api/v1", llmRoutes);
+      app.use("/usage", usageRoutes);
+    }
 
     // 根路径健康检查
     app.get("/", (req: Request, res: Response) => {
