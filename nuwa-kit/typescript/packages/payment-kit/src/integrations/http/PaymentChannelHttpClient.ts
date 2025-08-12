@@ -230,7 +230,7 @@ export class PaymentChannelHttpClient {
       abort,
     };
   }
- 
+
   /**
    * Convenience methods for common HTTP verbs with payment info
    */
@@ -707,7 +707,14 @@ export class PaymentChannelHttpClient {
       keys.push(key);
     }
     if (keys.length > 0) {
-      this.log('[payment.pending.free]', 'resolved', keys.length, 'requests as free', 'keys=', keys);
+      this.log(
+        '[payment.pending.free]',
+        'resolved',
+        keys.length,
+        'requests as free',
+        'keys=',
+        keys
+      );
     }
   }
 

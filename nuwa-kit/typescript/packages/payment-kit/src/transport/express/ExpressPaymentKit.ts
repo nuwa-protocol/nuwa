@@ -403,7 +403,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             try {
               this.ensureExposeHeader(res);
               const raw = (res.locals as any).usage;
-              const units = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+              const units =
+                typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
               this.middleware.settleBillingSync(billingContext, units, resAdapter);
             } catch (error) {}
           });
@@ -439,9 +440,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private ensureExposeHeader(res: Response) {
     const headerName = HttpPaymentCodec.getHeaderName();
     const existing = res.getHeader('Access-Control-Expose-Headers');
-    const current = (Array.isArray(existing)
-      ? existing.join(',')
-      : (existing as string | undefined) || '')
+    const current = (
+      Array.isArray(existing) ? existing.join(',') : (existing as string | undefined) || ''
+    )
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);

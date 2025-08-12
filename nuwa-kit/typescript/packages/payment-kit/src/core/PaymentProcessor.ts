@@ -299,8 +299,16 @@ export class PaymentProcessor {
 
       // Unified synchronous calculation for both pre-flight and post-flight
       if (rule) {
-        this.log('📊 Processing billing rule:', rule.id, 'paymentRequired:', rule.paymentRequired, 'units:', units);
-        const usageUnits = Number.isFinite(units) && (units as number) >= 0 ? Math.floor(units as number) : 0;
+        this.log(
+          '📊 Processing billing rule:',
+          rule.id,
+          'paymentRequired:',
+          rule.paymentRequired,
+          'units:',
+          units
+        );
+        const usageUnits =
+          Number.isFinite(units) && (units as number) >= 0 ? Math.floor(units as number) : 0;
 
         const strategy = getStrategy(rule);
         const usdCost = strategy.evaluate(pctx, usageUnits);
