@@ -21,12 +21,7 @@ export interface ParagraphProps extends TextProps {
   ellipsis?: boolean | { rows: number };
 }
 
-export const Title: React.FC<TitleProps> = ({ 
-  level = 1, 
-  children, 
-  className, 
-  ...props 
-}) => {
+export const Title: React.FC<TitleProps> = ({ level = 1, children, className, ...props }) => {
   const sizeClasses = {
     1: 'text-4xl font-extrabold tracking-tight',
     2: 'text-3xl font-semibold tracking-tight',
@@ -37,17 +32,41 @@ export const Title: React.FC<TitleProps> = ({
 
   switch (level) {
     case 1:
-      return <h1 className={cn(sizeClasses[1], 'scroll-m-20', className)} {...props}>{children}</h1>;
+      return (
+        <h1 className={cn(sizeClasses[1], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h1>
+      );
     case 2:
-      return <h2 className={cn(sizeClasses[2], 'scroll-m-20', className)} {...props}>{children}</h2>;
+      return (
+        <h2 className={cn(sizeClasses[2], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h2>
+      );
     case 3:
-      return <h3 className={cn(sizeClasses[3], 'scroll-m-20', className)} {...props}>{children}</h3>;
+      return (
+        <h3 className={cn(sizeClasses[3], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h3>
+      );
     case 4:
-      return <h4 className={cn(sizeClasses[4], 'scroll-m-20', className)} {...props}>{children}</h4>;
+      return (
+        <h4 className={cn(sizeClasses[4], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h4>
+      );
     case 5:
-      return <h5 className={cn(sizeClasses[5], 'scroll-m-20', className)} {...props}>{children}</h5>;
+      return (
+        <h5 className={cn(sizeClasses[5], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h5>
+      );
     default:
-      return <h1 className={cn(sizeClasses[1], 'scroll-m-20', className)} {...props}>{children}</h1>;
+      return (
+        <h1 className={cn(sizeClasses[1], 'scroll-m-20', className)} {...props}>
+          {children}
+        </h1>
+      );
   }
 };
 
@@ -75,18 +94,17 @@ export const Text: React.FC<TextProps> = ({
   };
 
   return (
-    <span
-      className={cn(
-        typeClasses[type],
-        strong && 'font-semibold',
-        className
+    <span className={cn(typeClasses[type], strong && 'font-semibold', className)} {...props}>
+      {code ? (
+        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
+          {children}
+        </code>
+      ) : (
+        children
       )}
-      {...props}
-    >
-      {code ? <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">{children}</code> : children}
       {copyable && (
-        <button 
-          onClick={handleCopy} 
+        <button
+          onClick={handleCopy}
           className="ml-1.5 inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-foreground"
           aria-label="Copy"
         >
@@ -115,17 +133,15 @@ export const Paragraph: React.FC<ParagraphProps> = ({
   className,
   ...props
 }) => {
-  const ellipsisClasses = typeof ellipsis === 'object' 
-    ? `line-clamp-${ellipsis.rows}` 
-    : ellipsis 
-      ? 'text-ellipsis overflow-hidden whitespace-nowrap' 
-      : '';
+  const ellipsisClasses =
+    typeof ellipsis === 'object'
+      ? `line-clamp-${ellipsis.rows}`
+      : ellipsis
+        ? 'text-ellipsis overflow-hidden whitespace-nowrap'
+        : '';
 
   return (
-    <p
-      className={cn('leading-7', ellipsisClasses, className)}
-      {...props}
-    >
+    <p className={cn('leading-7', ellipsisClasses, className)} {...props}>
       <Text {...props}>{children}</Text>
     </p>
   );
@@ -135,4 +151,4 @@ export const Typography = {
   Title,
   Text,
   Paragraph,
-}; 
+};

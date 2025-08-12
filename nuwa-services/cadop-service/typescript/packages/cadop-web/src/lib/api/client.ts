@@ -162,7 +162,6 @@ export class CustodianAPIClient {
   }): Promise<APIResponse<AgentDIDCreationStatus>> {
     return this.apiClient.post('/api/custodian/mint', params);
   }
-
 }
 
 export const apiClient = APIClient.getInstance();

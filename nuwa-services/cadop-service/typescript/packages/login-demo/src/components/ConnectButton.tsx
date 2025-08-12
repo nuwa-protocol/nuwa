@@ -26,12 +26,8 @@ export function ConnectButton({ onConnecting, onError }: ConnectButtonProps) {
   };
 
   return (
-    <button 
-      onClick={handleConnect} 
-      disabled={isLoading}
-      className="connect-button"
-    >
+    <button onClick={handleConnect} disabled={isLoading} className="connect-button">
       {isLoading ? 'Connecting...' : 'Connect with Nuwa Agent'}
     </button>
   );
-} 
+}

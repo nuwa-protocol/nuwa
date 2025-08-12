@@ -4,13 +4,14 @@
 > Focused on browser-side TypeScript / JavaScript integration with **crypto.subtle**.
 
 > A companion file, **`webauthn_debug.html`**, lives in the same directory.  
-> Open it over `https://` or `http://localhost` and you will:  
-> 1. Register a new Passkey on the current origin.  
+> Open it over `https://` or `http://localhost` and you will:
+>
+> 1. Register a new Passkey on the current origin.
 > 2. Obtain an assertion and verify it three ways on-page:  
->    • WebCrypto + **raw** signature (expected ✅)  
->    • WebCrypto + **DER** signature (may ❌)  
->    • Noble `p256.verify` (expected ✅)  
-> Use this minimal repro whenever you need to demonstrate or debug browser discrepancies.
+>     • WebCrypto + **raw** signature (expected ✅)  
+>     • WebCrypto + **DER** signature (may ❌)  
+>     • Noble `p256.verify` (expected ✅)  
+>    Use this minimal repro whenever you need to demonstrate or debug browser discrepancies.
 
 ### Quick Start (local)
 
@@ -24,17 +25,17 @@ npx http-server -p 8080 | cat
 
 ## 1. Public-Key Formats in the WebAuthn Pipeline
 
-| Stage | Byte-level format | Description |
-|-------|------------------|-------------|
-| Registration (`navigator.credentials.create`) | **SPKI** (`SubjectPublicKeyInfo`) | Returned by `AuthenticatorAttestationResponse.getPublicKey()` |
-| Original container | **COSE_Key** (CBOR Map) | If you parse `attestationObject.authData`, you get a COSE map; labels `-2/-3` hold X/Y. |
-| Runtime verification | **65-byte Uncompressed** → `0x04‖X32‖Y32`<br/>or **33-byte Compressed** → `0x02/0x03‖X32` | 65-byte form is accepted by noble / OpenSSL / `crypto.subtle` (`'raw'`); noble also accepts 33-byte. |
+| Stage                                         | Byte-level format                                                                         | Description                                                                                          |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Registration (`navigator.credentials.create`) | **SPKI** (`SubjectPublicKeyInfo`)                                                         | Returned by `AuthenticatorAttestationResponse.getPublicKey()`                                        |
+| Original container                            | **COSE_Key** (CBOR Map)                                                                   | If you parse `attestationObject.authData`, you get a COSE map; labels `-2/-3` hold X/Y.              |
+| Runtime verification                          | **65-byte Uncompressed** → `0x04‖X32‖Y32`<br/>or **33-byte Compressed** → `0x02/0x03‖X32` | 65-byte form is accepted by noble / OpenSSL / `crypto.subtle` (`'raw'`); noble also accepts 33-byte. |
 
 > **Extract 65-byte key from SPKI**
 >
 > ```ts
 > const spki = new Uint8Array(getPublicKey());
-> const idx = spki.indexOf(0x04);      // first byte of uncompressed key
+> const idx = spki.indexOf(0x04); // first byte of uncompressed key
 > const pubU = spki.slice(idx, idx + 65); // 65 bytes
 > ```
 
@@ -49,6 +50,7 @@ Browsers return **DER-encoded ECDSA** in `AuthenticatorAssertionResponse.signatu
 ```
 
 Common pitfalls:
+
 1. If `S` is high (> n/2) or starts with a leading `0x00`, some implementations mark it "non-canonical" → `verify` returns `false`.
 2. Different browsers perform slightly different DER validation, causing cross-browser discrepancies.
 
@@ -67,15 +69,15 @@ const sigRaw = p256.Signature.fromDER(sigDER).toCompactRawBytes(); // Uint8Array
 
 ### 3.1 `importKey`
 
-| format | keyData | Notes |
-|--------|---------|-------|
-| `'jwk'` | { kty:'EC', crv:'P-256', x, y } | x/y are **Base64URL** (no padding) |
+| format  | keyData                           | Notes                              |
+| ------- | --------------------------------- | ---------------------------------- |
+| `'jwk'` | { kty:'EC', crv:'P-256', x, y }   | x/y are **Base64URL** (no padding) |
 | `'raw'` | 65-byte uncompressed (`0x04‖X‖Y`) | Simple; no JWK conversion required |
 
 ```ts
 const key = await crypto.subtle.importKey(
-  'raw',                      // or 'jwk'
-  pubU,                       // Uint8Array(65)
+  'raw', // or 'jwk'
+  pubU, // Uint8Array(65)
   { name: 'ECDSA', namedCurve: 'P-256' },
   false,
   ['verify']
@@ -84,10 +86,10 @@ const key = await crypto.subtle.importKey(
 
 ### 3.2 `verify`
 
-| Signature given to `verify` | Compatibility | Recommendation |
-|-----------------------------|---------------|----------------|
-| DER (default) | Fragile — some signatures return `false` | ❌ Avoid |
-| **raw (r32‖s32)** | Works in all major browsers | ✅ Preferred |
+| Signature given to `verify` | Compatibility                            | Recommendation |
+| --------------------------- | ---------------------------------------- | -------------- |
+| DER (default)               | Fragile — some signatures return `false` | ❌ Avoid       |
+| **raw (r32‖s32)**           | Works in all major browsers              | ✅ Preferred   |
 
 > **Best practice**: Always convert DER → raw before calling `verify`.
 >
@@ -95,8 +97,8 @@ const key = await crypto.subtle.importKey(
 > const ok = await crypto.subtle.verify(
 >   { name: 'ECDSA', hash: 'SHA-256' },
 >   key,
->   sigRaw,            // 64 bytes
->   message,           // authenticatorData ‖ SHA-256(clientDataJSON)
+>   sigRaw, // 64 bytes
+>   message // authenticatorData ‖ SHA-256(clientDataJSON)
 > );
 > ```
 
@@ -136,28 +138,22 @@ const key = await crypto.subtle.importKey(
 const sigRaw = p256.Signature.fromDER(sigDER).toCompactRawBytes();
 
 // 4. Verify
-const ok = await crypto.subtle.verify(
-  { name: 'ECDSA', hash: 'SHA-256' },
-  key,
-  sigRaw,
-  msg,
-);
+const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, sigRaw, msg);
 ```
 
 ---
 
 ## 6. Quick Debug Checklist
 
-1. **Use raw signatures first** — avoids DER parsing bugs.  
-2. **Public-key pipeline**: `getPublicKey()` → SPKI → locate `0x04` → 65-byte uncompressed.  
-3. noble is the lightest "source of truth" in browsers; if `verify` fails, cross-check with noble.  
-4. If `getPublicKey()` is unsupported, fall back to parsing `attestationObject.authData` (COSE_Key).  
-5. Whether you import as JWK or `'raw'`, end result is the same; `'raw'` is simpler.  
+1. **Use raw signatures first** — avoids DER parsing bugs.
+2. **Public-key pipeline**: `getPublicKey()` → SPKI → locate `0x04` → 65-byte uncompressed.
+3. noble is the lightest "source of truth" in browsers; if `verify` fails, cross-check with noble.
+4. If `getPublicKey()` is unsupported, fall back to parsing `attestationObject.authData` (COSE_Key).
+5. Whether you import as JWK or `'raw'`, end result is the same; `'raw'` is simpler.
 
 ---
 
 ## 7. References
 
-* FIDO Dev Discussion: *Webauthn verify signature using crypto.subtle*  – multiple developers confirmed the same issue <https://groups.google.com/a/fidoalliance.org/g/fido-dev/c/kkZWPBhUFKk>
-* Phil Holden gist failed example  – data is correct but WebCrypto still returns false <https://gist.github.com/philholden/50120652bfe0498958fd5926694ba354>
-
+- FIDO Dev Discussion: _Webauthn verify signature using crypto.subtle_ – multiple developers confirmed the same issue <https://groups.google.com/a/fidoalliance.org/g/fido-dev/c/kkZWPBhUFKk>
+- Phil Holden gist failed example – data is correct but WebCrypto still returns false <https://gist.github.com/philholden/50120652bfe0498958fd5926694ba354>

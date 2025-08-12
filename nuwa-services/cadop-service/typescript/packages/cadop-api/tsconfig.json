@@ -11,9 +11,7 @@
     "module": "Node16",
     "moduleResolution": "Node16"
   },
-  "references": [
-    { "path": "../cadop-shared" }
-  ],
+  "references": [{ "path": "../cadop-shared" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
-} 
+}

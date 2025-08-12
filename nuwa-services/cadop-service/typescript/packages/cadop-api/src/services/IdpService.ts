@@ -67,7 +67,7 @@ export class IdpService {
       userDid,
       nonce,
       this.config.cadopDid,
-      this.config.signingKey,
+      this.config.signingKey
     );
     return { idToken };
   }

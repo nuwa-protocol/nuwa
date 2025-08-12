@@ -23,38 +23,46 @@ export function Modal({
   className,
 }: ModalProps) {
   // Convert width to class or style
-  const widthClass = typeof width === 'string' ? 
-    (width === 'sm' ? 'max-w-sm' : 
-     width === 'md' ? 'max-w-md' : 
-     width === 'lg' ? 'max-w-lg' : 
-     width === 'xl' ? 'max-w-xl' : 
-     width === '2xl' ? 'max-w-2xl' : 
-     width === '3xl' ? 'max-w-3xl' : 
-     width === '4xl' ? 'max-w-4xl' : 
-     width === '5xl' ? 'max-w-5xl' : 
-     width === '6xl' ? 'max-w-6xl' : 
-     width === '7xl' ? 'max-w-7xl' : 'max-w-lg') : '';
+  const widthClass =
+    typeof width === 'string'
+      ? width === 'sm'
+        ? 'max-w-sm'
+        : width === 'md'
+          ? 'max-w-md'
+          : width === 'lg'
+            ? 'max-w-lg'
+            : width === 'xl'
+              ? 'max-w-xl'
+              : width === '2xl'
+                ? 'max-w-2xl'
+                : width === '3xl'
+                  ? 'max-w-3xl'
+                  : width === '4xl'
+                    ? 'max-w-4xl'
+                    : width === '5xl'
+                      ? 'max-w-5xl'
+                      : width === '6xl'
+                        ? 'max-w-6xl'
+                        : width === '7xl'
+                          ? 'max-w-7xl'
+                          : 'max-w-lg'
+      : '';
 
   const widthStyle = typeof width === 'number' ? { maxWidth: `${width}px` } : {};
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent 
-        className={cn(widthClass, className)}
-        style={widthStyle}
-      >
+    <Dialog open={open} onOpenChange={open => !open && onClose()}>
+      <DialogContent className={cn(widthClass, className)} style={widthStyle}>
         {title && (
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
         )}
-        
+
         <div className="py-2">{children}</div>
-        
-        {footer && (
-          <DialogFooter>{footer}</DialogFooter>
-        )}
+
+        {footer && <DialogFooter>{footer}</DialogFooter>}
       </DialogContent>
     </Dialog>
   );
-} 
+}

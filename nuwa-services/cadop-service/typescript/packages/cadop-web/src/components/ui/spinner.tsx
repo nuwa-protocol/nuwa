@@ -14,33 +14,25 @@ export function Spinner({ size = 'default', className }: SpinnerProps) {
     large: 'h-10 w-10',
   };
 
-  return (
-    <Loader2 
-      className={cn(
-        'animate-spin text-primary',
-        sizeClass[size],
-        className
-      )}
-    />
-  );
+  return <Loader2 className={cn('animate-spin text-primary', sizeClass[size], className)} />;
 }
 
-export function SpinnerContainer({ 
-  children, 
-  loading, 
+export function SpinnerContainer({
+  children,
+  loading,
   size = 'default',
-  className 
-}: { 
+  className,
+}: {
   children?: React.ReactNode;
   loading: boolean;
   size?: 'small' | 'default' | 'large';
   className?: string;
 }) {
   if (!loading) return <>{children}</>;
-  
+
   return (
     <div className={cn('flex justify-center items-center py-4', className)}>
       <Spinner size={size} />
     </div>
   );
-} 
+}

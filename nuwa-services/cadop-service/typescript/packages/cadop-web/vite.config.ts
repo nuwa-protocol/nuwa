@@ -14,8 +14,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         headers: {
-          'X-Client-Type': 'cadop-web'
-        }
+          'X-Client-Type': 'cadop-web',
+        },
       },
     },
     headers: {
@@ -23,8 +23,8 @@ export default defineConfig({
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
-    }
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    },
   },
   build: {
     outDir: 'dist/public',
@@ -34,23 +34,27 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select']
-        }
-      }
-    }
+          'ui-vendor': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+          ],
+        },
+      },
+    },
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src')
+      '@': path.resolve(__dirname, 'src'),
     },
-    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
   },
   optimizeDeps: {
     esbuildOptions: {
-      target: 'es2020'
-    }
+      target: 'es2020',
+    },
   },
   esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' }
-  }
-}); 
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+  },
+});

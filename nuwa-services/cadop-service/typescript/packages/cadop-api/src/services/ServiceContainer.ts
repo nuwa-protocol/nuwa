@@ -69,7 +69,10 @@ export class ServiceContainer {
       logger.info('Initializing CadopKit...');
       const keyManager = KeyManager.createEmpty(this.serviceConfig.cadopDid);
       await keyManager.importRoochKeyPair('account-key', keypair);
-      const cadopKit = await CadopIdentityKit.fromServiceDID(this.serviceConfig.cadopDid, keyManager);
+      const cadopKit = await CadopIdentityKit.fromServiceDID(
+        this.serviceConfig.cadopDid,
+        keyManager
+      );
 
       // Initialize Custodian service
       logger.info('Initializing Custodian service...');

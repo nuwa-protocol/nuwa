@@ -65,7 +65,7 @@ export function Tag({
         <button
           type="button"
           className="ml-1 -mr-1 h-3.5 w-3.5 rounded-full hover:bg-gray-400/20 flex items-center justify-center"
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation();
             onClose?.();
           }}
@@ -84,4 +84,4 @@ export function Tag({
       )}
     </span>
   );
-} 
+}

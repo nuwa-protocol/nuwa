@@ -1,4 +1,10 @@
-import { KeyType, CryptoUtils, MultibaseCodec, KeyManager, MemoryKeyStore } from '@nuwa-ai/identity-kit';
+import {
+  KeyType,
+  CryptoUtils,
+  MultibaseCodec,
+  KeyManager,
+  MemoryKeyStore,
+} from '@nuwa-ai/identity-kit';
 
 export interface GeneratedKeyInfo {
   storedKeyString: string;
@@ -15,14 +21,14 @@ export interface GeneratedKeyInfo {
  * @returns Generated key information
  */
 export async function generateKeyPair(
-  did: string, 
+  did: string,
   keyType: KeyType = KeyType.ED25519,
   fragment?: string
 ): Promise<GeneratedKeyInfo> {
   try {
     // Generate the key pair using CryptoUtils
     const { privateKey, publicKey } = await CryptoUtils.generateKeyPair(keyType);
-    
+
     // Create a temporary KeyManager to handle key storage and export
     const keyFragment = fragment || `key-${Date.now()}`;
     const { keyManager, keyId } = await KeyManager.createWithKeyPair(
@@ -32,21 +38,23 @@ export async function generateKeyPair(
       keyType,
       new MemoryKeyStore() // Use memory store for temporary key handling
     );
-    
+
     // Export the key as a string for server environment variable
     const storedKeyString = await keyManager.exportKeyToString(keyId);
-    
+
     // Encode public key for DID verification method
     const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKey);
-    
+
     return {
       storedKeyString,
       publicKeyMultibase,
       idFragment: keyFragment,
-      keyType
+      keyType,
     };
   } catch (error) {
-    throw new Error(`Failed to generate key pair: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to generate key pair: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -56,10 +64,13 @@ export async function generateKeyPair(
  * @param expectedKeyType The expected key type
  * @returns True if valid, false otherwise
  */
-export function validatePublicKeyFormat(publicKeyMultibase: string, expectedKeyType: KeyType): boolean {
+export function validatePublicKeyFormat(
+  publicKeyMultibase: string,
+  expectedKeyType: KeyType
+): boolean {
   try {
     const decoded = MultibaseCodec.decodeBase58btc(publicKeyMultibase);
-    
+
     // Basic length validation based on key type
     switch (expectedKeyType) {
       case KeyType.ED25519:

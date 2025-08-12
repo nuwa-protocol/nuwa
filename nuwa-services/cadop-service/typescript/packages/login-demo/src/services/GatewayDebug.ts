@@ -37,7 +37,7 @@ export async function sendSignedRequest(
   const url = new URL(options.path, gatewayBaseUrl).toString();
 
   const headerObj: Record<string, string> = {
-    'Authorization': authHeader,
+    Authorization: authHeader,
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
@@ -53,6 +53,8 @@ export async function sendSignedRequest(
   const res = await fetch(url, fetchOptions);
   const text = await res.text();
   const headersObj: Record<string, string> = {};
-  res.headers.forEach((v, k) => { headersObj[k] = v; });
+  res.headers.forEach((v, k) => {
+    headersObj[k] = v;
+  });
   return { status: res.status, headers: headersObj, body: text };
-} 
+}

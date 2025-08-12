@@ -10,12 +10,12 @@ interface CopyButtonProps {
   children?: React.ReactNode;
 }
 
-export function CopyButton({ 
-  value, 
-  variant = 'outline', 
-  size = 'sm', 
+export function CopyButton({
+  value,
+  variant = 'outline',
+  size = 'sm',
   className,
-  children 
+  children,
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 

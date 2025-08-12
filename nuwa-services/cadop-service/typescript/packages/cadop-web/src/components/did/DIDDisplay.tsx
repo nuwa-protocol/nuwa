@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy} from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { Button, Badge, Card, CardContent } from '@/components/ui';
 
 interface DIDDisplayProps {
@@ -51,7 +51,6 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
     }
   };
 
-
   return (
     <Card>
       <CardContent className="p-4 space-y-4">
@@ -72,20 +71,22 @@ export const DIDDisplay: React.FC<DIDDisplayProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             {showCopy && (
-              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(did)} className="h-8 w-8 p-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard(did)}
+                className="h-8 w-8 p-0"
+              >
                 <Copy className="h-4 w-4" />
                 <span className="sr-only">Copy DID</span>
               </Button>
             )}
-            {copyFeedback === 'success' && (
-              <span className="text-xs text-green-600">Copied!</span>
-            )}
+            {copyFeedback === 'success' && <span className="text-xs text-green-600">Copied!</span>}
             {copyFeedback === 'error' && (
               <span className="text-xs text-red-600">Failed to copy</span>
             )}
           </div>
         </div>
-
       </CardContent>
     </Card>
   );

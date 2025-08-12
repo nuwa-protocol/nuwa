@@ -2,18 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { 
-  Button, 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Alert,
   Tooltip,
   TooltipProvider,
   TooltipTrigger,
   TooltipContent,
-  Spinner 
+  Spinner,
 } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
@@ -48,9 +48,7 @@ export function DashboardPage() {
                   <TooltipTrigger asChild>
                     <Info className="h-4 w-4 text-gray-400" />
                   </TooltipTrigger>
-                  <TooltipContent>
-                    {t('dashboard.identity.agentDidTooltip')}
-                  </TooltipContent>
+                  <TooltipContent>{t('dashboard.identity.agentDidTooltip')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -66,9 +64,7 @@ export function DashboardPage() {
                           <TooltipTrigger asChild>
                             <Info className="ml-1 h-4 w-4 text-gray-400" />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {t('dashboard.identity.userDidTooltip')}
-                          </TooltipContent>
+                          <TooltipContent>{t('dashboard.identity.userDidTooltip')}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </dt>
@@ -86,10 +82,7 @@ export function DashboardPage() {
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">{t('dashboard.agent.title')}</h2>
-              <Button
-                onClick={() => navigate('/create-agent-did')}
-                className="flex items-center"
-              >
+              <Button onClick={() => navigate('/create-agent-did')} className="flex items-center">
                 <PlusCircle className="h-4 w-4 mr-2" />
                 {t('dashboard.agent.createNew')}
               </Button>
@@ -117,11 +110,7 @@ export function DashboardPage() {
                         </div>
                         <DIDDisplay did={did} />
                       </div>
-                      <Button 
-                        onClick={() => navigate(`/agent/${did}`)} 
-                        variant="outline" 
-                        size="sm"
-                      >
+                      <Button onClick={() => navigate(`/agent/${did}`)} variant="outline" size="sm">
                         {t('dashboard.agent.manage')}
                       </Button>
                     </div>
@@ -131,10 +120,7 @@ export function DashboardPage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>{t('dashboard.agent.noAgents')}</p>
-                <Button
-                  onClick={() => navigate('/create-agent-did')}
-                  className="mt-4"
-                >
+                <Button onClick={() => navigate('/create-agent-did')} className="mt-4">
                   {t('dashboard.agent.createFirst')}
                 </Button>
               </div>

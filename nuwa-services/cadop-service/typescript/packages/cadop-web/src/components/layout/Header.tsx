@@ -1,6 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui';
+import {
+  Button,
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthContext';
 
 interface HeaderProps {

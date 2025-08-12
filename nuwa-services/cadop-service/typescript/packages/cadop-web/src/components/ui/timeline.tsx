@@ -16,16 +16,11 @@ export interface TimelineProps {
 export const TimelineItem = React.forwardRef<HTMLDivElement, TimelineItemProps>(
   ({ dot, children, className, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn('relative pl-8 pb-8 last:pb-0', className)}
-        {...props}
-      >
+      <div ref={ref} className={cn('relative pl-8 pb-8 last:pb-0', className)} {...props}>
         <div className="absolute left-0 top-1.5 flex items-center justify-center">
           {dot || <div className="h-3 w-3 rounded-full bg-primary" />}
         </div>
-        <div className="absolute left-1.5 top-6 bottom-0 w-[1px] bg-border last:hidden">
-        </div>
+        <div className="absolute left-1.5 top-6 bottom-0 w-[1px] bg-border last:hidden"></div>
         <div>{children}</div>
       </div>
     );
@@ -50,4 +45,4 @@ export const Timeline = React.forwardRef<HTMLDivElement, TimelineProps>(
   }
 );
 
-Timeline.displayName = 'Timeline'; 
+Timeline.displayName = 'Timeline';

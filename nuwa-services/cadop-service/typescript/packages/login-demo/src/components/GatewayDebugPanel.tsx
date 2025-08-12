@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import {
-  getGatewayUrl,
-  setGatewayUrl,
-  sendSignedRequest,
-} from '../services/GatewayDebug';
+import { getGatewayUrl, setGatewayUrl, sendSignedRequest } from '../services/GatewayDebug';
 import { useAuth } from '../App';
 
 export function GatewayDebugPanel() {
@@ -48,7 +44,10 @@ export function GatewayDebugPanel() {
         const parseIfJsonString = (value: any) => {
           if (typeof value !== 'string') return value;
           const trimmed = value.trim();
-          if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))){
+          if (
+            (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))
+          ) {
             try {
               return JSON.parse(trimmed);
             } catch {
@@ -101,7 +100,9 @@ export function GatewayDebugPanel() {
           onChange={e => setGatewayUrlState(e.target.value)}
           style={{ width: '60%' }}
         />
-        <button onClick={handleSaveGateway} style={{ marginLeft: '8px' }}>Save</button>
+        <button onClick={handleSaveGateway} style={{ marginLeft: '8px' }}>
+          Save
+        </button>
       </div>
 
       <div className="gateway-request" style={{ marginBottom: '1rem' }}>
@@ -145,10 +146,12 @@ export function GatewayDebugPanel() {
       )}
 
       {responseText && (
-        <pre style={{ marginTop: '1rem', background: '#f5f5f5', padding: '1rem', overflowX: 'auto' }}>
+        <pre
+          style={{ marginTop: '1rem', background: '#f5f5f5', padding: '1rem', overflowX: 'auto' }}
+        >
           {responseText}
         </pre>
       )}
     </div>
   );
-} 
+}

@@ -27,22 +27,22 @@
 ```jsonc
 {
   "version": 1,
-  "currentUserDid": "did:key:z6Mk…",   // ← 当前登录用户，无则视为未登录
+  "currentUserDid": "did:key:z6Mk…", // ← 当前登录用户，无则视为未登录
   "users": {
     "did:key:z6Mk…": {
       "credentials": [
-        "credId-1",            // WebAuthn credentialId
-        "credId-2"
+        "credId-1", // WebAuthn credentialId
+        "credId-2",
       ],
       "agents": [
-        "did:rooch:abc",       // agentDID
-        "did:rooch:def"
+        "did:rooch:abc", // agentDID
+        "did:rooch:def",
       ],
-      "createdAt": 1690000000,   // Unix epoch (秒)
-      "updatedAt": 1690001234
-    }
+      "createdAt": 1690000000, // Unix epoch (秒)
+      "updatedAt": 1690001234,
+    },
     // … 其他 userDID
-  }
+  },
 }
 ```
 
@@ -50,9 +50,9 @@
 
 ### 补充说明：为什么 `credentials` 仍使用数组？
 
-* WebAuthn 规范并未保证"同一把公钥 ⇔ 唯一 credentialId"。平台验证器可能在再次注册时生成新的 `credentialId`，或在系统重置、设备同步后出现不同的 `credentialId`。
-* 用户可能在多台设备导入同一 Passkey，或同时拥有平台 Passkey 与外接 FIDO2 Token。
-* 因此保留 `credentials: string[]` 可兼容上述场景；业务层若目前只需第一项，可在 `UserStore.listCredentials(userDid)[0]` 取用即可。
+- WebAuthn 规范并未保证"同一把公钥 ⇔ 唯一 credentialId"。平台验证器可能在再次注册时生成新的 `credentialId`，或在系统重置、设备同步后出现不同的 `credentialId`。
+- 用户可能在多台设备导入同一 Passkey，或同时拥有平台 Passkey 与外接 FIDO2 Token。
+- 因此保留 `credentials: string[]` 可兼容上述场景；业务层若目前只需第一项，可在 `UserStore.listCredentials(userDid)[0]` 取用即可。
 
 ---
 
@@ -65,9 +65,9 @@
 
 推荐的预防措施：
 
-* 提供「导出身份数据」功能，把 `nuwa:v1` JSON 手动保存；
-* 或申请 `navigator.storage.persist()` 以降低被浏览器垃圾回收的概率；
-* 若用户确实丢失数据，只能重新注册 Passkey，生成新的 `userDid` 并重新创建 Agent。
+- 提供「导出身份数据」功能，把 `nuwa:v1` JSON 手动保存；
+- 或申请 `navigator.storage.persist()` 以降低被浏览器垃圾回收的概率；
+- 若用户确实丢失数据，只能重新注册 Passkey，生成新的 `userDid` 并重新创建 Agent。
 
 ---
 
@@ -84,6 +84,7 @@ interface StorageAdapter {
   clear(): void;
 }
 ```
+
 - 默认实现直接调用 `window.localStorage`。
 - 将来可替换为 IndexedDB、加密存储等。
 
@@ -98,7 +99,7 @@ interface NuwaState {
 
 interface UserEntry {
   credentials: string[]; // credentialId list
-  agents: string[];      // agentDID list
+  agents: string[]; // agentDID list
   createdAt: number;
   updatedAt: number;
 }
@@ -175,4 +176,4 @@ AuthStore.clearCurrentUser();
 
 ---
 
-如需修改请在 PR 中更新此文档。 
+如需修改请在 PR 中更新此文档。

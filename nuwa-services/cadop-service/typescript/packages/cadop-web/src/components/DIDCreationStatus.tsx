@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   Progress,
   Button,
@@ -10,15 +10,9 @@ import {
   Space,
   Tag,
   Timeline,
-  TimelineItem
+  TimelineItem,
 } from '@/components/ui';
-import {
-  Loader,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  RotateCcw
-} from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, Clock, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface DIDStatus {

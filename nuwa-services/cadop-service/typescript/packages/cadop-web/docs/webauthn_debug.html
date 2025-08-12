@@ -1,12 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <title>WebAuthn × WebCrypto Verification Repro</title>
     <style>
-      body { font-family: sans-serif; padding: 20px; }
-      button { margin-right: 12px; padding: 6px 12px; }
-      pre { margin-top: 20px; background: #f5f5f5; padding: 12px; border-radius: 4px; }
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      button {
+        margin-right: 12px;
+        padding: 6px 12px;
+      }
+      pre {
+        margin-top: 20px;
+        background: #f5f5f5;
+        padding: 12px;
+        border-radius: 4px;
+      }
     </style>
   </head>
   <body>
@@ -42,7 +53,7 @@
 
       let credentialId; // ArrayBuffer
       /** @type {Uint8Array|undefined} */
-      let publicKeyU;   // 65-byte uncompressed key (0x04 | X | Y)
+      let publicKeyU; // 65-byte uncompressed key (0x04 | X | Y)
 
       // ---------- registration ----------
       $('register').addEventListener('click', async () => {
@@ -105,18 +116,34 @@
           msg.set(clientHash, authData.length);
 
           // ---- WebCrypto verification ----
-          const key = await crypto.subtle.importKey('raw', publicKeyU, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+          const key = await crypto.subtle.importKey(
+            'raw',
+            publicKeyU,
+            { name: 'ECDSA', namedCurve: 'P-256' },
+            false,
+            ['verify']
+          );
           const sigDER = new Uint8Array(res.signature);
           const sigRaw = p256.Signature.fromDER(sigDER).toCompactRawBytes();
 
-          const okWebCryptoRaw = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, sigRaw, msg);
+          const okWebCryptoRaw = await crypto.subtle.verify(
+            { name: 'ECDSA', hash: 'SHA-256' },
+            key,
+            sigRaw,
+            msg
+          );
           log('WebCrypto.verify (raw) =>', okWebCryptoRaw);
-          
-          const okWebCryptoDER = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, sigDER, msg);
+
+          const okWebCryptoDER = await crypto.subtle.verify(
+            { name: 'ECDSA', hash: 'SHA-256' },
+            key,
+            sigDER,
+            msg
+          );
           log('WebCrypto.verify (DER) =>', okWebCryptoDER);
 
           // ---- Noble verification ----
-          
+
           const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', msg));
           const okNoble = p256.verify(sigRaw, digest, publicKeyU);
           log('noble p256.verify =>', okNoble);
@@ -127,4 +154,4 @@
       });
     </script>
   </body>
-</html> 
+</html>

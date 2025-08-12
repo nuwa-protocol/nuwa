@@ -51,7 +51,7 @@ export function Home() {
   // Helper function to safely convert unknown to string
   const formatSignature = (value: unknown): string => {
     if (value === null || value === undefined) return '';
-    
+
     if (typeof value === 'object') {
       try {
         return JSON.stringify(value, null, 2);
@@ -59,13 +59,13 @@ export function Home() {
         return String(value);
       }
     }
-    
+
     return String(value);
   };
 
-  const handleDisconnect = () => {   
+  const handleDisconnect = () => {
     logout();
-  
+
     setSignatureObj(null);
     setSignatureStr(null);
     setVerifyResult(null);
@@ -103,7 +103,8 @@ export function Home() {
           </div>
           <div className="domain-hint">
             <small>
-              Use full URL（such as http://localhost:3000） or just domain（such as test-id.nuwa.dev）
+              Use full URL（such as http://localhost:3000） or just domain（such as
+              test-id.nuwa.dev）
             </small>
           </div>
         </div>
@@ -116,8 +117,12 @@ export function Home() {
 
           {state.isConnected && state.agentDid && (
             <div className="key-info">
-              <p><strong>Agent DID:</strong> {state.agentDid}</p>
-              <p><strong>Key ID:</strong> {state.keyId}</p>
+              <p>
+                <strong>Agent DID:</strong> {state.agentDid}
+              </p>
+              <p>
+                <strong>Key ID:</strong> {state.keyId}
+              </p>
               <button onClick={handleDisconnect} className="disconnect-button">
                 Disconnect
               </button>
@@ -132,21 +137,13 @@ export function Home() {
               <p>
                 Click the button below to generate a new key and authorize it with your Nuwa Agent.
               </p>
-              <ConnectButton 
-                onConnecting={handleConnecting}
-                onError={handleError}
-              />
+              <ConnectButton onConnecting={handleConnecting} onError={handleError} />
             </div>
           ) : (
             <div className="login-container">
               <h2>Step 2: Sign a Challenge</h2>
-              <p>
-                Now you can sign a challenge using your authorized key.
-              </p>
-              <SignButton
-                onSignatureCreated={handleSignatureCreated}
-                onError={handleError}
-              />
+              <p>Now you can sign a challenge using your authorized key.</p>
+              <SignButton onSignatureCreated={handleSignatureCreated} onError={handleError} />
             </div>
           )}
         </div>
@@ -155,10 +152,7 @@ export function Home() {
           <div className="signature-container">
             <h2>Signature Result</h2>
             <pre className="signature-output">{signatureStr}</pre>
-            <VerifyButton
-              signature={signatureObj}
-              onVerified={ok => setVerifyResult(ok)}
-            />
+            <VerifyButton signature={signatureObj} onVerified={ok => setVerifyResult(ok)} />
             {verifyResult !== null && (
               <p style={{ marginTop: '8px' }}>
                 Verify Result: {verifyResult ? '✅ Passed' : '❌ Failed'}
@@ -168,21 +162,24 @@ export function Home() {
         )}
 
         {/* Gateway Debug Panel */}
-        {state.isConnected && (
-          <GatewayDebugPanel />
-        )}
+        {state.isConnected && <GatewayDebugPanel />}
       </main>
 
       <footer>
         <p>
           <a href="https://github.com/rooch-network/nuwa" target="_blank" rel="noopener noreferrer">
             Nuwa Project
-          </a> | 
-          <a href="https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/typescript/docs/third_party_login_integration.md" target="_blank" rel="noopener noreferrer">
+          </a>{' '}
+          |
+          <a
+            href="https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/typescript/docs/third_party_login_integration.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Integration Guide
           </a>
         </p>
       </footer>
     </div>
   );
-} 
+}

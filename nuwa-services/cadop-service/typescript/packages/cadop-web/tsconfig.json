@@ -26,10 +26,7 @@
       "@/*": ["src/*"]
     }
   },
-  "references": [
-    { "path": "../cadop-shared" },
-    { "path": "./tsconfig.node.json" }
-  ],
+  "references": [{ "path": "../cadop-shared" }, { "path": "./tsconfig.node.json" }],
   "include": ["src/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
-} 
+}

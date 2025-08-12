@@ -40,7 +40,9 @@ export const Space: React.FC<SpaceProps> = ({
 
   const sizeValue = getSize();
 
-  const childrenArray = React.Children.toArray(children).filter(child => child !== null && child !== undefined);
+  const childrenArray = React.Children.toArray(children).filter(
+    child => child !== null && child !== undefined
+  );
 
   // Apply styles based on direction
   const spaceStyle: React.CSSProperties = {
@@ -68,4 +70,4 @@ export const Space: React.FC<SpaceProps> = ({
   );
 };
 
-export default Space; 
+export default Space;

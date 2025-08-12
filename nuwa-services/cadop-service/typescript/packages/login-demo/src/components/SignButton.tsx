@@ -19,7 +19,7 @@ export function SignButton({ onSignatureCreated, onError }: SignButtonProps) {
         operation: 'login',
         params: {
           domain: window.location.hostname,
-        }
+        },
       };
 
       // Sign the challenge using the hook's sign method
@@ -36,12 +36,8 @@ export function SignButton({ onSignatureCreated, onError }: SignButtonProps) {
   };
 
   return (
-    <button 
-      onClick={handleSign} 
-      disabled={isLoading}
-      className="sign-button"
-    >
+    <button onClick={handleSign} disabled={isLoading} className="sign-button">
       {isLoading ? 'Signing...' : 'Create Signature'}
     </button>
   );
-} 
+}

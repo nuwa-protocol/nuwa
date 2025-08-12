@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { 
-  Button, 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   Alert,
   AlertTitle,
   AlertDescription,
   Modal,
-  Spinner, 
-  SpinnerContainer, 
-  Tag 
+  Spinner,
+  SpinnerContainer,
+  Tag,
 } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
@@ -27,7 +27,7 @@ import {
   FileText,
   RotateCcw,
   Gift,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
@@ -41,12 +41,8 @@ export function AgentDetailPage() {
   const navigate = useNavigate();
   const { userDid, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  
-  const {
-    didService,
-    isLoading: serviceLoading,
-    error: serviceError,
-  } = useDIDService(did);
+
+  const { didService, isLoading: serviceLoading, error: serviceError } = useDIDService(did);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didDocument, setDidDocument] = useState<DIDDocument | null>(null);
@@ -54,7 +50,7 @@ export function AgentDetailPage() {
   const [isController, setIsController] = useState(false);
   // state for delete confirmation modal
   const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
-  
+
   // Tab state
   const [activeTab, setActiveTab] = useState('info');
 
@@ -84,15 +80,15 @@ export function AgentDetailPage() {
       await refetchBalances();
       setHasClaimed(true);
       toast({
-        variant: "success",
-        title: "RGAS Claimed",
+        variant: 'success',
+        title: 'RGAS Claimed',
         description: `Successfully claimed ${Math.floor((data.gas || 5000000000) / 100000000)} RGAS!`,
       });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to claim RGAS';
       toast({
-        variant: "destructive",
-        title: "Claim Failed",
+        variant: 'destructive',
+        title: 'Claim Failed',
         description: errMsg,
       });
       console.error('RGAS claim failed:', err);
@@ -146,14 +142,14 @@ export function AgentDetailPage() {
       const updatedDoc = await didService.getDIDDocument();
       setDidDocument(updatedDoc);
       toast({
-        variant: "default",
+        variant: 'default',
         title: t('agent.removed', { defaultValue: 'Removed' }),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast({
-        variant: "destructive",
-        title: "Error",
+        variant: 'destructive',
+        title: 'Error',
         description: msg,
       });
     } finally {
@@ -249,9 +245,7 @@ export function AgentDetailPage() {
                       >
                         <div className="flex items-center">
                           <span className="font-medium">{bal.symbol}</span>
-                          <span className="ml-2 text-xs text-gray-500">
-                            {bal.name}
-                          </span>
+                          <span className="ml-2 text-xs text-gray-500">{bal.name}</span>
                         </div>
                         <span>{bal.fixedBalance}</span>
                       </div>
@@ -289,9 +283,7 @@ export function AgentDetailPage() {
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center mb-2">
                           <Key className="mr-2 h-4 w-4" />
-                          <span className="font-mono font-bold">
-                            {fragment}
-                          </span>
+                          <span className="font-mono font-bold">{fragment}</span>
                           <span className="ml-2">{method.type}</span>
                           {method.controller === userDid && (
                             <Tag variant="blue" className="ml-2">
@@ -322,7 +314,9 @@ export function AgentDetailPage() {
                               <Tag variant="success">{t('agent.authentication')}</Tag>
                             )}
                             {isAssertionMethod && <Tag variant="blue">{t('agent.assertion')}</Tag>}
-                            {isKeyAgreement && <Tag variant="purple">{t('agent.keyAgreement')}</Tag>}
+                            {isKeyAgreement && (
+                              <Tag variant="purple">{t('agent.keyAgreement')}</Tag>
+                            )}
                             {isCapabilityInvocation && (
                               <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
                             )}
@@ -389,7 +383,6 @@ export function AgentDetailPage() {
             </div>
           )}
         </div>
-
       </div>
 
       <Modal
@@ -413,9 +406,11 @@ export function AgentDetailPage() {
         width="sm"
       >
         <div className="space-y-4">
-          <p>{t('agent.deleteKeyPrompt', {
-            defaultValue: 'Are you sure you want to delete this authentication method?',
-          })}</p>
+          <p>
+            {t('agent.deleteKeyPrompt', {
+              defaultValue: 'Are you sure you want to delete this authentication method?',
+            })}
+          </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleCancelDelete}>
               {t('common.cancel')}

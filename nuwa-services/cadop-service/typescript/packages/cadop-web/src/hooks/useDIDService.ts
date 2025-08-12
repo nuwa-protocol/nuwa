@@ -34,4 +34,4 @@ export function useDIDService(targetDid: string | null | undefined): UseDIDServi
   }, [targetDid, autoCredentialId]);
 
   return { didService, isLoading, error };
-} 
+}

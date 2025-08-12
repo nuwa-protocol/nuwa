@@ -2,11 +2,11 @@
 
 > Status: Draft · 2025-06-20
 
-This document records how the *Nuwa Agent Login Demo* consumes the yet-to-be-published **identity-kit-web** package **from the local monorepo**, and how the UI migrates to the new high-level APIs (`IdentityKitWeb` & `useIdentityKit`).
+This document records how the _Nuwa Agent Login Demo_ consumes the yet-to-be-published **identity-kit-web** package **from the local monorepo**, and how the UI migrates to the new high-level APIs (`IdentityKitWeb` & `useIdentityKit`).
 
 ---
 
-## 1  Local Dependency Setup
+## 1 Local Dependency Setup
 
 Because `identity-kit-web` has not been released to npm you must link it via **file path** .
 
@@ -15,8 +15,8 @@ Because `identity-kit-web` has not been released to npm you must link it via **f
 {
   "dependencies": {
     "@nuwa-ai/identity-kit": "file:../../../../../../nuwa-kit/typescript/packages/nuwa-identity-kit",
-    "@nuwa-ai/identity-kit-web": "file:../../../../../../nuwa-kit/typescript/packages/identity-kit-web"
-  }
+    "@nuwa-ai/identity-kit-web": "file:../../../../../../nuwa-kit/typescript/packages/identity-kit-web",
+  },
 }
 ```
 
@@ -25,7 +25,7 @@ Because `identity-kit-web` has not been released to npm you must link it via **f
 
 ---
 
-## 2  Using the React Hook (recommended)
+## 2 Using the React Hook (recommended)
 
 The easiest way to integrate is to rely on the hook exported by the web-SDK.
 
@@ -34,9 +34,9 @@ import { useIdentityKit } from '@nuwa-ai/identity-kit-web';
 
 export function App() {
   const { state, connect, sign, verify, logout } = useIdentityKit({
-    appName: 'Nuwa Login Demo',        // optional – readable key fragment
+    appName: 'Nuwa Login Demo', // optional – readable key fragment
     cadopDomain: localStorage.getItem('cadop-domain') ?? 'https://test-id.nuwa.dev',
-    storage: 'indexeddb',              // or 'local'
+    storage: 'indexeddb', // or 'local'
   });
 
   /* render UI according to state */
@@ -45,23 +45,23 @@ export function App() {
 
 ### Hook advantages
 
-* Handles SDK initialisation & persistent connection state.
-* Provides imperative helpers (`connect`, `sign`, `verify`, `logout`).
-* Eliminates bespoke `KeyStore`, `SimpleSigner` and Deep-Link helpers.
+- Handles SDK initialisation & persistent connection state.
+- Provides imperative helpers (`connect`, `sign`, `verify`, `logout`).
+- Eliminates bespoke `KeyStore`, `SimpleSigner` and Deep-Link helpers.
 
 ---
 
-## 3  File-by-file Migration
+## 3 File-by-file Migration
 
-| Legacy file | Action | Notes |
-|-------------|--------|-------|
-| `src/services/DeepLink.ts` | **Delete** | replaced by `IdentityKitWeb.connect()` / `.handleCallback()` |
-| `src/services/KeyStore.ts` | **Delete** | browser storage now handled by SDK KeyStore implementations |
-| `src/services/SimpleSigner.ts` | **Delete** | signing handled via SDK / DIDAuth |
-| `src/components/ConnectButton.tsx` | simplify to call `connect()` |
-| `src/components/SignButton.tsx` | call `sign()` instead of local signer |
-| `src/components/VerifyButton.tsx` | call `verify()` |
-| `pages/Callback.tsx` | ~10→3 lines – just invoke `sdk.handleCallback()` |
+| Legacy file                        | Action                                           | Notes                                                        |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| `src/services/DeepLink.ts`         | **Delete**                                       | replaced by `IdentityKitWeb.connect()` / `.handleCallback()` |
+| `src/services/KeyStore.ts`         | **Delete**                                       | browser storage now handled by SDK KeyStore implementations  |
+| `src/services/SimpleSigner.ts`     | **Delete**                                       | signing handled via SDK / DIDAuth                            |
+| `src/components/ConnectButton.tsx` | simplify to call `connect()`                     |
+| `src/components/SignButton.tsx`    | call `sign()` instead of local signer            |
+| `src/components/VerifyButton.tsx`  | call `verify()`                                  |
+| `pages/Callback.tsx`               | ~10→3 lines – just invoke `sdk.handleCallback()` |
 
 ### Simplified Callback Page
 
@@ -83,7 +83,7 @@ export function Callback() {
 
 ---
 
-## 4  Gateway Debug Panel Update
+## 4 Gateway Debug Panel Update
 
 Replace manual signer usage with hook helpers:
 
@@ -96,7 +96,7 @@ No other changes are required.
 
 ---
 
-## 5  FAQ
+## 5 FAQ
 
 **Q : What if I still need custom encryption for KeyStore?**  
 A : Pass a custom `KeyManager` with your KeyStore implementation into `IdentityKitWeb.init({ keyManager })`.
@@ -106,4 +106,4 @@ A : The SDK generates the same `/add-key?payload=…` route as the original help
 
 ---
 
-Maintainer: @nuwa-team 
+Maintainer: @nuwa-team

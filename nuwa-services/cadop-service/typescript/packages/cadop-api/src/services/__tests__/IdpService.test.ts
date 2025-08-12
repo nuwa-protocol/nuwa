@@ -4,7 +4,6 @@ import { randomBytes } from 'crypto';
 import { PublicKeyCredentialJSON } from '@simplewebauthn/types';
 import { jest } from '@jest/globals';
 
-
 const rpId = 'localhost';
 const origin = 'http://localhost:3000';
 
@@ -72,9 +71,9 @@ describe('IdpService', () => {
         clientExtensionResults: {},
       };
 
-      await expect(idpService.verifyAssertion(mockAssertion, userDid, nonce, rpId, origin)).rejects.toThrow(
-        'invalid or expired challenge'
-      );
+      await expect(
+        idpService.verifyAssertion(mockAssertion, userDid, nonce, rpId, origin)
+      ).rejects.toThrow('invalid or expired challenge');
     });
 
     it('should throw an error for nonce mismatch', async () => {

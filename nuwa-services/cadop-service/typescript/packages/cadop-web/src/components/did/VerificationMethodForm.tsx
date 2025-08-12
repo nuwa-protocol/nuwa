@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { 
+import {
   Button,
   Input,
   Select,
@@ -17,11 +17,16 @@ import {
   CopyButton,
   Alert,
   AlertTitle,
-  AlertDescription
+  AlertDescription,
 } from '@/components/ui';
 import type { OperationalKeyInfo, VerificationRelationship } from '@nuwa-ai/identity-kit';
 import { MultibaseCodec, KeyType } from '@nuwa-ai/identity-kit';
-import { generateKeyPair, methodTypeToKeyType, getKeyTypeDisplayName, type GeneratedKeyInfo } from '@/lib/crypto/keyGeneration';
+import {
+  generateKeyPair,
+  methodTypeToKeyType,
+  getKeyTypeDisplayName,
+  type GeneratedKeyInfo,
+} from '@/lib/crypto/keyGeneration';
 import { Key, Shield, AlertTriangle } from 'lucide-react';
 
 export interface VerificationMethodFormValues {
@@ -39,7 +44,13 @@ interface Props {
   did?: string; // Required for key generation
 }
 
-export function VerificationMethodForm({ initial, onSubmit, submitting, submitText = 'Submit', did }: Props) {
+export function VerificationMethodForm({
+  initial,
+  onSubmit,
+  submitting,
+  submitText = 'Submit',
+  did,
+}: Props) {
   const [generatedKey, setGeneratedKey] = useState<GeneratedKeyInfo | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -49,8 +60,8 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
       type: initial?.type || 'Ed25519VerificationKey2020',
       publicKeyMultibase: initial?.publicKeyMultibase || '',
       relationships: initial?.relationships || [],
-      idFragment: initial?.idFragment || `key-${Date.now()}`
-    }
+      idFragment: initial?.idFragment || `key-${Date.now()}`,
+    },
   });
 
   const handleSubmit = (values: VerificationMethodFormValues) => {
@@ -70,7 +81,7 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
       const selectedType = form.getValues('type');
       const keyType = methodTypeToKeyType(selectedType);
       const fragment = form.getValues('idFragment') || `key-${Date.now()}`;
-      
+
       const keyInfo = await generateKeyPair(did, keyType, fragment);
       setGeneratedKey(keyInfo);
 
@@ -78,7 +89,7 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
       form.setValue('publicKeyMultibase', keyInfo.publicKeyMultibase);
       form.setValue('idFragment', keyInfo.idFragment);
       form.setValue('type', getKeyTypeDisplayName(keyInfo.keyType));
-      
+
       // Set default relationships for authentication
       if (!form.getValues('relationships').length) {
         form.setValue('relationships', ['authentication', 'capabilityInvocation']);
@@ -98,12 +109,15 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
           <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
             <div className="flex items-center gap-2 mb-3">
               <Key className="h-4 w-4 text-blue-600" />
-              <h4 className="font-medium text-blue-900 dark:text-blue-100">Generate New Key Pair</h4>
+              <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                Generate New Key Pair
+              </h4>
             </div>
             <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-              Generate a new cryptographic key pair for this DID. The private key will be provided as a Service Key for server deployment.
+              Generate a new cryptographic key pair for this DID. The private key will be provided
+              as a Service Key for server deployment.
             </p>
-            
+
             <Button
               type="button"
               onClick={handleGenerateKey}
@@ -134,10 +148,13 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
             {generatedKey && (
               <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
                 <Shield className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-800 dark:text-green-200">Service Key Generated</AlertTitle>
+                <AlertTitle className="text-green-800 dark:text-green-200">
+                  Service Key Generated
+                </AlertTitle>
                 <AlertDescription className="mt-2">
                   <p className="text-sm text-green-700 dark:text-green-300 mb-3">
-                    <strong>Important:</strong> Copy and save the Service Key immediately. You won't be able to view it again.
+                    <strong>Important:</strong> Copy and save the Service Key immediately. You won't
+                    be able to view it again.
                   </p>
                   <div className="bg-white dark:bg-gray-800 border rounded p-3 mb-3">
                     <div className="flex items-center justify-between">
@@ -152,7 +169,8 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
                     </div>
                   </div>
                   <p className="text-xs text-green-600 dark:text-green-400">
-                    Add this to your server environment variables: <code>SERVICE_KEY="&lt;copied_value&gt;"</code>
+                    Add this to your server environment variables:{' '}
+                    <code>SERVICE_KEY="&lt;copied_value&gt;"</code>
                   </p>
                 </AlertDescription>
               </Alert>
@@ -166,18 +184,19 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
           render={({ field }) => (
             <FormItem>
               <FormLabel>Method Type</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                defaultValue={field.value}
-              >
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select method type" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Ed25519VerificationKey2020">Ed25519VerificationKey2020</SelectItem>
-                  <SelectItem value="EcdsaSecp256k1VerificationKey2019">EcdsaSecp256k1VerificationKey2019</SelectItem>
+                  <SelectItem value="Ed25519VerificationKey2020">
+                    Ed25519VerificationKey2020
+                  </SelectItem>
+                  <SelectItem value="EcdsaSecp256k1VerificationKey2019">
+                    EcdsaSecp256k1VerificationKey2019
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -193,8 +212,8 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
             <FormItem>
               <FormLabel>Public Key (Base58)</FormLabel>
               <FormControl>
-                <Input 
-                  placeholder="z...." 
+                <Input
+                  placeholder="z...."
                   {...field}
                   readOnly={!!generatedKey}
                   className={generatedKey ? 'bg-gray-50 dark:bg-gray-900' : ''}
@@ -217,7 +236,7 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
             <FormItem>
               <FormLabel>Capabilities</FormLabel>
               <Select
-                onValueChange={(value) => {
+                onValueChange={value => {
                   // Handle multi-select manually since shadcn/ui Select doesn't have built-in multi-select
                   const currentValues = field.value || [];
                   const newValues = currentValues.includes(value as VerificationRelationship)
@@ -241,9 +260,12 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
               </Select>
               <div className="flex flex-wrap gap-1 mt-2">
                 {field.value?.map(rel => (
-                  <div key={rel} className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-md flex items-center">
+                  <div
+                    key={rel}
+                    className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-md flex items-center"
+                  >
                     {rel}
-                    <button 
+                    <button
                       type="button"
                       className="ml-1 text-xs"
                       onClick={() => {
@@ -283,4 +305,4 @@ export function VerificationMethodForm({ initial, onSubmit, submitting, submitTe
       </form>
     </Form>
   );
-} 
+}

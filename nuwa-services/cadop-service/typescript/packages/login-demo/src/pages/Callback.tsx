@@ -10,20 +10,23 @@ export function Callback() {
       try {
         // Initialize SDK and handle callback
         const sdk = await IdentityKitWeb.init({
-          appName: 'Nuwa Login Demo'
+          appName: 'Nuwa Login Demo',
         });
         await sdk.handleCallback(window.location.search);
-        
+
         // Set success status
         setStatus('success');
         setMessage('Authorization successful! You can close this window.');
-        
+
         // Notify the opener window if available
         if (window.opener) {
-          window.opener.postMessage({ 
-            type: 'nuwa-auth-success'
-          }, window.location.origin);
-          
+          window.opener.postMessage(
+            {
+              type: 'nuwa-auth-success',
+            },
+            window.location.origin
+          );
+
           // Close the window after a short delay
           setTimeout(() => {
             window.close();
@@ -48,13 +51,9 @@ export function Callback() {
           {status === 'error' && 'Error'}
         </h2>
         <p>{message}</p>
-        {status === 'success' && (
-          <p>You can close this window and return to the application.</p>
-        )}
-        {status === 'error' && (
-          <button onClick={() => window.close()}>Close Window</button>
-        )}
+        {status === 'success' && <p>You can close this window and return to the application.</p>}
+        {status === 'error' && <button onClick={() => window.close()}>Close Window</button>}
       </div>
     </div>
   );
-} 
+}

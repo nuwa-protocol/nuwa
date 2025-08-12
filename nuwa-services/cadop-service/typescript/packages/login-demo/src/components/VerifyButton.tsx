@@ -29,4 +29,4 @@ export function VerifyButton({ signature, onVerified }: VerifyButtonProps) {
       {isVerifying ? 'Verifying...' : 'Verify Signature'}
     </button>
   );
-} 
+}

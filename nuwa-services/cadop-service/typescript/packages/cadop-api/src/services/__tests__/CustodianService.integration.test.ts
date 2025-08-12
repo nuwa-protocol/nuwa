@@ -154,7 +154,9 @@ describe('CustodianService Integration Tests', () => {
         // Get a valid token
         const origin = 'http://localhost:3000';
         const credentialId = Buffer.from('credential-id').toString('base64url');
-        const authenticatorData = Buffer.from('auth-data-base64-at-least-37-bytes-long').toString('base64url');
+        const authenticatorData = Buffer.from('auth-data-base64-at-least-37-bytes-long').toString(
+          'base64url'
+        );
         const { nonce, challenge } = await idpService.generateChallenge();
         const mockAssertion: PublicKeyCredentialJSON = {
           id: credentialId,
@@ -174,7 +176,13 @@ describe('CustodianService Integration Tests', () => {
           },
           clientExtensionResults: {},
         };
-        const { idToken } = await idpService.verifyAssertion(mockAssertion, userDID, nonce, 'localhost', 'http://localhost:3000');
+        const { idToken } = await idpService.verifyAssertion(
+          mockAssertion,
+          userDID,
+          nonce,
+          'localhost',
+          'http://localhost:3000'
+        );
 
         // Create agent DID
         const result = await custodianService.createAgentDIDViaCADOP({

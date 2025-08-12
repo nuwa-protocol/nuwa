@@ -14,8 +14,6 @@ export default {
     ],
   },
   modulePathIgnorePatterns: ['<rootDir>/dist/'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(simplewebauthn|@simplewebauthn)/)',
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(simplewebauthn|@simplewebauthn)/)'],
   setupFiles: ['<rootDir>/src/test/setup.ts'],
-}; 
+};

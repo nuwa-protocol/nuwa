@@ -26,11 +26,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
     storage: 'local',
   });
 
-  return (
-    <AuthContext.Provider value={auth}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 
 function App() {

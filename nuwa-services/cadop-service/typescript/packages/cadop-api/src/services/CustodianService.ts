@@ -1,9 +1,5 @@
 import { CreateAgentDIDRequest, AgentDIDCreationStatus } from '@cadop/shared';
-import {
-  VDRRegistry,
-  DIDDocument,
-  CadopIdentityKit,
-} from '@nuwa-ai/identity-kit';
+import { VDRRegistry, DIDDocument, CadopIdentityKit } from '@nuwa-ai/identity-kit';
 import { logger } from '../utils/logger.js';
 import crypto from 'crypto';
 

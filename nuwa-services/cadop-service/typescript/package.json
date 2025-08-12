@@ -12,8 +12,8 @@
     "test": "pnpm --recursive run test",
     "lint": "eslint packages/*/src --ext .ts,.tsx",
     "lint:fix": "eslint packages/*/src --ext .ts,.tsx --fix",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "pnpm --recursive run clean"
   },
   "devDependencies": {

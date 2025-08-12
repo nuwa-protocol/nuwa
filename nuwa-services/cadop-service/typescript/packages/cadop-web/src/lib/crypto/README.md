@@ -11,11 +11,7 @@ import { generateKeyPair } from './keyGeneration';
 import { KeyType } from '@nuwa-ai/identity-kit';
 
 // Generate an Ed25519 key pair
-const keyInfo = await generateKeyPair(
-  'did:example:123',
-  KeyType.ED25519,
-  'service-key'
-);
+const keyInfo = await generateKeyPair('did:example:123', KeyType.ED25519, 'service-key');
 
 console.log('Service Key:', keyInfo.storedKeyString);
 console.log('Public Key:', keyInfo.publicKeyMultibase);

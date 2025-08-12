@@ -5,11 +5,11 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/u
 import { useAuth } from '../lib/auth/AuthContext';
 import { DIDService } from '../lib/did/DIDService';
 import { ArrowLeft } from 'lucide-react';
+import { MultibaseCodec, type VerificationRelationship } from '@nuwa-ai/identity-kit';
 import {
-  MultibaseCodec,
-  type VerificationRelationship,
-} from '@nuwa-ai/identity-kit';
-import { VerificationMethodForm, VerificationMethodFormValues } from '@/components/did/VerificationMethodForm';
+  VerificationMethodForm,
+  VerificationMethodFormValues,
+} from '@/components/did/VerificationMethodForm';
 import { useDIDService } from '@/hooks/useDIDService';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui';
 

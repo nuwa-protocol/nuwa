@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Select, 
-  SelectTrigger, 
-  SelectValue, 
-  SelectContent, 
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
   SelectItem,
-  SpinnerContainer
+  SpinnerContainer,
 } from '@/components/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { UserStore } from '../lib/storage';
