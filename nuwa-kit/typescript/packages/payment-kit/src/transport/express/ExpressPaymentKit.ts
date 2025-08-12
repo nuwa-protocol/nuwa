@@ -383,6 +383,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             const err = billingContext.state.error as { code: string; message?: string };
             const status = this.mapErrorCodeToHttpStatus(err.code);
             const headerValue = this.buildProtocolErrorHeader(req, err);
+            this.ensureExposeHeader(res);
             res.setHeader('X-Payment-Channel-Data', headerValue);
 
             return res.status(status).json({
@@ -400,9 +401,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             if (headerWritten) return;
             headerWritten = true;
             try {
+              this.ensureExposeHeader(res);
               const raw = (res.locals as any).usage;
-              const units =
-                typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1;
+              const units = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
               this.middleware.settleBillingSync(billingContext, units, resAdapter);
             } catch (error) {}
           });
@@ -430,6 +431,24 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         });
       }
     };
+  }
+
+  /**
+   * Ensure CORS exposes our payment header to browsers so client JS can read it.
+   */
+  private ensureExposeHeader(res: Response) {
+    const headerName = HttpPaymentCodec.getHeaderName();
+    const existing = res.getHeader('Access-Control-Expose-Headers');
+    const current = (Array.isArray(existing)
+      ? existing.join(',')
+      : (existing as string | undefined) || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (!current.map(s => s.toLowerCase()).includes(headerName.toLowerCase())) {
+      current.push(headerName);
+      res.setHeader('Access-Control-Expose-Headers', current.join(', '));
+    }
   }
 
   /**
@@ -629,12 +648,10 @@ export async function createExpressPaymentKit(
   }
 
   // Get service DID from signer
-  const serviceDid =
-    typeof (config.signer as any).getDid === 'function'
-      ? await (config.signer as any).getDid()
-      : (() => {
-          throw new Error('Signer must implement getDid() method to return the service DID');
-        })();
+  const serviceDid = await (async () => {
+    const maybe = (config.signer as any).getDid?.();
+    return typeof maybe?.then === 'function' ? await maybe : maybe;
+  })();
 
   // Set up blockchain connection
   const rpcUrl = config.rpcUrl;
