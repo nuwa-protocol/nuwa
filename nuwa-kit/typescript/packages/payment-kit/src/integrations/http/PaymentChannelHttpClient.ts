@@ -239,7 +239,7 @@ export class PaymentChannelHttpClient {
    */
   async get<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
     const result = await this.requestWithPayment('GET', path, init);
-    const data = await this.parseJsonResponse<T>(result.data);
+    const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
@@ -253,7 +253,7 @@ export class PaymentChannelHttpClient {
       },
     };
     const result = await this.requestWithPayment('POST', path, requestInit);
-    const data = await this.parseJsonResponse<T>(result.data);
+    const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
@@ -267,7 +267,7 @@ export class PaymentChannelHttpClient {
       },
     };
     const result = await this.requestWithPayment('PUT', path, requestInit);
-    const data = await this.parseJsonResponse<T>(result.data);
+    const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
@@ -281,13 +281,13 @@ export class PaymentChannelHttpClient {
       },
     };
     const result = await this.requestWithPayment('PATCH', path, requestInit);
-    const data = await this.parseJsonResponse<T>(result.data);
+    const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
   async delete<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
     const result = await this.requestWithPayment('DELETE', path, init);
-    const data = await this.parseJsonResponse<T>(result.data);
+    const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
@@ -343,7 +343,7 @@ export class PaymentChannelHttpClient {
   async healthCheck(): Promise<HealthResponse> {
     const healthUrl = this.buildPaymentUrl('/health');
     const response = await this.fetchImpl(healthUrl, { method: 'GET' });
-    return this.parseJsonResponseWithSchema(response, HealthResponseSchema);
+    return this.parseJsonAuto(response, HealthResponseSchema);
   }
 
   /**
@@ -381,7 +381,7 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to recover from service: HTTP ${response.status}`);
       }
 
-      const recoveryData = (await this.parseJsonResponseWithSchema(
+      const recoveryData = (await this.parseJsonAuto(
         response,
         RecoveryResponseSchema
       )) as RecoveryResponse;
@@ -447,7 +447,7 @@ export class PaymentChannelHttpClient {
         throw new Error(`Failed to commit SubRAV: HTTP ${response.status} - ${errorBody}`);
       }
 
-      const result = await this.parseJsonResponse<CommitResponse>(response);
+      const result = await this.parseJsonAuto<CommitResponse>(response);
 
       this.log('SubRAV committed successfully');
       return result;
@@ -1056,10 +1056,11 @@ export class PaymentChannelHttpClient {
 
   /**
    * Parse JSON response with error handling
-   * Expects standard ApiResponse format
-   * @deprecated Use parseJsonResponseWithSchema for better type safety
+   * Smart auto mode:
+   * - If schema provided: validate (supports ApiResponse or raw)
+   * - No schema: if ApiResponse format, unwrap on success else throw PaymentKitError; otherwise return raw JSON
    */
-  private async parseJsonResponse<T>(response: Response): Promise<T> {
+  private async parseJsonAuto<T>(response: Response, schema?: z.ZodType<T>): Promise<T> {
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('Response is not JSON');
@@ -1078,33 +1079,42 @@ export class PaymentChannelHttpClient {
       throw new Error('Failed to parse JSON response');
     }
 
-    // Expect ApiResponse format
-    if (responseData && typeof responseData === 'object' && 'success' in responseData) {
-      const apiResponse = responseData as ApiResponse<T>;
-
-      if (apiResponse.success) {
-        return apiResponse.data as T;
-      } else {
-        // Handle error response
-        const error = apiResponse.error;
-        if (error) {
-          throw new PaymentKitError(
-            error.code || ErrorCode.INTERNAL_ERROR,
-            error.message || 'Unknown error',
-            error.httpStatus || response.status,
-            error.details
-          );
+    // If schema provided, validate either ApiResponse.data or raw
+    if (schema) {
+      if (responseData && typeof responseData === 'object' && 'success' in responseData) {
+        const apiResponse = responseData as ApiResponse<any>;
+        if (apiResponse.success) {
+          return schema.parse(apiResponse.data);
         } else {
+          const error = apiResponse.error;
           throw new PaymentKitError(
-            ErrorCode.INTERNAL_ERROR,
-            'Unknown error occurred',
-            response.status
+            error?.code || ErrorCode.INTERNAL_ERROR,
+            error?.message || 'Unknown error',
+            error?.httpStatus || response.status,
+            error?.details
           );
         }
       }
+      return schema.parse(responseData);
     }
 
-    // If response doesn't follow ApiResponse format, treat as raw data
+    // No schema: honor ApiResponse if present
+    if (responseData && typeof responseData === 'object' && 'success' in responseData) {
+      const apiResponse = responseData as ApiResponse<T>;
+      if (apiResponse.success) {
+        return apiResponse.data as T;
+      } else {
+        const error = apiResponse.error;
+        throw new PaymentKitError(
+          error?.code || ErrorCode.INTERNAL_ERROR,
+          error?.message || 'Unknown error',
+          error?.httpStatus || response.status,
+          error?.details
+        );
+      }
+    }
+
+    // Raw JSON passthrough
     return responseData as T;
   }
 
