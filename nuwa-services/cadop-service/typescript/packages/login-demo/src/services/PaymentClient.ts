@@ -53,6 +53,28 @@ export async function requestWithPayment(
   }
 }
 
+// Raw variant that returns Response for streaming use-cases
+export async function requestWithPaymentRaw(
+  sdk: IdentityKitWeb,
+  baseUrl: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+  path: string,
+  body?: any,
+  headers?: Record<string, string>
+) {
+  const http = await getPaymentClient(sdk, baseUrl);
+  const initHeaders: Record<string, string> = { ...(headers || {}) };
+  let requestBody: any = undefined;
+  if (method !== 'GET' && method !== 'DELETE' && body !== undefined) {
+    initHeaders['Content-Type'] = initHeaders['Content-Type'] || 'application/json';
+    requestBody = typeof body === 'string' ? body : JSON.stringify(body);
+  }
+  return http.createRequestHandle(method as any, path, {
+    headers: initHeaders,
+    body: requestBody,
+  } as RequestInit);
+}
+
 export function resetPaymentClient(baseUrl?: string): void {
   if (!baseUrl) {
     clientsByHost.clear();
