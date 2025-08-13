@@ -46,15 +46,154 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
     logger.setLevel('debug');
   }
 
-  // Billable: non-stream chat completions using FinalCost (post-flight)
+  // --- Helpers shared by stream/non-stream branches ---
+  const resolveProvider = (req: Request) => {
+    const providerHeader = (req.headers['x-llm-provider'] as string | undefined)?.toLowerCase();
+    let backendEnvVar = (process.env.LLM_BACKEND || 'both').toLowerCase();
+    if (backendEnvVar === 'both') backendEnvVar = 'openrouter';
+    const providerName = providerHeader || backendEnvVar;
+    const isLiteLLM = providerName === 'litellm';
+    const provider = isLiteLLM ? litellmProvider : openrouterProvider;
+    return { providerName, isLiteLLM, provider } as const;
+  };
+
+  const ensureUserApiKey = async (did: string, isLiteLLM: boolean): Promise<string | null> => {
+    // try fetch existing key
+    let apiKey = await supabaseService.getUserActualApiKey(did, isLiteLLM ? 'litellm' : 'openrouter');
+    if (apiKey) return apiKey;
+    // auto-create (match non-stream semantics)
+    const keyName = `nuwa-generated-did_${did}`;
+    if (isLiteLLM) {
+      const created = await litellmProvider.createApiKey({ name: keyName });
+      if (created && created.key) {
+        const ok = await supabaseService.createUserApiKey(
+          did,
+          created.key,
+          created.key,
+          keyName,
+          'litellm'
+        );
+        if (ok) apiKey = created.key;
+      }
+    } else {
+      const created = await openrouterProvider.createApiKey({ name: keyName });
+      if (created && created.key) {
+        const ok = await supabaseService.createUserApiKey(
+          did,
+          created.data?.hash || created.key,
+          created.key,
+          keyName,
+          'openrouter'
+        );
+        if (ok) apiKey = created.key;
+      }
+    }
+    return apiKey || null;
+  };
+
+  // Billable: chat completions (non-stream and stream in one path, controlled by body.stream)
   billing.post('/api/v1/chat/completions', { pricing: { type: 'FinalCost' } }, async (req: Request, res: Response) => {
-    const handler = deps?.handleNonStreamLLM || defaultHandleNonStreamLLM;
-    const result = await handler(req);
-    const totalCostUSD = result?.usage?.cost ?? 0;
-    const pico = Math.round(Number(totalCostUSD) * 1e12);
-    (res as any).locals.usage = pico; // USD -> picoUSD
-    logger.debug('[gateway] usage from provider:', result?.usage, 'picoUSD=', pico);
-    res.status(result.status).json(result.body);
+    const isStream = !!(req.body && (req.body as any).stream);
+
+    if (!isStream) {
+      // Non-stream branch (FinalCost post-flight)
+      const handler = deps?.handleNonStreamLLM || defaultHandleNonStreamLLM;
+      const result = await handler(req);
+      const totalCostUSD = result?.usage?.cost ?? 0;
+      const pico = Math.round(Number(totalCostUSD) * 1e12);
+      (res as any).locals.usage = pico; // USD -> picoUSD
+      logger.debug('[gateway] usage from provider:', result?.usage, 'picoUSD=', pico);
+      res.status(result.status).json(result.body);
+      return;
+    }
+
+    // Stream branch (SSE)
+    const didInfo = (req as any).didInfo as DIDInfo;
+    if (!didInfo?.did) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    const { pathname } = parse(req.url);
+    let apiPath = (pathname || '').replace(/^\/api\/v1(?=\/?)/, '') || '/';
+    if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
+
+    const { isLiteLLM, provider } = resolveProvider(req);
+    // Build payload; for OpenRouter, enable usage tracking in stream too
+    const baseBody = ['GET', 'DELETE'].includes(req.method) ? undefined : { ...(req.body || {}), stream: true };
+    const requestData = !baseBody
+      ? undefined
+      : isLiteLLM
+      ? baseBody
+      : { ...baseBody, usage: { include: true, ...(baseBody as any).usage } };
+
+    const apiKey = await ensureUserApiKey(didInfo.did, isLiteLLM);
+    if (!apiKey) {
+      res.status(404).json({ success: false, error: 'User API key not found' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    try {
+      const upstream = await provider.forwardRequest(apiKey, apiPath, 'POST', requestData, true);
+      if (!upstream || 'error' in upstream) {
+        res.status((upstream as any)?.status || 502).end();
+        return;
+      }
+
+      let usageUsd = 0;
+      let closed = false;
+      upstream.data.on('data', (chunk: Buffer) => {
+        const s = chunk.toString();
+        try {
+          if (s.includes('"usage"')) {
+            const lines = s.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed === 'data: [DONE]') {
+                // finalize immediately on DONE
+                (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
+                if (!closed && !res.destroyed) {
+                  closed = true;
+                  try { res.end(); } catch {}
+                  try { upstream.data.destroy(); } catch {}
+                }
+                break;
+              }
+              if (line.startsWith('data: ') && line.includes('"usage"')) {
+                const obj = JSON.parse(line.slice(6));
+                if (obj?.usage?.cost) usageUsd = obj.usage.cost;
+              }
+            }
+          }
+        } catch {}
+        if (!closed && !res.destroyed) {
+          res.write(chunk);
+        }
+      });
+      upstream.data.on('end', () => {
+        (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
+        if (!closed && !res.destroyed) {
+          closed = true;
+          res.end();
+        }
+      });
+      upstream.data.on('error', () => {
+        if (!closed && !res.headersSent) {
+          closed = true;
+          res.status(500).end();
+        }
+      });
+      res.on('close', () => {
+        upstream.data.destroy();
+      });
+    } catch (e) {
+      if (!res.headersSent) res.status(500).end();
+    }
   }, 'llm.chat.completions');
 
   // Free: usage route, still requires DID auth via PaymentKit
