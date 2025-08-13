@@ -27,6 +27,7 @@ import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { PaymentProcessor } from '../../core/PaymentProcessor';
+import { isStreamingRequest } from './utils';
 
 /**
  * Configuration for creating ExpressPaymentKit
@@ -394,12 +395,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
           let billingCompleted = false;
           let headerWritten = false;
-          const isStreaming =
-            !!(rule as any).streaming ||
-            (typeof req.body === 'object' && !!(req as any).body?.stream === true) ||
-            (typeof req.query === 'object' &&
-              ((req.query as any).stream === 'true' || (req.query as any).stream === true)) ||
-            req.path.includes(':stream');
+          const isStreaming = isStreamingRequest(req as any, rule as any);
 
           // Intercept headers to write payment header synchronously
           // Note: This is the unified exit for the settlement stage, which writes the success/failure payment header; it is complementary to the pre-processing error short-circuit rather than redundant.

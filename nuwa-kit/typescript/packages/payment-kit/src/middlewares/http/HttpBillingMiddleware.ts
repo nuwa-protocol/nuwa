@@ -85,8 +85,6 @@ export class HttpBillingMiddleware {
   private codec: HttpPaymentCodec;
   private config: HttpBillingMiddlewareConfig;
   private logger: DebugLogger;
-  // In-memory settlement store keyed by clientTxRef (for streaming polling)
-  private settlementStore = new Map<string, { payload: any; timestamp: number }>();
 
   constructor(config: HttpBillingMiddlewareConfig) {
     this.config = config;
@@ -165,10 +163,6 @@ export class HttpBillingMiddleware {
       if (resAdapter) {
         resAdapter.setHeader('X-Payment-Channel-Data', settledCtx.state.headerValue);
         this.log('✅ Payment header added to response synchronously');
-        // Save for polling in streaming case
-        try {
-          this.saveSettlement(ctx);
-        } catch {}
       }
 
       return true;
@@ -190,12 +184,6 @@ export class HttpBillingMiddleware {
       version: 1,
     };
     if (!payload.clientTxRef) return;
-    this.settlementStore.set(payload.clientTxRef, { payload, timestamp: Date.now() });
-  }
-
-  /** Get settlement payload by clientTxRef (returns undefined if not ready) */
-  getSettlement(clientTxRef: string): any | undefined {
-    return this.settlementStore.get(clientTxRef)?.payload;
   }
 
   /**
