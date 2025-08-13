@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nuwa-ai/identity-kit": "file:../../../../../nuwa-kit/typescript/packages/identity-kit",
-    "@nuwa-ai/identity-kit-web": "file:../../../../../nuwa-kit/typescript/packages/identity-kit-web",
-    "@nuwa-ai/payment-kit": "file:../../../../../nuwa-kit/typescript/packages/payment-kit",
+    "@nuwa-ai/identity-kit": "^0.3.6",
+    "@nuwa-ai/identity-kit-web": "^0.3.5",
+    "@nuwa-ai/payment-kit": "^0.3.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3"
@@ -29,10 +29,5 @@
     "eslint-plugin-react-refresh": "^0.4.6",
     "typescript": "^5.4.2",
     "vite": "^5.1.6"
-  },
-  "overrides": {
-    "@nuwa-ai/identity-kit": "file:../../../../../nuwa-kit/typescript/packages/identity-kit",
-    "@nuwa-ai/identity-kit-web": "file:../../../../../nuwa-kit/typescript/packages/identity-kit-web",
-    "@nuwa-ai/payment-kit": "file:../../../../../nuwa-kit/typescript/packages/payment-kit"
   }
 }
