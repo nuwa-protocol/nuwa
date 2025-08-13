@@ -159,8 +159,8 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
                 (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
                 if (!closed && !res.destroyed) {
                   closed = true;
-                  try { res.end(); } catch {}
-                  try { upstream.data.destroy(); } catch {}
+                  try { res.end(); } catch (err) { console.error('Error ending response:', err); }
+                  try { upstream.data.destroy(); } catch (err) { console.error('Error destroying upstream data stream:', err); }
                 }
                 break;
               }
@@ -192,6 +192,7 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
         upstream.data.destroy();
       });
     } catch (e) {
+      logger.error('Error in /api/v1/chat/completions handler:', e);
       if (!res.headersSent) res.status(500).end();
     }
   }, 'llm.chat.completions');

@@ -19,7 +19,8 @@ import {
 import { ClaimScheduler, DEFAULT_CLAIM_POLICY } from '../../core/ClaimScheduler';
 import type { ClaimPolicy } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
-import { SignerInterface, DIDResolver, DebugLogger } from '@nuwa-ai/identity-kit';
+import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
