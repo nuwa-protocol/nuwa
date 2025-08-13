@@ -25,9 +25,17 @@ export function wrapAndFilterInBandFrames(
   const isSSE = ct.includes('text/event-stream');
   const isNDJSON = ct.includes('application/x-ndjson');
 
+  // After payment frame is handled, proactively close the filtered stream to avoid hanging
+  const afterPayment = (controller: ReadableStreamDefaultController<Uint8Array>) => {
+    try {
+      controller.close();
+      try { reader.cancel(); } catch {}
+    } catch {}
+  };
+
   const parser: InBandParser = isSSE
-    ? new SseInbandParser(textEncoder, onPayment, log)
-    : new NdjsonInbandParser(textEncoder, onPayment, log);
+    ? new SseInbandParser(textEncoder, onPayment, log, afterPayment)
+    : new NdjsonInbandParser(textEncoder, onPayment, log, afterPayment);
 
   const filtered = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -83,7 +91,8 @@ class SseInbandParser implements InBandParser {
   constructor(
     private encoder: TextEncoder,
     private onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
-    private log: (...args: any[]) => void
+    private log: (...args: any[]) => void,
+    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void
   ) {}
 
   async process(
@@ -116,6 +125,7 @@ class SseInbandParser implements InBandParser {
               const headerValue = payload?.nuwa_payment_header || payload?.__nuwa_payment_header__;
               if (typeof headerValue === 'string') {
                 await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+                this.onAfterPayment(controller);
               }
             }
           } catch {}
@@ -148,6 +158,7 @@ class SseInbandParser implements InBandParser {
           const headerValue = payload?.nuwa_payment_header || payload?.__nuwa_payment_header__;
           if (typeof headerValue === 'string') {
             await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+            this.onAfterPayment(controller);
           }
         }
       } catch {}
@@ -162,7 +173,8 @@ class NdjsonInbandParser implements InBandParser {
   constructor(
     private encoder: TextEncoder,
     private onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
-    private log: (...args: any[]) => void
+    private log: (...args: any[]) => void,
+    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void
   ) {}
 
   async process(
@@ -182,6 +194,7 @@ class NdjsonInbandParser implements InBandParser {
         if (typeof headerValue === 'string') {
           drop = true;
           await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+          this.onAfterPayment(controller);
         }
       } catch {}
       if (!drop) controller.enqueue(this.encoder.encode(line + '\n'));
@@ -198,6 +211,7 @@ class NdjsonInbandParser implements InBandParser {
       if (typeof headerValue === 'string') {
         drop = true;
         await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+        this.onAfterPayment(controller);
       }
     } catch {}
     if (!drop) controller.enqueue(this.encoder.encode(this.buffer + '\n'));
