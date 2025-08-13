@@ -93,6 +93,29 @@ export const ChannelInfoSchema = z.object({
 export type ChannelInfo = z.infer<typeof ChannelInfoSchema>;
 
 /**
+ * Sub-channel state schema (matches contracts/IPaymentChannelContract SubChannelInfo)
+ * Exposed for API schemas that need to serialize sub-channel state (e.g., recovery endpoint)
+ */
+export const SubChannelStateSchema = z.object({
+  /** Associated channel ID */
+  channelId: z.string(),
+  /** Channel epoch */
+  epoch: createBigIntSchema(),
+  /** DID verification method fragment */
+  vmIdFragment: z.string(),
+  /** Optional public key for the verification method */
+  publicKey: z.string().optional(),
+  /** Optional DID method type for the verification method */
+  methodType: z.string().optional(),
+  /** Last on-chain claimed amount for this sub-channel */
+  lastClaimedAmount: createBigIntSchema(),
+  /** Last on-chain confirmed nonce for this sub-channel */
+  lastConfirmedNonce: createBigIntSchema(),
+  /** Optional last updated timestamp (ms) for local caches */
+  lastUpdated: z.number().optional(),
+});
+
+/**
  * Service discovery information schema
  */
 export const ServiceDiscoverySchema = z.object({

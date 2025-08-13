@@ -480,6 +480,11 @@ export class PaymentChannelHttpClient {
     }
 
     await this.ensureReadyPromise;
+
+    // After initialization (including loading persisted state), ensure sub-channel/pending are recovered
+    if (this.state === ClientState.READY && this.clientState.channelId) {
+      await this.tryRecoverPendingIfNeeded();
+    }
   }
 
   private async tryRecoverPendingIfNeeded(): Promise<void> {
@@ -499,6 +504,28 @@ export class PaymentChannelHttpClient {
         } else {
           this.log('🔧 No pending SubRAV found in recovery response');
         }
+
+        // Ensure sub-channel is authorized (server may include subChannel)
+        if (this.clientState.channelId) {
+          let vmIdFragment = recoveryData.subChannel?.vmIdFragment;
+          if (!vmIdFragment && this.options.keyId) {
+            const parts = this.options.keyId.split('#');
+            vmIdFragment = parts.length > 1 ? parts[1] : '';
+          }
+          if (vmIdFragment && !recoveryData.subChannel) {
+            try {
+              this.log('🔧 Sub-channel missing in recovery, authorizing:', vmIdFragment);
+              await this.payerClient.authorizeSubChannel({
+                channelId: this.clientState.channelId,
+                vmIdFragment,
+              });
+              await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
+              this.log('✅ Sub-channel authorized during ready-check');
+            } catch (e) {
+              this.log('❌ Sub-channel authorization failed during ready-check:', e);
+            }
+          }
+        }
       } catch (error) {
         this.log('❌ Recovery failed in ensureChannelReady, continuing anyway:', error);
       }
@@ -507,6 +534,26 @@ export class PaymentChannelHttpClient {
         '🔧 Already have pending SubRAV, no recovery needed:',
         this.clientState.pendingSubRAV.nonce
       );
+      // Even if we have pending, verify sub-channel exists; if not, authorize it using vmIdFragment from pending
+      try {
+        if (this.clientState.channelId && this.clientState.pendingSubRAV) {
+          const vmIdFragment = this.clientState.pendingSubRAV.vmIdFragment;
+          await this.payerClient.getSubChannelInfo(this.clientState.channelId, vmIdFragment);
+        }
+      } catch {
+        try {
+          const vmIdFragment = this.clientState.pendingSubRAV!.vmIdFragment;
+          this.log('🔧 Sub-channel not found while pending exists, authorizing:', vmIdFragment);
+          await this.payerClient.authorizeSubChannel({
+            channelId: this.clientState.channelId!,
+            vmIdFragment,
+          });
+          await this.waitForSubChannelAuthorization(this.clientState.channelId!, vmIdFragment);
+          this.log('✅ Sub-channel authorized while pending existed');
+        } catch (e) {
+          this.log('❌ Sub-channel authorization failed while pending existed:', e);
+        }
+      }
     }
   }
 
@@ -539,6 +586,39 @@ export class PaymentChannelHttpClient {
           //if (channelInfo.status === 'active') {
           this.clientState.channelId = recoveryData.channel.channelId;
           this.clientState.pendingSubRAV = recoveryData.pendingSubRav || undefined;
+
+          // Ensure sub-channel is authorized; if server returned subChannel it's authorized
+          let vmIdFragment = recoveryData.subChannel?.vmIdFragment;
+          if (!vmIdFragment && this.options.keyId) {
+            const parts = this.options.keyId.split('#');
+            vmIdFragment = parts.length > 1 ? parts[1] : '';
+          }
+          if (vmIdFragment) {
+            if (!recoveryData.subChannel) {
+              try {
+                this.log(
+                  'Sub-channel not found in recovery. Authorizing vmIdFragment:',
+                  vmIdFragment
+                );
+                await this.payerClient.authorizeSubChannel({
+                  channelId: this.clientState.channelId,
+                  vmIdFragment,
+                });
+                this.log('Sub-channel authorized for fragment:', vmIdFragment);
+                // Ensure visibility on-chain before proceeding to first paid request
+                await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
+              } catch (e) {
+                this.log('AuthorizeSubChannel failed:', e);
+                throw e;
+              }
+            }
+          } else {
+            // Without vmIdFragment we can't guarantee sub-channel readiness
+            throw new Error(
+              'Recovered channel but sub-channel cannot be verified/authorized: missing vmIdFragment. Provide keyId or upgrade server recovery response.'
+            );
+          }
+
           this.state = ClientState.READY;
           this.log('✅ Recovered active channel from server:', recoveryData.channel.channelId);
 
@@ -1391,5 +1471,26 @@ export class PaymentChannelHttpClient {
    */
   private parsePaymentHeader(headerValue: string) {
     return HttpPaymentCodec.parseResponseHeader(headerValue);
+  }
+
+  /**
+   * Wait until sub-channel authorization is visible on-chain to avoid race conditions.
+   */
+  private async waitForSubChannelAuthorization(
+    channelId: string,
+    vmIdFragment: string,
+    attempts: number = 10,
+    delayMs: number = 500
+  ): Promise<void> {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await this.payerClient.getSubChannelInfo(channelId, vmIdFragment);
+        this.log('Sub-channel visible on-chain after authorization:', vmIdFragment);
+        return;
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    throw new Error('Sub-channel authorization not visible on-chain within timeout');
   }
 }

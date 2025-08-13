@@ -405,6 +405,63 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 Recovery functionality test successful!');
   }, 60000);
 
+  test('Auto-authorize sub-channel on recovery when channel exists without sub-channel', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    // Create an isolated payer to avoid interference with existing channels
+    const isolatedPayer = await createSelfDid(env, {
+      keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
+      skipFunding: false,
+    });
+
+    // Fund the isolated payer's hub
+    const directContract = new RoochPaymentChannelContract({
+      rpcUrl: env.rpcUrl,
+      network: 'local',
+      debug: false,
+    });
+
+    const isolatedHubClient = new PaymentHubClient({
+      contract: directContract,
+      signer: isolatedPayer.signer,
+      defaultAssetId: testAsset.assetId,
+    });
+
+    await isolatedHubClient.deposit(testAsset.assetId, BigInt('500000000'));
+
+    // Open channel WITHOUT authorizing sub-channel
+    await directContract.openChannel({
+      payerDid: isolatedPayer.did,
+      payeeDid: payee.did,
+      assetId: testAsset.assetId,
+      signer: isolatedPayer.signer,
+    });
+
+    // Create client for the isolated payer
+    const client = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: isolatedPayer.identityEnv,
+      maxAmount: BigInt('50000000000'),
+      debug: true,
+    });
+
+    // Before any paid call, recovery should show channel present but no sub-channel
+    const recoveryBefore = await client.recoverFromService();
+    expect(recoveryBefore.channel).toBeTruthy();
+    expect(recoveryBefore.subChannel ?? null).toBeNull();
+
+    // First paid request should trigger client-side auto-authorization of sub-channel
+    const r = await client.get('/echo?q=auto-authorize');
+    expect(r.data.echo).toBe('auto-authorize');
+    expect(r.payment).toBeTruthy();
+
+    // Recovery after first request should include sub-channel state
+    const recoveryAfter = await client.recoverFromService();
+    expect(recoveryAfter.channel).toBeTruthy();
+    expect(recoveryAfter.subChannel).toBeTruthy();
+    expect(recoveryAfter.subChannel!.vmIdFragment).toBe(isolatedPayer.vmIdFragment);
+  }, 120000);
+
   test('Admin Client functionality', async () => {
     if (!shouldRunE2ETests()) return;
 
