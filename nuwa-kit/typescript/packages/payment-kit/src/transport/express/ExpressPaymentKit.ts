@@ -19,7 +19,7 @@ import {
 import { ClaimScheduler, DEFAULT_CLAIM_POLICY } from '../../core/ClaimScheduler';
 import type { ClaimPolicy } from '../../core/ClaimScheduler';
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
-import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
+import { SignerInterface, DIDResolver, DebugLogger } from '@nuwa-ai/identity-kit';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
@@ -107,6 +107,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly ravRepo: RAVRepository;
   private readonly pendingSubRAVRepo: PendingSubRAVRepository;
   private readonly processor: PaymentProcessor;
+  private readonly logger: DebugLogger;
 
   constructor(
     config: ExpressPaymentKitOptions,
@@ -123,6 +124,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       pendingSubRAVRepo: PendingSubRAVRepository;
     }
   ) {
+    this.logger = DebugLogger.get('ExpressPaymentKit');
     this.config = config;
     this.rateProvider = deps.rateProvider;
     this.serviceDid = deps.serviceDid;
@@ -218,6 +220,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         // Use DebugLogger in ClaimScheduler internally; avoid console here
       }
     }
+
   }
 
   /**
@@ -385,7 +388,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             const status = this.mapErrorCodeToHttpStatus(err.code);
             const headerValue = this.buildProtocolErrorHeader(req, err);
             this.ensureExposeHeader(res);
-            res.setHeader('X-Payment-Channel-Data', headerValue);
+            res.setHeader(HttpPaymentCodec.getHeaderName(), headerValue);
 
             return res.status(status).json({
               success: false,
@@ -434,29 +437,26 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                     } catch {}
                   }
                   try {
-                    const payload = {
-                      nuwa_payment: {
-                        subRav: settled?.state?.unsignedSubRav,
-                        cost: settled?.state?.cost?.toString?.() ?? '0',
-                        clientTxRef: billingContext.meta?.clientTxRef,
-                        serviceTxRef: settled?.state?.serviceTxRef,
-                        version: 1,
-                      },
-                    };
-                    const ct = (res.getHeader('Content-Type') as string) || '';
-                    const frameSSE = `data: ${JSON.stringify(payload)}\n\n`;
-                    const frameNDJSON =
-                      JSON.stringify({ __nuwa_payment__: payload.nuwa_payment }) + '\n';
-                    if (ct.includes('text/event-stream')) {
-                      try {
-                        (res as any).write?.(frameSSE);
-                      } catch {}
-                    } else if (ct.includes('application/x-ndjson')) {
-                      try {
-                        (res as any).write?.(frameNDJSON);
-                      } catch {}
+                    const headerValue: string | undefined = settled?.state?.headerValue;
+                    if (headerValue) {
+                      const ct = (res.getHeader('Content-Type') as string) || '';
+                      const sseObj = { nuwa_payment_header: headerValue };
+                      const ndjsonObj = { __nuwa_payment_header__: headerValue };
+                      const frameSSE = `data: ${JSON.stringify(sseObj)}\n\n`;
+                      const frameNDJSON = JSON.stringify(ndjsonObj) + '\n';
+                      if (ct.includes('text/event-stream')) {
+                        try {
+                          (res as any).write?.(frameSSE);
+                        } catch {}
+                      } else if (ct.includes('application/x-ndjson')) {
+                        try {
+                          (res as any).write?.(frameNDJSON);
+                        } catch {}
+                      } else {
+                        // For other content types, do not force insertion to avoid breaking protocol
+                        this.logger.warn('Streaming response with unsupported content type:', ct);
+                      }
                     }
-                    // For other content types, do not force insertion to avoid breaking protocol
                   } catch {}
                   if (settled?.state?.unsignedSubRav) {
                     this.middleware.persistBilling(settled).catch(() => {});

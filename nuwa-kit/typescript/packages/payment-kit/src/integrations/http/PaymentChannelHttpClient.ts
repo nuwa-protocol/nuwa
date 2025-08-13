@@ -933,14 +933,21 @@ export class PaymentChannelHttpClient {
         const filtered = wrapAndFilterInBandFrames(
           response,
           async p => {
-            await this.handleProtocolSuccess({
-              type: 'success',
-              clientTxRef: (p as any).clientTxRef,
-              subRav: (p as any).subRav,
-              cost: BigInt(p.cost as any),
-              costUsd: p.costUsd !== undefined ? BigInt(p.costUsd as any) : undefined,
-              serviceTxRef: (p as any).serviceTxRef,
-            });
+            try {
+              const decoded = this.parsePaymentHeader((p as any).headerValue);
+              if (decoded?.subRav && decoded.cost !== undefined) {
+                await this.handleProtocolSuccess({
+                  type: 'success',
+                  clientTxRef: decoded.clientTxRef,
+                  subRav: decoded.subRav,
+                  cost: decoded.cost as bigint,
+                  costUsd: decoded.costUsd as bigint | undefined,
+                  serviceTxRef: decoded.serviceTxRef,
+                });
+              }
+            } catch (e) {
+              this.log('[inband.decode.error]', e);
+            }
           },
           (...args: any[]) => this.log(...args)
         );

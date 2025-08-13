@@ -17,6 +17,30 @@
 - **API 服务端集成**: 提供 `ExpressPaymentKit`，一行挂载支付能力与计费规则（内置按请求/按用量策略、自动结算与管理端点）
 - **类型安全**: 100% TypeScript 实现，提供完整的类型定义
 
+### 流式输出支持（SSE/NDJSON）
+
+Payment Kit 支持流式端点（SSE、NDJSON）的“带内支付帧（In-band Payment Frame）”，并在客户端自动过滤支付帧。
+
+- 服务端（ExpressPaymentKit）
+  - 识别：根据请求提示判断（body.stream=true、query.stream=true、或路径包含":stream"）。
+  - 结算：对 post-flight 策略（如 FinalCost/PerToken），在响应结束时计算费用并结算。
+  - 帧注入：仅注入编码后的 Header 值，确保与响应头完全一致：
+    - SSE: `data: { "nuwa_payment_header": "<X-Payment-Channel-Data>" }`\n\n
+    - NDJSON: `{ "__nuwa_payment_header__": "<X-Payment-Channel-Data>" }`\n
+  - 响应头：若仍可写头，会同时发送标准 `X-Payment-Channel-Data`。
+
+- 客户端（PaymentChannelHttpClient）
+  - 识别：仅依据 Content-Type（SSE `text/event-stream`、NDJSON `application/x-ndjson`）。
+  - 响应包装：对流式响应进行包装过滤：
+    - 提取 `nuwa_payment_header`/`__nuwa_payment_header__` 并通过相同的 `HttpPaymentCodec` 解码
+    - 将这些控制帧从流中移除，只向上层透出业务数据
+  - 无需 tee：只有包装层读取原始流，避免与应用层竞争导致的挂起。
+  - 恢复：若本次流未收到支付帧，下次请求会按正常恢复流程获取最新 SubRAV。
+
+说明
+- 应用代码按常规读取响应体，不会看到支付帧，只会看到业务数据。
+- 非流式端点行为不变（仍使用响应头）。
+
 ## 📦 安装
 
 ```bash

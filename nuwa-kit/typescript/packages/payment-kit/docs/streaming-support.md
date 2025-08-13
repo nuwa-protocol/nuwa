@@ -101,9 +101,9 @@
 
 支持形式：
 
-- SSE：发送事件 `event: nuwa-payment`，`data: <base64(JSON of PaymentResponsePayload)>`；
-- NDJSON：插入一行形如 `{ "__nuwa_payment__": <PaymentResponsePayload> }`；
-- OpenAI 样式：插入 `data: { "nuwa_payment": <PaymentResponsePayload> }` 的一帧。
+- SSE：`data: { "nuwa_payment_header": "<X-Payment-Channel-Data>" }`；
+- NDJSON：`{ "__nuwa_payment_header__": "<X-Payment-Channel-Data>" }`；
+- OpenAI 样式：同上，使用 `data: { "nuwa_payment_header": ... }`。
 
 客户端扩展：
 
@@ -148,7 +148,7 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
       buf = lines.pop() ?? '';
 
       if (mode === 'sse') {
-        // SSE: 过滤 event: nuwa-payment 或 data: { nuwa_payment: ... } 帧
+        // SSE: 过滤 data: { nuwa_payment_header: ... } 帧
         for (const line of lines) {
           pendingEvent.push(line);
           if (line === '') {
@@ -159,7 +159,7 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
                 if (!m) return false;
                 try {
                   const obj = JSON.parse(m[1]);
-                  return !!obj?.nuwa_payment;
+                  return !!obj?.nuwa_payment_header;
                 } catch {
                   return false;
                 }
@@ -171,14 +171,14 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
           }
         }
       } else {
-        // NDJSON: 过滤 { "__nuwa_payment__": ... } 行
+        // NDJSON: 过滤 { "__nuwa_payment_header__": ... } 行
         for (const line of lines) {
           const t = line.trim();
           if (!t) continue;
           let drop = false;
           try {
             const obj = JSON.parse(t);
-            drop = !!obj?.__nuwa_payment__;
+            drop = !!obj?.__nuwa_payment_header__;
           } catch {}
           if (!drop) controller.enqueue(encoder.encode(line + '\n'));
         }
@@ -191,7 +191,7 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
         let drop = false;
         try {
           const obj = JSON.parse(t);
-          drop = !!obj?.__nuwa_payment__;
+          drop = !!obj?.__nuwa_payment_header__;
         } catch {}
         if (!drop) controller.enqueue(encoder.encode(buf + '\n'));
       } else {
@@ -204,7 +204,7 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
             if (!m) return false;
             try {
               const obj = JSON.parse(m[1]);
-              return !!obj?.nuwa_payment;
+              return !!obj?.nuwa_payment_header;
             } catch {
               return false;
             }

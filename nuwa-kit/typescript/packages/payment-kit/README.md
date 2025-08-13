@@ -17,6 +17,30 @@ TypeScript/JavaScript SDK based on the “NIP-4 Unidirectional Payment Channel C
 - **API Server Integration**: `ExpressPaymentKit` mounts payment and billing with one line (built-in per-request/per-usage strategies, auto-settlement, and admin endpoints)
 - **Type-safe**: 100% TypeScript with complete typings
 
+### Streaming support (SSE/NDJSON)
+
+Payment Kit supports streaming endpoints (Server-Sent Events and NDJSON) with in-band payment frames and automatic client-side filtering.
+
+- Server-side (ExpressPaymentKit)
+  - Detection: streaming is inferred via request hints (body.stream=true, query.stream=true, or path contains ":stream").
+  - Settlement: for post-flight strategies (e.g., FinalCost/PerToken), settlement runs at response finish.
+  - In-band frame: the kit injects the encoded header value as the only payload, keeping header and frame perfectly consistent:
+    - SSE: `data: { "nuwa_payment_header": "<X-Payment-Channel-Data>" }`\n\n
+    - NDJSON: `{ "__nuwa_payment_header__": "<X-Payment-Channel-Data>" }`\n
+  - Header: if headers are still writable, the standard `X-Payment-Channel-Data` header is also emitted.
+
+- Client-side (PaymentChannelHttpClient)
+  - Detection: strictly by Content-Type (SSE `text/event-stream`, NDJSON `application/x-ndjson`).
+  - Response wrapping: streaming responses are wrapped with an internal filter that:
+    - Extracts `nuwa_payment_header`/`__nuwa_payment_header__` and decodes it via the same `HttpPaymentCodec`
+    - Removes those control frames before passing the stream to the application
+  - No tee required: only the wrapper reads the original stream, avoiding reader competition or hangs.
+  - Recovery: if a stream finishes without a payment frame, the next request will recover the latest SubRAV from the service as usual.
+
+Notes
+- Your app code continues to read the response body as usual. It will not see payment frames; only business data.
+- For non-streaming endpoints, behavior is unchanged (headers are used).
+
 ## 📦 Installation
 
 ```bash
