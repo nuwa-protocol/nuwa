@@ -220,7 +220,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         // Use DebugLogger in ClaimScheduler internally; avoid console here
       }
     }
-
   }
 
   /**

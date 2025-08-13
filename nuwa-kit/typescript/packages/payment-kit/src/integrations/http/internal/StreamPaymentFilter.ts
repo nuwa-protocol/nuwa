@@ -22,12 +22,12 @@ export function wrapAndFilterInBandFrames(
   const textEncoder = new TextEncoder();
 
   const ct = (response.headers.get('content-type') || '').toLowerCase();
-    const isSSE = ct.includes('text/event-stream');
-    const isNDJSON = ct.includes('application/x-ndjson');
+  const isSSE = ct.includes('text/event-stream');
+  const isNDJSON = ct.includes('application/x-ndjson');
 
-    const parser: InBandParser = isSSE
-      ? new SseInbandParser(textEncoder, onPayment, log)
-      : new NdjsonInbandParser(textEncoder, onPayment, log);
+  const parser: InBandParser = isSSE
+    ? new SseInbandParser(textEncoder, onPayment, log)
+    : new NdjsonInbandParser(textEncoder, onPayment, log);
 
   const filtered = new ReadableStream<Uint8Array>({
     async pull(controller) {
