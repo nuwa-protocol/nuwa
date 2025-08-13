@@ -4,12 +4,12 @@ providers = ["node"]
 nixPkgs = ['nodejs', 'pnpm']
 
 [phases.install]
-cmds = ['npm install']
+cmds = ['pnpm install']
 
 [phases.build]
 cmds = [
-    'npm run build'
+    'pnpm run build'
 ]
 
 [start]
-cmd = 'npm run start'
+cmd = 'pnpm run start'
