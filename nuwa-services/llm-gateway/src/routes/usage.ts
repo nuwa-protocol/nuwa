@@ -4,7 +4,7 @@ import { didAuthMiddleware } from "../middleware/didAuth.js";
 import { ApiResponse, DIDInfo } from "../types/index.js";
 
 const supabaseService = new SupabaseService();
-const router = Router();
+const router: Router = Router();
 
 router.get("/", didAuthMiddleware, async (req: Request, res: Response) => {
   const didInfo = req.didInfo as DIDInfo;
@@ -45,4 +45,4 @@ router.get("/", didAuthMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-export const usageRoutes = router;
+export const usageRoutes: Router = router;

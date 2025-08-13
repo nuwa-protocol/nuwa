@@ -11,7 +11,7 @@ import LiteLLMService from "../services/litellm.js";
 
 const supabaseService = new SupabaseService();
 const litellmProvider = new LiteLLMService();
-const router = Router();
+const router: Router = Router();
 
 // Define supported HTTP methods
 const SUPPORTED_METHODS = ["get", "post", "put", "delete", "patch"] as const;
@@ -73,7 +73,7 @@ for (const method of SUPPORTED_METHODS) {
   );
 }
 
-export const llmRoutes = router;
+export const llmRoutes: Router = router;
 
 // -----------------------------------------------------------------------------
 // General-purpose proxy handler supporting arbitrary LLM providers
