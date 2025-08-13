@@ -39,6 +39,7 @@ export class DebugLogger {
   // ---------------------------------------------------------------------------
   private static globalLevel: LogLevel = detectInitialGlobalLevel();
   private static loggers = new Map<string, DebugLogger>();
+  private static defaultNamespace = 'global';
 
   /** Acquire (or create) a logger for the given namespace. */
   static get(namespace: string): DebugLogger {
@@ -62,6 +63,34 @@ export class DebugLogger {
   /** Read current global level. */
   static getGlobalLevel(): LogLevel {
     return DebugLogger.globalLevel;
+  }
+
+  /** Set default namespace used by static convenience methods. */
+  static setDefaultNamespace(namespace: string): void {
+    DebugLogger.defaultNamespace = namespace;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Static convenience logging methods
+  // ---------------------------------------------------------------------------
+  /**
+   * Log using the default namespace. Useful when callers don't need per-module loggers.
+   * Example: DebugLogger.debug('hello')
+   */
+  static debug(...args: unknown[]): void {
+    DebugLogger.get(DebugLogger.defaultNamespace).debug(...args);
+  }
+
+  static info(...args: unknown[]): void {
+    DebugLogger.get(DebugLogger.defaultNamespace).info(...args);
+  }
+
+  static warn(...args: unknown[]): void {
+    DebugLogger.get(DebugLogger.defaultNamespace).warn(...args);
+  }
+
+  static error(...args: unknown[]): void {
+    DebugLogger.get(DebugLogger.defaultNamespace).error(...args);
   }
 
   // ---------------------------------------------------------------------------
