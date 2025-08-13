@@ -31,9 +31,9 @@ describe('CadopIdentityKit Integration Test', () => {
     // Create a custodian DID with CADOP service using testHelper
     custodian = await createCadopCustodian(env, {
       custodianKeyType: KeyType.SECP256K1,
-      skipFunding: true
+      skipFunding: true,
     });
-    
+
     // Create CadopIdentityKit from the custodian DID
     cadopKit = await CadopIdentityKit.fromServiceDID(custodian.did, custodian.signer);
 
@@ -45,7 +45,7 @@ describe('CadopIdentityKit Integration Test', () => {
   describe('Service Discovery', () => {
     it('should find custodian services', () => {
       if (!shouldRunIntegrationTests()) return;
-      
+
       //console.log('Current services:', cadopKit.getNuwaIdentityKit().getDIDDocument().service);
       const services = cadopKit.findCustodianServices();
       expect(services).toHaveLength(1);
@@ -96,4 +96,3 @@ describe('CadopIdentityKit Integration Test', () => {
     });
   });
 });
-

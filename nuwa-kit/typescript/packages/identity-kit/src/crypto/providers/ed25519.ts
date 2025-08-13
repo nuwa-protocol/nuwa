@@ -110,7 +110,7 @@ export class Ed25519Provider implements CryptoProvider {
       true,
       ['sign']
     );
-    
+
     // Generate a temporary key pair and use the same private key to get corresponding public key
     // This is a workaround since Web Crypto API doesn't allow direct derivation
     // We'll export as JWK and extract the public key coordinates
@@ -118,11 +118,9 @@ export class Ed25519Provider implements CryptoProvider {
     if (!jwk.x) {
       throw new Error('Failed to derive public key from private key');
     }
-    
+
     // Convert base64url public key to raw bytes
     const publicKeyBytes = base64urlToBytes(jwk.x);
     return publicKeyBytes;
   }
-
-
 }

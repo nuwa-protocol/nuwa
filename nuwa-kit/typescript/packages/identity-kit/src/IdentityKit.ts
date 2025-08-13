@@ -16,7 +16,6 @@ import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
 
-
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
  */
@@ -99,13 +98,15 @@ export class IdentityKit {
    * const kit = await env.loadDid(did);
    * ```
    */
-  static async bootstrap(opts: {
-    method?: string;
-    keyStore?: KeyStore;
-    vdrOptions?: any;
-  } = {}): Promise<IdentityEnv> {
+  static async bootstrap(
+    opts: {
+      method?: string;
+      keyStore?: KeyStore;
+      vdrOptions?: any;
+    } = {}
+  ): Promise<IdentityEnv> {
     return bootstrapIdentityEnv(opts);
-  } 
+  }
 
   // Verification Method Management
   /**

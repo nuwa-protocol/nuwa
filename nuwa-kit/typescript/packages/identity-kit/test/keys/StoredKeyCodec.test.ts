@@ -18,18 +18,18 @@ describe('StoredKeyCodec', () => {
       privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       meta: {
         created: '2023-01-01T00:00:00Z',
-        purpose: 'authentication'
-      }
+        purpose: 'authentication',
+      },
     };
   });
 
   describe('encode', () => {
     it('should encode a StoredKey to a base58btc string', () => {
       const encoded = StoredKeyCodec.encode(testStoredKey);
-      
+
       // Should start with 'z' (base58btc prefix)
       expect(encoded).toMatch(/^z/);
-      
+
       // Should be a non-empty string
       expect(encoded.length).toBeGreaterThan(1);
     });
@@ -39,7 +39,7 @@ describe('StoredKeyCodec', () => {
         keyId: testStoredKey.keyId,
         keyType: testStoredKey.keyType,
         publicKeyMultibase: testStoredKey.publicKeyMultibase,
-        privateKeyMultibase: testStoredKey.privateKeyMultibase
+        privateKeyMultibase: testStoredKey.privateKeyMultibase,
       };
 
       const encoded = StoredKeyCodec.encode(keyWithoutMeta);
@@ -50,7 +50,7 @@ describe('StoredKeyCodec', () => {
       const publicKeyOnly: StoredKey = {
         keyId: testStoredKey.keyId,
         keyType: testStoredKey.keyType,
-        publicKeyMultibase: testStoredKey.publicKeyMultibase
+        publicKeyMultibase: testStoredKey.publicKeyMultibase,
       };
 
       const encoded = StoredKeyCodec.encode(publicKeyOnly);
@@ -84,7 +84,7 @@ describe('StoredKeyCodec', () => {
         ...testStoredKey,
         keyType: KeyType.SECP256K1,
         publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(secp256k1Key);
@@ -100,7 +100,7 @@ describe('StoredKeyCodec', () => {
     it('should throw error for malformed JSON', async () => {
       // Create a valid base58btc string but with invalid JSON content
       const invalidJson = 'z' + 'InvalidJsonContent';
-      
+
       await expect(StoredKeyCodec.decode(invalidJson)).rejects.toThrow();
     });
   });
@@ -108,13 +108,13 @@ describe('StoredKeyCodec', () => {
   describe('round-trip consistency', () => {
     it('should maintain data integrity through multiple encode/decode cycles', async () => {
       let current = testStoredKey;
-      
+
       // Perform multiple encode/decode cycles
       for (let i = 0; i < 5; i++) {
         const encoded = StoredKeyCodec.encode(current);
         current = await StoredKeyCodec.decode(encoded);
       }
-      
+
       expect(current).toEqual(testStoredKey);
     });
 
@@ -127,10 +127,10 @@ describe('StoredKeyCodec', () => {
           numbers: [1, 2, 3.14],
           nested: {
             level1: {
-              level2: 'deep value'
-            }
-          }
-        }
+              level2: 'deep value',
+            },
+          },
+        },
       };
 
       const encoded = StoredKeyCodec.encode(keyWithSpecialMeta);
@@ -148,7 +148,7 @@ describe('StoredKeyCodec', () => {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ED25519,
         publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(testKey);
@@ -162,7 +162,7 @@ describe('StoredKeyCodec', () => {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.SECP256K1,
         publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(testKey);
@@ -176,7 +176,7 @@ describe('StoredKeyCodec', () => {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ECDSAR1,
         publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(testKey);
@@ -188,20 +188,20 @@ describe('StoredKeyCodec', () => {
       // Generate two different key pairs
       const keyPair1 = await CryptoUtils.generateKeyPair(KeyType.ED25519);
       const keyPair2 = await CryptoUtils.generateKeyPair(KeyType.ED25519);
-      
+
       // Mix private key from one pair with public key from another
       const inconsistentKey: StoredKey = {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ED25519,
         publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair1.publicKey),
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair2.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair2.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(inconsistentKey);
-      
-      await expect(StoredKeyCodec.decode(encoded))
-        .rejects
-        .toThrow('StoredKey validation failed: private and public keys are inconsistent');
+
+      await expect(StoredKeyCodec.decode(encoded)).rejects.toThrow(
+        'StoredKey validation failed: private and public keys are inconsistent'
+      );
     });
 
     it('should skip validation when private key is missing', async () => {
@@ -209,7 +209,7 @@ describe('StoredKeyCodec', () => {
       const publicKeyOnlyKey: StoredKey = {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ED25519,
-        publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey)
+        publicKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.publicKey),
         // No privateKeyMultibase
       };
 
@@ -224,7 +224,7 @@ describe('StoredKeyCodec', () => {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ED25519,
         publicKeyMultibase: '', // Empty string to simulate missing public key
-        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey)
+        privateKeyMultibase: MultibaseCodec.encodeBase58btc(keyPair.privateKey),
       };
 
       const encoded = StoredKeyCodec.encode(privateKeyOnlyKey);
@@ -237,15 +237,14 @@ describe('StoredKeyCodec', () => {
         keyId: 'did:example:123#key-1',
         keyType: KeyType.ED25519,
         publicKeyMultibase: 'z-invalid-multibase',
-        privateKeyMultibase: 'z-invalid-multibase'
+        privateKeyMultibase: 'z-invalid-multibase',
       };
 
       const encoded = StoredKeyCodec.encode(invalidKey);
-      
-      await expect(StoredKeyCodec.decode(encoded))
-        .rejects
-        .toThrow('StoredKey validation failed: private and public keys are inconsistent');
+
+      await expect(StoredKeyCodec.decode(encoded)).rejects.toThrow(
+        'StoredKey validation failed: private and public keys are inconsistent'
+      );
     });
   });
-
-}); 
+});

@@ -186,7 +186,7 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('returns INVALID_JSON error for malformed JSON payload', async () => {
     const resolver = new StaticResolver(didDoc);
-    
+
     // Create invalid JSON as base64
     const invalidJson = 'invalid json content {';
     const b64url = MultibaseCodec.encodeBase64url(invalidJson);
@@ -201,10 +201,10 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('returns MISSING_SIGNATURE error for payload without signature', async () => {
     const resolver = new StaticResolver(didDoc);
-    
+
     // Create JSON without signature
     const invalidPayload = JSON.stringify({
-      signed_data: { operation: 'test', timestamp: Date.now(), nonce: 'test' }
+      signed_data: { operation: 'test', timestamp: Date.now(), nonce: 'test' },
       // missing signature field
     });
     const b64url = MultibaseCodec.encodeBase64url(invalidPayload);
@@ -219,18 +219,18 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('returns TIMESTAMP_OUT_OF_WINDOW error for expired signatures', async () => {
     const resolver = new StaticResolver(didDoc);
-    
+
     const payload = { operation: 'test-expired', params: {} };
-    
+
     // Create signature with timestamp far in the past
     const expiredTimestamp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId, {
-      timestamp: expiredTimestamp
+      timestamp: expiredTimestamp,
     });
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.TIMESTAMP_OUT_OF_WINDOW);
@@ -241,13 +241,13 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('returns NONCE_REPLAYED error for duplicate nonces', async () => {
     const resolver = new StaticResolver(didDoc);
-    
+
     const payload = { operation: 'test-nonce', params: {} };
     const fixedNonce = 'fixed-nonce-for-testing';
-    
+
     // Create first signature with fixed nonce
     const sigObj1 = await DIDAuth.v1.createSignature(payload, signer, keyId, {
-      nonce: fixedNonce
+      nonce: fixedNonce,
     });
 
     // First verification should succeed
@@ -257,13 +257,13 @@ describe('DIDAuth.v1 error code tests', () => {
 
     // Create second signature with same nonce
     const sigObj2 = await DIDAuth.v1.createSignature(payload, signer, keyId, {
-      nonce: fixedNonce
+      nonce: fixedNonce,
     });
 
     // Second verification should fail with nonce replay error
     const header2 = DIDAuth.v1.toAuthorizationHeader(sigObj2);
     const result2 = await DIDAuth.v1.verifyAuthHeader(header2, resolver);
-    
+
     expect(result2.ok).toBe(false);
     if (!result2.ok) {
       expect(result2.errorCode).toBe(AuthErrorCode.NONCE_REPLAYED);
@@ -274,13 +274,13 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('returns DID_DOCUMENT_NOT_FOUND error when DID cannot be resolved', async () => {
     const nullResolver = new NullResolver();
-    
+
     const payload = { operation: 'test-no-did', params: {} };
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, nullResolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.DID_DOCUMENT_NOT_FOUND);
@@ -293,13 +293,13 @@ describe('DIDAuth.v1 error code tests', () => {
     const wrongDid = 'did:key:wrong-did';
     const wrongDidDoc = buildDidDoc(goodKeyPair.publicKey, wrongDid, keyId);
     const resolver = new StaticResolver(wrongDidDoc);
-    
+
     const payload = { operation: 'test-did-mismatch', params: {} };
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.DID_MISMATCH);
@@ -316,13 +316,13 @@ describe('DIDAuth.v1 error code tests', () => {
       authentication: [],
     };
     const resolver = new StaticResolver(didDocWithoutKey);
-    
+
     const payload = { operation: 'test-no-key', params: {} };
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.VERIFICATION_METHOD_NOT_FOUND);
@@ -346,13 +346,13 @@ describe('DIDAuth.v1 error code tests', () => {
       authentication: [keyId],
     };
     const resolver = new StaticResolver(didDocWithBadKey);
-    
+
     const payload = { operation: 'test-no-pubkey', params: {} };
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.INVALID_PUBLIC_KEY);
@@ -365,14 +365,14 @@ describe('DIDAuth.v1 error code tests', () => {
     const wrongKeyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
     const wrongDidDoc = buildDidDoc(wrongKeyPair.publicKey, did, keyId);
     const resolver = new StaticResolver(wrongDidDoc);
-    
+
     const payload = { operation: 'test-wrong-signature', params: {} };
     // Sign with original key but verify against wrong public key
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId);
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe(AuthErrorCode.SIGNATURE_VERIFICATION_FAILED);
@@ -382,16 +382,16 @@ describe('DIDAuth.v1 error code tests', () => {
 
   it('provides signedObject in all verification failure cases (except header parsing errors)', async () => {
     const resolver = new StaticResolver(didDoc);
-    
+
     const payload = { operation: 'test-signed-object', params: {} };
     const expiredTimestamp = Math.floor(Date.now() / 1000) - 3600;
     const sigObj = await DIDAuth.v1.createSignature(payload, signer, keyId, {
-      timestamp: expiredTimestamp
+      timestamp: expiredTimestamp,
     });
 
     const header = DIDAuth.v1.toAuthorizationHeader(sigObj);
     const result = await DIDAuth.v1.verifyAuthHeader(header, resolver);
-    
+
     // Should fail but provide signedObject for context
     expect(result.ok).toBe(false);
     expect(result.signedObject).toBeDefined();

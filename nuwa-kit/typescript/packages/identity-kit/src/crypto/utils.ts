@@ -75,14 +75,14 @@ export class CryptoUtils {
    * @returns true if the keys are consistent, false otherwise
    */
   static async validateKeyPairConsistency(
-    privateKey: Uint8Array, 
-    publicKey: Uint8Array, 
+    privateKey: Uint8Array,
+    publicKey: Uint8Array,
     keyType: KeyTypeInput
   ): Promise<boolean> {
     try {
       // Derive public key from private key
       const derivedPublicKey = await this.derivePublicKey(privateKey, keyType);
-      
+
       // Compare if public keys match
       return this.areUint8ArraysEqual(derivedPublicKey, publicKey);
     } catch (error) {

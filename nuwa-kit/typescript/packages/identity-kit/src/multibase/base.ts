@@ -145,7 +145,7 @@ export class MultibaseCodec {
     return base64url.decode(encoded);
   }
 
-    /**
+  /**
    * Decode base64url string to string
    * @param encoded The base64url encoded string
    * @returns decoded string

@@ -40,4 +40,4 @@ export interface AddKeyRequestPayloadV1 {
 /**
  * Union of all supported payload versions. Placed here for future expansion.
  */
-export type AddKeyRequestPayload = AddKeyRequestPayloadV1; 
+export type AddKeyRequestPayload = AddKeyRequestPayloadV1;

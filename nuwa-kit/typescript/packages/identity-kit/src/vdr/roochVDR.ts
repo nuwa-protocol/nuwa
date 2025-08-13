@@ -24,7 +24,7 @@ import {
   ServiceEndpoint,
 } from '../types/did';
 import { SignerInterface, DidAccountSigner } from '../signers';
-import { KeyType, keyTypeToRoochSignatureScheme} from '../types/crypto';
+import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
@@ -126,8 +126,6 @@ export interface RoochTxnOptions {
   maxGas?: number;
 }
 
-
-
 /**
  * VDR implementation for did:rooch method
  *
@@ -209,7 +207,7 @@ export class RoochVDR extends AbstractVDR {
 
       // Always combine base scopes with custom scopes
       const finalScopes = combineScopes(request.customScopes || []);
-      
+
       // Validate all scopes
       const scopeValidation = validateScopes(finalScopes);
       if (!scopeValidation.valid) {
@@ -220,13 +218,10 @@ export class RoochVDR extends AbstractVDR {
       const transaction = this.createTransaction();
       transaction.callFunction({
         target: `${this.didContractAddress}::create_did_object_for_self_with_custom_scopes_entry`,
-        args: [
-          Args.string(request.publicKeyMultibase),
-          Args.vec('string', finalScopes)
-        ],
+        args: [Args.string(request.publicKeyMultibase), Args.vec('string', finalScopes)],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
-      
+
       this.debugLog('Creating DID with scopes:', finalScopes);
 
       this.debugLog('Creating DID Transaction:', transaction);
@@ -304,10 +299,10 @@ export class RoochVDR extends AbstractVDR {
 
       this.debugLog('Creating DID via CADOP with request:', request);
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
-      
+
       // Always combine base scopes with custom scopes
       const finalScopes = combineScopes(request.customScopes || []);
-      
+
       // Validate all scopes
       const scopeValidation = validateScopes(finalScopes);
       if (!scopeValidation.valid) {
@@ -326,7 +321,7 @@ export class RoochVDR extends AbstractVDR {
         ],
         maxGas: options?.advanced?.maxGas || 100000000,
       });
-      
+
       this.debugLog('Creating DID via CADOP with scopes:', finalScopes);
 
       this.debugLog('Creating DID via CADOP Transaction:', transaction);
@@ -503,14 +498,14 @@ export class RoochVDR extends AbstractVDR {
 
       // Check if we need to use scopes version for authentication relationship
       const hasAuthentication = relationships?.includes('authentication');
-      
+
       // Create transaction
       const transaction = this.createTransaction();
-      
+
       if (hasAuthentication) {
         // When adding authentication VM, we need to handle scopes
         const finalScopes = combineScopes(options?.scopes || []);
-        
+
         // Validate all scopes
         const scopeValidation = validateScopes(finalScopes);
         if (!scopeValidation.valid) {
@@ -529,7 +524,7 @@ export class RoochVDR extends AbstractVDR {
           ],
           maxGas: options?.advanced?.maxGas || 100000000,
         });
-        
+
         this.debugLog('Using add_verification_method_with_scopes_entry with scopes:', finalScopes);
       } else {
         // Use regular version for non-authentication VM
@@ -543,8 +538,10 @@ export class RoochVDR extends AbstractVDR {
           ],
           maxGas: options?.advanced?.maxGas || 100000000,
         });
-        
-        this.debugLog('Using regular add_verification_method_entry (no authentication relationship)');
+
+        this.debugLog(
+          'Using regular add_verification_method_entry (no authentication relationship)'
+        );
       }
 
       this.debugLog(`Verification method transaction prepared`);

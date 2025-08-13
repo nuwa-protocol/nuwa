@@ -55,7 +55,7 @@ export interface CADOPCreationRequest {
   userDidKey: string;
   custodianServicePublicKey: string;
   custodianServiceVMType: string;
-  
+
   // Custom session key scopes (for Rooch VDR)
   customScopes?: string[];
 }

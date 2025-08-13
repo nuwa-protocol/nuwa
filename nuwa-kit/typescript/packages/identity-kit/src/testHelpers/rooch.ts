@@ -16,7 +16,7 @@ export const RoochTestUtils = {
    */
   checkEnvironment(): any {
     return TestEnv.checkEnvironmentSync();
-  }
+  },
 };
 
 /**
@@ -25,4 +25,4 @@ export const RoochTestUtils = {
  */
 export async function bootstrapRoochTestEnv(options: any = {}): Promise<TestEnv> {
   return TestEnv.bootstrap(options);
-} 
+}

@@ -8,11 +8,7 @@ import { MultibaseCodec, DidKeyCodec } from '../multibase';
 import { CryptoUtils } from '../crypto';
 import { IdentityKit } from '../IdentityKit';
 import { IdentityEnv } from '../IdentityEnv';
-import { 
-  CreateSelfDidResult, 
-  CreateSelfDidOptions,
-  CreateCadopDidOptions 
-} from './types';
+import { CreateSelfDidResult, CreateSelfDidOptions, CreateCadopDidOptions } from './types';
 import { CadopServiceType } from '../CadopIdentityKit';
 
 // Forward declaration to avoid circular import
@@ -28,14 +24,10 @@ interface TestEnv {
  * Create a self-managed DID by calling the on-chain create_did_object_for_self function
  */
 export async function createSelfDid(
-  env: TestEnv, 
+  env: TestEnv,
   options: CreateSelfDidOptions = {}
 ): Promise<CreateSelfDidResult> {
-  const {
-    keyType = KeyType.SECP256K1,
-    keyFragment = 'account-key',
-    skipFunding = true
-  } = options;
+  const { keyType = KeyType.SECP256K1, keyFragment = 'account-key', skipFunding = true } = options;
 
   // Generate keypair based on type
   let roochKeyPair: Keypair;
@@ -60,20 +52,25 @@ export async function createSelfDid(
   // Fund the account if needed
   if (!skipFunding) {
     await env.fundAccount(address.toBech32Address());
-  }  
+  }
 
   // Create creation request
   const publicKeyMultibase = MultibaseCodec.encodeBase58btc(roochKeyPair.getPublicKey().toBytes());
   const creationRequest: DIDCreationRequest = {
     publicKeyMultibase,
     keyType: keyType,
-    initialRelationships: ['authentication', 'assertionMethod', 'capabilityInvocation', 'capabilityDelegation'],
+    initialRelationships: [
+      'authentication',
+      'assertionMethod',
+      'capabilityInvocation',
+      'capabilityDelegation',
+    ],
     customScopes: options.customScopes,
   };
 
   // Create DID on-chain using VDR
   const result = await env.vdrRegistry.createDID('rooch', creationRequest, {
-    signer: roochKeyPair
+    signer: roochKeyPair,
   });
 
   if (!result.success || !result.didDocument) {
@@ -98,7 +95,7 @@ export async function createSelfDid(
     vmIdFragment: keyFragment,
     keyManager,
     signer,
-    identityEnv
+    identityEnv,
   };
 }
 
@@ -109,15 +106,12 @@ export async function createCadopCustodian(
   env: TestEnv,
   options: Pick<CreateCadopDidOptions, 'custodianKeyType' | 'skipFunding'> = {}
 ): Promise<CreateSelfDidResult> {
-  const {
-    custodianKeyType = KeyType.SECP256K1,
-    skipFunding = false
-  } = options;
+  const { custodianKeyType = KeyType.SECP256K1, skipFunding = false } = options;
 
-  // Create custodian DID 
+  // Create custodian DID
   const custodian = await createSelfDid(env, {
     keyType: custodianKeyType,
-    skipFunding
+    skipFunding,
   });
 
   // Add CADOP service using IdentityKit
@@ -126,19 +120,19 @@ export async function createCadopCustodian(
   // Add CADOP custodian service to custodian DID
   const custodianAuthMethods = custodianKit.getDIDDocument().verificationMethod || [];
   const custodianAuthMethod = custodianAuthMethods[0];
-  
+
   if (!custodianAuthMethod) {
     throw new Error('No authentication method found in custodian DID document');
   }
-  
+
   await custodianKit.addService({
     idFragment: 'cadop-custodian',
     type: CadopServiceType.CUSTODIAN,
     serviceEndpoint: 'https://example.com/cadop',
     additionalProperties: {
       custodianPublicKey: custodianAuthMethod.publicKeyMultibase,
-      custodianServiceVMType: custodianAuthMethod.type
-    }
+      custodianServiceVMType: custodianAuthMethod.type,
+    },
   });
 
   return custodian;
@@ -152,9 +146,7 @@ export async function createDidViaCadop(
   custodian: CreateSelfDidResult,
   options: Pick<CreateCadopDidOptions, 'userKeyType'> = {}
 ): Promise<CreateSelfDidResult> {
-  const {
-    userKeyType = KeyType.ED25519
-  } = options;
+  const { userKeyType = KeyType.ED25519 } = options;
 
   const custodianKit = await IdentityKit.fromExistingDID(custodian.did, custodian.signer);
 
@@ -169,17 +161,21 @@ export async function createDidViaCadop(
   }
 
   // Create user DID via CADOP
-  const cadopResult = await env.vdrRegistry.createDIDViaCADOP('rooch', {
-    userDidKey,
-    custodianServicePublicKey: custodianAuthMethod.publicKeyMultibase!,
-    custodianServiceVMType: custodianAuthMethod.type
-  }, {
-    signer: custodian.signer
-  });
+  const cadopResult = await env.vdrRegistry.createDIDViaCADOP(
+    'rooch',
+    {
+      userDidKey,
+      custodianServicePublicKey: custodianAuthMethod.publicKeyMultibase!,
+      custodianServiceVMType: custodianAuthMethod.type,
+    },
+    {
+      signer: custodian.signer,
+    }
+  );
 
   if (!cadopResult.success || !cadopResult.didDocument) {
     throw new Error(`Failed to create user DID via CADOP: ${cadopResult.error || 'Unknown error'}`);
-  } 
+  }
 
   const userDid = cadopResult.didDocument.id;
 
@@ -187,11 +183,7 @@ export async function createDidViaCadop(
   const userKeyStore = new MemoryKeyStore();
   const userKeyManager = KeyManager.createEmpty(userDid, userKeyStore);
   const userKeyFragment = 'account-key';
-  const userKeyId = await userKeyManager.importKeyPair(
-    userKeyFragment,
-    userKeyPair,
-    userKeyType
-  );
+  const userKeyId = await userKeyManager.importKeyPair(userKeyFragment, userKeyPair, userKeyType);
 
   // Create user signer
   const userSigner = await DidAccountSigner.create(userKeyManager, userKeyId);
@@ -204,8 +196,6 @@ export async function createDidViaCadop(
     vmIdFragment: userKeyFragment,
     keyManager: userKeyManager,
     signer: userSigner,
-    identityEnv: userIdentityEnv
+    identityEnv: userIdentityEnv,
   };
 }
-
- 

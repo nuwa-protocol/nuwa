@@ -50,8 +50,6 @@ export interface CreateSelfDidOptions {
   customScopes?: string[];
 }
 
-
-
 /**
  * Options for creating a CADOP DID scenario
  */
@@ -74,4 +72,4 @@ export interface EnvironmentCheck {
   reason?: string;
   /** Available RPC URL */
   rpcUrl?: string;
-} 
+}

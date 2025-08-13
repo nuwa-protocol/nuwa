@@ -169,11 +169,11 @@ describe('KeyManager', () => {
   describe('importKeyPair', () => {
     it('should successfully import consistent key pairs', async () => {
       const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-      
+
       const keyId = await keyManager.importKeyPair('test-key', keyPair, KEY_TYPE.ED25519);
-      
+
       expect(keyId).toBe(`${TEST_DID}#test-key`);
-      
+
       // Verify the key is stored correctly
       const storedKey = await keyManager.getStoredKey(keyId);
       expect(storedKey).toBeDefined();
@@ -184,13 +184,13 @@ describe('KeyManager', () => {
       // Generate two different key pairs
       const keyPair1 = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
       const keyPair2 = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-      
+
       // Create an inconsistent key pair (private key from one, public key from another)
       const inconsistentKeyPair = {
         privateKey: keyPair1.privateKey,
-        publicKey: keyPair2.publicKey
+        publicKey: keyPair2.publicKey,
       };
-      
+
       await expect(
         keyManager.importKeyPair('test-key', inconsistentKeyPair, KEY_TYPE.ED25519)
       ).rejects.toThrow('Key pair validation failed: private and public keys are inconsistent');
@@ -198,13 +198,13 @@ describe('KeyManager', () => {
 
     it('should work with different key types', async () => {
       const keyTypes = [KEY_TYPE.ED25519, KEY_TYPE.SECP256K1, KEY_TYPE.ECDSAR1];
-      
+
       for (const keyType of keyTypes) {
         const keyPair = await CryptoUtils.generateKeyPair(keyType);
         const keyId = await keyManager.importKeyPair(`test-key-${keyType}`, keyPair, keyType);
-        
+
         expect(keyId).toBe(`${TEST_DID}#test-key-${keyType}`);
-        
+
         const storedKey = await keyManager.getStoredKey(keyId);
         expect(storedKey?.keyType).toBe(keyType);
       }
@@ -212,14 +212,14 @@ describe('KeyManager', () => {
 
     it('should reject duplicate key IDs', async () => {
       const keyPair = await CryptoUtils.generateKeyPair(KEY_TYPE.ED25519);
-      
+
       // Import the key pair first time
       await keyManager.importKeyPair('test-key', keyPair, KEY_TYPE.ED25519);
-      
+
       // Try to import again with same fragment
-      await expect(
-        keyManager.importKeyPair('test-key', keyPair, KEY_TYPE.ED25519)
-      ).rejects.toThrow('Key ID did:example:123#test-key already exists in store');
+      await expect(keyManager.importKeyPair('test-key', keyPair, KEY_TYPE.ED25519)).rejects.toThrow(
+        'Key ID did:example:123#test-key already exists in store'
+      );
     });
   });
 });

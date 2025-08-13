@@ -44,7 +44,8 @@ export class CadopIdentityKit {
       requiredProperties: ['id', 'type', 'serviceEndpoint'],
       optionalProperties: ['supportedCredentials', 'description', 'fees', 'termsOfService'],
       propertyValidators: {
-        supportedCredentials: (value: any) => typeof value === 'string' || (Array.isArray(value) && value.length > 0),
+        supportedCredentials: (value: any) =>
+          typeof value === 'string' || (Array.isArray(value) && value.length > 0),
         fees: (value: any) => typeof value === 'object' && value !== null,
         termsOfService: (value: any) => typeof value === 'string' && value.length > 0,
       },
@@ -53,7 +54,8 @@ export class CadopIdentityKit {
       requiredProperties: ['id', 'type', 'serviceEndpoint'],
       optionalProperties: ['supportedPlatforms', 'description', 'fees'],
       propertyValidators: {
-        supportedPlatforms: (value: any) => typeof value === 'string' || (Array.isArray(value) && value.length > 0),
+        supportedPlatforms: (value: any) =>
+          typeof value === 'string' || (Array.isArray(value) && value.length > 0),
         fees: (value: any) => typeof value === 'object' && value !== null,
       },
     },

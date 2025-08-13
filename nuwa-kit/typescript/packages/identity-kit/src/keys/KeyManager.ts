@@ -265,8 +265,8 @@ export class KeyManager implements SignerInterface {
 
     // Validate key pair consistency for security
     const isConsistent = await CryptoUtils.validateKeyPairConsistency(
-      keyPair.privateKey, 
-      keyPair.publicKey, 
+      keyPair.privateKey,
+      keyPair.publicKey,
       type
     );
     if (!isConsistent) {

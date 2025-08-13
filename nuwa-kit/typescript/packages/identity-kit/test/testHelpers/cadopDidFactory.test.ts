@@ -31,7 +31,7 @@ describe('CADOP DID Factory Integration Tests', () => {
 
       const custodian = await createCadopCustodian(env, {
         custodianKeyType: KeyType.SECP256K1,
-        skipFunding: false
+        skipFunding: false,
       });
 
       expect(custodian).toBeDefined();
@@ -62,7 +62,7 @@ describe('CADOP DID Factory Integration Tests', () => {
 
       // Then create user via CADOP
       const user = await createDidViaCadop(env, custodian, {
-        userKeyType: KeyType.ED25519
+        userKeyType: KeyType.ED25519,
       });
 
       expect(user).toBeDefined();
@@ -83,5 +83,4 @@ describe('CADOP DID Factory Integration Tests', () => {
       console.log(`Custodian DID: ${custodian.did}`);
     });
   });
-
-}); 
+});

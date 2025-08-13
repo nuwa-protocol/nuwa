@@ -12,7 +12,10 @@ import { getDidWithoutFragment } from './utils/did';
  * It wires together VDRRegistry + KeyManager, but **does not** automatically create a DID.
  */
 export class IdentityEnv {
-  constructor(public registry: VDRRegistry, public keyManager: KeyManager) {}
+  constructor(
+    public registry: VDRRegistry,
+    public keyManager: KeyManager
+  ) {}
 
   /**
    * Load an existing DID and return a ready IdentityKit instance
@@ -107,14 +110,16 @@ export class IdentityEnvBuilder {
 }
 
 /** Convenience helper similar to the old `init()` but **without** auto-creating DID */
-export async function bootstrapIdentityEnv(opts: {
-  method?: string;
-  keyStore?: KeyStore;
-  vdrOptions?: any;
-} = {}): Promise<IdentityEnv> {
+export async function bootstrapIdentityEnv(
+  opts: {
+    method?: string;
+    keyStore?: KeyStore;
+    vdrOptions?: any;
+  } = {}
+): Promise<IdentityEnv> {
   const builder = new IdentityEnvBuilder();
   const method = opts.method || 'rooch';
   builder.useVDR(method, opts.vdrOptions);
   if (opts.keyStore) builder.useKeyStore(opts.keyStore);
   return builder.init();
-} 
+}

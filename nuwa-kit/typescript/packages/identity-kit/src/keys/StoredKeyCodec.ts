@@ -29,13 +29,13 @@ export class StoredKeyCodec {
     const jsonBytes = MultibaseCodec.decode(serialized);
     const jsonStr = bytesToString(jsonBytes);
     const key = JSON.parse(jsonStr) as StoredKey;
-    
+
     // Automatically validate key consistency for security
     const isValid = await this.validateKeyConsistency(key);
     if (!isValid) {
       throw new Error('StoredKey validation failed: private and public keys are inconsistent');
     }
-    
+
     return key;
   }
 
@@ -45,22 +45,30 @@ export class StoredKeyCodec {
    * @returns true if keys are consistent or validation can be skipped, false otherwise
    */
   private static async validateKeyConsistency(key: StoredKey): Promise<boolean> {
-    if (!key.privateKeyMultibase || !key.publicKeyMultibase || 
-        key.privateKeyMultibase.trim() === '' || key.publicKeyMultibase.trim() === '') {
+    if (
+      !key.privateKeyMultibase ||
+      !key.publicKeyMultibase ||
+      key.privateKeyMultibase.trim() === '' ||
+      key.publicKeyMultibase.trim() === ''
+    ) {
       // Skip validation if either key is missing or empty
       return true;
     }
-    
+
     try {
       // Decode private and public keys
       const privateKeyBytes = MultibaseCodec.decode(key.privateKeyMultibase);
       const publicKeyBytes = MultibaseCodec.decode(key.publicKeyMultibase);
-      
+
       // Use the centralized validation method from CryptoUtils
-      return await CryptoUtils.validateKeyPairConsistency(privateKeyBytes, publicKeyBytes, key.keyType);
+      return await CryptoUtils.validateKeyPairConsistency(
+        privateKeyBytes,
+        publicKeyBytes,
+        key.keyType
+      );
     } catch (error) {
       console.warn('Key consistency validation failed:', error);
       return false;
     }
   }
-} 
+}

@@ -137,4 +137,4 @@ export class DidAccountSigner extends Signer implements SignerInterface {
       publicKey: this.publicKey,
     };
   }
-} 
+}

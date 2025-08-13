@@ -29,7 +29,7 @@ export enum AuthErrorCode {
   DID_DOCUMENT_NOT_FOUND = 'DID_DOCUMENT_NOT_FOUND',
   VERIFICATION_METHOD_NOT_FOUND = 'VERIFICATION_METHOD_NOT_FOUND',
   INVALID_PUBLIC_KEY = 'INVALID_PUBLIC_KEY',
-  DID_MISMATCH = 'DID_MISMATCH'
+  DID_MISMATCH = 'DID_MISMATCH',
 }
 
 interface VerifyOptions {
@@ -41,7 +41,7 @@ interface VerifyHeaderOptions extends VerifyOptions {
 }
 
 // Detailed verification result with error codes
-export type DetailedVerifyResult = 
+export type DetailedVerifyResult =
   | {
       ok: true;
       signedObject: NIP1SignedObject;
@@ -133,7 +133,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'Timestamp out of window',
         errorCode: AuthErrorCode.TIMESTAMP_OUT_OF_WINDOW,
-        signedObject
+        signedObject,
       };
     }
 
@@ -142,7 +142,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'DID document ID does not match signer DID',
         errorCode: AuthErrorCode.DID_MISMATCH,
-        signedObject
+        signedObject,
       };
     }
 
@@ -152,7 +152,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'Verification method not found in DID document',
         errorCode: AuthErrorCode.VERIFICATION_METHOD_NOT_FOUND,
-        signedObject
+        signedObject,
       };
     }
 
@@ -169,7 +169,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'Invalid or missing public key material',
         errorCode: AuthErrorCode.INVALID_PUBLIC_KEY,
-        signedObject
+        signedObject,
       };
     }
 
@@ -190,7 +190,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'Signature verification failed',
         errorCode: AuthErrorCode.SIGNATURE_VERIFICATION_FAILED,
-        signedObject
+        signedObject,
       };
     }
   };
@@ -202,7 +202,7 @@ async function verifySignatureDetailed(
       const result = await attemptVerify(doc);
       if (result.ok) return result;
     }
-    
+
     // fallback: force refresh once
     doc = await resolver.resolveDID(signature.signer_did, { forceRefresh: true });
     if (!doc) {
@@ -210,7 +210,7 @@ async function verifySignatureDetailed(
         ok: false,
         error: 'DID document not found',
         errorCode: AuthErrorCode.DID_DOCUMENT_NOT_FOUND,
-        signedObject
+        signedObject,
       };
     }
     return attemptVerify(doc);
@@ -235,10 +235,10 @@ export async function verifyAuthHeader(
   opts: VerifyHeaderOptions = {}
 ): Promise<AuthVerifyResult> {
   if (!header || !header.startsWith(HEADER_PREFIX)) {
-    return { 
-      ok: false, 
+    return {
+      ok: false,
       error: 'Unsupported or missing Authorization header',
-      errorCode: AuthErrorCode.INVALID_HEADER
+      errorCode: AuthErrorCode.INVALID_HEADER,
     };
   }
   const b64url = header.substring(HEADER_PREFIX.length).trim();
@@ -246,10 +246,10 @@ export async function verifyAuthHeader(
   try {
     payloadStr = Bytes.bytesToString(MultibaseCodec.decodeBase64url(b64url));
   } catch (e) {
-    return { 
-      ok: false, 
+    return {
+      ok: false,
       error: 'Invalid base64 credentials',
-      errorCode: AuthErrorCode.INVALID_BASE64
+      errorCode: AuthErrorCode.INVALID_BASE64,
     };
   }
 
@@ -257,26 +257,28 @@ export async function verifyAuthHeader(
   try {
     parsed = JSON.parse(payloadStr);
   } catch (e) {
-    return { 
-      ok: false, 
+    return {
+      ok: false,
       error: 'Invalid JSON in credentials',
-      errorCode: AuthErrorCode.INVALID_JSON
+      errorCode: AuthErrorCode.INVALID_JSON,
     };
   }
 
   // restore signature.value Uint8Array
   if (!parsed?.signature?.value) {
-    return { 
-      ok: false, 
+    return {
+      ok: false,
       error: 'Missing signature value',
-      errorCode: AuthErrorCode.MISSING_SIGNATURE
+      errorCode: AuthErrorCode.MISSING_SIGNATURE,
     };
   }
   parsed.signature.value = MultibaseCodec.decodeBase64url(parsed.signature.value);
   const signedObj = parsed as NIP1SignedObject;
 
   // Use detailed verification function first (includes timestamp check)
-  const verifyResult = await verifySignatureDetailed(signedObj, resolver, { maxClockSkew: opts.maxClockSkew });
+  const verifyResult = await verifySignatureDetailed(signedObj, resolver, {
+    maxClockSkew: opts.maxClockSkew,
+  });
   if (!verifyResult.ok) {
     return verifyResult; // Return the detailed error from signature verification
   }
@@ -292,11 +294,11 @@ export async function verifyAuthHeader(
     ttlSeconds
   );
   if (!stored) {
-    return { 
-      ok: false, 
+    return {
+      ok: false,
       error: 'Nonce replayed',
       errorCode: AuthErrorCode.NONCE_REPLAYED,
-      signedObject: signedObj
+      signedObject: signedObj,
     };
   }
 

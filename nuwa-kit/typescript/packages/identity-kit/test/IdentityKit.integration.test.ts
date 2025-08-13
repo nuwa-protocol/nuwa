@@ -29,7 +29,7 @@ describe('IdentityKit Integration Test', () => {
     // Create a test DID using test helper
     testDid = await createSelfDid(env, {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
-      skipFunding: false
+      skipFunding: false,
     });
 
     console.log(`Test setup completed:
@@ -43,10 +43,10 @@ describe('IdentityKit Integration Test', () => {
 
       // Load the DID using IdentityKit
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       // Get DID document
       const didDocument = kit.getDIDDocument();
-      
+
       expect(didDocument).toBeDefined();
       expect(didDocument.id).toBe(testDid.did);
       expect(didDocument.verificationMethod).toBeDefined();
@@ -59,13 +59,13 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       const availableKeys = await kit.getAvailableKeyIds();
-      
+
       expect(availableKeys).toBeDefined();
       expect(availableKeys.authentication).toBeDefined();
       expect(availableKeys.authentication!.length).toBeGreaterThan(0);
-      
+
       console.log('Available key relationships:', Object.keys(availableKeys));
     });
 
@@ -73,12 +73,12 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       const availableKeys = await kit.getAvailableKeyIds();
       const authKeyId = availableKeys.authentication?.[0];
-      
+
       expect(authKeyId).toBeDefined();
-      
+
       const canSign = await kit.canSignWithKey(authKeyId!);
       expect(canSign).toBe(true);
     });
@@ -87,9 +87,9 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       const authMethods = kit.findVerificationMethodsByRelationship('authentication');
-      
+
       expect(authMethods).toBeDefined();
       expect(authMethods.length).toBeGreaterThan(0);
       expect(authMethods[0].type).toBe('EcdsaSecp256k1VerificationKey2019');
@@ -102,20 +102,20 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       // Generate a new key pair for the verification method
       const newKeyPair = await testDid.keyManager.generateKey('test-key', KeyType.ED25519);
-      
+
       // Get the public key bytes from the multibase encoded key
       const { MultibaseCodec } = await import('../src/multibase');
       const publicKeyBytes = MultibaseCodec.decodeBase58btc(newKeyPair.publicKeyMultibase);
-      
+
       // Add verification method
       const newKeyId = await kit.addVerificationMethod(
         {
           type: 'Ed25519VerificationKey2020',
           publicKeyMaterial: publicKeyBytes,
-          idFragment: 'test-key'
+          idFragment: 'test-key',
         },
         ['authentication', 'assertionMethod']
       );
@@ -138,18 +138,18 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       const serviceInfo: ServiceInfo = {
         idFragment: 'test-service',
         type: 'TestService',
         serviceEndpoint: 'https://example.com/test-service',
         additionalProperties: {
-          description: 'A test service for integration testing'
-        }
+          description: 'A test service for integration testing',
+        },
       };
 
       const serviceId = await kit.addService(serviceInfo);
-      
+
       expect(serviceId).toBeDefined();
       expect(serviceId).toContain('#test-service');
 
@@ -168,19 +168,19 @@ describe('IdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const kit = await IdentityKit.fromExistingDID(testDid.did, testDid.signer);
-      
+
       // First add a service
       const serviceInfo: ServiceInfo = {
         idFragment: 'findable-service',
         type: 'FindableService',
-        serviceEndpoint: 'https://example.com/findable'
+        serviceEndpoint: 'https://example.com/findable',
       };
 
       await kit.addService(serviceInfo);
 
       // Now find it
       const foundService = kit.findServiceByType('FindableService');
-      
+
       expect(foundService).toBeDefined();
       expect(foundService!.type).toBe('FindableService');
       expect(foundService!.serviceEndpoint).toBe('https://example.com/findable');
@@ -195,8 +195,8 @@ describe('IdentityKit Integration Test', () => {
         method: 'rooch',
         vdrOptions: {
           rpcUrl: process.env.ROOCH_NODE_URL || 'http://localhost:6767',
-          network: 'test'
-        }
+          network: 'test',
+        },
       });
 
       expect(bootstrapEnv).toBeDefined();
@@ -206,7 +206,7 @@ describe('IdentityKit Integration Test', () => {
       // Test loading our existing DID through the bootstrapped environment
       const kit = await bootstrapEnv.loadDid(testDid.did, testDid.signer);
       const didDoc = kit.getDIDDocument();
-      
+
       expect(didDoc.id).toBe(testDid.did);
     });
   });
@@ -217,9 +217,7 @@ describe('IdentityKit Integration Test', () => {
 
       const invalidDid = 'did:rooch:0xinvalidaddress';
 
-      await expect(
-        IdentityKit.fromExistingDID(invalidDid, testDid.signer)
-      ).rejects.toThrow();
+      await expect(IdentityKit.fromExistingDID(invalidDid, testDid.signer)).rejects.toThrow();
     });
 
     it('should throw error when no VDR available for method', async () => {
@@ -227,9 +225,9 @@ describe('IdentityKit Integration Test', () => {
 
       const unsupportedDid = 'did:unsupported:test';
 
-      await expect(
-        IdentityKit.fromExistingDID(unsupportedDid, testDid.signer)
-      ).rejects.toThrow('No VDR available for DID method \'unsupported\'');
+      await expect(IdentityKit.fromExistingDID(unsupportedDid, testDid.signer)).rejects.toThrow(
+        "No VDR available for DID method 'unsupported'"
+      );
     });
   });
-}); 
+});

@@ -201,26 +201,24 @@ export class EcdsaR1Provider implements CryptoProvider {
       true,
       ['sign']
     );
-    
+
     // Export as JWK to get public key coordinates
     const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
     if (!jwk.x || !jwk.y) {
       throw new Error('Failed to derive public key from private key');
     }
-    
+
     // Convert base64url coordinates to raw bytes
     const x = base64urlToBytes(jwk.x);
     const y = base64urlToBytes(jwk.y);
-    
+
     // Reconstruct uncompressed public key (0x04 + x + y)
     const uncompressed = new Uint8Array(65);
     uncompressed[0] = 0x04;
     uncompressed.set(x, 1);
     uncompressed.set(y, 33);
-    
+
     // Compress the public key to match our standard format
     return this.compressPublicKey(uncompressed);
   }
-
-
 }

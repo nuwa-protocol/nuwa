@@ -12,7 +12,7 @@ describe('sessionScopes', () => {
   describe('buildBaseScopes', () => {
     it('should build correct base scopes', () => {
       const scopes = buildBaseScopes();
-      
+
       expect(scopes).toEqual([
         '0x3::did::*',
         '0x3::payment_channel::*',
@@ -28,28 +28,28 @@ describe('sessionScopes', () => {
         '0x123::chat::send',
         '0x3::did::*', // duplicate with base scope
       ];
-      
+
       const combined = combineScopes(customScopes);
-      
+
       // Should include base scopes + custom scopes, with duplicates removed
       expect(combined).toEqual([
-        '0x3::did::*',                 // base scope (duplicate removed)
-        '0x3::payment_channel::*',     // base scope
+        '0x3::did::*', // base scope (duplicate removed)
+        '0x3::payment_channel::*', // base scope
         '0xdc2a3eba923548660bb642b9df42936941a03e2d8bab223ae6dda6318716e742::*::*', // base scope
-        '0xabc::defi::*',              // custom scope
-        '0x123::chat::send',           // custom scope
+        '0xabc::defi::*', // custom scope
+        '0x123::chat::send', // custom scope
       ]);
     });
 
     it('should handle empty custom scopes', () => {
       const combined = combineScopes([]);
-      
+
       expect(combined).toEqual(buildBaseScopes());
     });
 
     it('should handle undefined custom scopes', () => {
       const combined = combineScopes();
-      
+
       expect(combined).toEqual(buildBaseScopes());
     });
   });
@@ -71,14 +71,14 @@ describe('sessionScopes', () => {
 
     it('should reject invalid scope formats', () => {
       const invalidScopes = [
-        '',                          // empty
-        'invalid',                   // missing parts
-        '0x3::did',                  // missing function
+        '', // empty
+        'invalid', // missing parts
+        '0x3::did', // missing function
         '0x3::did::function::extra', // too many parts
-        '::did::*',                  // empty address
-        '0x3::::*',                  // empty module
-        '0x3::did::',                // empty function
-        'invalid-hex::did::*',       // invalid address format
+        '::did::*', // empty address
+        '0x3::::*', // empty module
+        '0x3::did::', // empty function
+        'invalid-hex::did::*', // invalid address format
       ];
 
       invalidScopes.forEach(scope => {
@@ -96,38 +96,31 @@ describe('sessionScopes', () => {
 
   describe('validateScopes', () => {
     it('should validate array of valid scopes', () => {
-      const scopes = [
-        '0x3::did::*',
-        '0xabc::defi::swap',
-        'rooch1test::chat::send',
-      ];
+      const scopes = ['0x3::did::*', '0xabc::defi::swap', 'rooch1test::chat::send'];
 
       const result = validateScopes(scopes);
-      
+
       expect(result.valid).toBe(true);
       expect(result.invalidScopes).toEqual([]);
     });
 
     it('should identify invalid scopes in array', () => {
       const scopes = [
-        '0x3::did::*',           // valid
-        'invalid-format',        // invalid
-        '0xabc::defi::swap',     // valid
-        '::missing::address',    // invalid
+        '0x3::did::*', // valid
+        'invalid-format', // invalid
+        '0xabc::defi::swap', // valid
+        '::missing::address', // invalid
       ];
 
       const result = validateScopes(scopes);
-      
+
       expect(result.valid).toBe(false);
-      expect(result.invalidScopes).toEqual([
-        'invalid-format',
-        '::missing::address',
-      ]);
+      expect(result.invalidScopes).toEqual(['invalid-format', '::missing::address']);
     });
 
     it('should handle empty array', () => {
       const result = validateScopes([]);
-      
+
       expect(result.valid).toBe(true);
       expect(result.invalidScopes).toEqual([]);
     });
@@ -142,7 +135,7 @@ describe('sessionScopes', () => {
       };
 
       const result = scopeObjectToString(scope);
-      
+
       expect(result).toBe('0x3::did::*');
     });
 
@@ -154,7 +147,7 @@ describe('sessionScopes', () => {
       };
 
       const result = scopeObjectToString(scope);
-      
+
       expect(result).toBe('0xabc::defi::swap');
     });
   });
@@ -168,17 +161,13 @@ describe('sessionScopes', () => {
       ];
 
       const result = scopeObjectsToStrings(scopes);
-      
-      expect(result).toEqual([
-        '0x3::did::*',
-        '0xabc::defi::swap',
-        'rooch1test::chat::send',
-      ]);
+
+      expect(result).toEqual(['0x3::did::*', '0xabc::defi::swap', 'rooch1test::chat::send']);
     });
 
     it('should handle empty array', () => {
       const result = scopeObjectsToStrings([]);
-      
+
       expect(result).toEqual([]);
     });
   });
@@ -214,9 +203,9 @@ describe('sessionScopes', () => {
 
     it('should reject malformed hex addresses', () => {
       const malformedHex = [
-        '0xGHI::module::func',    // invalid hex chars
-        '0::module::func',        // missing x
-        'x123::module::func',     // missing 0
+        '0xGHI::module::func', // invalid hex chars
+        '0::module::func', // missing x
+        'x123::module::func', // missing 0
       ];
 
       malformedHex.forEach(scope => {
@@ -224,4 +213,4 @@ describe('sessionScopes', () => {
       });
     });
   });
-}); 
+});
