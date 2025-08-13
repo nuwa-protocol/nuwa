@@ -460,7 +460,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                         (res as any).write?.(frameNDJSON);
                       } catch {}
                     }
-                    // For other content types,不强制插入，避免破坏协议
+                    // For other content types, do not force insertion to avoid breaking protocol
                   } catch {}
                   if (settled?.state?.unsignedSubRav) {
                     this.middleware.persistBilling(settled).catch(() => {});
