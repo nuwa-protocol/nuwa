@@ -132,18 +132,7 @@ export function registerBillableRoutes(billing: any) {
 
 ### 4. 关于流式响应的计费
 
-流式响应的首包很早发出，难以在响应头中注入最终成本（`FinalCost` 需要 usage）。建议两步走：
-
-- 短期（MVP）：流式接口按“固定单价”计费（`PerRequest`），或暂不计费（FREE）。
-
-```ts
-billing.post('/api/v1/chat/completions:stream', { pricing: '2000000000' }, async (req, res) => {
-  // 固定价格（示例 0.002 USD）
-  await handleStreamLLM(req, res);
-});
-```
-
-- 后续：采用“提案 + 提交”的 Commit 流程（开始时发提案，结束后提交最终金额），需要在网关中对接 PaymentKit 的提交接口，或在流结束前缓冲并延迟首包（较复杂，建议单独迭代）。
+与 OpenRouter 保持一致，流式与非流式共用同一路径 `/api/v1/chat/completions`，通过请求体中的 `stream: true` 开关启用流式（SSE）。在流式分支中，使用 `FinalCost` 的延迟结算，网关在流结束时将 `usage.cost`（USD）转换为 picoUSD 写入 `res.locals.usage`，由 `ExpressPaymentKit` 完成结算与 In-band 支付帧注入（`nuwa_payment_header`）。
 
 ---
 
