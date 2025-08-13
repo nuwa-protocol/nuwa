@@ -26,6 +26,12 @@ export interface RouteOptions {
    * Admin routes require both DID authentication and admin permission check.
    */
   adminOnly?: boolean;
+
+  /**
+   * Whether this route produces streaming responses (SSE/NDJSON/chunked).
+   * If true, settlement header will not be written pre-body; provider should settle on finish.
+   */
+  streaming?: boolean;
 }
 
 /**

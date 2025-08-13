@@ -43,6 +43,7 @@ import { PaymentHubClient } from '../../client/PaymentHubClient';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { MemoryChannelRepository, type ChannelRepository } from '../../storage';
 import { PaymentErrorCode } from '../../errors/codes';
+import { wrapAndFilterInBandFrames } from './internal/StreamPaymentFilter';
 
 /**
  * HTTP Client State enum for internal state management
@@ -919,7 +920,30 @@ export class PaymentChannelHttpClient {
         ...initWithoutHeaders,
       });
 
+      // Handle headers first
       await this.handleResponse(response);
+
+      // For streaming responses, wrap and filter in-band frames so app sees clean business stream
+      const ct = (response.headers.get('content-type') || '').toLowerCase();
+      const isStreamLike = ct.includes('text/event-stream') || ct.includes('application/x-ndjson');
+      if (isStreamLike && response.body && typeof (response.body as any).getReader === 'function') {
+        const filtered = wrapAndFilterInBandFrames(
+          response,
+          async p => {
+            await this.handleProtocolSuccess({
+              type: 'success',
+              clientTxRef: (p as any).clientTxRef,
+              subRav: (p as any).subRav,
+              cost: BigInt(p.cost as any),
+              costUsd: p.costUsd !== undefined ? BigInt(p.costUsd as any) : undefined,
+              serviceTxRef: (p as any).serviceTxRef,
+            });
+          },
+          (...args: any[]) => this.log(...args)
+        );
+        return filtered;
+      }
+
       return response;
     } catch (error) {
       this.handleError('Request failed', error);
@@ -1123,7 +1147,25 @@ export class PaymentChannelHttpClient {
   }
 
   private async handleNoProtocolHeader(response: Response): Promise<void> {
-    // Treat as free endpoint: resolve all pending
+    // If this looks like a streaming response, attempt background polling for settlement
+    try {
+      const ct = (response.headers.get('content-type') || '').toLowerCase();
+      // Strict content-type based detection to avoid false positives (e.g., chunked JSON)
+      const isStreamLike = ct.includes('text/event-stream') || ct.includes('application/x-ndjson');
+
+      if (
+        isStreamLike &&
+        this.clientState.pendingPayments &&
+        this.clientState.pendingPayments.size
+      ) {
+        // Prefer in-band frame parsing; if not parsed, pending will be resolved by recovery on next request
+        // Optional: Parse in-band payment frames (SSE/NDJSON)
+        this.parseInBandFrames(response).catch(err => this.log('[inband.parse.error]', err));
+        return; // Do not resolve as free yet; let polling resolve the pending promises
+      }
+    } catch (_) {}
+
+    // Non-streaming or no pending: treat as free endpoint
     this.resolveAllPendingAsFree();
 
     // Map known status codes when no protocol header present
@@ -1147,6 +1189,49 @@ export class PaymentChannelHttpClient {
         'SubRAV conflict - cleared pending proposal',
         409
       );
+    }
+  }
+
+  // Try parse in-band payment frames while response body is read by the app
+  private async parseInBandFrames(response: Response): Promise<void> {
+    const stream = response.body;
+    if (!stream || typeof (stream as any).getReader !== 'function') return;
+    const reader = (stream as any).getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const text = decoder.decode(value, { stream: true });
+      buffer += text;
+      // SSE frames end with blank line
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        // SSE style: event: nuwa-payment 或 data: { nuwa_payment: ... }
+        if (line.startsWith('event:')) {
+          // ignore; use data line
+        }
+        if (line.startsWith('data: ')) {
+          const payload = line.slice(6);
+          try {
+            const obj = JSON.parse(payload);
+            const p = obj?.nuwa_payment || obj?.__nuwa_payment__;
+            if (p && p.subRav && p.cost !== undefined) {
+              await this.handleProtocolSuccess({
+                type: 'success',
+                clientTxRef: p.clientTxRef,
+                subRav: p.subRav,
+                cost: BigInt(p.cost),
+                costUsd: p.costUsd ? BigInt(p.costUsd) : undefined,
+                serviceTxRef: p.serviceTxRef,
+              });
+              return;
+            }
+          } catch {}
+        }
+      }
     }
   }
 

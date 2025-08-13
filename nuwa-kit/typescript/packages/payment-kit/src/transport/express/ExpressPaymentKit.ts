@@ -394,27 +394,108 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
           let billingCompleted = false;
           let headerWritten = false;
+          const isStreaming =
+            !!(rule as any).streaming ||
+            (typeof req.body === 'object' && !!(req as any).body?.stream === true) ||
+            (typeof req.query === 'object' &&
+              ((req.query as any).stream === 'true' || (req.query as any).stream === true)) ||
+            req.path.includes(':stream');
 
           // Intercept headers to write payment header synchronously
           // Note: This is the unified exit for the settlement stage, which writes the success/failure payment header; it is complementary to the pre-processing error short-circuit rather than redundant.
-          onHeaders(res, () => {
-            if (headerWritten) return;
-            headerWritten = true;
-            try {
-              this.ensureExposeHeader(res);
-              const raw = (res.locals as any).usage;
-              const units =
-                typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
-              this.middleware.settleBillingSync(billingContext, units, resAdapter);
-            } catch (error) {}
-          });
+          if (!isStreaming) {
+            onHeaders(res, () => {
+              if (headerWritten) return;
+              headerWritten = true;
+              try {
+                this.ensureExposeHeader(res);
+                const raw = (res.locals as any).usage;
+                const units =
+                  typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+                this.middleware.settleBillingSync(billingContext, units, resAdapter);
+              } catch (error) {}
+            });
+          }
+
+          // Inject in-band payment frame for streaming just before end (best-effort)
+          if (isStreaming) {
+            const originalEnd = (res as any).end?.bind(res) || res.end;
+            (res as any).end = (...args: any[]) => {
+              try {
+                if (!billingCompleted) {
+                  const raw = (res.locals as any).usage;
+                  const units =
+                    typeof raw === 'number' && Number.isFinite(raw) && raw >= 0
+                      ? Math.floor(raw)
+                      : 0;
+                  const settled: any = this.processor.settle(billingContext, units);
+                  if (!headerWritten) {
+                    try {
+                      this.ensureExposeHeader(res);
+                      if (settled?.state?.headerValue) {
+                        res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
+                      }
+                    } catch {}
+                  }
+                  try {
+                    const payload = {
+                      nuwa_payment: {
+                        subRav: settled?.state?.unsignedSubRav,
+                        cost: settled?.state?.cost?.toString?.() ?? '0',
+                        clientTxRef: billingContext.meta?.clientTxRef,
+                        serviceTxRef: settled?.state?.serviceTxRef,
+                        version: 1,
+                      },
+                    };
+                    const ct = (res.getHeader('Content-Type') as string) || '';
+                    const frameSSE = `data: ${JSON.stringify(payload)}\n\n`;
+                    const frameNDJSON =
+                      JSON.stringify({ __nuwa_payment__: payload.nuwa_payment }) + '\n';
+                    if (ct.includes('text/event-stream')) {
+                      try {
+                        (res as any).write?.(frameSSE);
+                      } catch {}
+                    } else if (ct.includes('application/x-ndjson')) {
+                      try {
+                        (res as any).write?.(frameNDJSON);
+                      } catch {}
+                    }
+                    // For other content types,不强制插入，避免破坏协议
+                  } catch {}
+                  if (settled?.state?.unsignedSubRav) {
+                    this.middleware.persistBilling(settled).catch(() => {});
+                  }
+                  billingCompleted = true;
+                }
+              } catch {}
+              return originalEnd(...args);
+            };
+          }
 
           // Persist after response is sent
           res.on('finish', async () => {
             if (billingCompleted) return;
             billingCompleted = true;
             try {
-              if (billingContext.state?.unsignedSubRav) {
+              if (isStreaming) {
+                // Streaming: settle at finish and persist
+                const raw = (res.locals as any).usage;
+                const units =
+                  typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+                const settled = this.processor.settle(billingContext, units) as any;
+                if (!headerWritten) {
+                  // Trailers are not widely supported; rely on polling/in-band. Still expose header if possible.
+                  try {
+                    this.ensureExposeHeader(res);
+                    if (settled?.state?.headerValue) {
+                      res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
+                    }
+                  } catch {}
+                }
+                if (settled?.state?.unsignedSubRav) {
+                  await this.middleware.persistBilling(settled);
+                }
+              } else if (billingContext.state?.unsignedSubRav) {
                 await this.middleware.persistBilling(billingContext);
               }
             } catch (error) {}

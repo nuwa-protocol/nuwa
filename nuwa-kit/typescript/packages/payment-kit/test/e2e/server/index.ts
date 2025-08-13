@@ -168,6 +168,37 @@ export async function createBillingServer(config: BillingServerConfig) {
     }
   );
 
+  // Streaming SSE route: FinalCost post-flight billing with in-band payment frame
+  billing.get(
+    '/stream',
+    { pricing: { type: 'FinalCost' }, authRequired: true },
+    async (req: Request, res: Response) => {
+      try {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        // Emit a few chunks
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i >= 3) return;
+          res.write(`data: ${JSON.stringify({ text: `chunk-${i}` })}\n\n`);
+          i += 1;
+        }, 20);
+
+        setTimeout(() => {
+          clearInterval(timer);
+          // Provide picoUSD cost (e.g., 0.002 USD)
+          res.locals.usage = 2_000_000_000; // 2e9 picoUSD
+          res.end();
+        }, 120);
+      } catch (error) {
+        if (!res.headersSent) res.status(500).end();
+      }
+    }
+  );
+
   // Original business routes have been migrated to BillableRouter
 
   // 4. Mount billing routes with all integrated endpoints (discovery, admin, recovery, business routes)

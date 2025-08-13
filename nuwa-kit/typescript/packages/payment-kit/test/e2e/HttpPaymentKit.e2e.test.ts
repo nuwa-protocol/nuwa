@@ -405,6 +405,42 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 Recovery functionality test successful!');
   }, 60000);
 
+  test('Streaming SSE endpoint with in-band payment frame', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('📡 Testing streaming SSE with in-band payment frame');
+
+    // Use low-level requestWithPayment to keep Response as stream
+    const handle = await (httpClient as any).requestWithPayment('GET', '/stream');
+    const response: Response = handle.data as any;
+
+    // Consume a few chunks then allow end
+    const reader = (response.body as any).getReader?.();
+    if (reader) {
+      for (let i = 0; i < 3; i++) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    }
+
+    // Wait a short while for frame parsing/settlement to resolve payment internally
+    await new Promise(r => setTimeout(r, 300));
+
+    const channelId = httpClient.getChannelId();
+    expect(channelId).toBeTruthy();
+
+    // In-band frame or next-request recovery should provide a pending SubRAV
+    const pending = httpClient.getPendingSubRAV();
+    expect(pending).toBeTruthy();
+
+    // Make a follow-up paid request to ensure previous stream cost was settled
+    const follow = await httpClient.get('/echo?q=after%20stream');
+    expect(follow.payment).toBeTruthy();
+    console.log(`💰 Follow-up payment after stream - ${formatPaymentInfo(follow.payment!)}`);
+
+    console.log('🎉 Streaming SSE with in-band payment frame test successful!');
+  }, 120000);
+
   test('Auto-authorize sub-channel on recovery when channel exists without sub-channel', async () => {
     if (!shouldRunE2ETests()) return;
 
