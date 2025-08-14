@@ -132,16 +132,45 @@ export class PaymentChannelHttpClient {
   }
 
   /**
-   * Send an HTTP request with payment channel integration
-   * Returns response with payment information
+   * Primary API – returns a handle with separate response and payment promises.
+   * Callers can choose to await `response`, `payment`, or `done` depending on needs.
    */
   async requestWithPayment(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
     init?: RequestInit
+  ): Promise<PaymentRequestHandle<Response>> {
+    return this.createRequestHandle(method, path, init);
+  }
+
+  /**
+   * Convenience: return only the HTTP response (non-blocking for payment).
+   */
+  async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+    path: string,
+    init?: RequestInit
+  ): Promise<Response> {
+    const handle = await this.createRequestHandle(method, path, init);
+    return handle.response;
+  }
+
+  /**
+   * Convenience: wait for response and payment (recommended for non-streaming endpoints).
+   */
+  async requestAndWaitForPayment(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+    path: string,
+    init?: RequestInit
   ): Promise<PaymentResult<Response>> {
     const handle = await this.createRequestHandle(method, path, init);
-    const { data, payment } = await handle.done;
+    const data = await handle.response;
+    let payment: PaymentInfo | undefined = undefined;
+    try {
+      payment = await handle.payment;
+    } catch {
+      // swallow payment wait errors here; callers still have the response
+    }
     return { data, payment };
   }
 
@@ -149,7 +178,7 @@ export class PaymentChannelHttpClient {
    * Create a handle containing both response and payment promises, correlated by clientTxRef.
    * Advanced callers can use this for fine-grained tracking or cancellation without changing the existing API.
    */
-  async createRequestHandle(
+  private async createRequestHandle(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
     init?: RequestInit
@@ -237,7 +266,7 @@ export class PaymentChannelHttpClient {
    * Convenience methods for common HTTP verbs with payment info
    */
   async get<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
-    const result = await this.requestWithPayment('GET', path, init);
+    const result = await this.requestAndWaitForPayment('GET', path, init);
     const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
@@ -251,7 +280,7 @@ export class PaymentChannelHttpClient {
         ...init?.headers,
       },
     };
-    const result = await this.requestWithPayment('POST', path, requestInit);
+    const result = await this.requestAndWaitForPayment('POST', path, requestInit);
     const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
@@ -265,7 +294,7 @@ export class PaymentChannelHttpClient {
         ...init?.headers,
       },
     };
-    const result = await this.requestWithPayment('PUT', path, requestInit);
+    const result = await this.requestAndWaitForPayment('PUT', path, requestInit);
     const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
@@ -279,13 +308,13 @@ export class PaymentChannelHttpClient {
         ...init?.headers,
       },
     };
-    const result = await this.requestWithPayment('PATCH', path, requestInit);
+    const result = await this.requestAndWaitForPayment('PATCH', path, requestInit);
     const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }
 
   async delete<T = any>(path: string, init?: RequestInit): Promise<PaymentResult<T>> {
-    const result = await this.requestWithPayment('DELETE', path, init);
+    const result = await this.requestAndWaitForPayment('DELETE', path, init);
     const data = await this.parseJsonAuto<T>(result.data);
     return { data, payment: result.payment };
   }

@@ -410,9 +410,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('📡 Testing streaming SSE with in-band payment frame');
 
-    // Use low-level requestWithPayment to keep Response as stream
-    const handle = await (httpClient as any).requestWithPayment('GET', '/stream');
-    const response: Response = handle.data as any;
+    // Use requestWithPayment to get a handle and keep Response as stream
+    const handle = await httpClient.requestWithPayment('GET', '/stream');
+    const response: Response = await handle.response;
 
     // Consume a few chunks then allow end
     const reader = (response.body as any).getReader?.();
