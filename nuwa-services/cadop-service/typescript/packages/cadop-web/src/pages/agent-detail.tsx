@@ -18,19 +18,12 @@ import {
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
-import {
-  ArrowLeft,
-  Key,
-  History,
-  Users,
-  FileText,
-  RotateCcw,
-  Gift,
-  Trash2,
-} from 'lucide-react';
+import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2 } from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
-  import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
+import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
+import { usePaymentHubClient } from '../hooks/usePaymentHubClient';
+import { DEFAULT_ASSET_ID } from '@/config/env';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
@@ -55,19 +48,19 @@ export function AgentDetailPage() {
   // Tab state (reserved for future use)
 
   const {
-    balances,
-    isLoading: balanceLoading,
-    isError: balanceError,
-    refetch: refetchBalances,
+    balances: agentAccountBalances,
+    isLoading: agentAccountLoading,
+    isError: agentAccountError,
+    refetch: refetchAgentAccountBalances,
   } = useAgentBalances(did);
   // PaymentHub balances
   const {
-    balances: hubBalances,
-    activeCounts: hubActiveCounts,
-    loading: hubLoading,
-    error: hubError,
-    refetch: refetchHub,
+    activeCounts: paymentHubActiveCounts,
+    loading: paymentHubStateLoading,
+    error: paymentHubStateError,
+    refetch: refetchPaymentHubState,
   } = usePaymentHubBalances(did);
+  const { hubClient } = usePaymentHubClient(did);
   const { depositPercentOfClaimed } = useHubDeposit(did);
 
   // ---------------- RGAS Faucet Claim ----------------
@@ -88,9 +81,9 @@ export function AgentDetailPage() {
       const data = { gas: claimed };
       // Best-effort deposit 50% of claimed to PaymentHub (non-blocking)
       depositPercentOfClaimed(claimed, 50)
-        .then(() => refetchHub())
+        .then(() => refetchPaymentHubRgas())
         .catch(e => console.warn('Auto deposit to PaymentHub failed:', e));
-      await refetchBalances();
+      await refetchAgentAccountBalances();
       setHasClaimed(true);
       toast({
         variant: 'success',
@@ -117,6 +110,52 @@ export function AgentDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [didService, userDid]);
+
+  // Format bigint with decimals
+  const formatBigIntWithDecimals = (
+    value: bigint,
+    decimals: number,
+    fractionDigits?: number
+  ): string => {
+    const negative = value < 0n;
+    const v = negative ? -value : value;
+    const base = 10n ** BigInt(decimals);
+    const integer = v / base;
+    let fraction = (v % base).toString().padStart(decimals, '0');
+    if (typeof fractionDigits === 'number') {
+      fraction = fraction.slice(0, Math.min(decimals, fractionDigits));
+    }
+    const fracPart = fraction.length > 0 ? `.${fraction}` : '';
+    return `${negative ? '-' : ''}${integer.toString()}${fracPart}`;
+  };
+
+  // PaymentHub RGas (default asset) balance with USD
+  const [paymentHubRgasLoading, setPaymentHubRgasLoading] = useState(false);
+  const [paymentHubRgasError, setPaymentHubRgasError] = useState<string | null>(null);
+  const [paymentHubRgasAmount, setPaymentHubRgasAmount] = useState<string>('0');
+  const [paymentHubRgasUsd, setPaymentHubRgasUsd] = useState<string>('0');
+
+  const refetchPaymentHubRgas = async () => {
+    if (!hubClient) return;
+    setPaymentHubRgasLoading(true);
+    try {
+      const res = await hubClient.getBalanceWithUsd({ assetId: DEFAULT_ASSET_ID });
+      setPaymentHubRgasAmount(formatBigIntWithDecimals(res.balance, 8));
+      setPaymentHubRgasUsd(formatBigIntWithDecimals(res.balancePicoUSD, 12, 2));
+      setPaymentHubRgasError(null);
+    } catch (e: any) {
+      setPaymentHubRgasError(e?.message || String(e));
+    } finally {
+      setPaymentHubRgasLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hubClient && did) {
+      refetchPaymentHubRgas();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubClient, did]);
 
   const loadAgentInfo = async () => {
     if (!didService) return;
@@ -240,18 +279,18 @@ export function AgentDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => refetchBalances()}
+                  onClick={() => refetchAgentAccountBalances()}
                   className="h-8 w-8 p-0"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent>
-                {balanceLoading ? (
+                {agentAccountLoading ? (
                   <SpinnerContainer loading={true} size="small" />
-                ) : balances.length > 0 ? (
+                ) : agentAccountBalances.length > 0 ? (
                   <div className="space-y-2">
-                    {balances.map((bal, idx) => (
+                    {agentAccountBalances.map((bal, idx) => (
                       <div
                         key={idx}
                         className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
@@ -264,12 +303,57 @@ export function AgentDetailPage() {
                       </div>
                     ))}
                   </div>
-                ) : balanceError ? (
+                ) : agentAccountError ? (
                   <div className="text-center py-2">
                     <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
                   </div>
                 ) : (
                   <span className="text-gray-500">{t('agent.noBalance')}</span>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* PaymentHub Balances - moved below account balance to keep same width */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>PaymentHub</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    refetchPaymentHubState();
+                    refetchPaymentHubRgas();
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {paymentHubStateLoading || paymentHubRgasLoading ? (
+                  <SpinnerContainer loading={true} size="small" />
+                ) : paymentHubStateError || paymentHubRgasError ? (
+                  <div className="text-center py-2">
+                    <span className="text-red-500">
+                      {paymentHubStateError || paymentHubRgasError}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center">
+                      <span className="font-medium">RGas</span>
+                      {paymentHubActiveCounts[DEFAULT_ASSET_ID] !== undefined && (
+                        <Tag variant="info" className="ml-2">
+                          {t('agent.activeChannels', { defaultValue: 'Active Channels' })}:{' '}
+                          {paymentHubActiveCounts[DEFAULT_ASSET_ID]}
+                        </Tag>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div>{paymentHubRgasAmount}</div>
+                      <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -326,7 +410,9 @@ export function AgentDetailPage() {
                             {isAuthentication && (
                               <Tag variant="success">{t('agent.authentication')}</Tag>
                             )}
-                            {isAssertionMethod && <Tag variant="secondary">{t('agent.assertion')}</Tag>}
+                            {isAssertionMethod && (
+                              <Tag variant="secondary">{t('agent.assertion')}</Tag>
+                            )}
                             {isKeyAgreement && (
                               <Tag variant="secondary">{t('agent.keyAgreement')}</Tag>
                             )}
@@ -393,50 +479,6 @@ export function AgentDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>PaymentHub</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchHub()}
-                  className="h-8 w-8 p-0"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {hubLoading ? (
-                  <SpinnerContainer loading={true} size="small" />
-                ) : hubError ? (
-                  <div className="text-center py-2">
-                    <span className="text-red-500">{hubError}</span>
-                  </div>
-                ) : Object.keys(hubBalances).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.entries(hubBalances).map(([assetId, amount]) => (
-                      <div
-                        key={assetId}
-                        className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
-                      >
-                        <div className="flex items-center">
-                          <span className="font-medium">{assetId}</span>
-                          {hubActiveCounts[assetId] !== undefined && (
-                            <Tag variant="info" className="ml-2">
-                              {t('agent.activeChannels', { defaultValue: 'Active Channels' })}: {hubActiveCounts[assetId]}
-                            </Tag>
-                          )}
-                        </div>
-                        <span>{amount.toString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-gray-500">{t('agent.noBalance')}</span>
-                )}
-              </CardContent>
-            </Card>
             </div>
           )}
         </div>

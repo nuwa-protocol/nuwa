@@ -23,23 +23,6 @@ export function AddAuthMethodPage() {
 
   const { didService, error: serviceError } = useDIDService(did);
 
-  useEffect(() => {
-    if (did) {
-      loadDIDService();
-    }
-  }, [did, userDid]);
-
-  const loadDIDService = async () => {
-    if (!did || !userDid) return;
-
-    try {
-      await DIDService.initialize(did);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
-      setError(message);
-    }
-  };
-
   const handleSubmit = async (values: VerificationMethodFormValues) => {
     if (!did || !didService) return;
 

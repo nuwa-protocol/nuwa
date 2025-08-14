@@ -1,6 +1,10 @@
 import { createVDR, IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
 import { ROOCH_RPC_URL } from '../../config/env';
-import type { OperationalKeyInfo, VerificationRelationship, SignerInterface } from '@nuwa-ai/identity-kit';
+import type {
+  OperationalKeyInfo,
+  VerificationRelationship,
+  SignerInterface,
+} from '@nuwa-ai/identity-kit';
 import { WebAuthnSigner } from '../auth/WebAuthnSigner';
 
 export class DIDService {

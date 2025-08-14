@@ -34,5 +34,3 @@ export function usePaymentHubBalances(agentDid?: string | null) {
 
   return { balances, activeCounts, loading, error, refetch };
 }
-
-

@@ -15,23 +15,22 @@ export function useDIDService(targetDid: string | null | undefined): UseDIDServi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { userDid } = useAuth();
-
-  // auto fetch first credentialId if exists
-  const autoCredentialId = (() => {
-    if (!userDid) return undefined;
-    const creds = UserStore.listCredentials(userDid);
-    return creds.length > 0 ? creds[0] : undefined;
-  })();
+  const { userDid, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     if (!targetDid) return;
+    // Wait until auth bootstrap finishes to avoid initializing with undefined credentialId
+    if (authLoading) return;
+
+    const creds = userDid ? UserStore.listCredentials(userDid) : [];
+    const credentialId = creds.length > 0 ? creds[0] : undefined;
+
     setIsLoading(true);
-    DIDService.initialize(targetDid, autoCredentialId)
+    DIDService.initialize(targetDid, credentialId)
       .then(setDidService)
       .catch(err => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setIsLoading(false));
-  }, [targetDid, autoCredentialId]);
+  }, [targetDid, userDid, authLoading]);
 
   return { didService, isLoading, error };
 }

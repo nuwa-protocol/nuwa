@@ -43,5 +43,3 @@ export function usePaymentHubClient(agentDid?: string | null) {
 
   return { hubClient: client, error };
 }
-
-
