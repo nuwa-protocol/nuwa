@@ -13,11 +13,14 @@ import type {
   DepositParams,
   WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
+import type { RateProvider } from '../billing/rate/types';
+import { ContractRateProvider } from '../billing/rate/contract';
 
 export interface PaymentHubClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
   defaultAssetId: string;
+  rateProvider?: RateProvider;
 }
 
 export interface BalanceOptions {
@@ -44,11 +47,13 @@ export class PaymentHubClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
   private defaultAssetId: string;
+  private rateProvider: RateProvider;
 
   constructor(options: PaymentHubClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
     this.defaultAssetId = options.defaultAssetId;
+    this.rateProvider = options.rateProvider || new ContractRateProvider(this.contract);
   }
 
   // -------- Hub Operations --------
@@ -99,6 +104,26 @@ export class PaymentHubClient {
     const ownerDid = options.ownerDid || (await this.signer.getDid());
     const assetId = options.assetId || this.defaultAssetId;
     return this.contract.getHubBalance(ownerDid, assetId);
+  }
+
+  /**
+   * Get balance and its value in picoUSD using a rate provider.
+   * Returns: { assetId, balance, pricePicoUSD, balancePicoUSD }
+   */
+  async getBalanceWithUsd(options: BalanceOptions = {}): Promise<{
+    assetId: string;
+    balance: bigint;
+    pricePicoUSD: bigint;
+    balancePicoUSD: bigint;
+  }> {
+    const ownerDid = options.ownerDid || (await this.signer.getDid());
+    const assetId = options.assetId || this.defaultAssetId;
+    const balance = await this.contract.getHubBalance(ownerDid, assetId);
+
+    const pricePicoUSD = await this.rateProvider.getPricePicoUSD(assetId);
+    const balancePicoUSD = balance * pricePicoUSD;
+
+    return { assetId, balance, pricePicoUSD, balancePicoUSD };
   }
 
   /**

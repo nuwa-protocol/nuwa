@@ -403,6 +403,10 @@ export class PaymentChannelHttpClient {
     return this.payerClient.getHubClient();
   }
 
+  getTransactionStore(): TransactionStore {
+    return this.transactionStore;
+  }
+
   /**
    * Discover service information and get service DID
    */
