@@ -126,6 +126,9 @@ export interface HttpClientState {
   channelInfo?: ChannelInfo;
   /** Cached latest sub-channel info (non-persistent) */
   subChannelInfo?: SubChannelState;
+  /** Cached key id and vmId fragment for current signer */
+  keyId?: string;
+  vmIdFragment?: string;
 }
 
 /**

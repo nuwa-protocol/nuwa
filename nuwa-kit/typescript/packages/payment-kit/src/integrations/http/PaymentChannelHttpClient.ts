@@ -86,6 +86,7 @@ export class PaymentChannelHttpClient {
   private subRavMutex: Promise<void> = Promise.resolve();
   // Configurable timeout for pending payment resolution
   private requestTimeoutMs: number;
+  // key id and vmId fragment are stored in clientState (lazy initialized)
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -112,6 +113,8 @@ export class PaymentChannelHttpClient {
     this.clientState = {
       pendingPayments: new Map(),
     };
+
+    // keyId/vmIdFragment will be resolved lazily via ensureKeyFragment()
 
     this.logger = DebugLogger.get('PaymentChannelHttpClient');
     this.logger.setLevel(this.options.debug ? 'debug' : 'info');
@@ -186,6 +189,7 @@ export class PaymentChannelHttpClient {
     path: string,
     init?: RequestInit
   ): Promise<PaymentRequestHandle<Response>> {
+    await this.ensureKeyFragment();
     // First perform discovery if not done yet
     if (!this.cachedDiscoveryInfo) {
       await this.performDiscovery();
@@ -589,11 +593,8 @@ export class PaymentChannelHttpClient {
 
         // Ensure sub-channel is authorized (server may include subChannel)
         if (this.clientState.channelId) {
-          let vmIdFragment = recoveryData.subChannel?.vmIdFragment;
-          if (!vmIdFragment && this.options.keyId) {
-            const parts = this.options.keyId.split('#');
-            vmIdFragment = parts.length > 1 ? parts[1] : '';
-          }
+          let vmIdFragment =
+            recoveryData.subChannel?.vmIdFragment || this.clientState.vmIdFragment || '';
           if (vmIdFragment && !recoveryData.subChannel) {
             try {
               this.log('🔧 Sub-channel missing in recovery, authorizing:', vmIdFragment);
@@ -754,15 +755,12 @@ export class PaymentChannelHttpClient {
       this.clientState.channelId = channelInfo.channelId;
       try {
         this.clientState.channelInfo = await this.payerClient.getChannelInfo(channelInfo.channelId);
-        if (this.options.keyId) {
-          const parts = this.options.keyId.split('#');
-          const vm = parts.length > 1 ? parts[1] : '';
-          if (vm) {
-            this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
-              channelInfo.channelId,
-              vm
-            );
-          }
+        const vm = this.clientState.vmIdFragment;
+        if (vm) {
+          this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
+            channelInfo.channelId,
+            vm
+          );
         }
       } catch {}
 
@@ -807,6 +805,30 @@ export class PaymentChannelHttpClient {
 
     // Generate new UUID if not provided
     return crypto.randomUUID();
+  }
+
+  /**
+   * Lazily resolve keyId and vmIdFragment from options or signer.listKeyIds()
+   */
+  private async ensureKeyFragment(): Promise<void> {
+    if (this.clientState.keyId && this.clientState.vmIdFragment) return;
+    let keyId = this.options.keyId;
+    if (!keyId) {
+      if (this.options.signer && typeof this.options.signer.listKeyIds === 'function') {
+        try {
+          const ids: string[] = await this.options.signer.listKeyIds();
+          keyId = Array.isArray(ids) && ids.length > 0 ? ids[0] : undefined;
+        } catch {}
+      }
+    }
+    if (keyId) {
+      this.clientState.keyId = keyId;
+      const parts = keyId.split('#');
+      this.clientState.vmIdFragment = parts.length > 1 ? parts[1] : undefined;
+    }
+    if (!this.clientState.keyId || !this.clientState.vmIdFragment) {
+      throw new Error('No keyId found');
+    }
   }
 
   /**
