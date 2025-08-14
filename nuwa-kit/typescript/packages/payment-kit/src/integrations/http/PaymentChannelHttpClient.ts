@@ -426,7 +426,7 @@ export class PaymentChannelHttpClient {
     lastClaimed: bigint;
     unsettled: bigint;
     unsettledUsd: bigint;
-    subChannelState: SubChannelInfo;
+    subChannelInfo: SubChannelInfo;
     latestSubRavNonce?: bigint;
   }> {
     await this.ensureChannelReady();
@@ -441,15 +441,15 @@ export class PaymentChannelHttpClient {
     const assetId = channelInfo!.assetId;
 
     // Fetch on-chain sub-channel state
-    let subChannelState = this.clientState.subChannelInfo;
-    if (!subChannelState) {
-      subChannelState = await this.payerClient.getSubChannelInfo(
+    let subChannelInfo = this.clientState.subChannelInfo;
+    if (!subChannelInfo) {
+      subChannelInfo = await this.payerClient.getSubChannelInfo(
         channelInfo.channelId,
         vmIdFragment
       );
-      this.clientState.subChannelInfo = subChannelState;
+      this.clientState.subChannelInfo = subChannelInfo;
     }
-    const lastClaimed = subChannelState.lastClaimedAmount;
+    const lastClaimed = subChannelInfo.lastClaimedAmount;
 
     // Determine latest authorized accumulated value
     let authorizedAccumulated: bigint | undefined = undefined;
@@ -497,7 +497,7 @@ export class PaymentChannelHttpClient {
       lastClaimed,
       unsettled,
       unsettledUsd,
-      subChannelState,
+      subChannelInfo,
       latestSubRavNonce,
     };
   }

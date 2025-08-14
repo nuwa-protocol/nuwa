@@ -23,7 +23,7 @@ export interface RavVerifyResult {
 
 export interface RavVerifyParams {
   channelInfo: ChannelInfo;
-  subChannelState: SubChannelInfo;
+  subChannelInfo: SubChannelInfo;
   billingRule: BillingRule;
   payerDidDoc: DIDDocument;
   /** Signed SubRAV from client (optional in FREE mode) */
@@ -111,17 +111,17 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
         //there no latestSignedSubRav, it means the server lost the signed subrav.
         //we check the signed subrav with the subchannel state
         if (
-          signed.subRav.channelId === params.subChannelState.channelId &&
-          signed.subRav.vmIdFragment === params.subChannelState.vmIdFragment &&
-          signed.subRav.nonce > params.subChannelState.lastConfirmedNonce &&
-          signed.subRav.accumulatedAmount > params.subChannelState.lastClaimedAmount
+          signed.subRav.channelId === params.subChannelInfo.channelId &&
+          signed.subRav.vmIdFragment === params.subChannelInfo.vmIdFragment &&
+          signed.subRav.nonce > params.subChannelInfo.lastConfirmedNonce &&
+          signed.subRav.accumulatedAmount > params.subChannelInfo.lastClaimedAmount
         ) {
           result.decision = 'ALLOW';
         } else {
           result.decision = 'CONFLICT';
           result.error = {
             code: PaymentErrorCode.RAV_CONFLICT,
-            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelState.lastConfirmedNonce}, received: ${signed.subRav.nonce})`,
+            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelInfo.lastConfirmedNonce}, received: ${signed.subRav.nonce})`,
           } as any;
           return finalize();
         }

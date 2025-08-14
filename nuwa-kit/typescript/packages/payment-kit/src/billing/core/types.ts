@@ -49,7 +49,7 @@ export interface BillingContext {
     /** Latest pending SubRAV from pending repository, it should match the signed SubRAV */
     latestPendingSubRav?: SubRAV;
     /** Latest sub-channel state cursor (from ChannelRepository) */
-    subChannelState?: SubChannelInfo;
+    subChannelInfo?: SubChannelInfo;
     /** Channel info (must exist for verification) */
     channelInfo?: ChannelInfo;
     /** Cached chain ID for synchronous proposal building (to be removed when all paths use channelInfo.chainId) */

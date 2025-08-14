@@ -15,7 +15,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     epoch,
     status: 'active',
   };
-  const subChannelState: SubChannelInfo & { vmIdFragment: string } = {
+  const subChannelInfo: SubChannelInfo & { vmIdFragment: string } = {
     channelId,
     epoch,
     lastClaimedAmount: 0n,
@@ -58,7 +58,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
   test('paid route: pending exists and no signature → REQUIRE_SIGNATURE_402', async () => {
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       latestPendingSubRav: {
@@ -80,7 +80,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     const signed = createSignedSubRav(3n, 10n);
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       signedSubRav: signed,
@@ -95,7 +95,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     const signed = createSignedSubRav(2n, 10n);
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       signedSubRav: signed,
@@ -111,7 +111,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     const verifySpy = jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       signedSubRav: signed,
@@ -126,7 +126,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     const verifySpy = jest.spyOn(SubRAVSigner, 'verify').mockResolvedValue(true as any);
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       signedSubRav: signed,
@@ -141,7 +141,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     const signed = createSignedSubRav(1n, 0n);
     const res = await verifyRav({
       channelInfo,
-      subChannelState,
+      subChannelInfo,
       billingRule,
       payerDidDoc,
       signedSubRav: signed,

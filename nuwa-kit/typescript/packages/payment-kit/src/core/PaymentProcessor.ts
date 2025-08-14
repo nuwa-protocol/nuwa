@@ -150,11 +150,11 @@ export class PaymentProcessor {
         return this.fail(pctx, Errors.channelNotFound(channelId), { attachHeader: false });
       }
 
-      const subChannelState = await this.config.payeeClient.getSubChannelState(
+      const subChannelInfo = await this.config.payeeClient.getSubChannelState(
         channelId,
         vmIdFragment
       );
-      if (!subChannelState) {
+      if (!subChannelInfo) {
         return this.fail(pctx, Errors.subchannelNotAuthorized(channelId, vmIdFragment), {
           attachHeader: false,
         });
@@ -181,7 +181,7 @@ export class PaymentProcessor {
       // Single-entry verification using prefetched context
       const ravResult = await verifyRav({
         channelInfo,
-        subChannelState,
+        subChannelInfo,
         billingRule: ctx.meta.billingRule!,
         payerDidDoc,
         signedSubRav: ctx.meta.signedSubRav,
@@ -191,7 +191,7 @@ export class PaymentProcessor {
       });
 
       pctx.state.channelInfo = channelInfo;
-      pctx.state.subChannelState = subChannelState;
+      pctx.state.subChannelInfo = subChannelInfo;
       pctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
       pctx.state.latestPendingSubRav = latestPendingSubRav || undefined;
 
@@ -365,10 +365,10 @@ export class PaymentProcessor {
           }
         } else {
           // Paid route: always generate SubRAV and header (even if cost=0 per §4.2)
-          // Require a baseline: SignedSubRAV, latestSignedSubRav, or subChannelState
+          // Require a baseline: SignedSubRAV, latestSignedSubRav, or subChannelInfo
           const hasSigned = !!pctx.meta.signedSubRav;
           const hasLatest = !!pctx.state && !!pctx.state.latestSignedSubRav;
-          const hasSubState = !!pctx.state && !!(pctx.state as any).subChannelState;
+          const hasSubState = !!pctx.state && !!(pctx.state as any).subChannelInfo;
 
           this.log('🔍 Baseline check:', {
             hasSigned,
@@ -386,7 +386,7 @@ export class PaymentProcessor {
           const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateNextSubRAV({
             signedSubRAV: pctx.meta.signedSubRav,
             latestSignedSubRav: pctx.state?.latestSignedSubRav,
-            subChannelState: pctx.state?.subChannelState!,
+            subChannelInfo: pctx.state?.subChannelInfo!,
             chainId: pctx.state?.chainId!,
             clientTxRef: pctx.meta.clientTxRef,
             cost: finalCost,
@@ -509,7 +509,7 @@ export class PaymentProcessor {
   private generateNextSubRAV(params: {
     signedSubRAV?: SignedSubRAV;
     latestSignedSubRav?: SignedSubRAV;
-    subChannelState: SubChannelInfo;
+    subChannelInfo: SubChannelInfo;
     chainId: bigint;
     clientTxRef: string;
     cost: bigint;
@@ -523,12 +523,12 @@ export class PaymentProcessor {
 
     const current = params.signedSubRAV?.subRav ??
       params.latestSignedSubRav?.subRav ?? {
-        channelId: params.subChannelState.channelId,
-        vmIdFragment: params.subChannelState.vmIdFragment,
-        nonce: params.subChannelState.lastConfirmedNonce,
-        accumulatedAmount: params.subChannelState.lastClaimedAmount,
+        channelId: params.subChannelInfo.channelId,
+        vmIdFragment: params.subChannelInfo.vmIdFragment,
+        nonce: params.subChannelInfo.lastConfirmedNonce,
+        accumulatedAmount: params.subChannelInfo.lastClaimedAmount,
         chainId: params.chainId,
-        channelEpoch: params.subChannelState.epoch,
+        channelEpoch: params.subChannelInfo.epoch,
         version: 1,
       };
 
