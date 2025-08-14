@@ -56,9 +56,10 @@ export class PaymentHubClient {
   /**
    * Deposit funds to the payment hub for the current signer
    */
-  async deposit(assetId: string, amount: bigint): Promise<{ txHash: string }> {
-    const ownerDid = await this.signer.getDid();
-
+  async deposit(assetId: string, amount: bigint, ownerDid?: string): Promise<{ txHash: string }> {
+    if (!ownerDid) {
+      ownerDid = await this.signer.getDid();
+    }
     const params: DepositParams = {
       ownerDid,
       assetId,
