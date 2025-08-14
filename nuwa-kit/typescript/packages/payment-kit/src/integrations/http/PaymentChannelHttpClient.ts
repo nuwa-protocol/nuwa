@@ -1170,6 +1170,7 @@ export class PaymentChannelHttpClient {
       costUsd: proto.costUsd ?? BigInt(0),
       nonce: proto.subRav.nonce,
       channelId: pendingRequest.channelId,
+      vmIdFragment: proto.subRav.vmIdFragment,
       assetId: pendingRequest.assetId,
       timestamp: new Date().toISOString(),
     };

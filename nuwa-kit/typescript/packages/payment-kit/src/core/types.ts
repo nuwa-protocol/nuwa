@@ -148,6 +148,8 @@ export interface PaymentInfo {
   nonce: bigint;
   /** Channel identifier */
   channelId: string;
+  /** Sub-channel verification method fragment (from SubRAV) */
+  vmIdFragment: string;
   /** Asset identifier */
   assetId: string;
   /** Timestamp when payment was resolved (ISO8601) */
