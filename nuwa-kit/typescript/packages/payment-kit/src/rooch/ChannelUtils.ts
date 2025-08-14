@@ -291,10 +291,12 @@ export function calculatePaymentHubId(ownerAddress: string): string {
   const ownerBytes = roochAddress.toBytes();
 
   // Append struct tag bytes (canonical string format)
-  const structTagBytes = Buffer.from(canonicalStructTag, 'utf8');
+  const structTagBytes = new TextEncoder().encode(canonicalStructTag);
 
-  // Combine owner address bytes + struct tag bytes
-  const combined = Buffer.concat([ownerBytes, structTagBytes]);
+  // Combine owner address bytes + struct tag bytes (browser-friendly)
+  const combined = new Uint8Array(ownerBytes.length + structTagBytes.length);
+  combined.set(ownerBytes, 0);
+  combined.set(structTagBytes, ownerBytes.length);
 
   // Calculate SHA3-256 hash
   const hash = sha3_256(combined);
@@ -390,8 +392,12 @@ export function parsePaymentChannelData(value: string): PaymentChannelData {
 export function parsePaymentHubData(value: string): PaymentHub {
   try {
     if (typeof value === 'string' && value.startsWith('0x')) {
-      // Parse BCS bytes using PaymentHubSchema
-      const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+      // Parse BCS bytes using PaymentHubSchema (browser-friendly hex decode)
+      const hex = value.slice(2);
+      const bcsBytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bcsBytes.length; i++) {
+        bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      }
       const parsed = PaymentHubSchema.parse(bcsBytes);
 
       return {
@@ -445,7 +451,11 @@ export function parseDynamicFieldCoinStore(
   value: string
 ): DynamicField<string, CoinStoreFieldData> {
   try {
-    const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+    const hex = value.startsWith('0x') ? value.slice(2) : value;
+    const bcsBytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bcsBytes.length; i++) {
+      bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    }
     const parsed = DynamicFieldCoinStoreSchema.parse(bcsBytes);
 
     return {
@@ -464,7 +474,11 @@ export function parseDynamicFieldCoinStore(
  */
 export function parseDynamicFieldU64(value: string): DynamicField<string, number> {
   try {
-    const bcsBytes = Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
+    const hex = value.startsWith('0x') ? value.slice(2) : value;
+    const bcsBytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bcsBytes.length; i++) {
+      bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    }
     const parsed = DynamicFieldU64Schema.parse(bcsBytes);
 
     return {
