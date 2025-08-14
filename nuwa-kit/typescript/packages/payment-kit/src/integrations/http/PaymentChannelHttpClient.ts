@@ -8,7 +8,13 @@ import type {
   PendingPaymentRequest,
   PaymentRequestHandle,
 } from './types';
-import type { SubRAV, SignedSubRAV, PaymentInfo, PaymentResult } from '../../core/types';
+import type {
+  SubRAV,
+  SignedSubRAV,
+  PaymentInfo,
+  PaymentResult,
+  SubChannelState,
+} from '../../core/types';
 import type { ApiResponse } from '../../types/api';
 import type {
   DiscoveryResponse,
@@ -46,6 +52,8 @@ import { MemoryChannelRepository, TransactionStore, type ChannelRepository } fro
 import { PaymentErrorCode } from '../../errors/codes';
 import { wrapAndFilterInBandFrames } from './internal/StreamPaymentFilter';
 import { isStreamLikeResponse } from './internal/utils';
+import { RateProvider } from 'src/billing/rate/types';
+import { ContractRateProvider } from 'src/billing/rate/contract';
 
 /**
  * HTTP Client State enum for internal state management
@@ -86,7 +94,7 @@ export class PaymentChannelHttpClient {
   private subRavMutex: Promise<void> = Promise.resolve();
   // Configurable timeout for pending payment resolution
   private requestTimeoutMs: number;
-  // key id and vmId fragment are stored in clientState (lazy initialized)
+  private rateProvider: RateProvider;
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -109,6 +117,8 @@ export class PaymentChannelHttpClient {
         channelRepo: this.channelRepo,
       },
     });
+
+    this.rateProvider = new ContractRateProvider(this.payerClient.getContract());
 
     this.clientState = {
       pendingPayments: new Map(),
@@ -401,6 +411,95 @@ export class PaymentChannelHttpClient {
 
   getHubClient(): PaymentHubClient {
     return this.payerClient.getHubClient();
+  }
+
+  /**
+   * Compute unsettled amount for the current sub-channel (bound to this client).
+   * Logic: use the latest authorized SubRAV (pending/proposed) accumulatedAmount
+   * minus on-chain sub-channel lastClaimedAmount. If no pending SubRAV available,
+   * falls back to on-chain state (unsettled = 0).
+   */
+  async getUnsettledAmountForSubChannel(): Promise<{
+    channelId: string;
+    vmIdFragment: string;
+    authorizedAccumulated: bigint;
+    lastClaimed: bigint;
+    unsettled: bigint;
+    unsettledUsd: bigint;
+    subChannelState: SubChannelState;
+    latestSubRavNonce?: bigint;
+  }> {
+    await this.ensureChannelReady();
+    await this.ensureKeyFragment();
+
+    const channelInfo = this.clientState.channelInfo;
+    const vmIdFragment = this.clientState.vmIdFragment;
+
+    if (!channelInfo || !vmIdFragment) {
+      throw new Error('Channel or vmIdFragment not initialized');
+    }
+    const assetId = channelInfo!.assetId;
+
+    // Fetch on-chain sub-channel state
+    let subChannelState = this.clientState.subChannelInfo;
+    if (!subChannelState) {
+      subChannelState = await this.payerClient.getSubChannelInfo(
+        channelInfo.channelId,
+        vmIdFragment
+      );
+      this.clientState.subChannelInfo = subChannelState;
+    }
+    const lastClaimed = subChannelState.lastClaimedAmount;
+
+    // Determine latest authorized accumulated value
+    let authorizedAccumulated: bigint | undefined = undefined;
+    let latestSubRavNonce: bigint | undefined = undefined;
+
+    const pending = this.clientState.pendingSubRAV;
+    if (
+      pending &&
+      pending.channelId === channelInfo.channelId &&
+      pending.vmIdFragment === vmIdFragment
+    ) {
+      authorizedAccumulated = pending.accumulatedAmount;
+      latestSubRavNonce = pending.nonce;
+    } else {
+      // Try to recover from service to get the latest proposal
+      try {
+        const recovery = await this.recoverFromService();
+        if (
+          recovery.pendingSubRav &&
+          recovery.pendingSubRav.channelId === channelInfo.channelId &&
+          recovery.pendingSubRav.vmIdFragment === vmIdFragment
+        ) {
+          authorizedAccumulated = recovery.pendingSubRav.accumulatedAmount;
+          latestSubRavNonce = recovery.pendingSubRav.nonce;
+        }
+      } catch (e) {
+        this.log('[unsettled.recover.error]', e);
+      }
+      //TODO we should also get the latest signed sub-rav from the service
+    }
+
+    if (authorizedAccumulated === undefined) {
+      // No local/recovered proposal; treat as fully settled
+      authorizedAccumulated = lastClaimed;
+    }
+
+    const diff = authorizedAccumulated - lastClaimed;
+    const unsettled = diff > 0n ? diff : 0n;
+    const unsettledUsd = (await this.rateProvider.getPricePicoUSD(assetId)) * unsettled;
+
+    return {
+      channelId: channelInfo.channelId,
+      vmIdFragment,
+      authorizedAccumulated,
+      lastClaimed,
+      unsettled,
+      unsettledUsd,
+      subChannelState,
+      latestSubRavNonce,
+    };
   }
 
   getTransactionStore(): TransactionStore {

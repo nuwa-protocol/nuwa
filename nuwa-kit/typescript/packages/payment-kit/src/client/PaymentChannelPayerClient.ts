@@ -320,6 +320,10 @@ export class PaymentChannelPayerClient {
     return this.activeChannelId;
   }
 
+  getContract(): IPaymentChannelContract {
+    return this.contract;
+  }
+
   // -------- Asset Information --------
 
   /**
