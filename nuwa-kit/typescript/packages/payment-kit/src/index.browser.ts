@@ -28,6 +28,20 @@ export * from './rooch/RoochPaymentChannelContract';
 // HTTP Payer Client integration
 export * from './integrations/http';
 
+// Storage: browser-safe exports (types, memory, IndexedDB, and factory)
+export type {
+  TransactionStore,
+  TransactionRecord,
+  TransactionStatus,
+  PaymentSnapshot,
+} from './storage/interfaces/TransactionStore';
+export { MemoryTransactionStore } from './storage/memory/transaction.memory';
+export { IndexedDBTransactionStore } from './storage/indexeddb/transactions.indexeddb';
+export {
+  createTransactionStore,
+  type TransactionStoreOptions,
+} from './storage/factories/createTransactionStore';
+
 // Framework-agnostic API types and errors (data-only)
 export * from './types/api';
 export * from './errors';
