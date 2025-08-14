@@ -46,7 +46,7 @@ export class IndexedDBTransactionStore implements TransactionStore {
   async update(clientTxRef: string, updates: Partial<TransactionRecord>): Promise<void> {
     const existing = await this.get(clientTxRef);
     if (!existing) return;
-    const updated: TransactionRecord = { ...existing, ...updates } as any;
+    const updated: TransactionRecord = { ...existing, ...updates } as TransactionRecord;
     await this.create(updated);
   }
 

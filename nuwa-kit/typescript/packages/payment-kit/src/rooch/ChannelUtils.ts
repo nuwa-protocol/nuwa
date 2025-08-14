@@ -396,7 +396,7 @@ export function parsePaymentHubData(value: string): PaymentHub {
       const hex = value.slice(2);
       const bcsBytes = new Uint8Array(hex.length / 2);
       for (let i = 0; i < bcsBytes.length; i++) {
-        bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
       }
       const parsed = PaymentHubSchema.parse(bcsBytes);
 
@@ -454,7 +454,7 @@ export function parseDynamicFieldCoinStore(
     const hex = value.startsWith('0x') ? value.slice(2) : value;
     const bcsBytes = new Uint8Array(hex.length / 2);
     for (let i = 0; i < bcsBytes.length; i++) {
-      bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
     }
     const parsed = DynamicFieldCoinStoreSchema.parse(bcsBytes);
 
@@ -477,7 +477,7 @@ export function parseDynamicFieldU64(value: string): DynamicField<string, number
     const hex = value.startsWith('0x') ? value.slice(2) : value;
     const bcsBytes = new Uint8Array(hex.length / 2);
     for (let i = 0; i < bcsBytes.length; i++) {
-      bcsBytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+      bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
     }
     const parsed = DynamicFieldU64Schema.parse(bcsBytes);
 

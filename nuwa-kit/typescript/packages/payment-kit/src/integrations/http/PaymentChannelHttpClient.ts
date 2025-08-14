@@ -1209,7 +1209,7 @@ export class PaymentChannelHttpClient {
             this.transactionStore &&
             context.clientTxRef
           ) {
-            await this.transactionStore.update(context.clientTxRef, { stream: true } as any);
+            await this.transactionStore.update(context.clientTxRef, { stream: true });
           }
         } catch {}
         // Extend pending timeout for streaming if configured
