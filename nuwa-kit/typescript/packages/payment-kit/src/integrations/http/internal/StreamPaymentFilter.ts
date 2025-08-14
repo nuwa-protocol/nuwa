@@ -29,7 +29,9 @@ export function wrapAndFilterInBandFrames(
   const afterPayment = (controller: ReadableStreamDefaultController<Uint8Array>) => {
     try {
       controller.close();
-      try { reader.cancel(); } catch {}
+      try {
+        reader.cancel();
+      } catch {}
     } catch {}
   };
 
