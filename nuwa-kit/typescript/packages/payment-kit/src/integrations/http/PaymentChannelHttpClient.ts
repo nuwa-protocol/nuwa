@@ -28,6 +28,7 @@ import {
   extractHost,
   createDefaultChannelRepo,
   MemoryHostChannelMappingStore,
+  createDefaultTransactionStore,
 } from './internal/LocalStore';
 import { parseJsonResponse, serializeJson } from '../../utils/json';
 import {
@@ -41,7 +42,7 @@ import {
 import type { z } from 'zod';
 import { PaymentHubClient } from '../../client/PaymentHubClient';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
-import { MemoryChannelRepository, type ChannelRepository } from '../../storage';
+import { MemoryChannelRepository, TransactionStore, type ChannelRepository } from '../../storage';
 import { PaymentErrorCode } from '../../errors/codes';
 import { wrapAndFilterInBandFrames } from './internal/StreamPaymentFilter';
 import { isStreamLikeResponse } from './internal/utils';
@@ -72,6 +73,7 @@ export class PaymentChannelHttpClient {
   private fetchImpl: FetchLike;
   private mappingStore: HostChannelMappingStore;
   private channelRepo: ChannelRepository;
+  private transactionStore: TransactionStore;
   private host: string;
   private state: ClientState = ClientState.INIT;
   private clientState: HttpClientState;
@@ -91,6 +93,7 @@ export class PaymentChannelHttpClient {
     this.mappingStore = options.mappingStore || createDefaultMappingStore();
     this.host = extractHost(options.baseUrl);
     this.channelRepo = options.channelRepo || createDefaultChannelRepo();
+    this.transactionStore = options.transactionStore || createDefaultTransactionStore();
 
     if (!this.fetchImpl) {
       throw new Error('fetch implementation not available. Please provide fetchImpl option.');
@@ -211,6 +214,7 @@ export class PaymentChannelHttpClient {
       url: fullUrl,
       headers,
       body: init?.body,
+      clientTxRef,
     };
 
     // Create payment promise for this request
@@ -218,6 +222,40 @@ export class PaymentChannelHttpClient {
 
     // Execute request (defer await to keep both promises available to caller)
     const responsePromise = this.executeRequest(requestContext, init);
+
+    // Transaction logging: create pending record
+    try {
+      if (this.options.transactionLog?.enabled !== false) {
+        const store = this.transactionStore;
+        if (store) {
+          const urlObj = new URL(fullUrl);
+          const sanitize = this.options.transactionLog?.sanitizeRequest;
+          const sanitized = sanitize ? sanitize(headers, init?.body) : undefined;
+          const headersSummary = sanitized?.headersSummary ?? {
+            'content-type': headers['Content-Type'] || headers['content-type'] || '',
+          };
+          const requestBodyHash = sanitized?.requestBodyHash;
+          await store.create({
+            clientTxRef,
+            timestamp: Date.now(),
+            protocol: 'http',
+            method,
+            urlOrTarget: fullUrl,
+            operation: `${method}:${urlObj.pathname}`,
+            headersSummary,
+            requestBodyHash,
+            stream: false, // will be updated if streaming detected later
+            channelId: this.clientState.channelId,
+            vmIdFragment: sentedSubRav?.subRav?.vmIdFragment,
+            //TODO get assetId from the channel
+            assetId: this.options.defaultAssetId || '0x3::gas_coin::RGas',
+            status: 'pending',
+          });
+        }
+      }
+    } catch (e) {
+      this.log('[txlog.create.error]', e);
+    }
 
     this.log(
       '[request.start]',
@@ -234,6 +272,7 @@ export class PaymentChannelHttpClient {
       this.clientState.pendingPayments?.delete(clientTxRef);
     });
 
+    const startTs = Date.now();
     const done = Promise.all([responsePromise, paymentPromise]).then(([data, payment]) => ({
       data,
       payment,
@@ -252,6 +291,18 @@ export class PaymentChannelHttpClient {
       }
       abort = () => controller.abort('aborted by PaymentRequestHandle');
     }
+
+    // Update transaction on response headers arrival
+    responsePromise
+      .then(res => {
+        const durationMs = Date.now() - startTs;
+        this.transactionStore?.update(clientTxRef, {
+          statusCode: res.status,
+          durationMs,
+        });
+        return res;
+      })
+      .catch(() => void 0);
 
     return {
       clientTxRef,
@@ -980,6 +1031,16 @@ export class PaymentChannelHttpClient {
           },
           (...args: any[]) => this.log(...args)
         );
+        // Mark as streaming in transaction log
+        try {
+          if (
+            this.options.transactionLog?.enabled !== false &&
+            this.transactionStore &&
+            context.clientTxRef
+          ) {
+            await this.transactionStore.update(context.clientTxRef, { stream: true } as any);
+          }
+        } catch {}
         return filtered;
       }
 
@@ -1176,6 +1237,24 @@ export class PaymentChannelHttpClient {
     };
 
     this.resolveByRef(keyToDelete!, paymentInfo);
+    // Transaction logging: finalize payment snapshot and vmIdFragment
+    try {
+      if (this.options.transactionLog?.enabled !== false && this.transactionStore) {
+        await this.transactionStore.update(paymentInfo.clientTxRef, {
+          payment: {
+            cost: paymentInfo.cost,
+            costUsd: paymentInfo.costUsd,
+            nonce: paymentInfo.nonce,
+            serviceTxRef: paymentInfo.serviceTxRef,
+            paidAt: paymentInfo.timestamp,
+          },
+          vmIdFragment: paymentInfo.vmIdFragment,
+          status: 'paid',
+        });
+      }
+    } catch (e) {
+      this.log('[txlog.finalize.error]', e);
+    }
     this.log(
       'Resolved payment for clientTxRef:',
       paymentInfo.clientTxRef,

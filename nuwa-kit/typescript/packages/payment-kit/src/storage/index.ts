@@ -53,6 +53,20 @@ export {
 // SQL serialization utilities
 export { encodeSubRAV, decodeSubRAV, getSubRAVHex } from './sql/serialization';
 
+// ==================== Transaction Store Exports ====================
+export type {
+  TransactionStore,
+  TransactionRecord,
+  TransactionStatus,
+  PaymentSnapshot,
+} from './interfaces/TransactionStore';
+export { MemoryTransactionStore } from './memory/transaction.memory';
+export { IndexedDBTransactionStore } from './indexeddb/transactions.indexeddb';
+export {
+  createTransactionStore,
+  type TransactionStoreOptions,
+} from './factories/createTransactionStore';
+
 // ==================== Convenience Functions ====================
 
 import { createChannelRepo as _createChannelRepo } from './factories/createChannelRepo';

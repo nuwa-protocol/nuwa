@@ -5,6 +5,9 @@ import {
   ChannelRepository,
   IndexedDBChannelRepository,
   MemoryChannelRepository,
+  MemoryTransactionStore,
+  TransactionStore,
+  IndexedDBTransactionStore,
 } from '../../../storage';
 
 /**
@@ -196,10 +199,17 @@ export function createDefaultMappingStore(): HostChannelMappingStore {
 }
 
 export function createDefaultChannelRepo(): ChannelRepository {
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
     return new IndexedDBChannelRepository();
   }
   return new MemoryChannelRepository();
+}
+
+export function createDefaultTransactionStore(): TransactionStore {
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+    return new IndexedDBTransactionStore();
+  }
+  return new MemoryTransactionStore();
 }
 
 /**

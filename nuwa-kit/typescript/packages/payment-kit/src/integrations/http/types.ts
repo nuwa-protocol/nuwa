@@ -63,6 +63,21 @@ export interface HttpPayerOptions {
 
   /** Timeout for pending payment resolution in milliseconds (default: 30000ms) */
   timeoutMs?: number;
+
+  /** Timeout used when the response is streaming (SSE/NDJSON). Defaults to 10 minutes. */
+  timeoutMsStream?: number;
+
+  /** Transaction logging */
+  transactionStore?: import('../../storage').TransactionStore;
+  transactionLog?: {
+    enabled?: boolean;
+    persist?: 'memory' | 'indexeddb' | 'custom';
+    maxRecords?: number;
+    sanitizeRequest?: (
+      headers: Record<string, string>,
+      body?: any
+    ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
+  };
 }
 
 // PersistedHttpClientState is now imported from schema/core to ensure
@@ -132,6 +147,8 @@ export interface PaymentRequestContext {
   url: string;
   headers: Record<string, string>;
   body?: any;
+  /** Correlation id for this request */
+  clientTxRef?: string;
 }
 
 /**
