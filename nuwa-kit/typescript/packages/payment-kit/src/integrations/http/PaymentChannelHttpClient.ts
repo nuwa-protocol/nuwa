@@ -839,6 +839,29 @@ export class PaymentChannelHttpClient {
     });
   }
 
+  /**
+   * Extend timeout for a specific pending payment (used for streaming responses)
+   */
+  private extendPendingTimeout(clientTxRef: string, newTimeoutMs: number): void {
+    const pending = this.clientState.pendingPayments?.get(clientTxRef);
+    if (!pending) return;
+    clearTimeout(pending.timeoutId);
+    pending.timeoutId = setTimeout(() => {
+      if (this.clientState.pendingPayments?.has(clientTxRef)) {
+        this.clientState.pendingPayments.delete(clientTxRef);
+        this.log(
+          '[payment.timeout.stream]',
+          'clientTxRef=',
+          clientTxRef,
+          'url=',
+          pending.requestContext.url
+        );
+        pending.reject(new Error('Payment resolution timeout'));
+      }
+    }, newTimeoutMs);
+    this.log('[payment.timeout.extend.one]', 'clientTxRef=', clientTxRef, 'ms=', newTimeoutMs);
+  }
+
   private resolveByRef(clientTxRef: string, info: PaymentInfo | undefined): boolean {
     const pending = this.clientState.pendingPayments?.get(clientTxRef);
     if (!pending) return false;
@@ -1041,6 +1064,10 @@ export class PaymentChannelHttpClient {
             await this.transactionStore.update(context.clientTxRef, { stream: true } as any);
           }
         } catch {}
+        // Extend pending timeout for streaming if configured
+        if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+          this.extendPendingTimeout(context.clientTxRef, this.options.timeoutMsStream);
+        }
         return filtered;
       }
 
