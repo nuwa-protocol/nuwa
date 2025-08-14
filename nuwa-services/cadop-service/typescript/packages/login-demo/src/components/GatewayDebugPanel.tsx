@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getGatewayUrl, setGatewayUrl } from '../services/GatewayDebug';
 import { useAuth } from '../App';
-import { requestWithPayment, requestWithPaymentRaw, resetPaymentClient } from '../services/PaymentClient';
+import { requestWithPayment, requestWithPaymentRaw, resetPaymentClient, getPaymentClient } from '../services/PaymentClient';
 import { formatUsdAmount } from '@nuwa-ai/payment-kit';
 
 export function GatewayDebugPanel() {
@@ -23,6 +23,12 @@ export function GatewayDebugPanel() {
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<any | null>(null);
   const [paymentNote, setPaymentNote] = useState<string | null>(null);
+
+  // Transaction history state
+  const [txItems, setTxItems] = useState<any[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+  const [liveSubscribe, setLiveSubscribe] = useState<boolean>(true);
 
   const handleSaveGateway = () => {
     setGatewayUrl(gatewayUrl);
@@ -127,12 +133,61 @@ export function GatewayDebugPanel() {
       }
 
       // non-stream path already set responseText above
+      await refreshTransactions();
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
       setLoading(false);
     }
   };
+
+  async function refreshTransactions() {
+    if (!sdk) return;
+    try {
+      setTxLoading(true);
+      setTxError(null);
+      const client = await getPaymentClient(sdk, gatewayUrl);
+      const store = client.getTransactionStore();
+      const { items } = await store.list({}, { limit: 100 });
+      const sorted = [...items].sort((a, b) => b.timestamp - a.timestamp);
+      setTxItems(sorted);
+    } catch (e: any) {
+      setTxError(e.message || String(e));
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdk, gatewayUrl]);
+
+  useEffect(() => {
+    if (!liveSubscribe || !sdk) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      try {
+        const client = await getPaymentClient(sdk, gatewayUrl);
+        const store = client.getTransactionStore();
+        if (store.subscribe) {
+          unsub = store.subscribe(evt => {
+            setTxItems(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(r => r.clientTxRef === evt.record.clientTxRef);
+              if (idx >= 0) next[idx] = evt.record; else next.unshift(evt.record);
+              return next.slice(0, 100);
+            });
+          });
+        }
+      } catch {}
+    })();
+    return () => {
+      try {
+        if (unsub) unsub();
+      } catch {}
+    };
+  }, [sdk, gatewayUrl, liveSubscribe]);
 
   return (
     <div className="gateway-container">
@@ -256,6 +311,66 @@ export function GatewayDebugPanel() {
           </table>
         </div>
       )}
+
+      {/* Transaction history */}
+      <div style={{ marginTop: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3>Transaction History</h3>
+          <div>
+            <label style={{ marginRight: 12 }}>
+              <input
+                type="checkbox"
+                checked={liveSubscribe}
+                onChange={e => setLiveSubscribe(e.target.checked)}
+                style={{ marginRight: 6 }}
+              />
+              Live
+            </label>
+            <button onClick={refreshTransactions} disabled={txLoading}>Refresh</button>
+          </div>
+        </div>
+        {txError && (
+          <div style={{ color: 'red', marginTop: 8 }}>{txError}</div>
+        )}
+        <div style={{ marginTop: 8, maxHeight: 320, overflowY: 'auto', background: '#fafafa', border: '1px solid #eee' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Time</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Method</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Path</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px' }}>Status</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px' }}>Cost (USD)</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px' }}>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {txItems.map(rec => {
+                const url = rec.urlOrTarget || '';
+                let path = url;
+                try { const u = new URL(url); path = u.pathname; } catch {}
+                const paidUsd = rec.payment ? formatUsdAmount(rec.payment.costUsd) : '-';
+                const time = new Date(rec.timestamp).toLocaleString();
+                return (
+                  <tr key={rec.clientTxRef} style={{ borderTop: '1px solid #eee' }}>
+                    <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{time}</td>
+                    <td style={{ padding: '6px 8px' }}>{rec.method || '-'}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{path}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{rec.statusCode ?? ''}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{paidUsd}</td>
+                    <td style={{ padding: '6px 8px' }}>{rec.status}</td>
+                  </tr>
+                );
+              })}
+              {txItems.length === 0 && !txLoading && (
+                <tr>
+                  <td colSpan={6} style={{ padding: '8px 10px', color: '#666' }}>No transactions yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

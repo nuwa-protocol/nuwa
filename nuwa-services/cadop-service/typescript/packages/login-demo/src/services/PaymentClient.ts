@@ -69,7 +69,8 @@ export async function requestWithPaymentRaw(
     initHeaders['Content-Type'] = initHeaders['Content-Type'] || 'application/json';
     requestBody = typeof body === 'string' ? body : JSON.stringify(body);
   }
-  return http.createRequestHandle(method as any, path, {
+  // Use public API to obtain a PaymentRequestHandle<Response>
+  return http.requestWithPayment(method, path, {
     headers: initHeaders,
     body: requestBody,
   } as RequestInit);
