@@ -10,6 +10,7 @@ import {
   FixedCardLoading,
 } from '@/components/ui';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
+import { useHubDeposit } from '@/hooks/useHubDeposit';
 
 interface Props {
   agentDid: string;
@@ -20,6 +21,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [claimedAmount, setClaimedAmount] = useState<number | null>(null);
+  const { depositPercentOfClaimed } = useHubDeposit(agentDid);
 
   const claimGas = useCallback(async () => {
     setLoading(true);
@@ -29,12 +31,16 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
       const claimed = await claimTestnetGas(address);
 
       setClaimedAmount(claimed);
+      // Try auto-deposit 50% of claimed amount to PaymentHub (non-blocking)
+      depositPercentOfClaimed(claimed, 50).catch(e =>
+        console.warn('Auto deposit to PaymentHub failed:', e)
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [agentDid]);
+  }, [agentDid, depositPercentOfClaimed]);
 
   useEffect(() => {
     if (!error) {

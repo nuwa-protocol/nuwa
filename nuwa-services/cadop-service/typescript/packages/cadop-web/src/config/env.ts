@@ -73,6 +73,9 @@ const CONFIG = buildConfig();
 export const ROOCH_RPC_URL = CONFIG.roochRpcUrl;
 export const API_URL = CONFIG.apiUrl;
 
+// Default Asset Id for Rooch RGAS
+export const DEFAULT_ASSET_ID = '0x3::gas_coin::RGas';
+
 // ---------------- RoochScan helpers ----------------
 const ROOCH_SCAN_BASE = CONFIG.roochRpcUrl.includes('test')
   ? 'https://test.roochscan.io'

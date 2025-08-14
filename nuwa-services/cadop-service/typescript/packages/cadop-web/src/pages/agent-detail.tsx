@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -20,7 +20,6 @@ import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
 import {
   ArrowLeft,
-  Settings,
   Key,
   History,
   Users,
@@ -31,9 +30,11 @@ import {
 } from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
+  import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
+import { useHubDeposit } from '@/hooks/useHubDeposit';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
@@ -51,8 +52,7 @@ export function AgentDetailPage() {
   // state for delete confirmation modal
   const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState('info');
+  // Tab state (reserved for future use)
 
   const {
     balances,
@@ -60,6 +60,15 @@ export function AgentDetailPage() {
     isError: balanceError,
     refetch: refetchBalances,
   } = useAgentBalances(did);
+  // PaymentHub balances
+  const {
+    balances: hubBalances,
+    activeCounts: hubActiveCounts,
+    loading: hubLoading,
+    error: hubError,
+    refetch: refetchHub,
+  } = usePaymentHubBalances(did);
+  const { depositPercentOfClaimed } = useHubDeposit(did);
 
   // ---------------- RGAS Faucet Claim ----------------
   const [isClaiming, setIsClaiming] = useState(false);
@@ -77,6 +86,10 @@ export function AgentDetailPage() {
     try {
       const claimed = await claimTestnetGas(agentAddress, FAUCET_URL || undefined);
       const data = { gas: claimed };
+      // Best-effort deposit 50% of claimed to PaymentHub (non-blocking)
+      depositPercentOfClaimed(claimed, 50)
+        .then(() => refetchHub())
+        .catch(e => console.warn('Auto deposit to PaymentHub failed:', e));
       await refetchBalances();
       setHasClaimed(true);
       toast({
@@ -286,7 +299,7 @@ export function AgentDetailPage() {
                           <span className="font-mono font-bold">{fragment}</span>
                           <span className="ml-2">{method.type}</span>
                           {method.controller === userDid && (
-                            <Tag variant="blue" className="ml-2">
+                            <Tag variant="info" className="ml-2">
                               {t('agent.controller')}
                             </Tag>
                           )}
@@ -313,9 +326,9 @@ export function AgentDetailPage() {
                             {isAuthentication && (
                               <Tag variant="success">{t('agent.authentication')}</Tag>
                             )}
-                            {isAssertionMethod && <Tag variant="blue">{t('agent.assertion')}</Tag>}
+                            {isAssertionMethod && <Tag variant="secondary">{t('agent.assertion')}</Tag>}
                             {isKeyAgreement && (
-                              <Tag variant="purple">{t('agent.keyAgreement')}</Tag>
+                              <Tag variant="secondary">{t('agent.keyAgreement')}</Tag>
                             )}
                             {isCapabilityInvocation && (
                               <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
@@ -380,6 +393,50 @@ export function AgentDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>PaymentHub</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchHub()}
+                  className="h-8 w-8 p-0"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {hubLoading ? (
+                  <SpinnerContainer loading={true} size="small" />
+                ) : hubError ? (
+                  <div className="text-center py-2">
+                    <span className="text-red-500">{hubError}</span>
+                  </div>
+                ) : Object.keys(hubBalances).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(hubBalances).map(([assetId, amount]) => (
+                      <div
+                        key={assetId}
+                        className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
+                      >
+                        <div className="flex items-center">
+                          <span className="font-medium">{assetId}</span>
+                          {hubActiveCounts[assetId] !== undefined && (
+                            <Tag variant="info" className="ml-2">
+                              {t('agent.activeChannels', { defaultValue: 'Active Channels' })}: {hubActiveCounts[assetId]}
+                            </Tag>
+                          )}
+                        </div>
+                        <span>{amount.toString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-gray-500">{t('agent.noBalance')}</span>
+                )}
+              </CardContent>
+            </Card>
             </div>
           )}
         </div>
