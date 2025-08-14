@@ -1,6 +1,12 @@
 import type { ChainConfig } from '../../factory/chainFactory';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
-import type { SubRAV, PaymentInfo, SignedSubRAV } from '../../core/types';
+import type {
+  SubRAV,
+  PaymentInfo,
+  SignedSubRAV,
+  ChannelInfo,
+  SubChannelState,
+} from '../../core/types';
 import type { PersistedHttpClientState } from '../../schema/core';
 import type { ChannelRepository } from '../../storage';
 
@@ -116,6 +122,10 @@ export interface HttpClientState {
   pendingSubRAV?: SubRAV;
   /** Pending requests by clientTxRef for payment resolution */
   pendingPayments?: Map<string, PendingPaymentRequest>;
+  /** Cached latest channel info (non-persistent) */
+  channelInfo?: ChannelInfo;
+  /** Cached latest sub-channel info (non-persistent) */
+  subChannelInfo?: SubChannelState;
 }
 
 /**

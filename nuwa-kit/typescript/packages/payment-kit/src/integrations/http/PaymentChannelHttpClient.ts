@@ -667,6 +667,7 @@ export class PaymentChannelHttpClient {
           const channelInfo = await this.payerClient.getChannelInfo(recoveryData.channel.channelId);
           //if (channelInfo.status === 'active') {
           this.clientState.channelId = recoveryData.channel.channelId;
+          this.clientState.channelInfo = channelInfo;
           this.clientState.pendingSubRAV = recoveryData.pendingSubRav || undefined;
 
           // Ensure sub-channel is authorized; if server returned subChannel it's authorized
@@ -689,6 +690,12 @@ export class PaymentChannelHttpClient {
                 this.log('Sub-channel authorized for fragment:', vmIdFragment);
                 // Ensure visibility on-chain before proceeding to first paid request
                 await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
+                try {
+                  this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
+                    this.clientState.channelId,
+                    vmIdFragment
+                  );
+                } catch {}
               } catch (e) {
                 this.log('AuthorizeSubChannel failed:', e);
                 throw e;
@@ -745,6 +752,19 @@ export class PaymentChannelHttpClient {
       });
 
       this.clientState.channelId = channelInfo.channelId;
+      try {
+        this.clientState.channelInfo = await this.payerClient.getChannelInfo(channelInfo.channelId);
+        if (this.options.keyId) {
+          const parts = this.options.keyId.split('#');
+          const vm = parts.length > 1 ? parts[1] : '';
+          if (vm) {
+            this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
+              channelInfo.channelId,
+              vm
+            );
+          }
+        }
+      } catch {}
 
       // Store the mapping (legacy compatibility)
       await this.mappingStore.set(this.host, channelInfo.channelId);
