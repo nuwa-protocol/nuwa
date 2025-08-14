@@ -1,4 +1,4 @@
-import type { SignedSubRAV, SubChannelState, SubRAV } from './types';
+import type { SignedSubRAV, SubChannelInfo, SubRAV } from './types';
 import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import type { VerificationResult } from '../client/PaymentChannelPayeeClient';
 import type { BillingContext } from '../billing';
@@ -509,7 +509,7 @@ export class PaymentProcessor {
   private generateNextSubRAV(params: {
     signedSubRAV?: SignedSubRAV;
     latestSignedSubRav?: SignedSubRAV;
-    subChannelState: SubChannelState;
+    subChannelState: SubChannelInfo;
     chainId: bigint;
     clientTxRef: string;
     cost: bigint;

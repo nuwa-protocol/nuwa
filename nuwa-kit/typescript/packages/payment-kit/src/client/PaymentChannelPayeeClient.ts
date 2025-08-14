@@ -5,7 +5,7 @@
  * from the Payee perspective, using the IPaymentChannelContract abstraction.
  */
 
-import type { AssetInfo, SubChannelState, ChannelInfo, SignedSubRAV, SubRAV } from '../core/types';
+import type { AssetInfo, SubChannelInfo, ChannelInfo, SignedSubRAV, SubRAV } from '../core/types';
 import type { IPaymentChannelContract, ClaimResult } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '../storage';
@@ -130,7 +130,7 @@ export class PaymentChannelPayeeClient {
   async getSubChannelState(
     channelId: string,
     vmIdFragment: string
-  ): Promise<SubChannelState | null> {
+  ): Promise<SubChannelInfo | null> {
     // 1) Try local repository first (no side effects)
     const local = await this.channelRepo.getSubChannelState(channelId, vmIdFragment);
     if (local) return local;
@@ -142,7 +142,7 @@ export class PaymentChannelPayeeClient {
         this.contract.getSubChannel({ channelId, vmIdFragment }),
       ]);
 
-      const derived: SubChannelState = {
+      const derived: SubChannelInfo = {
         channelId,
         epoch: channelInfo.epoch,
         vmIdFragment: subInfo.vmIdFragment,

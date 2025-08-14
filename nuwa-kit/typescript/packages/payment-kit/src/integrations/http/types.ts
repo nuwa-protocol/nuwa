@@ -5,7 +5,7 @@ import type {
   PaymentInfo,
   SignedSubRAV,
   ChannelInfo,
-  SubChannelState,
+  SubChannelInfo,
 } from '../../core/types';
 import type { PersistedHttpClientState } from '../../schema/core';
 import type { ChannelRepository } from '../../storage';
@@ -125,7 +125,7 @@ export interface HttpClientState {
   /** Cached latest channel info (non-persistent) */
   channelInfo?: ChannelInfo;
   /** Cached latest sub-channel info (non-persistent) */
-  subChannelInfo?: SubChannelState;
+  subChannelInfo?: SubChannelInfo;
   /** Cached key id and vmId fragment for current signer */
   keyId?: string;
   vmIdFragment?: string;

@@ -3,7 +3,7 @@
  * Handles persistence of channel metadata and sub-channel states
  */
 
-import type { ChannelInfo, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SubChannelInfo } from '../../core/types';
 import type {
   PaginationParams,
   ChannelFilter,
@@ -50,7 +50,7 @@ export interface ChannelRepository {
    * @param vmIdFragment - DID verification method fragment (e.g., "key-1")
    * @returns Sub-channel state if present; null if no local information
    */
-  getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelState | null>;
+  getSubChannelState(channelId: string, vmIdFragment: string): Promise<SubChannelInfo | null>;
 
   /**
    * Update sub-channel state
@@ -62,14 +62,14 @@ export interface ChannelRepository {
   updateSubChannelState(
     channelId: string,
     vmIdFragment: string,
-    updates: Partial<SubChannelState>
+    updates: Partial<SubChannelInfo>
   ): Promise<void>;
 
   /**
    * List all sub-channel states for a channel
    * @param channelId - Channel ID to list sub-channels for
    */
-  listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>>;
+  listSubChannelStates(channelId: string): Promise<Record<string, SubChannelInfo>>;
 
   /**
    * Remove sub-channel state

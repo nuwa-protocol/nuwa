@@ -5,7 +5,7 @@
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
-import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelInfo } from '../../core/types';
 import type { RateResult } from '../rate/types';
 import type { PaymentError as CentralPaymentError } from '../../errors/codes';
 
@@ -49,7 +49,7 @@ export interface BillingContext {
     /** Latest pending SubRAV from pending repository, it should match the signed SubRAV */
     latestPendingSubRav?: SubRAV;
     /** Latest sub-channel state cursor (from ChannelRepository) */
-    subChannelState?: SubChannelState;
+    subChannelState?: SubChannelInfo;
     /** Channel info (must exist for verification) */
     channelInfo?: ChannelInfo;
     /** Cached chain ID for synchronous proposal building (to be removed when all paths use channelInfo.chainId) */

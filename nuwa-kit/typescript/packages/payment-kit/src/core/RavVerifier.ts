@@ -1,4 +1,4 @@
-import type { ChannelInfo, SignedSubRAV, SubChannelState, SubRAV } from './types';
+import type { ChannelInfo, SignedSubRAV, SubChannelInfo, SubRAV } from './types';
 import type { BillingContext, BillingRule } from '../billing';
 import { PaymentErrorCode } from '../errors/codes';
 import type { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
@@ -23,7 +23,7 @@ export interface RavVerifyResult {
 
 export interface RavVerifyParams {
   channelInfo: ChannelInfo;
-  subChannelState: SubChannelState;
+  subChannelState: SubChannelInfo;
   billingRule: BillingRule;
   payerDidDoc: DIDDocument;
   /** Signed SubRAV from client (optional in FREE mode) */

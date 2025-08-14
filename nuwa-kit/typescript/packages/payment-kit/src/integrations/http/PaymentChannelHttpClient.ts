@@ -13,7 +13,7 @@ import type {
   SignedSubRAV,
   PaymentInfo,
   PaymentResult,
-  SubChannelState,
+  SubChannelInfo,
 } from '../../core/types';
 import type { ApiResponse } from '../../types/api';
 import type {
@@ -52,8 +52,8 @@ import { MemoryChannelRepository, TransactionStore, type ChannelRepository } fro
 import { PaymentErrorCode } from '../../errors/codes';
 import { wrapAndFilterInBandFrames } from './internal/StreamPaymentFilter';
 import { isStreamLikeResponse } from './internal/utils';
-import { RateProvider } from 'src/billing/rate/types';
-import { ContractRateProvider } from 'src/billing/rate/contract';
+import { RateProvider } from '../../billing/rate/types';
+import { ContractRateProvider } from '../../billing/rate/contract';
 
 /**
  * HTTP Client State enum for internal state management
@@ -426,7 +426,7 @@ export class PaymentChannelHttpClient {
     lastClaimed: bigint;
     unsettled: bigint;
     unsettledUsd: bigint;
-    subChannelState: SubChannelState;
+    subChannelState: SubChannelInfo;
     latestSubRavNonce?: bigint;
   }> {
     await this.ensureChannelReady();

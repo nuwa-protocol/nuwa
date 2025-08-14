@@ -1,7 +1,7 @@
 import { describe, test, expect, jest, afterEach } from '@jest/globals';
 import { verify as verifyRav } from '../RavVerifier';
 import { SubRAVSigner } from '../SubRav';
-import type { SignedSubRAV, ChannelInfo, SubChannelState } from '../types';
+import type { SignedSubRAV, ChannelInfo, SubChannelInfo } from '../types';
 
 describe('RavVerifier (unit) – pending priority and signature verification', () => {
   const channelId = '0x'.padEnd(66, 'a');
@@ -15,7 +15,7 @@ describe('RavVerifier (unit) – pending priority and signature verification', (
     epoch,
     status: 'active',
   };
-  const subChannelState: SubChannelState & { vmIdFragment: string } = {
+  const subChannelState: SubChannelInfo & { vmIdFragment: string } = {
     channelId,
     epoch,
     lastClaimedAmount: 0n,

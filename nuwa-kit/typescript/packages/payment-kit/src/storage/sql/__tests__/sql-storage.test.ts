@@ -14,7 +14,7 @@ import {
   type SqlPendingSubRAVRepositoryOptions,
 } from '../pendingSubRav.sql';
 import { SubRAVUtils } from '../../../core/SubRav';
-import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../../core/types';
+import type { ChannelInfo, SubChannelInfo, SignedSubRAV, SubRAV } from '../../../core/types';
 
 // Prefer SUPABASE_DB_URL if provided
 const SUPABASE_DB_URL = process.env.SUPABASE_DB_URL;

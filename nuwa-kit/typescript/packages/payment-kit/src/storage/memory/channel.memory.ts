@@ -3,7 +3,7 @@
  * For testing and development environments
  */
 
-import type { ChannelInfo, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SubChannelInfo } from '../../core/types';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
 import type {
   PaginationParams,
@@ -14,7 +14,7 @@ import type {
 
 export class MemoryChannelRepository implements ChannelRepository {
   private channelMetadata = new Map<string, ChannelInfo>();
-  private subChannelStates = new Map<string, SubChannelState>();
+  private subChannelStates = new Map<string, SubChannelInfo>();
   private hitCount = 0;
   private missCount = 0;
 
@@ -82,7 +82,7 @@ export class MemoryChannelRepository implements ChannelRepository {
   async getSubChannelState(
     channelId: string,
     vmIdFragment: string
-  ): Promise<SubChannelState | null> {
+  ): Promise<SubChannelInfo | null> {
     const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key);
 
@@ -98,7 +98,7 @@ export class MemoryChannelRepository implements ChannelRepository {
   async updateSubChannelState(
     channelId: string,
     vmIdFragment: string,
-    updates: Partial<SubChannelState>
+    updates: Partial<SubChannelInfo>
   ): Promise<void> {
     const key = this.getSubChannelKey(channelId, vmIdFragment);
     const existing = this.subChannelStates.get(key) || {
@@ -119,8 +119,8 @@ export class MemoryChannelRepository implements ChannelRepository {
     this.subChannelStates.set(key, updated);
   }
 
-  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>> {
-    const result: Record<string, SubChannelState> = {};
+  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelInfo>> {
+    const result: Record<string, SubChannelInfo> = {};
 
     for (const [key, state] of this.subChannelStates.entries()) {
       if (key.startsWith(channelId + ':')) {

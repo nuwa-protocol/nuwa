@@ -4,7 +4,7 @@
 
 import type { Pool, PoolClient } from 'pg';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
-import type { ChannelInfo, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SubChannelInfo } from '../../core/types';
 import type {
   PaginationParams,
   ChannelFilter,
@@ -270,7 +270,7 @@ export class SqlChannelRepository implements ChannelRepository {
   async getSubChannelState(
     channelId: string,
     vmIdFragment: string
-  ): Promise<SubChannelState | null> {
+  ): Promise<SubChannelInfo | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -303,7 +303,7 @@ export class SqlChannelRepository implements ChannelRepository {
   async updateSubChannelState(
     channelId: string,
     vmIdFragment: string,
-    updates: Partial<SubChannelState>
+    updates: Partial<SubChannelInfo>
   ): Promise<void> {
     const client = await this.pool.connect();
     try {
@@ -356,7 +356,7 @@ export class SqlChannelRepository implements ChannelRepository {
     }
   }
 
-  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>> {
+  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelInfo>> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -368,7 +368,7 @@ export class SqlChannelRepository implements ChannelRepository {
         [channelId]
       );
 
-      const states: Record<string, SubChannelState> = {};
+      const states: Record<string, SubChannelInfo> = {};
 
       for (const row of result.rows) {
         states[row.vm_id_fragment] = {

@@ -2,7 +2,7 @@
  * Browser IndexedDB-based ChannelRepository implementation
  */
 
-import type { ChannelInfo, SubChannelState } from '../../core/types';
+import type { ChannelInfo, SubChannelInfo } from '../../core/types';
 import type { ChannelRepository } from '../interfaces/ChannelRepository';
 import type {
   PaginationParams,
@@ -145,12 +145,12 @@ export class IndexedDBChannelRepository implements ChannelRepository {
   async getSubChannelState(
     channelId: string,
     vmIdFragment: string
-  ): Promise<SubChannelState | null> {
+  ): Promise<SubChannelInfo | null> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readonly');
     const store = tx.objectStore('subChannelStates');
 
-    const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
+    const existing = await new Promise<SubChannelInfo | null>((resolve, reject) => {
       const request = store.get([channelId, vmIdFragment]);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
@@ -174,14 +174,14 @@ export class IndexedDBChannelRepository implements ChannelRepository {
   async updateSubChannelState(
     channelId: string,
     vmIdFragment: string,
-    updates: Partial<SubChannelState>
+    updates: Partial<SubChannelInfo>
   ): Promise<void> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readwrite');
     const store = tx.objectStore('subChannelStates');
 
     // Get existing state first
-    const existing = await new Promise<SubChannelState | null>((resolve, reject) => {
+    const existing = await new Promise<SubChannelInfo | null>((resolve, reject) => {
       const request = store.get([channelId, vmIdFragment]);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
@@ -222,13 +222,13 @@ export class IndexedDBChannelRepository implements ChannelRepository {
     });
   }
 
-  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelState>> {
+  async listSubChannelStates(channelId: string): Promise<Record<string, SubChannelInfo>> {
     const db = await this.getDB();
     const tx = db.transaction(['subChannelStates'], 'readonly');
     const store = tx.objectStore('subChannelStates');
     const index = store.index('channelId');
 
-    const result: Record<string, SubChannelState> = {};
+    const result: Record<string, SubChannelInfo> = {};
 
     await new Promise<void>((resolve, reject) => {
       const request = index.openCursor(IDBKeyRange.only(channelId));

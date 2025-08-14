@@ -20,7 +20,7 @@ import {
   createPendingSubRAVRepo,
   createStorageRepositories,
 } from '..';
-import type { ChannelInfo, SubChannelState, SignedSubRAV, SubRAV } from '../../core/types';
+import type { ChannelInfo, SubChannelInfo, SignedSubRAV, SubRAV } from '../../core/types';
 
 describe('Repository-Based Storage Layer', () => {
   describe('ChannelRepository', () => {
