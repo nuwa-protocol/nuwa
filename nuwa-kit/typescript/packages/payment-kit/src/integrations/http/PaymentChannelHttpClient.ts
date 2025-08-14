@@ -52,6 +52,7 @@ import { MemoryChannelRepository, TransactionStore, type ChannelRepository } fro
 import { PaymentErrorCode } from '../../errors/codes';
 import { wrapAndFilterInBandFrames } from './internal/StreamPaymentFilter';
 import { isStreamLikeResponse } from './internal/utils';
+import { createNamespacedMappingStore } from './internal/LocalStore';
 import { RateProvider } from '../../billing/rate/types';
 import { ContractRateProvider } from '../../billing/rate/contract';
 
@@ -99,7 +100,10 @@ export class PaymentChannelHttpClient {
   constructor(options: HttpPayerOptions) {
     this.options = options;
     this.fetchImpl = options.fetchImpl || (globalThis as any).fetch?.bind(globalThis);
-    this.mappingStore = options.mappingStore || createDefaultMappingStore();
+    const baseMapping = options.mappingStore || createDefaultMappingStore();
+    this.mappingStore = createNamespacedMappingStore(baseMapping, {
+      getPayerDid: async () => this.options.payerDid || (await this.options.signer.getDid()),
+    });
     this.host = extractHost(options.baseUrl);
     this.channelRepo = options.channelRepo || createDefaultChannelRepo();
     this.transactionStore = options.transactionStore || createDefaultTransactionStore();

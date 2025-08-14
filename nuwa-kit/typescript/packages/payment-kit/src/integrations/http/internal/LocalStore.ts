@@ -223,3 +223,67 @@ export function extractHost(url: string): string {
     throw new Error(`Invalid URL: ${url}`);
   }
 }
+
+// ==================== Namespaced Host Mapping Store ====================
+
+export interface NamespaceProviders {
+  /** Resolve payer DID (async) */
+  getPayerDid: () => Promise<string>;
+}
+
+/**
+ * A wrapper around HostChannelMappingStore adding DID/network namespacing to keys.
+ * Composite key format: `${host}::${payerDid}`
+ */
+export class NamespacedHostChannelMappingStore implements HostChannelMappingStore {
+  constructor(
+    private readonly base: HostChannelMappingStore,
+    private readonly providers: NamespaceProviders
+  ) {}
+
+  private async buildKey(host: string): Promise<string> {
+    const payerDid = await this.providers.getPayerDid();
+    const ns = [host, payerDid].join('::');
+    return ns;
+  }
+
+  async get(host: string): Promise<string | undefined> {
+    const key = await this.buildKey(host);
+    return this.base.get(key);
+  }
+
+  async set(host: string, channelId: string): Promise<void> {
+    const key = await this.buildKey(host);
+    return this.base.set(key, channelId);
+  }
+
+  async delete(host: string): Promise<void> {
+    const key = await this.buildKey(host);
+    return this.base.delete(key);
+  }
+
+  async getState(host: string): Promise<PersistedHttpClientState | undefined> {
+    if (!this.base.getState) return undefined;
+    const key = await this.buildKey(host);
+    return this.base.getState(key);
+  }
+
+  async setState(host: string, state: PersistedHttpClientState): Promise<void> {
+    if (!this.base.setState) return;
+    const key = await this.buildKey(host);
+    return this.base.setState(key, state);
+  }
+
+  async deleteState(host: string): Promise<void> {
+    if (!this.base.deleteState) return;
+    const key = await this.buildKey(host);
+    return this.base.deleteState(key);
+  }
+}
+
+export function createNamespacedMappingStore(
+  base: HostChannelMappingStore,
+  providers: NamespaceProviders
+): HostChannelMappingStore {
+  return new NamespacedHostChannelMappingStore(base, providers);
+}
