@@ -114,8 +114,6 @@ export class PaymentChannelHttpClient {
       pendingPayments: new Map(),
     };
 
-    // keyId/vmIdFragment will be resolved lazily via ensureKeyFragment()
-
     this.logger = DebugLogger.get('PaymentChannelHttpClient');
     this.logger.setLevel(this.options.debug ? 'debug' : 'info');
     const mappingStoreType =
@@ -272,7 +270,8 @@ export class PaymentChannelHttpClient {
     );
 
     // Couple: when response promise rejects, clear the pending payment to avoid dangling
-    responsePromise.catch(() => {
+    responsePromise.catch(err => {
+      this.log('[response.error]', err);
       this.clientState.pendingPayments?.delete(clientTxRef);
     });
 
@@ -306,7 +305,7 @@ export class PaymentChannelHttpClient {
         });
         return res;
       })
-      .catch(() => void 0);
+      .catch(err => this.log('[txlog.update.error]', err));
 
     return {
       clientTxRef,
