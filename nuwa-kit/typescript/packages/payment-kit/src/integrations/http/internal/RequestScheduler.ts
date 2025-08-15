@@ -20,11 +20,11 @@ export class RequestScheduler {
           const result = await start(release);
           outerResolve(result);
         } catch (e) {
-          console.error("RequestScheduler: Task failed", e);
+          console.error('RequestScheduler: Task failed', e);
           try {
             release();
           } catch (releaseError) {
-            console.error("Error during release in RequestScheduler:", releaseError);
+            console.error('Error during release in RequestScheduler:', releaseError);
           }
           outerReject(e);
           return;

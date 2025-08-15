@@ -188,8 +188,9 @@ export class PaymentChannelHttpClient {
     let payment: PaymentInfo | undefined = undefined;
     try {
       payment = await handle.payment;
-    } catch {
+    } catch (e) {
       // swallow payment wait errors here; callers still have the response
+      this.log('[payment.error]', e);
     }
     return { data, payment };
   }
@@ -322,11 +323,13 @@ export class PaymentChannelHttpClient {
     });
 
     const startTs = Date.now();
-    const done = Promise.allSettled([responsePromise, paymentPromise]).then(results => {
-      const [res0, res1] = results;
-      const data: Response | undefined = res0.status === 'fulfilled' ? res0.value : undefined;
-      const payment =
-        res1.status === 'fulfilled' ? (res1.value as PaymentInfo | undefined) : undefined;
+    const done = responsePromise.then(async (data: Response) => {
+      let payment: PaymentInfo | undefined = undefined;
+      try {
+        payment = await paymentPromise;
+      } catch (e) {
+        this.log?.('[payment.error]', e);
+      }
       return { data, payment };
     });
 
@@ -837,7 +840,9 @@ export class PaymentChannelHttpClient {
                     this.clientState.channelId,
                     vmIdFragment
                   );
-                } catch {}
+                } catch (e) {
+                  this.log('GetSubChannelInfo failed:', e);
+                }
               } catch (e) {
                 this.log('AuthorizeSubChannel failed:', e);
                 throw e;
@@ -903,7 +908,9 @@ export class PaymentChannelHttpClient {
             vm
           );
         }
-      } catch {}
+      } catch (e) {
+        this.log('GetChannelInfo or GetSubChannelInfo failed:', e);
+      }
 
       // Store the mapping (legacy compatibility)
       await this.mappingStore.set(this.host, channelInfo.channelId);
@@ -959,7 +966,9 @@ export class PaymentChannelHttpClient {
         try {
           const ids: string[] = await this.options.signer.listKeyIds();
           keyId = Array.isArray(ids) && ids.length > 0 ? ids[0] : undefined;
-        } catch {}
+        } catch (e) {
+          this.log('listKeyIds failed:', e);
+        }
       }
     }
     if (keyId) {
@@ -1061,7 +1070,9 @@ export class PaymentChannelHttpClient {
     clearTimeout(pending.timeoutId);
     try {
       pending.release?.();
-    } catch {}
+    } catch (e) {
+      this.log('[release.error]', e);
+    }
     pending.reject(err);
     this.clientState.pendingPayments?.delete(clientTxRef);
     this.log('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
@@ -1075,7 +1086,9 @@ export class PaymentChannelHttpClient {
       clearTimeout(pending.timeoutId);
       try {
         pending.release?.();
-      } catch {}
+      } catch (e) {
+        this.log('[release.error]', e);
+      }
       pending.resolve(undefined);
       this.clientState.pendingPayments.delete(key);
       keys.push(key);
@@ -1252,7 +1265,9 @@ export class PaymentChannelHttpClient {
           ) {
             await this.transactionStore.update(context.clientTxRef, { stream: true });
           }
-        } catch {}
+        } catch (e) {
+          this.log('[transaction.update.error]', e);
+        }
         // Extend pending timeout for streaming if configured
         if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
           this.extendPendingTimeout(context.clientTxRef, this.options.timeoutMsStream);
@@ -1286,7 +1301,9 @@ export class PaymentChannelHttpClient {
       const visibleHeaderNames: string[] = [];
       try {
         response.headers.forEach((_, k) => visibleHeaderNames.push(k));
-      } catch {}
+      } catch (e) {
+        this.log('[response.no-header.error]', e);
+      }
       this.log(
         '[response.no-header]',
         'status=',
@@ -1417,7 +1434,9 @@ export class PaymentChannelHttpClient {
             try {
               assertSubRavProgression(prevSent, proto.subRav, true);
               candidates.push([k, p]);
-            } catch {}
+            } catch (e) {
+              this.log('assertSubRavProgression failed:', e);
+            }
           }
           if (candidates.length === 1) {
             const [k, p] = candidates[0];
@@ -1425,7 +1444,9 @@ export class PaymentChannelHttpClient {
             keyToDelete = k;
           }
         }
-      } catch {}
+      } catch (e) {
+        this.log('assertSubRavProgression failed:', e);
+      }
     }
 
     if (!pendingRequest || !keyToDelete) {
@@ -1477,7 +1498,9 @@ export class PaymentChannelHttpClient {
     this.resolveByRef(keyToDelete!, paymentInfo);
     try {
       pendingRequest.release?.();
-    } catch {}
+    } catch (e) {
+      this.log('[release.error]', e);
+    }
     // Transaction logging: finalize payment snapshot and vmIdFragment
     try {
       if (this.options.transactionLog?.enabled !== false && this.transactionStore) {
@@ -1519,7 +1542,9 @@ export class PaymentChannelHttpClient {
       if (this.clientState.pendingPayments && this.clientState.pendingPayments.size === 0) {
         // no-op: release is attached per pending; nothing to release here
       }
-    } catch {}
+    } catch (e) {
+      this.log('[release.error]', e);
+    }
 
     // Map known status codes when no protocol header present
     if (response.status === 402) {
@@ -1776,7 +1801,9 @@ export class PaymentChannelHttpClient {
     let release!: () => void;
     this.subRavMutex = new Promise<void>(resolve => (release = resolve));
     try {
-      await previous.catch(() => {});
+      await previous.catch(e => {
+        this.log('[subRavLock.error]', e);
+      });
       return await fn();
     } finally {
       release();
