@@ -7,7 +7,6 @@ export interface PaymentSnapshot {
   costUsd: bigint;
   nonce: bigint;
   serviceTxRef?: string;
-  paidAt: string; // ISO8601 time when payment was resolved
 }
 
 export interface TransactionRecord {

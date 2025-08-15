@@ -1483,7 +1483,6 @@ export class PaymentChannelHttpClient {
             costUsd: paymentInfo.costUsd,
             nonce: paymentInfo.nonce,
             serviceTxRef: paymentInfo.serviceTxRef,
-            paidAt: paymentInfo.timestamp,
           },
           vmIdFragment: paymentInfo.vmIdFragment,
           status: 'paid',
