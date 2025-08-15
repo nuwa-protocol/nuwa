@@ -39,6 +39,15 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
     defaultPricePicoUSD: '0',
     adminDid: process.env.ADMIN_DID?.split(',') || [],
     debug: process.env.DEBUG === 'true',
+    claimScheduler: {
+      policy: {
+        minClaimAmount: BigInt(process.env.MIN_CLAIM_AMOUNT || '100000000'),
+        maxConcurrentClaims: Number(process.env.MAX_CONCURRENT_CLAIMS || '5'),
+        maxIntervalMs: Number(process.env.MAX_INTERVAL_MS || '0'),
+        maxRetries: Number(process.env.MAX_RETRIES || '3'),
+        retryDelayMs: Number(process.env.RETRY_DELAY_MS || '60000'),
+      },
+    },
   });
 
   if (process.env.DEBUG === 'true') {
