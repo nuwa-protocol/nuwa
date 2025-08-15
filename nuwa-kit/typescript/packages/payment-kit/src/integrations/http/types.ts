@@ -139,6 +139,8 @@ export interface PendingPaymentRequest {
   resolve: (paymentInfo: PaymentInfo | undefined) => void;
   /** Promise rejector */
   reject: (error: Error) => void;
+  /** Optional release function for serialization queue */
+  release?: () => void;
   /** Request timestamp */
   timestamp: Date;
   /** Channel and asset info for PaymentInfo construction */

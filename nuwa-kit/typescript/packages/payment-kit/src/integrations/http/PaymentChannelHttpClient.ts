@@ -55,6 +55,7 @@ import { isStreamLikeResponse } from './internal/utils';
 import { createNamespacedMappingStore } from './internal/LocalStore';
 import { RateProvider } from '../../billing/rate/types';
 import { ContractRateProvider } from '../../billing/rate/contract';
+import { RequestScheduler } from './internal/RequestScheduler';
 
 /**
  * HTTP Client State enum for internal state management
@@ -96,6 +97,7 @@ export class PaymentChannelHttpClient {
   // Configurable timeout for pending payment resolution
   private requestTimeoutMs: number;
   private rateProvider: RateProvider;
+  private scheduler: RequestScheduler = new RequestScheduler();
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -216,62 +218,85 @@ export class PaymentChannelHttpClient {
     // Generate or extract clientTxRef
     const clientTxRef = this.extractOrGenerateClientTxRef(init?.headers);
 
-    // Prepare headers with clientTxRef
-    const { headers, sentedSubRav } = await this.prepareHeaders(
-      fullUrl,
-      method,
-      clientTxRef,
-      init?.headers
-    );
+    // Use scheduler to serialize payable requests until next proposal is available
+    let requestContext!: PaymentRequestContext;
+    let paymentResolve!: (v: PaymentInfo | undefined) => void;
+    let paymentReject!: (e: any) => void;
+    const paymentPromise: Promise<PaymentInfo | undefined> = new Promise((res, rej) => {
+      paymentResolve = res;
+      paymentReject = rej;
+    });
 
-    // Build request context
-    const requestContext: PaymentRequestContext = {
-      method,
-      url: fullUrl,
-      headers,
-      body: init?.body,
-      clientTxRef,
-    };
+    const responsePromise: Promise<Response> = this.scheduler.enqueue(async release => {
+      // Prepare headers with clientTxRef (may sign and consume pending SubRAV)
+      const { headers, sentedSubRav } = await this.prepareHeaders(
+        fullUrl,
+        method,
+        clientTxRef,
+        init?.headers
+      );
 
-    // Create payment promise for this request
-    const paymentPromise = this.createPaymentPromise(clientTxRef, requestContext, sentedSubRav);
+      // Build request context
+      requestContext = {
+        method,
+        url: fullUrl,
+        headers,
+        body: init?.body,
+        clientTxRef,
+      };
 
-    // Execute request (defer await to keep both promises available to caller)
-    const responsePromise = this.executeRequest(requestContext, init);
+      // Create payment promise and attach release
+      const pp = this.createPaymentPromise(clientTxRef, requestContext, sentedSubRav);
+      const pending = this.clientState.pendingPayments?.get(clientTxRef);
+      if (pending)
+        pending.release = () => {
+          try {
+            release();
+          } catch {}
+          pending.release = undefined;
+        };
+      // Bridge internal promise to external one
+      pp.then(paymentResolve).catch(paymentReject);
+
+      // Transaction logging: create pending record
+      try {
+        if (this.options.transactionLog?.enabled !== false) {
+          const store = this.transactionStore;
+          if (store) {
+            const urlObj = new URL(fullUrl);
+            const sanitize = this.options.transactionLog?.sanitizeRequest;
+            const sanitized = sanitize ? sanitize(headers, init?.body) : undefined;
+            const headersSummary = sanitized?.headersSummary ?? {
+              'content-type': headers['Content-Type'] || headers['content-type'] || '',
+            };
+            const requestBodyHash = sanitized?.requestBodyHash;
+            await store.create({
+              clientTxRef,
+              timestamp: Date.now(),
+              protocol: 'http',
+              method,
+              urlOrTarget: fullUrl,
+              operation: `${method}:${urlObj.pathname}`,
+              headersSummary,
+              requestBodyHash,
+              stream: false,
+              channelId: this.clientState.channelId,
+              vmIdFragment: sentedSubRav?.subRav?.vmIdFragment,
+              assetId: this.options.defaultAssetId || '0x3::gas_coin::RGas',
+              status: 'pending',
+            });
+          }
+        }
+      } catch (e) {
+        this.log('[txlog.create.error]', e);
+      }
+
+      // Execute request (headers processing will happen inside executeRequest)
+      return this.executeRequest(requestContext, init);
+    });
 
     // Transaction logging: create pending record
-    try {
-      if (this.options.transactionLog?.enabled !== false) {
-        const store = this.transactionStore;
-        if (store) {
-          const urlObj = new URL(fullUrl);
-          const sanitize = this.options.transactionLog?.sanitizeRequest;
-          const sanitized = sanitize ? sanitize(headers, init?.body) : undefined;
-          const headersSummary = sanitized?.headersSummary ?? {
-            'content-type': headers['Content-Type'] || headers['content-type'] || '',
-          };
-          const requestBodyHash = sanitized?.requestBodyHash;
-          await store.create({
-            clientTxRef,
-            timestamp: Date.now(),
-            protocol: 'http',
-            method,
-            urlOrTarget: fullUrl,
-            operation: `${method}:${urlObj.pathname}`,
-            headersSummary,
-            requestBodyHash,
-            stream: false, // will be updated if streaming detected later
-            channelId: this.clientState.channelId,
-            vmIdFragment: sentedSubRav?.subRav?.vmIdFragment,
-            //TODO get assetId from the channel
-            assetId: this.options.defaultAssetId || '0x3::gas_coin::RGas',
-            status: 'pending',
-          });
-        }
-      }
-    } catch (e) {
-      this.log('[txlog.create.error]', e);
-    }
+    // Note: transaction record creation moved inside scheduler before executeRequest
 
     this.log(
       '[request.start]',
@@ -283,17 +308,23 @@ export class PaymentChannelHttpClient {
       this.clientState.channelId
     );
 
-    // Couple: when response promise rejects, clear the pending payment to avoid dangling
+    // Couple: when response promise rejects, reject the corresponding pending payment to avoid dangling
     responsePromise.catch(err => {
       this.log('[response.error]', err);
-      this.clientState.pendingPayments?.delete(clientTxRef);
+      try {
+        this.rejectByRef(clientTxRef, err instanceof Error ? err : new Error(String(err)));
+      } catch {}
+      // In case there was no pending (e.g., FREE or already resolved), nothing to release here
     });
 
     const startTs = Date.now();
-    const done = Promise.all([responsePromise, paymentPromise]).then(([data, payment]) => ({
-      data,
-      payment,
-    }));
+    const done = Promise.allSettled([responsePromise, paymentPromise]).then(results => {
+      const [res0, res1] = results;
+      const data = res0.status === 'fulfilled' ? res0.value : (undefined as unknown as Response);
+      const payment =
+        res1.status === 'fulfilled' ? (res1.value as PaymentInfo | undefined) : undefined;
+      return { data, payment };
+    });
 
     // Optional abort support if caller provided an AbortSignal in init
     let abort: (() => void) | undefined;
@@ -1024,6 +1055,9 @@ export class PaymentChannelHttpClient {
     const pending = this.clientState.pendingPayments?.get(clientTxRef);
     if (!pending) return false;
     clearTimeout(pending.timeoutId);
+    try {
+      pending.release?.();
+    } catch {}
     pending.reject(err);
     this.clientState.pendingPayments?.delete(clientTxRef);
     this.log('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
@@ -1035,6 +1069,9 @@ export class PaymentChannelHttpClient {
     const keys: string[] = [];
     for (const [key, pending] of this.clientState.pendingPayments.entries()) {
       clearTimeout(pending.timeoutId);
+      try {
+        pending.release?.();
+      } catch {}
       pending.resolve(undefined);
       this.clientState.pendingPayments.delete(key);
       keys.push(key);
@@ -1366,6 +1403,28 @@ export class PaymentChannelHttpClient {
     }
 
     if (!pendingRequest || !keyToDelete) {
+      // Attempt heuristic match under concurrency by checking SubRAV progression
+      try {
+        if (this.clientState.pendingPayments && this.clientState.pendingPayments.size > 1) {
+          const candidates: Array<[string, PendingPaymentRequest]> = [];
+          for (const [k, p] of this.clientState.pendingPayments.entries()) {
+            const prevSent = p.sendedSubRav?.subRav;
+            if (!prevSent) continue;
+            try {
+              assertSubRavProgression(prevSent, proto.subRav, true);
+              candidates.push([k, p]);
+            } catch {}
+          }
+          if (candidates.length === 1) {
+            const [k, p] = candidates[0];
+            pendingRequest = p;
+            keyToDelete = k;
+          }
+        }
+      } catch {}
+    }
+
+    if (!pendingRequest || !keyToDelete) {
       // No matching pending: still cache SubRAV and return
       await this.cachePendingSubRAV(proto.subRav);
       if (proto.serviceTxRef) {
@@ -1412,6 +1471,9 @@ export class PaymentChannelHttpClient {
     };
 
     this.resolveByRef(keyToDelete!, paymentInfo);
+    try {
+      pendingRequest.release?.();
+    } catch {}
     // Transaction logging: finalize payment snapshot and vmIdFragment
     try {
       if (this.options.transactionLog?.enabled !== false && this.transactionStore) {
@@ -1449,6 +1511,12 @@ export class PaymentChannelHttpClient {
 
     // Non-streaming or no pending: treat as free endpoint
     this.resolveAllPendingAsFree();
+    // Release any queued request since no payment header is present (FREE)
+    try {
+      if (this.clientState.pendingPayments && this.clientState.pendingPayments.size === 0) {
+        // no-op: release is attached per pending; nothing to release here
+      }
+    } catch {}
 
     // Map known status codes when no protocol header present
     if (response.status === 402) {

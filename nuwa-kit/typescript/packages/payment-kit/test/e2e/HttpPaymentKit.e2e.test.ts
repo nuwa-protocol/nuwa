@@ -777,6 +777,63 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 Post-flight billing header transmission verification successful!');
   }, 120000);
 
+  test('Concurrent requests with clientTxRef loss on one response are still matched via SubRAV progression', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    // Warmup phase: first call may be FREE; second call should settle the first and return payment
+    const warmup0 = await httpClient.get('/echo?q=warmup0');
+    expect(warmup0.payment).toBeTruthy();
+
+    // Fire two concurrent requests: one normal echo, one mutated header
+    const p1 = httpClient.get('/echo?q=concurrent-1');
+    const p2 = httpClient.get('/echo-mutate?q=concurrent-2');
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.payment).toBeTruthy();
+    expect(r2.payment).toBeTruthy();
+
+    // Verify both nonces are valid and strictly increasing across the two
+    const nonces = [r1.payment!.nonce, r2.payment!.nonce].sort((a, b) => (a < b ? -1 : 1));
+    expect(nonces[0] < nonces[1]).toBe(true);
+  }, 120000);
+
+  test('Concurrent streaming and non-stream requests serialize and settle correctly', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    // Warmup to establish proposal chain
+    await httpClient.get('/echo?q=warmupS0');
+    const w1 = await httpClient.get('/echo?q=warmupS1');
+    expect(w1.payment).toBeTruthy();
+
+    // Start a streaming request (FinalCost, payment at end)
+    const streamHandle = await httpClient.requestWithPayment('GET', '/stream');
+    const streamResponse: Response = await streamHandle.response;
+    const reader = (streamResponse.body as any)?.getReader?.();
+
+    // Fire a non-stream request concurrently; scheduler should queue it until stream settles
+    const echoPromise = httpClient.get('/echo?q=after-stream-concurrent');
+
+    // Consume the stream fully to trigger end-of-response payment
+    if (reader) {
+      // Read until done
+      while (true) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    }
+
+    const streamPayment = await streamHandle.payment;
+    const echoResult = await echoPromise;
+
+    expect(streamPayment).toBeTruthy();
+    expect(echoResult.payment).toBeTruthy();
+
+    // The echo should run after stream settled; nonce must increase
+    if (streamPayment && echoResult.payment) {
+      expect(echoResult.payment.nonce).toBeGreaterThan(streamPayment.nonce);
+    }
+  }, 120000);
+
   test('maxAmount limit enforcement', async () => {
     if (!shouldRunE2ETests()) {
       console.log('Skipping test - E2E tests disabled');

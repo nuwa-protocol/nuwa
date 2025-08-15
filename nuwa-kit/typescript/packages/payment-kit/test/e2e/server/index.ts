@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import onHeaders from 'on-headers';
 import { createExpressPaymentKitFromEnv } from '../../../src/transport/express/fromIdentityEnv';
 import { HttpPaymentCodec } from '../../../src/middlewares/http/HttpPaymentCodec';
 import type { HttpRequestPayload, HttpResponsePayload, SubRAV } from '../../../src/core/types';
@@ -39,6 +40,24 @@ export async function createBillingServer(config: BillingServerConfig) {
   const app = express();
   app.use(express.json());
 
+  // Interceptor: for /echo-mutate, strip clientTxRef from payment header to simulate header loss
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/echo-mutate') {
+      onHeaders(res, function () {
+        try {
+          const headerName = HttpPaymentCodec.getHeaderName();
+          const val = res.getHeader(headerName);
+          if (typeof val === 'string' && val.startsWith('{')) {
+            const payload = JSON.parse(val);
+            delete payload.clientTxRef;
+            res.setHeader(headerName, JSON.stringify(payload));
+          }
+        } catch {}
+      });
+    }
+    next();
+  });
+
   // 1. Create ExpressPaymentKit integration for billing functionality
   const billing = await createExpressPaymentKitFromEnv(env, {
     serviceId,
@@ -71,6 +90,30 @@ export async function createBillingServer(config: BillingServerConfig) {
           return;
         }
         console.error('Error in /echo route:', error);
+        next(error);
+      }
+    }
+  );
+
+  // Same as /echo but with clientTxRef stripped from payment header by interceptor above
+  billing.get(
+    '/echo-mutate',
+    { pricing: '1000000000' },
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        res.json({
+          echo: req.query.q || 'hello',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes('Cannot set headers after they are sent')
+        ) {
+          console.log('Response already sent by middleware, skipping route handler');
+          return;
+        }
+        console.error('Error in /echo-mutate route:', error);
         next(error);
       }
     }
