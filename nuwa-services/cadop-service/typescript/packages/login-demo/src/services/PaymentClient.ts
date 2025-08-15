@@ -1,4 +1,4 @@
-import { DebugLogger, IdentityEnv } from '@nuwa-ai/identity-kit';
+import { DebugLogger} from '@nuwa-ai/identity-kit';
 import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
 
@@ -21,7 +21,7 @@ export async function getPaymentClient(sdk: IdentityKitWeb, baseUrl: string): Pr
   const env = sdk.getIdentityEnv();
   const client = await createHttpClient({
     baseUrl,
-    env: ((env as any) as IdentityEnv),
+    env,
     // optional: max amount per request in picoUSD (default ~ $0.5)
     // maxAmount: BigInt('500000000000'),
     debug: true,

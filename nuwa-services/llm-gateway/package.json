@@ -20,8 +20,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@nuwa-ai/identity-kit": "^0.3.6",
-    "@nuwa-ai/payment-kit": "^0.3.9",
+    "@nuwa-ai/identity-kit": "^0.4.0",
+    "@nuwa-ai/payment-kit": "^0.4.0",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
     "cors": "^2.8.5",
