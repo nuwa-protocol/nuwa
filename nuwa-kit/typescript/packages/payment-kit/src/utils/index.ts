@@ -96,14 +96,17 @@ export function stringToBigint(value: string): bigint {
  * @param picoUsd Amount in picoUSD (1 USD = 1,000,000,000,000 picoUSD)
  * @returns Formatted USD string (e.g., "$0.0123")
  */
-export function formatUsdAmount(picoUsd: bigint): string {
+export function formatUsdAmount(picoUsd: bigint, maxFractionDigits: number = 12): string {
   // 1 USD = 1,000,000,000,000 picoUSD
   const divisor = 1_000_000_000_000n;
   const whole = picoUsd / divisor;
   const remainder = picoUsd % divisor;
-  // Format remainder as a 12-digit string, then take the first 4 digits for 4 decimal places
-  const remainderStr = remainder.toString().padStart(12, '0').slice(0, 4);
-  // Remove trailing zeros from the fractional part, but keep at least one zero if all are zero
-  const fractional = remainderStr.replace(/0+$/, '') || '0';
+  // Ensure bounds for fraction digits
+  const digits = Math.max(0, Math.min(12, Math.floor(maxFractionDigits)));
+  // Format remainder as a 12-digit string, optionally truncate for max fraction digits (default 12)
+  const fullRemainderStr = remainder.toString().padStart(12, '0');
+  const usedRemainder = digits === 12 ? fullRemainderStr : fullRemainderStr.slice(0, digits);
+  // Remove trailing zeros; if all zeros, show a single zero
+  const fractional = usedRemainder.replace(/0+$/, '') || '0';
   return `$${whole.toString()}.${fractional}`;
 }
