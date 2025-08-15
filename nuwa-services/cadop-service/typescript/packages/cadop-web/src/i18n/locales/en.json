@@ -8,7 +8,8 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "back": "Back"
+    "back": "Back",
+    "technicalDetails": "Technical Details"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -103,5 +104,33 @@
     "language": "Language",
     "theme": "Theme",
     "notifications": "Notifications"
+  },
+  "passkey": {
+    "creating": "Creating Passkey...",
+    "creatingMessage": "Please complete the passkey creation on your device",
+    "createTitle": "Create Passkey for Nuwa DID",
+    "createSubtitle": "We will use the passkey to generate your Nuwa DID.",
+    "createButton": "Create Passkey",
+    "noteMessage": "Please Note: The passkey will be securely stored on your device for DID authentication and management.",
+    "errors": {
+      "userCancelled": "User cancelled Passkey operation",
+      "userCancelledDescription": "You cancelled the Passkey creation. To continue using Nuwa DID, please click Create Passkey again.",
+      "timeout": "Passkey operation timed out",
+      "timeoutDescription": "The Passkey operation timed out. Please try again and ensure your device supports biometric authentication and it's enabled.",
+      "notAllowed": "Passkey operation not allowed",
+      "notAllowedDescription": "The Passkey operation was not allowed due to security policy restrictions. Please refresh the page and try again, or check your browser settings.",
+      "unsupported": "Device doesn't support Passkey",
+      "unsupportedDescription": "Your device or browser doesn't support Passkey functionality. Please use a modern browser that supports WebAuthn.",
+      "generic": "Passkey operation failed",
+      "genericDescription": "An error occurred while creating the Passkey. Please try again. If the problem persists, contact technical support.",
+      "alreadyExists": "Passkey already exists",
+      "alreadyExistsDescription": "You have already created a Passkey on this device. To use a new Passkey, please clear your browser data first."
+    },
+    "retry": "Retry",
+    "learnMore": "Learn More",
+    "refreshPage": "Refresh Page",
+    "signInWithPasskey": "Sign in with Passkey",
+    "createNewDid": "Create new DID",
+    "loading": "Loading..."
   }
 }

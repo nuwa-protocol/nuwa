@@ -8,7 +8,8 @@
     "save": "保存",
     "edit": "编辑",
     "delete": "删除",
-    "back": "返回"
+    "back": "返回",
+    "technicalDetails": "技术详情"
   },
   "navigation": {
     "dashboard": "仪表盘",
@@ -103,5 +104,33 @@
     "language": "语言",
     "theme": "主题",
     "notifications": "通知"
+  },
+  "passkey": {
+    "creating": "正在创建 Passkey...",
+    "creatingMessage": "请在您的设备上完成 Passkey 创建",
+    "createTitle": "为 Nuwa DID 创建 Passkey",
+    "createSubtitle": "我们将使用 Passkey 生成您的 Nuwa DID。",
+    "createButton": "创建 Passkey",
+    "noteMessage": "请注意：Passkey 将安全地存储在您的设备上，用于 DID 身份验证和管理。",
+    "errors": {
+      "userCancelled": "用户取消了 Passkey 操作",
+      "userCancelledDescription": "您取消了 Passkey 创建。如需继续使用 Nuwa DID，请重新点击创建 Passkey。",
+      "timeout": "Passkey 操作超时",
+      "timeoutDescription": "Passkey 操作超时，请重试。确保您的设备支持生物识别认证并已启用。",
+      "notAllowed": "Passkey 操作不被允许",
+      "notAllowedDescription": "由于安全策略限制，无法完成 Passkey 操作。请刷新页面后重试，或检查浏览器设置。",
+      "unsupported": "设备不支持 Passkey",
+      "unsupportedDescription": "您的设备或浏览器不支持 Passkey 功能。请使用支持 WebAuthn 的现代浏览器。",
+      "generic": "Passkey 操作失败",
+      "genericDescription": "创建 Passkey 时发生错误，请重试。如问题持续存在，请联系技术支持。",
+      "alreadyExists": "Passkey 已存在",
+      "alreadyExistsDescription": "您已在此设备上创建了 Passkey。如需使用新的 Passkey，请先清除浏览器数据。"
+    },
+    "retry": "重试",
+    "learnMore": "了解更多",
+    "refreshPage": "刷新页面",
+    "signInWithPasskey": "使用 Passkey 登录",
+    "createNewDid": "创建新 DID",
+    "loading": "加载中..."
   }
 }

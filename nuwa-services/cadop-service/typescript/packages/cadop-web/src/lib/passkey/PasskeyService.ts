@@ -148,9 +148,15 @@ export class PasskeyService {
       },
     } as unknown as PublicKeyCredentialCreationOptions;
 
-    const cred = (await navigator.credentials.create({
-      publicKey: publicKeyOptions,
-    })) as PublicKeyCredential;
+    let cred: PublicKeyCredential;
+    try {
+      cred = (await navigator.credentials.create({
+        publicKey: publicKeyOptions,
+      })) as PublicKeyCredential;
+    } catch (error) {
+      // Re-throw the original error to be handled by UI layer with proper internationalization
+      throw error;
+    }
 
     if (this.developmentMode) {
       console.log('[PasskeyService] Credential created:', {
@@ -319,10 +325,16 @@ export class PasskeyService {
     // Use 'required' for user-initiated login (always shows UI with available credentials)
     const mediation = options?.mediation || 'silent';
 
-    const cred = (await navigator.credentials.get({
-      publicKey: publicKeyRequest,
-      mediation,
-    })) as PublicKeyCredential | null;
+    let cred: PublicKeyCredential | null;
+    try {
+      cred = (await navigator.credentials.get({
+        publicKey: publicKeyRequest,
+        mediation,
+      })) as PublicKeyCredential | null;
+    } catch (error) {
+      // Re-throw the original error to be handled by UI layer with proper internationalization
+      throw error;
+    }
 
     if (!cred) throw new Error('No credential from get');
 
@@ -383,10 +395,16 @@ export class PasskeyService {
       } as unknown as PublicKeyCredentialRequestOptions;
 
       // call WebAuthn API to get assertion
-      const cred = (await navigator.credentials.get({
-        publicKey: publicKeyRequest,
-        mediation: options.mediation || 'silent',
-      })) as PublicKeyCredential | null;
+      let cred: PublicKeyCredential | null;
+      try {
+        cred = (await navigator.credentials.get({
+          publicKey: publicKeyRequest,
+          mediation: options.mediation || 'silent',
+        })) as PublicKeyCredential | null;
+      } catch (webauthnError) {
+        // Re-throw the original error to be handled by UI layer with proper internationalization
+        throw webauthnError;
+      }
 
       if (!cred) throw new Error('No credential from get');
 

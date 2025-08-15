@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PasskeyService } from '../../lib/passkey/PasskeyService';
+import { getPasskeyErrorInfo } from '../../lib/passkey/PasskeyErrorHandler';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { UserStore } from '../../lib/storage';
 
@@ -13,7 +14,7 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { signInWithDid } = useAuth();
   const passkeyService = new PasskeyService();
-  const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // Determine available action
   const hasCredential = UserStore.hasAnyCredential();
@@ -29,7 +30,8 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
       onSuccess?.(userDid, false);
     } catch (error) {
       console.error('Passkey login failed:', error);
-      onError?.(error instanceof Error ? error.message : String(error));
+      const errorInfo = getPasskeyErrorInfo(error, t);
+      onError?.(errorInfo.description);
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +48,8 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
       onSuccess?.(userDid, true);
     } catch (error) {
       console.error('Passkey registration failed:', error);
-      onError?.(error instanceof Error ? error.message : String(error));
+      const errorInfo = getPasskeyErrorInfo(error, t);
+      onError?.(errorInfo.description);
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +64,7 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
           onClick={handleSignInWithPasskey}
           disabled={isLoading}
         >
-          {isLoading ? 'Loading...' : 'Sign in with Passkey'}
+          {isLoading ? t('passkey.loading') : t('passkey.signInWithPasskey')}
         </button>
       ) : (
         <button
@@ -70,7 +73,7 @@ export function WebAuthnLogin({ onSuccess, onError }: WebAuthnLoginProps) {
           onClick={handleCreateNewDid}
           disabled={isLoading}
         >
-          {isLoading ? 'Loading...' : 'Create new DID'}
+          {isLoading ? t('passkey.loading') : t('passkey.createNewDid')}
         </button>
       )}
     </div>

@@ -17,10 +17,16 @@ i18n
         translation: zhTranslations,
       },
     },
+    lng: 'en', // 明确设置默认语言为英文
     fallbackLng: 'en',
     debug: process.env.NODE_ENV === 'development',
     interpolation: {
       escapeValue: false,
+    },
+    detection: {
+      // 自定义语言检测顺序，优先使用默认设置
+      order: ['localStorage', 'navigator', 'htmlTag'],
+      caches: ['localStorage'],
     },
   });
 
