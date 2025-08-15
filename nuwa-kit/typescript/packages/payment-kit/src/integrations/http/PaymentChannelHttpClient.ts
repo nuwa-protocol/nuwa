@@ -252,7 +252,9 @@ export class PaymentChannelHttpClient {
         pending.release = () => {
           try {
             release();
-          } catch {}
+          } catch (e) {
+            this.log?.('[release.error]', e);
+          }
           pending.release = undefined;
         };
       // Bridge internal promise to external one
@@ -313,14 +315,16 @@ export class PaymentChannelHttpClient {
       this.log('[response.error]', err);
       try {
         this.rejectByRef(clientTxRef, err instanceof Error ? err : new Error(String(err)));
-      } catch {}
+      } catch (rejectErr) {
+        this.log('[rejectByRef.error]', rejectErr);
+      }
       // In case there was no pending (e.g., FREE or already resolved), nothing to release here
     });
 
     const startTs = Date.now();
     const done = Promise.allSettled([responsePromise, paymentPromise]).then(results => {
       const [res0, res1] = results;
-      const data = res0.status === 'fulfilled' ? res0.value : (undefined as unknown as Response);
+      const data: Response | undefined = res0.status === 'fulfilled' ? res0.value : undefined;
       const payment =
         res1.status === 'fulfilled' ? (res1.value as PaymentInfo | undefined) : undefined;
       return { data, payment };
