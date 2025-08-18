@@ -1,12 +1,12 @@
 [submodule "agents/deps/a2a"]
-	path = agents/deps/a2a
+	path = archives/agents/deps/a2a
 	url = git@github.com:google/A2A.git
 [submodule "nips"]
 	path = nips
 	url = git@github.com:nuwa-protocol/NIPs.git
-[submodule "nuwa-agent"]
-	path = nuwa-agent
-	url = https://github.com/nuwa-protocol/nuwa-agent.git
 [submodule "deps/rooch"]
 	path = deps/rooch
 	url = git@github.com:rooch-network/rooch.git
+[submodule "nuwa-client"]
+	path = nuwa-client
+	url = git@github.com:nuwa-protocol/nuwa-client.git
