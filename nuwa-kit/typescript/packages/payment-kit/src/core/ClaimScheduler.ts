@@ -14,9 +14,6 @@ export interface ClaimPolicy {
   /** Minimum accumulated amount to trigger claim (in smallest unit) */
   minClaimAmount: bigint;
 
-  /** Maximum interval between claims in milliseconds */
-  maxIntervalMs: number;
-
   /** Maximum number of concurrent claim operations */
   maxConcurrentClaims?: number;
 
@@ -73,8 +70,6 @@ export interface ClaimAttempt {
 export const DEFAULT_CLAIM_POLICY: ClaimPolicy = {
   // 1 RGas minimum (10,000,000 base units)
   minClaimAmount: BigInt('10000000'),
-  // Claim at least every 24 hours
-  maxIntervalMs: 24 * 60 * 60 * 1000,
   // Concurrency and retry defaults
   maxConcurrentClaims: 5,
   maxRetries: 3,
@@ -286,20 +281,6 @@ export class ClaimScheduler {
         vmIdFragment,
         delta: delta.toString(),
         threshold: this.policy.minClaimAmount.toString(),
-      });
-      return false;
-    }
-
-    // Check time threshold
-    const lastClaimTime = this.lastClaimTimes.get(key) || 0;
-    const timeSinceLastClaim = now - lastClaimTime;
-
-    if (timeSinceLastClaim < this.policy.maxIntervalMs) {
-      this.logger.debug('Time threshold not met', {
-        channelId,
-        vmIdFragment,
-        timeSinceLastClaim,
-        threshold: this.policy.maxIntervalMs,
       });
       return false;
     }

@@ -159,8 +159,6 @@ export type HealthCheck = z.infer<typeof HealthCheckSchema>;
 export const ClaimPolicySchema = z.object({
   /** Minimum accumulated amount to trigger claim (in smallest unit) */
   minClaimAmount: createBigIntSchema(),
-  /** Maximum interval between claims in milliseconds */
-  maxIntervalMs: z.number(),
   /** Maximum number of concurrent claim operations */
   maxConcurrentClaims: z.number().optional(),
   /** Retry attempts for failed claims */
