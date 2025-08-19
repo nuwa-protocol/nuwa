@@ -25,11 +25,24 @@ export interface ClaimPolicy {
 }
 
 /**
+ * Default claim policy for reactive claims
+ */
+export const DEFAULT_REACTIVE_CLAIM_POLICY: ClaimPolicy = {
+  // 1 RGas minimum (10,000,000 base units)
+  minClaimAmount: BigInt('10000000'),
+  // Reactive mode can be more aggressive with concurrency
+  maxConcurrentClaims: 10,
+  maxRetries: 3,
+  retryDelayMs: 60_000,
+  requireHubBalance: true,
+};
+
+/**
  * Configuration for ClaimTriggerService
  */
 export interface ClaimTriggerOptions {
-  /** Claim triggering policy */
-  policy: ClaimPolicy;
+  /** Claim triggering policy (optional, uses DEFAULT_REACTIVE_CLAIM_POLICY if not provided) */
+  policy?: Partial<ClaimPolicy>;
   
   /** Contract instance for on-chain claim operations */
   contract: IPaymentChannelContract;
@@ -118,7 +131,16 @@ export class ClaimTriggerService {
   private readonly processingIntervalMs = 1000; // Check queue every 1s
 
   constructor(options: ClaimTriggerOptions) {
-    this.policy = options.policy;
+    // Merge user policy with defaults
+    this.policy = { 
+      ...DEFAULT_REACTIVE_CLAIM_POLICY, 
+      ...options.policy 
+    };
+    
+    // Runtime safety check: ensure minClaimAmount is defined
+    if (this.policy.minClaimAmount === undefined || this.policy.minClaimAmount === null) {
+      throw new Error('Internal error: policy.minClaimAmount should never be undefined after merging with defaults');
+    }
     this.contract = options.contract;
     this.signer = options.signer;
     this.ravRepo = options.ravRepo;
@@ -131,6 +153,7 @@ export class ClaimTriggerService {
       minClaimAmount: this.policy.minClaimAmount.toString(),
       maxConcurrentClaims: this.policy.maxConcurrentClaims,
       maxRetries: this.policy.maxRetries,
+      requireHubBalance: this.policy.requireHubBalance,
     });
     
     // Start background processing

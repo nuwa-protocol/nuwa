@@ -29,7 +29,7 @@ import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { PaymentProcessor } from '../../core/PaymentProcessor';
 import { HubBalanceService, type HubBalanceServiceOptions } from '../../core/HubBalanceService';
-import { ClaimTriggerService, type ClaimTriggerOptions } from '../../core/ClaimTriggerService';
+import { ClaimTriggerService, type ClaimTriggerOptions, DEFAULT_REACTIVE_CLAIM_POLICY } from '../../core/ClaimTriggerService';
 import { isStreamingRequest } from './utils';
 
 /**
@@ -192,19 +192,35 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Create ClaimScheduler for automated claiming (configurable)
     const defaultPolicy: ClaimPolicy = DEFAULT_CLAIM_POLICY;
     const userPolicy = config.claimScheduler?.policy || {};
-    const normalizedUserPolicy: Partial<ClaimPolicy> = {
-      ...userPolicy,
-      // Allow string for minClaimAmount in config and normalize to bigint
-      minClaimAmount:
+    // Only include defined values in normalized policy to avoid overriding defaults with undefined
+    const normalizedUserPolicy: Partial<ClaimPolicy> = {};
+    
+    // Only set fields that are actually provided (not undefined)
+    if (userPolicy.minClaimAmount !== undefined) {
+      normalizedUserPolicy.minClaimAmount =
         typeof userPolicy.minClaimAmount === 'string'
           ? BigInt(userPolicy.minClaimAmount)
-          : userPolicy.minClaimAmount,
-    } as Partial<ClaimPolicy>;
+          : userPolicy.minClaimAmount;
+    }
+    if (userPolicy.maxConcurrentClaims !== undefined) {
+      normalizedUserPolicy.maxConcurrentClaims = userPolicy.maxConcurrentClaims;
+    }
+    if (userPolicy.maxRetries !== undefined) {
+      normalizedUserPolicy.maxRetries = userPolicy.maxRetries;
+    }
+    if (userPolicy.retryDelayMs !== undefined) {
+      normalizedUserPolicy.retryDelayMs = userPolicy.retryDelayMs;
+    }
 
     const schedulerPolicy: ClaimPolicy = {
       ...defaultPolicy,
       ...normalizedUserPolicy,
     } as ClaimPolicy;
+    
+    // Runtime safety check: ensure minClaimAmount is defined
+    if (schedulerPolicy.minClaimAmount === undefined || schedulerPolicy.minClaimAmount === null) {
+      throw new Error('Internal error: schedulerPolicy.minClaimAmount should never be undefined after merging with defaults');
+    }
     const schedulerPollMs =
       typeof config.claimScheduler?.pollIntervalMs === 'number'
         ? config.claimScheduler!.pollIntervalMs!
@@ -237,11 +253,12 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     if (claimMode === 'reactive' || claimMode === 'hybrid') {
       this.claimTriggerService = new ClaimTriggerService({
         policy: {
-          minClaimAmount: schedulerPolicy.minClaimAmount, // Reuse same threshold
-          maxConcurrentClaims: config.claim?.maxConcurrentClaims ?? 5,
-          maxRetries: config.claim?.maxRetries ?? 3,
-          retryDelayMs: config.claim?.retryDelayMs ?? 60000,
-          requireHubBalance: config.claim?.requireHubBalance ?? true,
+          // Only override non-default values from config
+          minClaimAmount: schedulerPolicy.minClaimAmount, // Should now always have a value from defaultPolicy
+          maxConcurrentClaims: config.claim?.maxConcurrentClaims,
+          maxRetries: config.claim?.maxRetries,
+          retryDelayMs: config.claim?.retryDelayMs,
+          requireHubBalance: config.claim?.requireHubBalance,
         },
         contract: deps.contract,
         signer: deps.signer, // Pass the payee signer
