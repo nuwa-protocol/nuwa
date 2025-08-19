@@ -149,7 +149,7 @@ export interface ExpressPaymentKitOptions {
     mode?: 'reactive' | 'polling' | 'hybrid'; // default: 'reactive'
     policy?: Partial<ClaimPolicy> & { minClaimAmount?: bigint | string };
     requireHubBalance?: boolean;  // default: true
-    maxConcurrentClaims?: number; // default: 5
+    maxConcurrentClaims?: number; // default: 10 (reactive), 5 (polling)
     maxRetries?: number;          // default: 3
     retryDelayMs?: number;        // default: 60_000
   };

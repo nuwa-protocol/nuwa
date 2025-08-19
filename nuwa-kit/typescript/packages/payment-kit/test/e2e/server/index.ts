@@ -65,6 +65,29 @@ export async function createBillingServer(config: BillingServerConfig) {
     defaultPricePicoUSD: '500000000', // 0.0005 USD
     adminDid,
     debug,
+    // Reduce hub balance cache TTLs in tests to avoid stale negative cache after deposit
+    hubBalance: {
+      ttlMs: 1000,
+      negativeTtlMs: 200,
+      staleWhileRevalidateMs: 500,
+      maxEntries: 1000,
+    },
+    // Ensure reactive claim is explicitly enabled and faster for tests
+    claim: {
+      mode: 'reactive',
+      maxConcurrentClaims: 10,
+      maxRetries: 2,
+      retryDelayMs: 1000,
+      requireHubBalance: true,
+    },
+    // Use small threshold so claims trigger quickly in tests
+    claimScheduler: {
+      policy: {
+        minClaimAmount: 1000000n, // 0.1 RGas
+      },
+      pollIntervalMs: 15000,
+      debug: false,
+    },
   });
 
   // 2. Declare routes & pricing strategies
@@ -90,6 +113,24 @@ export async function createBillingServer(config: BillingServerConfig) {
           return;
         }
         console.error('Error in /echo route:', error);
+        next(error);
+      }
+    }
+  );
+
+  // High-cost endpoint to accelerate balance depletion in tests
+  billing.get(
+    '/expensive',
+    { pricing: '5000000000' }, // 5,000,000,000 picoUSD (~50,000,000 base units assuming 100 picoUSD/unit)
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        res.json({
+          ok: true,
+          type: 'expensive',
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Error in /expensive route:', error);
         next(error);
       }
     }
