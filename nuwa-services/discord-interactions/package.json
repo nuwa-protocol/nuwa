@@ -2,7 +2,7 @@
   "name": "nuwa-discord-interactions",
   "version": "1.0.0",
   "description": "Discord Interactions service for Nuwa AI (Express + TypeScript)",
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
