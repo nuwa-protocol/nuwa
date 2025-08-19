@@ -2,6 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import urlMetadata from "url-metadata";
 import { authenticate } from "./auth";
 
+
+export const runtime = "nodejs";
+
+
 // define the request body type
 interface UrlMetadataRequest {
 	urls: string[];
