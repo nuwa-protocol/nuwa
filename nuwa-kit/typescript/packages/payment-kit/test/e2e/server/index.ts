@@ -81,7 +81,7 @@ export async function createBillingServer(config: BillingServerConfig) {
       maxRetries: 2,
       retryDelayMs: 1000,
       requireHubBalance: true,
-    }
+    },
   });
 
   // 2. Declare routes & pricing strategies

@@ -954,7 +954,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 1: Start with zero balance - requests should be rejected
     console.log('🚫 Test 1: Zero balance - requests should be rejected');
-    
+
     let initialBalance;
     try {
       initialBalance = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
@@ -985,10 +985,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 2: Deposit sufficient balance for testing
     console.log('💰 Test 2: Deposit balance and verify requests succeed');
-    
+
     const depositAmount = BigInt('200000000'); // 2 RGas
     await claimTestHubClient.deposit(testAsset.assetId, depositAmount);
-    
+
     const balanceAfterDeposit = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
     console.log(`💰 Balance after deposit: ${balanceAfterDeposit.toString()}`);
     expect(balanceAfterDeposit).toBeGreaterThanOrEqual(depositAmount);
@@ -999,30 +999,32 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Now requests should succeed
     const successResult1 = await claimTestClient.get('/echo?q=balance%20test%201');
     expect(successResult1.payment).toBeTruthy();
-    console.log(`✅ Request 1 successful after deposit - ${formatPaymentInfo(successResult1.payment!)}`);
+    console.log(
+      `✅ Request 1 successful after deposit - ${formatPaymentInfo(successResult1.payment!)}`
+    );
 
     // Test 3: Make multiple requests to accumulate claims and trigger reactive claim
     console.log('🔄 Test 3: Multiple requests to test reactive claim mechanism');
-    
+
     const requests: PaymentResult<any>[] = [];
     const requestCount = 5;
-    
+
     for (let i = 2; i <= requestCount + 1; i++) {
       const result = await claimTestClient.get(`/echo?q=claim%20test%20${i}`);
       expect(result.payment).toBeTruthy();
       requests.push(result);
       console.log(`✅ Request ${i} successful - ${formatPaymentInfo(result.payment!)}`);
-      
+
       // Small delay to allow reactive claims to process
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Test 4: Check that nonces are properly incremented (indicating settlement)
     console.log('🔍 Test 4: Verify nonce progression and reactive claim behavior');
-    
+
     const nonces = requests.map(r => r.payment!.nonce);
     console.log(`📈 Nonce progression: ${nonces.map(n => n.toString()).join(' → ')}`);
-    
+
     // Verify nonces are strictly increasing
     for (let i = 1; i < nonces.length; i++) {
       expect(nonces[i]).toBeGreaterThan(nonces[i - 1]);
@@ -1031,15 +1033,15 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 5: Check channel state and verify on-chain claims occurred
     console.log('🔍 Test 5: Verify on-chain claim state');
-    
+
     const channelId = claimTestClient.getChannelId();
     expect(channelId).toBeTruthy();
-    
+
     // Get on-chain channel state
     const channelState = await directContract.getChannelStatus({
       channelId: channelId!,
     });
-    
+
     console.log(`🔗 On-chain channel state:
       Channel ID: ${channelState.channelId}
       Status: ${channelState.status}
@@ -1067,14 +1069,14 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 6: Admin client verification of claim status
     console.log('📊 Test 6: Check claim processing stats via admin client');
-    
+
     try {
       const adminStats = await adminClient.getClaimsStatus();
       console.log('📊 Claim processing stats:', JSON.stringify(adminStats, null, 2));
-      
+
       expect(adminStats.claimsStatus).toBeTruthy();
       expect(adminStats.processingStats).toBeTruthy();
-      
+
       // Should show some claim activity
       // processingStats schema: { totalRequests, successfulPayments, failedPayments, autoClaimsTriggered }
       expect(adminStats.processingStats.totalRequests).toBeGreaterThan(0);
@@ -1090,27 +1092,33 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('ℹ️ Test 7: Balance depletion scenario (skipped to avoid test interference)');
     // This test would drain the balance and verify that subsequent requests are rejected
     // Commented out to avoid affecting other tests
-    
-    
+
     console.log('💸 Test 7: Balance depletion scenario');
-    
+
     // Make fewer, higher-cost requests to deplete balance faster
     let requestCounter = 1;
     let lastSuccessfulBalance = balanceAfterDeposit;
-    
+
     try {
       const maxDepleteRequests = 20; // hard cap to avoid infinite loop in CI
       while (lastSuccessfulBalance > 0n && requestCounter <= maxDepleteRequests) {
-        const depletionResult = await claimTestClient.get(`/expensive?q=depletion%20${requestCounter}`);
+        const depletionResult = await claimTestClient.get(
+          `/expensive?q=depletion%20${requestCounter}`
+        );
         if (depletionResult.payment) {
-          console.log(`💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`);
+          console.log(
+            `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
+          );
         }
         requestCounter++;
 
         // Observe reactive claim status via admin endpoint
         try {
           const adminStatsNow = await adminClient.getClaimsStatus();
-          console.log('📊 Reactive claim status snapshot:', JSON.stringify(adminStatsNow.claimsStatus));
+          console.log(
+            '📊 Reactive claim status snapshot:',
+            JSON.stringify(adminStatsNow.claimsStatus)
+          );
         } catch (e) {
           console.log('ℹ️ Admin status unavailable:', (e as any)?.message || String(e));
         }
@@ -1120,22 +1128,27 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
         // Check balance more frequently since depletion is faster
         if (requestCounter % 2 === 0) {
-          lastSuccessfulBalance = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
+          lastSuccessfulBalance = await claimTestHubClient.getBalance({
+            assetId: testAsset.assetId,
+          });
           console.log(`💰 Current balance: ${lastSuccessfulBalance.toString()}`);
         }
       }
 
       if (requestCounter > maxDepleteRequests) {
-        console.log('⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout');
+        console.log(
+          '⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout'
+        );
       }
     } catch (error: any) {
       console.log('🚫 Request failed due to balance depletion (expected):', error.message);
       expect(error.message).toMatch(/balance|insufficient|funds|402/i);
     }
-    
 
-    console.log('🎉 PaymentHub balance check and reactive claim mechanism test completed successfully!');
-    
+    console.log(
+      '🎉 PaymentHub balance check and reactive claim mechanism test completed successfully!'
+    );
+
     console.log(`📋 Test Summary:
       ✅ Balance check prevents requests with insufficient funds
       ✅ Requests succeed after sufficient deposit
