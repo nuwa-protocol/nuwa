@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
+    "module": "commonjs",
     "lib": ["ES2020", "DOM", "ESNext"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -13,7 +13,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "node",
     "types": ["node", "express"]
   },
   "include": ["src/**/*"],

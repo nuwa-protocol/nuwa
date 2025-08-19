@@ -11,13 +11,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 读取环境变量
-const DISCORD_APP_PUBLIC_KEY = process.env.DISCORD_APP_PUBLIC_KEY;
+const DISCORD_APP_PUBLIC_KEY = process.env.DISCORD_APP_PUBLIC_KEY || '';
 const FAUCET_URL = process.env.FAUCET_URL || 'https://test-faucet.rooch.network';
 const ROOCH_RPC_URL = process.env.ROOCH_RPC_URL || 'https://test-seed.rooch.network';
 const DEFAULT_ASSET_ID = '0x3::gas_coin::RGas';
-const HUB_PRIVATE_KEY = process.env.HUB_PRIVATE_KEY;
-const HUB_DID = process.env.HUB_DID;
-const hubAddress = HUB_DID.split(':')[2];
+const HUB_PRIVATE_KEY = process.env.HUB_PRIVATE_KEY || '';
+const HUB_DID = process.env.HUB_DID || '';
+const hubAddress = HUB_DID ? HUB_DID.split(':')[2] : '';
 
 // 提供原始 body 给签名校验
 app.use(
