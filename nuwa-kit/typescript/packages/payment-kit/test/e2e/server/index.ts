@@ -67,27 +67,21 @@ export async function createBillingServer(config: BillingServerConfig) {
     debug,
     // Reduce hub balance cache TTLs in tests to avoid stale negative cache after deposit
     hubBalance: {
-      ttlMs: 1000,
-      negativeTtlMs: 200,
+      ttlMs: 10,
+      negativeTtlMs: 10,
       staleWhileRevalidateMs: 500,
       maxEntries: 1000,
     },
     // Ensure reactive claim is explicitly enabled and faster for tests
     claim: {
-      mode: 'reactive',
       maxConcurrentClaims: 10,
-      maxRetries: 2,
-      retryDelayMs: 1000,
-      requireHubBalance: true,
-    },
-    // Use small threshold so claims trigger quickly in tests
-    claimScheduler: {
       policy: {
         minClaimAmount: 1000000n, // 0.1 RGas
       },
-      pollIntervalMs: 15000,
-      debug: false,
-    },
+      maxRetries: 2,
+      retryDelayMs: 1000,
+      requireHubBalance: true,
+    }
   });
 
   // 2. Declare routes & pricing strategies

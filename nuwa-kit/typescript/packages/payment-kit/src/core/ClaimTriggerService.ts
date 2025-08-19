@@ -22,6 +22,12 @@ export interface ClaimPolicy {
   
   /** Whether to check PaymentHub balance before triggering claims */
   requireHubBalance: boolean;
+
+  /** Fixed backoff when insufficient funds detected (ms) */
+  insufficientFundsBackoffMs: number;
+
+  /** Whether to count insufficient funds as failures in stats */
+  countInsufficientAsFailure: boolean;
 }
 
 /**
@@ -35,6 +41,8 @@ export const DEFAULT_REACTIVE_CLAIM_POLICY: ClaimPolicy = {
   maxRetries: 3,
   retryDelayMs: 60_000,
   requireHubBalance: true,
+  insufficientFundsBackoffMs: 30_000,
+  countInsufficientAsFailure: false,
 };
 
 /**
@@ -87,6 +95,12 @@ export interface ClaimTriggerStats {
   
   /** Total failed claims */
   failedCount: number;
+
+  /** Total skipped claims (e.g., insufficient funds precheck) */
+  skippedCount: number;
+
+  /** Total insufficient funds occurrences */
+  insufficientFundsCount: number;
   
   /** Number of tasks in backoff (waiting for retry) */
   backoffCount: number;
@@ -94,6 +108,21 @@ export interface ClaimTriggerStats {
   /** Average claim processing time in milliseconds */
   avgProcessingTimeMs: number;
 }
+
+/**
+ * Result of a single claim execution attempt
+ */
+type ClaimExecutionResult =
+  | {
+      status: 'skipped';
+      reason: 'insufficient_funds' | 'below_threshold' | 'concurrency_limit' | 'already_processing' | 'already_queued';
+      context?: Record<string, unknown>;
+    }
+  | {
+      status: 'succeeded';
+      txHash: string;
+      claimedAmount?: bigint;
+    };
 
 /**
  * Event-driven Claim Trigger Service
@@ -123,6 +152,8 @@ export class ClaimTriggerService {
   private readonly stats = {
     successCount: 0,
     failedCount: 0,
+    skippedCount: 0,
+    insufficientFundsCount: 0,
     totalProcessingTime: 0,
   };
   
@@ -180,12 +211,14 @@ export class ClaimTriggerService {
         delta: delta.toString(), 
         threshold: this.policy.minClaimAmount.toString() 
       });
+      this.stats.skippedCount++;
       return;
     }
     
     // Check if already processing this sub-channel
     if (this.activeClaims.has(key)) {
       this.logger.debug('Claim already in progress, skipping', { channelId, vmIdFragment });
+      this.stats.skippedCount++;
       return;
     }
     
@@ -209,6 +242,7 @@ export class ClaimTriggerService {
         totalInFlight, 
         limit: this.policy.maxConcurrentClaims 
       });
+      this.stats.skippedCount++;
       return;
     }
     
@@ -239,6 +273,8 @@ export class ClaimTriggerService {
       queued: this.claimQueue.size,
       successCount: this.stats.successCount,
       failedCount: this.stats.failedCount,
+      skippedCount: this.stats.skippedCount,
+      insufficientFundsCount: this.stats.insufficientFundsCount,
       backoffCount,
       avgProcessingTimeMs: this.stats.successCount > 0 
         ? this.stats.totalProcessingTime / this.stats.successCount
@@ -316,19 +352,46 @@ export class ClaimTriggerService {
     });
     
     try {
-      await this.executeClaim(task.channelId, task.vmIdFragment);
-      
-      // Success
-      const processingTime = Date.now() - startTime;
-      this.stats.successCount++;
-      this.stats.totalProcessingTime += processingTime;
-      
-      this.logger.info('Claim successful', { 
-        channelId: task.channelId, 
-        vmIdFragment: task.vmIdFragment,
-        processingTimeMs: processingTime,
-      });
-      
+      const result = await this.executeClaim(task.channelId, task.vmIdFragment);
+
+      if (result.status === 'succeeded') {
+        // Success
+        const processingTime = Date.now() - startTime;
+        this.stats.successCount++;
+        this.stats.totalProcessingTime += processingTime;
+        
+        this.logger.info('Claim successful', { 
+          channelId: task.channelId, 
+          vmIdFragment: task.vmIdFragment,
+          processingTimeMs: processingTime,
+          txHash: result.txHash,
+        });
+        return;
+      }
+
+      if (result.status === 'skipped') {
+        // Skipped due to preconditions (e.g., insufficient funds)
+        this.stats.skippedCount++;
+        if (result.reason === 'insufficient_funds') {
+          this.stats.insufficientFundsCount++;
+        }
+        // Schedule backoff for insufficient funds
+        const backoffMs =
+          result.reason === 'insufficient_funds'
+            ? this.policy.insufficientFundsBackoffMs
+            : this.policy.retryDelayMs;
+        task.nextRetryAt = Date.now() + backoffMs;
+        this.logger.warn('Claim skipped due to precondition', {
+          channelId: task.channelId,
+          vmIdFragment: task.vmIdFragment,
+          reason: result.reason,
+          backoffMs,
+        });
+        // Re-queue for later
+        this.claimQueue.set(key, task);
+        return;
+      }
+
     } catch (error) {
       this.logger.error('Claim failed', { 
         channelId: task.channelId, 
@@ -339,8 +402,24 @@ export class ClaimTriggerService {
       
       // Check if should retry
       if (task.attempts < this.policy.maxRetries) {
-        // Calculate exponential backoff
-        const backoffMs = this.policy.retryDelayMs * Math.pow(2, task.attempts - 1);
+        // Check if this is an insufficient funds error - use longer backoff
+        const isInsufficientFunds = (error as any)?.code === 'HUB_INSUFFICIENT_FUNDS';
+        let backoffMs: number;
+        
+        if (isInsufficientFunds) {
+          // For insufficient funds, use a longer fixed delay to give user time to deposit
+          backoffMs = 30000; // 30 seconds fixed delay for balance issues
+          this.logger.warn('Claim failed due to insufficient hub balance - using extended retry delay', {
+            channelId: task.channelId,
+            vmIdFragment: task.vmIdFragment,
+            backoffMs,
+            message: 'User may need to deposit funds to PaymentHub',
+          });
+        } else {
+          // For other errors, use exponential backoff
+          backoffMs = this.policy.retryDelayMs * Math.pow(2, task.attempts - 1);
+        }
+        
         task.nextRetryAt = Date.now() + backoffMs;
         
         // Re-queue for retry
@@ -352,6 +431,7 @@ export class ClaimTriggerService {
           attempt: task.attempts,
           nextRetryAt: new Date(task.nextRetryAt).toISOString(),
           backoffMs,
+          errorType: isInsufficientFunds ? 'insufficient_funds' : 'other',
         });
       } else {
         // Max retries reached
@@ -365,7 +445,7 @@ export class ClaimTriggerService {
     }
   }
 
-  private async executeClaim(channelId: string, vmIdFragment: string): Promise<void> {
+  private async executeClaim(channelId: string, vmIdFragment: string): Promise<ClaimExecutionResult> {
     this.logger.debug('Executing claim', { channelId, vmIdFragment });
     
     // Get latest signed SubRAV
@@ -374,14 +454,90 @@ export class ClaimTriggerService {
       throw new Error(`No signed SubRAV found for ${channelId}:${vmIdFragment}`);
     }
     
-    this.logger.debug('Found latest signed SubRAV', { 
+    // Get current sub-channel info for delta calculation
+    const subChannelInfo = await this.channelRepo.getSubChannelState(channelId, vmIdFragment);
+    if (!subChannelInfo) {
+      throw new Error(`No SubChannelInfo found for channel ${channelId}:${vmIdFragment}`);
+    }
+
+    // Get channel metadata to access assetId and payerDid  
+    const channelMetadata = await this.channelRepo.getChannelMetadata(channelId);
+    if (!channelMetadata) {
+      throw new Error(`No ChannelInfo found for channel ${channelId}`);
+    }
+
+    // Calculate delta (amount to claim)
+    const accumulatedAmount = latestSignedRAV.subRav.accumulatedAmount;
+    const lastClaimedAmount = subChannelInfo.lastClaimedAmount;
+    const delta = accumulatedAmount > lastClaimedAmount ? accumulatedAmount - lastClaimedAmount : 0n;
+    
+    this.logger.debug('Found latest signed SubRAV with detailed info', { 
       channelId, 
       vmIdFragment,
       nonce: latestSignedRAV.subRav.nonce.toString(),
-      accumulatedAmount: latestSignedRAV.subRav.accumulatedAmount.toString(),
+      accumulatedAmount: accumulatedAmount.toString(),
+      lastClaimedAmount: lastClaimedAmount.toString(),
+      delta: delta.toString(),
+      assetId: channelMetadata.assetId,
+      payerDid: channelMetadata.payerDid,
+      payeeDid: channelMetadata.payeeDid,
     });
+
+    // Verify on-chain balance before attempting claim
+    try {
+      const onChainBalance = await this.contract.getHubBalance(
+        channelMetadata.payerDid,
+        channelMetadata.assetId
+      );
+      this.logger.debug('On-chain hub balance verification', {
+        channelId,
+        payerDid: channelMetadata.payerDid,
+        assetId: channelMetadata.assetId,
+        onChainBalance: onChainBalance.toString(),
+        deltaToWithdraw: delta.toString(),
+        sufficient: onChainBalance >= delta,
+        minClaimAmount: this.policy.minClaimAmount.toString(),
+      });
+
+      if (onChainBalance < delta) {
+        this.logger.warn('Insufficient on-chain hub balance detected before claim', {
+          channelId,
+          payerDid: channelMetadata.payerDid,
+          assetId: channelMetadata.assetId,
+          onChainBalance: onChainBalance.toString(),
+          deltaToWithdraw: delta.toString(),
+          deficit: (delta - onChainBalance).toString(),
+        });
+        
+        // Return skipped result instead of throwing
+        return {
+          status: 'skipped',
+          reason: 'insufficient_funds',
+          context: {
+            onChainBalance: onChainBalance.toString(),
+            delta: delta.toString(),
+            payerDid: channelMetadata.payerDid,
+            assetId: channelMetadata.assetId,
+          },
+        };
+      }
+    } catch (balanceError) {
+      // For balance API errors, log and continue (do not skip)
+      this.logger.warn('Failed to verify on-chain balance before claim', {
+        channelId,
+        payerDid: channelMetadata.payerDid,
+        assetId: channelMetadata.assetId,
+        error: balanceError instanceof Error ? balanceError.message : String(balanceError),
+      });
+      // Continue with claim attempt
+    }
     
     // Execute claim on-chain
+    this.logger.debug('Attempting claim on-chain', {
+      channelId,
+      vmIdFragment,
+    });
+    
     const claimResult = await this.contract.claimFromChannel({
       signedSubRAV: latestSignedRAV,
       signer: this.signer,
@@ -406,6 +562,13 @@ export class ClaimTriggerService {
       // Mark RAV as claimed
       this.ravRepo.markAsClaimed(channelId, vmIdFragment, latestSignedRAV.subRav.nonce),
     ]);
+
+    this.logger.debug('Successfully updated local state after claim', {
+      channelId,
+      vmIdFragment,
+      newLastClaimedAmount: latestSignedRAV.subRav.accumulatedAmount.toString(),
+      newLastConfirmedNonce: latestSignedRAV.subRav.nonce.toString(),
+    });
     
     this.logger.info('Local state updated after claim', { 
       channelId, 
@@ -413,5 +576,11 @@ export class ClaimTriggerService {
       lastClaimedAmount: latestSignedRAV.subRav.accumulatedAmount.toString(),
       lastConfirmedNonce: latestSignedRAV.subRav.nonce.toString(),
     });
+
+    return {
+      status: 'succeeded',
+      txHash: claimResult.txHash,
+      claimedAmount: claimResult.claimedAmount,
+    };
   }
 }

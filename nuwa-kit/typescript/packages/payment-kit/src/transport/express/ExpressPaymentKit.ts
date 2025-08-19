@@ -16,8 +16,7 @@ import {
   type PendingSubRAVRepository,
   type RAVRepository,
 } from '../../storage';
-import { ClaimScheduler, DEFAULT_CLAIM_POLICY } from '../../core/ClaimScheduler';
-import type { ClaimPolicy } from '../../core/ClaimScheduler';
+// Removed legacy ClaimScheduler in favor of reactive ClaimTriggerService
 import { DIDAuth, VDRRegistry, RoochVDR } from '@nuwa-ai/identity-kit';
 import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
@@ -62,17 +61,7 @@ export interface ExpressPaymentKitOptions {
   /** Debug logging */
   debug?: boolean;
 
-  /** Optional ClaimScheduler configuration */
-  claimScheduler?: {
-    /** Override claiming policy; only set fields you want to change */
-    policy?: Partial<ClaimPolicy> & { minClaimAmount?: bigint | string };
-    /** Polling interval in milliseconds (default: 30s) */
-    pollIntervalMs?: number;
-    /** Enable detailed debug logs for scheduler */
-    debug?: boolean;
-    /** Auto start the scheduler on kit initialization (default: true) */
-    autoStart?: boolean;
-  };
+  // Legacy polling scheduler removed; reactive claims are the default
 
   /** PaymentHub balance caching configuration */
   hubBalance?: {
@@ -88,10 +77,8 @@ export interface ExpressPaymentKitOptions {
 
   /** Claim triggering configuration */
   claim?: {
-    /** Claim mode - default 'reactive' (event-driven) */
-    mode?: 'reactive' | 'polling' | 'hybrid';
     /** Claim policy configuration */
-    policy?: Partial<ClaimPolicy> & { minClaimAmount?: bigint | string };
+    policy?: Partial<{ minClaimAmount: bigint | string; maxConcurrentClaims: number; maxRetries: number; retryDelayMs: number }>;
     /** Require hub balance check before triggering claims (default: true) */
     requireHubBalance?: boolean;
     /** Maximum concurrent claims across all sub-channels (default: 5) */
@@ -132,7 +119,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly payeeClient: PaymentChannelPayeeClient;
   private readonly rateProvider: RateProvider;
   private readonly serviceDid: string;
-  private readonly claimScheduler: ClaimScheduler;
+  // claimScheduler removed
   // Hold storage repositories explicitly for reuse across components
   private readonly channelRepo: ChannelRepository;
   private readonly ravRepo: RAVRepository;
@@ -189,53 +176,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       defaultPricePicoUSD: config.defaultPricePicoUSD,
     });
 
-    // Create ClaimScheduler for automated claiming (configurable)
-    const defaultPolicy: ClaimPolicy = DEFAULT_CLAIM_POLICY;
-    const userPolicy = config.claimScheduler?.policy || {};
-    // Only include defined values in normalized policy to avoid overriding defaults with undefined
-    const normalizedUserPolicy: Partial<ClaimPolicy> = {};
-    
-    // Only set fields that are actually provided (not undefined)
-    if (userPolicy.minClaimAmount !== undefined) {
-      normalizedUserPolicy.minClaimAmount =
-        typeof userPolicy.minClaimAmount === 'string'
-          ? BigInt(userPolicy.minClaimAmount)
-          : userPolicy.minClaimAmount;
-    }
-    if (userPolicy.maxConcurrentClaims !== undefined) {
-      normalizedUserPolicy.maxConcurrentClaims = userPolicy.maxConcurrentClaims;
-    }
-    if (userPolicy.maxRetries !== undefined) {
-      normalizedUserPolicy.maxRetries = userPolicy.maxRetries;
-    }
-    if (userPolicy.retryDelayMs !== undefined) {
-      normalizedUserPolicy.retryDelayMs = userPolicy.retryDelayMs;
-    }
-
-    const schedulerPolicy: ClaimPolicy = {
-      ...defaultPolicy,
-      ...normalizedUserPolicy,
-    } as ClaimPolicy;
-    
-    // Runtime safety check: ensure minClaimAmount is defined
-    if (schedulerPolicy.minClaimAmount === undefined || schedulerPolicy.minClaimAmount === null) {
-      throw new Error('Internal error: schedulerPolicy.minClaimAmount should never be undefined after merging with defaults');
-    }
-    const schedulerPollMs =
-      typeof config.claimScheduler?.pollIntervalMs === 'number'
-        ? config.claimScheduler!.pollIntervalMs!
-        : 30_000;
-    const schedulerDebug = config.claimScheduler?.debug ?? config.debug ?? false;
-
-    this.claimScheduler = new ClaimScheduler({
-      store: this.ravRepo,
-      contract: this.payeeClient.getContract(),
-      signer: config.signer,
-      channelRepo: this.channelRepo,
-      policy: schedulerPolicy,
-      pollIntervalMs: schedulerPollMs,
-      debug: schedulerDebug,
-    });
+    // Determine minClaimAmount using reactive default policy
+    const reactiveMin = DEFAULT_REACTIVE_CLAIM_POLICY.minClaimAmount;
 
     // Initialize HubBalanceService (always enabled)
     this.hubBalanceService = new HubBalanceService({
@@ -249,12 +191,10 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     });
 
     // Initialize ClaimTriggerService if reactive mode is enabled
-    const claimMode = config.claim?.mode ?? 'reactive';
-    if (claimMode === 'reactive' || claimMode === 'hybrid') {
       this.claimTriggerService = new ClaimTriggerService({
         policy: {
           // Only override non-default values from config
-          minClaimAmount: schedulerPolicy.minClaimAmount, // Should now always have a value from defaultPolicy
+          minClaimAmount: reactiveMin,
           maxConcurrentClaims: config.claim?.maxConcurrentClaims,
           maxRetries: config.claim?.maxRetries,
           retryDelayMs: config.claim?.retryDelayMs,
@@ -266,7 +206,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
         channelRepo: this.channelRepo,
         debug: config.debug,
       });
-    }
 
     // Initialize PaymentProcessor with config
     this.processor = new PaymentProcessor({
@@ -279,7 +218,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       didResolver: this.payeeClient.getDidResolver(),
       hubBalanceService: this.hubBalanceService,
       claimTriggerService: this.claimTriggerService,
-      minClaimAmount: schedulerPolicy.minClaimAmount,
+      minClaimAmount: reactiveMin,
       debug: config.debug,
     });
 
@@ -295,20 +234,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     // Set up discovery endpoint and routes
     this.setupRoutes();
 
-    // Start background claim scheduler by default (configurable)
-    // Only start if not in reactive mode or if explicitly configured
-    const autoStart = config.claimScheduler?.autoStart ?? true;
-    const shouldStartPolling = autoStart && (claimMode === 'polling' || claimMode === 'hybrid');
-    if (shouldStartPolling) {
-      try {
-        this.claimScheduler.start();
-        this.logger.info('ClaimScheduler started in polling mode', { mode: claimMode });
-      } catch (e) {
-        this.logger.warn('Failed to start ClaimScheduler', { error: e });
-      }
-    } else if (claimMode === 'reactive') {
-      this.logger.info('ClaimScheduler disabled - using reactive claim mode');
-    }
+    // Polling scheduler removed; reactive claim mode is default
   }
 
   /**
@@ -384,7 +310,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       },
       payeeClient: this.payeeClient,
       rateProvider: this.rateProvider,
-      claimScheduler: this.claimScheduler,
+      // Expose reactive claim trigger for admin/status handlers
+      claimTriggerService: this.claimTriggerService,
       processor: this.processor,
       ravRepository: this.ravRepo,
       channelRepo: this.channelRepo,

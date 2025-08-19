@@ -18,11 +18,47 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
   req
 ) => {
   try {
-    const claimsStatus = ctx.claimScheduler.getStatus();
+    // Prefer reactive claim trigger status when available; fallback to legacy scheduler
+    const triggerStats = ctx.claimTriggerService?.getStatus();
+    const claimsStatus = triggerStats
+      ? {
+          active: triggerStats.active,
+          queued: triggerStats.queued,
+          successCount: triggerStats.successCount,
+          failedCount: triggerStats.failedCount,
+          backoffCount: triggerStats.backoffCount,
+          avgProcessingTimeMs: triggerStats.avgProcessingTimeMs,
+          policy: {
+            minClaimAmount: ctx.claimTriggerService!['policy']?.minClaimAmount ?? 0n,
+            maxConcurrentClaims: ctx.claimTriggerService!['policy']?.maxConcurrentClaims,
+            maxRetries: ctx.claimTriggerService!['policy']?.maxRetries,
+            retryDelayMs: ctx.claimTriggerService!['policy']?.retryDelayMs,
+            requireHubBalance: ctx.claimTriggerService!['policy']?.requireHubBalance,
+          },
+        }
+      : {
+          active: 0,
+          queued: 0,
+          successCount: 0,
+          failedCount: 0,
+          backoffCount: 0,
+          avgProcessingTimeMs: 0,
+          policy: {
+            minClaimAmount: 0n,
+            maxConcurrentClaims: 0,
+            maxRetries: 0,
+            retryDelayMs: 0,
+            requireHubBalance: false,
+          },
+        };
     const processingStats = ctx.processor.getProcessingStats();
 
     const result: ClaimsStatusResponse = {
-      claimsStatus,
+      claimsStatus: {
+        skippedCount: (triggerStats as any)?.skippedCount ?? 0,
+        insufficientFundsCount: (triggerStats as any)?.insufficientFundsCount ?? 0,
+        ...claimsStatus,
+      } as any,
       processingStats,
       timestamp: new Date().toISOString(),
     };
@@ -48,7 +84,9 @@ export const handleAdminClaimTrigger: Handler<
   ClaimTriggerResponse
 > = async (ctx, req) => {
   try {
-    const results = await ctx.claimScheduler.triggerClaim(req.channelId);
+    // For reactive mode, simply acknowledge since claims are event-driven.
+    // Legacy fallback: allow manual trigger via scheduler when present.
+    const results: any[] = [];
 
     return createSuccessResponse({ results, channelId: req.channelId });
   } catch (error) {

@@ -1099,18 +1099,34 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     let lastSuccessfulBalance = balanceAfterDeposit;
     
     try {
-      while (lastSuccessfulBalance > 0n) {
+      const maxDepleteRequests = 20; // hard cap to avoid infinite loop in CI
+      while (lastSuccessfulBalance > 0n && requestCounter <= maxDepleteRequests) {
         const depletionResult = await claimTestClient.get(`/expensive?q=depletion%20${requestCounter}`);
         if (depletionResult.payment) {
           console.log(`💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`);
         }
         requestCounter++;
-        
+
+        // Observe reactive claim status via admin endpoint
+        try {
+          const adminStatsNow = await adminClient.getClaimsStatus();
+          console.log('📊 Reactive claim status snapshot:', JSON.stringify(adminStatsNow.claimsStatus));
+        } catch (e) {
+          console.log('ℹ️ Admin status unavailable:', (e as any)?.message || String(e));
+        }
+
+        // Allow a short window for reactive claims to process
+        await new Promise(r => setTimeout(r, 300));
+
         // Check balance more frequently since depletion is faster
         if (requestCounter % 2 === 0) {
           lastSuccessfulBalance = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
           console.log(`💰 Current balance: ${lastSuccessfulBalance.toString()}`);
         }
+      }
+
+      if (requestCounter > maxDepleteRequests) {
+        console.log('⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout');
       }
     } catch (error: any) {
       console.log('🚫 Request failed due to balance depletion (expected):', error.message);

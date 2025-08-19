@@ -9,7 +9,7 @@ import { RAVRepository } from '../storage/interfaces/RAVRepository';
 import type { ErrorCodeType, ApiError } from '../schema/core';
 import { ChannelRepository } from '../storage/interfaces/ChannelRepository';
 import { PendingSubRAVRepository } from '../storage/interfaces/PendingSubRAVRepository';
-import { ClaimScheduler } from '../core/ClaimScheduler';
+import { ClaimTriggerService } from '../core/ClaimTriggerService';
 import { PaymentChannelPayeeClient } from '../client/PaymentChannelPayeeClient';
 import { RateProvider } from '../billing';
 import { PaymentProcessor } from '../core/PaymentProcessor';
@@ -63,7 +63,7 @@ export interface ApiContext {
   };
   payeeClient: PaymentChannelPayeeClient;
   rateProvider: RateProvider;
-  claimScheduler: ClaimScheduler;
+  claimTriggerService?: ClaimTriggerService;
   processor: PaymentProcessor;
   ravRepository: RAVRepository;
   channelRepo: ChannelRepository;

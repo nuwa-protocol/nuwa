@@ -21,7 +21,7 @@ import type { BillingRule, RuleProvider } from '../../billing';
 import type { RateProvider } from '../../billing/rate/types';
 import { findRule } from '../../billing/core/rule-matcher';
 import type { PendingSubRAVRepository } from '../../storage/interfaces/PendingSubRAVRepository';
-import type { ClaimScheduler } from '../../core/ClaimScheduler';
+// Legacy ClaimScheduler removed
 import type { RAVRepository } from '../../storage/interfaces/RAVRepository';
 import { DIDResolver, DebugLogger } from '@nuwa-ai/identity-kit';
 import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
@@ -60,8 +60,7 @@ export interface HttpBillingMiddlewareConfig {
 
   /** Debug logging */
   debug?: boolean;
-  /** Optional claim scheduler for automated claiming */
-  claimScheduler?: ClaimScheduler;
+  /** Reactive claim stats are exposed via ClaimTriggerService on admin APIs */
 }
 
 /**

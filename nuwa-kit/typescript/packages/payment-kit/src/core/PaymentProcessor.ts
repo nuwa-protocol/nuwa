@@ -214,14 +214,24 @@ export class PaymentProcessor {
             channelInfo.assetId
           );
           
-          this.log('Hub balance check', { 
+          this.log('Hub balance check (cached)', { 
             payerDid: channelInfo.payerDid, 
             assetId: channelInfo.assetId,
-            balance: hubBalance.toString(),
+            cachedBalance: hubBalance.toString(),
             minClaimAmount: this.config.minClaimAmount.toString(),
+            sufficient: hubBalance >= this.config.minClaimAmount,
+            source: 'HubBalanceService_cache'
           });
           
           if (hubBalance < this.config.minClaimAmount) {
+            this.log('❌ Hub balance insufficient - rejecting request', {
+              payerDid: channelInfo.payerDid,
+              assetId: channelInfo.assetId,
+              cachedBalance: hubBalance.toString(),
+              minClaimAmount: this.config.minClaimAmount.toString(),
+              deficit: (this.config.minClaimAmount - hubBalance).toString(),
+            });
+            
             return this.fail(
               pctx,
               Errors.hubInsufficientFunds(hubBalance, this.config.minClaimAmount, channelInfo.assetId),
@@ -229,7 +239,12 @@ export class PaymentProcessor {
             );
           }
         } catch (error) {
-          this.log('Hub balance check failed', { payerDid: channelInfo.payerDid, error });
+          this.log('⚠️ Hub balance check failed - proceeding anyway', { 
+            payerDid: channelInfo.payerDid, 
+            assetId: channelInfo.assetId,
+            error: error instanceof Error ? error.message : String(error),
+            source: 'HubBalanceService_cache'
+          });
           // Don't fail the request on balance fetch errors - let it proceed
           // The claim will fail later if balance is actually insufficient
         }

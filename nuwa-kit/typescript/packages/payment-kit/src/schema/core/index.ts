@@ -156,7 +156,7 @@ export type HealthCheck = z.infer<typeof HealthCheckSchema>;
 /**
  * Claims policy configuration schema
  */
-export const ClaimPolicySchema = z.object({
+export const ClaimTriggerPolicySchema = z.object({
   /** Minimum accumulated amount to trigger claim (in smallest unit) */
   minClaimAmount: createBigIntSchema(),
   /** Maximum number of concurrent claim operations */
@@ -165,27 +165,41 @@ export const ClaimPolicySchema = z.object({
   maxRetries: z.number().optional(),
   /** Delay between retries in milliseconds */
   retryDelayMs: z.number().optional(),
+  /** Whether to check hub balance before triggering claims */
+  requireHubBalance: z.boolean().optional(),
+  /** Fixed backoff for insufficient funds (ms) */
+  insufficientFundsBackoffMs: z.number().optional(),
+  /** Count insufficient funds as failures */
+  countInsufficientAsFailure: z.boolean().optional(),
 });
 
-export type ClaimPolicy = z.infer<typeof ClaimPolicySchema>;
+export type ClaimTriggerPolicy = z.infer<typeof ClaimTriggerPolicySchema>;
 
 /**
- * Claim scheduler status schema
+ * Claim trigger service status schema (reactive)
  */
-export const ClaimSchedulerStatusSchema = z.object({
-  /** Whether scheduler is currently running */
-  isRunning: z.boolean(),
-  /** Number of active claim operations */
-  activeClaims: z.number(),
-  /** Number of failed claim attempts */
-  failedAttempts: z.number(),
-  /** Last poll timestamp */
-  lastPollTime: z.number(),
-  /** Current claiming policy */
-  policy: ClaimPolicySchema,
+export const ClaimTriggerStatusSchema = z.object({
+  /** Number of active claims currently processing */
+  active: z.number(),
+  /** Number of tasks queued for processing */
+  queued: z.number(),
+  /** Total successful claims */
+  successCount: z.number(),
+  /** Total failed claims */
+  failedCount: z.number(),
+  /** Total skipped claims */
+  skippedCount: z.number(),
+  /** Total insufficient funds occurrences */
+  insufficientFundsCount: z.number(),
+  /** Number of tasks in backoff (waiting for retry) */
+  backoffCount: z.number(),
+  /** Average claim processing time in milliseconds */
+  avgProcessingTimeMs: z.number(),
+  /** Claim trigger policy (reactive) */
+  policy: ClaimTriggerPolicySchema,
 });
 
-export type ClaimSchedulerStatus = z.infer<typeof ClaimSchedulerStatusSchema>;
+export type ClaimTriggerStatus = z.infer<typeof ClaimTriggerStatusSchema>;
 
 /**
  * Payment processing statistics schema
@@ -207,8 +221,8 @@ export type PaymentProcessingStats = z.infer<typeof PaymentProcessingStatsSchema
  * Claims status information schema
  */
 export const ClaimsStatusSchema = z.object({
-  /** Current claims scheduler status */
-  claimsStatus: ClaimSchedulerStatusSchema,
+  /** Current reactive claim trigger status */
+  claimsStatus: ClaimTriggerStatusSchema,
   /** Payment processing statistics */
   processingStats: PaymentProcessingStatsSchema,
   /** Response timestamp in ISO-8601 format */

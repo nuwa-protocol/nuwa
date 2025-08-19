@@ -3,7 +3,7 @@
 // Core types and utilities
 export * from './core/types';
 export * from './core/SubRav';
-export * from './core/ClaimScheduler';
+// Legacy ClaimScheduler export removed in favor of reactive claims
 export * from './core/PaymentProcessor';
 export * from './core/PaymentUtils';
 
