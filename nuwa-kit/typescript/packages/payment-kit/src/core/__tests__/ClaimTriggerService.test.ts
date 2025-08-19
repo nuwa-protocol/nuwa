@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ClaimTriggerService } from '../ClaimTriggerService';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 import type { RAVRepository } from '../../storage/interfaces/RAVRepository';
@@ -7,11 +8,12 @@ import type { SignedSubRAV } from '../types';
 // Mock dependencies
 const mockContract: jest.Mocked<IPaymentChannelContract> = {
   claimFromChannel: jest.fn(),
+  getHubBalance: jest.fn(),
 } as any;
 
-const mockSigner = {
-  getDid: jest.fn().mockResolvedValue('did:example:payee'),
-} as any;
+const mockSigner: any = {
+  getDid: jest.fn(async () => 'did:example:payee'),
+};
 
 const mockRavRepo: jest.Mocked<RAVRepository> = {
   getLatest: jest.fn(),
@@ -20,6 +22,8 @@ const mockRavRepo: jest.Mocked<RAVRepository> = {
 
 const mockChannelRepo: jest.Mocked<ChannelRepository> = {
   updateSubChannelState: jest.fn(),
+  getSubChannelState: jest.fn(),
+  getChannelMetadata: jest.fn(),
 } as any;
 
 describe('ClaimTriggerService', () => {
@@ -27,7 +31,7 @@ describe('ClaimTriggerService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
+    // Use real timers to simplify async processing
 
     service = new ClaimTriggerService({
       policy: {
@@ -43,12 +47,39 @@ describe('ClaimTriggerService', () => {
       channelRepo: mockChannelRepo,
       debug: false,
     });
+
+    // Default mocks
+    // Sufficient hub balance by default
+    mockContract.getHubBalance.mockResolvedValue(BigInt(1_000_000_000));
+    // Default sub-channel state
+    mockChannelRepo.getSubChannelState.mockResolvedValue({
+      channelId: 'channel123',
+      epoch: BigInt(1),
+      vmIdFragment: 'key-1',
+      lastClaimedAmount: BigInt(3000),
+      lastConfirmedNonce: BigInt(4),
+      lastUpdated: Date.now(),
+    } as any);
+    // Default channel metadata
+    mockChannelRepo.getChannelMetadata.mockResolvedValue({
+      channelId: 'channel123',
+      payerDid: 'did:example:payer',
+      payeeDid: 'did:example:payee',
+      assetId: '0x3::gas_coin::RGas',
+      epoch: BigInt(1),
+      status: 'active',
+    } as any);
   });
 
   afterEach(() => {
-    jest.useRealTimers();
     service.destroy();
   });
+
+  const waitForProcessing = async () => {
+    // Allow microtasks and a minimal macrotask to complete
+    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 1));
+  };
 
   describe('maybeQueue', () => {
     it('should queue claim when delta meets threshold', async () => {
@@ -145,11 +176,9 @@ describe('ClaimTriggerService', () => {
       // Queue and process claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
 
-      // Fast-forward time to trigger processing
-      jest.advanceTimersByTime(1000);
-
-      // Wait for async processing
-      await new Promise(resolve => setTimeout(resolve, 0));
+      // Process queue immediately and wait for completion
+      await (service as any).processNow();
+      await waitForProcessing();
 
       expect(mockContract.claimFromChannel).toHaveBeenCalledWith({
         signedSubRAV: mockSignedRAV,
@@ -169,19 +198,21 @@ describe('ClaimTriggerService', () => {
     });
 
     it('should handle claim failure with retry', async () => {
+      jest.setTimeout(15000);
       const channelId = 'channel123';
       const vmIdFragment = 'key-1';
       const delta = BigInt(2000);
 
       mockRavRepo.getLatest.mockResolvedValue(mockSignedRAV);
       mockContract.claimFromChannel.mockRejectedValue(new Error('Claim failed'));
+      mockContract.getHubBalance.mockResolvedValue(BigInt(1_000_000_000));
 
       // Queue claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
 
       // Process first attempt (should fail and schedule retry)
-      jest.advanceTimersByTime(1000);
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await (service as any).processNow();
+      await waitForProcessing();
 
       const status = service.getStatus();
       expect(status.failedCount).toBe(0); // Not permanently failed yet
@@ -189,18 +220,20 @@ describe('ClaimTriggerService', () => {
     });
 
     it('should handle missing signed RAV', async () => {
+      jest.setTimeout(15000);
       const channelId = 'channel123';
       const vmIdFragment = 'key-1';
       const delta = BigInt(2000);
 
       mockRavRepo.getLatest.mockResolvedValue(null);
+      mockContract.getHubBalance.mockResolvedValue(BigInt(1_000_000_000));
 
       // Queue claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
 
       // Process (should fail due to missing RAV)
-      jest.advanceTimersByTime(1000);
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await (service as any).processNow();
+      await waitForProcessing();
 
       // Should be scheduled for retry
       const status = service.getStatus();

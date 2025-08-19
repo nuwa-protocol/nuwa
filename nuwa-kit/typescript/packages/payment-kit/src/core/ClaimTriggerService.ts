@@ -304,6 +304,13 @@ export class ClaimTriggerService {
     return `${channelId}:${vmIdFragment}`;
   }
 
+  /**
+   * Test helper: process the queue immediately once without waiting for interval
+   */
+  async processNow(): Promise<void> {
+    await this.processQueue();
+  }
+
   private startProcessing(): void {
     this.processingInterval = setInterval(() => {
       this.processQueue().catch(error => {
