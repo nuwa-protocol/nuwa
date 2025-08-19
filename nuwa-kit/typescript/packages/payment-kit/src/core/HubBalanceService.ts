@@ -15,7 +15,7 @@ export interface HubBalanceCacheKey {
  */
 export interface HubBalanceCacheValue {
   balance: bigint;
-  updatedAt: number;  // ms epoch
+  updatedAt: number; // ms epoch
   source: 'onchain' | 'adjusted';
 }
 
@@ -25,22 +25,22 @@ export interface HubBalanceCacheValue {
 export interface HubBalanceServiceOptions {
   /** Contract instance for on-chain operations */
   contract: IPaymentChannelContract;
-  
+
   /** Default asset ID if not specified in requests */
   defaultAssetId: string;
-  
+
   /** Normal cache TTL in milliseconds (default: 5000ms = 5s) */
   ttlMs?: number;
-  
+
   /** Negative cache TTL in milliseconds for zero balances (default: 2000ms = 2s) */
   negativeTtlMs?: number;
-  
+
   /** Stale-while-revalidate window in milliseconds (default: 30000ms = 30s) */
   staleWhileRevalidateMs?: number;
-  
+
   /** Maximum cache entries (LRU eviction, default: 10000) */
   maxEntries?: number;
-  
+
   /** Debug logging */
   debug?: boolean;
 }
@@ -68,7 +68,7 @@ export interface HubBalanceStats {
 
 /**
  * PaymentHub balance service with short TTL caching and SWR (Stale-While-Revalidate)
- * 
+ *
  * Features:
  * - Short TTL for balance freshness (2-5s recommended)
  * - Negative caching for zero balances (1-2s recommended)
@@ -84,7 +84,7 @@ export class HubBalanceService {
   private readonly staleWhileRevalidateMs: number;
   private readonly maxEntries: number;
   private readonly logger: DebugLogger;
-  
+
   // LRU cache: Map maintains insertion order, we'll manage LRU manually
   private readonly cache = new Map<string, CacheEntry>();
   private readonly stats: HubBalanceStats = {
@@ -103,10 +103,10 @@ export class HubBalanceService {
     this.negativeTtlMs = options.negativeTtlMs ?? 2000; // 2s
     this.staleWhileRevalidateMs = options.staleWhileRevalidateMs ?? 30000; // 30s
     this.maxEntries = options.maxEntries ?? 10000;
-    
+
     this.logger = DebugLogger.get('HubBalanceService');
     this.logger.setLevel(options.debug ? 'debug' : 'info');
-    
+
     this.logger.info('HubBalanceService initialized', {
       ttlMs: this.ttlMs,
       negativeTtlMs: this.negativeTtlMs,
@@ -123,24 +123,32 @@ export class HubBalanceService {
     const effectiveAssetId = assetId ?? this.defaultAssetId;
     const cacheKey = this.buildCacheKey(ownerDid, effectiveAssetId);
     const now = Date.now();
-    
+
     const entry = this.cache.get(cacheKey);
-    
+
     if (entry) {
       // Move to end (LRU)
       this.cache.delete(cacheKey);
       this.cache.set(cacheKey, entry);
-      
+
       if (now < entry.expiresAt) {
         // Fresh hit
         this.stats.hits++;
-        this.logger.debug('Cache hit (fresh)', { ownerDid, assetId: effectiveAssetId, balance: entry.balance.toString() });
+        this.logger.debug('Cache hit (fresh)', {
+          ownerDid,
+          assetId: effectiveAssetId,
+          balance: entry.balance.toString(),
+        });
         return entry.balance;
       } else if (now < entry.staleAt) {
         // Stale hit - serve stale data while refreshing in background
         this.stats.staleHits++;
-        this.logger.debug('Cache hit (stale)', { ownerDid, assetId: effectiveAssetId, balance: entry.balance.toString() });
-        
+        this.logger.debug('Cache hit (stale)', {
+          ownerDid,
+          assetId: effectiveAssetId,
+          balance: entry.balance.toString(),
+        });
+
         // Trigger background refresh if not already refreshing
         if (!entry.isRefreshing) {
           entry.isRefreshing = true;
@@ -150,16 +158,16 @@ export class HubBalanceService {
             }
           });
         }
-        
+
         return entry.balance;
       }
       // Entry is too stale, fall through to fresh fetch
     }
-    
+
     // Cache miss or entry too stale
     this.stats.misses++;
     this.logger.debug('Cache miss', { ownerDid, assetId: effectiveAssetId });
-    
+
     return this.fetchAndCache(ownerDid, effectiveAssetId, cacheKey);
   }
 
@@ -169,11 +177,11 @@ export class HubBalanceService {
   async refresh(ownerDid: string, assetId: string): Promise<bigint> {
     const cacheKey = this.buildCacheKey(ownerDid, assetId);
     this.logger.debug('Force refresh', { ownerDid, assetId });
-    
+
     // Remove existing cache entry
     this.cache.delete(cacheKey);
     this.stats.refreshes++;
-    
+
     return this.fetchAndCache(ownerDid, assetId, cacheKey);
   }
 
@@ -209,16 +217,20 @@ export class HubBalanceService {
     return `${ownerDid}:${assetId}`;
   }
 
-  private async fetchAndCache(ownerDid: string, assetId: string, cacheKey: string): Promise<bigint> {
+  private async fetchAndCache(
+    ownerDid: string,
+    assetId: string,
+    cacheKey: string
+  ): Promise<bigint> {
     try {
       this.logger.debug('Fetching balance from on-chain', { ownerDid, assetId });
-      
+
       const balance = await this.contract.getHubBalance(ownerDid, assetId);
       const now = Date.now();
-      
+
       // Use negative TTL for zero balances
       const ttl = balance === 0n ? this.negativeTtlMs : this.ttlMs;
-      
+
       const entry: CacheEntry = {
         balance,
         updatedAt: now,
@@ -227,17 +239,17 @@ export class HubBalanceService {
         staleAt: now + this.staleWhileRevalidateMs,
         isRefreshing: false,
       };
-      
+
       this.setCache(cacheKey, entry);
-      
-      this.logger.debug('Balance cached', { 
-        ownerDid, 
-        assetId, 
+
+      this.logger.debug('Balance cached', {
+        ownerDid,
+        assetId,
         balance: balance.toString(),
         ttl,
         expiresAt: new Date(entry.expiresAt).toISOString(),
       });
-      
+
       return balance;
     } catch (error) {
       this.stats.errors++;
@@ -246,7 +258,11 @@ export class HubBalanceService {
     }
   }
 
-  private async refreshInBackground(ownerDid: string, assetId: string, cacheKey: string): Promise<void> {
+  private async refreshInBackground(
+    ownerDid: string,
+    assetId: string,
+    cacheKey: string
+  ): Promise<void> {
     try {
       this.logger.debug('Background refresh started', { ownerDid, assetId });
       await this.fetchAndCache(ownerDid, assetId, cacheKey);
@@ -267,7 +283,7 @@ export class HubBalanceService {
         this.logger.debug('LRU eviction', { evictedKey: firstKey });
       }
     }
-    
+
     this.cache.set(key, entry);
   }
 }

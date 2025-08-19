@@ -213,16 +213,16 @@ export class PaymentProcessor {
             channelInfo.payerDid,
             channelInfo.assetId
           );
-          
-          this.log('Hub balance check (cached)', { 
-            payerDid: channelInfo.payerDid, 
+
+          this.log('Hub balance check (cached)', {
+            payerDid: channelInfo.payerDid,
             assetId: channelInfo.assetId,
             cachedBalance: hubBalance.toString(),
             minClaimAmount: this.config.minClaimAmount.toString(),
             sufficient: hubBalance >= this.config.minClaimAmount,
-            source: 'HubBalanceService_cache'
+            source: 'HubBalanceService_cache',
           });
-          
+
           if (hubBalance < this.config.minClaimAmount) {
             this.log('❌ Hub balance insufficient - rejecting request', {
               payerDid: channelInfo.payerDid,
@@ -231,19 +231,23 @@ export class PaymentProcessor {
               minClaimAmount: this.config.minClaimAmount.toString(),
               deficit: (this.config.minClaimAmount - hubBalance).toString(),
             });
-            
+
             return this.fail(
               pctx,
-              Errors.hubInsufficientFunds(hubBalance, this.config.minClaimAmount, channelInfo.assetId),
+              Errors.hubInsufficientFunds(
+                hubBalance,
+                this.config.minClaimAmount,
+                channelInfo.assetId
+              ),
               { attachHeader: false }
             );
           }
         } catch (error) {
-          this.log('⚠️ Hub balance check failed - proceeding anyway', { 
-            payerDid: channelInfo.payerDid, 
+          this.log('⚠️ Hub balance check failed - proceeding anyway', {
+            payerDid: channelInfo.payerDid,
             assetId: channelInfo.assetId,
             error: error instanceof Error ? error.message : String(error),
-            source: 'HubBalanceService_cache'
+            source: 'HubBalanceService_cache',
           });
           // Don't fail the request on balance fetch errors - let it proceed
           // The claim will fail later if balance is actually insufficient
@@ -514,13 +518,18 @@ export class PaymentProcessor {
       pctx.state.persisted = true;
 
       // Trigger reactive claim if enabled and conditions are met
-      if (this.config.claimTriggerService && this.config.minClaimAmount && pctx.state.subChannelInfo && pctx.state.latestSignedSubRav) {
+      if (
+        this.config.claimTriggerService &&
+        this.config.minClaimAmount &&
+        pctx.state.subChannelInfo &&
+        pctx.state.latestSignedSubRav
+      ) {
         try {
           // Calculate delta: latest signed accumulated amount - last claimed amount
           const latestAccumulated = pctx.state.latestSignedSubRav.subRav.accumulatedAmount;
           const lastClaimed = pctx.state.subChannelInfo.lastClaimedAmount;
           const delta = latestAccumulated > lastClaimed ? latestAccumulated - lastClaimed : 0n;
-          
+
           this.log('Reactive claim evaluation', {
             channelId: newSubRAV.channelId,
             vmIdFragment: newSubRAV.vmIdFragment,
@@ -529,15 +538,15 @@ export class PaymentProcessor {
             delta: delta.toString(),
             minClaimAmount: this.config.minClaimAmount.toString(),
           });
-          
+
           if (delta >= this.config.minClaimAmount) {
             await this.config.claimTriggerService.maybeQueue(
               newSubRAV.channelId,
               newSubRAV.vmIdFragment,
               delta
             );
-            this.log('Reactive claim queued', { 
-              channelId: newSubRAV.channelId, 
+            this.log('Reactive claim queued', {
+              channelId: newSubRAV.channelId,
               vmIdFragment: newSubRAV.vmIdFragment,
               delta: delta.toString(),
             });

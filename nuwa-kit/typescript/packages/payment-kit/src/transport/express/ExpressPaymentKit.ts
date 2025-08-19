@@ -28,7 +28,11 @@ import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { PaymentProcessor } from '../../core/PaymentProcessor';
 import { HubBalanceService, type HubBalanceServiceOptions } from '../../core/HubBalanceService';
-import { ClaimTriggerService, type ClaimTriggerOptions, DEFAULT_REACTIVE_CLAIM_POLICY } from '../../core/ClaimTriggerService';
+import {
+  ClaimTriggerService,
+  type ClaimTriggerOptions,
+  DEFAULT_REACTIVE_CLAIM_POLICY,
+} from '../../core/ClaimTriggerService';
 import { isStreamingRequest } from './utils';
 
 /**
@@ -78,7 +82,12 @@ export interface ExpressPaymentKitOptions {
   /** Claim triggering configuration */
   claim?: {
     /** Claim policy configuration */
-    policy?: Partial<{ minClaimAmount: bigint | string; maxConcurrentClaims: number; maxRetries: number; retryDelayMs: number }>;
+    policy?: Partial<{
+      minClaimAmount: bigint | string;
+      maxConcurrentClaims: number;
+      maxRetries: number;
+      retryDelayMs: number;
+    }>;
     /** Require hub balance check before triggering claims (default: true) */
     requireHubBalance?: boolean;
     /** Maximum concurrent claims across all sub-channels (default: 5) */
@@ -191,21 +200,21 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     });
 
     // Initialize ClaimTriggerService if reactive mode is enabled
-      this.claimTriggerService = new ClaimTriggerService({
-        policy: {
-          // Only override non-default values from config
-          minClaimAmount: reactiveMin,
-          maxConcurrentClaims: config.claim?.maxConcurrentClaims,
-          maxRetries: config.claim?.maxRetries,
-          retryDelayMs: config.claim?.retryDelayMs,
-          requireHubBalance: config.claim?.requireHubBalance,
-        },
-        contract: deps.contract,
-        signer: deps.signer, // Pass the payee signer
-        ravRepo: this.ravRepo,
-        channelRepo: this.channelRepo,
-        debug: config.debug,
-      });
+    this.claimTriggerService = new ClaimTriggerService({
+      policy: {
+        // Only override non-default values from config
+        minClaimAmount: reactiveMin,
+        maxConcurrentClaims: config.claim?.maxConcurrentClaims,
+        maxRetries: config.claim?.maxRetries,
+        retryDelayMs: config.claim?.retryDelayMs,
+        requireHubBalance: config.claim?.requireHubBalance,
+      },
+      contract: deps.contract,
+      signer: deps.signer, // Pass the payee signer
+      ravRepo: this.ravRepo,
+      channelRepo: this.channelRepo,
+      debug: config.debug,
+    });
 
     // Initialize PaymentProcessor with config
     this.processor = new PaymentProcessor({

@@ -144,10 +144,10 @@ describe('ClaimTriggerService', () => {
 
       // Queue and process claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
-      
+
       // Fast-forward time to trigger processing
       jest.advanceTimersByTime(1000);
-      
+
       // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -165,11 +165,7 @@ describe('ClaimTriggerService', () => {
         })
       );
 
-      expect(mockRavRepo.markAsClaimed).toHaveBeenCalledWith(
-        channelId,
-        vmIdFragment,
-        BigInt(5)
-      );
+      expect(mockRavRepo.markAsClaimed).toHaveBeenCalledWith(channelId, vmIdFragment, BigInt(5));
     });
 
     it('should handle claim failure with retry', async () => {
@@ -182,7 +178,7 @@ describe('ClaimTriggerService', () => {
 
       // Queue claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
-      
+
       // Process first attempt (should fail and schedule retry)
       jest.advanceTimersByTime(1000);
       await new Promise(resolve => setTimeout(resolve, 0));
@@ -201,7 +197,7 @@ describe('ClaimTriggerService', () => {
 
       // Queue claim
       await service.maybeQueue(channelId, vmIdFragment, delta);
-      
+
       // Process (should fail due to missing RAV)
       jest.advanceTimersByTime(1000);
       await new Promise(resolve => setTimeout(resolve, 0));
