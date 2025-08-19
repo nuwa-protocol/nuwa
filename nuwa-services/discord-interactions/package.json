@@ -1,0 +1,26 @@
+{
+  "name": "nuwa-discord-interactions",
+  "version": "1.0.0",
+  "description": "Discord Interactions service for Nuwa AI (Express + TypeScript)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@nuwa-ai/identity-kit": "^0.4.0",
+    "@nuwa-ai/payment-kit": "^0.4.0",
+    "discord-api-types": "^0.37.97",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.15.7",
+    "typescript": "^5.4.5"
+  }
+} 
