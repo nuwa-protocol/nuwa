@@ -17,6 +17,8 @@ import { deriveChannelId } from '../rooch/ChannelUtils';
 import { verify as verifyRav } from './RavVerifier';
 import type { DIDResolver } from '@nuwa-ai/identity-kit';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
+import type { HubBalanceService } from './HubBalanceService';
+import type { ClaimTriggerService } from './ClaimTriggerService';
 
 /**
  * Configuration for PaymentProcessor
@@ -41,6 +43,15 @@ export interface PaymentProcessorConfig {
 
   /** Default asset ID if not provided in request context */
   defaultAssetId?: string;
+
+  /** Hub balance service for payer balance checks */
+  hubBalanceService: HubBalanceService;
+
+  /** Claim trigger service for reactive claims (optional) */
+  claimTriggerService?: ClaimTriggerService;
+
+  /** Minimum claim amount threshold */
+  minClaimAmount?: bigint;
 
   /** Debug logging */
   debug?: boolean;
@@ -194,6 +205,35 @@ export class PaymentProcessor {
       pctx.state.subChannelInfo = subChannelInfo;
       pctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
       pctx.state.latestPendingSubRav = latestPendingSubRav || undefined;
+
+      // Hub balance check (if minClaimAmount is configured)
+      if (this.config.minClaimAmount) {
+        try {
+          const hubBalance = await this.config.hubBalanceService.getBalance(
+            channelInfo.payerDid,
+            channelInfo.assetId
+          );
+          
+          this.log('Hub balance check', { 
+            payerDid: channelInfo.payerDid, 
+            assetId: channelInfo.assetId,
+            balance: hubBalance.toString(),
+            minClaimAmount: this.config.minClaimAmount.toString(),
+          });
+          
+          if (hubBalance < this.config.minClaimAmount) {
+            return this.fail(
+              pctx,
+              Errors.hubInsufficientFunds(hubBalance, this.config.minClaimAmount, channelInfo.assetId),
+              { attachHeader: false }
+            );
+          }
+        } catch (error) {
+          this.log('Hub balance check failed', { payerDid: channelInfo.payerDid, error });
+          // Don't fail the request on balance fetch errors - let it proceed
+          // The claim will fail later if balance is actually insufficient
+        }
+      }
 
       // Handle early-return decisions
       if (ravResult.decision === 'REQUIRE_SIGNATURE_402' || ravResult.decision === 'CONFLICT') {
@@ -457,6 +497,41 @@ export class PaymentProcessor {
 
       // Mark as persisted
       pctx.state.persisted = true;
+
+      // Trigger reactive claim if enabled and conditions are met
+      if (this.config.claimTriggerService && this.config.minClaimAmount && pctx.state.subChannelInfo && pctx.state.latestSignedSubRav) {
+        try {
+          // Calculate delta: latest signed accumulated amount - last claimed amount
+          const latestAccumulated = pctx.state.latestSignedSubRav.subRav.accumulatedAmount;
+          const lastClaimed = pctx.state.subChannelInfo.lastClaimedAmount;
+          const delta = latestAccumulated > lastClaimed ? latestAccumulated - lastClaimed : 0n;
+          
+          this.log('Reactive claim evaluation', {
+            channelId: newSubRAV.channelId,
+            vmIdFragment: newSubRAV.vmIdFragment,
+            latestAccumulated: latestAccumulated.toString(),
+            lastClaimed: lastClaimed.toString(),
+            delta: delta.toString(),
+            minClaimAmount: this.config.minClaimAmount.toString(),
+          });
+          
+          if (delta >= this.config.minClaimAmount) {
+            await this.config.claimTriggerService.maybeQueue(
+              newSubRAV.channelId,
+              newSubRAV.vmIdFragment,
+              delta
+            );
+            this.log('Reactive claim queued', { 
+              channelId: newSubRAV.channelId, 
+              vmIdFragment: newSubRAV.vmIdFragment,
+              delta: delta.toString(),
+            });
+          }
+        } catch (error) {
+          this.log('⚠️ Reactive claim trigger failed', { error });
+          // Don't fail the persist operation for claim trigger errors
+        }
+      }
 
       this.log('✅ Billing state persisted successfully');
     } catch (error) {

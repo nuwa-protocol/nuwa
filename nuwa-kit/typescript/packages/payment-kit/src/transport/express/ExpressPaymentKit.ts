@@ -28,6 +28,8 @@ import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { PaymentProcessor } from '../../core/PaymentProcessor';
+import { HubBalanceService, type HubBalanceServiceOptions } from '../../core/HubBalanceService';
+import { ClaimTriggerService, type ClaimTriggerOptions } from '../../core/ClaimTriggerService';
 import { isStreamingRequest } from './utils';
 
 /**
@@ -71,6 +73,34 @@ export interface ExpressPaymentKitOptions {
     /** Auto start the scheduler on kit initialization (default: true) */
     autoStart?: boolean;
   };
+
+  /** PaymentHub balance caching configuration */
+  hubBalance?: {
+    /** Normal cache TTL in milliseconds */
+    ttlMs?: number;
+    /** Negative cache TTL for zero balances */
+    negativeTtlMs?: number;
+    /** Stale-while-revalidate window in milliseconds */
+    staleWhileRevalidateMs?: number;
+    /** Maximum cache entries */
+    maxEntries?: number;
+  };
+
+  /** Claim triggering configuration */
+  claim?: {
+    /** Claim mode - default 'reactive' (event-driven) */
+    mode?: 'reactive' | 'polling' | 'hybrid';
+    /** Claim policy configuration */
+    policy?: Partial<ClaimPolicy> & { minClaimAmount?: bigint | string };
+    /** Require hub balance check before triggering claims (default: true) */
+    requireHubBalance?: boolean;
+    /** Maximum concurrent claims across all sub-channels (default: 5) */
+    maxConcurrentClaims?: number;
+    /** Maximum retry attempts for failed claims (default: 3) */
+    maxRetries?: number;
+    /** Delay between retry attempts in milliseconds (default: 60000ms = 60s) */
+    retryDelayMs?: number;
+  };
 }
 
 /**
@@ -109,6 +139,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   private readonly pendingSubRAVRepo: PendingSubRAVRepository;
   private readonly processor: PaymentProcessor;
   private readonly logger: DebugLogger;
+  // New services for reactive claim and hub balance
+  private readonly hubBalanceService: HubBalanceService;
+  private readonly claimTriggerService?: ClaimTriggerService;
 
   constructor(
     config: ExpressPaymentKitOptions,
@@ -188,6 +221,36 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       debug: schedulerDebug,
     });
 
+    // Initialize HubBalanceService (always enabled)
+    this.hubBalanceService = new HubBalanceService({
+      contract: deps.contract,
+      defaultAssetId: config.defaultAssetId || '0x3::gas_coin::RGas',
+      ttlMs: config.hubBalance?.ttlMs,
+      negativeTtlMs: config.hubBalance?.negativeTtlMs,
+      staleWhileRevalidateMs: config.hubBalance?.staleWhileRevalidateMs,
+      maxEntries: config.hubBalance?.maxEntries,
+      debug: config.debug,
+    });
+
+    // Initialize ClaimTriggerService if reactive mode is enabled
+    const claimMode = config.claim?.mode ?? 'reactive';
+    if (claimMode === 'reactive' || claimMode === 'hybrid') {
+      this.claimTriggerService = new ClaimTriggerService({
+        policy: {
+          minClaimAmount: schedulerPolicy.minClaimAmount, // Reuse same threshold
+          maxConcurrentClaims: config.claim?.maxConcurrentClaims ?? 5,
+          maxRetries: config.claim?.maxRetries ?? 3,
+          retryDelayMs: config.claim?.retryDelayMs ?? 60000,
+          requireHubBalance: config.claim?.requireHubBalance ?? true,
+        },
+        contract: deps.contract,
+        signer: deps.signer, // Pass the payee signer
+        ravRepo: this.ravRepo,
+        channelRepo: this.channelRepo,
+        debug: config.debug,
+      });
+    }
+
     // Initialize PaymentProcessor with config
     this.processor = new PaymentProcessor({
       payeeClient: this.payeeClient,
@@ -197,6 +260,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       pendingSubRAVStore: this.pendingSubRAVRepo,
       ravRepository: this.ravRepo,
       didResolver: this.payeeClient.getDidResolver(),
+      hubBalanceService: this.hubBalanceService,
+      claimTriggerService: this.claimTriggerService,
+      minClaimAmount: schedulerPolicy.minClaimAmount,
       debug: config.debug,
     });
 
@@ -213,13 +279,18 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     this.setupRoutes();
 
     // Start background claim scheduler by default (configurable)
+    // Only start if not in reactive mode or if explicitly configured
     const autoStart = config.claimScheduler?.autoStart ?? true;
-    if (autoStart) {
+    const shouldStartPolling = autoStart && (claimMode === 'polling' || claimMode === 'hybrid');
+    if (shouldStartPolling) {
       try {
         this.claimScheduler.start();
+        this.logger.info('ClaimScheduler started in polling mode', { mode: claimMode });
       } catch (e) {
-        // Use DebugLogger in ClaimScheduler internally; avoid console here
+        this.logger.warn('Failed to start ClaimScheduler', { error: e });
       }
+    } else if (claimMode === 'reactive') {
+      this.logger.info('ClaimScheduler disabled - using reactive claim mode');
     }
   }
 

@@ -23,6 +23,10 @@ export enum PaymentErrorCode {
   BILLING_MAX_AMOUNT_EXCEEDED = 'BILLING_MAX_AMOUNT_EXCEEDED',
   BILLING_CONFIG_ERROR = 'BILLING_CONFIG_ERROR',
 
+  // Hub Balance
+  HUB_INSUFFICIENT_FUNDS = 'HUB_INSUFFICIENT_FUNDS',
+  HUB_BALANCE_FETCH_FAILED = 'HUB_BALANCE_FETCH_FAILED',
+
   // Channel state
   CHANNEL_CLOSED = 'CHANNEL_CLOSED',
   EPOCH_MISMATCH = 'EPOCH_MISMATCH',
@@ -40,6 +44,7 @@ export interface PaymentError {
 export function httpStatusFor(code?: PaymentErrorCode | string): number {
   switch (code as PaymentErrorCode) {
     case PaymentErrorCode.PAYMENT_REQUIRED:
+    case PaymentErrorCode.HUB_INSUFFICIENT_FUNDS:
       return 402;
     case PaymentErrorCode.RAV_CONFLICT:
     case PaymentErrorCode.CHANNEL_CONTEXT_MISSING:
@@ -64,6 +69,7 @@ export function httpStatusFor(code?: PaymentErrorCode | string): number {
     case PaymentErrorCode.BILLING_RATE_NOT_AVAILABLE:
     case PaymentErrorCode.BILLING_RATE_FETCH_FAILED:
     case PaymentErrorCode.BILLING_CONFIG_ERROR:
+    case PaymentErrorCode.HUB_BALANCE_FETCH_FAILED:
     default:
       return 500;
   }
@@ -110,5 +116,15 @@ export const Errors = {
   internal: (msg: string): PaymentError => ({
     code: PaymentErrorCode.INTERNAL_SERVER_ERROR,
     message: msg,
+  }),
+  hubInsufficientFunds: (balance: bigint, required: bigint, assetId: string): PaymentError => ({
+    code: PaymentErrorCode.HUB_INSUFFICIENT_FUNDS,
+    message: `PaymentHub balance insufficient: ${balance}, required: ${required} for asset ${assetId}`,
+    details: { balance: balance.toString(), required: required.toString(), assetId },
+  }),
+  hubBalanceFetchFailed: (error: unknown, ownerDid: string, assetId: string): PaymentError => ({
+    code: PaymentErrorCode.HUB_BALANCE_FETCH_FAILED,
+    message: `Failed to fetch PaymentHub balance for ${ownerDid}#${assetId}: ${String(error)}`,
+    details: { ownerDid, assetId, error: String(error) },
   }),
 } as const;
