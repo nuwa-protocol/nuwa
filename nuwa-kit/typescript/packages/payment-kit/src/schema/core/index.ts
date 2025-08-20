@@ -241,25 +241,26 @@ export const ClaimTriggerRequestSchema = z.object({
 
 export type ClaimTriggerRequest = z.infer<typeof ClaimTriggerRequestSchema>;
 
-export const ScheduledClaimResultSchema = z.object({
-  /** VM ID fragment that was processed */
+// Reactive mode: return queued/skipped summary rather than on-chain tx results
+export const ClaimTriggerQueuedSchema = z.object({
   vmIdFragment: z.string(),
-  /** Amount claimed */
-  claimedAmount: createBigIntSchema(),
-  /** Transaction hash of the claim */
-  txHash: z.string(),
-  /** Timestamp of the claim */
-  timestamp: z.number(),
+  delta: createBigIntSchema(),
+});
+
+export const ClaimTriggerSkippedSchema = z.object({
+  vmIdFragment: z.string(),
+  reason: z.enum(['no_delta', 'below_threshold']),
+  delta: createBigIntSchema().optional(),
+  threshold: createBigIntSchema().optional(),
 });
 
 /**
  * Claim trigger response schema
  */
 export const ClaimTriggerResponseSchema = z.object({
-  /** Channel identifier that was processed */
   channelId: z.string(),
-  /** Results of the claim trigger operation */
-  results: z.array(ScheduledClaimResultSchema),
+  queued: z.array(ClaimTriggerQueuedSchema),
+  skipped: z.array(ClaimTriggerSkippedSchema),
 });
 
 export type ClaimTriggerResponse = z.infer<typeof ClaimTriggerResponseSchema>;

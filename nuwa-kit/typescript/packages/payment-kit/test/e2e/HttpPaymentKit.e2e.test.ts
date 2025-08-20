@@ -556,7 +556,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       const triggerResponse = await adminClient.triggerClaim({
         channelId: channelId!,
       });
-      expect(triggerResponse.results).toBeTruthy();
+      expect(triggerResponse.queued).toBeTruthy();
+      expect(triggerResponse.skipped).toBeTruthy();
       console.log('✅ Manual claim trigger successful:', triggerResponse);
     } catch (error) {
       // It's OK if there's nothing to claim

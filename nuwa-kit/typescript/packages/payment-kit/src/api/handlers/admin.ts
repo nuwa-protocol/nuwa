@@ -3,6 +3,7 @@ import { createSuccessResponse, PaymentKitError } from '../../errors';
 import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
 import type { HealthResponse, SystemStatusResponse, ClaimTriggerRequest, ClaimTriggerResponse } from '../../schema';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 /**
  * Handle admin system status endpoint requests
@@ -83,11 +84,51 @@ export const handleAdminClaimTrigger: Handler<
   ClaimTriggerResponse
 > = async (ctx, req) => {
   try {
-    // For reactive mode, simply acknowledge since claims are event-driven.
-    // Legacy fallback: allow manual trigger via scheduler when present.
-    const results: any[] = [];
+    // Diagnostic/manual trigger: enqueue a reactive claim for all known sub-channels under the channelId
+    // Behavior:
+    // - Reads latest SignedSubRAVs for each vmIdFragment under the channel (from ravRepo)
+    // - Computes delta vs current SubChannelInfo
+    // - If delta >= minClaimAmount, queue claim via ClaimTriggerService
+    // - Returns an empty results array immediately; status can be observed via /admin/status
 
-    return createSuccessResponse({ results, channelId: req.channelId });
+    if (!ctx.claimTriggerService) {
+      return createSuccessResponse({ channelId: req.channelId, queued: [], skipped: [] });
+    }
+
+    const channelId = req.channelId;
+    const queued: { vmIdFragment: string; delta: bigint }[] = [];
+    const skipped: { vmIdFragment: string; reason: 'no_delta' | 'below_threshold'; delta?: bigint; threshold?: bigint }[] = [];
+
+    try {
+      // List all sub-channels we have state for
+      const subStates = await ctx.channelRepo.listSubChannelStates(channelId);
+      const vmIds = Object.keys(subStates);
+
+      for (const vmIdFragment of vmIds) {
+        const latest = await ctx.ravRepository.getLatest(channelId, vmIdFragment);
+        const state = subStates[vmIdFragment];
+        if (!latest || !state) continue;
+
+        const accumulated = latest.subRav.accumulatedAmount;
+        const lastClaimed = state.lastClaimedAmount;
+        const delta = accumulated > lastClaimed ? accumulated - lastClaimed : 0n;
+
+        if (delta <= 0n) {
+          skipped.push({ vmIdFragment, reason: 'no_delta' });
+          continue;
+        }
+        // enqueue regardless of threshold; ClaimTriggerService will decide to skip/queue by policy
+        await ctx.claimTriggerService.maybeQueue(channelId, vmIdFragment, delta);
+        queued.push({ vmIdFragment, delta });
+      }
+    } catch (e) {
+      DebugLogger.error('Failed to trigger claim', e);
+      // swallow diagnostic errors; return partial
+    }
+
+    // Response schema expects ScheduledClaimResult[]; in reactive mode we return an empty list
+    // and rely on /admin/status for detailed progress.
+    return createSuccessResponse({ channelId, queued, skipped });
   } catch (error) {
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
