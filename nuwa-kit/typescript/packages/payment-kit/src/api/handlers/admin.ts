@@ -2,38 +2,37 @@ import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../t
 import { createSuccessResponse, PaymentKitError } from '../../errors';
 import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
-import type {
-  HealthResponse,
-  ClaimsStatusResponse,
-  ClaimTriggerRequest,
-  ClaimTriggerResponse,
-} from '../../schema';
+import type { HealthResponse, SystemStatusResponse, ClaimTriggerRequest, ClaimTriggerResponse } from '../../schema';
 
 /**
- * Handle admin claims status endpoint requests
+ * Handle admin system status endpoint requests
  * Admin only endpoint
  */
-export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = async (
+export const handleAdminStatus: Handler<ApiContext, {}, SystemStatusResponse> = async (
   ctx,
   req
 ) => {
   try {
     // Prefer reactive claim trigger status when available; fallback to legacy scheduler
-    const triggerStats = ctx.claimTriggerService?.getStatus();
-    const claimsStatus = triggerStats
+    const stats = ctx.claimTriggerService?.getStatus();
+    const claimsStatus = stats
       ? {
-          active: triggerStats.active,
-          queued: triggerStats.queued,
-          successCount: triggerStats.successCount,
-          failedCount: triggerStats.failedCount,
-          backoffCount: triggerStats.backoffCount,
-          avgProcessingTimeMs: triggerStats.avgProcessingTimeMs,
+          active: stats.active,
+          queued: stats.queued,
+          successCount: stats.successCount,
+          failedCount: stats.failedCount,
+          skippedCount: stats.skippedCount,
+          insufficientFundsCount: stats.insufficientFundsCount,
+          backoffCount: stats.backoffCount,
+          avgProcessingTimeMs: stats.avgProcessingTimeMs,
           policy: {
-            minClaimAmount: ctx.claimTriggerService!['policy']?.minClaimAmount ?? 0n,
-            maxConcurrentClaims: ctx.claimTriggerService!['policy']?.maxConcurrentClaims,
-            maxRetries: ctx.claimTriggerService!['policy']?.maxRetries,
-            retryDelayMs: ctx.claimTriggerService!['policy']?.retryDelayMs,
-            requireHubBalance: ctx.claimTriggerService!['policy']?.requireHubBalance,
+            minClaimAmount: stats.policy.minClaimAmount,
+            maxConcurrentClaims: stats.policy.maxConcurrentClaims,
+            maxRetries: stats.policy.maxRetries,
+            retryDelayMs: stats.policy.retryDelayMs,
+            requireHubBalance: stats.policy.requireHubBalance,
+            insufficientFundsBackoffMs: stats.policy.insufficientFundsBackoffMs,
+            countInsufficientAsFailure: stats.policy.countInsufficientAsFailure,
           },
         }
       : {
@@ -41,6 +40,8 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
           queued: 0,
           successCount: 0,
           failedCount: 0,
+          skippedCount: 0,
+          insufficientFundsCount: 0,
           backoffCount: 0,
           avgProcessingTimeMs: 0,
           policy: {
@@ -49,17 +50,15 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
             maxRetries: 0,
             retryDelayMs: 0,
             requireHubBalance: false,
+            insufficientFundsBackoffMs: 0,
+            countInsufficientAsFailure: false,
           },
         };
     const processingStats = ctx.processor.getProcessingStats();
 
-    const result: ClaimsStatusResponse = {
-      claimsStatus: {
-        skippedCount: (triggerStats as any)?.skippedCount ?? 0,
-        insufficientFundsCount: (triggerStats as any)?.insufficientFundsCount ?? 0,
-        ...claimsStatus,
-      } as any,
-      processingStats,
+    const result: SystemStatusResponse = {
+      claims: claimsStatus,
+      processor: processingStats,
       timestamp: new Date().toISOString(),
     };
 
@@ -67,7 +66,7 @@ export const handleAdminClaims: Handler<ApiContext, {}, ClaimsStatusResponse> = 
   } catch (error) {
     throw new PaymentKitError(
       ErrorCode.INTERNAL_ERROR,
-      'Failed to retrieve claims status',
+      'Failed to retrieve system status',
       500,
       error instanceof Error ? error.message : String(error)
     );

@@ -4,31 +4,10 @@
 
 import type { Handler, ApiContext } from '../types/api';
 import type { RouteOptions } from '../transport/express/BillableRouter';
-import {
-  handleRecovery,
-  handleCommit,
-  handleHealth,
-  handleAdminClaims,
-  handleAdminClaimTrigger,
-  handleSubRavQuery,
-} from './handlers';
+import { handleRecovery, handleCommit, handleHealth, handleAdminStatus, handleAdminClaimTrigger, handleSubRavQuery } from './handlers';
 
 import { createValidatedHandler } from './utils';
-import {
-  RecoveryRequestSchema,
-  RecoveryResponseSchema,
-  CommitRequestSchema,
-  CommitResponseSchema,
-  HealthRequestSchema,
-  HealthResponseSchema,
-  SubRavRequestSchema,
-  SubRavResponseSchema,
-  AdminRequestSchema,
-  ClaimsStatusResponseSchema,
-  // Import admin schemas from core since they're the same
-  ClaimTriggerRequestSchema,
-  ClaimTriggerResponseSchema,
-} from '../schema';
+import { RecoveryRequestSchema, RecoveryResponseSchema, CommitRequestSchema, CommitResponseSchema, HealthRequestSchema, HealthResponseSchema, SubRavRequestSchema, SubRavResponseSchema, AdminRequestSchema, SystemStatusResponseSchema, ClaimTriggerRequestSchema, ClaimTriggerResponseSchema } from '../schema';
 
 /**
  * Configuration for a built-in API handler
@@ -110,18 +89,18 @@ export const BuiltInApiHandlers: Record<string, ApiHandlerConfig> = {
   },
 
   // Admin operations
-  adminClaims: {
+  adminStatus: {
     handler: createValidatedHandler({
       schema: {
         request: AdminRequestSchema,
-        response: ClaimsStatusResponseSchema,
+        response: SystemStatusResponseSchema,
       },
-      handler: handleAdminClaims,
+      handler: handleAdminStatus,
     }),
     method: 'GET',
-    path: '/admin/claims',
+    path: '/admin/status',
     options: { pricing: '0', adminOnly: true },
-    description: 'Get claims status and statistics (admin only)',
+    description: 'Get system internal status (claims, processor, etc.) (admin only)',
   },
 
   adminClaimTrigger: {

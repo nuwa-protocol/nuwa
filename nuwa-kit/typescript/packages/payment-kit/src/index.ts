@@ -85,7 +85,7 @@ export {
   PersistedHttpClientStateSchema,
   // Other essential schemas not conflicting with core types
   ServiceDiscoverySchema,
-  ClaimsStatusSchema,
+  SystemStatusSchema,
   ClaimTriggerRequestSchema,
   ClaimTriggerResponseSchema,
   RecoveryRequestSchema,
@@ -97,7 +97,7 @@ export {
   SubRavRequestSchema,
   SubRavResponseSchema,
   AdminRequestSchema,
-  ClaimsStatusResponseSchema,
+  SystemStatusResponseSchema,
   DiscoveryRequestSchema,
   DiscoveryResponseSchema,
 } from './schema';

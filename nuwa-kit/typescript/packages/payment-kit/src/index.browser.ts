@@ -50,7 +50,7 @@ export * from './errors';
 export {
   PersistedHttpClientStateSchema,
   ServiceDiscoverySchema,
-  ClaimsStatusSchema,
+  SystemStatusSchema,
   ClaimTriggerRequestSchema,
   ClaimTriggerResponseSchema,
   RecoveryRequestSchema,
@@ -62,7 +62,7 @@ export {
   SubRavRequestSchema,
   SubRavResponseSchema,
   AdminRequestSchema,
-  ClaimsStatusResponseSchema,
+  SystemStatusResponseSchema,
   DiscoveryRequestSchema,
   DiscoveryResponseSchema,
 } from './schema';

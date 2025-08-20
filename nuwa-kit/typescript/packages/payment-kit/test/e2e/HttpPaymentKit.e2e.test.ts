@@ -236,7 +236,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     }
 
     // Check admin stats for payment tracking using AdminClient
-    const adminStats = await adminClient.getClaimsStatus();
+    const adminStats = await adminClient.getSystemStatus();
     console.log('📊 Admin stats after multiple requests:', safeStringify(adminStats, 2));
 
     console.log('🎉 Complete HTTP deferred payment flow successful!');
@@ -289,7 +289,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('✅ Mixed request types processed successfully');
 
     // Check accumulated costs using AdminClient
-    const adminStats = await adminClient.getClaimsStatus();
+    const adminStats = await adminClient.getSystemStatus();
     console.log('📊 Final admin stats:', safeStringify(adminStats, 2));
 
     console.log('🎉 Mixed request types test successful!');
@@ -306,9 +306,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(healthResponse.success).toBe(true);
 
     // Test admin endpoints using AdminClient
-    const adminResponse = await adminClient.getClaimsStatus();
+    const adminResponse = await adminClient.getSystemStatus();
     console.log('✅ Admin endpoints accessible response:', safeStringify(adminResponse, 2));
-    expect(adminResponse.claimsStatus).toBeTruthy();
+    expect(adminResponse.claims).toBeTruthy();
     console.log('🎉 Error handling test successful!');
   }, 60000);
 
@@ -521,9 +521,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     // Test 3: Claims status (admin endpoint)
     console.log('📞 Testing claims status via AdminClient');
-    const claimsStatus = await adminClient.getClaimsStatus();
-    expect(claimsStatus.claimsStatus).toBeTruthy();
-    expect(claimsStatus.processingStats).toBeTruthy();
+    const claimsStatus = await adminClient.getSystemStatus();
+    expect(claimsStatus.claims).toBeTruthy();
+    expect(claimsStatus.processor).toBeTruthy();
     expect(claimsStatus.timestamp).toBeTruthy();
     console.log('✅ Claims status retrieval successful');
 
@@ -1071,18 +1071,18 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('📊 Test 6: Check claim processing stats via admin client');
 
     try {
-      const adminStats = await adminClient.getClaimsStatus();
+      const adminStats = await adminClient.getSystemStatus();
       console.log('📊 Claim processing stats:', JSON.stringify(adminStats, null, 2));
 
-      expect(adminStats.claimsStatus).toBeTruthy();
-      expect(adminStats.processingStats).toBeTruthy();
+      expect(adminStats.claims).toBeTruthy();
+      expect(adminStats.processor).toBeTruthy();
 
       // Should show some claim activity
-      // processingStats schema: { totalRequests, successfulPayments, failedPayments, autoClaimsTriggered }
-      expect(adminStats.processingStats.totalRequests).toBeGreaterThan(0);
+      // processor schema: { totalRequests, successfulPayments, failedPayments, autoClaimsTriggered }
+      expect(adminStats.processor.totalRequests).toBeGreaterThan(0);
       // At least one auto claim should be triggered in this test sequence (best-effort)
-      if (typeof adminStats.processingStats.autoClaimsTriggered === 'number') {
-        expect(adminStats.processingStats.autoClaimsTriggered).toBeGreaterThanOrEqual(0);
+      if (typeof adminStats.processor.autoClaimsTriggered === 'number') {
+        expect(adminStats.processor.autoClaimsTriggered).toBeGreaterThanOrEqual(0);
       }
     } catch (error) {
       console.log('ℹ️ Admin stats not available or restricted:', error);
@@ -1114,10 +1114,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
         // Observe reactive claim status via admin endpoint
         try {
-          const adminStatsNow = await adminClient.getClaimsStatus();
+          const adminStatsNow = await adminClient.getSystemStatus();
           console.log(
             '📊 Reactive claim status snapshot:',
-            JSON.stringify(adminStatsNow.claimsStatus)
+            JSON.stringify(adminStatsNow.claims)
           );
         } catch (e) {
           console.log('ℹ️ Admin status unavailable:', (e as any)?.message || String(e));

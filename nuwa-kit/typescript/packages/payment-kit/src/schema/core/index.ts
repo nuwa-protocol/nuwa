@@ -220,16 +220,16 @@ export type PaymentProcessingStats = z.infer<typeof PaymentProcessingStatsSchema
 /**
  * Claims status information schema
  */
-export const ClaimsStatusSchema = z.object({
-  /** Current reactive claim trigger status */
-  claimsStatus: ClaimTriggerStatusSchema,
+export const SystemStatusSchema = z.object({
+  /** Reactive claim trigger status */
+  claims: ClaimTriggerStatusSchema,
   /** Payment processing statistics */
-  processingStats: PaymentProcessingStatsSchema,
+  processor: PaymentProcessingStatsSchema,
   /** Response timestamp in ISO-8601 format */
   timestamp: z.string(),
 });
 
-export type ClaimsStatus = z.infer<typeof ClaimsStatusSchema>;
+export type SystemStatus = z.infer<typeof SystemStatusSchema>;
 
 /**
  * Claim trigger request schema

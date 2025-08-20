@@ -107,6 +107,9 @@ export interface ClaimTriggerStats {
 
   /** Average claim processing time in milliseconds */
   avgProcessingTimeMs: number;
+
+  /** Claim policy snapshot */
+  policy: ClaimPolicy;
 }
 
 /**
@@ -172,13 +175,7 @@ export class ClaimTriggerService {
       ...DEFAULT_REACTIVE_CLAIM_POLICY,
       ...options.policy,
     };
-
-    // Runtime safety check: ensure minClaimAmount is defined
-    if (this.policy.minClaimAmount === undefined || this.policy.minClaimAmount === null) {
-      throw new Error(
-        'Internal error: policy.minClaimAmount should never be undefined after merging with defaults'
-      );
-    }
+ 
     this.contract = options.contract;
     this.signer = options.signer;
     this.ravRepo = options.ravRepo;
@@ -286,7 +283,23 @@ export class ClaimTriggerService {
       backoffCount,
       avgProcessingTimeMs:
         this.stats.successCount > 0 ? this.stats.totalProcessingTime / this.stats.successCount : 0,
+      policy: {
+        minClaimAmount: this.policy.minClaimAmount,
+        maxConcurrentClaims: this.policy.maxConcurrentClaims,
+        maxRetries: this.policy.maxRetries,
+        retryDelayMs: this.policy.retryDelayMs,
+        requireHubBalance: this.policy.requireHubBalance,
+        insufficientFundsBackoffMs: this.policy.insufficientFundsBackoffMs,
+        countInsufficientAsFailure: this.policy.countInsufficientAsFailure,
+      },
     };
+  }
+
+  /**
+   * Getter for current claim policy
+   */
+  getPolicy(): ClaimPolicy {
+    return this.policy;
   }
 
   /**

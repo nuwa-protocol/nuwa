@@ -1,11 +1,4 @@
-import type {
-  HealthResponse,
-  ClaimsStatusResponse,
-  ClaimTriggerRequest,
-  ClaimTriggerResponse,
-  SubRavRequest,
-  SubRavResponse,
-} from '../../schema';
+import type { HealthResponse, SystemStatusResponse, ClaimTriggerRequest, ClaimTriggerResponse, SubRavRequest, SubRavResponse } from '../../schema';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 
 /**
@@ -44,11 +37,11 @@ export class PaymentChannelAdminClient {
   }
 
   /**
-   * Get claims status and processing statistics (admin only)
+   * Get system internal status (admin only)
    */
-  async getClaimsStatus(): Promise<ClaimsStatusResponse> {
-    const result = await this.httpClient.get<ClaimsStatusResponse>(
-      this.buildPaymentUrl('/admin/claims')
+  async getSystemStatus(): Promise<SystemStatusResponse> {
+    const result = await this.httpClient.get<SystemStatusResponse>(
+      this.buildPaymentUrl('/admin/status')
     );
     return result.data;
   }

@@ -39,7 +39,7 @@ export {
 
 export {
   AdminRequestSchema,
-  ClaimsStatusResponseSchema,
+  SystemStatusResponseSchema,
   type AdminRequest,
-  type ClaimsStatusResponse,
+  type SystemStatusResponse,
 } from './api/admin';
