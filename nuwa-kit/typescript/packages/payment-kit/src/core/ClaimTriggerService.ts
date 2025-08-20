@@ -428,26 +428,8 @@ export class ClaimTriggerService {
 
       // Check if should retry
       if (task.attempts < this.policy.maxRetries) {
-        // Check if this is an insufficient funds error - use longer backoff
-        const isInsufficientFunds = (error as any)?.code === 'HUB_INSUFFICIENT_FUNDS';
-        let backoffMs: number;
-
-        if (isInsufficientFunds) {
-          // For insufficient funds, use a longer fixed delay to give user time to deposit
-          backoffMs = 30000; // 30 seconds fixed delay for balance issues
-          this.logger.warn(
-            'Claim failed due to insufficient hub balance - using extended retry delay',
-            {
-              channelId: task.channelId,
-              vmIdFragment: task.vmIdFragment,
-              backoffMs,
-              message: 'User may need to deposit funds to PaymentHub',
-            }
-          );
-        } else {
-          // For other errors, use exponential backoff
-          backoffMs = this.policy.retryDelayMs * Math.pow(2, task.attempts - 1);
-        }
+        // Uniform exponential backoff for unexpected errors.
+        const backoffMs = this.policy.retryDelayMs * Math.pow(2, task.attempts - 1);
 
         task.nextRetryAt = Date.now() + backoffMs;
 
@@ -460,7 +442,6 @@ export class ClaimTriggerService {
           attempt: task.attempts,
           nextRetryAt: new Date(task.nextRetryAt).toISOString(),
           backoffMs,
-          errorType: isInsufficientFunds ? 'insufficient_funds' : 'other',
         });
       } else {
         // Max retries reached
