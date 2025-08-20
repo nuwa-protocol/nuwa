@@ -1,4 +1,11 @@
-import type { HealthResponse, SystemStatusResponse, ClaimTriggerRequest, ClaimTriggerResponse, SubRavRequest, SubRavResponse } from '../../schema';
+import type {
+  HealthResponse,
+  SystemStatusResponse,
+  ClaimTriggerRequest,
+  ClaimTriggerResponse,
+  SubRavRequest,
+  SubRavResponse,
+} from '../../schema';
 import { PaymentChannelHttpClient } from './PaymentChannelHttpClient';
 
 /**

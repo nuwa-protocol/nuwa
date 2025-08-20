@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { SystemStatusSchema, ClaimTriggerRequestSchema as CoreClaimTriggerRequestSchema, ClaimTriggerResponseSchema as CoreClaimTriggerResponseSchema } from '../core';
+import {
+  SystemStatusSchema,
+  ClaimTriggerRequestSchema as CoreClaimTriggerRequestSchema,
+  ClaimTriggerResponseSchema as CoreClaimTriggerResponseSchema,
+} from '../core';
 
 /**
  * Schema for GET /admin/status response

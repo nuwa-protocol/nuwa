@@ -1116,10 +1116,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
         // Observe reactive claim status via admin endpoint
         try {
           const adminStatsNow = await adminClient.getSystemStatus();
-          console.log(
-            '📊 Reactive claim status snapshot:',
-            JSON.stringify(adminStatsNow.claims)
-          );
+          console.log('📊 Reactive claim status snapshot:', JSON.stringify(adminStatsNow.claims));
         } catch (e) {
           console.log('ℹ️ Admin status unavailable:', (e as any)?.message || String(e));
         }

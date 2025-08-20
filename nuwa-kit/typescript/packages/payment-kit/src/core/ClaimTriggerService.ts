@@ -175,7 +175,7 @@ export class ClaimTriggerService {
       ...DEFAULT_REACTIVE_CLAIM_POLICY,
       ...options.policy,
     };
- 
+
     this.contract = options.contract;
     this.signer = options.signer;
     this.ravRepo = options.ravRepo;

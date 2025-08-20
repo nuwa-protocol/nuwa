@@ -4,10 +4,30 @@
 
 import type { Handler, ApiContext } from '../types/api';
 import type { RouteOptions } from '../transport/express/BillableRouter';
-import { handleRecovery, handleCommit, handleHealth, handleAdminStatus, handleAdminClaimTrigger, handleSubRavQuery } from './handlers';
+import {
+  handleRecovery,
+  handleCommit,
+  handleHealth,
+  handleAdminStatus,
+  handleAdminClaimTrigger,
+  handleSubRavQuery,
+} from './handlers';
 
 import { createValidatedHandler } from './utils';
-import { RecoveryRequestSchema, RecoveryResponseSchema, CommitRequestSchema, CommitResponseSchema, HealthRequestSchema, HealthResponseSchema, SubRavRequestSchema, SubRavResponseSchema, AdminRequestSchema, SystemStatusResponseSchema, ClaimTriggerRequestSchema, ClaimTriggerResponseSchema } from '../schema';
+import {
+  RecoveryRequestSchema,
+  RecoveryResponseSchema,
+  CommitRequestSchema,
+  CommitResponseSchema,
+  HealthRequestSchema,
+  HealthResponseSchema,
+  SubRavRequestSchema,
+  SubRavResponseSchema,
+  AdminRequestSchema,
+  SystemStatusResponseSchema,
+  ClaimTriggerRequestSchema,
+  ClaimTriggerResponseSchema,
+} from '../schema';
 
 /**
  * Configuration for a built-in API handler

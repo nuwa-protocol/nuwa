@@ -2,7 +2,12 @@ import type { InternalClaimTriggerRequest, InternalSubRavRequest } from '../../t
 import { createSuccessResponse, PaymentKitError } from '../../errors';
 import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
-import type { HealthResponse, SystemStatusResponse, ClaimTriggerRequest, ClaimTriggerResponse } from '../../schema';
+import type {
+  HealthResponse,
+  SystemStatusResponse,
+  ClaimTriggerRequest,
+  ClaimTriggerResponse,
+} from '../../schema';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 /**
@@ -97,7 +102,12 @@ export const handleAdminClaimTrigger: Handler<
 
     const channelId = req.channelId;
     const queued: { vmIdFragment: string; delta: bigint }[] = [];
-    const skipped: { vmIdFragment: string; reason: 'no_delta' | 'below_threshold'; delta?: bigint; threshold?: bigint }[] = [];
+    const skipped: {
+      vmIdFragment: string;
+      reason: 'no_delta' | 'below_threshold';
+      delta?: bigint;
+      threshold?: bigint;
+    }[] = [];
 
     try {
       // List all sub-channels we have state for
