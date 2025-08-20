@@ -594,20 +594,20 @@ class PaymentCLIClient {
     }
   }
 
-  async getAdminClaims() {
+  async getSystemStatus() {
     if (!this.adminClient) {
       throw new Error('Client not initialized. Call initialize() first.');
     }
     try {
       console.log(chalk.blue('🔍 Admin Claims Status:'));
 
-      const response = await this.adminClient.getClaimsStatus();
+      const response = await this.adminClient.getSystemStatus();
 
       console.log(
-        chalk.white(`  Claims Status: ${JSON.stringify(response.claimsStatus, null, 2)}`)
+        chalk.white(`  Claims Status: ${JSON.stringify(response.claims, null, 2)}`)
       );
       console.log(
-        chalk.white(`  Processing Stats: ${JSON.stringify(response.processingStats, null, 2)}`)
+        chalk.white(`  Processing Stats: ${JSON.stringify(response.processor, null, 2)}`)
       );
       console.log(chalk.white(`  Timestamp: ${response.timestamp}`));
 
@@ -629,7 +629,8 @@ class PaymentCLIClient {
 
       console.log(chalk.green('✅ Claim Triggered:'));
       console.log(chalk.white(`  Channel ID: ${response.channelId}`));
-      console.log(chalk.white(`  Results: ${JSON.stringify(response.results, null, 2)}`));
+      console.log(chalk.white(`  Queued: ${JSON.stringify(response.queued, null, 2)}`));
+      console.log(chalk.white(`  Skipped: ${JSON.stringify(response.skipped, null, 2)}`));
 
       return response;
     } catch (error) {
@@ -781,7 +782,7 @@ async function handleAdminFunctions(client: PaymentCLIClient) {
       name: 'adminAction',
       message: 'What admin function would you like to perform?',
       choices: [
-        { name: '📊 Get claims status', value: 'claims' },
+        { name: '📊 Get system status', value: 'status' },
         { name: '🚀 Trigger claim', value: 'trigger-claim' },
         { name: '⬅️ Back to main menu', value: 'back' },
       ],
@@ -789,8 +790,8 @@ async function handleAdminFunctions(client: PaymentCLIClient) {
   ]);
 
   switch (adminAction) {
-    case 'claims':
-      await client.getAdminClaims();
+    case 'status':
+      await client.getSystemStatus();
       break;
 
     case 'trigger-claim':
@@ -901,18 +902,18 @@ async function main() {
 
   // Admin claims command
   program
-    .command('admin:claims')
-    .description('Get admin claims status')
+    .command('admin:status')
+    .description('Get admin system status')
     .action(async options => {
       const config = getConfig(program.opts());
       const client = new PaymentCLIClient(config);
       await client.initialize();
-      await client.getAdminClaims();
+      await client.getSystemStatus();
     });
 
   // Admin trigger claim command
   program
-    .command('admin:claim <channelId>')
+    .command('admin:trigger-claim <channelId>')
     .description('Trigger claim for a specific channel')
     .action(async (channelId, options) => {
       const config = getConfig(program.opts());
