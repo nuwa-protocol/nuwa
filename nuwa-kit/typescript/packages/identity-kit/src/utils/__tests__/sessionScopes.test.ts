@@ -16,7 +16,7 @@ describe('sessionScopes', () => {
       expect(scopes).toEqual([
         '0x3::did::*',
         '0x3::payment_channel::*',
-        '0xdc2a3eba923548660bb642b9df42936941a03e2d8bab223ae6dda6318716e742::*::*',
+        '0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625::*::*',
       ]);
     });
   });
@@ -35,7 +35,7 @@ describe('sessionScopes', () => {
       expect(combined).toEqual([
         '0x3::did::*', // base scope (duplicate removed)
         '0x3::payment_channel::*', // base scope
-        '0xdc2a3eba923548660bb642b9df42936941a03e2d8bab223ae6dda6318716e742::*::*', // base scope
+        '0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625::*::*', // base scope
         '0xabc::defi::*', // custom scope
         '0x123::chat::send', // custom scope
       ]);
