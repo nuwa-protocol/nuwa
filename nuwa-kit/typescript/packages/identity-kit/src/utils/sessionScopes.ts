@@ -15,7 +15,7 @@ export function buildBaseScopes(): string[] {
   return [
     '0x3::did::*', // DID contract - all functions
     '0x3::payment_channel::*', // Payment channel contract - all functions
-    '0xdc2a3eba923548660bb642b9df42936941a03e2d8bab223ae6dda6318716e742::*::*', // Cap Registry contract - all functions
+    '0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625::*::*', // Cap Registry contract - all functions
   ];
 }
 
