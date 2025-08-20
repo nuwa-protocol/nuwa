@@ -424,8 +424,8 @@ importers:
         specifier: ^0.5.0
         version: 0.5.0(typescript@5.8.3)
       '@nuwa-ai/identity-kit-web':
-        specifier: ^0.5.0
-        version: 0.5.0(react@18.3.1)(typescript@5.8.3)
+        specifier: ^0.5.1
+        version: 0.5.1(react@18.3.1)(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
         specifier: ^0.5.0
         version: 0.5.0(express@4.21.2)(typescript@5.8.3)
@@ -1401,8 +1401,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nuwa-ai/identity-kit-web@0.5.0':
-    resolution: {integrity: sha512-V8Nf/BQBxq6YoTZfvFqvUtfwyx8D84+VpWTWpiBi7Jsh0W0wClUxnPOUHUfe8QXIIPWSEDt66iWDIZn47KoZRQ==}
+  '@nuwa-ai/identity-kit-web@0.5.1':
+    resolution: {integrity: sha512-sgRLqsTCcNMIQsM+JpkY2pPJ5tNf0/+WgpkFbzC59umX7BKH5i0EPkMpzBbuy//91Bs7Jcsbl0J/FAXdSAWqnw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0
     peerDependenciesMeta:
@@ -6156,7 +6156,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@nuwa-ai/identity-kit-web@0.5.0(react@18.3.1)(typescript@5.8.3)':
+  '@nuwa-ai/identity-kit-web@0.5.1(react@18.3.1)(typescript@5.8.3)':
     dependencies:
       '@nuwa-ai/identity-kit': 0.5.0(typescript@5.8.3)
     optionalDependencies:
