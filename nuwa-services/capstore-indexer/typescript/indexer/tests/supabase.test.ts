@@ -45,7 +45,7 @@ describe('Supabase Read Functions', () => {
     }, 10000);
 
     it('should handle pagination parameters correctly', async () => {
-      const result = await queryFromSupabase(null, null, null, 0, 10);
+      const result = await queryFromSupabase(null, null, null, null, 0, 10);
       
       expect(result).toHaveProperty('success');
       if (result.success) {
@@ -56,7 +56,7 @@ describe('Supabase Read Functions', () => {
     }, 10000);
 
     it('should respect maximum page size limit (50)', async () => {
-      const result = await queryFromSupabase(null, null, null, 0, 100);
+      const result = await queryFromSupabase(null, null, null, null, 0, 100);
       
       expect(result).toHaveProperty('success');
       if (result.success) {
@@ -128,7 +128,7 @@ describe('Supabase Read Functions', () => {
         console.log(`Using existing tag for test: ${testTags[0]}`);
       }
       
-      const result = await queryFromSupabase(null, null, ['Coding']);
+      const result = await queryFromSupabase(null, null, null, ['Coding']);
       
       expect(result).toHaveProperty('success');
       expect(typeof result.success).toBe('boolean');
@@ -165,7 +165,7 @@ describe('Supabase Read Functions', () => {
     }, 10000);
 
     it('should return valid pagination info', async () => {
-      const result = await queryFromSupabase(null, null, null, 0, 5);
+      const result = await queryFromSupabase(null, null, null, null, 0, 5);
       
       expect(result).toHaveProperty('success');
       if (result.success) {
@@ -310,7 +310,7 @@ describe('Supabase Read Functions', () => {
         console.log(`2. 使用第一个标签进行测试: "${firstTag}"`);
         
         // Test 2: Query with single tag
-        const singleTagResult = await queryFromSupabase(null, null, [firstTag]);
+        const singleTagResult = await queryFromSupabase(null, null, null, [firstTag]);
         console.log('Single tag result:', JSON.stringify(singleTagResult, null, 2));
         
         expect(singleTagResult).toHaveProperty('success');
@@ -320,7 +320,7 @@ describe('Supabase Read Functions', () => {
         
         // Test 3: Query with multiple tags if more available
         if (tagsResult.tags.length > 1) {
-          const multipleTagsResult = await queryFromSupabase(null, null, tagsResult.tags.slice(0, 2));
+          const multipleTagsResult = await queryFromSupabase(null, null, null, tagsResult.tags.slice(0, 2));
           console.log('Multiple tags result:', JSON.stringify(multipleTagsResult, null, 2));
           
           expect(multipleTagsResult).toHaveProperty('success');
@@ -379,7 +379,7 @@ describe('Supabase Read Functions', () => {
   describe('Database Connection', () => {
     it('should be able to connect to Supabase', async () => {
       // Test basic connectivity by running a simple query
-      const result = await queryFromSupabase(null, null, null, 0, 1);
+      const result = await queryFromSupabase(null, null, null, null, 0, 1);
       
       // Should not throw connection errors
       expect(result).toHaveProperty('success');
