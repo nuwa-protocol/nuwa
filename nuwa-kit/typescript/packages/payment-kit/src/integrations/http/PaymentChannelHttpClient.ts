@@ -1247,9 +1247,7 @@ export class PaymentChannelHttpClient {
         typeof (response.body as any).getReader === 'function'
       ) {
         // Track per-frame activity to extend timeout for streaming
-        let lastActivityAt = Date.now();
         const onActivity = () => {
-          lastActivityAt = Date.now();
           if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
             this.extendPendingTimeout(context.clientTxRef, this.options.timeoutMsStream);
           }

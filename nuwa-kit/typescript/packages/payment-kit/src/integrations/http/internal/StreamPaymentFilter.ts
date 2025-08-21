@@ -32,8 +32,12 @@ export function wrapAndFilterInBandFrames(
       controller.close();
       try {
         reader.cancel();
-      } catch {}
-    } catch {}
+      } catch (e) {
+        log('[afterPayment.error]', e);
+      }
+    } catch (e) {
+      log('[afterPayment.error]', e);
+    }
   };
 
   const parser: InBandParser = isSSE
@@ -52,20 +56,26 @@ export function wrapAndFilterInBandFrames(
         if (!value) return;
         try {
           onActivity?.();
-        } catch {}
+        } catch (e) {
+          log('[pull.onActivity.error]', e);
+        }
         const chunkText = textDecoder.decode(value, { stream: true });
         await parser.process(chunkText, controller);
       } catch (e) {
         try {
           reader.cancel();
-        } catch {}
+        } catch (e) {
+          log('[pull.error]', e);
+        }
         controller.error(e);
       }
     },
     cancel() {
       try {
         reader.cancel();
-      } catch {}
+      } catch (e) {
+        log('[cancel.error]', e);
+      }
     },
   });
 
@@ -134,7 +144,9 @@ class SseInbandParser implements InBandParser {
                 this.onAfterPayment(controller);
               }
             }
-          } catch {}
+          } catch (e) {
+            this.log('[process.error]', e);
+          }
         }
         this.pendingEvent = [];
       }
@@ -167,7 +179,9 @@ class SseInbandParser implements InBandParser {
             this.onAfterPayment(controller);
           }
         }
-      } catch {}
+      } catch (e) {
+        this.log('[flush.error]', e);
+      }
     }
     this.pendingEvent = [];
     this.buffer = '';
@@ -202,7 +216,9 @@ class NdjsonInbandParser implements InBandParser {
           await safeHandlePayment({ headerValue }, this.onPayment, this.log);
           this.onAfterPayment(controller);
         }
-      } catch {}
+      } catch (e) {
+        this.log('[process.error]', e);
+      }
       if (!drop) controller.enqueue(this.encoder.encode(line + '\n'));
     }
   }
@@ -219,7 +235,9 @@ class NdjsonInbandParser implements InBandParser {
         await safeHandlePayment({ headerValue }, this.onPayment, this.log);
         this.onAfterPayment(controller);
       }
-    } catch {}
+    } catch (e) {
+      this.log('[flush.error]', e);
+    }
     if (!drop) controller.enqueue(this.encoder.encode(this.buffer + '\n'));
     this.buffer = '';
   }
