@@ -30,6 +30,12 @@ export interface CreateHttpClientOptions {
 
   /** Optional channel repository */
   channelRepo?: HttpPayerOptions['channelRepo'];
+
+  /** Timeout for pending payment resolution in milliseconds (non-streaming). */
+  timeoutMs?: number;
+
+  /** Per-frame idle timeout for streaming responses; defaults to timeoutMs if unspecified. */
+  timeoutMsStream?: number;
 }
 
 /**
@@ -115,6 +121,8 @@ export async function createHttpClient(
     fetchImpl: options.fetchImpl,
     mappingStore: options.mappingStore,
     channelRepo: options.channelRepo,
+    timeoutMs: options.timeoutMs,
+    timeoutMsStream: options.timeoutMsStream,
   };
 
   // If caller did not explicitly provide a keyId, pick the first available from the KeyManager
