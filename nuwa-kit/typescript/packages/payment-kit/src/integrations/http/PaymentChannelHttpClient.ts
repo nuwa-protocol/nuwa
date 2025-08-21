@@ -1051,6 +1051,12 @@ export class PaymentChannelHttpClient {
     clearTimeout(pending.timeoutId);
     pending.timeoutId = setTimeout(() => {
       if (this.clientState.pendingPayments?.has(clientTxRef)) {
+        // Ensure the scheduler queue is released on stream idle timeout
+        try {
+          pending.release?.();
+        } catch (e) {
+          this.log('[release.error]', e);
+        }
         this.clientState.pendingPayments.delete(clientTxRef);
         this.log(
           '[payment.timeout.stream]',
