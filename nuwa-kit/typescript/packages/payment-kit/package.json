@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/payment-kit",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "SDK for NIP-4 Unidirectional Payment Channels on Rooch and other ledgers",
   "type": "module",
   "main": "./dist/node/index.cjs",

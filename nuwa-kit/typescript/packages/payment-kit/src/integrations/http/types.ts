@@ -70,7 +70,11 @@ export interface HttpPayerOptions {
   /** Timeout for pending payment resolution in milliseconds (default: 30000ms) */
   timeoutMs?: number;
 
-  /** Timeout used when the response is streaming (SSE/NDJSON). Defaults to 10 minutes. */
+  /**
+   * Timeout used when the response is streaming (SSE/NDJSON).
+   * Interpreted as per-frame idle timeout: the timer resets on every received frame/chunk.
+   * Defaults to `timeoutMs` when unspecified.
+   */
   timeoutMsStream?: number;
 
   /** Transaction logging */

@@ -10,7 +10,8 @@ export interface InBandPaymentPayload {
 export function wrapAndFilterInBandFrames(
   response: Response,
   onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
-  log: (...args: any[]) => void
+  log: (...args: any[]) => void,
+  onActivity?: () => void
 ): Response {
   const originalBody = response.body as ReadableStream<Uint8Array> | null;
   if (!originalBody || typeof (originalBody as any).getReader !== 'function') {
@@ -49,6 +50,9 @@ export function wrapAndFilterInBandFrames(
           return;
         }
         if (!value) return;
+        try {
+          onActivity?.();
+        } catch {}
         const chunkText = textDecoder.decode(value, { stream: true });
         await parser.process(chunkText, controller);
       } catch (e) {

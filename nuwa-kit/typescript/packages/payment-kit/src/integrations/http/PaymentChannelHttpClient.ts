@@ -149,6 +149,10 @@ export class PaymentChannelHttpClient {
 
     // Initialize configurable timeout
     this.requestTimeoutMs = this.options.timeoutMs ?? 30000;
+    // Streaming timeout defaults to non-streaming timeout and is applied per-frame (idle between frames)
+    if (this.options.timeoutMsStream === undefined) {
+      this.options.timeoutMsStream = this.requestTimeoutMs; // per-frame idle timeout
+    }
   }
 
   /**
@@ -998,8 +1002,15 @@ export class PaymentChannelHttpClient {
 
       // Set timeout for cleanup (configurable)
       const timeoutId = setTimeout(() => {
-        if (this.clientState.pendingPayments?.has(clientTxRef)) {
-          this.clientState.pendingPayments.delete(clientTxRef);
+        const pending = this.clientState.pendingPayments?.get(clientTxRef);
+        if (pending) {
+          // Ensure the scheduler queue is released on timeout to avoid deadlock
+          try {
+            pending.release?.();
+          } catch (e) {
+            this.log('[release.error]', e);
+          }
+          this.clientState.pendingPayments?.delete(clientTxRef);
           this.log('[payment.timeout]', 'clientTxRef=', clientTxRef, 'url=', requestContext.url);
           reject(new Error('Payment resolution timeout'));
         }
@@ -1235,6 +1246,15 @@ export class PaymentChannelHttpClient {
         response.body &&
         typeof (response.body as any).getReader === 'function'
       ) {
+        // Track per-frame activity to extend timeout for streaming
+        let lastActivityAt = Date.now();
+        const onActivity = () => {
+          lastActivityAt = Date.now();
+          if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+            this.extendPendingTimeout(context.clientTxRef, this.options.timeoutMsStream);
+          }
+        };
+
         const filtered = wrapAndFilterInBandFrames(
           response,
           async p => {
@@ -1254,7 +1274,8 @@ export class PaymentChannelHttpClient {
               this.log('[inband.decode.error]', e);
             }
           },
-          (...args: any[]) => this.log(...args)
+          (...args: any[]) => this.log(...args),
+          onActivity
         );
         // Mark as streaming in transaction log
         try {
@@ -1268,7 +1289,7 @@ export class PaymentChannelHttpClient {
         } catch (e) {
           this.log('[transaction.update.error]', e);
         }
-        // Extend pending timeout for streaming if configured
+        // Set initial per-frame timeout for streaming if configured
         if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
           this.extendPendingTimeout(context.clientTxRef, this.options.timeoutMsStream);
         }
@@ -1446,6 +1467,27 @@ export class PaymentChannelHttpClient {
         }
       } catch (e) {
         this.log('assertSubRavProgression failed:', e);
+      }
+    }
+
+    // Final fallback: if still not matched but there are pendings, pick the most recent pending
+    // This avoids deadlock when server omits clientTxRef and no prevSent exists (FREE mode).
+    if (!pendingRequest || !keyToDelete) {
+      if (this.clientState.pendingPayments && this.clientState.pendingPayments.size >= 1) {
+        try {
+          const all = Array.from(this.clientState.pendingPayments.entries());
+          const [fallbackKey, fallbackPending] = all[all.length - 1]; // most recent
+          pendingRequest = fallbackPending;
+          keyToDelete = fallbackKey;
+          this.log(
+            '[payment.match.fallback]',
+            'using-most-recent-pending',
+            'candidateKey=',
+            keyToDelete
+          );
+        } catch (e) {
+          this.log('[payment.match.fallback.error]', e);
+        }
       }
     }
 
