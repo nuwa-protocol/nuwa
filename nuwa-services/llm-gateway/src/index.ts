@@ -19,6 +19,7 @@ initRoochVDR("test", undefined, registry);
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { initPaymentKitAndRegisterRoutes } from './paymentKit.js';
+import { accessLogMiddleware } from './middleware/accessLog.js';
 
 const app = express();
 
@@ -33,6 +34,9 @@ async function start() {
 
     app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ extended: true }));
+
+    // Access Log middleware (must be before PaymentKit routes)
+    app.use(accessLogMiddleware);
 
     // enable payment kit
     await initPaymentKitAndRegisterRoutes(app);

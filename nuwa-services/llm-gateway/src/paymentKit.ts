@@ -123,10 +123,31 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
     try {
       const upstream = await provider.forwardRequest(apiKey, apiPath, 'POST', requestData, true) as any;
       if (!upstream || 'error' in upstream) {
-        meta.upstream_status_code = (upstream as any)?.status || 502;
+        const status = (upstream as any)?.status || 502;
+        const errMsg = (upstream as any)?.error || 'Upstream error';
+        const d = (upstream as any)?.details || {};
+        const safeDetails = {
+          code: d.code,
+          type: d.type,
+          requestId: d.requestId,
+          statusText: d.statusText,
+        } as any;
+        try {
+          if (upstream && (upstream as any).details) {
+            logger.error('[gateway][stream] upstream error details:', (upstream as any).details);
+          }
+        } catch {}
+        meta.upstream_status_code = status;
         meta.upstream_duration_ms = Date.now() - started;
         (res as any).locals.upstream = meta;
-        res.status((upstream as any)?.status || 502).end();
+        try {
+          res.status(status);
+          // Emit an OpenAI-style SSE data frame with error payload, then a DONE sentinel
+          const payload = { error: { message: errMsg, type: safeDetails.type, code: safeDetails.code, status } };
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+          res.write('data: [DONE]\n\n');
+        } catch {}
+        try { res.end(); } catch {}
         return;
       }
 
@@ -173,14 +194,21 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
           res.end();
         }
       });
-      upstream.data.on('error', () => {
+      upstream.data.on('error', (err: any) => {
         meta.upstream_bytes = bytes;
         meta.upstream_status_code = upstream.status;
         meta.upstream_duration_ms = Date.now() - started;
         (res as any).locals.upstream = meta;
-        if (!closed && !res.headersSent) {
+        try { logger.error('[gateway][stream] upstream stream error:', err); } catch {}
+        if (!closed) {
           closed = true;
-          res.status(500).end();
+          try {
+            // best-effort SSE error frame in OpenAI-compatible shape
+            const payload = { error: { message: 'Upstream stream error', status: upstream.status } } as any;
+            res.write(`data: ${JSON.stringify(payload)}\n\n`);
+            res.write('data: [DONE]\n\n');
+          } catch {}
+          try { res.end(); } catch {}
         }
       });
       res.on('close', () => {
