@@ -28,11 +28,7 @@ import { httpStatusFor, PaymentErrorCode } from '../../errors/codes';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { PaymentProcessor } from '../../core/PaymentProcessor';
 import { HubBalanceService, type HubBalanceServiceOptions } from '../../core/HubBalanceService';
-import {
-  ClaimTriggerService,
-  type ClaimTriggerOptions,
-  DEFAULT_REACTIVE_CLAIM_POLICY,
-} from '../../core/ClaimTriggerService';
+import { ClaimTriggerService, DEFAULT_REACTIVE_CLAIM_POLICY } from '../../core/ClaimTriggerService';
 import { isStreamingRequest } from './utils';
 
 /**
@@ -81,13 +77,8 @@ export interface ExpressPaymentKitOptions {
 
   /** Claim triggering configuration */
   claim?: {
-    /** Claim policy configuration */
-    policy?: Partial<{
-      minClaimAmount: bigint | string;
-      maxConcurrentClaims: number;
-      maxRetries: number;
-      retryDelayMs: number;
-    }>;
+    /** Minimum accumulated amount to trigger a claim (bigint or string) */
+    minClaimAmount?: bigint | string;
     /** Require hub balance check before triggering claims (default: true) */
     requireHubBalance?: boolean;
     /** Maximum concurrent claims across all sub-channels (default: 5) */
@@ -185,9 +176,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       defaultPricePicoUSD: config.defaultPricePicoUSD,
     });
 
-    // Determine minClaimAmount using reactive default policy
-    const reactiveMin = DEFAULT_REACTIVE_CLAIM_POLICY.minClaimAmount;
-
     // Initialize HubBalanceService (always enabled)
     this.hubBalanceService = new HubBalanceService({
       contract: deps.contract,
@@ -199,15 +187,14 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       debug: config.debug,
     });
 
-    // Initialize ClaimTriggerService if reactive mode is enabled
+    // Initialize ClaimTriggerService with flattened config
     this.claimTriggerService = new ClaimTriggerService({
       policy: {
-        // Only override non-default values from config
-        minClaimAmount: reactiveMin,
-        maxConcurrentClaims: config.claim?.maxConcurrentClaims,
-        maxRetries: config.claim?.maxRetries,
-        retryDelayMs: config.claim?.retryDelayMs,
-        requireHubBalance: config.claim?.requireHubBalance,
+        minClaimAmount: this.config.claim?.minClaimAmount,
+        maxConcurrentClaims: this.config.claim?.maxConcurrentClaims,
+        maxRetries: this.config.claim?.maxRetries,
+        retryDelayMs: this.config.claim?.retryDelayMs,
+        requireHubBalance: this.config.claim?.requireHubBalance,
       },
       contract: deps.contract,
       signer: deps.signer, // Pass the payee signer
@@ -215,6 +202,8 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       channelRepo: this.channelRepo,
       debug: config.debug,
     });
+
+    const claimPolicy = this.claimTriggerService.getPolicy();
 
     // Initialize PaymentProcessor with config
     this.processor = new PaymentProcessor({
@@ -227,7 +216,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
       didResolver: this.payeeClient.getDidResolver(),
       hubBalanceService: this.hubBalanceService,
       claimTriggerService: this.claimTriggerService,
-      minClaimAmount: reactiveMin,
+      minClaimAmount: claimPolicy.minClaimAmount,
       debug: config.debug,
     });
 
@@ -470,10 +459,14 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                       const frameNDJSON = JSON.stringify(ndjsonObj) + '\n';
                       if (ct.includes('text/event-stream')) {
                         try {
+                          // Ensure event boundary so we don't concatenate into previous frame
+                          (res as any).write?.('\n\n');
                           (res as any).write?.(frameSSE);
                         } catch {}
                       } else if (ct.includes('application/x-ndjson')) {
                         try {
+                          // Ensure record boundary for NDJSON
+                          (res as any).write?.('\n');
                           (res as any).write?.(frameNDJSON);
                         } catch {}
                       } else {
