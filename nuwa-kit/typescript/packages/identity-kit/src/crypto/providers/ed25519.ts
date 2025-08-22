@@ -27,7 +27,6 @@ export class Ed25519Provider implements CryptoProvider {
     const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
       {
         name: 'Ed25519',
-        namedCurve: 'Ed25519',
       },
       true,
       ['sign', 'verify']
@@ -50,7 +49,6 @@ export class Ed25519Provider implements CryptoProvider {
         privateKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['sign']
@@ -76,7 +74,6 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
@@ -87,7 +84,6 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
@@ -106,7 +102,7 @@ export class Ed25519Provider implements CryptoProvider {
     const cryptoKey = await this.crypto.subtle.importKey(
       'pkcs8',
       privateKey,
-      { name: 'Ed25519', namedCurve: 'Ed25519' },
+      { name: 'Ed25519' },
       true,
       ['sign']
     );
