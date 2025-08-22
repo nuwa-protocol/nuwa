@@ -136,12 +136,9 @@ export function registerBillableRoutes(billing: any) {
 
 ---
 
-### 5. 功能开关与灰度
+### 5. 发布与灰度
 
-建议引入 `ENABLE_PAYMENT_KIT=true|false`：
-
-- `true`：启用本文所述 `billing.*` 路由；原有 `llmRoutes` 可部分迁移或关闭对应路径。
-- `false`：保持现有实现不变，便于回滚与灰度发布。
+已默认启用 PaymentKit 计费路由，无需开关。若需灰度或回滚，请使用常规的发布策略（如按环境/版本控制），不再通过环境变量切换。
 
 ---
 
