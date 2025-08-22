@@ -35,6 +35,26 @@ interface DeleteApiKeyResponse {
   };
 }
 
+// Structured error information extracted from upstream (OpenRouter)
+interface OpenRouterErrorInfo {
+  message: string;
+  statusCode: number;
+  statusText?: string;
+  code?: string;
+  type?: string;
+  headers?: Record<string, any>;
+  requestId?: string;
+  rawBody?: string;
+  details?: any;
+}
+
+// Typed error return for forwardRequest
+interface UpstreamErrorResponse {
+  error: string;
+  status?: number;
+  details: OpenRouterErrorInfo;
+}
+
 class OpenRouterService {
   private baseURL: string;
   private provisioningApiKey: string | null;
@@ -45,17 +65,7 @@ class OpenRouterService {
   }
 
   // Extract error information from axios error (handles Buffer/Stream/object) and log structured details
-  private async extractErrorInfo(error: any): Promise<{
-    message: string;
-    statusCode: number;
-    statusText?: string;
-    code?: string;
-    type?: string;
-    headers?: Record<string, any>;
-    requestId?: string;
-    rawBody?: string;
-    details?: any;
-  }> {
+  private async extractErrorInfo(error: any): Promise<OpenRouterErrorInfo> {
     let errorMessage = "Unknown error occurred";
     let statusCode = 500;
     let statusText: string | undefined;
@@ -392,7 +402,7 @@ class OpenRouterService {
     method: string = "POST",
     requestData?: any,
     isStream: boolean = false
-  ): Promise<AxiosResponse | { error: string; status?: number } | null> {
+  ): Promise<AxiosResponse | UpstreamErrorResponse | null> {
     try {
       const headers = {
         Authorization: `Bearer ${apiKey}`,
@@ -426,7 +436,7 @@ class OpenRouterService {
       );
 
       // Extract error information to return to client (attach details for higher-level logging)
-      return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo } as any;
+      return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo };
     }
   }
 
