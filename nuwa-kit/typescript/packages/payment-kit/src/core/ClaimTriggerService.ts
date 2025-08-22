@@ -48,9 +48,14 @@ export const DEFAULT_REACTIVE_CLAIM_POLICY: ClaimPolicy = {
 /**
  * Configuration for ClaimTriggerService
  */
+// Input shape accepts string for minClaimAmount for convenience
+export type ClaimPolicyInput = Omit<ClaimPolicy, 'minClaimAmount'> & {
+  minClaimAmount: bigint | string;
+};
+
 export interface ClaimTriggerOptions {
   /** Claim triggering policy (optional, uses DEFAULT_REACTIVE_CLAIM_POLICY if not provided) */
-  policy?: Partial<ClaimPolicy>;
+  policy?: Partial<ClaimPolicyInput>;
 
   /** Contract instance for on-chain claim operations */
   contract: IPaymentChannelContract;
@@ -170,10 +175,11 @@ export class ClaimTriggerService {
   private readonly processingIntervalMs = 1000; // Check queue every 1s
 
   constructor(options: ClaimTriggerOptions) {
-    // Merge user policy with defaults
+    // Merge user policy with defaults, ignoring null/undefined overrides
+    const overrides = options.policy ? this.sanitizePolicy(options.policy) : undefined;
     this.policy = {
       ...DEFAULT_REACTIVE_CLAIM_POLICY,
-      ...options.policy,
+      ...(overrides || {}),
     };
 
     this.contract = options.contract;
@@ -193,6 +199,19 @@ export class ClaimTriggerService {
 
     // Start background processing
     this.startProcessing();
+  }
+
+  private sanitizePolicy(policy: Partial<ClaimPolicyInput>): Partial<ClaimPolicy> {
+    const result: Partial<ClaimPolicy> = {};
+    for (const [key, value] of Object.entries(policy) as [keyof ClaimPolicyInput, any][]) {
+      if (value == null) continue;
+      if (key === 'minClaimAmount') {
+        (result as any)[key] = typeof value === 'string' ? BigInt(value) : value;
+      } else {
+        (result as any)[key] = value;
+      }
+    }
+    return result;
   }
 
   /**

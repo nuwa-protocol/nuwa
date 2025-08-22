@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { deriveFieldKeyFromString } from '../ChannelUtils';
+import { deriveChannelId, deriveFieldKeyFromString } from '../ChannelUtils';
 
 describe('ChannelUtils', () => {
   test('should derive FieldKey correctly for string "1"', () => {
@@ -43,5 +43,14 @@ describe('ChannelUtils', () => {
     const result2 = deriveFieldKeyFromString('vm_id_2');
 
     expect(result1).not.toBe(result2);
+  });
+
+  test('should derive channel id correctly', () => {
+    const payerDid = 'did:rooch:rooch1xr2395fk6jjxtuuk9ayscps2j95mvdtqsfav78eafe3fs2af826swywkmz';
+    const payeeDid = 'did:rooch:rooch1gxmlnqddmcmqrjwzsc4rllcccq5vzu56ar4g65fpdzv3myx5fvkqkcmefj';
+    const assetId = '0x3::gas_coin::RGas';
+    const result = deriveChannelId(payerDid, payeeDid, assetId);
+    // expect(result).toBe('0x4');
+    console.log(result);
   });
 });

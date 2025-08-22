@@ -35,6 +35,26 @@ interface DeleteApiKeyResponse {
   };
 }
 
+// Structured error information extracted from upstream (OpenRouter)
+interface OpenRouterErrorInfo {
+  message: string;
+  statusCode: number;
+  statusText?: string;
+  code?: string;
+  type?: string;
+  headers?: Record<string, any>;
+  requestId?: string;
+  rawBody?: string;
+  details?: any;
+}
+
+// Typed error return for forwardRequest
+interface UpstreamErrorResponse {
+  error: string;
+  status?: number;
+  details: OpenRouterErrorInfo;
+}
+
 class OpenRouterService {
   private baseURL: string;
   private provisioningApiKey: string | null;
@@ -44,16 +64,30 @@ class OpenRouterService {
     this.provisioningApiKey = process.env.OPENROUTER_PROVISIONING_KEY || null;
   }
 
-  // Extract error information from axios error
-  private async extractErrorInfo(error: any): Promise<{
-    message: string;
-    statusCode: number;
-  }> {
+  // Extract error information from axios error (handles Buffer/Stream/object) and log structured details
+  private async extractErrorInfo(error: any): Promise<OpenRouterErrorInfo> {
     let errorMessage = "Unknown error occurred";
     let statusCode = 500;
+    let statusText: string | undefined;
+    let headers: Record<string, any> | undefined;
+    let requestId: string | undefined;
+    let rawBody: string | undefined;
+    let code: string | undefined;
+    let type: string | undefined;
+    let details: any;
 
     if (error.response) {
       statusCode = error.response.status;
+      statusText = error.response.statusText;
+      headers = error.response.headers || undefined;
+      try {
+        const hdr: any = headers || {};
+        requestId =
+          hdr["x-request-id"] ||
+          hdr["x-openai-request-id"] ||
+          hdr["openrouter-request-id"] ||
+          hdr["request-id"]; 
+      } catch {}
 
       if (error.response.data) {
         let data = error.response.data;
@@ -61,11 +95,21 @@ class OpenRouterService {
         // Handle Buffer
         if (Buffer.isBuffer(data)) {
           try {
-            data = data.toString("utf-8");
-            data = JSON.parse(data);
+            const s = data.toString("utf-8");
+            rawBody = s;
+            data = JSON.parse(s);
           } catch (e) {
             errorMessage = data.toString();
-            return { message: errorMessage, statusCode };
+            rawBody = errorMessage;
+            this.logUpstreamError({
+              statusCode,
+              statusText,
+              message: errorMessage,
+              headers,
+              requestId,
+              rawBody: rawBody?.slice(0, 2000),
+            });
+            return { message: errorMessage, statusCode, statusText, headers, requestId, rawBody };
           }
         }
 
@@ -73,28 +117,50 @@ class OpenRouterService {
         if (
           data &&
           typeof data === "object" &&
-          typeof data.pipe === "function"
+          typeof (data as any).pipe === "function"
         ) {
           try {
             const str = await streamToString(data);
+            rawBody = str;
             try {
               const json = JSON.parse(str);
-              errorMessage = json?.error?.message || str;
+              errorMessage = json?.error?.message || json?.message || str;
+              code = json?.error?.code || json?.code;
+              type = json?.error?.type || json?.type;
+              details = json?.error || json;
             } catch {
               errorMessage = str;
             }
           } catch (e) {
             errorMessage = "Failed to read error stream";
           }
-          return { message: errorMessage, statusCode };
+          this.logUpstreamError({
+            statusCode,
+            statusText,
+            message: errorMessage,
+            code,
+            type,
+            headers,
+            requestId,
+            rawBody: rawBody?.slice(0, 2000),
+          });
+          return { message: errorMessage, statusCode, statusText, code, type, headers, requestId, rawBody, details };
         }
 
         // Handle normal object
         if (typeof data === "object" && data !== null) {
-          errorMessage =
-            data.error?.message || data.message || JSON.stringify(data);
+          try {
+            const anyData: any = data;
+            errorMessage = anyData?.error?.message || anyData?.message || JSON.stringify(anyData);
+            code = anyData?.error?.code || anyData?.code;
+            type = anyData?.error?.type || anyData?.type;
+            details = anyData?.error || anyData;
+          } catch {
+            errorMessage = JSON.stringify(data);
+          }
         } else if (typeof data === "string") {
           errorMessage = data;
+          rawBody = data;
         }
       } else {
         errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
@@ -106,7 +172,57 @@ class OpenRouterService {
       errorMessage = error.message;
     }
 
-    return { message: errorMessage, statusCode };
+    this.logUpstreamError({
+      statusCode,
+      statusText,
+      message: errorMessage,
+      code,
+      type,
+      headers,
+      requestId,
+      rawBody: rawBody?.slice(0, 2000),
+    });
+
+    return { message: errorMessage, statusCode, statusText, code, type, headers, requestId, rawBody, details };
+  }
+
+  // Minimal structured logger for upstream errors
+  private logUpstreamError(info: {
+    statusCode?: number;
+    statusText?: string;
+    message: string;
+    code?: string;
+    type?: string;
+    headers?: Record<string, any>;
+    requestId?: string;
+    rawBody?: string;
+  }) {
+    try {
+      const headersSubset = info.headers
+        ? {
+            "x-request-id": (info.headers as any)["x-request-id"],
+            "x-openai-request-id": (info.headers as any)["x-openai-request-id"],
+            "openrouter-request-id": (info.headers as any)["openrouter-request-id"],
+            "x-usage": (info.headers as any)["x-usage"],
+            "x-ratelimit-limit": (info.headers as any)["x-ratelimit-limit"],
+            "x-ratelimit-remaining": (info.headers as any)["x-ratelimit-remaining"],
+            "cf-ray": (info.headers as any)["cf-ray"],
+          }
+        : undefined;
+      const payload: Record<string, any> = {
+        statusCode: info.statusCode,
+        statusText: info.statusText,
+        message: info.message,
+        code: info.code,
+        type: info.type,
+        requestId: info.requestId,
+        headers: headersSubset,
+        rawBodyPreview: info.rawBody,
+      };
+      console.error("[openrouter] upstream error:", JSON.stringify(payload));
+    } catch {
+      console.error("[openrouter] upstream error:", info.message);
+    }
   }
 
   // Create a new OpenRouter API Key
@@ -286,7 +402,7 @@ class OpenRouterService {
     method: string = "POST",
     requestData?: any,
     isStream: boolean = false
-  ): Promise<AxiosResponse | { error: string; status?: number } | null> {
+  ): Promise<AxiosResponse | UpstreamErrorResponse | null> {
     try {
       const headers = {
         Authorization: `Bearer ${apiKey}`,
@@ -319,8 +435,8 @@ class OpenRouterService {
         `Error forwarding request to OpenRouter: ${errorInfo.message}`
       );
 
-      // Extract error information to return to client
-      return { error: errorInfo.message, status: errorInfo.statusCode };
+      // Extract error information to return to client (attach details for higher-level logging)
+      return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo };
     }
   }
 

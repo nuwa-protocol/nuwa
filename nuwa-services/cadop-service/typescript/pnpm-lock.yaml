@@ -427,8 +427,8 @@ importers:
         specifier: ^0.5.1
         version: 0.5.1(react@18.3.1)(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.5.0
-        version: 0.5.0(express@4.21.2)(typescript@5.8.3)
+        specifier: ^0.5.4
+        version: 0.5.4(express@4.21.2)(typescript@5.8.3)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1414,6 +1414,17 @@ packages:
 
   '@nuwa-ai/payment-kit@0.5.0':
     resolution: {integrity: sha512-SGa81BOmy0KWCgFJ5JPwbkrOjpDvGmFTgKSCQ9my9Nn2/d1aT4R9a7JL1SC8JN2Wtbvi7Vg+1MFZ7otsKawhSw==}
+    peerDependencies:
+      express: '>=4'
+      pg: '>=8'
+    peerDependenciesMeta:
+      express:
+        optional: true
+      pg:
+        optional: true
+
+  '@nuwa-ai/payment-kit@0.5.4':
+    resolution: {integrity: sha512-wRv0ymdfrhwST/YE07ihLwBs3rZtXasL/uy1Q8oZtMV5VH9wD/Uwk1jxOc7qDj8bPl4vGix+lVKFzRcrAJPZOA==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -6201,7 +6212,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.5.0(express@4.21.2)(typescript@5.8.3)':
+  '@nuwa-ai/payment-kit@0.5.4(express@4.21.2)(typescript@5.8.3)':
     dependencies:
       '@nuwa-ai/identity-kit': 0.5.0(typescript@5.8.3)
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)

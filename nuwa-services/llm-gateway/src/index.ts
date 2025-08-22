@@ -18,39 +18,29 @@ initRoochVDR("test", undefined, registry);
 
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { llmRoutes } from "./routes/llm.js";
-import { usageRoutes } from "./routes/usage.js";
 import { initPaymentKitAndRegisterRoutes } from './paymentKit.js';
+import { accessLogMiddleware } from './middleware/accessLog.js';
 
 const app = express();
 
 async function start() {
   try {
-    // 配置 CORS
     app.use(
       cors({
-        origin: true, // 在生产环境中应该设置具体的域名
+        origin: true, 
         credentials: true,
       })
     );
 
-    // 配置解析中间件
     app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ extended: true }));
 
-    // 支付通道计费开关
-    const enablePaymentKit = (process.env.ENABLE_PAYMENT_KIT || 'false') === 'true';
+    // Access Log middleware (must be before PaymentKit routes)
+    app.use(accessLogMiddleware);
 
-    if (enablePaymentKit) {
-      // 将现有非流式 LLM 转发逻辑桥接为计费路由
-      await initPaymentKitAndRegisterRoutes(app);
-    } else {
-      // 旧路由（灰度/回滚路径）
-      app.use("/api/v1", llmRoutes);
-      app.use("/usage", usageRoutes);
-    }
+    // enable payment kit
+    await initPaymentKitAndRegisterRoutes(app);
 
-    // 根路径健康检查
     app.get("/", (req: Request, res: Response) => {
       res.json({
         service: "Nuwa LLM Gateway",
@@ -60,7 +50,6 @@ async function start() {
       });
     });
 
-    // 启动服务器
     const port = parseInt(process.env.PORT || "3000");
     const host = process.env.HOST || "0.0.0.0";
 
@@ -68,7 +57,7 @@ async function start() {
       console.log(`🚀 LLM Gateway server is running on http://${host}:${port}`);
     });
 
-    // 优雅关闭处理
+    
     const gracefulShutdown = async (signal: string) => {
       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
       server.close((err?: Error) => {
@@ -90,5 +79,4 @@ async function start() {
   }
 }
 
-// 启动应用
 start();

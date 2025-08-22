@@ -75,9 +75,7 @@ export async function createBillingServer(config: BillingServerConfig) {
     // Ensure reactive claim is explicitly enabled and faster for tests
     claim: {
       maxConcurrentClaims: 10,
-      policy: {
-        minClaimAmount: 1000000n, // 0.1 RGas
-      },
+      minClaimAmount: 1000000n, // 0.1 RGas
       maxRetries: 2,
       retryDelayMs: 1000,
       requireHubBalance: true,
