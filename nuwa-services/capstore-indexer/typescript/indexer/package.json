@@ -14,7 +14,7 @@
     "test-duplicate": "tsx src/debug/test-duplicate-handling.ts"
   },
   "dependencies": {
-    "@nuwa-ai/identity-kit": "^0.2.2",
+    "@nuwa-ai/identity-kit": "^0.5.1",
     "@supabase/supabase-js": "^2.50.5",
     "axios": "^1.10.0",
     "dotenv": "^17.0.0",

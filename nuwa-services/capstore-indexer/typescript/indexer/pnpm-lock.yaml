@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.2.2
-        version: 0.2.2(typescript@5.4.5)
+        specifier: ^0.5.1
+        version: 0.5.1(typescript@5.4.5)
       '@roochnetwork/rooch-sdk':
         specifier: 0.3.6
         version: 0.3.6(typescript@5.4.5)
@@ -490,8 +490,8 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@nuwa-ai/identity-kit@0.2.2':
-    resolution: {integrity: sha512-i1unD0Y8E5qUDbzcVBSwI44YIdSlarQNrs5muB0xaQzK1V+8Ze87p667zPQ/1CVjOA3QmETQGKA0Az40tgmXfg==}
+  '@nuwa-ai/identity-kit@0.5.1':
+    resolution: {integrity: sha512-4IAAAs/NEg97rvLcp0OTxAHsXFU5Z7JojzXViDGrlVYQBlcNMV7wjghpDZYf2d1EHc04CthIzE/N9BeF4g9Xtg==}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -2296,7 +2296,7 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
-  '@nuwa-ai/identity-kit@0.2.2(typescript@5.4.5)':
+  '@nuwa-ai/identity-kit@0.5.1(typescript@5.4.5)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0

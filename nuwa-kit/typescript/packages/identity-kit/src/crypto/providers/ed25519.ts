@@ -24,14 +24,18 @@ export class Ed25519Provider implements CryptoProvider {
   }
 
   async generateKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
-    const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
+    const generated = await this.crypto.subtle.generateKey(
       {
         name: 'Ed25519',
-        namedCurve: 'Ed25519',
       },
       true,
       ['sign', 'verify']
     );
+
+    if (!('publicKey' in generated)) {
+      throw new Error('Ed25519 generateKey did not return a key pair');
+    }
+    const { publicKey, privateKey } = generated;
 
     const exportedPublic = new Uint8Array(await this.crypto.subtle.exportKey('raw', publicKey));
     const exportedPrivate = new Uint8Array(await this.crypto.subtle.exportKey('pkcs8', privateKey));
@@ -50,7 +54,6 @@ export class Ed25519Provider implements CryptoProvider {
         privateKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['sign']
@@ -76,7 +79,6 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
@@ -87,7 +89,6 @@ export class Ed25519Provider implements CryptoProvider {
         publicKey,
         {
           name: 'Ed25519',
-          namedCurve: 'Ed25519',
         },
         false,
         ['verify']
@@ -106,7 +107,7 @@ export class Ed25519Provider implements CryptoProvider {
     const cryptoKey = await this.crypto.subtle.importKey(
       'pkcs8',
       privateKey,
-      { name: 'Ed25519', namedCurve: 'Ed25519' },
+      { name: 'Ed25519' },
       true,
       ['sign']
     );

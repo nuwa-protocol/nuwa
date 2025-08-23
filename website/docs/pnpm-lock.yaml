@@ -15,8 +15,8 @@ importers:
         specifier: ^1.2.12
         version: 1.2.12(react@19.1.0)(zod@3.24.4)
       '@nuwa-ai/identity-kit':
-        specifier: ^0.4.0
-        version: 0.4.0(typescript@5.8.3)
+        specifier: ^0.5.1
+        version: 0.5.1(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
         specifier: 0.4.6
         version: 0.4.6(typescript@5.8.3)
@@ -796,6 +796,9 @@ packages:
 
   '@nuwa-ai/identity-kit@0.4.0':
     resolution: {integrity: sha512-LEULnr4ptnB7DV0+mHdqEM10fzK/DC1jNPpHukB0/kBameQ7p2JnKf8l3JRQ8nVV/x9ObPzyexDfzA6+T4IacQ==}
+
+  '@nuwa-ai/identity-kit@0.5.1':
+    resolution: {integrity: sha512-4IAAAs/NEg97rvLcp0OTxAHsXFU5Z7JojzXViDGrlVYQBlcNMV7wjghpDZYf2d1EHc04CthIzE/N9BeF4g9Xtg==}
 
   '@nuwa-ai/payment-kit@0.4.6':
     resolution: {integrity: sha512-ICIWEPSmNuy34KQlX+eEbQYHNHkeS4S8a28/kuCH60sXCkwiH1nmLFFGF8J9Xxge5rkHbZsHXSlstofv+PNo/Q==}
@@ -4334,6 +4337,16 @@ snapshots:
       fastq: 1.19.1
 
   '@nuwa-ai/identity-kit@0.4.0(typescript@5.8.3)':
+    dependencies:
+      '@noble/curves': 1.9.6
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.8.3)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.5.1(typescript@5.8.3)':
     dependencies:
       '@noble/curves': 1.9.6
       '@noble/hashes': 1.8.0

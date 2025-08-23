@@ -20,7 +20,7 @@ export class EcdsaR1Provider implements CryptoProvider {
   }
 
   async generateKeyPair(): Promise<{ publicKey: Uint8Array; privateKey: Uint8Array }> {
-    const { publicKey, privateKey } = await this.crypto.subtle.generateKey(
+    const generated = await this.crypto.subtle.generateKey(
       {
         name: 'ECDSA',
         namedCurve: 'P-256',
@@ -28,6 +28,11 @@ export class EcdsaR1Provider implements CryptoProvider {
       true,
       ['sign', 'verify']
     );
+
+    if (!('publicKey' in generated)) {
+      throw new Error('ECDSA P-256 generateKey did not return a key pair');
+    }
+    const { publicKey, privateKey } = generated;
 
     const exportedPublic = new Uint8Array(await this.crypto.subtle.exportKey('raw', publicKey));
     const exportedPrivate = new Uint8Array(await this.crypto.subtle.exportKey('pkcs8', privateKey));
