@@ -25,7 +25,7 @@ export const useCapUI = ({
 		return () => {
 			capUIRef.current?.disconnect();
 		};
-	}, [onReceiveMessage, onError]);
+	}, []);
 
 	const sendMessage = async (msg: string) => {
 		if (!capUIRef.current) throw new Error("CapUI not initialized");
