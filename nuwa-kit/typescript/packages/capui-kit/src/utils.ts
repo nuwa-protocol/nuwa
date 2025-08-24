@@ -3,9 +3,6 @@ import type {
 	NuwaCapUIResource,
 	NuwaCapUIURI,
 } from "./types";
-import { validateName, validateUrl } from "./types";
-
-export { validateUrl, validateName };
 
 export const createCapUIResource = ({
 	type,
@@ -18,7 +15,7 @@ export const createCapUIResource = ({
 	return {
 		uri,
 		name,
-		text: uiUrl,
+		text: uiUrl.toString(),
 		annotations: {
 			height,
 		},

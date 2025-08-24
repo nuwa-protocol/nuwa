@@ -3,10 +3,6 @@ import { z } from "zod";
 type NuwaCapUIType = "embed" | "artifact";
 export type NuwaCapUIURI = `capui://${NuwaCapUIType}/${string}`;
 
-// Branded types for compile-time validation
-export type ValidUrl = string & { readonly __brand: unique symbol };
-export type ValidName = string & { readonly __brand: unique symbol };
-
 // Zod schemas for runtime validation
 const urlSchema = z.string().url();
 const nameSchema = z
@@ -18,16 +14,16 @@ const nameSchema = z
 	);
 
 export const CreateCapUIResourceSchema = z.object({
-	type: z.enum(["embed-NuwaCapUI", "artifact-ui"]),
+	type: z.enum(["embed", "artifact"]),
 	uiUrl: urlSchema,
 	name: nameSchema,
 	height: z.number().optional(),
 });
 
 export type CreateCapUIResourceProps = {
-	type: "embed-NuwaCapUI" | "artifact-ui";
-	uiUrl: ValidUrl;
-	name: ValidName;
+	type: NuwaCapUIType;
+	uiUrl: URL;
+	name: string;
 	height?: number;
 };
 
@@ -38,15 +34,4 @@ export type NuwaCapUIResource = {
 	annotations: {
 		height?: number;
 	};
-};
-
-// Helper functions to create branded types
-export const validateUrl = (url: string): ValidUrl | null => {
-	const result = urlSchema.safeParse(url);
-	return result.success ? (url as ValidUrl) : null;
-};
-
-export const validateName = (name: string): ValidName | null => {
-	const result = nameSchema.safeParse(name);
-	return result.success ? (name as ValidName) : null;
 };
