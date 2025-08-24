@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-type NuwaCapUIType = "embed-NuwaCapUI" | "artifact-ui";
+type NuwaCapUIType = "embed" | "artifact";
 export type NuwaCapUIURI = `capui://${NuwaCapUIType}/${string}`;
 
 // Branded types for compile-time validation
