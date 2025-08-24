@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm build",
-  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm build && cd examples/capui-demo && pnpm build",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
   "framework": "nextjs"
 }
