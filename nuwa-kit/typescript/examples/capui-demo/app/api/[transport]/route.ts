@@ -1,6 +1,4 @@
-// app/api/[transport]/route.ts
-
-import { createCapUIResource } from "@nuwa-ai/capui-kit";
+import type { CapUIResource } from "@nuwa-ai/capui-kit";
 import { createMcpHandler } from "mcp-handler";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,14 +15,14 @@ const handler = createMcpHandler(
 			},
 			async ({ longitude, latitude }) => {
 				// Implemenation of the tool
-				const resource = createCapUIResource({
-					type: "embed",
-					uiUrl: new URL(
-						`https://cap-ui-sooty.vercel.app/weather?latitude=${latitude}&longitude=${longitude}`,
-					),
+				const resource: CapUIResource = {
+					uri: "capui://embed/weather",
+					text: `https://cap-ui-sooty.vercel.app/weather?latitude=${latitude}&longitude=${longitude}`,
 					name: "weather",
-					height: 280,
-				});
+					annotations: {
+						height: 280,
+					},
+				};
 				return {
 					content: [{ type: "resource", resource: resource }],
 				};
