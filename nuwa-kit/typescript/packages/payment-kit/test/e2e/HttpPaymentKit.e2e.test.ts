@@ -129,7 +129,14 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
   afterAll(async () => {
     if (!shouldRunE2ETests()) return;
-
+    if (httpClient) {
+      try {
+        await httpClient.logoutCleanup();
+      } catch (e) {
+        console.error('Error during logout cleanup:', e);
+      }
+      console.log('✅ HTTP client logout cleanup');
+    }
     // Cleanup
     if (billingServerInstance) {
       await billingServerInstance.shutdown();
@@ -977,11 +984,11 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       try {
         await claimTestClient.get('/echo?q=should%20fail%20no%20balance');
         throw new Error('Expected request to fail due to insufficient hub balance');
-      } catch (error: any) {
-        console.log('✅ Request correctly rejected due to insufficient balance:', error.message);
-        // Expected: should get 402 error or balance-related error
-        expect(error.message).toMatch(/balance|insufficient|funds|402/i);
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(Error);
+        expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
       }
+      await new Promise(r => setImmediate(r));
     }
 
     // Test 2: Deposit sufficient balance for testing
@@ -1103,15 +1110,21 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     try {
       const maxDepleteRequests = 20; // hard cap to avoid infinite loop in CI
       while (lastSuccessfulBalance > 0n && requestCounter <= maxDepleteRequests) {
-        const depletionResult = await claimTestClient.get(
-          `/expensive?q=depletion%20${requestCounter}`
-        );
-        if (depletionResult.payment) {
-          console.log(
-            `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
+        try {
+          const depletionResult = await claimTestClient.get(
+            `/expensive?q=depletion%20${requestCounter}`
           );
+          if (depletionResult.payment) {
+            console.log(
+              `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
+            );
+          }
+          requestCounter++;
+        } catch (error: any) {
+          console.log('🚫 Request failed due to balance depletion (expected):', error.message);
+          expect(error.message).toMatch(/balance|insufficient|funds|402/i);
+          break;
         }
-        requestCounter++;
 
         // Observe reactive claim status via admin endpoint
         try {
