@@ -1354,7 +1354,8 @@ export class PaymentChannelHttpClient {
 
     if (protocol.type === 'error') {
       await this.handleProtocolError(protocol);
-      return;
+      // Propagate as error so callers can intercept and handle by error code
+      throw protocol.err;
     }
 
     if (protocol.type === 'success') {
