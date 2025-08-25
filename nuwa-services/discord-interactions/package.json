@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.5.1",
+    "@supabase/supabase-js": "^2.56.0",
     "@nuwa-ai/payment-kit": "^0.4.0",
     "discord-api-types": "^0.37.97",
     "dotenv": "^16.4.5",

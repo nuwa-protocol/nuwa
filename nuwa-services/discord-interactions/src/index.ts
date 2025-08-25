@@ -6,6 +6,8 @@ import { commands } from './commands';
 import { verifyInteractionRequest } from './verify-discord-request';
 import { KeyManager } from '@nuwa-ai/identity-kit';
 import { PaymentHubClient, RoochPaymentChannelContract } from '@nuwa-ai/payment-kit';
+import { supabase } from "./supabase";
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +83,41 @@ async function transferFromHub(userDid: string, amount: number): Promise<string 
 app.get('/health', (_req: Request, res: Response) => {
 	res.json({ status: 'ok' });
 });
+
+app.get("/claim_info", async (_req: Request, res: Response) => {
+  try {
+    const page = parseInt((_req.query.page as string) || "1", 10);
+    const pageSize = parseInt((_req.query.pageSize as string) || "10", 10);
+    const did = _req.query.did as string | undefined;
+
+    let query = supabase
+      .from("faucet_claims")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
+
+    if (did) {
+      query = query.eq("did", did);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({
+      page,
+      pageSize,
+      total: count || 0,
+      claims: data,
+    });
+  } catch (err) {
+    console.error("claim_info error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
 app.post('/api/discord/interactions', async (req: any, res: Response) => {
 	const verifyResult = verifyInteractionRequest(req, DISCORD_APP_PUBLIC_KEY);
@@ -164,6 +201,12 @@ async function processInteractionAsync(userDid: string, interaction: any) {
 						},
 					],
 				}),
+			});
+            const userAddress = userDid.split(":")[2];
+			await supabase.from("faucet_claims").insert({
+				did: userDid,
+				address: userAddress,
+				claimed_amount: transferAmount,
 			});
 		} else {
 			await fetch(webhookUrl, {
