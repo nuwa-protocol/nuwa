@@ -19,10 +19,21 @@
       "import": "./dist/node/integrations/http/index.js",
       "require": "./dist/node/integrations/http/index.cjs"
     },
+    "./mcp-client": {
+      "types": "./dist/node/integrations/mcp/index.d.ts",
+      "browser": "./dist/browser/empty.js",
+      "import": "./dist/node/integrations/mcp/index.js",
+      "require": "./dist/node/integrations/mcp/index.cjs"
+    },
     "./express": {
       "types": "./dist/node/transport/express/index.d.ts",
       "import": "./dist/node/transport/express/index.js",
       "require": "./dist/node/transport/express/index.cjs"
+    },
+    "./mcp": {
+      "types": "./dist/node/transport/mcp/index.d.ts",
+      "import": "./dist/node/transport/mcp/index.js",
+      "require": "./dist/node/transport/mcp/index.cjs"
     },
     "./storage/sql": {
       "types": "./dist/node/storage/sql/index.d.ts",
@@ -130,7 +141,9 @@
       "node/index": "src/index.node.ts",
       "browser/integrations/http/index": "src/integrations/http/index.ts",
       "node/integrations/http/index": "src/integrations/http/index.ts",
+      "node/integrations/mcp/index": "src/integrations/mcp/index.ts",
       "node/transport/express/index": "src/transport/express/index.ts",
+      "node/transport/mcp/index": "src/transport/mcp/index.ts",
       "node/storage/sql/index": "src/storage/sql/index.ts",
       "browser/storage/indexeddb/index": "src/storage/indexeddb/index.ts",
       "node/empty": "src/node/empty.ts"
