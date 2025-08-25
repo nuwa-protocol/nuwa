@@ -1714,28 +1714,7 @@ export class PaymentChannelHttpClient {
     }
   }
 
-  /**
-   * Accept a pending SubRAV recovered from storage/service only if it matches current key fragment (if known).
-   * If fragment is unknown, tentatively accept.
-   */
-  private acceptRecoveredPending(pending?: SubRAV | null): SubRAV | undefined {
-    if (!pending) return undefined;
-    const currentFragment = this.clientState.vmIdFragment;
-    if (!currentFragment || pending.vmIdFragment === currentFragment) {
-      // Use guarded cache to avoid rollback by older proposals
-      this.cachePendingSubRAV(pending);
-      this.log('Accepted recovered pending SubRAV:', pending.nonce);
-      return pending;
-    } else {
-      this.log(
-        'Ignoring recovered pending SubRAV due to fragment mismatch:',
-        pending.vmIdFragment,
-        '!=',
-        currentFragment
-      );
-      return undefined;
-    }
-  }
+  // acceptRecoveredPending merged into cachePendingSubRAV
 
   /**
    * Apply recovery response to client state with optional sub-channel authorization.
@@ -1757,8 +1736,10 @@ export class PaymentChannelHttpClient {
       }
     }
 
-    // Accept pending proposal if matches
-    this.acceptRecoveredPending(recovery.pendingSubRav);
+    // Accept pending proposal if matches (merged into cachePendingSubRAV)
+    if (recovery.pendingSubRav) {
+      await this.cachePendingSubRAV(recovery.pendingSubRav);
+    }
 
     // Ensure sub-channel authorized if requested
     if (options?.authorizeIfMissing && this.clientState.channelId) {
@@ -1895,8 +1876,10 @@ export class PaymentChannelHttpClient {
       const persistedState = await this.mappingStore.getState(this.host);
       if (persistedState) {
         this.clientState.channelId = persistedState.channelId;
-        // Accept persisted pending via helper; if fragment未知则先暂存，等到后续 ensureKeyFragment 后也安全
-        this.acceptRecoveredPending(persistedState.pendingSubRAV || undefined);
+        // Accept persisted pending via guarded cache; if fragment未知则先暂存，后续 ensureKeyFragment 也安全
+        if (persistedState.pendingSubRAV) {
+          await this.cachePendingSubRAV(persistedState.pendingSubRAV);
+        }
 
         // Set appropriate state based on persisted data
         if (persistedState.channelId) {
@@ -2035,6 +2018,18 @@ export class PaymentChannelHttpClient {
    * Cache with monotonic guard to avoid rollback by late/older proposals.
    */
   private async cachePendingSubRAV(subRav: SubRAV): Promise<void> {
+    // Fragment guard: only accept if vmIdFragment matches current or current unknown
+    const currentFragment = this.clientState.vmIdFragment;
+    if (currentFragment && subRav.vmIdFragment !== currentFragment) {
+      this.log(
+        '[cache.guard.fragment.skip]',
+        'incoming=',
+        subRav.vmIdFragment,
+        'current=',
+        currentFragment
+      );
+      return;
+    }
     const currentNonce = this.clientState.pendingSubRAV?.nonce;
     const guard = this.highestObservedNonce;
     if (
