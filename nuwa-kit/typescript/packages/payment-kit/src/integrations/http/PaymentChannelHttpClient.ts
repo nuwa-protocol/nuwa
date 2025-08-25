@@ -466,8 +466,18 @@ export class PaymentChannelHttpClient {
    * Clear the pending SubRAV cache
    */
   clearPendingSubRAV(): void {
+    this.clearPendingSubRAVInternal({ persist: true, reason: 'manual-clear' });
+  }
+
+  private clearPendingSubRAVInternal(options?: { persist?: boolean; reason?: string }): void {
+    const reason = options?.reason || 'clear-pending';
+    const had = !!this.clientState.pendingSubRAV;
     this.clientState.pendingSubRAV = undefined;
-    this.persistClientState();
+    this.log('[pending.clear]', 'had=', had, 'reason=', reason);
+    if (options?.persist) {
+      // fire-and-forget
+      void this.persistClientState();
+    }
   }
 
   /**
@@ -529,7 +539,7 @@ export class PaymentChannelHttpClient {
     this.rejectAllPending(new Error(reason));
 
     // Clear in-memory state
-    this.clientState.pendingSubRAV = undefined;
+    this.clearPendingSubRAVInternal({ persist: false, reason: 'signing:consume' });
     this.clientState.channelId = undefined;
     this.clientState.channelInfo = undefined;
     this.clientState.subChannelInfo = undefined;
@@ -1493,7 +1503,7 @@ export class PaymentChannelHttpClient {
   }): Promise<void> {
     if (proto.clientTxRef && this.resolveByRef(proto.clientTxRef, undefined)) {
       this.recentlyRejectedRefs.add(proto.clientTxRef);
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:matched' });
       await this.persistClientState();
       return;
     }
@@ -1501,7 +1511,7 @@ export class PaymentChannelHttpClient {
       const [[onlyKey]] = this.clientState.pendingPayments.entries();
       this.recentlyRejectedRefs.add(onlyKey);
       this.resolveByRef(onlyKey, undefined);
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:single-pending' });
       await this.persistClientState();
       return;
     }
@@ -1510,7 +1520,7 @@ export class PaymentChannelHttpClient {
         this.recentlyRejectedRefs.add(key);
         this.resolveByRef(key, undefined);
       }
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:multi-pending' });
       await this.persistClientState();
     }
   }
@@ -1693,7 +1703,7 @@ export class PaymentChannelHttpClient {
     // Map known status codes when no protocol header present
     if (response.status === 402) {
       this.log('Payment required (402) - clearing cache and retrying');
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'no-header:402' });
       await this.persistClientState();
       throw new PaymentKitError(
         PaymentErrorCode.PAYMENT_REQUIRED,
@@ -1703,7 +1713,7 @@ export class PaymentChannelHttpClient {
     }
     if (response.status === 409) {
       this.log('SubRAV conflict (409) - clearing pending proposal');
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'no-header:409' });
       this.state = ClientState.READY;
       await this.persistClientState();
       throw new PaymentKitError(
@@ -1713,8 +1723,6 @@ export class PaymentChannelHttpClient {
       );
     }
   }
-
-  // acceptRecoveredPending merged into cachePendingSubRAV
 
   /**
    * Apply recovery response to client state with optional sub-channel authorization.
