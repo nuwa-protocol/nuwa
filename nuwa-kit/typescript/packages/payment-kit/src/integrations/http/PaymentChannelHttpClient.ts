@@ -625,11 +625,8 @@ export class PaymentChannelHttpClient {
         RecoveryResponseSchema
       )) as RecoveryResponse;
 
-      // If there's a pending SubRAV, cache it
-      if (recoveryData.pendingSubRav) {
-        this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
-        this.log('Recovered and cached pending SubRAV:', recoveryData.pendingSubRav.nonce);
-      }
+      // If there's a pending SubRAV, accept it via helper
+      this.acceptRecoveredPending(recoveryData.pendingSubRav);
 
       // If there's channel info, update our state
       if (recoveryData.channel) {
@@ -737,12 +734,11 @@ export class PaymentChannelHttpClient {
         const recoveryData = await this.recoverFromService();
         this.log('🔧 Recovery response:', recoveryData);
         if (recoveryData.pendingSubRav) {
-          this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
-          this.log(
-            '✅ Recovered pending SubRAV in ensureChannelReady:',
-            recoveryData.pendingSubRav.nonce
-          );
-          await this.persistClientState();
+          const accepted = this.acceptRecoveredPending(recoveryData.pendingSubRav);
+          if (accepted) {
+            this.log('✅ Recovered pending SubRAV in ensureChannelReady:', accepted.nonce);
+            await this.persistClientState();
+          }
         } else {
           this.log('🔧 No pending SubRAV found in recovery response');
         }
@@ -825,7 +821,9 @@ export class PaymentChannelHttpClient {
           //if (channelInfo.status === 'active') {
           this.clientState.channelId = recoveryData.channel.channelId;
           this.clientState.channelInfo = channelInfo;
-          this.clientState.pendingSubRAV = recoveryData.pendingSubRav || undefined;
+          // Only accept recovered pending via helper
+          this.clientState.pendingSubRAV = undefined;
+          this.acceptRecoveredPending(recoveryData.pendingSubRav);
 
           // Ensure sub-channel is authorized; if server returned subChannel it's authorized
           let vmIdFragment = recoveryData.subChannel?.vmIdFragment;
@@ -1625,6 +1623,28 @@ export class PaymentChannelHttpClient {
   }
 
   /**
+   * Accept a pending SubRAV recovered from storage/service only if it matches current key fragment (if known).
+   * If fragment is unknown, tentatively accept.
+   */
+  private acceptRecoveredPending(pending?: SubRAV | null): SubRAV | undefined {
+    if (!pending) return undefined;
+    const currentFragment = this.clientState.vmIdFragment;
+    if (!currentFragment || pending.vmIdFragment === currentFragment) {
+      this.clientState.pendingSubRAV = pending;
+      this.log('Accepted recovered pending SubRAV:', pending.nonce);
+      return pending;
+    } else {
+      this.log(
+        'Ignoring recovered pending SubRAV due to fragment mismatch:',
+        pending.vmIdFragment,
+        '!=',
+        currentFragment
+      );
+      return undefined;
+    }
+  }
+
+  /**
    * Parse JSON response with error handling
    * Smart auto mode:
    * - If schema provided: validate (supports ApiResponse or raw)
@@ -1720,16 +1740,18 @@ export class PaymentChannelHttpClient {
       const persistedState = await this.mappingStore.getState(this.host);
       if (persistedState) {
         this.clientState.channelId = persistedState.channelId;
-        this.clientState.pendingSubRAV = persistedState.pendingSubRAV;
+        // Accept persisted pending via helper; if fragment未知则先暂存，等到后续 ensureKeyFragment 后也安全
+        this.acceptRecoveredPending(persistedState.pendingSubRAV || undefined);
 
         // Set appropriate state based on persisted data
         if (persistedState.channelId) {
           this.state = ClientState.READY;
         }
 
+        // Do not perform fragment filtering here; ensureKeyFragment will clean up once we know the fragment
         this.log('Loaded persisted client state:', {
           channelId: persistedState.channelId,
-          hasPendingSubRAV: !!persistedState.pendingSubRAV,
+          hasPendingSubRAV: !!this.clientState.pendingSubRAV,
         });
       }
     } catch (error) {
