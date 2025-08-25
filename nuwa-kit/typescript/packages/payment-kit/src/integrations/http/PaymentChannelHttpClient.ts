@@ -1589,7 +1589,7 @@ export class PaymentChannelHttpClient {
         return;
       }
       // No matching pending: guarded cache to prevent rollback
-      await this.cachePendingSubRAVGuarded(proto.subRav);
+      await this.cachePendingSubRAV(proto.subRav);
       if (proto.serviceTxRef) {
         this.log('Received service transaction reference:', proto.serviceTxRef);
       }
@@ -1619,7 +1619,7 @@ export class PaymentChannelHttpClient {
     }
 
     // Cache next proposal for future request (guarded)
-    await this.cachePendingSubRAVGuarded(proto.subRav);
+    await this.cachePendingSubRAV(proto.subRav);
 
     const paymentInfo: PaymentInfo = {
       clientTxRef: proto.clientTxRef || keyToDelete!,
@@ -1723,7 +1723,7 @@ export class PaymentChannelHttpClient {
     const currentFragment = this.clientState.vmIdFragment;
     if (!currentFragment || pending.vmIdFragment === currentFragment) {
       // Use guarded cache to avoid rollback by older proposals
-      this.cachePendingSubRAVGuarded(pending);
+      this.cachePendingSubRAV(pending);
       this.log('Accepted recovered pending SubRAV:', pending.nonce);
       return pending;
     } else {
@@ -2032,18 +2032,9 @@ export class PaymentChannelHttpClient {
   }
 
   /**
-   * Cache pending SubRAV and persist state (helper to avoid duplication)
-   */
-  private async cachePendingSubRAV(subRav: SubRAV): Promise<void> {
-    this.clientState.pendingSubRAV = subRav;
-    this.log('Cached new unsigned SubRAV:', subRav.nonce);
-    await this.persistClientState();
-  }
-
-  /**
    * Cache with monotonic guard to avoid rollback by late/older proposals.
    */
-  private async cachePendingSubRAVGuarded(subRav: SubRAV): Promise<void> {
+  private async cachePendingSubRAV(subRav: SubRAV): Promise<void> {
     const currentNonce = this.clientState.pendingSubRAV?.nonce;
     const guard = this.highestObservedNonce;
     if (
@@ -2061,7 +2052,9 @@ export class PaymentChannelHttpClient {
       );
       return;
     }
-    await this.cachePendingSubRAV(subRav);
+    this.clientState.pendingSubRAV = subRav;
+    this.log('Cached new unsigned SubRAV:', subRav.nonce);
+    await this.persistClientState();
   }
 
   /**
