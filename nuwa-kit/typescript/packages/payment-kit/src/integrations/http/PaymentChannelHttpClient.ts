@@ -232,6 +232,25 @@ export class PaymentChannelHttpClient {
       paymentReject = rej;
     });
 
+    // Setup abort support: create internal controller and bind external signal if provided
+    const controller = new AbortController();
+    let abort: (() => void) | undefined = () => {
+      controller.abort('aborted by PaymentRequestHandle');
+      try {
+        this.rejectByRef(clientTxRef, new Error('Request aborted by caller'));
+      } catch (e) {
+        this.log('[abort.reject.error]', e);
+      }
+    };
+    if (init?.signal instanceof AbortSignal) {
+      if (init.signal.aborted) {
+        controller.abort(init.signal.reason);
+      } else {
+        const onAbort = () => controller.abort(init.signal!.reason);
+        init.signal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
+
     const responsePromise: Promise<Response> = this.scheduler.enqueue(async release => {
       // Prepare headers with clientTxRef (may sign and consume pending SubRAV)
       const { headers, sentedSubRav } = await this.prepareHeaders(
@@ -299,7 +318,8 @@ export class PaymentChannelHttpClient {
       }
 
       // Execute request (headers processing will happen inside executeRequest)
-      return this.executeRequest(requestContext, init);
+      // Ensure our internal AbortController's signal is used so handle.abort() cancels fetch/stream
+      return this.executeRequest(requestContext, { ...init, signal: controller.signal });
     });
 
     // Transaction logging: create pending record
@@ -337,19 +357,7 @@ export class PaymentChannelHttpClient {
       return { data, payment };
     });
 
-    // Optional abort support if caller provided an AbortSignal in init
-    let abort: (() => void) | undefined;
-    if (init?.signal instanceof AbortSignal) {
-      const controller = new AbortController();
-      // Wire the external signal to internal controller (if any)
-      if (init.signal.aborted) {
-        controller.abort(init.signal.reason);
-      } else {
-        const onAbort = () => controller.abort(init.signal!.reason);
-        init.signal.addEventListener('abort', onAbort, { once: true });
-      }
-      abort = () => controller.abort('aborted by PaymentRequestHandle');
-    }
+    // Abort support configured above; responsePromise will be cancellable by abort()
 
     // Update transaction on response headers arrival
     responsePromise
