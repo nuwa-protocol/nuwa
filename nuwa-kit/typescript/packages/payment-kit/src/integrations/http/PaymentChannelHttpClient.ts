@@ -777,7 +777,10 @@ export class PaymentChannelHttpClient {
         this.log('🔧 Attempting to recover channel from server');
         const recoveryData = await this.recoverFromService();
         if (recoveryData.channel) {
-          await this.applyRecovery(recoveryData, { authorizeIfMissing: true, requireVmFragment: true });
+          await this.applyRecovery(recoveryData, {
+            authorizeIfMissing: true,
+            requireVmFragment: true,
+          });
           this.state = ClientState.READY;
           this.log('✅ Recovered active channel from server:', recoveryData.channel.channelId);
           // Update mapping store
