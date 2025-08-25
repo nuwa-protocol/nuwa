@@ -468,6 +468,82 @@ export class PaymentChannelHttpClient {
   }
 
   /**
+   * Cleanup client state on logout. Rejects pending payments, clears cached SubRAV/state,
+   * and optionally clears persisted host mapping/state.
+   */
+  async logoutCleanup(
+    options: { clearMapping: boolean; reason?: string } = { clearMapping: true }
+  ): Promise<void> {
+    const reason = options?.reason || 'Logout cleanup';
+
+    // First, if there is a pending SubRAV, sign and commit it best-effort
+    try {
+      await this.withSubRavLock(async () => {
+        const pending = this.clientState.pendingSubRAV;
+        if (!pending) return;
+        try {
+          // If current fragment mismatches pending's fragment, drop pending instead of attempting to sign
+          if (
+            this.clientState.vmIdFragment &&
+            this.clientState.vmIdFragment == pending.vmIdFragment
+          ) {
+            const signed = await this.payerClient.signSubRAV(pending);
+            await this.commitSubRAV(signed);
+            this.log('logoutCleanup: committed pending SubRAV on logout:', pending.nonce);
+          } else {
+            this.log(
+              'logoutCleanup: dropping pending SubRAV due to fragment mismatch:',
+              pending.vmIdFragment,
+              '!=',
+              this.clientState.vmIdFragment
+            );
+          }
+        } catch (e) {
+          this.log('logoutCleanup: failed to commit pending SubRAV:', e);
+          // Continue with cleanup regardless
+        }
+      });
+    } catch (e) {
+      this.log('logoutCleanup: subRAV lock failed:', e);
+    }
+
+    // Reject all pending payment promises and release scheduler queue
+    this.rejectAllPending(new Error(reason));
+
+    // Clear in-memory state
+    this.clientState.pendingSubRAV = undefined;
+    this.clientState.channelId = undefined;
+    this.clientState.channelInfo = undefined;
+    this.clientState.subChannelInfo = undefined;
+    this.clientState.keyId = undefined;
+    this.clientState.vmIdFragment = undefined;
+
+    // Reset client lifecycle state
+    this.state = ClientState.INIT;
+
+    // Clear persisted mapping/state if requested (default: true)
+    if (options?.clearMapping !== false) {
+      try {
+        await this.mappingStore.delete(this.host);
+      } catch (e) {
+        this.log('logoutCleanup: delete(mapping) failed:', e);
+      }
+      try {
+        if (this.mappingStore.deleteState) {
+          await this.mappingStore.deleteState(this.host);
+        } else if (this.mappingStore.setState) {
+          await this.mappingStore.setState(this.host, { lastUpdated: new Date().toISOString() });
+        }
+      } catch (e) {
+        this.log('logoutCleanup: deleteState/setState failed:', e);
+      }
+    }
+
+    // Persist cleared state
+    await this.persistClientState();
+  }
+
+  /**
    * Compute unsettled amount for the current sub-channel (bound to this client).
    * Logic: use the latest authorized SubRAV (pending/proposed) accumulatedAmount
    * minus on-chain sub-channel lastClaimedAmount. If no pending SubRAV available,
@@ -1012,6 +1088,24 @@ export class PaymentChannelHttpClient {
     this.clientState.pendingPayments?.delete(clientTxRef);
     this.log('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
     return true;
+  }
+
+  private rejectAllPending(err: Error): void {
+    if (!this.clientState.pendingPayments) return;
+    for (const [key, pending] of this.clientState.pendingPayments.entries()) {
+      clearTimeout(pending.timeoutId);
+      try {
+        pending.release?.();
+      } catch (e) {
+        this.log('[release.error]', e);
+      }
+      try {
+        pending.reject(err);
+      } catch (e) {
+        this.log('[pending.reject.error]', e);
+      }
+      this.clientState.pendingPayments.delete(key);
+    }
   }
 
   private resolveAllPendingAsFree(): void {
