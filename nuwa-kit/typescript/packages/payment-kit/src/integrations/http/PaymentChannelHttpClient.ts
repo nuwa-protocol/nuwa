@@ -1884,7 +1884,7 @@ export class PaymentChannelHttpClient {
       const persistedState = await this.mappingStore.getState(this.host);
       if (persistedState) {
         this.clientState.channelId = persistedState.channelId;
-        // Accept persisted pending via guarded cache; if fragment未知则先暂存，后续 ensureKeyFragment 也安全
+        // Accept persisted pending via guarded cache; if fragment unknown, cache it first, and ensureKeyFragment will clean it up later
         if (persistedState.pendingSubRAV) {
           await this.cachePendingSubRAV(persistedState.pendingSubRAV);
         }
