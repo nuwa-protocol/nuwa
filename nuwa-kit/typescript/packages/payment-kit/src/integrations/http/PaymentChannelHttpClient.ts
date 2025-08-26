@@ -513,7 +513,7 @@ export class PaymentChannelHttpClient {
           // If current fragment mismatches pending's fragment, drop pending instead of attempting to sign
           if (
             this.clientState.vmIdFragment &&
-            this.clientState.vmIdFragment == pending.vmIdFragment
+            this.clientState.vmIdFragment === pending.vmIdFragment
           ) {
             const signed = await this.payerClient.signSubRAV(pending);
             await this.commitSubRAV(signed);
