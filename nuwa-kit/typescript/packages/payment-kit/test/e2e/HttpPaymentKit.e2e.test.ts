@@ -988,7 +988,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
         expect(e).toBeInstanceOf(Error);
         expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
       }
-      await new Promise(r => setImmediate(r));
     }
 
     // Test 2: Deposit sufficient balance for testing
