@@ -15,22 +15,7 @@ import {
  * Suitable for short-lived processes or testing
  */
 export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
-  private store = new Map<string, string>();
   private stateStore = new Map<string, PersistedHttpClientState>();
-
-  // Legacy methods for backward compatibility
-  async get(host: string): Promise<string | undefined> {
-    return this.store.get(host);
-  }
-
-  async set(host: string, channelId: string): Promise<void> {
-    this.store.set(host, channelId);
-  }
-
-  async delete(host: string): Promise<void> {
-    this.store.delete(host);
-    this.stateStore.delete(host);
-  }
 
   // New methods for full state management
   async getState(host: string): Promise<PersistedHttpClientState | undefined> {
@@ -42,22 +27,16 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
     const validatedState = PersistedHttpClientStateSchema.parse(state);
 
     this.stateStore.set(host, validatedState);
-    // Keep legacy store in sync
-    if (validatedState.channelId) {
-      this.store.set(host, validatedState.channelId);
-    }
   }
 
   async deleteState(host: string): Promise<void> {
     this.stateStore.delete(host);
-    this.store.delete(host);
   }
 
   /**
    * Clear all stored mappings and states
    */
   clear(): void {
-    this.store.clear();
     this.stateStore.clear();
   }
 }
@@ -67,39 +46,7 @@ export class MemoryHostChannelMappingStore implements HostChannelMappingStore {
  * Provides persistence across browser sessions
  */
 export class LocalStorageHostChannelMappingStore implements HostChannelMappingStore {
-  private static readonly CHANNEL_PREFIX = 'nuwa-payment-channel-mapping:';
   private static readonly STATE_PREFIX = 'nuwa-payment-client-state:';
-
-  // Legacy methods for backward compatibility
-  async get(host: string): Promise<string | undefined> {
-    if (typeof localStorage === 'undefined') {
-      throw new Error('localStorage is not available');
-    }
-
-    const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
-    const value = localStorage.getItem(key);
-    return value || undefined;
-  }
-
-  async set(host: string, channelId: string): Promise<void> {
-    if (typeof localStorage === 'undefined') {
-      throw new Error('localStorage is not available');
-    }
-
-    const key = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
-    localStorage.setItem(key, channelId);
-  }
-
-  async delete(host: string): Promise<void> {
-    if (typeof localStorage === 'undefined') {
-      throw new Error('localStorage is not available');
-    }
-
-    const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
-    const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
-    localStorage.removeItem(channelKey);
-    localStorage.removeItem(stateKey);
-  }
 
   // New methods for full state management
   async getState(host: string): Promise<PersistedHttpClientState | undefined> {
@@ -143,11 +90,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
 
     localStorage.setItem(stateKey, serializedState);
 
-    // Keep legacy store in sync
-    if (state.channelId) {
-      const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
-      localStorage.setItem(channelKey, state.channelId);
-    }
+    // channelId is part of state; no separate legacy mapping kept
   }
 
   async deleteState(host: string): Promise<void> {
@@ -155,9 +98,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
       throw new Error('localStorage is not available');
     }
 
-    const channelKey = LocalStorageHostChannelMappingStore.CHANNEL_PREFIX + host;
     const stateKey = LocalStorageHostChannelMappingStore.STATE_PREFIX + host;
-    localStorage.removeItem(channelKey);
     localStorage.removeItem(stateKey);
   }
 
@@ -172,11 +113,7 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (
-        key &&
-        (key.startsWith(LocalStorageHostChannelMappingStore.CHANNEL_PREFIX) ||
-          key.startsWith(LocalStorageHostChannelMappingStore.STATE_PREFIX))
-      ) {
+      if (key && key.startsWith(LocalStorageHostChannelMappingStore.STATE_PREFIX)) {
         keysToRemove.push(key);
       }
     }
@@ -247,35 +184,17 @@ export class NamespacedHostChannelMappingStore implements HostChannelMappingStor
     return ns;
   }
 
-  async get(host: string): Promise<string | undefined> {
-    const key = await this.buildKey(host);
-    return this.base.get(key);
-  }
-
-  async set(host: string, channelId: string): Promise<void> {
-    const key = await this.buildKey(host);
-    return this.base.set(key, channelId);
-  }
-
-  async delete(host: string): Promise<void> {
-    const key = await this.buildKey(host);
-    return this.base.delete(key);
-  }
-
   async getState(host: string): Promise<PersistedHttpClientState | undefined> {
-    if (!this.base.getState) return undefined;
     const key = await this.buildKey(host);
     return this.base.getState(key);
   }
 
   async setState(host: string, state: PersistedHttpClientState): Promise<void> {
-    if (!this.base.setState) return;
     const key = await this.buildKey(host);
     return this.base.setState(key, state);
   }
 
   async deleteState(host: string): Promise<void> {
-    if (!this.base.deleteState) return;
     const key = await this.buildKey(host);
     return this.base.deleteState(key);
   }

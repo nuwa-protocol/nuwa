@@ -552,18 +552,9 @@ export class PaymentChannelHttpClient {
     // Clear persisted mapping/state if requested (default: true)
     if (options?.clearMapping !== false) {
       try {
-        await this.mappingStore.delete(this.host);
+        await this.mappingStore.deleteState(this.host);
       } catch (e) {
-        this.log('logoutCleanup: delete(mapping) failed:', e);
-      }
-      try {
-        if (this.mappingStore.deleteState) {
-          await this.mappingStore.deleteState(this.host);
-        } else if (this.mappingStore.setState) {
-          await this.mappingStore.setState(this.host, { lastUpdated: new Date().toISOString() });
-        }
-      } catch (e) {
-        this.log('logoutCleanup: deleteState/setState failed:', e);
+        this.log('logoutCleanup: deleteState(mapping) failed:', e);
       }
     }
 
@@ -767,7 +758,7 @@ export class PaymentChannelHttpClient {
       const response = await this.fetchImpl(commitUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ subRav: signedSubRAV }),
+        body: serializeJson({ subRav: signedSubRAV }),
       });
 
       if (!response.ok) {
@@ -884,7 +875,11 @@ export class PaymentChannelHttpClient {
           this.state = ClientState.READY;
           this.log('✅ Recovered active channel from server:', recoveryData.channel.channelId);
           // Update mapping store
-          await this.mappingStore.set(this.host, recoveryData.channel.channelId);
+          await this.mappingStore.setState(this.host, {
+            channelId: recoveryData.channel.channelId,
+            pendingSubRAV: this.clientState.pendingSubRAV,
+            lastUpdated: new Date().toISOString(),
+          });
           await this.persistClientState();
           return;
         } else {
@@ -935,7 +930,11 @@ export class PaymentChannelHttpClient {
       }
 
       // Store the mapping (legacy compatibility)
-      await this.mappingStore.set(this.host, channelInfo.channelId);
+      await this.mappingStore.setState(this.host, {
+        channelId: channelInfo.channelId,
+        pendingSubRAV: this.clientState.pendingSubRAV,
+        lastUpdated: new Date().toISOString(),
+      });
 
       this.state = ClientState.READY;
       this.log('Created new channel:', channelInfo.channelId);
@@ -1871,7 +1870,8 @@ export class PaymentChannelHttpClient {
   private async loadPersistedState(): Promise<void> {
     if (!this.mappingStore.getState) {
       // Fallback to legacy method for backward compatibility
-      const channelId = await this.mappingStore.get(this.host);
+      const state = await this.mappingStore.getState(this.host);
+      const channelId = state?.channelId;
       if (channelId) {
         this.clientState.channelId = channelId;
         this.state = ClientState.READY;
@@ -1912,7 +1912,11 @@ export class PaymentChannelHttpClient {
     if (!this.mappingStore.setState) {
       // Fallback to legacy method for backward compatibility
       if (this.clientState.channelId) {
-        await this.mappingStore.set(this.host, this.clientState.channelId);
+        await this.mappingStore.setState(this.host, {
+          channelId: this.clientState.channelId,
+          pendingSubRAV: this.clientState.pendingSubRAV,
+          lastUpdated: new Date().toISOString(),
+        });
       }
       return;
     }
