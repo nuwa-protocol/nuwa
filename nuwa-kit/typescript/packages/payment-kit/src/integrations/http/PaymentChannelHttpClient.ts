@@ -299,7 +299,8 @@ export class PaymentChannelHttpClient {
           pending.release = undefined;
         };
       // Bridge internal promise to external one
-      pp.then(paymentResolve).catch(paymentReject);
+      // Use void to indicate fire-and-forget and avoid unhandled rejection
+      void pp.then(paymentResolve).catch(paymentReject);
 
       // Transaction logging: create pending record
       try {
@@ -352,16 +353,16 @@ export class PaymentChannelHttpClient {
       this.clientState.channelId
     );
 
-    // Couple: when response promise rejects, reject the corresponding pending payment to avoid dangling
+    // Couple: when response promise rejects, settle pending payment (if any) and rethrow
     responsePromise.catch(err => {
       this.log('[response.error]', err);
       try {
-        // Avoid double rejection: settle payment as FREE/undefined on response error
         this.resolveByRef(clientTxRef, undefined);
       } catch (settleErr) {
         this.log('[response.error.settle]', settleErr);
       }
-      // In case there was no pending (e.g., FREE or already resolved), nothing to release here
+      // Don't rethrow here - it creates an unhandled promise rejection
+      // The original responsePromise will still propagate the error correctly
     });
 
     const startTs = Date.now();
@@ -378,7 +379,8 @@ export class PaymentChannelHttpClient {
     // Abort support configured above; responsePromise will be cancellable by abort()
 
     // Update transaction on response headers arrival
-    responsePromise
+    // Use void to indicate fire-and-forget, avoiding unhandled rejection
+    void responsePromise
       .then(res => {
         const durationMs = Date.now() - startTs;
         this.transactionStore?.update(clientTxRef, {
@@ -1423,16 +1425,7 @@ export class PaymentChannelHttpClient {
         }
       } catch {}
       await this.handleProtocolError(protocol);
-      // Only throw if this response correlates to a currently pending request; otherwise ignore
-      const hasMatchingPending = protocol.clientTxRef
-        ? this.clientState.pendingPayments?.has(protocol.clientTxRef)
-        : false;
-      if (hasMatchingPending) {
-        throw protocol.err;
-      } else {
-        this.log('[response.error.ignored]', 'unmatched clientTxRef=', protocol.clientTxRef);
-        return;
-      }
+      throw protocol.err;
     }
 
     if (protocol.type === 'success') {
