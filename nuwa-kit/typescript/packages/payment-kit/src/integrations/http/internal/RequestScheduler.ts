@@ -1,9 +1,12 @@
+import { DebugLogger } from '@nuwa-ai/identity-kit';
+
 type StartFn<T> = (release: () => void) => Promise<T>;
 
 export class RequestScheduler {
   private queue: Array<() => Promise<void>> = [];
   private active = 0;
   private readonly concurrency = 1;
+  private logger = DebugLogger.get('RequestScheduler');
 
   enqueue<T>(start: StartFn<T>): Promise<T> {
     return new Promise<T>((outerResolve, outerReject) => {
@@ -20,11 +23,11 @@ export class RequestScheduler {
           const result = await start(release);
           outerResolve(result);
         } catch (e) {
-          console.error('RequestScheduler: Task failed', e);
+          this.logger.debug('Task failed:', e);
           try {
             release();
           } catch (releaseError) {
-            console.error('Error during release in RequestScheduler:', releaseError);
+            this.logger.debug('Error during release:', releaseError);
           }
           outerReject(e);
           return;

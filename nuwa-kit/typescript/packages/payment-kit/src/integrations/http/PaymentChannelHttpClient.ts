@@ -92,12 +92,16 @@ export class PaymentChannelHttpClient {
   private logger: DebugLogger;
   // Ensure channel initialization is executed once across concurrent requests
   private ensureReadyPromise?: Promise<void>;
-  // Mutex for SubRAV proposal consume/sign to avoid races under concurrency
-  private subRavMutex: Promise<void> = Promise.resolve();
   // Configurable timeout for pending payment resolution
   private requestTimeoutMs: number;
   private rateProvider: RateProvider;
   private scheduler: RequestScheduler = new RequestScheduler();
+  // Monotonic guard to prevent proposal rollback across errors/late responses
+  private highestObservedNonce: bigint | undefined;
+  // Track recently rejected clientTxRef to ignore late success frames
+  private recentlyRejectedRefs: Set<string> = new Set();
+  // Debug: map clientTxRef -> creation callsite stack (for tracing offending test line)
+  private traceOrigins: Map<string, string> = new Map();
 
   constructor(options: HttpPayerOptions) {
     this.options = options;
@@ -208,20 +212,21 @@ export class PaymentChannelHttpClient {
     path: string,
     init?: RequestInit
   ): Promise<PaymentRequestHandle<Response>> {
-    await this.ensureKeyFragment();
-    // First perform discovery if not done yet
-    if (!this.cachedDiscoveryInfo) {
-      await this.performDiscovery();
-    }
+    // Defer ensureKeyFragment and discovery into the serialized queue
 
     // Build URL - use direct construction for all paths except relative ones
     const fullUrl = path.startsWith('http') ? path : new URL(path, this.options.baseUrl).toString();
 
-    // Ensure channel is ready
-    await this.ensureChannelReady();
+    // Defer ensureChannelReady into the serialized queue
 
     // Generate or extract clientTxRef
     const clientTxRef = this.extractOrGenerateClientTxRef(init?.headers);
+    // Record origin stack for debugging unhandled errors per clientTxRef
+    try {
+      const err = new Error(`[origin] ${method} ${fullUrl}`);
+      const stack = err.stack ? err.stack.split('\n').slice(1, 10).join('\n') : 'no stack';
+      this.traceOrigins.set(clientTxRef, stack);
+    } catch {}
 
     // Use scheduler to serialize payable requests until next proposal is available
     let requestContext!: PaymentRequestContext;
@@ -232,7 +237,38 @@ export class PaymentChannelHttpClient {
       paymentReject = rej;
     });
 
+    // Setup abort support: create internal controller and bind external signal if provided
+    const controller = new AbortController();
+    let abort: (() => void) | undefined = () => {
+      controller.abort('aborted by PaymentRequestHandle');
+      try {
+        this.rejectByRef(clientTxRef, new Error('Request aborted by caller'));
+      } catch (e) {
+        this.log('[abort.reject.error]', e);
+      }
+    };
+    if (init?.signal instanceof AbortSignal) {
+      if (init.signal.aborted) {
+        controller.abort(init.signal.reason);
+      } else {
+        const onAbort = () => controller.abort(init.signal!.reason);
+        init.signal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
+
     const responsePromise: Promise<Response> = this.scheduler.enqueue(async release => {
+      // Preflight inside queue to avoid races
+      await this.ensureKeyFragment();
+      if (!this.cachedDiscoveryInfo) {
+        await this.performDiscovery();
+      }
+      await this.ensureChannelReady();
+      // Ensure pending recovery only inside serialized queue to avoid races
+      try {
+        await this.tryRecoverPendingIfNeeded();
+      } catch (e) {
+        this.log('[serialized.recover.error]', e);
+      }
       // Prepare headers with clientTxRef (may sign and consume pending SubRAV)
       const { headers, sentedSubRav } = await this.prepareHeaders(
         fullUrl,
@@ -263,7 +299,8 @@ export class PaymentChannelHttpClient {
           pending.release = undefined;
         };
       // Bridge internal promise to external one
-      pp.then(paymentResolve).catch(paymentReject);
+      // Use void to indicate fire-and-forget and avoid unhandled rejection
+      void pp.then(paymentResolve).catch(paymentReject);
 
       // Transaction logging: create pending record
       try {
@@ -299,7 +336,8 @@ export class PaymentChannelHttpClient {
       }
 
       // Execute request (headers processing will happen inside executeRequest)
-      return this.executeRequest(requestContext, init);
+      // Ensure our internal AbortController's signal is used so handle.abort() cancels fetch/stream
+      return this.executeRequest(requestContext, { ...init, signal: controller.signal });
     });
 
     // Transaction logging: create pending record
@@ -315,15 +353,16 @@ export class PaymentChannelHttpClient {
       this.clientState.channelId
     );
 
-    // Couple: when response promise rejects, reject the corresponding pending payment to avoid dangling
+    // Couple: when response promise rejects, settle pending payment (if any) and rethrow
     responsePromise.catch(err => {
       this.log('[response.error]', err);
       try {
-        this.rejectByRef(clientTxRef, err instanceof Error ? err : new Error(String(err)));
-      } catch (rejectErr) {
-        this.log('[rejectByRef.error]', rejectErr);
+        this.resolveByRef(clientTxRef, undefined);
+      } catch (settleErr) {
+        this.log('[response.error.settle]', settleErr);
       }
-      // In case there was no pending (e.g., FREE or already resolved), nothing to release here
+      // Don't rethrow here - it creates an unhandled promise rejection
+      // The original responsePromise will still propagate the error correctly
     });
 
     const startTs = Date.now();
@@ -337,22 +376,11 @@ export class PaymentChannelHttpClient {
       return { data, payment };
     });
 
-    // Optional abort support if caller provided an AbortSignal in init
-    let abort: (() => void) | undefined;
-    if (init?.signal instanceof AbortSignal) {
-      const controller = new AbortController();
-      // Wire the external signal to internal controller (if any)
-      if (init.signal.aborted) {
-        controller.abort(init.signal.reason);
-      } else {
-        const onAbort = () => controller.abort(init.signal!.reason);
-        init.signal.addEventListener('abort', onAbort, { once: true });
-      }
-      abort = () => controller.abort('aborted by PaymentRequestHandle');
-    }
+    // Abort support configured above; responsePromise will be cancellable by abort()
 
     // Update transaction on response headers arrival
-    responsePromise
+    // Use void to indicate fire-and-forget, avoiding unhandled rejection
+    void responsePromise
       .then(res => {
         const durationMs = Date.now() - startTs;
         this.transactionStore?.update(clientTxRef, {
@@ -440,8 +468,18 @@ export class PaymentChannelHttpClient {
    * Clear the pending SubRAV cache
    */
   clearPendingSubRAV(): void {
+    this.clearPendingSubRAVInternal({ persist: true, reason: 'manual-clear' });
+  }
+
+  private clearPendingSubRAVInternal(options?: { persist?: boolean; reason?: string }): void {
+    const reason = options?.reason || 'clear-pending';
+    const had = !!this.clientState.pendingSubRAV;
     this.clientState.pendingSubRAV = undefined;
-    this.persistClientState();
+    this.log('[pending.clear]', 'had=', had, 'reason=', reason);
+    if (options?.persist) {
+      // fire-and-forget
+      void this.persistClientState();
+    }
   }
 
   /**
@@ -457,6 +495,73 @@ export class PaymentChannelHttpClient {
 
   getHubClient(): PaymentHubClient {
     return this.payerClient.getHubClient();
+  }
+
+  /**
+   * Cleanup client state on logout. Rejects pending payments, clears cached SubRAV/state,
+   * and optionally clears persisted host mapping/state.
+   */
+  async logoutCleanup(
+    options: { clearMapping: boolean; reason?: string } = { clearMapping: true }
+  ): Promise<void> {
+    const reason = options?.reason || 'Logout cleanup';
+
+    // First, if there is a pending SubRAV, sign and commit it best-effort
+    try {
+      {
+        const pending = this.clientState.pendingSubRAV;
+        if (!pending) return;
+        try {
+          // If current fragment mismatches pending's fragment, drop pending instead of attempting to sign
+          if (
+            this.clientState.vmIdFragment &&
+            this.clientState.vmIdFragment === pending.vmIdFragment
+          ) {
+            const signed = await this.payerClient.signSubRAV(pending);
+            await this.commitSubRAV(signed);
+            this.log('logoutCleanup: committed pending SubRAV on logout:', pending.nonce);
+          } else {
+            this.log(
+              'logoutCleanup: dropping pending SubRAV due to fragment mismatch:',
+              pending.vmIdFragment,
+              '!=',
+              this.clientState.vmIdFragment
+            );
+          }
+        } catch (e) {
+          this.log('logoutCleanup: failed to commit pending SubRAV:', e);
+          // Continue with cleanup regardless
+        }
+      }
+    } catch (e) {
+      this.log('logoutCleanup: subRAV lock failed:', e);
+    }
+
+    // Reject all pending payment promises and release scheduler queue
+    this.rejectAllPending(new Error(reason));
+
+    // Clear in-memory state
+    this.clearPendingSubRAVInternal({ persist: false, reason: 'signing:consume' });
+    this.clientState.channelId = undefined;
+    this.clientState.channelInfo = undefined;
+    this.clientState.subChannelInfo = undefined;
+    this.clientState.keyId = undefined;
+    this.clientState.vmIdFragment = undefined;
+
+    // Reset client lifecycle state
+    this.state = ClientState.INIT;
+
+    // Clear persisted mapping/state if requested (default: true)
+    if (options?.clearMapping !== false) {
+      try {
+        await this.mappingStore.deleteState(this.host);
+      } catch (e) {
+        this.log('logoutCleanup: deleteState(mapping) failed:', e);
+      }
+    }
+
+    // Persist cleared state
+    await this.persistClientState();
   }
 
   /**
@@ -616,23 +721,8 @@ export class PaymentChannelHttpClient {
         response,
         RecoveryResponseSchema
       )) as RecoveryResponse;
-
-      // If there's a pending SubRAV, cache it
-      if (recoveryData.pendingSubRav) {
-        this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
-        this.log('Recovered and cached pending SubRAV:', recoveryData.pendingSubRav.nonce);
-      }
-
-      // If there's channel info, update our state
-      if (recoveryData.channel) {
-        this.clientState.channelId = recoveryData.channel.channelId;
-        this.log('Recovered channel state:', recoveryData.channel.channelId);
-      }
-
-      // Persist the recovered state
-      this.persistClientState();
-
-      this.log('Recovery completed successfully');
+      // No side effects here; callers will apply recovery
+      this.log('Recovery completed successfully (no side effects)');
       return recoveryData;
     } catch (error) {
       const errorMessage = `Recovery failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -670,7 +760,7 @@ export class PaymentChannelHttpClient {
       const response = await this.fetchImpl(commitUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ subRav: signedSubRAV }),
+        body: serializeJson({ subRav: signedSubRAV }),
       });
 
       if (!response.ok) {
@@ -703,7 +793,6 @@ export class PaymentChannelHttpClient {
     );
 
     if (this.state === ClientState.READY && this.clientState.channelId) {
-      await this.tryRecoverPendingIfNeeded();
       return;
     }
 
@@ -715,10 +804,7 @@ export class PaymentChannelHttpClient {
 
     await this.ensureReadyPromise;
 
-    // After initialization (including loading persisted state), ensure sub-channel/pending are recovered
-    if (this.state === ClientState.READY && this.clientState.channelId) {
-      await this.tryRecoverPendingIfNeeded();
-    }
+    // After initialization, channel is ready. Pending recovery is handled inside request queue.
   }
 
   private async tryRecoverPendingIfNeeded(): Promise<void> {
@@ -728,35 +814,7 @@ export class PaymentChannelHttpClient {
       try {
         const recoveryData = await this.recoverFromService();
         this.log('🔧 Recovery response:', recoveryData);
-        if (recoveryData.pendingSubRav) {
-          this.clientState.pendingSubRAV = recoveryData.pendingSubRav;
-          this.log(
-            '✅ Recovered pending SubRAV in ensureChannelReady:',
-            recoveryData.pendingSubRav.nonce
-          );
-          await this.persistClientState();
-        } else {
-          this.log('🔧 No pending SubRAV found in recovery response');
-        }
-
-        // Ensure sub-channel is authorized (server may include subChannel)
-        if (this.clientState.channelId) {
-          let vmIdFragment =
-            recoveryData.subChannel?.vmIdFragment || this.clientState.vmIdFragment || '';
-          if (vmIdFragment && !recoveryData.subChannel) {
-            try {
-              this.log('🔧 Sub-channel missing in recovery, authorizing:', vmIdFragment);
-              await this.payerClient.authorizeSubChannel({
-                channelId: this.clientState.channelId,
-                vmIdFragment,
-              });
-              await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
-              this.log('✅ Sub-channel authorized during ready-check');
-            } catch (e) {
-              this.log('❌ Sub-channel authorization failed during ready-check:', e);
-            }
-          }
-        }
+        await this.applyRecovery(recoveryData, { authorizeIfMissing: true });
       } catch (error) {
         this.log('❌ Recovery failed in ensureChannelReady, continuing anyway:', error);
       }
@@ -812,63 +870,20 @@ export class PaymentChannelHttpClient {
         this.log('🔧 Attempting to recover channel from server');
         const recoveryData = await this.recoverFromService();
         if (recoveryData.channel) {
-          // Verify the recovered channel is still active
-          const channelInfo = await this.payerClient.getChannelInfo(recoveryData.channel.channelId);
-          //if (channelInfo.status === 'active') {
-          this.clientState.channelId = recoveryData.channel.channelId;
-          this.clientState.channelInfo = channelInfo;
-          this.clientState.pendingSubRAV = recoveryData.pendingSubRav || undefined;
-
-          // Ensure sub-channel is authorized; if server returned subChannel it's authorized
-          let vmIdFragment = recoveryData.subChannel?.vmIdFragment;
-          if (!vmIdFragment && this.options.keyId) {
-            const parts = this.options.keyId.split('#');
-            vmIdFragment = parts.length > 1 ? parts[1] : '';
-          }
-          if (vmIdFragment) {
-            if (!recoveryData.subChannel) {
-              try {
-                this.log(
-                  'Sub-channel not found in recovery. Authorizing vmIdFragment:',
-                  vmIdFragment
-                );
-                await this.payerClient.authorizeSubChannel({
-                  channelId: this.clientState.channelId,
-                  vmIdFragment,
-                });
-                this.log('Sub-channel authorized for fragment:', vmIdFragment);
-                // Ensure visibility on-chain before proceeding to first paid request
-                await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
-                try {
-                  this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
-                    this.clientState.channelId,
-                    vmIdFragment
-                  );
-                } catch (e) {
-                  this.log('GetSubChannelInfo failed:', e);
-                }
-              } catch (e) {
-                this.log('AuthorizeSubChannel failed:', e);
-                throw e;
-              }
-            }
-          } else {
-            // Without vmIdFragment we can't guarantee sub-channel readiness
-            throw new Error(
-              'Recovered channel but sub-channel cannot be verified/authorized: missing vmIdFragment. Provide keyId or upgrade server recovery response.'
-            );
-          }
-
+          await this.applyRecovery(recoveryData, {
+            authorizeIfMissing: true,
+            requireVmFragment: true,
+          });
           this.state = ClientState.READY;
           this.log('✅ Recovered active channel from server:', recoveryData.channel.channelId);
-
           // Update mapping store
-          await this.mappingStore.set(this.host, recoveryData.channel.channelId);
+          await this.mappingStore.setState(this.host, {
+            channelId: recoveryData.channel.channelId,
+            pendingSubRAV: this.clientState.pendingSubRAV,
+            lastUpdated: new Date().toISOString(),
+          });
           await this.persistClientState();
           return;
-          //} else {
-          //  this.log('⚠️ Recovered channel is not active:', recoveryData.channel.channelId, channelInfo.status);
-          //}
         } else {
           this.log('🔧 No existing channel found on server, will create new one');
         }
@@ -917,7 +932,11 @@ export class PaymentChannelHttpClient {
       }
 
       // Store the mapping (legacy compatibility)
-      await this.mappingStore.set(this.host, channelInfo.channelId);
+      await this.mappingStore.setState(this.host, {
+        channelId: channelInfo.channelId,
+        pendingSubRAV: this.clientState.pendingSubRAV,
+        lastUpdated: new Date().toISOString(),
+      });
 
       this.state = ClientState.READY;
       this.log('Created new channel:', channelInfo.channelId);
@@ -1075,8 +1094,16 @@ export class PaymentChannelHttpClient {
     const pending = this.clientState.pendingPayments?.get(clientTxRef);
     if (!pending) return false;
     clearTimeout(pending.timeoutId);
+    try {
+      pending.release?.();
+    } catch (e) {
+      this.log('[release.error]', e);
+    }
     pending.resolve(info);
     this.clientState.pendingPayments?.delete(clientTxRef);
+    try {
+      this.traceOrigins.delete(clientTxRef);
+    } catch {}
     this.log('[payment.pending.resolve]', 'clientTxRef=', clientTxRef, 'info=', info);
     return true;
   }
@@ -1092,8 +1119,29 @@ export class PaymentChannelHttpClient {
     }
     pending.reject(err);
     this.clientState.pendingPayments?.delete(clientTxRef);
+    try {
+      this.traceOrigins.delete(clientTxRef);
+    } catch {}
     this.log('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
     return true;
+  }
+
+  private rejectAllPending(err: Error): void {
+    if (!this.clientState.pendingPayments) return;
+    for (const [key, pending] of this.clientState.pendingPayments.entries()) {
+      clearTimeout(pending.timeoutId);
+      try {
+        pending.release?.();
+      } catch (e) {
+        this.log('[release.error]', e);
+      }
+      try {
+        pending.reject(err);
+      } catch (e) {
+        this.log('[pending.reject.error]', e);
+      }
+      this.clientState.pendingPayments.delete(key);
+    }
   }
 
   private resolveAllPendingAsFree(): void {
@@ -1206,6 +1254,7 @@ export class PaymentChannelHttpClient {
     }
 
     try {
+      // Serialize signing strictly by being inside the scheduler queue; rav lock removed
       const signedSubRAV = await this.buildSignedSubRavIfNeeded();
 
       // Always send payment header (with or without signedSubRAV) to include clientTxRef
@@ -1244,7 +1293,7 @@ export class PaymentChannelHttpClient {
       });
 
       // Handle headers first
-      await this.handleResponse(response);
+      await this.handleResponse(response, context);
 
       // For streaming responses, wrap and filter in-band frames so app sees clean business stream
       if (
@@ -1310,8 +1359,8 @@ export class PaymentChannelHttpClient {
   /**
    * Handle the HTTP response and extract payment data
    */
-  private async handleResponse(response: Response): Promise<void> {
-    const protocol = this.parseProtocolFromHeaders(response);
+  private async handleResponse(response: Response, context?: PaymentRequestContext): Promise<void> {
+    const protocol = this.parseProtocolFromHeaders(response, context);
     if (protocol.type !== 'none') {
       this.log(
         '[response.header]',
@@ -1341,8 +1390,42 @@ export class PaymentChannelHttpClient {
     }
 
     if (protocol.type === 'error') {
+      try {
+        this.log(
+          '[response.error.proto]',
+          'status=',
+          response.status,
+          'method=',
+          context?.method,
+          'url=',
+          context?.url,
+          'clientTxRef=',
+          protocol.clientTxRef
+        );
+      } catch {}
+      // Trace origin of this failing clientTxRef (if present) before handling/throwing
+      try {
+        if (protocol.clientTxRef) {
+          const origin = this.traceOrigins.get(protocol.clientTxRef);
+          if (origin) this.log('[trace.origin]', protocol.clientTxRef, '\n', origin);
+          this.traceOrigins.delete(protocol.clientTxRef);
+        } else {
+          // Fallback: dump a brief scan of outstanding origins to help locate the caller
+          const snapshots: Array<[string, string]> = [];
+          for (const [key, stack] of this.traceOrigins.entries()) {
+            snapshots.push([key, stack]);
+            if (snapshots.length >= 5) break;
+          }
+          if (snapshots.length > 0) {
+            this.log(
+              '[trace.origin.scan]',
+              JSON.stringify(snapshots.map(([k, s]) => ({ key: k, head: s.split('\n')[0] })))
+            );
+          }
+        }
+      } catch {}
       await this.handleProtocolError(protocol);
-      return;
+      throw protocol.err;
     }
 
     if (protocol.type === 'success') {
@@ -1355,7 +1438,10 @@ export class PaymentChannelHttpClient {
   }
 
   // ---- Response helpers to simplify branches ----
-  private parseProtocolFromHeaders(response: Response):
+  private parseProtocolFromHeaders(
+    response: Response,
+    context?: PaymentRequestContext
+  ):
     | { type: 'none' }
     | { type: 'error'; clientTxRef?: string; err: PaymentKitError }
     | {
@@ -1380,7 +1466,7 @@ export class PaymentChannelHttpClient {
         const message = payload.error.message || response.statusText || 'Payment error';
         return {
           type: 'error',
-          clientTxRef: payload.clientTxRef,
+          clientTxRef: payload.clientTxRef || context?.clientTxRef,
           err: new PaymentKitError(code, message, response.status),
         };
       }
@@ -1388,7 +1474,7 @@ export class PaymentChannelHttpClient {
         const costUsd = payload.costUsd as bigint | undefined;
         return {
           type: 'success',
-          clientTxRef: payload.clientTxRef,
+          clientTxRef: payload.clientTxRef || context?.clientTxRef,
           subRav: payload.subRav,
           cost: payload.cost as bigint,
           costUsd,
@@ -1407,23 +1493,26 @@ export class PaymentChannelHttpClient {
     clientTxRef?: string;
     err: PaymentKitError;
   }): Promise<void> {
-    if (proto.clientTxRef && this.rejectByRef(proto.clientTxRef, proto.err)) {
-      this.clientState.pendingSubRAV = undefined;
+    if (proto.clientTxRef && this.resolveByRef(proto.clientTxRef, undefined)) {
+      this.recentlyRejectedRefs.add(proto.clientTxRef);
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:matched' });
       await this.persistClientState();
       return;
     }
     if (this.clientState.pendingPayments && this.clientState.pendingPayments.size === 1) {
       const [[onlyKey]] = this.clientState.pendingPayments.entries();
-      this.rejectByRef(onlyKey, proto.err);
-      this.clientState.pendingSubRAV = undefined;
+      this.recentlyRejectedRefs.add(onlyKey);
+      this.resolveByRef(onlyKey, undefined);
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:single-pending' });
       await this.persistClientState();
       return;
     }
     if (this.clientState.pendingPayments && this.clientState.pendingPayments.size >= 1) {
       for (const [key] of this.clientState.pendingPayments.entries()) {
-        this.rejectByRef(key, proto.err);
+        this.recentlyRejectedRefs.add(key);
+        this.resolveByRef(key, undefined);
       }
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'protocol-error:multi-pending' });
       await this.persistClientState();
     }
   }
@@ -1496,7 +1585,12 @@ export class PaymentChannelHttpClient {
     }
 
     if (!pendingRequest || !keyToDelete) {
-      // No matching pending: still cache SubRAV and return
+      // If this clientTxRef was recently rejected, ignore late success to avoid rollback
+      if (proto.clientTxRef && this.recentlyRejectedRefs.has(proto.clientTxRef)) {
+        this.log('[payment.late-success.ignored]', proto.clientTxRef);
+        return;
+      }
+      // No matching pending: guarded cache to prevent rollback
       await this.cachePendingSubRAV(proto.subRav);
       if (proto.serviceTxRef) {
         this.log('Received service transaction reference:', proto.serviceTxRef);
@@ -1526,7 +1620,7 @@ export class PaymentChannelHttpClient {
       }
     }
 
-    // Cache next proposal for future request
+    // Cache next proposal for future request (guarded)
     await this.cachePendingSubRAV(proto.subRav);
 
     const paymentInfo: PaymentInfo = {
@@ -1572,6 +1666,12 @@ export class PaymentChannelHttpClient {
       'costUsd:',
       paymentInfo.costUsd.toString()
     );
+    // Update highest observed nonce after successful settlement
+    this.highestObservedNonce = this.highestObservedNonce
+      ? paymentInfo.nonce > this.highestObservedNonce
+        ? paymentInfo.nonce
+        : this.highestObservedNonce
+      : paymentInfo.nonce;
   }
 
   private async handleNoProtocolHeader(response: Response): Promise<void> {
@@ -1595,7 +1695,7 @@ export class PaymentChannelHttpClient {
     // Map known status codes when no protocol header present
     if (response.status === 402) {
       this.log('Payment required (402) - clearing cache and retrying');
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'no-header:402' });
       await this.persistClientState();
       throw new PaymentKitError(
         PaymentErrorCode.PAYMENT_REQUIRED,
@@ -1605,7 +1705,7 @@ export class PaymentChannelHttpClient {
     }
     if (response.status === 409) {
       this.log('SubRAV conflict (409) - clearing pending proposal');
-      this.clientState.pendingSubRAV = undefined;
+      this.clearPendingSubRAVInternal({ persist: true, reason: 'no-header:409' });
       this.state = ClientState.READY;
       await this.persistClientState();
       throw new PaymentKitError(
@@ -1613,6 +1713,70 @@ export class PaymentChannelHttpClient {
         'SubRAV conflict - cleared pending proposal',
         409
       );
+    }
+  }
+
+  /**
+   * Apply recovery response to client state with optional sub-channel authorization.
+   * No network calls except optional authorization.
+   */
+  private async applyRecovery(
+    recovery: RecoveryResponse,
+    options?: { authorizeIfMissing?: boolean; requireVmFragment?: boolean }
+  ): Promise<void> {
+    // Update channel info if present
+    if (recovery.channel) {
+      this.clientState.channelId = recovery.channel.channelId;
+      try {
+        this.clientState.channelInfo = await this.payerClient.getChannelInfo(
+          recovery.channel.channelId
+        );
+      } catch (e) {
+        this.log('GetChannelInfo failed during applyRecovery:', e);
+      }
+    }
+
+    // Accept pending proposal if matches (merged into cachePendingSubRAV)
+    if (recovery.pendingSubRav) {
+      await this.cachePendingSubRAV(recovery.pendingSubRav);
+    }
+
+    // Ensure sub-channel authorized if requested
+    if (options?.authorizeIfMissing && this.clientState.channelId) {
+      let vmIdFragment = recovery.subChannel?.vmIdFragment || this.clientState.vmIdFragment;
+
+      if (!vmIdFragment && options?.requireVmFragment) {
+        if (this.options.keyId) {
+          const parts = this.options.keyId.split('#');
+          vmIdFragment = parts.length > 1 ? parts[1] : '';
+        }
+        if (!vmIdFragment) {
+          throw new Error(
+            'Recovered channel but sub-channel cannot be verified/authorized: missing vmIdFragment.'
+          );
+        }
+      }
+
+      if (vmIdFragment && !recovery.subChannel) {
+        try {
+          this.log('Authorizing sub-channel for fragment during recovery:', vmIdFragment);
+          await this.payerClient.authorizeSubChannel({
+            channelId: this.clientState.channelId,
+            vmIdFragment,
+          });
+          await this.waitForSubChannelAuthorization(this.clientState.channelId, vmIdFragment);
+        } catch (e) {
+          this.log('Sub-channel authorization failed during recovery:', e);
+        }
+        try {
+          this.clientState.subChannelInfo = await this.payerClient.getSubChannelInfo(
+            this.clientState.channelId,
+            vmIdFragment
+          );
+        } catch (e) {
+          this.log('GetSubChannelInfo failed during recovery:', e);
+        }
+      }
     }
   }
 
@@ -1699,7 +1863,8 @@ export class PaymentChannelHttpClient {
   private async loadPersistedState(): Promise<void> {
     if (!this.mappingStore.getState) {
       // Fallback to legacy method for backward compatibility
-      const channelId = await this.mappingStore.get(this.host);
+      const state = await this.mappingStore.getState(this.host);
+      const channelId = state?.channelId;
       if (channelId) {
         this.clientState.channelId = channelId;
         this.state = ClientState.READY;
@@ -1712,16 +1877,20 @@ export class PaymentChannelHttpClient {
       const persistedState = await this.mappingStore.getState(this.host);
       if (persistedState) {
         this.clientState.channelId = persistedState.channelId;
-        this.clientState.pendingSubRAV = persistedState.pendingSubRAV;
+        // Accept persisted pending via guarded cache; if fragment unknown, cache it first, and ensureKeyFragment will clean it up later
+        if (persistedState.pendingSubRAV) {
+          await this.cachePendingSubRAV(persistedState.pendingSubRAV);
+        }
 
         // Set appropriate state based on persisted data
         if (persistedState.channelId) {
           this.state = ClientState.READY;
         }
 
+        // Do not perform fragment filtering here; ensureKeyFragment will clean up once we know the fragment
         this.log('Loaded persisted client state:', {
           channelId: persistedState.channelId,
-          hasPendingSubRAV: !!persistedState.pendingSubRAV,
+          hasPendingSubRAV: !!this.clientState.pendingSubRAV,
         });
       }
     } catch (error) {
@@ -1736,7 +1905,11 @@ export class PaymentChannelHttpClient {
     if (!this.mappingStore.setState) {
       // Fallback to legacy method for backward compatibility
       if (this.clientState.channelId) {
-        await this.mappingStore.set(this.host, this.clientState.channelId);
+        await this.mappingStore.setState(this.host, {
+          channelId: this.clientState.channelId,
+          pendingSubRAV: this.clientState.pendingSubRAV,
+          lastUpdated: new Date().toISOString(),
+        });
       }
       return;
     }
@@ -1825,41 +1998,60 @@ export class PaymentChannelHttpClient {
       throw new Error('Channel not initialized');
     }
 
-    return this.withSubRavLock(async () => {
-      if (this.clientState.pendingSubRAV) {
-        const pendingSubRAV = this.clientState.pendingSubRAV;
-        // Clear after taking to keep existing semantics (under lock)
-        this.clientState.pendingSubRAV = undefined;
+    if (this.clientState.pendingSubRAV) {
+      const pendingSubRAV = this.clientState.pendingSubRAV;
+      // Clear after taking (now we are in queue's serialized domain)
+      this.clientState.pendingSubRAV = undefined;
 
-        const signed = await this.payerClient.signSubRAV(pendingSubRAV);
-        this.log('Signed pending SubRAV:', pendingSubRAV.nonce, pendingSubRAV.accumulatedAmount);
-        return signed;
-      }
-
-      // No handshake RAV sent - FREE mode per rav-handling.md §3
-      this.log('No pending SubRAV - operating in FREE mode without RAV');
-      return undefined;
-    });
-  }
-
-  private async withSubRavLock<T>(fn: () => Promise<T>): Promise<T> {
-    const previous = this.subRavMutex;
-    let release!: () => void;
-    this.subRavMutex = new Promise<void>(resolve => (release = resolve));
-    try {
-      await previous.catch(e => {
-        this.log('[subRavLock.error]', e);
-      });
-      return await fn();
-    } finally {
-      release();
+      const signed = await this.payerClient.signSubRAV(pendingSubRAV);
+      this.log('Signed pending SubRAV:', pendingSubRAV.nonce, pendingSubRAV.accumulatedAmount);
+      // Update highest observed nonce after signing
+      this.highestObservedNonce = this.highestObservedNonce
+        ? pendingSubRAV.nonce > this.highestObservedNonce
+          ? pendingSubRAV.nonce
+          : this.highestObservedNonce
+        : pendingSubRAV.nonce;
+      return signed;
     }
+
+    // No handshake RAV sent - FREE mode per rav-handling.md §3
+    this.log('No pending SubRAV - operating in FREE mode without RAV');
+    return undefined;
   }
 
   /**
-   * Cache pending SubRAV and persist state (helper to avoid duplication)
+   * Cache with monotonic guard to avoid rollback by late/older proposals.
    */
   private async cachePendingSubRAV(subRav: SubRAV): Promise<void> {
+    // Fragment guard: only accept if vmIdFragment matches current or current unknown
+    const currentFragment = this.clientState.vmIdFragment;
+    if (currentFragment && subRav.vmIdFragment !== currentFragment) {
+      this.log(
+        '[cache.guard.fragment.skip]',
+        'incoming=',
+        subRav.vmIdFragment,
+        'current=',
+        currentFragment
+      );
+      return;
+    }
+    const currentNonce = this.clientState.pendingSubRAV?.nonce;
+    const guard = this.highestObservedNonce;
+    if (
+      (guard !== undefined && subRav.nonce <= guard) ||
+      (currentNonce !== undefined && subRav.nonce <= currentNonce)
+    ) {
+      this.log(
+        '[cache.guard.skip]',
+        'incoming=',
+        subRav.nonce?.toString?.(),
+        'current=',
+        currentNonce?.toString?.(),
+        'highest=',
+        guard?.toString?.()
+      );
+      return;
+    }
     this.clientState.pendingSubRAV = subRav;
     this.log('Cached new unsigned SubRAV:', subRav.nonce);
     await this.persistClientState();
