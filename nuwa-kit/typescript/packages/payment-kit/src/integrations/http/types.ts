@@ -150,7 +150,7 @@ export interface PendingPaymentRequest {
   /** Timeout ID for cleanup */
   timeoutId: NodeJS.Timeout;
   /** The SignedSubRAV that was sent with this pending request */
-  sendedSubRav?: SignedSubRAV;
+  sentSubRav?: SignedSubRAV;
   /** The request context that was sent with this pending request */
   requestContext: PaymentRequestContext;
 }

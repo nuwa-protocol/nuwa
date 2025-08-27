@@ -1043,7 +1043,7 @@ export class PaymentChannelHttpClient {
     pendingKey = pendingRequest.key;
 
     // Validate SubRAV progression
-    const prev = pendingRequest.pending.sendedSubRav?.subRav;
+    const prev = pendingRequest.pending.sentSubRav?.subRav;
     if (prev) {
       try {
         assertSubRavProgression(prev, proto.subRav, true);
@@ -1157,7 +1157,7 @@ export class PaymentChannelHttpClient {
     // Try to match by SubRAV progression
     if (pendingPayments.size > 1) {
       for (const [k, p] of pendingPayments.entries()) {
-        const prevSent = p.sendedSubRav?.subRav;
+        const prevSent = p.sentSubRav?.subRav;
         if (!prevSent) continue;
 
         try {
