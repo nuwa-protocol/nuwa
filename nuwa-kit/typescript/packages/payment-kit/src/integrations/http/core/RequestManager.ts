@@ -32,7 +32,7 @@ export class RequestManager {
   createPaymentPromise(
     clientTxRef: string,
     requestContext: PaymentRequestContext,
-    sentedSubRav: SignedSubRAV | undefined,
+    sentSubRav: SignedSubRAV | undefined,
     channelId: string,
     assetId: string,
     timeoutMs?: number
@@ -63,7 +63,7 @@ export class RequestManager {
         channelId,
         assetId,
         timeoutId,
-        sendedSubRav: sentedSubRav,
+        sentSubRav: sentSubRav,
         requestContext,
       };
 
@@ -76,7 +76,7 @@ export class RequestManager {
         'channelId=',
         channelId,
         'signedSubRav=',
-        !!sentedSubRav
+        !!sentSubRav
       );
     });
   }
