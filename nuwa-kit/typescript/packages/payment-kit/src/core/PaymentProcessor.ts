@@ -239,7 +239,7 @@ export class PaymentProcessor {
                 this.config.minClaimAmount,
                 channelInfo.assetId
               ),
-              { attachHeader: false }
+              { attachHeader: true }
             );
           }
         } catch (error) {

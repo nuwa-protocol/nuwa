@@ -56,7 +56,7 @@ import { ChannelManager } from './core/ChannelManager';
 /**
  * PaymentChannelHttpClient provides a high-level HTTP interface
  * for making requests with integrated payment channel functionality.
- *
+ * 
  * This refactored version uses modular architecture while maintaining
  * backward compatibility with the original API.
  */
@@ -72,7 +72,6 @@ export class PaymentChannelHttpClient {
   private isCleanedUp = false;
   private transactionStore: TransactionStore;
   private channelRepo: ChannelRepository;
-  private protocolErrorByResponse: WeakMap<Response, PaymentKitError> = new WeakMap();
   
   // New modular components
   private paymentState: PaymentState;
@@ -315,12 +314,6 @@ export class PaymentChannelHttpClient {
   }
 
   private async parseJsonAuto<T>(response: Response, schema?: z.ZodType<T>): Promise<T> {
-    // If protocol-level error was recorded for this response, prefer it
-    const protoErr = this.protocolErrorByResponse.get(response);
-    if (protoErr) {
-      throw protoErr;
-    }
-
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('Response is not JSON');
@@ -550,8 +543,6 @@ export class PaymentChannelHttpClient {
     };
   }
 
-
-
   /**
    * Cleanup client state on logout
    */
@@ -559,7 +550,7 @@ export class PaymentChannelHttpClient {
     options: { clearMapping: boolean; reason?: string } = { clearMapping: true }
   ): Promise<void> {
     const reason = options?.reason || 'Logout cleanup';
-
+    
     // Mark client as cleaned up
     this.isCleanedUp = true;
 
@@ -569,13 +560,13 @@ export class PaymentChannelHttpClient {
       if (pending) {
         const vmIdFragment = this.paymentState.getVmIdFragment();
         if (vmIdFragment && vmIdFragment === pending.vmIdFragment) {
-            const signed = await this.payerClient.signSubRAV(pending);
+          const signed = await this.payerClient.signSubRAV(pending);
           await this.channelManager.commitSubRAV(signed);
-            this.log('logoutCleanup: committed pending SubRAV on logout:', pending.nonce);
+          this.log('logoutCleanup: committed pending SubRAV on logout:', pending.nonce);
         }
-          }
-        } catch (e) {
-          this.log('logoutCleanup: failed to commit pending SubRAV:', e);
+      }
+    } catch (e) {
+      this.log('logoutCleanup: failed to commit pending SubRAV:', e);
     }
 
     // Clear scheduler and reject pending payments
@@ -932,17 +923,15 @@ export class PaymentChannelHttpClient {
 
         // Mark as streaming
         if (this.transactionStore && context.clientTxRef) {
-            await this.transactionStore.update(context.clientTxRef, { stream: true });
-          }
-        
+          await this.transactionStore.update(context.clientTxRef, { stream: true });
+        }
+
         // Set initial timeout for streaming
         if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
           this.requestManager.extendTimeout(context.clientTxRef, this.options.timeoutMsStream);
         }
-        
-              // Don't wrap for scheduler release - let payment promise control it
-      // This allows server time to process reactive claims before next request
-      return filtered;
+
+        return filtered;
       }
 
       return response;
@@ -981,9 +970,7 @@ export class PaymentChannelHttpClient {
     if (protocol.type === 'error') {
       this.logTraceOrigin(protocol.clientTxRef);
       await this.handleProtocolError(protocol);
-      // Record protocol error for this response; do not throw here to avoid double-throw.
-      this.protocolErrorByResponse.set(response, protocol.err);
-      return;
+      throw protocol.err;
     }
 
     if (protocol.type === 'success') {
@@ -1134,7 +1121,7 @@ export class PaymentChannelHttpClient {
     if (error) {
       if (response.status === 402 || response.status === 409) {
         this.paymentState.clearPendingSubRAV();
-      await this.persistClientState();
+        await this.persistClientState();
       }
       throw error;
     }
