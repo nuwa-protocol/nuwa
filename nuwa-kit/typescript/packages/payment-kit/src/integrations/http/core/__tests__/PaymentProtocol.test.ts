@@ -27,22 +27,14 @@ describe('PaymentProtocol', () => {
         signature: new Uint8Array([1, 2, 3, 4]),
       };
 
-      const header = protocol.encodeRequestHeader(
-        signedSubRAV,
-        'client-tx-123',
-        BigInt(1000)
-      );
+      const header = protocol.encodeRequestHeader(signedSubRAV, 'client-tx-123', BigInt(1000));
 
       expect(header).toBeDefined();
       expect(typeof header).toBe('string');
     });
 
     it('should encode request header without signed SubRAV (FREE mode)', () => {
-      const header = protocol.encodeRequestHeader(
-        undefined,
-        'client-tx-123',
-        BigInt(0)
-      );
+      const header = protocol.encodeRequestHeader(undefined, 'client-tx-123', BigInt(0));
 
       expect(header).toBeDefined();
       expect(typeof header).toBe('string');

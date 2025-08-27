@@ -21,10 +21,10 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Create mock fetch
     mockFetch = vi.fn();
-    
+
     // Create mock options
     mockOptions = {
       baseUrl: 'https://api.example.com',
@@ -52,7 +52,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
       const getPublicMethods = (obj: any) => {
         const methods = new Set<string>();
         const proto = Object.getPrototypeOf(obj);
-        
+
         Object.getOwnPropertyNames(proto).forEach(name => {
           if (
             name !== 'constructor' &&
@@ -63,10 +63,10 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
             methods.add(name);
           }
         });
-        
+
         return Array.from(methods).sort();
       };
-      
+
       // Note: We can't instantiate without proper setup, so check on class prototypes
       const originalMethods = [
         'initialize',
@@ -88,7 +88,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
         'logoutCleanup',
         'getPersistedState',
       ].sort();
-      
+
       // These are the public methods we expect in the refactored version
       const expectedRefactoredMethods = [
         'initialize',
@@ -110,7 +110,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
         'logoutCleanup',
         'getPersistedState',
       ].sort();
-      
+
       // Verify refactored client has all expected methods
       expect(expectedRefactoredMethods).toEqual(originalMethods);
     });
@@ -121,7 +121,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
       // Create clients
       originalClient = new PaymentChannelHttpClient(mockOptions);
       refactoredClient = new RefactoredClient(mockOptions);
-      
+
       // Mock successful discovery response
       const discoveryResponse = {
         ok: true,
@@ -143,10 +143,10 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
           },
         }),
       };
-      
+
       mockFetch.mockResolvedValueOnce(discoveryResponse);
       mockFetch.mockResolvedValueOnce(discoveryResponse); // For refactored client
-      
+
       // Initialize both clients
       await originalClient.initialize();
       await refactoredClient.initialize();
@@ -159,17 +159,17 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
         headers: new Headers(),
         json: vi.fn().mockResolvedValue({ data: 'test' }),
       };
-      
+
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       const [originalResult, refactoredResult] = await Promise.all([
         originalClient.get('/test'),
         refactoredClient.get('/test'),
       ]);
-      
+
       // Both should make the same request
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      
+
       // Both should return same type of result
       expect(originalResult).toBeDefined();
       expect(refactoredResult).toBeDefined();
@@ -183,17 +183,17 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
         headers: new Headers(),
         json: vi.fn().mockResolvedValue({ success: true }),
       };
-      
+
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       const [originalResult, refactoredResult] = await Promise.all([
         originalClient.post('/test', { body }),
         refactoredClient.post('/test', { body }),
       ]);
-      
+
       // Both should make the same request
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      
+
       // Check that both included the body
       const calls = mockFetch.mock.calls;
       expect(calls[0][1].body).toBeDefined();
@@ -214,7 +214,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
     it('should handle network errors similarly', async () => {
       const networkError = new Error('Network error');
       mockFetch.mockRejectedValue(networkError);
-      
+
       // Both should throw similar errors
       await expect(originalClient.get('/test')).rejects.toThrow();
       await expect(refactoredClient.get('/test')).rejects.toThrow();
@@ -228,9 +228,9 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
           'X-Payment-Channel-Data': 'some-error-data',
         }),
       };
-      
+
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       // Both should handle payment required errors
       await expect(originalClient.get('/test')).rejects.toThrow();
       await expect(refactoredClient.get('/test')).rejects.toThrow();
@@ -246,20 +246,20 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
         headers: new Headers(),
         json: vi.fn().mockResolvedValue({}),
       };
-      
+
       mockFetch.mockResolvedValue(mockResponse);
-      
+
       await originalClient.get('/test1');
       await refactoredClient.get('/test1');
-      
+
       // Get persisted state from both
       const originalState = originalClient.getPersistedState();
       const refactoredState = refactoredClient.getPersistedState();
-      
+
       // Both should have state structure
       expect(originalState).toBeDefined();
       expect(refactoredState).toBeDefined();
-      
+
       // Key properties should exist
       expect(originalState).toHaveProperty('channelId');
       expect(refactoredState).toHaveProperty('channelId');
@@ -271,7 +271,7 @@ describe('Refactored PaymentChannelHttpClient Compatibility', () => {
       // Both should have cleanup methods
       expect(originalClient.logoutCleanup).toBeDefined();
       expect(refactoredClient.logoutCleanup).toBeDefined();
-      
+
       // Both should not throw during cleanup
       await expect(originalClient.logoutCleanup()).resolves.not.toThrow();
       await expect(refactoredClient.logoutCleanup()).resolves.not.toThrow();

@@ -945,7 +945,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     if (!shouldRunE2ETests()) {
       console.log('Skipping test - E2E tests disabled');
       return;
-    } 
+    }
 
     console.log('🔄 Testing PaymentHub balance check and reactive claim mechanism');
 
@@ -994,22 +994,22 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     });
 
     expect(initialBalance).toBe(0n);
-    
+
     let errorCaught = false;
-      try {
-        console.log('🔍 Making request that should fail due to insufficient balance...');
-        await claimTestClient.get('/echo?q=should%20fail%20no%20balance');
-        //throw new Error('Expected request to fail due to insufficient hub balance');
-        expect(false).toBe(true);
-      } catch (e: any) {
-        errorCaught = true;
-        console.log('✅ Error caught as expected:', e);
-        expect(e).toBeInstanceOf(Error);
-        expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
-      }
-      expect(errorCaught).toBe(true);
-      // wait for 100ms to ensure the error is propagated
-      await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      console.log('🔍 Making request that should fail due to insufficient balance...');
+      await claimTestClient.get('/echo?q=should%20fail%20no%20balance');
+      //throw new Error('Expected request to fail due to insufficient hub balance');
+      expect(false).toBe(true);
+    } catch (e: any) {
+      errorCaught = true;
+      console.log('✅ Error caught as expected:', e);
+      expect(e).toBeInstanceOf(Error);
+      expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
+    }
+    expect(errorCaught).toBe(true);
+    // wait for 100ms to ensure the error is propagated
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Test 2: Deposit sufficient balance for testing
     console.log('💰 Test 2: Deposit balance and verify requests succeed');
@@ -1172,11 +1172,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
           '⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout'
         );
       } else if (lastSuccessfulBalance <= minBalanceToKeep) {
-        console.log(
-          `💸 Balance depleted to minimum threshold (${minBalanceToKeep}) successfully`
-        );
+        console.log(`💸 Balance depleted to minimum threshold (${minBalanceToKeep}) successfully`);
       }
-      
+
       // Wait for any pending async operations from the depletion loop
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error: any) {
@@ -1207,6 +1205,5 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     } catch (e) {
       console.log('🚫 Error during test client cleanup:', e);
     }
-
   }, 300000); // 5 minutes timeout for comprehensive testing
 });

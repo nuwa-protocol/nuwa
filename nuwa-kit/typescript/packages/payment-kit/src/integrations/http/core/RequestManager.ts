@@ -39,7 +39,7 @@ export class RequestManager {
   ): Promise<PaymentInfo | undefined> {
     return new Promise((resolve, reject) => {
       const timeout = timeoutMs || this.defaultTimeoutMs;
-      
+
       // Set timeout for cleanup
       const timeoutId = setTimeout(() => {
         const pending = this.paymentState.getPendingPayment(clientTxRef);
@@ -68,7 +68,7 @@ export class RequestManager {
       };
 
       this.paymentState.addPendingPayment(clientTxRef, pendingRequest);
-      
+
       this.logger.debug(
         '[payment.pending.create]',
         'clientTxRef=',
@@ -87,7 +87,7 @@ export class RequestManager {
   extendTimeout(clientTxRef: string, newTimeoutMs: number): void {
     const pending = this.paymentState.getPendingPayment(clientTxRef);
     if (!pending) return;
-    
+
     clearTimeout(pending.timeoutId);
     pending.timeoutId = setTimeout(() => {
       if (this.paymentState.getPendingPayment(clientTxRef)) {
@@ -101,7 +101,7 @@ export class RequestManager {
         pending.reject(new Error('Payment resolution timeout'));
       }
     }, newTimeoutMs);
-    
+
     this.logger.debug('[payment.timeout.extend]', 'clientTxRef=', clientTxRef, 'ms=', newTimeoutMs);
   }
 
@@ -111,9 +111,9 @@ export class RequestManager {
   resolveByRef(clientTxRef: string, info: PaymentInfo | undefined): boolean {
     const pending = this.paymentState.getPendingPayment(clientTxRef);
     if (!pending) return false;
-    
+
     clearTimeout(pending.timeoutId);
-    
+
     // Always release scheduler when payment is resolved
     // This matches the original implementation behavior
     try {
@@ -124,7 +124,7 @@ export class RequestManager {
     pending.resolve(info);
     this.paymentState.removePendingPayment(clientTxRef);
     this.clearTraceOrigin(clientTxRef);
-    
+
     this.logger.debug('[payment.pending.resolve]', 'clientTxRef=', clientTxRef);
     return true;
   }
@@ -135,7 +135,7 @@ export class RequestManager {
   rejectByRef(clientTxRef: string, err: Error): boolean {
     const pending = this.paymentState.getPendingPayment(clientTxRef);
     if (!pending) return false;
-    
+
     clearTimeout(pending.timeoutId);
     try {
       pending.release?.();
@@ -146,8 +146,14 @@ export class RequestManager {
     this.paymentState.removePendingPayment(clientTxRef);
     this.paymentState.markAsRejected(clientTxRef);
     this.clearTraceOrigin(clientTxRef);
-    
-    this.logger.debug('[payment.pending.reject]', 'clientTxRef=', clientTxRef, 'error=', err.message);
+
+    this.logger.debug(
+      '[payment.pending.reject]',
+      'clientTxRef=',
+      clientTxRef,
+      'error=',
+      err.message
+    );
     return true;
   }
 
@@ -156,7 +162,7 @@ export class RequestManager {
    */
   rejectAll(err: Error): void {
     const pendingPayments = this.paymentState.getAllPendingPayments();
-    
+
     for (const [key, pending] of pendingPayments.entries()) {
       clearTimeout(pending.timeoutId);
       try {
@@ -170,7 +176,7 @@ export class RequestManager {
         this.logger.debug('[pending.reject.error]', e);
       }
     }
-    
+
     this.paymentState.clearAllPendingPayments();
   }
 
@@ -180,7 +186,7 @@ export class RequestManager {
   resolveAllAsFree(): void {
     const pendingPayments = this.paymentState.getAllPendingPayments();
     const keys: string[] = [];
-    
+
     for (const [key, pending] of pendingPayments.entries()) {
       clearTimeout(pending.timeoutId);
       try {
@@ -191,9 +197,9 @@ export class RequestManager {
       pending.resolve(undefined);
       keys.push(key);
     }
-    
+
     this.paymentState.clearAllPendingPayments();
-    
+
     if (keys.length > 0) {
       this.logger.debug('[payment.pending.free]', 'resolved', keys.length, 'requests as free');
     }
@@ -232,12 +238,12 @@ export class RequestManager {
    */
   getTraceSnapshots(limit: number = 5): Array<{ key: string; head: string }> {
     const snapshots: Array<{ key: string; head: string }> = [];
-    
+
     for (const [key, stack] of this.traceOrigins.entries()) {
       snapshots.push({ key, head: stack.split('\n')[0] });
       if (snapshots.length >= limit) break;
     }
-    
+
     return snapshots;
   }
 }

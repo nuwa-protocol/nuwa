@@ -18,7 +18,7 @@ export interface PaymentHeaderData {
   };
 }
 
-export type ProtocolResult = 
+export type ProtocolResult =
   | { type: 'none' }
   | { type: 'error'; clientTxRef?: string; err: PaymentKitError }
   | {
@@ -76,24 +76,21 @@ export class PaymentProtocol {
   /**
    * Extract protocol information from response headers
    */
-  parseProtocolFromResponse(
-    response: Response,
-    context?: PaymentRequestContext
-  ): ProtocolResult {
+  parseProtocolFromResponse(response: Response, context?: PaymentRequestContext): ProtocolResult {
     const headerName = HttpPaymentCodec.getHeaderName();
     let paymentHeader = response.headers.get(headerName);
-    
+
     if (!paymentHeader) {
       paymentHeader = response.headers.get(headerName.toLowerCase());
     }
-    
+
     if (!paymentHeader) {
       return { type: 'none' };
     }
 
     try {
       const payload = this.parseResponseHeader(paymentHeader);
-      
+
       if (payload?.error) {
         const code = payload.error.code;
         const message = payload.error.message || response.statusText || 'Payment error';
@@ -103,7 +100,7 @@ export class PaymentProtocol {
           err: new PaymentKitError(code, message, response.status),
         };
       }
-      
+
       if (payload?.subRav && payload.cost !== undefined) {
         return {
           type: 'success',
@@ -114,7 +111,7 @@ export class PaymentProtocol {
           serviceTxRef: payload.serviceTxRef,
         };
       }
-      
+
       return { type: 'none' };
     } catch (e) {
       this.logger.debug('Failed to parse payment response header:', e);

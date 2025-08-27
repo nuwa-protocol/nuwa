@@ -22,7 +22,7 @@ export class PaymentState {
   private pendingSubRAV?: SubRAV;
   private highestObservedNonce?: bigint;
   private recentlyRejectedRefs = new Set<string>();
-  
+
   constructor() {
     this.logger = DebugLogger.get('PaymentState');
     this.state = {

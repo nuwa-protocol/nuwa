@@ -18,7 +18,7 @@ describe('ChannelManager', () => {
 
   beforeEach(() => {
     paymentState = new PaymentState();
-    
+
     mockPayerClient = {
       signSubRAV: jest.fn(),
       openChannel: jest.fn(),
@@ -34,7 +34,7 @@ describe('ChannelManager', () => {
     };
 
     mockFetch = jest.fn();
-    
+
     mockSigner = {
       getDid: jest.fn().mockResolvedValue('did:example:user'),
       sign: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
@@ -85,14 +85,14 @@ describe('ChannelManager', () => {
       });
 
       const result = await channelManager.discoverService();
-      
+
       expect(result).toEqual(discoveryResponse);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.example.com/.well-known/nuwa-payment/info',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
-            'Accept': 'application/json',
+            Accept: 'application/json',
           }),
         })
       );
@@ -105,9 +105,7 @@ describe('ChannelManager', () => {
         statusText: 'Not Found',
       });
 
-      await expect(channelManager.discoverService()).rejects.toThrow(
-        'Service discovery failed'
-      );
+      await expect(channelManager.discoverService()).rejects.toThrow('Service discovery failed');
     });
   });
 
@@ -140,7 +138,7 @@ describe('ChannelManager', () => {
       paymentState.setKeyInfo('did:example:user#key-1', 'key-1');
 
       const result = await channelManager.recoverFromService();
-      
+
       expect(result).toMatchObject({
         channelId: 'channel-123',
         pendingSubRav: expect.objectContaining({
@@ -161,7 +159,7 @@ describe('ChannelManager', () => {
       });
 
       const result = await channelManager.recoverFromService();
-      
+
       expect(result).toEqual({});
     });
   });
@@ -196,7 +194,7 @@ describe('ChannelManager', () => {
       });
 
       await channelManager.commitSubRAV(signedSubRav);
-      
+
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/commit'),
         expect.objectContaining({
@@ -217,7 +215,7 @@ describe('ChannelManager', () => {
         version: '1.0',
         endpoints: {
           recovery: '/recovery',
-          health: '/health', 
+          health: '/health',
           commit: '/commit',
         },
         paymentHub: {
@@ -238,7 +236,7 @@ describe('ChannelManager', () => {
 
       // Set up state retrieval - no existing channel
       mockMappingStore.getState.mockResolvedValue(undefined);
-      
+
       // Mock channel creation with sub-channel
       mockPayerClient.openChannelWithSubChannel.mockResolvedValue({
         channelId: 'new-channel-456',
@@ -246,7 +244,7 @@ describe('ChannelManager', () => {
         blockHeight: BigInt(100),
         events: [],
       });
-      
+
       // Mock getting channel info after creation
       mockPayerClient.getChannelInfo.mockResolvedValue({
         channelId: 'new-channel-456',
@@ -256,7 +254,7 @@ describe('ChannelManager', () => {
         epoch: BigInt(1),
         status: 'active',
       });
-      
+
       // Mock getting sub-channel info
       mockPayerClient.getSubChannelInfo = jest.fn().mockResolvedValue({
         channelId: 'new-channel-456',
@@ -268,7 +266,7 @@ describe('ChannelManager', () => {
 
       // Ensure channel is ready
       await channelManager.ensureChannelReady();
-      
+
       expect(paymentState.getChannelId()).toBe('new-channel-456');
       expect(mockPayerClient.openChannelWithSubChannel).toHaveBeenCalledWith({
         payeeDid: 'did:example:payee',
@@ -283,7 +281,7 @@ describe('ChannelManager', () => {
       };
 
       mockMappingStore.getState.mockResolvedValue(existingState);
-      
+
       mockPayerClient.getChannelInfo.mockResolvedValue({
         channelId: 'existing-channel-123',
         payerDid: 'did:example:user',
@@ -294,7 +292,7 @@ describe('ChannelManager', () => {
       });
 
       await channelManager.ensureChannelReady();
-      
+
       expect(paymentState.getChannelId()).toBe('existing-channel-123');
       expect(mockPayerClient.openChannelWithSubChannel).not.toHaveBeenCalled();
     });

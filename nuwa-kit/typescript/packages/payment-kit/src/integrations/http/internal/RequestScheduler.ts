@@ -16,7 +16,7 @@ export class RequestScheduler {
         outerReject(new Error('RequestScheduler is shutdown'));
         return;
       }
-      
+
       const task = async () => {
         this.active += 1;
         let released = false;

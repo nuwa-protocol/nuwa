@@ -11,10 +11,10 @@ describe('PaymentState', () => {
   describe('Channel Management', () => {
     it('should set and get channel ID', () => {
       expect(state.getChannelId()).toBeUndefined();
-      
+
       state.setChannelId('channel-123');
       expect(state.getChannelId()).toBe('channel-123');
-      
+
       state.setChannelId(undefined);
       expect(state.getChannelId()).toBeUndefined();
     });
@@ -30,7 +30,7 @@ describe('PaymentState', () => {
       };
 
       expect(state.getChannelInfo()).toBeUndefined();
-      
+
       state.setChannelInfo(channelInfo);
       expect(state.getChannelInfo()).toEqual(channelInfo);
     });
@@ -40,7 +40,7 @@ describe('PaymentState', () => {
     it('should set and get key info', () => {
       expect(state.getKeyId()).toBeUndefined();
       expect(state.getVmIdFragment()).toBeUndefined();
-      
+
       state.setKeyInfo('did:example:user#key-1', 'key-1');
       expect(state.getKeyId()).toBe('did:example:user#key-1');
       expect(state.getVmIdFragment()).toBe('key-1');
@@ -61,12 +61,12 @@ describe('PaymentState', () => {
 
       // Set key info first to pass fragment validation
       state.setKeyInfo('did:example:user#key-1', 'key-1');
-      
+
       expect(state.getPendingSubRAV()).toBeUndefined();
-      
+
       state.setPendingSubRAV(subRav);
       expect(state.getPendingSubRAV()).toEqual(subRav);
-      
+
       state.clearPendingSubRAV();
       expect(state.getPendingSubRAV()).toBeUndefined();
     });
@@ -84,14 +84,14 @@ describe('PaymentState', () => {
 
       state.setKeyInfo('did:example:user#key-1', 'key-1');
       state.setPendingSubRAV(subRav);
-      
+
       // Should not be set due to fragment mismatch
       expect(state.getPendingSubRAV()).toBeUndefined();
     });
 
     it('should enforce monotonic nonce progression', () => {
       state.setKeyInfo('did:example:user#key-1', 'key-1');
-      
+
       const subRav1: SubRAV = {
         version: 1,
         chainId: BigInt(4),
@@ -114,14 +114,14 @@ describe('PaymentState', () => {
 
       state.setPendingSubRAV(subRav1);
       expect(state.getPendingSubRAV()).toEqual(subRav1);
-      
+
       // Should reject lower nonce
       state.setPendingSubRAV(subRav2);
       expect(state.getPendingSubRAV()).toEqual(subRav1);
-      
+
       // Update highest nonce
       state.updateHighestNonce(BigInt(10));
-      
+
       // Should reject anything <= 10 now
       const subRav3: SubRAV = {
         ...subRav1,
@@ -150,13 +150,13 @@ describe('PaymentState', () => {
       };
 
       expect(state.getPendingPayment('tx-123')).toBeUndefined();
-      
+
       state.addPendingPayment('tx-123', pending);
       expect(state.getPendingPayment('tx-123')).toEqual(pending);
-      
+
       state.removePendingPayment('tx-123');
       expect(state.getPendingPayment('tx-123')).toBeUndefined();
-      
+
       clearTimeout(pending.timeoutId);
     });
 
@@ -164,9 +164,9 @@ describe('PaymentState', () => {
       state.addPendingPayment('tx-1', {} as any);
       state.addPendingPayment('tx-2', {} as any);
       state.addPendingPayment('tx-3', {} as any);
-      
+
       expect(state.getAllPendingPayments().size).toBe(3);
-      
+
       state.clearAllPendingPayments();
       expect(state.getAllPendingPayments().size).toBe(0);
     });
@@ -175,7 +175,7 @@ describe('PaymentState', () => {
   describe('Rejected refs tracking', () => {
     it('should mark and check rejected refs', () => {
       expect(state.isRecentlyRejected('tx-123')).toBe(false);
-      
+
       state.markAsRejected('tx-123');
       expect(state.isRecentlyRejected('tx-123')).toBe(true);
     });
@@ -185,7 +185,7 @@ describe('PaymentState', () => {
     it('should get persisted state', () => {
       state.setChannelId('channel-123');
       state.setKeyInfo('did:example:user#key-1', 'key-1');
-      
+
       const subRav: SubRAV = {
         version: 1,
         chainId: BigInt(4),
@@ -196,7 +196,7 @@ describe('PaymentState', () => {
         accumulatedAmount: BigInt(100),
       };
       state.setPendingSubRAV(subRav);
-      
+
       const persisted = state.getPersistedState();
       expect(persisted.channelId).toBe('channel-123');
       expect(persisted.pendingSubRAV).toEqual(subRav);
@@ -213,16 +213,16 @@ describe('PaymentState', () => {
         nonce: BigInt(1),
         accumulatedAmount: BigInt(100),
       };
-      
+
       const persistedState = {
         channelId: 'channel-456',
         pendingSubRAV: subRav,
         lastUpdated: new Date().toISOString(),
       };
-      
+
       // Need to set key info for SubRAV validation
       state.setKeyInfo('did:example:user#key-1', 'key-1');
-      
+
       state.loadPersistedState(persistedState);
       expect(state.getChannelId()).toBe('channel-456');
       expect(state.getPendingSubRAV()).toEqual(subRav);
@@ -236,7 +236,7 @@ describe('PaymentState', () => {
       state.setKeyInfo('did:example:user#key-1', 'key-1');
       state.addPendingPayment('tx-123', {} as any);
       state.markAsRejected('tx-456');
-      
+
       const subRav: SubRAV = {
         version: 1,
         chainId: BigInt(4),
@@ -247,10 +247,10 @@ describe('PaymentState', () => {
         accumulatedAmount: BigInt(100),
       };
       state.setPendingSubRAV(subRav);
-      
+
       // Reset
       state.reset();
-      
+
       // Verify everything is cleared
       expect(state.getChannelId()).toBeUndefined();
       expect(state.getKeyId()).toBeUndefined();
