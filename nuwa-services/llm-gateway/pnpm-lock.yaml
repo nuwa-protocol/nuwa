@@ -12,8 +12,8 @@ importers:
         specifier: ^0.5.1
         version: 0.5.1(typescript@5.9.2)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.5.4
-        version: 0.5.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
+        specifier: ^0.5.9
+        version: 0.5.9(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
       '@supabase/supabase-js':
         specifier: ^2.39.0
         version: 2.55.0
@@ -249,14 +249,11 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@nuwa-ai/identity-kit@0.5.0':
-    resolution: {integrity: sha512-8dBNxejhELrd+UosQZ/zUFmPWmKzrWL1thrwny1OZuRHdJal9+FAIMXZLnQYt3PP5Et/9Ri5W40Ej34yykKxlA==}
-
   '@nuwa-ai/identity-kit@0.5.1':
     resolution: {integrity: sha512-4IAAAs/NEg97rvLcp0OTxAHsXFU5Z7JojzXViDGrlVYQBlcNMV7wjghpDZYf2d1EHc04CthIzE/N9BeF4g9Xtg==}
 
-  '@nuwa-ai/payment-kit@0.5.4':
-    resolution: {integrity: sha512-wRv0ymdfrhwST/YE07ihLwBs3rZtXasL/uy1Q8oZtMV5VH9wD/Uwk1jxOc7qDj8bPl4vGix+lVKFzRcrAJPZOA==}
+  '@nuwa-ai/payment-kit@0.5.9':
+    resolution: {integrity: sha512-U95WYax1o3BVZT/N8+BD6SwMpWOCzSVnNUIAr7urxq+6CF6usx+2267vba8JvFxDYgQklI/oYxYqP81uG0UYSQ==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1134,16 +1131,6 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
-  '@nuwa-ai/identity-kit@0.5.0(typescript@5.9.2)':
-    dependencies:
-      '@noble/curves': 1.9.6
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.9.2)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   '@nuwa-ai/identity-kit@0.5.1(typescript@5.9.2)':
     dependencies:
       '@noble/curves': 1.9.6
@@ -1154,9 +1141,9 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.5.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
+  '@nuwa-ai/payment-kit@0.5.9(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
     dependencies:
-      '@nuwa-ai/identity-kit': 0.5.0(typescript@5.9.2)
+      '@nuwa-ai/identity-kit': 0.5.1(typescript@5.9.2)
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.9.2)
       '@types/js-yaml': 4.0.9
       '@types/pg': 8.15.5
