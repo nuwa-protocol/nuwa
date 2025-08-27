@@ -945,22 +945,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     if (!shouldRunE2ETests()) {
       console.log('Skipping test - E2E tests disabled');
       return;
-    }
-
-    // Temporarily suppress console.error to avoid Jest detecting expected errors
-    const originalConsoleError = console.error;
-    console.error = (...args: any[]) => {
-      // Filter out expected errors
-      const errorString = args.join(' ');
-      if (
-        errorString.includes('PaymentHub balance insufficient: 0') &&
-        errorString.includes('echo?q=should%20fail%20no%20balance')
-      ) {
-        // This is an expected error, don't log it
-        return;
-      }
-      originalConsoleError.apply(console, args);
-    };
+    } 
 
     console.log('🔄 Testing PaymentHub balance check and reactive claim mechanism');
 
@@ -1008,8 +993,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: true,
     });
 
-    if (initialBalance === 0n) {
-      let errorCaught = false;
+    expect(initialBalance).toBe(0n);
+    
+    let errorCaught = false;
       try {
         console.log('🔍 Making request that should fail due to insufficient balance...');
         await claimTestClient.get('/echo?q=should%20fail%20no%20balance');
@@ -1017,14 +1003,13 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
         expect(false).toBe(true);
       } catch (e: any) {
         errorCaught = true;
-        console.log('✅ Error caught as expected:', e.message);
+        console.log('✅ Error caught as expected:', e);
         expect(e).toBeInstanceOf(Error);
         expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
       }
       expect(errorCaught).toBe(true);
       // wait for 100ms to ensure the error is propagated
       await new Promise(resolve => setTimeout(resolve, 100));
-    }
 
     // Test 2: Deposit sufficient balance for testing
     console.log('💰 Test 2: Deposit balance and verify requests succeed');
@@ -1144,7 +1129,8 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     try {
       const maxDepleteRequests = 20; // hard cap to avoid infinite loop in CI
-      while (lastSuccessfulBalance > 0n && requestCounter <= maxDepleteRequests) {
+      const minBalanceToKeep = BigInt(10000000); // Keep 10 RGas to avoid background operation failures
+      while (lastSuccessfulBalance > minBalanceToKeep && requestCounter <= maxDepleteRequests) {
         try {
           const depletionResult = await claimTestClient.get(
             `/expensive?q=depletion%20${requestCounter}`
@@ -1185,7 +1171,14 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
         console.log(
           '⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout'
         );
+      } else if (lastSuccessfulBalance <= minBalanceToKeep) {
+        console.log(
+          `💸 Balance depleted to minimum threshold (${minBalanceToKeep}) successfully`
+        );
       }
+      
+      // Wait for any pending async operations from the depletion loop
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error: any) {
       console.log('🚫 Request failed due to balance depletion (expected):', error.message);
       // Only check for balance-related errors if it's not a connection error
@@ -1207,18 +1200,13 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       ✅ Admin stats show claim activity
     `);
 
-    // Wait for any pending requests to complete
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
     // Clean up test clients
     try {
       await claimTestClient.logoutCleanup();
       console.log('✅ Test client cleanup completed');
     } catch (e) {
-      originalConsoleError('Error during test client cleanup:', e);
+      console.log('🚫 Error during test client cleanup:', e);
     }
 
-    // Restore original console.error
-    console.error = originalConsoleError;
   }, 300000); // 5 minutes timeout for comprehensive testing
 });
