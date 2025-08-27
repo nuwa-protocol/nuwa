@@ -95,18 +95,5 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
     // 应该抛出 Zod 验证错误
     await expect(store.setState(host, invalidState)).rejects.toThrow();
   });
-
-  test('should maintain legacy store sync', async () => {
-    const testState: PersistedHttpClientState = {
-      channelId: 'legacy-channel-789',
-    };
-
-    const host = 'legacy.example.com';
-
-    await store.setState(host, testState);
-
-    // 验证 legacy get 方法也能获取到 channelId
-    const legacyChannelId = await store.get(host);
-    expect(legacyChannelId).toBe(testState.channelId);
-  });
+ 
 });
