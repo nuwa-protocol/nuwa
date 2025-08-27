@@ -231,7 +231,7 @@ export class ChannelManager {
       const jsonData = await response.json();
 
       // Log the raw response for debugging
-      this.logger.debug('Raw recovery response:', JSON.stringify(jsonData));
+      this.logger.debug('Raw recovery response:', serializeJson(jsonData));
 
       // Check if response is in ApiResponse format
       let dataToValidate = jsonData;

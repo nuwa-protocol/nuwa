@@ -1021,7 +1021,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     // Now request should succeed
     const successResult = await zeroBalanceClient.get('/echo?q=balance%20restored');
     expect(successResult.payment).toBeTruthy();
-    console.log(`✅ Request successful after deposit - ${formatPaymentInfo(successResult.payment!)}`);
+    console.log(
+      `✅ Request successful after deposit - ${formatPaymentInfo(successResult.payment!)}`
+    );
 
     // Clean up test client
     try {
@@ -1097,15 +1099,21 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
       while (lastSuccessfulBalance > minBalanceToKeep && requestCounter <= maxDepleteRequests) {
         try {
-          const depletionResult = await depletionClient.get(`/expensive?q=depletion%20${requestCounter}`);
+          const depletionResult = await depletionClient.get(
+            `/expensive?q=depletion%20${requestCounter}`
+          );
           if (depletionResult.payment) {
-            console.log(`💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`);
+            console.log(
+              `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
+            );
           }
           requestCounter++;
 
           // Check balance periodically
           if (requestCounter % 3 === 0) {
-            lastSuccessfulBalance = await depletionHubClient.getBalance({ assetId: testAsset.assetId });
+            lastSuccessfulBalance = await depletionHubClient.getBalance({
+              assetId: testAsset.assetId,
+            });
             console.log(`💰 Current balance: ${lastSuccessfulBalance.toString()}`);
           }
 
@@ -1120,7 +1128,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       }
 
       if (requestCounter > maxDepleteRequests) {
-        console.log('⏱️ Reached max depletion requests without error - balance may still be sufficient');
+        console.log(
+          '⏱️ Reached max depletion requests without error - balance may still be sufficient'
+        );
       }
     } catch (error: any) {
       depletionErrorCaught = true;
