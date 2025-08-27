@@ -476,6 +476,9 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                     }
                   } catch {}
                   if (settled?.state?.unsignedSubRav) {
+                    // TODO: Race condition - the in-band payment frame is sent before this async
+                    // persist completes. If client sends next request immediately, server may not
+                    // find the pending SubRAV yet. See temporary workaround in RavVerifier.ts
                     this.middleware.persistBilling(settled).catch(() => {});
                   }
                   billingCompleted = true;
