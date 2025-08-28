@@ -414,9 +414,13 @@ export class PaymentChannelHttpClient {
           // Pass undefined reason to minimize external reporting
           scheduledHandle?.cancel(undefined);
           if (!paymentBridgeAttached) {
-            try { paymentResolve(undefined); } catch {}
+            try {
+              paymentResolve(undefined);
+            } catch {}
           } else {
-            try { void this.requestManager.resolveByRef(clientTxRef, undefined); } catch {}
+            try {
+              void this.requestManager.resolveByRef(clientTxRef, undefined);
+            } catch {}
           }
         } catch {}
       }, 0);
@@ -433,92 +437,94 @@ export class PaymentChannelHttpClient {
       }
     }
 
-    const responsePromise: Promise<Response> = (scheduledHandle = this.scheduler.enqueue(async (release, signal) => {
-      // Check if client has been cleaned up or aborted
-      if (this.isCleanedUp || signal.aborted) {
-        throw new Error('Client has been cleaned up');
-      }
+    const responsePromise: Promise<Response> = (scheduledHandle = this.scheduler.enqueue(
+      async (release, signal) => {
+        // Check if client has been cleaned up or aborted
+        if (this.isCleanedUp || signal.aborted) {
+          throw new Error('Client has been cleaned up');
+        }
 
-      // Ensure prerequisites
-      if (signal.aborted) throw new Error('Request aborted');
-      await this.ensureKeyFragment();
-      if (signal.aborted) throw new Error('Request aborted');
-      await this.channelManager.ensureChannelReady();
-      if (signal.aborted) throw new Error('Request aborted');
-      await this.channelManager.discoverService();
-      if (signal.aborted) throw new Error('Request aborted');
+        // Ensure prerequisites
+        if (signal.aborted) throw new Error('Request aborted');
+        await this.ensureKeyFragment();
+        if (signal.aborted) throw new Error('Request aborted');
+        await this.channelManager.ensureChannelReady();
+        if (signal.aborted) throw new Error('Request aborted');
+        await this.channelManager.discoverService();
+        if (signal.aborted) throw new Error('Request aborted');
 
-      // Try to recover pending SubRAV if needed
-      try {
-        await this.tryRecoverPendingIfNeeded();
-      } catch (e) {
-        this.log('[serialized.recover.error]', e);
-      }
-      if (signal.aborted) throw new Error('Request aborted');
+        // Try to recover pending SubRAV if needed
+        try {
+          await this.tryRecoverPendingIfNeeded();
+        } catch (e) {
+          this.log('[serialized.recover.error]', e);
+        }
+        if (signal.aborted) throw new Error('Request aborted');
 
-      // Prepare headers with payment data
-      const { headers, sentedSubRav } = await this.prepareHeaders(
-        fullUrl,
-        method,
-        clientTxRef,
-        init?.headers
-      );
-      if (signal.aborted) throw new Error('Request aborted');
+        // Prepare headers with payment data
+        const { headers, sentedSubRav } = await this.prepareHeaders(
+          fullUrl,
+          method,
+          clientTxRef,
+          init?.headers
+        );
+        if (signal.aborted) throw new Error('Request aborted');
 
-      // Build request context
-      requestContext = {
-        method,
-        url: fullUrl,
-        headers,
-        body: init?.body,
-        clientTxRef,
-      };
-
-      // Create payment promise
-      const channelId = this.paymentState.getChannelId();
-      const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
-
-      if (!channelId) {
-        throw new Error('Channel not initialized');
-      }
-
-      const pp = this.requestManager.createPaymentPromise(
-        clientTxRef,
-        requestContext,
-        sentedSubRav,
-        channelId,
-        assetId
-      );
-
-      // Attach release function
-      const pending = this.paymentState.getPendingPayment(clientTxRef);
-      if (pending) {
-        pending.release = () => {
-          try {
-            release();
-          } catch (e) {
-            this.log?.('[release.error]', e);
-          }
-          pending.release = undefined;
+        // Build request context
+        requestContext = {
+          method,
+          url: fullUrl,
+          headers,
+          body: init?.body,
+          clientTxRef,
         };
+
+        // Create payment promise
+        const channelId = this.paymentState.getChannelId();
+        const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
+
+        if (!channelId) {
+          throw new Error('Channel not initialized');
+        }
+
+        const pp = this.requestManager.createPaymentPromise(
+          clientTxRef,
+          requestContext,
+          sentedSubRav,
+          channelId,
+          assetId
+        );
+
+        // Attach release function
+        const pending = this.paymentState.getPendingPayment(clientTxRef);
+        if (pending) {
+          pending.release = () => {
+            try {
+              release();
+            } catch (e) {
+              this.log?.('[release.error]', e);
+            }
+            pending.release = undefined;
+          };
+        }
+
+        // Bridge internal promise to external one
+        paymentBridgeAttached = true;
+        void pp.then(paymentResolve).catch(paymentReject);
+
+        // Transaction logging
+        try {
+          await this.logTransaction(clientTxRef, requestContext, sentedSubRav);
+        } catch (e) {
+          this.log('[txlog.create.error]', e);
+        }
+        if (signal.aborted) throw new Error('Request aborted');
+
+        // Execute request with abort support; ensure fetchImpl receives AbortSignal
+        const fetchInit: RequestInit = { ...init, signal };
+        return this.executeRequest(requestContext, fetchInit);
       }
-
-      // Bridge internal promise to external one
-      paymentBridgeAttached = true;
-      void pp.then(paymentResolve).catch(paymentReject);
-
-      // Transaction logging
-      try {
-        await this.logTransaction(clientTxRef, requestContext, sentedSubRav);
-      } catch (e) {
-        this.log('[txlog.create.error]', e);
-      }
-      if (signal.aborted) throw new Error('Request aborted');
-
-      // Execute request with abort support; ensure fetchImpl receives AbortSignal
-      const fetchInit: RequestInit = { ...init, signal };
-      return this.executeRequest(requestContext, fetchInit);
-    })).promise;
+    )).promise;
 
     // Prophylactic catch to prevent unhandled rejection before user attaches handlers
     // This avoids unhandled rejection warnings/errors if abort happens immediately
@@ -543,7 +549,9 @@ export class PaymentChannelHttpClient {
         const settled = this.requestManager.resolveByRef(clientTxRef, undefined);
         if (!settled) {
           // No pending in manager (likely pre-bridge) → resolve local promise to avoid hang
-          try { paymentResolve(undefined); } catch {}
+          try {
+            paymentResolve(undefined);
+          } catch {}
         }
       } catch (settleErr) {
         this.log('[response.error.settle]', settleErr);

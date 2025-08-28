@@ -492,15 +492,14 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     try {
       await queuedHandle.payment;
-    } catch (err) {
-    }
+    } catch (err) {}
 
     expect(errorCaught).toBe(true);
 
     // Cleanup stream
     try {
-    const responseStream: Response = await handleStream.response;
-    const reader = (responseStream.body as any)?.getReader?.();
+      const responseStream: Response = await handleStream.response;
+      const reader = (responseStream.body as any)?.getReader?.();
       if (reader) {
         try {
           await reader.cancel();
@@ -548,7 +547,9 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     handle.abort?.();
 
     // Cancel reader explicitly to release lock and avoid further reads
-    try { await reader?.cancel?.(); } catch {}
+    try {
+      await reader?.cancel?.();
+    } catch {}
 
     // Wait for quick settle
     try {
@@ -558,7 +559,6 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     }
     // Give scheduler a brief moment to flush
     await new Promise(resolve => setTimeout(resolve, 500));
-
   }, 120000);
 
   test('Auto-authorize sub-channel on recovery when channel exists without sub-channel', async () => {

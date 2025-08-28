@@ -68,7 +68,7 @@ describe('RequestScheduler - cancellation', () => {
 
     // Cancel T2 immediately
     handle2.cancel(new Error('cancelled by test'));
-    
+
     await expect(handle2.promise).rejects.toBeTruthy();
     expect(startedT2).toBe(false);
 
@@ -78,5 +78,3 @@ describe('RequestScheduler - cancellation', () => {
     await expect(handle1.promise).resolves.toBe('t1');
   });
 });
-
-
