@@ -50,7 +50,7 @@
     "clean": "rimraf dist",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "format": "prettier --write \"{src,test,docs}/**/*.{ts,tsx,js,jsx,md,mdx,json,yaml,yml}\"",
+    "format": "prettier --write \"{src,test,docs}/**/*.{ts,tsx,js,jsx,md,mdx,json,yaml,yml}\" --list-different",
     "format:check": "prettier --check \"{src,test,docs}/**/*.{ts,tsx,js,jsx,md,mdx,json,yaml,yml}\"",
     "prepublishOnly": "pnpm run clean && pnpm run build"
   },
