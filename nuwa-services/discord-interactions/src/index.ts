@@ -194,8 +194,9 @@ async function processInteractionAsync(userDid: string, interaction: any) {
 			console.error("Supabase check error:", checkError);
 		}
 
+        console.log(existingClaims)
 		if (existingClaims && existingClaims.length > 0) {
-			// 已领取，直接回复
+
 			await fetch(webhookUrl, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
