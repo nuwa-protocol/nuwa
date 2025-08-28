@@ -46,13 +46,6 @@ export class ChannelManager {
    * Ensure channel is ready for use
    */
   async ensureChannelReady(): Promise<void> {
-    const channelId = this.options.paymentState.getChannelId();
-
-    if (channelId) {
-      this.logger.debug('Channel already ready:', channelId);
-      return;
-    }
-
     if (!this.ensureReadyPromise) {
       this.ensureReadyPromise = this.doEnsureChannelReady().finally(() => {
         this.ensureReadyPromise = undefined;
@@ -63,23 +56,29 @@ export class ChannelManager {
   }
 
   private async doEnsureChannelReady(): Promise<void> {
-    // Try to load persisted state first
+    // 1) Ensure key fragment present (needed for sub-channel checks)
+    await this.ensureKeyFragmentPresent();
+
+    // 2) Try to load persisted state first
     await this.loadPersistedState();
 
-    // If we still don't have a channel, initialize it
-    if (!this.options.paymentState.getChannelId()) {
-      await this.initializeChannel();
+    // 3) Validate or recover/create channel
+    let channelId = this.options.paymentState.getChannelId();
+    if (channelId) {
+      // Validate channel exists and refresh channelInfo
+      try {
+        const info = await this.options.payerClient.getChannelInfo(channelId);
+        this.options.paymentState.setChannelInfo(info);
+      } catch (e) {
+        this.logger.debug('Persisted channel not found, clearing and recovering:', e);
+        this.options.paymentState.setChannelId(undefined);
+        this.options.paymentState.setChannelInfo(undefined);
+        channelId = undefined;
+      }
     }
-  }
 
-  /**
-   * Initialize or restore payment channel
-   */
-  private async initializeChannel(): Promise<void> {
-    this.logger.debug('Initializing channel for host:', this.options.host);
-
-    try {
-      // First, try to recover existing channel from server
+    if (!channelId) {
+      // Attempt recovery first
       try {
         const recoveryData = await this.recoverFromService();
         if (recoveryData.channel) {
@@ -87,24 +86,53 @@ export class ChannelManager {
             authorizeIfMissing: true,
             requireVmFragment: true,
           });
-          this.logger.debug(
-            'Recovered active channel from server:',
-            recoveryData.channel.channelId
-          );
-
-          // Update mapping store
           await this.persistState();
-          return;
+          channelId = this.options.paymentState.getChannelId();
         }
-      } catch (error) {
-        this.logger.debug('Server recovery failed, will create new channel:', error);
+      } catch (e) {
+        this.logger.debug('Recovery attempt failed:', e);
       }
 
-      // Create new channel
-      await this.createNewChannel();
-    } catch (error) {
-      this.logger.error('Failed to initialize channel:', error);
-      throw error;
+      // Create new if still missing
+      if (!channelId) {
+        await this.createNewChannel();
+        channelId = this.options.paymentState.getChannelId();
+      }
+    }
+
+    // 4) Ensure sub-channel exists/authorized for current vmIdFragment
+    const vmIdFragment = this.options.paymentState.getVmIdFragment();
+    if (channelId && vmIdFragment) {
+      const existingSub = this.options.paymentState.getSubChannelInfo();
+      if (!existingSub) {
+        try {
+          const subInfo = await this.options.payerClient.getSubChannelInfo(channelId, vmIdFragment);
+          this.options.paymentState.setSubChannelInfo(subInfo);
+        } catch {
+          // Try server-assisted authorization path via recovery
+          try {
+            const rec = await this.recoverFromService();
+            await this.applyRecovery(rec, { authorizeIfMissing: true, requireVmFragment: true });
+            await this.persistState();
+          } catch (e) {
+            this.logger.debug('Sub-channel recovery/authorization failed:', e);
+            // Fallback: direct authorize
+            try {
+              await this.options.payerClient.authorizeSubChannel({ channelId, vmIdFragment });
+              await this.waitForSubChannelAuthorization(channelId, vmIdFragment);
+              const subInfo = await this.options.payerClient.getSubChannelInfo(
+                channelId,
+                vmIdFragment
+              );
+              this.options.paymentState.setSubChannelInfo(subInfo);
+              await this.persistState();
+            } catch (e2) {
+              this.logger.debug('Direct sub-channel authorization failed:', e2);
+              throw e2;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -123,31 +151,54 @@ export class ChannelManager {
       this.logger.debug('Discovered payeeDid from service:', payeeDid);
     }
 
-    const channelInfo = await this.options.payerClient.openChannelWithSubChannel({
+    const openChannelResult = await this.options.payerClient.openChannelWithSubChannel({
       payeeDid,
       assetId: defaultAssetId,
     });
 
-    this.options.paymentState.setChannelId(channelInfo.channelId);
+    this.options.paymentState.setChannelId(openChannelResult.channelId);
 
-    try {
-      const fullChannelInfo = await this.options.payerClient.getChannelInfo(channelInfo.channelId);
-      this.options.paymentState.setChannelInfo(fullChannelInfo);
-
-      const vmIdFragment = this.options.paymentState.getVmIdFragment();
-      if (vmIdFragment) {
-        const subChannelInfo = await this.options.payerClient.getSubChannelInfo(
-          channelInfo.channelId,
-          vmIdFragment
-        );
-        this.options.paymentState.setSubChannelInfo(subChannelInfo);
-      }
-    } catch (e) {
-      this.logger.debug('Failed to get channel/subchannel info:', e);
+    // Use returned infos directly to avoid redundant queries
+    if (openChannelResult.channelInfo) {
+      this.options.paymentState.setChannelInfo(openChannelResult.channelInfo);
+    }
+    if (openChannelResult.subChannelInfo) {
+      this.options.paymentState.setSubChannelInfo(openChannelResult.subChannelInfo);
     }
 
     await this.persistState();
-    this.logger.debug('Created new channel:', channelInfo.channelId);
+    this.logger.debug('Created new channel:', openChannelResult.channelId);
+  }
+
+  /**
+   * Ensure keyId and vmIdFragment are present in PaymentState
+   */
+  private async ensureKeyFragmentPresent(): Promise<void> {
+    if (this.options.paymentState.getKeyId() && this.options.paymentState.getVmIdFragment()) return;
+
+    let keyId = this.options.keyId;
+    if (!keyId) {
+      if (this.options.signer && typeof this.options.signer.listKeyIds === 'function') {
+        try {
+          const ids: string[] = await this.options.signer.listKeyIds();
+          keyId = Array.isArray(ids) && ids.length > 0 ? ids[0] : undefined;
+        } catch (e) {
+          this.logger.debug('listKeyIds failed:', e);
+        }
+      }
+    }
+
+    if (keyId) {
+      const parts = keyId.split('#');
+      const vmIdFragment = parts.length > 1 ? parts[1] : undefined;
+      if (vmIdFragment) {
+        this.options.paymentState.setKeyInfo(keyId, vmIdFragment);
+      }
+    }
+
+    if (!this.options.paymentState.getKeyId() || !this.options.paymentState.getVmIdFragment()) {
+      throw new Error('No keyId found');
+    }
   }
 
   /**
@@ -318,17 +369,12 @@ export class ChannelManager {
 
     if (vmIdFragment && !recovery.subChannel) {
       try {
-        await this.options.payerClient.authorizeSubChannel({
+        const auth = await this.options.payerClient.authorizeSubChannel({
           channelId,
           vmIdFragment,
         });
-        await this.waitForSubChannelAuthorization(channelId, vmIdFragment);
-
-        const subChannelInfo = await this.options.payerClient.getSubChannelInfo(
-          channelId,
-          vmIdFragment
-        );
-        this.options.paymentState.setSubChannelInfo(subChannelInfo);
+        // Directly use returned subChannelInfo
+        this.options.paymentState.setSubChannelInfo(auth.subChannelInfo);
       } catch (e) {
         this.logger.debug('Sub-channel authorization failed during recovery:', e);
       }

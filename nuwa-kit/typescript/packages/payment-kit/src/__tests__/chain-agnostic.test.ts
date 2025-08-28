@@ -200,8 +200,8 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
       });
 
       expect(channelMeta.channelId).toBe('0x1234567890abcdef1234567890abcdef12345678');
-      expect(channelMeta.payerDid).toBe('did:test:0x123');
-      expect(channelMeta.payeeDid).toBe('did:test:0x456');
+      expect(channelMeta.channelInfo.payerDid).toBe('did:test:0x123');
+      expect(channelMeta.channelInfo.payeeDid).toBe('did:test:0x456');
     });
 
     it('should get asset information', async () => {

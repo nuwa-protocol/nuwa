@@ -15,6 +15,7 @@ import {
   createHttpClient,
   PaymentChannelAdminClient,
   createAdminClient,
+  MemoryHostChannelMappingStore,
 } from '../../src/integrations/http';
 import { safeStringify } from '../../src/utils/json';
 import { PaymentChannelFactory } from '../../src/factory/chainFactory';
@@ -593,12 +594,14 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       signer: isolatedPayer.signer,
     });
 
-    // Create client for the isolated payer
+    // Create client for the isolated payer with a fresh memory mapping store to simulate persisted channel later
+    const mappingStore = new MemoryHostChannelMappingStore();
     const client = await createHttpClient({
       baseUrl: billingServerInstance.baseURL,
       env: isolatedPayer.identityEnv,
       maxAmount: BigInt('50000000000'),
       debug: true,
+      mappingStore,
     });
 
     // Before any paid call, recovery should show channel present but no sub-channel
@@ -616,6 +619,29 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     expect(recoveryAfter.channel).toBeTruthy();
     expect(recoveryAfter.subChannel).toBeTruthy();
     expect(recoveryAfter.subChannel!.vmIdFragment).toBe(isolatedPayer.vmIdFragment);
+
+    // New regression: simulate persisted channel without sub-channel, ensure next client instance auto-authorizes on ready
+    // 1) Persist only channelId to mapping store (clear subChannelInfo/pendingSubRAV)
+    const host = new URL(billingServerInstance.baseURL).host;
+    await mappingStore.setState(host, {
+      channelId: recoveryAfter.channel!.channelId,
+      pendingSubRAV: undefined,
+      lastUpdated: new Date().toISOString(),
+    } as any);
+
+    // 2) Create a fresh client reusing the same mapping store (simulating app restart)
+    const client2 = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: isolatedPayer.identityEnv,
+      maxAmount: BigInt('50000000000'),
+      debug: true,
+      mappingStore,
+    });
+
+    // 3) First paid call should succeed and auto-authorize sub-channel within ensureChannelReady
+    const r2 = await client2.get('/echo?q=auto-authorize-after-persist');
+    expect(r2.data.echo).toBe('auto-authorize-after-persist');
+    expect(r2.payment).toBeTruthy();
   }, 120000);
 
   test('Admin Client functionality', async () => {
