@@ -95,5 +95,4 @@ describe('BigInt Serialization in HostChannelMappingStore', () => {
     // 应该抛出 Zod 验证错误
     await expect(store.setState(host, invalidState)).rejects.toThrow();
   });
- 
 });

@@ -99,6 +99,19 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
           signed.subRav.accumulatedAmount > params.latestSignedSubRav.subRav.accumulatedAmount
         ) {
           result.decision = 'ALLOW';
+        } else if (
+          // Special case: Allow nonce that is exactly +1 from latest signed SubRAV
+          // This handles the race condition where server sent a proposal via in-band frame
+          // but hasn't persisted it to pendingSubRAVStore yet
+          signed.subRav.channelId === params.latestSignedSubRav.subRav.channelId &&
+          signed.subRav.vmIdFragment === params.latestSignedSubRav.subRav.vmIdFragment &&
+          signed.subRav.nonce === params.latestSignedSubRav.subRav.nonce + 1n &&
+          signed.subRav.accumulatedAmount >= params.latestSignedSubRav.subRav.accumulatedAmount
+        ) {
+          // TODO: This is a temporary workaround for the race condition in streaming responses
+          // where the in-band payment frame is sent before the pending SubRAV is persisted.
+          // A proper fix would be to ensure the pending SubRAV is saved before sending the frame.
+          result.decision = 'ALLOW';
         } else {
           result.decision = 'CONFLICT';
           result.error = {
