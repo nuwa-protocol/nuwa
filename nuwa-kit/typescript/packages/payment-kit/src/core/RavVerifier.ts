@@ -127,14 +127,14 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
           signed.subRav.channelId === params.subChannelInfo.channelId &&
           signed.subRav.vmIdFragment === params.subChannelInfo.vmIdFragment &&
           signed.subRav.nonce > params.subChannelInfo.lastConfirmedNonce &&
-          signed.subRav.accumulatedAmount > params.subChannelInfo.lastClaimedAmount
+          signed.subRav.accumulatedAmount >= params.subChannelInfo.lastClaimedAmount
         ) {
           result.decision = 'ALLOW';
         } else {
           result.decision = 'CONFLICT';
           result.error = {
             code: PaymentErrorCode.RAV_CONFLICT,
-            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelInfo.lastConfirmedNonce}, received: ${signed.subRav.nonce})`,
+            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelInfo.lastConfirmedNonce}, accumulatedAmount: ${params.subChannelInfo.lastClaimedAmount}, received: ${signed.subRav.nonce}, ${signed.subRav.accumulatedAmount})`,
           } as any;
           return finalize();
         }
