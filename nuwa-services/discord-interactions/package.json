@@ -11,8 +11,9 @@
   },
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.5.1",
-    "@supabase/supabase-js": "^2.56.0",
     "@nuwa-ai/payment-kit": "^0.4.0",
+    "@supabase/supabase-js": "^2.56.0",
+    "dayjs": "^1.11.14",
     "discord-api-types": "^0.37.97",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -24,4 +25,4 @@
     "tsx": "^4.15.7",
     "typescript": "^5.4.5"
   }
-} 
+}
