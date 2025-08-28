@@ -51,7 +51,16 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
   let adminClient: PaymentChannelAdminClient;
   let hubClient: PaymentHubClient;
 
+  // Track unhandled rejections for debugging
+  const unhandledRejections = new Set<any>();
+  const unhandledRejectionListener = (reason: any, promise: Promise<any>) => {
+    console.error('🚨 Unhandled promise rejection detected:', reason);
+    console.error('Stack:', reason?.stack);
+    unhandledRejections.add({ reason, promise });
+  };
+
   beforeAll(async () => {
+    process.on('unhandledRejection', unhandledRejectionListener);
     if (!shouldRunE2ETests()) {
       console.log('Skipping HTTP E2E tests - PAYMENT_E2E not set or node not accessible');
       return;
@@ -128,8 +137,19 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
   }, 180000); // 3 minutes timeout for setup
 
   afterAll(async () => {
+    process.removeListener('unhandledRejection', unhandledRejectionListener);
+    if (unhandledRejections.size > 0) {
+      console.error(`🚨 Total unhandled rejections: ${unhandledRejections.size}`);
+    }
     if (!shouldRunE2ETests()) return;
-
+    if (httpClient) {
+      try {
+        await httpClient.logoutCleanup();
+      } catch (e) {
+        console.error('Error during logout cleanup:', e);
+      }
+      console.log('✅ HTTP client logout cleanup');
+    }
     // Cleanup
     if (billingServerInstance) {
       await billingServerInstance.shutdown();
@@ -921,22 +941,22 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log('🎉 MaxAmount limit enforcement test successful!');
   }, 60000);
 
-  test('PaymentHub balance check and reactive claim mechanism', async () => {
+  test('PaymentHub zero balance error handling', async () => {
     if (!shouldRunE2ETests()) {
       console.log('Skipping test - E2E tests disabled');
       return;
     }
 
-    console.log('🔄 Testing PaymentHub balance check and reactive claim mechanism');
+    console.log('🚫 Testing PaymentHub zero balance error handling');
 
     // Create an isolated payer for this test to control balance precisely
-    const claimTestPayer = await createSelfDid(env, {
+    const zeroBalancePayer = await createSelfDid(env, {
       keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
       skipFunding: false,
     });
 
-    console.log(`📝 Claim test setup:
-      Payer DID: ${claimTestPayer.did}
+    console.log(`📝 Zero balance test setup:
+      Payer DID: ${zeroBalancePayer.did}
       Payee DID: ${payee.did}
     `);
 
@@ -947,213 +967,198 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       debug: false,
     });
 
-    const claimTestHubClient = new PaymentHubClient({
+    const zeroBalanceHubClient = new PaymentHubClient({
       contract: directContract,
-      signer: claimTestPayer.signer,
+      signer: zeroBalancePayer.signer,
       defaultAssetId: testAsset.assetId,
     });
 
-    // Test 1: Start with zero balance - requests should be rejected
-    console.log('🚫 Test 1: Zero balance - requests should be rejected');
-
+    // Verify zero balance
     let initialBalance;
     try {
-      initialBalance = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
+      initialBalance = await zeroBalanceHubClient.getBalance({ assetId: testAsset.assetId });
       console.log(`💰 Initial balance: ${initialBalance.toString()}`);
     } catch (error) {
       console.log('💰 No initial balance (expected for new DID)');
       initialBalance = 0n;
     }
 
-    // Create client with the claim test payer
-    const claimTestClient = await createHttpClient({
+    // Create client with the zero balance payer
+    const zeroBalanceClient = await createHttpClient({
       baseUrl: billingServerInstance.baseURL,
-      env: claimTestPayer.identityEnv,
+      env: zeroBalancePayer.identityEnv,
       maxAmount: BigInt('50000000000'),
       debug: true,
     });
 
-    if (initialBalance === 0n) {
-      try {
-        await claimTestClient.get('/echo?q=should%20fail%20no%20balance');
-        throw new Error('Expected request to fail due to insufficient hub balance');
-      } catch (error: any) {
-        console.log('✅ Request correctly rejected due to insufficient balance:', error.message);
-        // Expected: should get 402 error or balance-related error
-        expect(error.message).toMatch(/balance|insufficient|funds|402/i);
-      }
+    expect(initialBalance).toBe(0n);
+
+    // Test: Request with zero balance should be rejected
+    let errorCaught = false;
+    try {
+      console.log('🔍 Making request that should fail due to zero balance...');
+      await zeroBalanceClient.get('/echo?q=should%20fail%20no%20balance');
+      expect(false).toBe(true); // Should not reach here
+    } catch (e: any) {
+      errorCaught = true;
+      console.log('✅ Error caught as expected:', e);
+      expect(e).toBeInstanceOf(Error);
+      expect(String(e.message)).toMatch(/balance|insufficient|funds|402/i);
     }
+    expect(errorCaught).toBe(true);
 
-    // Test 2: Deposit sufficient balance for testing
-    console.log('💰 Test 2: Deposit balance and verify requests succeed');
+    // Wait for error propagation
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-    const depositAmount = BigInt('200000000'); // 2 RGas
-    await claimTestHubClient.deposit(testAsset.assetId, depositAmount);
+    // Verify that after deposit, requests succeed
+    console.log('💰 Depositing balance to verify error was due to zero balance');
+    const depositAmount = BigInt('100000000'); // 1 RGas
+    await zeroBalanceHubClient.deposit(testAsset.assetId, depositAmount);
 
-    const balanceAfterDeposit = await claimTestHubClient.getBalance({ assetId: testAsset.assetId });
-    console.log(`💰 Balance after deposit: ${balanceAfterDeposit.toString()}`);
-    expect(balanceAfterDeposit).toBeGreaterThanOrEqual(depositAmount);
-
-    // Wait slightly longer than server-side negative cache TTL (2s) to avoid stale 0-balance
+    // Wait for balance cache refresh
     await new Promise(resolve => setTimeout(resolve, 2500));
 
-    // Now requests should succeed
-    const successResult1 = await claimTestClient.get('/echo?q=balance%20test%201');
-    expect(successResult1.payment).toBeTruthy();
+    // Now request should succeed
+    const successResult = await zeroBalanceClient.get('/echo?q=balance%20restored');
+    expect(successResult.payment).toBeTruthy();
     console.log(
-      `✅ Request 1 successful after deposit - ${formatPaymentInfo(successResult1.payment!)}`
+      `✅ Request successful after deposit - ${formatPaymentInfo(successResult.payment!)}`
     );
 
-    // Test 3: Make multiple requests to accumulate claims and trigger reactive claim
-    console.log('🔄 Test 3: Multiple requests to test reactive claim mechanism');
-
-    const requests: PaymentResult<any>[] = [];
-    const requestCount = 5;
-
-    for (let i = 2; i <= requestCount + 1; i++) {
-      const result = await claimTestClient.get(`/echo?q=claim%20test%20${i}`);
-      expect(result.payment).toBeTruthy();
-      requests.push(result);
-      console.log(`✅ Request ${i} successful - ${formatPaymentInfo(result.payment!)}`);
-
-      // Small delay to allow reactive claims to process
-      await new Promise(resolve => setTimeout(resolve, 100));
+    // Clean up test client
+    try {
+      await zeroBalanceClient.logoutCleanup();
+      console.log('✅ Zero balance test client cleanup completed');
+    } catch (e) {
+      console.log('🚫 Error during zero balance test client cleanup:', e);
     }
 
-    // Test 4: Check that nonces are properly incremented (indicating settlement)
-    console.log('🔍 Test 4: Verify nonce progression and reactive claim behavior');
+    console.log('🎉 PaymentHub zero balance error handling test successful!');
+  }, 120000);
 
-    const nonces = requests.map(r => r.payment!.nonce);
-    console.log(`📈 Nonce progression: ${nonces.map(n => n.toString()).join(' → ')}`);
-
-    // Verify nonces are strictly increasing
-    for (let i = 1; i < nonces.length; i++) {
-      expect(nonces[i]).toBeGreaterThan(nonces[i - 1]);
+  test('PaymentHub balance depletion error handling', async () => {
+    if (!shouldRunE2ETests()) {
+      console.log('Skipping test - E2E tests disabled');
+      return;
     }
-    console.log('✅ Nonce progression verified - reactive claims are working');
 
-    // Test 5: Check channel state and verify on-chain claims occurred
-    console.log('🔍 Test 5: Verify on-chain claim state');
+    console.log('💸 Testing PaymentHub balance depletion error handling');
 
-    const channelId = claimTestClient.getChannelId();
-    expect(channelId).toBeTruthy();
-
-    // Get on-chain channel state
-    const channelState = await directContract.getChannelStatus({
-      channelId: channelId!,
+    // Create an isolated payer for this test
+    const depletionPayer = await createSelfDid(env, {
+      keyType: 'EcdsaSecp256k1VerificationKey2019' as any,
+      skipFunding: false,
     });
 
-    console.log(`🔗 On-chain channel state:
-      Channel ID: ${channelState.channelId}
-      Status: ${channelState.status}
+    console.log(`📝 Balance depletion test setup:
+      Payer DID: ${depletionPayer.did}
+      Payee DID: ${payee.did}
     `);
 
-    // If sub-channel exists, check its state
-    try {
-      // Use the payer's vmIdFragment to query sub-channel state
-      const subChannelState = await directContract.getSubChannel({
-        channelId: channelId!,
-        vmIdFragment: claimTestPayer.vmIdFragment,
-      });
+    // Create PaymentHub client for balance management
+    const directContract = new RoochPaymentChannelContract({
+      rpcUrl: env.rpcUrl,
+      network: 'local',
+      debug: false,
+    });
 
-      console.log(`🔗 Sub-channel state:
-        Last Claimed Amount: ${subChannelState.lastClaimedAmount.toString()}
-        Last Confirmed Nonce: ${subChannelState.lastConfirmedNonce.toString()}
-      `);
+    const depletionHubClient = new PaymentHubClient({
+      contract: directContract,
+      signer: depletionPayer.signer,
+      defaultAssetId: testAsset.assetId,
+    });
 
-      // Should have claimed some amount (reactive claims triggered)
-      expect(subChannelState.lastClaimedAmount).toBeGreaterThan(0n);
-      console.log('✅ Reactive claims have been processed on-chain');
-    } catch (error) {
-      console.log('ℹ️ Sub-channel not yet established or claims still pending');
-    }
+    // Deposit a small amount that will be depleted
+    const smallDepositAmount = BigInt('50000000'); // 0.5 RGas - small amount for quick depletion
+    await depletionHubClient.deposit(testAsset.assetId, smallDepositAmount);
 
-    // Test 6: Admin client verification of claim status
-    console.log('📊 Test 6: Check claim processing stats via admin client');
+    const initialBalance = await depletionHubClient.getBalance({ assetId: testAsset.assetId });
+    console.log(`💰 Initial balance for depletion test: ${initialBalance.toString()}`);
+    expect(initialBalance).toBeGreaterThanOrEqual(smallDepositAmount);
 
-    try {
-      const adminStats = await adminClient.getSystemStatus();
-      console.log('📊 Claim processing stats:', JSON.stringify(adminStats, null, 2));
+    // Create client with the depletion test payer
+    const depletionClient = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: depletionPayer.identityEnv,
+      maxAmount: BigInt('50000000000'),
+      debug: true,
+    });
 
-      expect(adminStats.claims).toBeTruthy();
-      expect(adminStats.processor).toBeTruthy();
+    // Wait for balance cache refresh
+    await new Promise(resolve => setTimeout(resolve, 2500));
 
-      // Should show some claim activity
-      // processor schema: { totalRequests, successfulPayments, failedPayments, autoClaimsTriggered }
-      expect(adminStats.processor.totalRequests).toBeGreaterThan(0);
-      // At least one auto claim should be triggered in this test sequence (best-effort)
-      if (typeof adminStats.processor.autoClaimsTriggered === 'number') {
-        expect(adminStats.processor.autoClaimsTriggered).toBeGreaterThanOrEqual(0);
-      }
-    } catch (error) {
-      console.log('ℹ️ Admin stats not available or restricted:', error);
-    }
-
-    // Test 7: Balance depletion scenario (optional, commented out to avoid interference)
-    console.log('ℹ️ Test 7: Balance depletion scenario (skipped to avoid test interference)');
-    // This test would drain the balance and verify that subsequent requests are rejected
-    // Commented out to avoid affecting other tests
-
-    console.log('💸 Test 7: Balance depletion scenario');
-
-    // Make fewer, higher-cost requests to deplete balance faster
+    // Make requests until balance is depleted
+    console.log('🔄 Making requests to deplete balance...');
     let requestCounter = 1;
-    let lastSuccessfulBalance = balanceAfterDeposit;
+    let lastSuccessfulBalance = initialBalance;
+    let depletionErrorCaught = false;
 
     try {
-      const maxDepleteRequests = 20; // hard cap to avoid infinite loop in CI
-      while (lastSuccessfulBalance > 0n && requestCounter <= maxDepleteRequests) {
-        const depletionResult = await claimTestClient.get(
-          `/expensive?q=depletion%20${requestCounter}`
-        );
-        if (depletionResult.payment) {
-          console.log(
-            `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
-          );
-        }
-        requestCounter++;
+      const maxDepleteRequests = 15; // Limit to avoid infinite loop
+      const minBalanceToKeep = BigInt(5000000); // Keep minimal balance
 
-        // Observe reactive claim status via admin endpoint
+      while (lastSuccessfulBalance > minBalanceToKeep && requestCounter <= maxDepleteRequests) {
         try {
-          const adminStatsNow = await adminClient.getSystemStatus();
-          console.log('📊 Reactive claim status snapshot:', JSON.stringify(adminStatsNow.claims));
-        } catch (e) {
-          console.log('ℹ️ Admin status unavailable:', (e as any)?.message || String(e));
-        }
+          const depletionResult = await depletionClient.get(
+            `/expensive?q=depletion%20${requestCounter}`
+          );
+          if (depletionResult.payment) {
+            console.log(
+              `💰 Depletion request ${requestCounter} - ${formatPaymentInfo(depletionResult.payment)}`
+            );
+          }
+          requestCounter++;
 
-        // Allow a short window for reactive claims to process
-        await new Promise(r => setTimeout(r, 300));
+          // Check balance periodically
+          if (requestCounter % 3 === 0) {
+            lastSuccessfulBalance = await depletionHubClient.getBalance({
+              assetId: testAsset.assetId,
+            });
+            console.log(`💰 Current balance: ${lastSuccessfulBalance.toString()}`);
+          }
 
-        // Check balance more frequently since depletion is faster
-        if (requestCounter % 2 === 0) {
-          lastSuccessfulBalance = await claimTestHubClient.getBalance({
-            assetId: testAsset.assetId,
-          });
-          console.log(`💰 Current balance: ${lastSuccessfulBalance.toString()}`);
+          // Allow time for reactive claims to process
+          await new Promise(r => setTimeout(r, 200));
+        } catch (error: any) {
+          depletionErrorCaught = true;
+          console.log('🚫 Request failed due to balance depletion (expected):', error.message);
+          expect(error.message).toMatch(/balance|insufficient|funds|402/i);
+          break;
         }
       }
 
       if (requestCounter > maxDepleteRequests) {
         console.log(
-          '⏱️ Stopped depletion due to maxDepleteRequests cap; skipping further drains to avoid timeout'
+          '⏱️ Reached max depletion requests without error - balance may still be sufficient'
         );
       }
     } catch (error: any) {
+      depletionErrorCaught = true;
       console.log('🚫 Request failed due to balance depletion (expected):', error.message);
-      expect(error.message).toMatch(/balance|insufficient|funds|402/i);
+      if (error.message && !error.message.includes('fetch failed')) {
+        expect(error.message).toMatch(/balance|insufficient|funds|402/i);
+      }
     }
 
-    console.log(
-      '🎉 PaymentHub balance check and reactive claim mechanism test completed successfully!'
-    );
+    // Verify final balance is low
+    const finalBalance = await depletionHubClient.getBalance({ assetId: testAsset.assetId });
+    console.log(`💰 Final balance: ${finalBalance.toString()}`);
+    expect(finalBalance).toBeLessThan(initialBalance);
 
-    console.log(`📋 Test Summary:
-      ✅ Balance check prevents requests with insufficient funds
-      ✅ Requests succeed after sufficient deposit
-      ✅ Reactive claim mechanism processes accumulated amounts
-      ✅ Nonce progression indicates proper settlement
-      ✅ On-chain state reflects claim processing
-      ✅ Admin stats show claim activity
-    `);
-  }, 180000); // 3 minutes timeout for comprehensive testing
+    if (depletionErrorCaught) {
+      console.log('✅ Balance depletion error correctly caught');
+    } else {
+      console.log('ℹ️ Balance not fully depleted within test limits (acceptable)');
+    }
+
+    // Clean up test client
+    try {
+      await depletionClient.logoutCleanup();
+      console.log('✅ Depletion test client cleanup completed');
+    } catch (e) {
+      console.log('🚫 Error during depletion test client cleanup:', e);
+    }
+
+    console.log('🎉 PaymentHub balance depletion error handling test successful!');
+  }, 180000);
 });

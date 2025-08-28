@@ -100,15 +100,12 @@ export type { PersistedHttpClientState };
  * Extended to support full client state persistence
  */
 export interface HostChannelMappingStore {
-  // Legacy methods for backward compatibility
-  get(host: string): Promise<string | undefined>;
-  set(host: string, channelId: string): Promise<void>;
-  delete(host: string): Promise<void>;
-
-  // New methods for full state management
-  getState?(host: string): Promise<PersistedHttpClientState | undefined>;
-  setState?(host: string, state: PersistedHttpClientState): Promise<void>;
-  deleteState?(host: string): Promise<void>;
+  /** Read full persisted http client state for a host (required) */
+  getState(host: string): Promise<PersistedHttpClientState | undefined>;
+  /** Write full persisted http client state for a host (required) */
+  setState(host: string, state: PersistedHttpClientState): Promise<void>;
+  /** Delete persisted http client state for a host (required) */
+  deleteState(host: string): Promise<void>;
 }
 
 /**
@@ -153,7 +150,7 @@ export interface PendingPaymentRequest {
   /** Timeout ID for cleanup */
   timeoutId: NodeJS.Timeout;
   /** The SignedSubRAV that was sent with this pending request */
-  sendedSubRav?: SignedSubRAV;
+  sentSubRav?: SignedSubRAV;
   /** The request context that was sent with this pending request */
   requestContext: PaymentRequestContext;
 }

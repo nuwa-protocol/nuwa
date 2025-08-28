@@ -7,10 +7,7 @@
 
 import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelInfo } from '../../core/types';
 import type { RateResult } from '../rate/types';
-import type { PaymentError as CentralPaymentError } from '../../errors/codes';
-
-// Re-export centralized PaymentError type for BillingContext usage
-export type PaymentError = CentralPaymentError;
+import type { PaymentError } from '../../errors/codes';
 
 export interface BillingContext {
   /** Service identifier (e.g. "llm-gateway", "mcp-server") */

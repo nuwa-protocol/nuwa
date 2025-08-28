@@ -22,64 +22,150 @@ bun add @nuwa-kit/capui-kit
 
 ## Quick Start
 
-### Vanilla JavaScript
-
-```javascript
-import { CapUI } from '@nuwa-kit/capui-kit';
-
-const capUI = new CapUI({
-  onReceiveMessage: (message) => {
-    console.log('Received:', message);
-    return 'Message processed';
-  },
-  onError: (error) => {
-    console.error('CapUI Error:', error);
-  },
-  onConnectionChange: (isConnected) => {
-    console.log('Connection status:', isConnected);
-  }
-});
-
-
-await capUI.sendMessage('Hello from Cap UI!'); // Send a message to the Nuwa client
-await capUI.sendToolCall('{"tool": "example", "params": {}}'); // ask the client to execute a tool call
-await capUI.sendPrompt('Generate something amazing'); // ask the client to send a prompt for the user
-```
-
-### React Hook
+### React Hook (Recommended)
 
 ```jsx
-import { useCapUI } from '@nuwa-kit/capui-kit';
+import { useCapEmbedUIKit } from '@nuwa-kit/capui-kit';
 
 function MyComponent() {
-  const { sendMessage, sendToolCall, sendPrompt, isConnected } = useCapUI({
-    onReceiveMessage: (message) => {
-      console.log('Received:', message);
-      return 'Processed';
-    },
-    onError: (error) => console.error(error)
+  const { containerRef, sendMessage, sendPrompt, isConnected } = useCapEmbedUIKit({
+    autoAdjustHeight: true // Automatically adjust iframe height
   });
 
-  const handleClick = async () => {
-    await sendMessage('Button clicked!');
+  const handleSendMessage = async () => {
+    const response = await sendMessage('Hello from iframe!');
+    console.log('Response:', response);
+  };
+
+  const handleSendPrompt = async () => {
+    await sendPrompt('Generate something amazing');
   };
 
   return (
-    <div>
-      <p>Status: {isConnected ? 'Connected' : 'Disconnected'}</p>
-      <button onClick={handleClick}>Send Message</button>
+    <div ref={containerRef} className="p-4">
+      <h1>My Cap UI</h1>
+      <p>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</p>
+      
+      <button onClick={handleSendMessage} disabled={!isConnected}>
+        Send Message
+      </button>
+      
+      <button onClick={handleSendPrompt} disabled={!isConnected}>
+        Send Prompt
+      </button>
     </div>
   );
 }
 ```
 
-#### Nuwa Client Methods
+### Auto Height Adjustment
 
-- `sendMessage(message: string): Promise<string>` - Send a message to the client
-- `sendToolCall(toolCall: string): Promise<string>` - Send a tool call to the client
-- `sendPrompt(prompt: string): Promise<string>` - Send a prompt to the client
+The SDK provides automatic height adjustment to ensure your iframe content is fully visible:
 
-| todo: explain the callbacks and the detailed behaviors
+```jsx
+function WeatherApp() {
+  const [weatherData, setWeatherData] = useState(null);
+  const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
+
+  useEffect(() => {
+    fetchWeatherData().then(setWeatherData);
+  }, []);
+
+  return (
+    <div ref={containerRef}>
+      {weatherData ? (
+        <WeatherDisplay data={weatherData} />
+      ) : (
+        <div>Loading weather...</div>
+      )}
+    </div>
+  );
+}
+```
+
+**Features:**
+- ✅ Automatic height detection on initial load
+- ✅ Dynamic height adjustment when content changes
+- ✅ Responsive height updates on window resize
+- ✅ Works with async content loading
+- ✅ Uses MutationObserver for efficient DOM change detection
+
+### Vanilla JavaScript
+
+```javascript
+import { CapEmbedUIKit } from '@nuwa-kit/capui-kit';
+
+const capUI = new CapEmbedUIKit();
+
+await capUI.connect();
+
+// Send messages
+await capUI.sendMessage('Hello from Cap UI!');
+await capUI.sendPrompt('Generate something amazing');
+
+// Set iframe height manually
+await capUI.setUIHeight(400);
+```
+
+## API Reference
+
+### `useCapEmbedUIKit(options)`
+
+**Options:**
+- `autoAdjustHeight?: boolean` - Enable automatic height adjustment (default: `false`)
+
+**Returns:**
+- `isConnected: boolean` - Connection status
+- `containerRef: RefObject<HTMLDivElement>` - Ref to attach to your root container
+- `sendMessage(message: string): Promise<string>` - Send a message to the parent
+- `sendPrompt(prompt: string): Promise<string>` - Send a prompt to the parent  
+- `setUIHeight(height: number): Promise<void>` - Manually set iframe height
+
+### `CapEmbedUIKit` Class
+
+**Methods:**
+- `connect(): Promise<void>` - Establish connection with parent
+- `sendMessage(message: string): Promise<string>` - Send a message to parent
+- `sendPrompt(prompt: string): Promise<string>` - Send a prompt to parent
+- `setUIHeight(height: number): Promise<void>` - Set iframe height
+
+## Best Practices
+
+### 1. Always Use Container Ref
+```jsx
+// ✅ Correct
+const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
+return <div ref={containerRef}>Content</div>;
+
+// ❌ Wrong - height detection won't work
+const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
+return <div>Content</div>; // Missing ref
+```
+
+### 2. Handle Async Content
+```jsx
+// ✅ Good - Always render container
+return (
+  <div ref={containerRef}>
+    {data ? <Content data={data} /> : <Loading />}
+  </div>
+);
+
+// ❌ Avoid - Conditional rendering of container
+if (!data) return null; // This breaks height detection
+return <div ref={containerRef}><Content data={data} /></div>;
+```
+
+### 3. Check Connection Status
+```jsx
+const handleAction = async () => {
+  if (!isConnected) {
+    console.warn('Not connected to parent');
+    return;
+  }
+  await sendMessage('Action performed');
+};
+```
 
 ## Requirements
 

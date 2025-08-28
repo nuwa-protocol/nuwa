@@ -113,7 +113,7 @@ export async function createBillingServer(config: BillingServerConfig) {
   // High-cost endpoint to accelerate balance depletion in tests
   billing.get(
     '/expensive',
-    { pricing: '5000000000' }, // 5,000,000,000 picoUSD (~50,000,000 base units assuming 100 picoUSD/unit)
+    { pricing: '500000000' }, // 500,000,000 picoUSD (~5,000,000 base units assuming 100 picoUSD/unit)
     (req: Request, res: Response, next: NextFunction) => {
       try {
         res.json({

@@ -51,7 +51,7 @@ export interface PaymentProcessorConfig {
   claimTriggerService?: ClaimTriggerService;
 
   /** Minimum claim amount threshold */
-  minClaimAmount?: bigint;
+  minClaimAmount: bigint;
 
   /** Debug logging */
   debug?: boolean;
@@ -206,52 +206,76 @@ export class PaymentProcessor {
       pctx.state.latestSignedSubRav = latestSignedSubRav || undefined;
       pctx.state.latestPendingSubRav = latestPendingSubRav || undefined;
 
-      // Hub balance check (if minClaimAmount is configured)
-      if (this.config.minClaimAmount) {
-        try {
-          const hubBalance = await this.config.hubBalanceService.getBalance(
-            channelInfo.payerDid,
-            channelInfo.assetId
-          );
+      try {
+        const hubBalance = await this.config.hubBalanceService.getBalance(
+          channelInfo.payerDid,
+          channelInfo.assetId
+        );
 
-          this.log('Hub balance check (cached)', {
+        // Compute outstanding withdrawable delta based on latest signed vs last claimed
+        const latestAccumulatedForDelta =
+          (latestSignedSubRav?.subRav?.accumulatedAmount as bigint | undefined) ??
+          subChannelInfo.lastClaimedAmount;
+        const lastClaimedAmount = subChannelInfo.lastClaimedAmount;
+        const deltaOutstanding =
+          latestAccumulatedForDelta > lastClaimedAmount
+            ? latestAccumulatedForDelta - lastClaimedAmount
+            : 0n;
+
+        this.log('Hub balance check (cached)', {
+          payerDid: channelInfo.payerDid,
+          assetId: channelInfo.assetId,
+          cachedBalance: hubBalance.toString(),
+          minClaimAmount: this.config.minClaimAmount.toString(),
+          deltaOutstanding: deltaOutstanding.toString(),
+          sufficient: hubBalance >= this.config.minClaimAmount && hubBalance >= deltaOutstanding,
+          source: 'HubBalanceService_cache',
+        });
+
+        // If withdrawable delta already crosses threshold but hub balance is insufficient, block with 402
+        if (deltaOutstanding >= this.config.minClaimAmount && hubBalance < deltaOutstanding) {
+          this.log('❌ Hub balance insufficient for outstanding delta - rejecting request', {
+            payerDid: channelInfo.payerDid,
+            assetId: channelInfo.assetId,
+            cachedBalance: hubBalance.toString(),
+            deltaOutstanding: deltaOutstanding.toString(),
+          });
+
+          return this.fail(
+            pctx,
+            Errors.hubInsufficientFunds(hubBalance, deltaOutstanding, channelInfo.assetId),
+            { attachHeader: true }
+          );
+        }
+
+        if (hubBalance < this.config.minClaimAmount) {
+          this.log('❌ Hub balance insufficient - rejecting request', {
             payerDid: channelInfo.payerDid,
             assetId: channelInfo.assetId,
             cachedBalance: hubBalance.toString(),
             minClaimAmount: this.config.minClaimAmount.toString(),
-            sufficient: hubBalance >= this.config.minClaimAmount,
-            source: 'HubBalanceService_cache',
+            deficit: (this.config.minClaimAmount - hubBalance).toString(),
           });
 
-          if (hubBalance < this.config.minClaimAmount) {
-            this.log('❌ Hub balance insufficient - rejecting request', {
-              payerDid: channelInfo.payerDid,
-              assetId: channelInfo.assetId,
-              cachedBalance: hubBalance.toString(),
-              minClaimAmount: this.config.minClaimAmount.toString(),
-              deficit: (this.config.minClaimAmount - hubBalance).toString(),
-            });
-
-            return this.fail(
-              pctx,
-              Errors.hubInsufficientFunds(
-                hubBalance,
-                this.config.minClaimAmount,
-                channelInfo.assetId
-              ),
-              { attachHeader: false }
-            );
-          }
-        } catch (error) {
-          this.log('⚠️ Hub balance check failed - proceeding anyway', {
-            payerDid: channelInfo.payerDid,
-            assetId: channelInfo.assetId,
-            error: error instanceof Error ? error.message : String(error),
-            source: 'HubBalanceService_cache',
-          });
-          // Don't fail the request on balance fetch errors - let it proceed
-          // The claim will fail later if balance is actually insufficient
+          return this.fail(
+            pctx,
+            Errors.hubInsufficientFunds(
+              hubBalance,
+              this.config.minClaimAmount,
+              channelInfo.assetId
+            ),
+            { attachHeader: true }
+          );
         }
+      } catch (error) {
+        this.log('⚠️ Hub balance check failed - proceeding anyway', {
+          payerDid: channelInfo.payerDid,
+          assetId: channelInfo.assetId,
+          error: error instanceof Error ? error.message : String(error),
+          source: 'HubBalanceService_cache',
+        });
+        // Don't fail the request on balance fetch errors - let it proceed
+        // The claim will fail later if balance is actually insufficient
       }
 
       // Handle early-return decisions
