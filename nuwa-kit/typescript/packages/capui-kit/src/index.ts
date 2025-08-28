@@ -1,13 +1,5 @@
-// Types
-export type { CapUIOptions } from "./cap-ui";
-
 // Vanilla JS Class (framework-agnostic)
-export { CapUI } from "./cap-ui";
-export type {
-	CapUIResource,
-	CapUIURI,
-} from "./types";
-export type { UseCapUIParentProps } from "./use-cap-ui";
+export { CapEmbedUIKit } from "./cap-ui-embed";
 
 // React Hooks
-export { useCapUI } from "./use-cap-ui";
+export { useCapEmbedUIKit } from "./use-cap-ui-embed";

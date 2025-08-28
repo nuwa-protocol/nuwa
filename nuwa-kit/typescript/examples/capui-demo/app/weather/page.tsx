@@ -1,5 +1,6 @@
 "use client";
 
+import { useCapEmbedUIKit } from "@nuwa-ai/capui-kit";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Weather, type WeatherAtLocation } from "@/components/weather";
@@ -25,20 +26,25 @@ function WeatherContent() {
         getWeather();
     }, [searchParams]);
 
-    if (weatherData)
-        return (
-            <div className="p-4">
+    return (
+        <div className="p-4">
+            {weatherData ? (
                 <Weather weatherAtLocation={weatherData} />
-            </div>
-        );
-
-    return null;
+            ) : (
+                <div>Loading weather...</div>
+            )}
+        </div>
+    );
 }
 
 export default function WeatherPage() {
+    const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
     return (
-        <Suspense fallback={<div>Loading weather...</div>}>
-            <WeatherContent />
-        </Suspense>
+        <div ref={containerRef}>
+            <Suspense fallback={<div>Loading weather...</div>}>
+                <WeatherContent />
+            </Suspense>
+        </div>
+
     );
 }
