@@ -403,37 +403,50 @@ export class PaymentChannelHttpClient {
       paymentResolve = res;
       paymentReject = rej;
     });
+    let paymentBridgeAttached = false;
 
     // Setup abort support
-    const controller = new AbortController();
+    let scheduledHandle: { cancel: (reason?: any) => void; promise: Promise<Response> } | undefined;
     let abort: (() => void) | undefined = () => {
-      controller.abort('aborted by PaymentRequestHandle');
-      try {
-        this.requestManager.rejectByRef(clientTxRef, new Error('Request aborted by caller'));
-      } catch (e) {
-        this.log('[abort.reject.error]', e);
-      }
+      // Defer to next tick to avoid surfacing abort synchronously at call-site
+      setTimeout(() => {
+        try {
+          // Pass undefined reason to minimize external reporting
+          scheduledHandle?.cancel(undefined);
+          if (!paymentBridgeAttached) {
+            try { paymentResolve(undefined); } catch {}
+          } else {
+            try { void this.requestManager.resolveByRef(clientTxRef, undefined); } catch {}
+          }
+        } catch {}
+      }, 0);
     };
 
     if (init?.signal instanceof AbortSignal) {
+      const onInitAbort = () => {
+        abort?.();
+      };
       if (init.signal.aborted) {
-        controller.abort(init.signal.reason);
+        onInitAbort();
       } else {
-        const onAbort = () => controller.abort(init.signal!.reason);
-        init.signal.addEventListener('abort', onAbort, { once: true });
+        init.signal.addEventListener('abort', onInitAbort, { once: true });
       }
     }
 
-    const responsePromise: Promise<Response> = this.scheduler.enqueue(async release => {
-      // Check if client has been cleaned up
-      if (this.isCleanedUp) {
+    const responsePromise: Promise<Response> = (scheduledHandle = this.scheduler.enqueue(async (release, signal) => {
+      // Check if client has been cleaned up or aborted
+      if (this.isCleanedUp || signal.aborted) {
         throw new Error('Client has been cleaned up');
       }
 
       // Ensure prerequisites
+      if (signal.aborted) throw new Error('Request aborted');
       await this.ensureKeyFragment();
+      if (signal.aborted) throw new Error('Request aborted');
       await this.channelManager.ensureChannelReady();
+      if (signal.aborted) throw new Error('Request aborted');
       await this.channelManager.discoverService();
+      if (signal.aborted) throw new Error('Request aborted');
 
       // Try to recover pending SubRAV if needed
       try {
@@ -441,6 +454,7 @@ export class PaymentChannelHttpClient {
       } catch (e) {
         this.log('[serialized.recover.error]', e);
       }
+      if (signal.aborted) throw new Error('Request aborted');
 
       // Prepare headers with payment data
       const { headers, sentedSubRav } = await this.prepareHeaders(
@@ -449,6 +463,7 @@ export class PaymentChannelHttpClient {
         clientTxRef,
         init?.headers
       );
+      if (signal.aborted) throw new Error('Request aborted');
 
       // Build request context
       requestContext = {
@@ -489,6 +504,7 @@ export class PaymentChannelHttpClient {
       }
 
       // Bridge internal promise to external one
+      paymentBridgeAttached = true;
       void pp.then(paymentResolve).catch(paymentReject);
 
       // Transaction logging
@@ -497,10 +513,18 @@ export class PaymentChannelHttpClient {
       } catch (e) {
         this.log('[txlog.create.error]', e);
       }
+      if (signal.aborted) throw new Error('Request aborted');
 
-      // Execute request
-      return this.executeRequest(requestContext, { ...init, signal: controller.signal });
-    });
+      // Execute request with abort support; ensure fetchImpl receives AbortSignal
+      const fetchInit: RequestInit = { ...init, signal };
+      return this.executeRequest(requestContext, fetchInit);
+    })).promise;
+
+    // Prophylactic catch to prevent unhandled rejection before user attaches handlers
+    // This avoids unhandled rejection warnings/errors if abort happens immediately
+    responsePromise.catch(() => {});
+
+    // No external controller. Abort flows handled via handle.abort() and init.signal above
 
     this.log(
       '[request.start]',
@@ -516,7 +540,11 @@ export class PaymentChannelHttpClient {
     responsePromise.catch(err => {
       this.log('[response.error]', err);
       try {
-        this.requestManager.resolveByRef(clientTxRef, undefined);
+        const settled = this.requestManager.resolveByRef(clientTxRef, undefined);
+        if (!settled) {
+          // No pending in manager (likely pre-bridge) → resolve local promise to avoid hang
+          try { paymentResolve(undefined); } catch {}
+        }
       } catch (settleErr) {
         this.log('[response.error.settle]', settleErr);
       }
@@ -532,6 +560,10 @@ export class PaymentChannelHttpClient {
       }
       return { data, payment };
     });
+
+    // Avoid unhandled rejections if caller never awaits these
+    void paymentPromise.catch(() => {});
+    void done.catch(() => {});
 
     // Update transaction on response
     void responsePromise
