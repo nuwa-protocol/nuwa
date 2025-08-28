@@ -446,8 +446,6 @@ export class PaymentChannelHttpClient {
 
         // Ensure prerequisites
         if (signal.aborted) throw new Error('Request aborted');
-        await this.ensureKeyFragment();
-        if (signal.aborted) throw new Error('Request aborted');
         await this.channelManager.ensureChannelReady();
         if (signal.aborted) throw new Error('Request aborted');
         await this.channelManager.discoverService();
@@ -658,7 +656,6 @@ export class PaymentChannelHttpClient {
     latestSubRavNonce?: bigint;
   }> {
     await this.channelManager.ensureChannelReady();
-    await this.ensureKeyFragment();
 
     const channelInfo = this.paymentState.getChannelInfo();
     const vmIdFragment = this.paymentState.getVmIdFragment();
@@ -749,37 +746,6 @@ export class PaymentChannelHttpClient {
     }
 
     return crypto.randomUUID();
-  }
-
-  /**
-   * Ensure keyId and vmIdFragment are resolved
-   */
-  private async ensureKeyFragment(): Promise<void> {
-    if (this.paymentState.getKeyId() && this.paymentState.getVmIdFragment()) return;
-
-    let keyId = this.options.keyId;
-    if (!keyId) {
-      if (this.options.signer && typeof this.options.signer.listKeyIds === 'function') {
-        try {
-          const ids: string[] = await this.options.signer.listKeyIds();
-          keyId = Array.isArray(ids) && ids.length > 0 ? ids[0] : undefined;
-        } catch (e) {
-          this.log('listKeyIds failed:', e);
-        }
-      }
-    }
-
-    if (keyId) {
-      const parts = keyId.split('#');
-      const vmIdFragment = parts.length > 1 ? parts[1] : undefined;
-      if (vmIdFragment) {
-        this.paymentState.setKeyInfo(keyId, vmIdFragment);
-      }
-    }
-
-    if (!this.paymentState.getKeyId() || !this.paymentState.getVmIdFragment()) {
-      throw new Error('No keyId found');
-    }
   }
 
   /**
