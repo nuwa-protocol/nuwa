@@ -7,7 +7,7 @@ import { verifyInteractionRequest } from './verify-discord-request';
 import { KeyManager } from '@nuwa-ai/identity-kit';
 import { PaymentHubClient, RoochPaymentChannelContract } from '@nuwa-ai/payment-kit';
 import { supabase } from "./supabase";
-
+import dayjs from "dayjs";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -171,38 +171,71 @@ app.post('/api/discord/interactions', async (req: any, res: Response) => {
 	return res.status(400).send('Unknown interaction');
 });
 
+
 async function processInteractionAsync(userDid: string, interaction: any) {
-	if (!hubAddress) {
-		return;
-	}
+	if (!hubAddress) return;
+
 	const applicationId = interaction.application_id;
 	const interactionToken = interaction.token;
 	const webhookUrl = `https://discord.com/api/v10/webhooks/${applicationId}/${interactionToken}`;
+	const userId = interaction.member?.user?.id || interaction.user?.id;
+	const mention = userId ? `<@${userId}>` : userDid;
+
 	try {
+
+		const startOfDay = dayjs().startOf("day").toISOString();
+		const { data: existingClaims, error: checkError } = await supabase
+			.from("faucet_claims")
+			.select("id")
+			.eq("did", userDid)
+			.gte("created_at", startOfDay);
+
+		if (checkError) {
+			console.error("Supabase check error:", checkError);
+		}
+
+		if (existingClaims && existingClaims.length > 0) {
+			// 已领取，直接回复
+			await fetch(webhookUrl, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					content: `${mention} ❌ You have already claimed testnet funds today. Please try again tomorrow.`,
+					embeds: [
+						{
+							title: "Claim Limit Reached",
+							description: "You can only claim once per day.",
+							color: 0xff0000,
+						},
+					],
+				}),
+			});
+			return;
+		}
+
 		const claimedAmount = await claimTestnetGas(hubAddress);
 		const rgasAmount = Math.floor(claimedAmount / 100000000);
 		const transferAmount = Math.floor((claimedAmount * 50) / 100);
 		const transferRgasAmount = Math.floor(transferAmount / 100000000);
 		const transferUsdAmount = transferRgasAmount / 100;
+
 		const result = await transferFromHub(userDid, transferAmount);
-		const userId = interaction.member?.user?.id || interaction.user?.id;
-		const mention = userId ? `<@${userId}>` : userDid;
 		if (result) {
 			await fetch(webhookUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					content: `${mention}`,
 					embeds: [
 						{
-							title: 'Claim Successful 🎉',
+							title: "Claim Successful 🎉",
 							description: `**$${transferUsdAmount}** USD test balance has been sent to your account.\n\n**Check your balance on [Nuwa AI Beta](https://test-app.nuwa.dev)**`,
 							color: 0x00ff00,
 						},
 					],
 				}),
 			});
-            const userAddress = userDid.split(":")[2];
+			const userAddress = userDid.split(":")[2];
 			await supabase.from("faucet_claims").insert({
 				did: userDid,
 				address: userAddress,
@@ -210,13 +243,13 @@ async function processInteractionAsync(userDid: string, interaction: any) {
 			});
 		} else {
 			await fetch(webhookUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					content: `${mention} ❌ Successfully claimed **${rgasAmount} RGAS** to hub account, but failed to transfer to your wallet. Please try again later.`,
 					embeds: [
 						{
-							title: 'Claim Success, Transfer Failed',
+							title: "Claim Success, Transfer Failed",
 							description: `✅ Claimed ${rgasAmount} RGAS to hub\n❌ Failed to transfer to user wallet`,
 							color: 0xffaa00,
 						},
@@ -225,22 +258,25 @@ async function processInteractionAsync(userDid: string, interaction: any) {
 			});
 		}
 	} catch (error) {
-		console.error('Process interaction error:', error);
-		const userId = interaction.member?.user?.id || interaction.user?.id;
-		const mention = userId ? `<@${userId}>` : userDid;
+		console.error("Process interaction error:", error);
 		await fetch(webhookUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				content: `${mention} ❌ Error occurred while processing claim and transfer: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				content: `${mention} ❌ Error occurred while processing claim and transfer: ${
+					error instanceof Error ? error.message : "Unknown error"
+				}`,
 				embeds: [
-					{ title: 'Error', description: 'An error occurred during the claim and transfer process', color: 0xff0000 },
+					{
+						title: "Error",
+						description: "An error occurred during the claim and transfer process",
+						color: 0xff0000,
+					},
 				],
 			}),
 		});
 	}
 }
-
 app.listen(PORT, () => {
 	console.log(`Discord Interactions service listening on http://127.0.0.1:${PORT}`);
 }); 
