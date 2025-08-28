@@ -611,8 +611,9 @@ export class PaymentChannelHttpClient {
       if (pending) {
         const vmIdFragment = this.paymentState.getVmIdFragment();
         if (vmIdFragment && vmIdFragment === pending.vmIdFragment) {
-          const signed = await this.payerClient.signSubRAV(pending);
-          await this.channelManager.commitSubRAV(signed);
+          //TODO: Implement commit and commit api
+          //const signed = await this.payerClient.signSubRAV(pending);
+          //await this.channelManager.commitSubRAV(signed);
           this.log('logoutCleanup: committed pending SubRAV on logout:', pending.nonce);
         }
       }
