@@ -24,6 +24,8 @@ describe('ChannelManager', () => {
       openChannel: jest.fn(),
       openChannelWithSubChannel: jest.fn(),
       getChannelInfo: jest.fn(),
+      getSubChannelInfo: jest.fn(),
+      authorizeSubChannel: jest.fn(),
       closeChannel: jest.fn(),
     } as any;
 
@@ -237,31 +239,27 @@ describe('ChannelManager', () => {
       // Set up state retrieval - no existing channel
       mockMappingStore.getState.mockResolvedValue(undefined);
 
-      // Mock channel creation with sub-channel
+      // Mock channel creation with sub-channel and include returned infos to avoid extra lookups
       mockPayerClient.openChannelWithSubChannel.mockResolvedValue({
         channelId: 'new-channel-456',
         txHash: '0x123',
-        blockHeight: BigInt(100),
         events: [],
-      });
-
-      // Mock getting channel info after creation
-      mockPayerClient.getChannelInfo.mockResolvedValue({
-        channelId: 'new-channel-456',
-        payerDid: 'did:example:user',
-        payeeDid: 'did:example:payee',
-        assetId: '0x3::gas_coin::RGas',
-        epoch: BigInt(1),
-        status: 'active',
-      });
-
-      // Mock getting sub-channel info
-      mockPayerClient.getSubChannelInfo = jest.fn().mockResolvedValue({
-        channelId: 'new-channel-456',
-        subChannelId: 'sub-channel-1',
-        vmIdFragment: 'key-1',
-        status: 'active',
-        balance: BigInt(0),
+        channelInfo: {
+          channelId: 'new-channel-456',
+          payerDid: 'did:example:user',
+          payeeDid: 'did:example:payee',
+          assetId: '0x3::gas_coin::RGas',
+          epoch: BigInt(1),
+          status: 'active',
+        },
+        subChannelInfo: {
+          channelId: 'new-channel-456',
+          epoch: BigInt(1),
+          vmIdFragment: 'key-1',
+          lastClaimedAmount: BigInt(0),
+          lastConfirmedNonce: BigInt(0),
+          lastUpdated: Date.now(),
+        },
       });
 
       // Ensure channel is ready
