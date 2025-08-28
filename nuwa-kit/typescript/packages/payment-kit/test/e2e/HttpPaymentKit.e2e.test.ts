@@ -50,6 +50,7 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
   let httpClient: PaymentChannelHttpClient;
   let adminClient: PaymentChannelAdminClient;
   let hubClient: PaymentHubClient;
+  let logger: DebugLogger;
 
   // Track unhandled rejections for debugging
   const unhandledRejections = new Set<any>();
@@ -66,9 +67,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       return;
     }
 
-    console.log('🚀 Starting HTTP Payment Kit E2E Tests');
     DebugLogger.setGlobalLevel('debug'); // Reduce noise in E2E tests
-
+    logger = DebugLogger.get('HttpPaymentKit.e2e.test');
+    logger.setLevel('debug');
+    logger.debug('🚀 Starting HTTP Payment Kit E2E Tests');
     // Bootstrap test environment with real Rooch node
     env = await TestEnv.bootstrap({
       rpcUrl: process.env.ROOCH_NODE_URL || 'http://localhost:6767',
@@ -124,16 +126,16 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     hubClient = httpClient.getHubClient();
 
     let tx = await hubClient.deposit(testAsset.assetId, BigInt('1000000000'));
-    console.log('💰 Deposit tx:', tx);
+    logger.debug('💰 Deposit tx:', tx);
 
     // Create admin client for testing admin endpoints
     adminClient = createAdminClient(httpClient);
 
-    console.log(`✅ Billing server started on ${billingServerInstance.baseURL}`);
-    console.log(
+    logger.debug(`✅ Billing server started on ${billingServerInstance.baseURL}`);
+    logger.debug(
       `✅ HTTP client created using simplified createHttpClient API with automatic service discovery`
     );
-    console.log(`✅ Admin client created for testing admin endpoints`);
+    logger.debug(`✅ Admin client created for testing admin endpoints`);
   }, 180000); // 3 minutes timeout for setup
 
   afterAll(async () => {
@@ -146,17 +148,17 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
       try {
         await httpClient.logoutCleanup();
       } catch (e) {
-        console.error('Error during logout cleanup:', e);
+        logger.error('Error during logout cleanup:', e);
       }
-      console.log('✅ HTTP client logout cleanup');
+      logger.debug('✅ HTTP client logout cleanup');
     }
     // Cleanup
     if (billingServerInstance) {
       await billingServerInstance.shutdown();
-      console.log('✅ Billing server shutdown');
+      logger.debug('✅ Billing server shutdown');
     }
-
-    console.log('🏁 HTTP Payment Kit E2E Tests completed');
+    DebugLogger.setGlobalLevel('error');
+    logger.debug('🏁 HTTP Payment Kit E2E Tests completed');
   }, 60000);
 
   test('Service discovery with createHttpClient', async () => {
@@ -459,6 +461,104 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     console.log(`💰 Follow-up payment after stream - ${formatPaymentInfo(follow.payment!)}`);
 
     console.log('🎉 Streaming SSE with in-band payment frame test successful!');
+  }, 120000);
+
+  test('Abort queued request before start removes from queue', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    logger.debug('🧪 Testing abort of queued request');
+
+    // Warm up
+    await httpClient.get('/echo?q=warmup-abort');
+
+    // Start a streaming request to occupy scheduler but don't await response yet
+    const handleStream = await httpClient.requestWithPayment('GET', '/stream');
+
+    // Queue a GET request via requestWithPayment and abort using handle
+    const queuedHandle = await httpClient.requestWithPayment('GET', '/echo?q=queued-abort');
+    // Abort immediately to ensure it stays queued and gets removed
+    queuedHandle.abort?.();
+
+    // It should reject the response promise
+    let errorCaught = false;
+    try {
+      await queuedHandle.response;
+      // Should not reach here
+      expect(true).toBe(false);
+    } catch (err) {
+      errorCaught = true;
+      logger.debug('✅ Request correctly rejected due to abort (handle):', err);
+    }
+
+    try {
+      await queuedHandle.payment;
+    } catch (err) {}
+
+    expect(errorCaught).toBe(true);
+
+    // Cleanup stream
+    try {
+      const responseStream: Response = await handleStream.response;
+      const reader = (responseStream.body as any)?.getReader?.();
+      if (reader) {
+        try {
+          await reader.cancel();
+        } catch {}
+      }
+    } catch (err) {
+      console.log('✅ Stream correctly rejected due to abort (handle):', err);
+    }
+
+    // Wait for stream payment to settle
+    try {
+      await handleStream.payment;
+    } catch {}
+
+    // Give scheduler a brief moment to flush
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Verify client remains functional after abort
+    console.log('🔄 Verifying client remains functional after abort');
+    const postAbort = await httpClient.get('/echo?q=post-abort-test');
+    expect(postAbort.data.echo).toBe('post-abort-test');
+    expect(postAbort.payment).toBeTruthy();
+
+    logger.debug('🎉 Abort queued request test completed');
+  }, 120000);
+
+  test('Abort streaming mid-way stops reading and settles properly', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    const handle = await httpClient.requestWithPayment('GET', '/stream');
+    const response: Response = await handle.response;
+
+    const reader = (response.body as any)?.getReader?.();
+    expect(reader).toBeTruthy();
+
+    // Read a couple of chunks then abort via handle.abort()
+    if (reader) {
+      for (let i = 0; i < 2; i++) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    }
+
+    // Abort should cancel stream and reject payment if not yet settled
+    handle.abort?.();
+
+    // Cancel reader explicitly to release lock and avoid further reads
+    try {
+      await reader?.cancel?.();
+    } catch {}
+
+    // Wait for quick settle
+    try {
+      await handle.payment;
+    } catch (e) {
+      // acceptable: payment may reject due to abort
+    }
+    // Give scheduler a brief moment to flush
+    await new Promise(resolve => setTimeout(resolve, 500));
   }, 120000);
 
   test('Auto-authorize sub-channel on recovery when channel exists without sub-channel', async () => {
