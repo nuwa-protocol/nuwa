@@ -69,6 +69,13 @@ export class PaymentChannelHttpClient {
   private isCleanedUp = false;
   private transactionStore: TransactionStore;
   private channelRepo: ChannelRepository;
+  /**
+   * Associates protocol errors with HTTP responses to avoid double-throwing errors.
+   * This WeakMap tracks errors encountered during the response handling flow,
+   * ensuring that only one error is thrown per response and preventing duplicate
+   * error propagation. This is especially important in asynchronous flows where
+   * multiple handlers may process the same response.
+   */
   private protocolErrorByResponse: WeakMap<Response, PaymentKitError> = new WeakMap();
 
   // New modular components
