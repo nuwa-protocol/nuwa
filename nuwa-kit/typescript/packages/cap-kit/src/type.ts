@@ -13,6 +13,15 @@ export interface Page<T> {
   items: T[]
 }
 
+export const CapStatsSchema = z.object({
+  capId: z.string(),
+  downloads: z.number(),
+  ratingCount: z.number(),
+  averageRating: z.number(),
+  favorites: z.number(),
+  userRating: z.number().optional(),
+});
+
 // Zod schemas as single source of truth
 export const CapMcpServerConfigSchema = z.object({
   url: z.string(),
@@ -102,3 +111,4 @@ export type CapThumbnail = z.infer<typeof CapThumbnailSchema>;
 export type CapMetadata = z.infer<typeof CapMetadataSchema>;
 export type Cap = z.infer<typeof CapSchema>;
 export type ResultCap = z.infer<typeof ResultCapMetadataSchema>;
+export type CapStats = z.infer<typeof CapStatsSchema>;
