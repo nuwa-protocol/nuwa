@@ -58,6 +58,13 @@ import {
   CoinStoreFieldData,
 } from './ChannelUtils';
 import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
+import {
+  badRequest,
+  notFound,
+  wrapUnknownError,
+  mapTxFailureToPaymentKitError,
+  internalError,
+} from '../errors/RoochErrorMapper';
 
 export interface RoochContractOptions {
   rpcUrl?: string;
@@ -131,10 +138,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const payeeParsed = parseDid(params.payeeDid);
 
       if (payerParsed.method !== 'rooch') {
-        throw new Error(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
+        throw badRequest(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
       }
       if (payeeParsed.method !== 'rooch') {
-        throw new Error(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
+        throw badRequest(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
       }
 
       const signer = await this.convertSigner(params.signer);
@@ -158,7 +165,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('openChannel', result.execution_info);
       }
 
       // Calculate the expected channel ID deterministically
@@ -176,7 +183,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error opening channel:', error);
-      throw error;
+      throw wrapUnknownError('openChannel', error);
     }
   }
 
@@ -191,10 +198,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const payeeParsed = parseDid(params.payeeDid);
 
       if (payerParsed.method !== 'rooch') {
-        throw new Error(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
+        throw badRequest(`Invalid payer DID method: expected 'rooch', got '${payerParsed.method}'`);
       }
       if (payeeParsed.method !== 'rooch') {
-        throw new Error(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
+        throw badRequest(`Invalid payee DID method: expected 'rooch', got '${payeeParsed.method}'`);
       }
 
       const signer = await this.convertSigner(params.signer);
@@ -218,7 +225,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('openChannelWithSubChannel', result.execution_info);
       }
 
       // Calculate the expected channel ID deterministically
@@ -236,7 +243,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error opening channel with sub-channel:', error);
-      throw error;
+      throw wrapUnknownError('openChannelWithSubChannel', error);
     }
   }
 
@@ -264,7 +271,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('authorizeSubChannel', result.execution_info);
       }
 
       return {
@@ -274,7 +281,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error authorizing sub-channel:', error);
-      throw error;
+      throw wrapUnknownError('authorizeSubChannel', error);
     }
   }
 
@@ -309,7 +316,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('claimFromChannel', result.execution_info);
       }
 
       // Parse claimed amount from events
@@ -323,7 +330,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error claiming from channel:', error);
-      throw error;
+      throw wrapUnknownError('claimFromChannel', error);
     }
   }
 
@@ -363,7 +370,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('closeChannel', result.execution_info);
       }
 
       return {
@@ -373,7 +380,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error closing channel:', error);
-      throw error;
+      throw wrapUnknownError('closeChannel', error);
     }
   }
 
@@ -387,7 +394,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (!channelObject || channelObject.length === 0 || !channelObject[0]) {
-        throw new Error(`Channel ${params.channelId} not found`);
+        throw notFound(`Channel ${params.channelId} not found`);
       }
 
       const channelState = channelObject[0];
@@ -410,7 +417,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error getting channel status:', error);
-      throw error;
+      throw wrapUnknownError('getChannelStatus', error);
     }
   }
 
@@ -424,7 +431,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (!channelObject || channelObject.length === 0 || !channelObject[0]) {
-        throw new Error(`Channel ${params.channelId} not found`);
+        throw notFound(`Channel ${params.channelId} not found`);
       }
 
       const channelData = parsePaymentChannelData(channelObject[0].value);
@@ -436,7 +443,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       );
 
       if (!subChannelData) {
-        throw new Error(
+        throw notFound(
           `Sub-channel ${params.vmIdFragment} not found in channel ${params.channelId}`
         );
       }
@@ -452,7 +459,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error getting sub-channel info:', error);
-      throw error;
+      throw wrapUnknownError('getSubChannel', error);
     }
   }
 
@@ -468,7 +475,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
       return assetInfo;
     }
-    throw new Error(`Unsupported asset type: ${assetId}`);
+    throw badRequest(`Unsupported asset type: ${assetId}`);
   }
 
   async getAssetPrice(assetId: string): Promise<bigint> {
@@ -490,10 +497,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       }
 
       // Unknown asset type
-      throw new Error(`Unsupported asset type: ${assetId}`);
+      throw badRequest(`Unsupported asset type: ${assetId}`);
     } catch (error) {
       this.logger.error('Error getting asset price:', error);
-      throw error;
+      throw wrapUnknownError('getAssetPrice', error);
     }
   }
 
@@ -506,7 +513,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       return BigInt(chainId);
     } catch (error) {
       this.logger.error('Error getting chain ID:', error);
-      throw error;
+      throw wrapUnknownError('getChainId', error);
     }
   }
 
@@ -517,7 +524,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
       if (ownerParsed.method !== 'rooch') {
-        throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
+        throw badRequest(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
       }
 
       const signer = await this.convertSigner(params.signer);
@@ -541,7 +548,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('depositToHub', result.execution_info);
       }
 
       return {
@@ -551,7 +558,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error depositing to hub:', error);
-      throw error;
+      throw wrapUnknownError('depositToHub', error);
     }
   }
 
@@ -562,7 +569,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
       if (ownerParsed.method !== 'rooch') {
-        throw new Error(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
+        throw badRequest(`Invalid owner DID method: expected 'rooch', got '${ownerParsed.method}'`);
       }
 
       const signer = await this.convertSigner(params.signer);
@@ -586,7 +593,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       });
 
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transaction failed: ${JSON.stringify(result.execution_info)}`);
+        throw mapTxFailureToPaymentKitError('withdrawFromHub', result.execution_info);
       }
 
       return {
@@ -596,7 +603,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       };
     } catch (error) {
       this.logger.error('Error withdrawing from hub:', error);
-      throw error;
+      throw wrapUnknownError('withdrawFromHub', error);
     }
   }
 
@@ -896,7 +903,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   private parseChannelIdFromEvents(events?: EventView[]): string {
     if (!events) {
-      throw new Error('No events found to parse channel ID');
+      throw internalError('No events found to parse channel ID');
     }
 
     for (const event of events) {
@@ -916,12 +923,12 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           return event.event_data; // Return the raw event data for now
         } catch (error) {
           this.logger.error('Failed to parse channel ID from event:', error);
-          throw new Error(`Failed to parse channel ID from event: ${error}`);
+          throw internalError(`Failed to parse channel ID from event: ${error}`);
         }
       }
     }
 
-    throw new Error('PaymentChannelOpenedEvent not found in transaction events');
+    throw internalError('PaymentChannelOpenedEvent not found in transaction events');
   }
 
   private parseClaimedAmountFromEvents(events?: EventView[]): bigint {
