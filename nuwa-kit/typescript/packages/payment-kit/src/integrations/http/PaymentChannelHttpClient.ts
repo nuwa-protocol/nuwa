@@ -21,7 +21,7 @@ import type {
 import { ErrorCode } from '../../types/api';
 import { PaymentKitError } from '../../errors';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
-import { assertSubRavProgression } from '../../core/SubRavValidator';
+import { assertSubRavProgression } from '../../core/RavVerifier';
 import { PaymentChannelFactory } from '../../factory/chainFactory';
 import { DidAuthHelper } from './internal/DidAuthHelper';
 import {

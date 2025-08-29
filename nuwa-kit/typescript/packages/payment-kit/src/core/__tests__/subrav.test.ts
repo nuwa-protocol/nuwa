@@ -6,7 +6,6 @@ import { describe, test, expect, beforeEach } from '@jest/globals';
 import {
   SubRAVCodec,
   SubRAVUtils,
-  SubRAVValidator,
   SubRAVSigner,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1,
@@ -18,6 +17,7 @@ import {
   MockDIDResolver,
   createTestEnvironment,
 } from '../../test-helpers/mocks';
+import { assertSubRavProgression } from '../RavVerifier';
 
 describe('SubRAV BCS Serialization', () => {
   const sampleSubRAV: SubRAV = {
@@ -226,8 +226,8 @@ describe('SubRAVUtils', () => {
   });
 });
 
-describe('SubRAVValidator', () => {
-  const validSubRAV: SubRAV = {
+describe('Rav progression assertions', () => {
+  const base: SubRAV = {
     version: SUBRAV_VERSION_1,
     chainId: BigInt(4),
     channelId: '0x35df6e58502089ed640382c477e4b6f99e5e90d881678d37ed774a737fd3797c',
@@ -237,57 +237,21 @@ describe('SubRAVValidator', () => {
     nonce: BigInt(1),
   };
 
-  test('should validate correct SubRAV', () => {
-    const result = SubRAVValidator.validate(validSubRAV);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
-  });
-
-  test('should reject invalid version', () => {
-    const invalidSubRAV = { ...validSubRAV, version: 0 };
-    const result = SubRAVValidator.validate(invalidSubRAV);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Version must be a positive integer'))).toBe(true);
-  });
-
-  test('should reject unsupported version', () => {
-    const invalidSubRAV = { ...validSubRAV, version: 99 };
-    const result = SubRAVValidator.validate(invalidSubRAV);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Unsupported SubRAV version'))).toBe(true);
-  });
-
-  test('should reject invalid channel ID', () => {
-    const invalidSubRAV = { ...validSubRAV, channelId: 'invalid' };
-    const result = SubRAVValidator.validate(invalidSubRAV);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Invalid channel ID format'))).toBe(true);
-  });
-
-  test('should validate sequence correctly', () => {
-    const prev: SubRAV = { ...validSubRAV, nonce: BigInt(1), accumulatedAmount: BigInt(1000) };
-    const current: SubRAV = { ...validSubRAV, nonce: BigInt(2), accumulatedAmount: BigInt(2000) };
-
-    const result = SubRAVValidator.validateSequence(prev, current);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+  test('should accept monotonic progression', () => {
+    const prev: SubRAV = { ...base, nonce: 1n, accumulatedAmount: 1000n };
+    const next: SubRAV = { ...base, nonce: 2n, accumulatedAmount: 2000n };
+    expect(() => assertSubRavProgression(prev, next)).not.toThrow();
   });
 
   test('should reject non-monotonic nonce', () => {
-    const prev: SubRAV = { ...validSubRAV, nonce: BigInt(2), accumulatedAmount: BigInt(1000) };
-    const current: SubRAV = { ...validSubRAV, nonce: BigInt(1), accumulatedAmount: BigInt(2000) };
-
-    const result = SubRAVValidator.validateSequence(prev, current);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Nonce must be strictly increasing'))).toBe(true);
+    const prev: SubRAV = { ...base, nonce: 2n, accumulatedAmount: 1000n };
+    const next: SubRAV = { ...base, nonce: 1n, accumulatedAmount: 2000n };
+    expect(() => assertSubRavProgression(prev, next)).toThrow('Invalid nonce');
   });
 
   test('should reject decreasing accumulated amount', () => {
-    const prev: SubRAV = { ...validSubRAV, nonce: BigInt(1), accumulatedAmount: BigInt(2000) };
-    const current: SubRAV = { ...validSubRAV, nonce: BigInt(2), accumulatedAmount: BigInt(1000) };
-
-    const result = SubRAVValidator.validateSequence(prev, current);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Accumulated amount cannot decrease'))).toBe(true);
+    const prev: SubRAV = { ...base, nonce: 1n, accumulatedAmount: 2000n };
+    const next: SubRAV = { ...base, nonce: 2n, accumulatedAmount: 1000n };
+    expect(() => assertSubRavProgression(prev, next)).toThrow('Amount must increase');
   });
 });
