@@ -29,7 +29,8 @@
     "react": ">=16.8.0"
   },
   "dependencies": {
-    "penpal": "^7.0.4"
+    "penpal": "^7.0.4",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.11",
