@@ -4,7 +4,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 interface FixedCardLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
   title?: string;
