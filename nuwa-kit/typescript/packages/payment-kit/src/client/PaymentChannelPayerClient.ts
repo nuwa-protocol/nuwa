@@ -8,9 +8,10 @@
 import type { AssetInfo, SubChannelInfo, ChannelInfo, SignedSubRAV, SubRAV } from '../core/types';
 import type {
   IPaymentChannelContract,
-  OpenChannelResult,
+  OpenChannelResult as ContractOpenChannelResult,
   OpenChannelParams as ContractOpenChannelParams,
   OpenChannelWithSubChannelParams as ContractOpenChannelWithSubChannelParams,
+  TxResult,
 } from '../contracts/IPaymentChannelContract';
 import type { SignerInterface } from '@nuwa-ai/identity-kit';
 import type { ChannelRepository } from '../storage/interfaces/ChannelRepository';
@@ -52,6 +53,19 @@ export interface SignSubRAVOptions {
   maxAmount?: bigint; // Optional: refuse to sign if amount exceeds this limit
 }
 
+export interface OpenChannelResultWithInfo extends ContractOpenChannelResult {
+  channelInfo: ChannelInfo;
+}
+
+export interface OpenChannelResultWithSubChannelInfo extends ContractOpenChannelResult {
+  channelInfo: ChannelInfo;
+  subChannelInfo: SubChannelInfo;
+}
+
+export interface AuthorizeSubChannelResult extends TxResult {
+  subChannelInfo: SubChannelInfo;
+}
+
 /**
  * Chain-agnostic Payment Channel Payer Client
  *
@@ -86,7 +100,7 @@ export class PaymentChannelPayerClient {
   /**
    * Open a new payment channel
    */
-  async openChannel(params: PayerOpenChannelParams): Promise<ChannelInfo> {
+  async openChannel(params: PayerOpenChannelParams): Promise<OpenChannelResultWithInfo> {
     const payerDid = await this.signer.getDid();
 
     const openParams: ContractOpenChannelParams = {
@@ -115,7 +129,12 @@ export class PaymentChannelPayerClient {
       this.activeChannelId = result.channelId;
     }
 
-    return channelInfo;
+    return {
+      channelId: result.channelId,
+      channelInfo,
+      txHash: result.txHash,
+      events: result.events,
+    };
   }
 
   /**
@@ -123,7 +142,7 @@ export class PaymentChannelPayerClient {
    */
   async openChannelWithSubChannel(
     params: PayerOpenChannelWithSubChannelParams
-  ): Promise<OpenChannelResult> {
+  ): Promise<OpenChannelResultWithSubChannelInfo> {
     const payerDid = await this.signer.getDid();
     const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
 
@@ -138,7 +157,7 @@ export class PaymentChannelPayerClient {
     const result = await this.contract.openChannelWithSubChannel(openParams);
 
     // Cache channel metadata
-    const metadata: ChannelInfo = {
+    const channelInfo: ChannelInfo = {
       channelId: result.channelId,
       payerDid,
       payeeDid: params.payeeDid,
@@ -147,48 +166,66 @@ export class PaymentChannelPayerClient {
       status: 'active',
     };
 
-    await this.channelRepo.setChannelMetadata(result.channelId, metadata);
+    await this.channelRepo.setChannelMetadata(result.channelId, channelInfo);
 
-    // Initialize sub-channel state for this key
-    await this.channelRepo.updateSubChannelState(result.channelId, useFragment, {
+    const subChannelInfo: SubChannelInfo = {
       channelId: result.channelId,
       epoch: BigInt(0),
       vmIdFragment: useFragment,
       lastClaimedAmount: BigInt(0),
       lastConfirmedNonce: BigInt(0),
       lastUpdated: Date.now(),
-    });
+    };
+    // Initialize sub-channel state for this key
+    await this.channelRepo.updateSubChannelState(result.channelId, useFragment, subChannelInfo);
 
     // Set as active channel if no active channel is set
     if (!this.activeChannelId) {
       this.activeChannelId = result.channelId;
     }
 
-    return result;
+    return {
+      channelId: result.channelId,
+      channelInfo: channelInfo,
+      subChannelInfo: subChannelInfo,
+      txHash: result.txHash,
+      events: result.events,
+    };
   }
 
   /**
    * Authorize a sub-channel for an existing channel
    */
-  async authorizeSubChannel(params: { channelId: string; vmIdFragment?: string }): Promise<void> {
+  async authorizeSubChannel(params: {
+    channelId: string;
+    vmIdFragment?: string;
+  }): Promise<AuthorizeSubChannelResult> {
     const payerDid = await this.signer.getDid();
     const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
 
-    await this.contract.authorizeSubChannel({
+    const result = await this.contract.authorizeSubChannel({
       channelId: params.channelId,
       vmIdFragment: useFragment,
       signer: this.signer,
     });
 
-    // Initialize sub-channel state
-    await this.channelRepo.updateSubChannelState(params.channelId, useFragment, {
+    const subChannelInfo: SubChannelInfo = {
       channelId: params.channelId,
       epoch: BigInt(0),
       vmIdFragment: useFragment,
       lastClaimedAmount: BigInt(0),
       lastConfirmedNonce: BigInt(0),
       lastUpdated: Date.now(),
-    });
+    };
+
+    // Initialize sub-channel state
+    await this.channelRepo.updateSubChannelState(params.channelId, useFragment, subChannelInfo);
+
+    return {
+      subChannelInfo,
+      txHash: result.txHash,
+      events: result.events,
+    };
   }
 
   /**

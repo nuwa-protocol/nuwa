@@ -4,8 +4,8 @@ import {
   type OperationalKeyInfo,
   type VerificationRelationship,
 } from '@nuwa-ai/identity-kit';
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Key, ShieldCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Key, Plus, ShieldCheck } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -34,6 +34,20 @@ export function AddKeyPage() {
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showKeyDetails, setShowKeyDetails] = useState<boolean>(false);
+
+  // Refresh agents when returning from onboarding
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible again - user might be returning from onboarding
+        // Force AgentSelector to reload by triggering a re-render
+        setSelectedAgentDid(null);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Parse payload parameter
   useEffect(() => {
@@ -98,13 +112,9 @@ export function AddKeyPage() {
     authenticateUser();
   }, [payload, isAuthenticated, signInWithDid]);
 
-  const handleAgentSelect = (did: string) => {
+  const handleAgentSelect = useCallback((did: string) => {
     setSelectedAgentDid(did);
-  };
-
-  const handleChangeAgent = () => {
-    setSelectedAgentDid(null);
-  };
+  }, []);
 
   const handleConfirm = async () => {
     if (!didService || !payload || !selectedAgentDid) return;
@@ -173,7 +183,7 @@ export function AddKeyPage() {
         redirectUrl.searchParams.append('error', 'User canceled');
         redirectUrl.searchParams.append('state', payload.state);
         window.location.href = redirectUrl.toString();
-      } catch (err) {
+      } catch {
         // If redirect fails, go back to home
         navigate('/');
       }
@@ -242,7 +252,22 @@ export function AddKeyPage() {
 
         {/* Agent Selection - Primary Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Select DID</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">Select DID</h3>
+            <button
+              type="button"
+              onClick={() => {
+                const payloadParam = searchParams.get('payload');
+                if (payloadParam) {
+                  navigate(`/create-agent-did?payload=${encodeURIComponent(payloadParam)}`);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Create New DID
+            </button>
+          </div>
           <AgentSelector onSelect={handleAgentSelect} autoSelectFirst={true} />
         </div>
 

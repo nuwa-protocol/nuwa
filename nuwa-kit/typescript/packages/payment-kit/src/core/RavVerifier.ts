@@ -81,7 +81,7 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
         result.decision = 'CONFLICT';
         result.error = {
           code: PaymentErrorCode.RAV_CONFLICT,
-          message: `SignedSubRAV does not match pending proposal (expected nonce: ${params.latestPendingSubRav.nonce}, received: ${signed.subRav.nonce})`,
+          message: `SignedSubRAV does not match pending proposal (expected nonce: ${params.latestPendingSubRav.nonce}, accumulatedAmount: ${params.latestPendingSubRav.accumulatedAmount}, received: ${signed.subRav.nonce}, ${signed.subRav.accumulatedAmount})`,
         } as any;
         return finalize();
       }
@@ -116,7 +116,7 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
           result.decision = 'CONFLICT';
           result.error = {
             code: PaymentErrorCode.RAV_CONFLICT,
-            message: `SignedSubRAV does not match latest signed SubRAV (expected nonce: ${params.latestSignedSubRav.subRav.nonce}, received: ${signed.subRav.nonce})`,
+            message: `SignedSubRAV does not match latest signed SubRAV (expected nonce: ${params.latestSignedSubRav.subRav.nonce} accumulatedAmount: ${params.latestSignedSubRav.subRav.accumulatedAmount}, received: ${signed.subRav.nonce}, ${signed.subRav.accumulatedAmount})`,
           } as any;
           return finalize();
         }
@@ -127,14 +127,14 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
           signed.subRav.channelId === params.subChannelInfo.channelId &&
           signed.subRav.vmIdFragment === params.subChannelInfo.vmIdFragment &&
           signed.subRav.nonce > params.subChannelInfo.lastConfirmedNonce &&
-          signed.subRav.accumulatedAmount > params.subChannelInfo.lastClaimedAmount
+          signed.subRav.accumulatedAmount >= params.subChannelInfo.lastClaimedAmount
         ) {
           result.decision = 'ALLOW';
         } else {
           result.decision = 'CONFLICT';
           result.error = {
             code: PaymentErrorCode.RAV_CONFLICT,
-            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelInfo.lastConfirmedNonce}, received: ${signed.subRav.nonce})`,
+            message: `SignedSubRAV does not match subchannel state (expected nonce: ${params.subChannelInfo.lastConfirmedNonce}, accumulatedAmount: ${params.subChannelInfo.lastClaimedAmount}, received: ${signed.subRav.nonce}, ${signed.subRav.accumulatedAmount})`,
           } as any;
           return finalize();
         }
@@ -148,4 +148,54 @@ export async function verify(params: RavVerifyParams): Promise<RavVerifyResult> 
     // Leave detailed logging to caller using DebugLogger
     return result;
   }
+}
+
+/**
+ * Assert monotonic progression between previous and next SubRAV deltas.
+ * - next.nonce must equal prev.nonce + 1
+ * - next.accumulatedAmount must be > prev.accumulatedAmount
+ *   (set allowSameAccumulated=true to allow equality in special cases)
+ */
+export function assertRavProgression(
+  prevNonce: bigint,
+  prevAccumulatedAmount: bigint,
+  nextNonce: bigint,
+  nextAccumulatedAmount: bigint,
+  allowSameAccumulated: boolean = false
+): void {
+  const expectedNonce = prevNonce + 1n;
+  if (nextNonce !== expectedNonce) {
+    throw new Error(`Invalid nonce: expected ${expectedNonce}, got ${nextNonce}`);
+  }
+
+  if (allowSameAccumulated) {
+    if (nextAccumulatedAmount < prevAccumulatedAmount) {
+      throw new Error(
+        `Amount must not decrease: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`
+      );
+    }
+  } else {
+    if (nextAccumulatedAmount <= prevAccumulatedAmount) {
+      throw new Error(
+        `Amount must increase: previous ${prevAccumulatedAmount}, new ${nextAccumulatedAmount}`
+      );
+    }
+  }
+}
+
+/**
+ * Convenience helper to assert progression using SubRAV objects.
+ */
+export function assertSubRavProgression(
+  prev: Pick<SubRAV, 'nonce' | 'accumulatedAmount'>,
+  next: Pick<SubRAV, 'nonce' | 'accumulatedAmount'>,
+  allowSameAccumulated: boolean = false
+): void {
+  assertRavProgression(
+    prev.nonce,
+    prev.accumulatedAmount,
+    next.nonce,
+    next.accumulatedAmount,
+    allowSameAccumulated
+  );
 }

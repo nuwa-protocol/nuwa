@@ -8,7 +8,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   SubRAVCodec,
-  SubRAVValidator,
   HttpPaymentCodec,
   generateNonce,
   extractFragment,
@@ -23,39 +22,7 @@ import { createTestEnvironment } from '../test-helpers/mocks';
 import type { SubRAV, SignedSubRAV } from '../core/types';
 
 describe('Payment Kit Basic Tests', () => {
-  describe('SubRAV Types and Validation', () => {
-    it('should validate valid SubRAV', () => {
-      const subRav: SubRAV = {
-        version: SUBRAV_VERSION_1,
-        chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        channelEpoch: BigInt(0),
-        vmIdFragment: 'test-key',
-        accumulatedAmount: BigInt(1000),
-        nonce: BigInt(1),
-      };
-
-      const result = SubRAVValidator.validate(subRav);
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should reject invalid SubRAV', () => {
-      const subRav: SubRAV = {
-        version: SUBRAV_VERSION_1,
-        chainId: BigInt(-1), // Invalid negative chain ID
-        channelId: 'invalid', // Invalid channel ID format
-        channelEpoch: BigInt(0),
-        vmIdFragment: '', // Empty fragment
-        accumulatedAmount: BigInt(-100), // Invalid negative amount
-        nonce: BigInt(-1), // Invalid negative nonce
-      };
-
-      const result = SubRAVValidator.validate(subRav);
-      expect(result.valid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
-    });
-  });
+  // Removed SubRAVValidator tests; validation is now enforced via RavVerifier utilities
 
   describe('SubRAV Codec', () => {
     it('should encode and decode SubRAV correctly', () => {
@@ -115,48 +82,5 @@ describe('Payment Kit Basic Tests', () => {
     // signing functionality, so we'll keep these basic for now
   });
 
-  describe('SubRAV Sequence Validation', () => {
-    it('should validate correct sequence', () => {
-      const prev: SubRAV = {
-        version: SUBRAV_VERSION_1,
-        chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        channelEpoch: BigInt(0),
-        vmIdFragment: 'test-key',
-        accumulatedAmount: BigInt(1000),
-        nonce: BigInt(1),
-      };
-
-      const current: SubRAV = {
-        ...prev,
-        accumulatedAmount: BigInt(1500),
-        nonce: BigInt(2),
-      };
-
-      const result = SubRAVValidator.validateSequence(prev, current);
-      expect(result.valid).toBe(true);
-    });
-
-    it('should reject invalid sequence', () => {
-      const prev: SubRAV = {
-        version: SUBRAV_VERSION_1,
-        chainId: BigInt(4),
-        channelId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        channelEpoch: BigInt(0),
-        vmIdFragment: 'test-key',
-        accumulatedAmount: BigInt(1000),
-        nonce: BigInt(2),
-      };
-
-      const current: SubRAV = {
-        ...prev,
-        accumulatedAmount: BigInt(500), // Amount decreased
-        nonce: BigInt(1), // Nonce decreased
-      };
-
-      const result = SubRAVValidator.validateSequence(prev, current);
-      expect(result.valid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
-    });
-  });
+  // Removed SubRAV sequence validation tests in favor of RavVerifier assertions
 });

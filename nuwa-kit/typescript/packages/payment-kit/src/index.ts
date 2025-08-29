@@ -38,7 +38,6 @@ export {
   SubRAVSigner,
   SubRAVCodec,
   SubRAVUtils,
-  SubRAVValidator,
   SubRAVSchema,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1,
