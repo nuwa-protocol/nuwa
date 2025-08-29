@@ -8,7 +8,7 @@ function httpStatusForErrorCode(code: ErrorCodeType | string): HttpStatus {
   switch (code as ErrorCodeType) {
     case ErrorCode.PAYMENT_REQUIRED:
     case ErrorCode.INSUFFICIENT_FUNDS:
-      return 402 as unknown as HttpStatus;
+      return 402;
     case ErrorCode.BAD_REQUEST:
       return 400;
     case ErrorCode.UNAUTHORIZED:
