@@ -72,9 +72,16 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
     },
   });
 
-  if (process.env.DEBUG === 'true') {
+  if (process.env.GLOBAL_DEBUG === 'true') {
     DebugLogger.setGlobalLevel('debug');
+  }else{
+    DebugLogger.setGlobalLevel('info');
+  }
+
+  if (process.env.DEBUG === 'true') {
     logger.setLevel('debug');
+  }else{
+    logger.setLevel('info');
   }
 
   // --- Helpers shared by stream/non-stream branches (moved to module scope) ---
