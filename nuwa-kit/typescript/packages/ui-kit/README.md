@@ -1,6 +1,6 @@
-# @nuwa-kit/capui-kit
+# @nuwa-kit/ui-kit
 
-Nuwa CapUI SDK for TypeScript/React - A powerful library for building iframe-based UI components with seamless parent-child communication.
+Nuwa UI SDK for TypeScript/React - A powerful library for building iframe-based UI components with seamless parent-child communication.
 
 With this SDK, you can embed your web page into NuwaAI client as the UI of your Cap. Your UI will be able to call certain functions in the Nuwa Client such as running a tool call or send a new prompt on behalf of the user.
 
@@ -8,16 +8,16 @@ With this SDK, you can embed your web page into NuwaAI client as the UI of your 
 
 ```bash
 # npm
-npm install @nuwa-kit/capui-kit
+npm install @nuwa-kit/ui-kit
 
 # yarn
-yarn add @nuwa-kit/capui-kit
+yarn add @nuwa-kit/ui-kit
 
 # pnpm
-pnpm add @nuwa-kit/capui-kit
+pnpm add @nuwa-kit/ui-kit
 
 # bun
-bun add @nuwa-kit/capui-kit
+bun add @nuwa-kit/ui-kit
 ```
 
 ## Quick Start
@@ -25,15 +25,15 @@ bun add @nuwa-kit/capui-kit
 ### React Hook (Recommended)
 
 ```jsx
-import { useCapEmbedUIKit } from '@nuwa-kit/capui-kit';
+import { useNuwaClient } from '@nuwa-kit/ui-kit';
 
 function MyComponent() {
-  const { containerRef, sendMessage, sendPrompt, isConnected } = useCapEmbedUIKit({
-    autoAdjustHeight: true // Automatically adjust iframe height
+  const { containerRef, sendLog, sendPrompt, isConnected } = useNuwaClient({
+    autoAdjustHeight: true // Automatically adjust iframe height - Must set the containerRef for the outer div
   });
 
   const handleSendMessage = async () => {
-    const response = await sendMessage('Hello from iframe!');
+    const response = await sendLog('Hello from iframe!');
     console.log('Response:', response);
   };
 
@@ -65,7 +65,7 @@ The SDK provides automatic height adjustment to ensure your iframe content is fu
 ```jsx
 function WeatherApp() {
   const [weatherData, setWeatherData] = useState(null);
-  const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
+  const { containerRef } = useNuwaClient({ autoAdjustHeight: true });
 
   useEffect(() => {
     fetchWeatherData().then(setWeatherData);
@@ -93,18 +93,18 @@ function WeatherApp() {
 ### Vanilla JavaScript
 
 ```javascript
-import { CapEmbedUIKit } from '@nuwa-kit/capui-kit';
+import { NuwaClient } from '@nuwa-kit/ui-kit';
 
-const capUI = new CapEmbedUIKit();
+const ui = new NuwaClient();
 
-await capUI.connect();
+await ui.connect();
 
 // Send messages
-await capUI.sendMessage('Hello from Cap UI!');
-await capUI.sendPrompt('Generate something amazing');
+await ui.sendLog('Hello from Cap UI!');
+await ui.sendPrompt('Generate something amazing');
 
 // Set iframe height manually
-await capUI.setUIHeight(400);
+await ui.setHeight(400);
 ```
 
 ## API Reference
@@ -117,9 +117,9 @@ await capUI.setUIHeight(400);
 **Returns:**
 - `isConnected: boolean` - Connection status
 - `containerRef: RefObject<HTMLDivElement>` - Ref to attach to your root container
-- `sendMessage(message: string): Promise<string>` - Send a message to the parent
-- `sendPrompt(prompt: string): Promise<string>` - Send a prompt to the parent  
-- `setUIHeight(height: number): Promise<void>` - Manually set iframe height
+- `sendLog(message: string): Promise<string>` - Send a console log message to the Nuwa client
+- `sendPrompt(prompt: string): Promise<string>` - Send a prompt to the Nuwa client  
+- `setUIHeight(height: number): Promise<void>` - Manually set the iframe height in the Nuwa client
 
 ### `CapEmbedUIKit` Class
 

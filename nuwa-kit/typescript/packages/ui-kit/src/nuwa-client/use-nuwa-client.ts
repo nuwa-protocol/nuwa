@@ -1,24 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import type { AIResponse, PromptOptions } from "../shared/parent-functions.js";
-import { CapEmbedUIKit, type CapEmbedUIKitOptions } from "./cap-ui-embed.js";
+import { NuwaClient, type NuwaClientOptions } from "./nuwa-client";
+import type { PromptOptions } from "./types";
 
-export interface UseCapEmbedUIKitProps extends CapEmbedUIKitOptions {
+export interface useNuwaClientProps extends NuwaClientOptions {
 	autoAdjustHeight?: boolean;
 }
 
-export interface UseCapEmbedUIKitReturn {
-	capUI: CapEmbedUIKit | null;
+export interface useNuwaClientReturn {
+	nuwaClient: NuwaClient | null;
 	isConnected: boolean;
 	isConnecting: boolean;
 	error: string | null;
 
 	// Convenience methods
-	sendPrompt: (prompt: string, options?: PromptOptions) => Promise<AIResponse>;
-	sendMessage: (type: string, payload: any) => Promise<void>;
-	getContext: (keys?: string[]) => Promise<any>;
+	sendPrompt: (prompt: string, options?: PromptOptions) => Promise<void>;
+	sendLog: (log: string) => Promise<void>;
 	setHeight: (height: string | number) => Promise<void>;
-	showLoading: (message?: string) => Promise<void>;
-	hideLoading: () => Promise<void>;
 
 	// Connection management
 	connect: () => Promise<void>;
@@ -26,54 +23,54 @@ export interface UseCapEmbedUIKitReturn {
 	reconnect: () => Promise<void>;
 
 	// Auto height management
-	containerRef: React.RefObject<HTMLDivElement | null>;
+	containerRef: React.RefObject<HTMLDivElement>;
 }
 
 /**
- * React hook for CapUI Embed UI Kit
+ * React hook for Nuwa Client
  * Provides reactive state management for parent communication
  */
-export function useCapEmbedUIKit(
-	props: UseCapEmbedUIKitProps = {},
-): UseCapEmbedUIKitReturn {
-	const { autoAdjustHeight = false, ...capUIOptions } = props;
+export function useNuwaClient(
+	props: useNuwaClientProps = {},
+): useNuwaClientReturn {
+	const { autoAdjustHeight = false, ...nuwaClientOptions } = props;
 
 	const [isConnected, setIsConnected] = useState(false);
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const capUIRef = useRef<CapEmbedUIKit | null>(null);
+	const nuwaClientRef = useRef<NuwaClient | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Initialize CapEmbedUIKit
+	// Initialize NuwaClient
 	// biome-ignore lint/correctness/useExhaustiveDependencies: only run once on mount
 	useEffect(() => {
-		const capUI = new CapEmbedUIKit({
+		const nuwaClient = new NuwaClient({
 			autoConnect: false, // We'll manage connection manually for better React integration
-			...capUIOptions,
+			...nuwaClientOptions,
 		});
 
-		capUIRef.current = capUI;
+		nuwaClientRef.current = nuwaClient;
 
 		// Auto-connect by default
 		handleConnect();
 
 		// Cleanup on unmount
 		return () => {
-			if (capUIRef.current) {
-				capUIRef.current.disconnect();
+			if (nuwaClientRef.current) {
+				nuwaClientRef.current.disconnect();
 			}
 		};
 	}, []); // Only run once on mount
 
 	const handleConnect = async () => {
-		if (!capUIRef.current || isConnecting) return;
+		if (!nuwaClientRef.current || isConnecting) return;
 
 		setIsConnecting(true);
 		setError(null);
 
 		try {
-			await capUIRef.current.connect();
+			await nuwaClientRef.current.connect();
 			setIsConnected(true);
 		} catch (err) {
 			const errorMessage =
@@ -86,21 +83,21 @@ export function useCapEmbedUIKit(
 	};
 
 	const handleDisconnect = () => {
-		if (capUIRef.current) {
-			capUIRef.current.disconnect();
+		if (nuwaClientRef.current) {
+			nuwaClientRef.current.disconnect();
 			setIsConnected(false);
 			setError(null);
 		}
 	};
 
 	const handleReconnect = async () => {
-		if (!capUIRef.current) return;
+		if (!nuwaClientRef.current) return;
 
 		setIsConnecting(true);
 		setError(null);
 
 		try {
-			await capUIRef.current.reconnect();
+			await nuwaClientRef.current.reconnect();
 			setIsConnected(true);
 		} catch (err) {
 			const errorMessage =
@@ -116,13 +113,13 @@ export function useCapEmbedUIKit(
 	const sendPrompt = async (
 		prompt: string,
 		options?: PromptOptions,
-	): Promise<AIResponse> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
+	): Promise<void> => {
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
 		}
 
 		try {
-			return await capUIRef.current.sendPrompt(prompt, options);
+			await nuwaClientRef.current.sendPrompt(prompt, options);
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Send prompt failed";
@@ -131,13 +128,13 @@ export function useCapEmbedUIKit(
 		}
 	};
 
-	const sendMessage = async (type: string, payload: any): Promise<void> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
+	const sendLog = async (log: string): Promise<void> => {
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
 		}
 
 		try {
-			await capUIRef.current.sendMessage(type, payload);
+			await nuwaClientRef.current.sendLog(log);
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Send message failed";
@@ -146,61 +143,16 @@ export function useCapEmbedUIKit(
 		}
 	};
 
-	const getContext = async (keys?: string[]): Promise<any> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
-		}
-
-		try {
-			return await capUIRef.current.getContext(keys);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Get context failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
 	const setHeight = async (height: string | number): Promise<void> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
 		}
 
 		try {
-			await capUIRef.current.setHeight(height);
+			await nuwaClientRef.current.setHeight(height);
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Set height failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
-	const showLoading = async (message?: string): Promise<void> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
-		}
-
-		try {
-			await capUIRef.current.showLoading(message);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Show loading failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
-	const hideLoading = async (): Promise<void> => {
-		if (!capUIRef.current) {
-			throw new Error("CapUI not initialized");
-		}
-
-		try {
-			await capUIRef.current.hideLoading();
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Hide loading failed";
 			setError(errorMessage);
 			throw err;
 		}
@@ -211,7 +163,7 @@ export function useCapEmbedUIKit(
 	useEffect(() => {
 		if (
 			!autoAdjustHeight ||
-			!capUIRef.current ||
+			!nuwaClientRef.current ||
 			!containerRef.current ||
 			!isConnected
 		)
@@ -253,18 +205,15 @@ export function useCapEmbedUIKit(
 	}, [autoAdjustHeight, isConnected]);
 
 	return {
-		capUI: capUIRef.current,
+		nuwaClient: nuwaClientRef.current,
 		isConnected,
 		isConnecting,
 		error,
 
 		// Convenience methods
 		sendPrompt,
-		sendMessage,
-		getContext,
+		sendLog,
 		setHeight,
-		showLoading,
-		hideLoading,
 
 		// Connection management
 		connect: handleConnect,
@@ -272,6 +221,6 @@ export function useCapEmbedUIKit(
 		reconnect: handleReconnect,
 
 		// Auto height management
-		containerRef,
+		containerRef: containerRef as React.RefObject<HTMLDivElement>,
 	};
 }

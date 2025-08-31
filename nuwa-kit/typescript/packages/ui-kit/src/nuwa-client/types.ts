@@ -72,32 +72,6 @@ export interface SecurityPolicy {
 	};
 }
 
-// Error types
-export class CapUIError extends Error {
-	constructor(
-		message: string,
-		public code?: string,
-		public origin?: string,
-	) {
-		super(message);
-		this.name = "CapUIError";
-	}
-}
-
-export class TransportError extends CapUIError {
-	constructor(message: string, code?: string) {
-		super(message, code);
-		this.name = "TransportError";
-	}
-}
-
-export class SecurityError extends CapUIError {
-	constructor(message: string, origin?: string) {
-		super(message, "SECURITY_ERROR", origin);
-		this.name = "SecurityError";
-	}
-}
-
 // Event types
 export interface ConnectionEvent {
 	type: "connected" | "disconnected" | "error" | "message";
@@ -105,11 +79,3 @@ export interface ConnectionEvent {
 }
 
 export type EventHandler = (event: ConnectionEvent) => void;
-
-// Re-export from parent-functions for convenience
-export type {
-	ChildConfig,
-	ParentConfig,
-	ParentFunctions,
-	ParentHandler,
-} from "./parent-functions.js";

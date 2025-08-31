@@ -1,8 +1,8 @@
 "use client";
 
-import { useCapEmbedUIKit } from "@nuwa-ai/capui-kit";
+import { useNuwaClient } from "@nuwa-ai/ui-kit";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Weather, type WeatherAtLocation } from "@/components/weather";
 
 function WeatherContent() {
@@ -38,13 +38,12 @@ function WeatherContent() {
 }
 
 export default function WeatherPage() {
-    const { containerRef } = useCapEmbedUIKit({ autoAdjustHeight: true });
+    const { containerRef } = useNuwaClient({ autoAdjustHeight: true });
     return (
         <div ref={containerRef}>
-            <Suspense fallback={<div>Loading weather...</div>}>
+            <React.Suspense fallback={<div>Loading weather...</div>}>
                 <WeatherContent />
-            </Suspense>
+            </React.Suspense>
         </div>
-
     );
 }

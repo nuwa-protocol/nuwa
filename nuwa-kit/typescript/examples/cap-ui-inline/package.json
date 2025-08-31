@@ -10,7 +10,7 @@
     "format": "biome format --write"
   },
   "dependencies": {
-    "@nuwa-ai/capui-kit": "workspace:*",
+    "@nuwa-ai/ui-kit": "link:../../packages/ui-kit",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "classnames": "^2.5.1",
     "date-fns": "^4.1.0",

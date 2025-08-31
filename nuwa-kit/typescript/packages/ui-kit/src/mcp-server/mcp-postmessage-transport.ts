@@ -1,9 +1,9 @@
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport";
 import type {
 	JSONRPCRequest,
 	JSONRPCResponse,
-} from "@modelcontextprotocol/sdk/types.js";
-import { SecurityError, TransportError } from "../shared/types.js";
+} from "@modelcontextprotocol/sdk/types";
+import { SecurityError, TransportError } from "../types";
 
 export interface PostMessageMCPTransportOptions {
 	targetWindow?: Window;
