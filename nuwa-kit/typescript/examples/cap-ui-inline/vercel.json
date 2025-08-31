@@ -1,5 +1,0 @@
-{
-  "buildCommand": "cd ../.. && pnpm --filter @nuwa-ai/capui-kit build && cd examples/capui-demo && pnpm build",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "framework": "nextjs"
-}

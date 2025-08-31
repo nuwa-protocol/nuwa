@@ -1,12 +1,10 @@
-"use client";
-
 import { useNuwaClient } from "@nuwa-ai/ui-kit";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "react-router-dom";
 import React, { useEffect, useState } from "react";
 import { Weather, type WeatherAtLocation } from "@/components/weather";
 
 function WeatherContent() {
-    const searchParams = useSearchParams();
+    const [searchParams] = useSearchParams();
     const [weatherData, setWeatherData] = useState<WeatherAtLocation | null>(
         null,
     );

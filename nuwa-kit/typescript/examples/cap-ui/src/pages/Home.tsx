@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from 'react-router-dom';
 
 export default function Home() {
   return (
@@ -16,7 +16,7 @@ export default function Home() {
           <h2 className="text-xl font-semibold">Demo Pages</h2>
           <div className="grid gap-3">
             <Link
-              href="/weather"
+              to="/weather"
               className="rounded-lg border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-between hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent p-4"
             >
               <div>
@@ -26,12 +26,22 @@ export default function Home() {
               <span className="text-gray-400">→</span>
             </Link>
             <Link
-              href="/test"
+              to="/test"
               className="rounded-lg border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-between hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent p-4"
             >
               <div>
                 <h3 className="font-medium">Test Page</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Component development and testing area</p>
+              </div>
+              <span className="text-gray-400">→</span>
+            </Link>
+            <Link
+              to="/note"
+              className="rounded-lg border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-between hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent p-4"
+            >
+              <div>
+                <h3 className="font-medium">Note Page</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Note page</p>
               </div>
               <span className="text-gray-400">→</span>
             </Link>
