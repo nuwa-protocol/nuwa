@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { NuwaClient, type NuwaClientOptions } from "./nuwa-client";
-import type { PromptOptions } from "./types";
 
 export interface useNuwaClientProps extends NuwaClientOptions {
 	autoAdjustHeight?: boolean;
@@ -13,7 +12,7 @@ export interface useNuwaClientReturn {
 	error: string | null;
 
 	// Convenience methods
-	sendPrompt: (prompt: string, options?: PromptOptions) => Promise<void>;
+	sendPrompt: (prompt: string) => Promise<void>;
 	sendLog: (log: string) => Promise<void>;
 	setHeight: (height: string | number) => Promise<void>;
 
@@ -110,16 +109,13 @@ export function useNuwaClient(
 	};
 
 	// Convenience methods that handle errors gracefully
-	const sendPrompt = async (
-		prompt: string,
-		options?: PromptOptions,
-	): Promise<void> => {
+	const sendPrompt = async (prompt: string): Promise<void> => {
 		if (!nuwaClientRef.current) {
 			throw new Error("NuwaClient not initialized");
 		}
 
 		try {
-			await nuwaClientRef.current.sendPrompt(prompt, options);
+			await nuwaClientRef.current.sendPrompt(prompt);
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Send prompt failed";

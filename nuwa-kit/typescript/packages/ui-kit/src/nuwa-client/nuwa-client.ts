@@ -1,6 +1,5 @@
 import { connect, type RemoteProxy, type Reply, WindowMessenger } from "penpal";
 import { CapUIError, TransportError } from "../types";
-import type { AIResponse, PromptOptions } from "./types";
 
 /**
  * Interface for parent functions that can be called by child iframes
@@ -9,15 +8,13 @@ export interface ParentFunctions {
 	/**
 	 * Send a prompt to the AI backend
 	 * @param prompt The prompt text to send
-	 * @param options Optional configuration for the request
-	 * @returns Promise resolving to the AI response
+	 * @returns Promise resolving when prompt is sent
 	 */
-	sendPrompt(prompt: string, options?: PromptOptions): Promise<void>;
+	sendPrompt(prompt: string): Promise<void>;
 
 	/**
-	 * Send a message to the parent application
-	 * @param type Message type identifier
-	 * @param payload Message payload data
+	 * Send a console log to the parent application for testing the connection
+	 * @param log The log message to send
 	 * @returns Promise resolving when message is sent
 	 */
 	sendLog(log: string): Promise<void>;
@@ -30,63 +27,19 @@ export interface ParentFunctions {
 	setHeight?(height: string | number): Promise<void>;
 }
 
-/**
- * Parent handler interface - implemented by parent applications
- * to handle calls from child iframes
- */
-export interface ParentHandler {
-	/**
-	 * Handle prompt requests from child
-	 */
-	onSendPrompt?(
-		prompt: string,
-		options?: PromptOptions,
-		origin?: string,
-	): Promise<AIResponse>;
-
-	/**
-	 * Handle messages from child
-	 */
-	onSendLog?(log: string, origin?: string): Promise<void>;
-
-	/**
-	 * Handle height change requests from child
-	 */
-	onSetHeight?(height: string | number, origin?: string): Promise<void>;
-}
-
-/**
- * Base configuration for parent applications
- */
-export interface ParentConfig {
-	allowedOrigins?: string[];
-	securityPolicy?: Partial<import("./types.js").SecurityPolicy>;
-	debug?: boolean;
-	timeout?: number;
-}
-
-/**
- * Base configuration for child applications
- */
-export interface ChildConfig {
-	parentOrigin?: string;
-	timeout?: number;
-	debug?: boolean;
-	connectionInfo?: import("./types.js").ConnectionInfo;
-}
-
 // Penpal-specific parent methods interface
 // Maps shared ParentFunctions to Penpal Reply format
 type PenpalParentMethods = {
-	sendPrompt(prompt: string, options?: PromptOptions): Reply<AIResponse>;
+	sendPrompt(prompt: string): Reply<void>;
 	sendLog(log: string): Reply<void>;
 	setHeight(height: string | number): Reply<void>;
 };
 
-export interface NuwaClientOptions extends ChildConfig {
+export interface NuwaClientOptions {
 	allowedOrigins?: string[];
 	timeout?: number;
 	autoConnect?: boolean;
+	debug?: boolean;
 }
 
 /**
@@ -160,15 +113,14 @@ export class NuwaClient implements ParentFunctions {
 	/**
 	 * Send prompt to the parent Nuwa Client
 	 */
-	async sendPrompt(prompt: string, options?: PromptOptions): Promise<void> {
+	async sendPrompt(prompt: string): Promise<void> {
 		await this.ensureConnected();
 
 		try {
 			this.log("Sending prompt", {
 				prompt: prompt.substring(0, 100) + "...",
-				options,
 			});
-			await this.parentMethods!.sendPrompt(prompt, options);
+			await this.parentMethods!.sendPrompt(prompt);
 		} catch (error) {
 			this.log("Send prompt failed", error);
 			throw new CapUIError(`Send prompt failed: ${error}`);

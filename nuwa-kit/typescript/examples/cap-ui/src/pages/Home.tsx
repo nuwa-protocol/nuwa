@@ -47,19 +47,6 @@ export default function Home() {
             </Link>
           </div>
         </div>
-
-        <div className="flex flex-col gap-4 w-full">
-          <h2 className="text-xl font-semibold">MCP Integration</h2>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-            <h3 className="font-medium mb-2">API Endpoint</h3>
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono text-sm px-2 py-1 rounded">
-              /api/mcp
-            </code>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              MCP server endpoint for the <code className="bg-black/[.05] dark:bg-white/[.06] font-mono text-xs px-1 py-0.5 rounded">show_weather_ui</code> tool
-            </p>
-          </div>
-        </div>
       </main>
     </div>
   );
