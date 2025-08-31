@@ -3,10 +3,13 @@ import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PostMessageMCPTransport } from "@nuwa-ai/ui-kit";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 
 export default function NotePage() {
+  // Prevent double initialization in React Strict Mode
+  const isServerInitialized = useRef(false);
+
   const editor = useCreateBlockNote({
     initialContent: [
       {
@@ -21,6 +24,7 @@ export default function NotePage() {
 
   const initMcpServer = async () => {
     try {
+      // Create transport for communicating with parent window
       const transport = new PostMessageMCPTransport({
         targetWindow: window.parent,
         targetOrigin: "*",
@@ -29,11 +33,13 @@ export default function NotePage() {
         timeout: 10000,
       });
 
+      // Initialize MCP server
       const server = new McpServer({
         name: "note-editor-mcp",
         version: "1.0.0",
       });
 
+      // Register tool for editing content in the BlockNote editor
       server.registerTool(
         "edit_content",
         {
@@ -43,8 +49,10 @@ export default function NotePage() {
             content: z.string().describe("The content to add to the editor"),
           },
         },
-        async ({ content }) => {
-          await editor.insertInlineContent(content);
+        ({ content }) => {
+          // Insert content into the BlockNote editor
+          editor.insertInlineContent(content);
+          console.log(`Adding content ${content}`);
           return {
             content: [
               {
@@ -56,15 +64,24 @@ export default function NotePage() {
         },
       );
 
+      // Connect server to transport
       await server.connect(transport);
     } catch (error) {
       console.error("MCP server error:", error);
     }
   };
 
+
+  // Initialize MCP server with cleanup on unmount
   // biome-ignore lint/correctness/useExhaustiveDependencies: suppress
   useEffect(() => {
+    // Early return if server already initialized (prevents double initialization)
+    if (isServerInitialized.current) {
+      return;
+    }
+
     initMcpServer();
+    isServerInitialized.current = true;
   }, []);
 
   return (
