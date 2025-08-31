@@ -1,11 +1,10 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useNuwaClient } from "@nuwa-ai/ui-kit";
+import { useSearchParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import { Weather, type WeatherAtLocation } from "@/components/weather";
 
 function WeatherContent() {
-    const searchParams = useSearchParams();
+    const [searchParams] = useSearchParams();
     const [weatherData, setWeatherData] = useState<WeatherAtLocation | null>(
         null,
     );
@@ -25,20 +24,24 @@ function WeatherContent() {
         getWeather();
     }, [searchParams]);
 
-    if (weatherData)
-        return (
-            <div className="p-4">
+    return (
+        <div className="p-4">
+            {weatherData ? (
                 <Weather weatherAtLocation={weatherData} />
-            </div>
-        );
-
-    return null;
+            ) : (
+                <div>Loading weather...</div>
+            )}
+        </div>
+    );
 }
 
 export default function WeatherPage() {
+    const { containerRef } = useNuwaClient({ autoAdjustHeight: true });
     return (
-        <Suspense fallback={<div>Loading weather...</div>}>
-            <WeatherContent />
-        </Suspense>
+        <div ref={containerRef}>
+            <React.Suspense fallback={<div>Loading weather...</div>}>
+                <WeatherContent />
+            </React.Suspense>
+        </div>
     );
 }
