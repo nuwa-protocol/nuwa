@@ -1,99 +1,115 @@
 // Shared types for both embed-ui and artifact-ui architectures
 export interface AIResponse {
-  content: string
-  streaming?: boolean
-  model?: string
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
+	content: string;
+	streaming?: boolean;
+	model?: string;
+	usage?: {
+		prompt_tokens: number;
+		completion_tokens: number;
+		total_tokens: number;
+	};
 }
 
 export interface StreamingAIResponse {
-  id: string
-  type: 'streaming_start' | 'streaming_chunk' | 'streaming_end' | 'streaming_error'
-  content?: string
-  model?: string
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
-  error?: string
-  metadata?: any
+	id: string;
+	type:
+		| "streaming_start"
+		| "streaming_chunk"
+		| "streaming_end"
+		| "streaming_error";
+	content?: string;
+	model?: string;
+	usage?: {
+		prompt_tokens: number;
+		completion_tokens: number;
+		total_tokens: number;
+	};
+	error?: string;
+	metadata?: any;
 }
 
-export type StreamingCallback = (response: StreamingAIResponse) => void
+export type StreamingCallback = (response: StreamingAIResponse) => void;
 
 export interface PromptOptions {
-  model?: string
-  temperature?: number
-  max_tokens?: number
-  streaming?: boolean
+	model?: string;
+	temperature?: number;
+	max_tokens?: number;
+	streaming?: boolean;
 }
 
 export interface StreamingPromptOptions extends PromptOptions {
-  streaming: true
-  onChunk?: StreamingCallback
-  onComplete?: (finalResponse: AIResponse) => void
-  onError?: (error: string) => void
+	streaming: true;
+	onChunk?: StreamingCallback;
+	onComplete?: (finalResponse: AIResponse) => void;
+	onError?: (error: string) => void;
 }
 
 // Connection and transport types
 export interface TransportOptions {
-  targetOrigin?: string
-  allowedOrigins?: string[]
-  timeout?: number
-  debug?: boolean
+	targetOrigin?: string;
+	allowedOrigins?: string[];
+	timeout?: number;
+	debug?: boolean;
 }
 
 export interface ConnectionInfo {
-  name: string
-  version: string
-  capabilities?: string[]
+	name: string;
+	version: string;
+	capabilities?: string[];
 }
 
 // Security types
 export interface SecurityPolicy {
-  allowedOrigins: string[]
-  rateLimits?: {
-    windowMs: number
-    maxRequests: number
-  }[]
-  messageValidation?: {
-    enforceSchema: boolean
-    sanitizeInputs: boolean
-    maxMessageSize: number
-  }
+	allowedOrigins: string[];
+	rateLimits?: {
+		windowMs: number;
+		maxRequests: number;
+	}[];
+	messageValidation?: {
+		enforceSchema: boolean;
+		sanitizeInputs: boolean;
+		maxMessageSize: number;
+	};
 }
 
 // Error types
 export class CapUIError extends Error {
-  constructor(message: string, public code?: string, public origin?: string) {
-    super(message)
-    this.name = 'CapUIError'
-  }
+	constructor(
+		message: string,
+		public code?: string,
+		public origin?: string,
+	) {
+		super(message);
+		this.name = "CapUIError";
+	}
 }
 
 export class TransportError extends CapUIError {
-  constructor(message: string, code?: string) {
-    super(message, code)
-    this.name = 'TransportError'
-  }
+	constructor(message: string, code?: string) {
+		super(message, code);
+		this.name = "TransportError";
+	}
 }
 
 export class SecurityError extends CapUIError {
-  constructor(message: string, origin?: string) {
-    super(message, 'SECURITY_ERROR', origin)
-    this.name = 'SecurityError'
-  }
+	constructor(message: string, origin?: string) {
+		super(message, "SECURITY_ERROR", origin);
+		this.name = "SecurityError";
+	}
 }
 
 // Event types
 export interface ConnectionEvent {
-  type: 'connected' | 'disconnected' | 'error' | 'message'
-  data?: any
+	type: "connected" | "disconnected" | "error" | "message";
+	data?: any;
 }
 
-export type EventHandler = (event: ConnectionEvent) => void
+export type EventHandler = (event: ConnectionEvent) => void;
+
+// Re-export from parent-functions for convenience
+export type {
+	ChildConfig,
+	ParentConfig,
+	ParentFunctions,
+	ParentHandler,
+} from "./parent-functions.js";

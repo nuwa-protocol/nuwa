@@ -20,8 +20,11 @@
     "pnpm": "^10.15.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "@nuwa-ai/capui-kit": "link:../../packages/capui-kit",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.19.11",
