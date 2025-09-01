@@ -8,13 +8,17 @@ export interface useNuwaClientProps extends NuwaClientOptions {
 export interface useNuwaClientReturn {
 	nuwaClient: NuwaClient | null;
 	isConnected: boolean;
-	isConnecting: boolean;
 	error: string | null;
 
 	// Convenience methods
 	sendPrompt: (prompt: string) => Promise<void>;
-	sendLog: (log: string) => Promise<void>;
 	setHeight: (height: string | number) => Promise<void>;
+	addSelection: (
+		label: string,
+		message: string | Record<string, any>,
+	) => Promise<void>;
+	saveState: <T = any>(state: T) => Promise<void>;
+	getState: <T = any>() => Promise<T | null>;
 
 	// Connection management
 	connect: () => Promise<void>;
@@ -35,7 +39,6 @@ export function useNuwaClient(
 	const { autoAdjustHeight = false, ...nuwaClientOptions } = props;
 
 	const [isConnected, setIsConnected] = useState(false);
-	const [isConnecting, setIsConnecting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const nuwaClientRef = useRef<NuwaClient | null>(null);
@@ -63,21 +66,19 @@ export function useNuwaClient(
 	}, []); // Only run once on mount
 
 	const handleConnect = async () => {
-		if (!nuwaClientRef.current || isConnecting) return;
+		if (!nuwaClientRef.current) return;
 
-		setIsConnecting(true);
 		setError(null);
 
 		try {
 			await nuwaClientRef.current.connect();
 			setIsConnected(true);
 		} catch (err) {
+			setIsConnected(false);
+			console.log("hook handleConnect error", err);
 			const errorMessage =
 				err instanceof Error ? err.message : "Connection failed";
 			setError(errorMessage);
-			setIsConnected(false);
-		} finally {
-			setIsConnecting(false);
 		}
 	};
 
@@ -92,8 +93,8 @@ export function useNuwaClient(
 	const handleReconnect = async () => {
 		if (!nuwaClientRef.current) return;
 
-		setIsConnecting(true);
 		setError(null);
+		setIsConnected(false);
 
 		try {
 			await nuwaClientRef.current.reconnect();
@@ -103,8 +104,6 @@ export function useNuwaClient(
 				err instanceof Error ? err.message : "Reconnection failed";
 			setError(errorMessage);
 			setIsConnected(false);
-		} finally {
-			setIsConnecting(false);
 		}
 	};
 
@@ -124,21 +123,6 @@ export function useNuwaClient(
 		}
 	};
 
-	const sendLog = async (log: string): Promise<void> => {
-		if (!nuwaClientRef.current) {
-			throw new Error("NuwaClient not initialized");
-		}
-
-		try {
-			await nuwaClientRef.current.sendLog(log);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Send message failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
 	const setHeight = async (height: string | number): Promise<void> => {
 		if (!nuwaClientRef.current) {
 			throw new Error("NuwaClient not initialized");
@@ -149,6 +133,54 @@ export function useNuwaClient(
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Set height failed";
+			setError(errorMessage);
+			throw err;
+		}
+	};
+
+	const addSelection = async (
+		label: string,
+		message: string | Record<string, any>,
+	): Promise<void> => {
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
+		}
+
+		try {
+			await nuwaClientRef.current.addSelection(label, message);
+		} catch (err) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Send selection failed";
+			setError(errorMessage);
+			throw err;
+		}
+	};
+
+	const saveState = async <T = any>(state: T): Promise<void> => {
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
+		}
+
+		try {
+			await nuwaClientRef.current.saveState(state);
+		} catch (err) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Save state failed";
+			setError(errorMessage);
+			throw err;
+		}
+	};
+
+	const getState = async <T = any>(): Promise<T | null> => {
+		if (!nuwaClientRef.current) {
+			throw new Error("NuwaClient not initialized");
+		}
+
+		try {
+			return await nuwaClientRef.current.getState<T>();
+		} catch (err) {
+			const errorMessage =
+				err instanceof Error ? err.message : "Get state failed";
 			setError(errorMessage);
 			throw err;
 		}
@@ -203,13 +235,14 @@ export function useNuwaClient(
 	return {
 		nuwaClient: nuwaClientRef.current,
 		isConnected,
-		isConnecting,
 		error,
 
 		// Convenience methods
 		sendPrompt,
-		sendLog,
 		setHeight,
+		addSelection,
+		saveState,
+		getState,
 
 		// Connection management
 		connect: handleConnect,

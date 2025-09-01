@@ -1,10 +1,16 @@
 import { connect, type RemoteProxy, type Reply, WindowMessenger } from "penpal";
 import { CapUIError, TransportError } from "../types";
 
+// Types for selection functionality
+export interface Selection {
+	name: string;
+	message: string | Record<string, any>;
+}
+
 /**
- * Interface for parent functions that can be called by child iframes
+ * Interface for Nuwa client methods that can be called by child iframes
  */
-export interface ParentFunctions {
+export interface NuwaClientMethods {
 	/**
 	 * Send a prompt to the AI backend
 	 * @param prompt The prompt text to send
@@ -13,26 +19,42 @@ export interface ParentFunctions {
 	sendPrompt(prompt: string): Promise<void>;
 
 	/**
-	 * Send a console log to the parent application for testing the connection
-	 * @param log The log message to send
-	 * @returns Promise resolving when message is sent
-	 */
-	sendLog(log: string): Promise<void>;
-
-	/**
 	 * Set the height of the iframe (convenience method)
 	 * @param height Height in pixels or CSS value
 	 * @returns Promise resolving when height is set
 	 */
 	setHeight?(height: string | number): Promise<void>;
+
+	/**
+	 * Add a selection to the parent Nuwa client
+	 * @param label The label/name for the selection
+	 * @param message The message content (string or object)
+	 * @returns Promise resolving when selection is sent
+	 */
+	addSelection(label: string, message: string | Record<string, any>): Promise<void>;
+
+	/**
+	 * Save state data to the parent Nuwa client
+	 * @param state State data to save
+	 * @returns Promise resolving when state is saved
+	 */
+	saveState<T = any>(state: T): Promise<void>;
+
+	/**
+	 * Retrieve state data from the parent Nuwa client
+	 * @returns Promise resolving with the saved state
+	 */
+	getState<T = any>(): Promise<T | null>;
 }
 
 // Penpal-specific parent methods interface
-// Maps shared ParentFunctions to Penpal Reply format
+// Maps shared NuwaClientMethods to Penpal Reply format
 type PenpalParentMethods = {
 	sendPrompt(prompt: string): Reply<void>;
-	sendLog(log: string): Reply<void>;
 	setHeight(height: string | number): Reply<void>;
+	addSelection(label: string, message: string | Record<string, any>): Reply<void>;
+	saveState(state: any): Reply<void>;
+	getState(): Reply<any>;
 };
 
 export interface NuwaClientOptions {
@@ -44,9 +66,9 @@ export interface NuwaClientOptions {
 
 /**
  * NuwaClient - Simple iframe communication using Penpal
- * Implements shared ParentFunctions interface for consistency
+ * Implements shared NuwaClientMethods interface for consistency
  */
-export class NuwaClient implements ParentFunctions {
+export class NuwaClient implements NuwaClientMethods {
 	private parentMethods: RemoteProxy<PenpalParentMethods> | null = null;
 	private connectionStatus: boolean = false;
 	private connectionPromise: Promise<void> | null = null;
@@ -108,7 +130,7 @@ export class NuwaClient implements ParentFunctions {
 		}
 	}
 
-	// === ParentFunctions Implementation ===
+	// === NuwaClientMethods Implementation ===
 
 	/**
 	 * Send prompt to the parent Nuwa Client
@@ -128,21 +150,6 @@ export class NuwaClient implements ParentFunctions {
 	}
 
 	/**
-	 * Send log to the parent Nuwa Client
-	 */
-	async sendLog(log: string): Promise<void> {
-		await this.ensureConnected();
-
-		try {
-			this.log("Sending log", { log });
-			await this.parentMethods!.sendLog(log);
-		} catch (error) {
-			this.log("Send log failed", error);
-			throw new CapUIError(`Send log failed: ${error}`);
-		}
-	}
-
-	/**
 	 * Set the height of the iframe in the parent
 	 */
 	async setHeight(height: string | number): Promise<void> {
@@ -154,6 +161,58 @@ export class NuwaClient implements ParentFunctions {
 		} catch (error) {
 			this.log("Set height failed", error);
 			throw new CapUIError(`Set height failed: ${error}`);
+		}
+	}
+
+	/**
+	 * Add a selection to the parent Nuwa client
+	 */
+	async addSelection(label: string, message: string | Record<string, any>): Promise<void> {
+		await this.ensureConnected();
+
+		try {
+			// Convert message to string if it's an object
+			const normalizedMessage = 
+				typeof message === 'string' 
+					? message 
+					: JSON.stringify(message);
+			
+			this.log("Sending selection", { name: label });
+			await this.parentMethods!.addSelection(label, normalizedMessage);
+		} catch (error) {
+			this.log("Send selection failed", error);
+			throw new CapUIError(`Send selection failed: ${error}`);
+		}
+	}
+
+	/**
+	 * Save state data to the parent Nuwa client
+	 */
+	async saveState<T = any>(state: T): Promise<void> {
+		await this.ensureConnected();
+
+		try {
+			this.log("Saving state", { stateType: typeof state });
+			await this.parentMethods!.saveState(state);
+		} catch (error) {
+			this.log("Save state failed", error);
+			throw new CapUIError(`Save state failed: ${error}`);
+		}
+	}
+
+	/**
+	 * Retrieve state data from the parent Nuwa client
+	 */
+	async getState<T = any>(): Promise<T | null> {
+		await this.ensureConnected();
+
+		try {
+			this.log("Getting state");
+			const state = await this.parentMethods!.getState();
+			return state as T | null;
+		} catch (error) {
+			this.log("Get state failed", error);
+			throw new CapUIError(`Get state failed: ${error}`);
 		}
 	}
 
