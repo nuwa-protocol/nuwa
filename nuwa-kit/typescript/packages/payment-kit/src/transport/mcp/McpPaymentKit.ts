@@ -95,7 +95,8 @@ class McpPaymentKitImpl implements McpPaymentKit {
       didResolver: this.payeeClient.getDidResolver(),
       hubBalanceService,
       claimTriggerService,
-      minClaimAmount: undefined,
+      //TODO: get from config
+      minClaimAmount: BigInt('10000000'),
       debug: config.debug,
     });
 
