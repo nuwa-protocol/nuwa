@@ -1,5 +1,19 @@
-import { connect, type RemoteProxy, type Reply, WindowMessenger } from "penpal";
-import { CapUIError, TransportError } from "../types";
+import {
+	CallOptions,
+	connect,
+	type RemoteProxy,
+	type Reply,
+	WindowMessenger,
+} from "penpal";
+
+// Default timeout for Penpal connections
+export const NUWA_CLIENT_TIMEOUT = 5000;
+
+// Default timeout for method calls
+export const NUWA_METHOD_TIMEOUT = 10000;
+
+// Re-export Penpal error codes for client use
+export { ErrorCode } from "penpal";
 
 // Types for selection functionality
 export interface Selection {
@@ -31,7 +45,10 @@ export interface NuwaClientMethods {
 	 * @param message The message content (string or object)
 	 * @returns Promise resolving when selection is sent
 	 */
-	addSelection(label: string, message: string | Record<string, any>): Promise<void>;
+	addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Promise<void>;
 
 	/**
 	 * Save state data to the parent Nuwa client
@@ -52,7 +69,10 @@ export interface NuwaClientMethods {
 type PenpalParentMethods = {
 	sendPrompt(prompt: string): Reply<void>;
 	setHeight(height: string | number): Reply<void>;
-	addSelection(label: string, message: string | Record<string, any>): Reply<void>;
+	addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Reply<void>;
 	saveState(state: any): Reply<void>;
 	getState(): Reply<any>;
 };
@@ -62,6 +82,7 @@ export interface NuwaClientOptions {
 	timeout?: number;
 	autoConnect?: boolean;
 	debug?: boolean;
+	methodTimeout?: number;
 }
 
 /**
@@ -73,15 +94,19 @@ export class NuwaClient implements NuwaClientMethods {
 	private connectionStatus: boolean = false;
 	private connectionPromise: Promise<void> | null = null;
 	private options: NuwaClientOptions;
+	private methodTimeout: number;
 
 	constructor(options: NuwaClientOptions = {}) {
 		this.options = {
 			allowedOrigins: ["*"],
-			timeout: 5000,
+			timeout: NUWA_CLIENT_TIMEOUT,
 			debug: false,
 			autoConnect: true,
+			methodTimeout: NUWA_METHOD_TIMEOUT,
 			...options,
 		};
+
+		this.methodTimeout = this.options.methodTimeout || NUWA_METHOD_TIMEOUT;
 
 		if (this.options.autoConnect) {
 			// Auto-connect when instantiated
@@ -109,6 +134,13 @@ export class NuwaClient implements NuwaClientMethods {
 		try {
 			this.log("Establishing connection to parent");
 
+			// Check if we're in a proper iframe context
+			if (window.parent === window) {
+				throw new Error(
+					"No parent window found - this component must be embedded in an iframe",
+				);
+			}
+
 			const messenger = new WindowMessenger({
 				remoteWindow: window.parent,
 				allowedOrigins: this.options.allowedOrigins || ["*"],
@@ -116,7 +148,8 @@ export class NuwaClient implements NuwaClientMethods {
 
 			const conn = connect<PenpalParentMethods>({
 				messenger,
-				timeout: this.options.timeout || 5000,
+				timeout: this.options.timeout || NUWA_CLIENT_TIMEOUT,
+				// log: debug("Child"),
 			});
 
 			this.parentMethods = await conn.promise;
@@ -126,7 +159,7 @@ export class NuwaClient implements NuwaClientMethods {
 		} catch (error) {
 			this.log("Failed to connect to parent", error);
 			this.connectionStatus = false;
-			throw new TransportError(`Connection failed: ${error}`);
+			throw error;
 		}
 	}
 
@@ -138,14 +171,16 @@ export class NuwaClient implements NuwaClientMethods {
 	async sendPrompt(prompt: string): Promise<void> {
 		await this.ensureConnected();
 
+		this.log("Sending prompt", {
+			prompt: prompt.substring(0, 100) + "...",
+		});
 		try {
-			this.log("Sending prompt", {
-				prompt: prompt.substring(0, 100) + "...",
-			});
-			await this.parentMethods!.sendPrompt(prompt);
-		} catch (error) {
-			this.log("Send prompt failed", error);
-			throw new CapUIError(`Send prompt failed: ${error}`);
+			await this.parentMethods!.sendPrompt(
+				prompt,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("sendPrompt", error);
 		}
 	}
 
@@ -155,33 +190,39 @@ export class NuwaClient implements NuwaClientMethods {
 	async setHeight(height: string | number): Promise<void> {
 		await this.ensureConnected();
 
+		this.log("Setting height", { height });
 		try {
-			this.log("Setting height", { height });
-			await this.parentMethods!.setHeight(height);
-		} catch (error) {
-			this.log("Set height failed", error);
-			throw new CapUIError(`Set height failed: ${error}`);
+			await this.parentMethods!.setHeight(
+				height,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("setHeight", error);
 		}
 	}
 
 	/**
 	 * Add a selection to the parent Nuwa client
 	 */
-	async addSelection(label: string, message: string | Record<string, any>): Promise<void> {
+	async addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Promise<void> {
 		await this.ensureConnected();
 
+		// Convert message to string if it's an object
+		const normalizedMessage =
+			typeof message === "string" ? message : JSON.stringify(message);
+
+		this.log("Sending selection", { name: label });
 		try {
-			// Convert message to string if it's an object
-			const normalizedMessage = 
-				typeof message === 'string' 
-					? message 
-					: JSON.stringify(message);
-			
-			this.log("Sending selection", { name: label });
-			await this.parentMethods!.addSelection(label, normalizedMessage);
-		} catch (error) {
-			this.log("Send selection failed", error);
-			throw new CapUIError(`Send selection failed: ${error}`);
+			await this.parentMethods!.addSelection(
+				label,
+				normalizedMessage,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("addSelection", error);
 		}
 	}
 
@@ -191,12 +232,14 @@ export class NuwaClient implements NuwaClientMethods {
 	async saveState<T = any>(state: T): Promise<void> {
 		await this.ensureConnected();
 
+		this.log("Saving state", { stateType: typeof state });
 		try {
-			this.log("Saving state", { stateType: typeof state });
-			await this.parentMethods!.saveState(state);
-		} catch (error) {
-			this.log("Save state failed", error);
-			throw new CapUIError(`Save state failed: ${error}`);
+			await this.parentMethods!.saveState(
+				state,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("saveState", error);
 		}
 	}
 
@@ -206,13 +249,15 @@ export class NuwaClient implements NuwaClientMethods {
 	async getState<T = any>(): Promise<T | null> {
 		await this.ensureConnected();
 
+		this.log("Getting state");
 		try {
-			this.log("Getting state");
-			const state = await this.parentMethods!.getState();
+			const state = await this.parentMethods!.getState(
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
 			return state as T | null;
-		} catch (error) {
-			this.log("Get state failed", error);
-			throw new CapUIError(`Get state failed: ${error}`);
+		} catch (error: any) {
+			this.handleMethodError("getState", error);
+			return null; // This will never be reached due to handleMethodError throwing
 		}
 	}
 
@@ -263,9 +308,26 @@ export class NuwaClient implements NuwaClientMethods {
 		};
 	}
 
+	/**
+	 * Handle method call errors with proper error codes
+	 */
+	private handleMethodError(methodName: string, error: any): never {
+		this.log(`${methodName} failed`, error);
+
+		// Create a structured error with code
+		const structuredError = new Error(
+			`${methodName} failed: ${error.message || error}`,
+		);
+		(structuredError as any).code = error.code || "METHOD_CALL_ERROR";
+		(structuredError as any).originalError = error;
+		(structuredError as any).method = methodName;
+
+		throw structuredError;
+	}
+
 	private log(message: string, data?: any): void {
 		if (this.options.debug) {
-			console.log(`[NuwaClient] ${message}`, data);
+			console.debug(`[NuwaClient] ${message}`, data);
 		}
 	}
 }

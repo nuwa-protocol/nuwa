@@ -3,12 +3,16 @@ export { PostMessageMCPTransport } from "./mcp-server/mcp-postmessage-transport.
 
 // === Nuwa Client (Postmessage Penpal-based) ===
 export type {
-	NuwaClientOptions,
 	// Client Methods
 	NuwaClientMethods,
+	NuwaClientOptions,
 	Selection,
 } from "./nuwa-client/nuwa-client.js";
-export { NuwaClient } from "./nuwa-client/nuwa-client.js";
+export {
+	NUWA_CLIENT_TIMEOUT,
+	NUWA_METHOD_TIMEOUT,
+	NuwaClient,
+} from "./nuwa-client/nuwa-client.js";
 
 // === React Hook for Nuwa Client ===
 export { useNuwaClient } from "./nuwa-client/use-nuwa-client.js";

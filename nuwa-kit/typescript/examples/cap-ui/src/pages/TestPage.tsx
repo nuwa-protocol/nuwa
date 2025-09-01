@@ -1,7 +1,7 @@
 import { useNuwaClient } from "@nuwa-ai/ui-kit";
 import { useState } from "react";
 
-type TabType = "prompt" | "selection" | "state" | "height" | "connection";
+type TabType = "prompt" | "selection" | "state";
 
 export default function TestPage() {
     const [activeTab, setActiveTab] = useState<TabType>("prompt");
@@ -10,24 +10,31 @@ export default function TestPage() {
     const [selectionMessage, setSelectionMessage] = useState("");
     const [stateData, setStateData] = useState("");
     const [savedState, setSavedState] = useState<any>(null);
-    const [height, setHeightValue] = useState("400");
+
+    // Connection state managed locally since the hook no longer provides it
+    const [isConnected, setIsConnected] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const {
-        isConnected,
-
-        error,
+        nuwaClient,
         sendPrompt,
         addSelection,
         saveState,
         getState,
-        setHeight,
-        connect,
-        disconnect,
-        reconnect,
         containerRef,
     } = useNuwaClient({
-        autoAdjustHeight: false,
+        autoAdjustHeight: true,
         debug: true,
+        onConnected: () => {
+            console.log("Connected to parent!");
+            setIsConnected(true);
+            setError(null);
+        },
+        onError: (err) => {
+            console.error("Connection error:", err);
+            setIsConnected(false);
+            setError(err.message);
+        },
     });
 
     const handleSendPrompt = async () => {
@@ -36,6 +43,7 @@ export default function TestPage() {
             setInputValue("");
         } catch (err) {
             console.error("Failed to send prompt:", err);
+            setError(err instanceof Error ? err.message : "Send prompt failed");
         }
     };
 
@@ -49,6 +57,7 @@ export default function TestPage() {
             setSelectionMessage("");
         } catch (err) {
             console.error("Failed to add selection:", err);
+            setError(err instanceof Error ? err.message : "Add selection failed");
         }
     };
 
@@ -65,6 +74,7 @@ export default function TestPage() {
             setStateData("");
         } catch (err) {
             console.error("Failed to save state:", err);
+            setError(err instanceof Error ? err.message : "Save state failed");
         }
     };
 
@@ -74,14 +84,7 @@ export default function TestPage() {
             setSavedState(state);
         } catch (err) {
             console.error("Failed to get state:", err);
-        }
-    };
-
-    const handleSetHeight = async () => {
-        try {
-            await setHeight(parseInt(height) || 400);
-        } catch (err) {
-            console.error("Failed to set height:", err);
+            setError(err instanceof Error ? err.message : "Get state failed");
         }
     };
 
@@ -89,36 +92,25 @@ export default function TestPage() {
         { id: "prompt" as TabType, label: "Prompt", icon: "💬" },
         { id: "selection" as TabType, label: "Selection", icon: "📋" },
         { id: "state" as TabType, label: "State", icon: "💾" },
-        { id: "height" as TabType, label: "Height", icon: "📏" },
-        { id: "connection" as TabType, label: "Connection", icon: "🔗" },
     ];
 
     return (
-        <div className="p-4">
-            <div
-                ref={containerRef}
-                className="max-w-md mx-auto bg-white rounded-lg shadow-lg border"
-            >
+        <div ref={containerRef} className="p-4">
+            <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg border">
                 {/* Header */}
                 <div className="p-4 border-b">
                     <h2 className="text-lg font-semibold text-gray-800">
-                        Nuwa Client Demo
+                        A UI Demo
                     </h2>
                     <div className="flex items-center mt-2">
                         <div
-                            className={`w-2 h-2 rounded-full mr-2 ${!isConnected
-                                ? "bg-yellow-500 animate-pulse"
-                                : isConnected
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
+                            className={`w-2 h-2 rounded-full mr-2 ${isConnected
+                                ? "bg-green-500"
+                                : "bg-red-500 animate-pulse"
                                 }`}
                         ></div>
                         <span className="text-sm text-gray-600">
-                            {!isConnected
-                                ? "Connecting..."
-                                : isConnected
-                                    ? "Connected"
-                                    : "Disconnected"}
+                            {isConnected ? "Connected" : "Disconnected"}
                         </span>
                     </div>
                     {error && (
@@ -230,94 +222,6 @@ export default function TestPage() {
                                     </pre>
                                 </div>
                             )}
-                        </div>
-                    )}
-
-                    {activeTab === "height" && (
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="range"
-                                    min="200"
-                                    max="800"
-                                    value={height}
-                                    onChange={(e) => setHeightValue(e.target.value)}
-                                    className="flex-1"
-                                />
-                                <span className="text-xs font-mono w-12">{height}px</span>
-                            </div>
-                            <input
-                                type="number"
-                                className="w-full border border-gray-300 rounded p-2 text-sm"
-                                placeholder="Height in pixels"
-                                value={height}
-                                onChange={(e) => setHeightValue(e.target.value)}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleSetHeight}
-                                disabled={!isConnected}
-                                className="w-full px-3 py-2 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 disabled:bg-gray-300 transition-colors"
-                            >
-                                Set Height
-                            </button>
-                        </div>
-                    )}
-
-                    {activeTab === "connection" && (
-                        <div className="space-y-3">
-                            <div className="text-center">
-                                <div
-                                    className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3 ${!isConnected
-                                        ? "bg-yellow-100"
-                                        : isConnected
-                                            ? "bg-green-100"
-                                            : "bg-red-100"
-                                        }`}
-                                >
-                                    <div
-                                        className={`w-8 h-8 rounded-full ${!isConnected
-                                            ? "bg-yellow-500 animate-pulse"
-                                            : isConnected
-                                                ? "bg-green-500"
-                                                : "bg-red-500"
-                                            }`}
-                                    ></div>
-                                </div>
-                                <p className="text-sm font-medium mb-4">
-                                    {!isConnected
-                                        ? "Connecting..."
-                                        : isConnected
-                                            ? "Connected"
-                                            : "Disconnected"}
-                                </p>
-                            </div>
-                            <div className="space-y-2">
-                                <button
-                                    type="button"
-                                    onClick={connect}
-                                    disabled={isConnected || !isConnected}
-                                    className="w-full px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:bg-gray-300 transition-colors"
-                                >
-                                    Connect
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={disconnect}
-                                    disabled={!isConnected}
-                                    className="w-full px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 disabled:bg-gray-300 transition-colors"
-                                >
-                                    Disconnect
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={reconnect}
-                                    disabled={!isConnected}
-                                    className="w-full px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
-                                >
-                                    Reconnect
-                                </button>
-                            </div>
                         </div>
                     )}
                 </div>
