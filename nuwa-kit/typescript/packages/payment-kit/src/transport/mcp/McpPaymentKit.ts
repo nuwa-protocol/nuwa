@@ -72,7 +72,7 @@ export class McpPaymentKit {
   register(
     name: string,
     options: RouteOptions,
-    handler: (params: any, meta?: any) => Promise<any>,
+    handler: (params: any, context?: any) => Promise<any>,
     ruleId?: string
   ): this {
     // Register a synthetic HTTP rule for matcher reuse
