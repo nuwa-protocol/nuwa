@@ -1,5 +1,5 @@
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   PaymentResponsePayload,
   SignedSubRAV,
   SubRAV,
@@ -35,11 +35,11 @@ export type McpResponseObject = {
 };
 
 export const codecAdapter = {
-  // Request: MCP object -> PaymentHeaderPayload
-  toHeaderPayload(obj: McpRequestObject): PaymentHeaderPayload | null {
+  // Request: MCP object -> PaymentRequestPayload
+  toHeaderPayload(obj: McpRequestObject): PaymentRequestPayload | null {
     const p = obj?.__nuwa_payment;
     if (!p) return null;
-    const payload: PaymentHeaderPayload = {
+    const payload: PaymentRequestPayload = {
       version: p.version || 1,
       clientTxRef: p.clientTxRef,
       maxAmount: p.maxAmount ? BigInt(p.maxAmount) : BigInt(0),

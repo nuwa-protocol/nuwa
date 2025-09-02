@@ -82,7 +82,7 @@ export interface TransactionResult {
 /**
  * Payment header payload - protocol-agnostic structure for payment requests
  */
-export interface PaymentHeaderPayload {
+export interface PaymentRequestPayload {
   /** Signed SubRAV from client (optional in FREE mode) */
   signedSubRav?: SignedSubRAV;
   /** Per-request max amount (token smallest unit) */
@@ -94,7 +94,8 @@ export interface PaymentHeaderPayload {
 }
 
 // Compatibility alias - maintain backward compatibility
-export type HttpRequestPayload = PaymentHeaderPayload;
+export type HttpRequestPayload = PaymentRequestPayload;
+export type PaymentHeaderPayload = PaymentRequestPayload;
 
 /**
  * Payment response header payload (protocol-level)

@@ -1,5 +1,5 @@
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
-import type { PaymentHeaderPayload, PaymentResponsePayload, SubRAV } from '../../core/types';
+import type { PaymentRequestPayload, PaymentResponsePayload, SubRAV } from '../../core/types';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 
 /**
@@ -7,7 +7,7 @@ import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
  * and reuse HttpPaymentCodec for streaming headerValue frames.
  */
 export class McpPaymentCodec implements PaymentCodec {
-  encodePayload(payload: PaymentHeaderPayload): Record<string, any> {
+  encodePayload(payload: PaymentRequestPayload): Record<string, any> {
     return {
       version: payload.version,
       clientTxRef: payload.clientTxRef,
@@ -21,7 +21,7 @@ export class McpPaymentCodec implements PaymentCodec {
     };
   }
 
-  decodePayload(input: string | Record<string, any>): PaymentHeaderPayload {
+  decodePayload(input: string | Record<string, any>): PaymentRequestPayload {
     if (typeof input === 'string') {
       // Allow base64url headerValue in edge cases; parse via HTTP codec
       return HttpPaymentCodec.parseRequestHeader(input);

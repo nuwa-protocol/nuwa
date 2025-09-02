@@ -11,7 +11,7 @@ import type { PaymentProcessorConfig } from '../../core/PaymentProcessor';
 import type { BillingContext } from '../../billing';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   HttpRequestPayload,
   HttpResponsePayload,
   SignedSubRAV,
@@ -231,7 +231,7 @@ export class HttpBillingMiddleware {
    */
   extractPaymentData(
     headers: Record<string, string | string[] | undefined>
-  ): PaymentHeaderPayload | null {
+  ): PaymentRequestPayload | null {
     const headerValue = HttpPaymentCodec.extractPaymentHeader(headers);
 
     if (!headerValue) {
@@ -250,7 +250,7 @@ export class HttpBillingMiddleware {
    */
   private buildBillingContext(
     req: GenericHttpRequest,
-    paymentData?: PaymentHeaderPayload,
+    paymentData?: PaymentRequestPayload,
     billingRule?: BillingRule
   ): BillingContext {
     return {

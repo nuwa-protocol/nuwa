@@ -1,7 +1,7 @@
 import type {
   SignedSubRAV,
   SubRAV,
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   PaymentResponsePayload,
 } from '../core/types';
 
@@ -13,8 +13,8 @@ import type {
  */
 export interface PaymentCodec {
   // Request-side encode/decode
-  encodePayload(payload: PaymentHeaderPayload): string | Record<string, any>;
-  decodePayload(input: string | Record<string, any>): PaymentHeaderPayload;
+  encodePayload(payload: PaymentRequestPayload): string | Record<string, any>;
+  decodePayload(input: string | Record<string, any>): PaymentRequestPayload;
 
   // Response-side encode/decode
   encodeResponse(

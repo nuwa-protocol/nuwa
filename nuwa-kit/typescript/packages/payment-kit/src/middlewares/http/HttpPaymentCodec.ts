@@ -3,7 +3,7 @@ import type { SignedSubRAV, SubRAV } from '../../core/types';
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
 import { EncodingError, DecodingError } from '../../codecs/PaymentCodec';
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   HttpRequestPayload,
   PaymentResponsePayload as HttpResponsePayload,
   SerializableResponsePayload,
@@ -23,7 +23,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Encode payment header payload for HTTP request header (new interface)
    */
-  encodePayload(payload: PaymentHeaderPayload): string {
+  encodePayload(payload: PaymentRequestPayload): string {
     try {
       return HttpPaymentCodec.buildRequestHeader(payload);
     } catch (error) {
@@ -37,7 +37,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Decode HTTP request header to payment header payload (new interface)
    */
-  decodePayload(encoded: string): PaymentHeaderPayload {
+  decodePayload(encoded: string): PaymentRequestPayload {
     try {
       return HttpPaymentCodec.parseRequestHeader(encoded);
     } catch (error) {
@@ -125,7 +125,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Build HTTP request header value
    */
-  static buildRequestHeader(payload: PaymentHeaderPayload): string {
+  static buildRequestHeader(payload: PaymentRequestPayload): string {
     // Convert payload to serializable format
     const serializable: any = {
       maxAmount: payload.maxAmount.toString(),
@@ -146,7 +146,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Parse HTTP request header value
    */
-  static parseRequestHeader(headerValue: string): PaymentHeaderPayload {
+  static parseRequestHeader(headerValue: string): PaymentRequestPayload {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
@@ -156,7 +156,7 @@ export class HttpPaymentCodec implements PaymentCodec {
         throw new Error('clientTxRef is required in payment header');
       }
 
-      const result: PaymentHeaderPayload = {
+      const result: PaymentRequestPayload = {
         maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0), // Handle old format without maxAmount
         clientTxRef: data.clientTxRef,
         version: parseInt(data.version) || 1,
@@ -274,7 +274,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Extract payment data from request headers
    */
-  static extractPaymentData(headers: Record<string, string>): PaymentHeaderPayload | null {
+  static extractPaymentData(headers: Record<string, string>): PaymentRequestPayload | null {
     const headerValue =
       headers[this.getHeaderName().toLowerCase()] || headers[this.getHeaderName()];
 
@@ -307,7 +307,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Validate payment requirements for a request
    */
   static validatePaymentRequirement(
-    paymentData: PaymentHeaderPayload | null,
+    paymentData: PaymentRequestPayload | null,
     requiredAmount: bigint
   ): { valid: boolean; error?: string } {
     if (!paymentData) {

@@ -3,7 +3,7 @@ import type { BillingContext } from '../../billing';
 import type { BillingRule, RuleProvider } from '../../billing';
 import { findRule } from '../../billing/core/rule-matcher';
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   PaymentResponsePayload,
   SerializableResponsePayload,
 } from '../../core/types';
@@ -90,7 +90,7 @@ export class McpBillingMiddleware {
     return findRule(meta, this.ruleProvider.getRules());
   }
 
-  private extractPaymentData(params: any): PaymentHeaderPayload | null {
+  private extractPaymentData(params: any): PaymentRequestPayload | null {
     const p = params?.__nuwa_payment;
     if (!p) return null;
     const signed = p.signedSubRav
@@ -101,12 +101,12 @@ export class McpBillingMiddleware {
       clientTxRef: p.clientTxRef,
       maxAmount: p.maxAmount ? BigInt(p.maxAmount) : BigInt(0),
       signedSubRav: signed,
-    } as PaymentHeaderPayload;
+    } as PaymentRequestPayload;
   }
 
   private buildBillingContext(
     toolName: string,
-    paymentData: PaymentHeaderPayload | undefined,
+    paymentData: PaymentRequestPayload | undefined,
     billingRule: BillingRule | undefined,
     meta?: any
   ): BillingContext {
