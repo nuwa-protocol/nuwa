@@ -128,6 +128,45 @@ export interface PaymentResponsePayload {
 export type HttpResponsePayload = PaymentResponsePayload;
 
 /**
+ * JSON-serializable SubRAV representation (all bigint -> string)
+ */
+export interface SerializableSubRAV {
+  version: string;
+  chainId: string;
+  channelId: string;
+  channelEpoch: string;
+  vmIdFragment: string;
+  accumulatedAmount: string;
+  nonce: string;
+}
+
+/**
+ * JSON-serializable SignedSubRAV
+ */
+export interface SerializableSignedSubRAV {
+  subRav: SerializableSubRAV;
+  signature: string; // base64url
+}
+
+/**
+ * JSON-serializable PaymentResponsePayload for embedding into JSON bodies (e.g., MCP)
+ * - bigint fields become strings
+ * - subRav is SerializableSubRAV (not encoded header string)
+ */
+export interface SerializableResponsePayload {
+  version: number; // keep number for schema clarity
+  clientTxRef?: string;
+  serviceTxRef?: string;
+  subRav?: SerializableSubRAV;
+  cost?: string;
+  costUsd?: string;
+  error?: {
+    code: string;
+    message?: string;
+  };
+}
+
+/**
  * Payment information for completed requests
  */
 export interface PaymentInfo {

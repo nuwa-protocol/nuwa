@@ -6,6 +6,9 @@ import type {
   PaymentHeaderPayload,
   HttpRequestPayload,
   PaymentResponsePayload as HttpResponsePayload,
+  SerializableResponsePayload,
+  SerializableSubRAV,
+  SerializableSignedSubRAV,
 } from '../../core/types';
 
 /**
@@ -174,24 +177,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Build HTTP response header value
    */
   static buildResponseHeader(payload: HttpResponsePayload): string {
-    const serializable: any = {
-      clientTxRef: payload.clientTxRef,
-      serviceTxRef: payload.serviceTxRef,
-      version: (payload.version ?? 1).toString(),
-    };
-
-    if (payload.subRav && payload.cost !== undefined) {
-      serializable.subRav = this.serializeSubRAV(payload.subRav);
-      serializable.cost = payload.cost.toString();
-      if (payload.costUsd !== undefined) {
-        serializable.costUsd = payload.costUsd.toString();
-      }
-    }
-
-    if (payload.error) {
-      serializable.error = payload.error;
-    }
-
+    const serializable = this.toJSONResponse(payload);
     const json = JSON.stringify(serializable);
     return MultibaseCodec.encodeBase64url(json);
   }
@@ -202,37 +188,56 @@ export class HttpPaymentCodec implements PaymentCodec {
   static parseResponseHeader(headerValue: string): HttpResponsePayload {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
-      const data = JSON.parse(json);
-
-      const payload: HttpResponsePayload = {
-        clientTxRef: data.clientTxRef,
-        serviceTxRef: data.serviceTxRef,
-        version: parseInt(data.version) || 1,
-      } as HttpResponsePayload;
-
-      // Success path
-      if (data.subRav && (data.cost !== undefined || data.amountDebited !== undefined)) {
-        payload.subRav = this.deserializeSubRAV(data.subRav);
-        // Support old amountDebited for early servers
-        const costStr = data.cost ?? data.amountDebited;
-        payload.cost = costStr !== undefined ? BigInt(costStr) : undefined;
-        if (data.costUsd !== undefined) {
-          payload.costUsd = BigInt(data.costUsd);
-        }
-      }
-
-      // Error path
-      if (data.error) {
-        payload.error = data.error;
-      } else if (data.errorCode !== undefined) {
-        // Map legacy numeric errorCode to string code
-        payload.error = { code: String(data.errorCode), message: data.message };
-      }
-
-      return payload;
+      const data: any = JSON.parse(json);
+      return this.fromJSONResponse(data as SerializableResponsePayload);
     } catch (error) {
       throw new Error(`Failed to parse response header: ${error}`);
     }
+  }
+
+  // ============================================================================
+  // Structured JSON helpers for PaymentResponsePayload (for MCP and others)
+  // Note: subRav is serialized as JSON (not encoded string) for readability.
+  // In a future revision, we may add an additional encoded field (e.g., subRavHeader)
+  // without breaking compatibility.
+  // ============================================================================
+
+  static toJSONResponse(payload: HttpResponsePayload): SerializableResponsePayload {
+    const out: SerializableResponsePayload = {
+      version: payload.version ?? 1,
+      clientTxRef: payload.clientTxRef,
+      serviceTxRef: payload.serviceTxRef,
+    };
+    if (payload.subRav && payload.cost !== undefined) {
+      (out as any).subRav = this.serializeSubRAV(payload.subRav);
+      (out as any).cost = payload.cost.toString();
+      if (payload.costUsd !== undefined) (out as any).costUsd = payload.costUsd.toString();
+    }
+    if (payload.error) {
+      out.error = payload.error;
+    }
+    return out;
+  }
+
+  static fromJSONResponse(data: SerializableResponsePayload): HttpResponsePayload {
+    const payload: HttpResponsePayload = {
+      version: data?.version ? Number(data.version) : 1,
+      clientTxRef: data?.clientTxRef,
+      serviceTxRef: data?.serviceTxRef,
+    } as HttpResponsePayload;
+
+    if (data?.subRav && (data as any).cost !== undefined) {
+      payload.subRav = this.deserializeSubRAV(data.subRav as unknown as SerializableSubRAV);
+      const costStr = (data as any).cost;
+      if (costStr !== undefined) payload.cost = BigInt(costStr);
+      if ((data as any).costUsd !== undefined) payload.costUsd = BigInt((data as any).costUsd);
+    }
+    if ((data as any)?.error) {
+      payload.error = (data as any).error as any;
+    } else if ((data as any)?.errorCode !== undefined) {
+      payload.error = { code: String((data as any).errorCode), message: (data as any).message };
+    }
+    return payload;
   }
 
   /**
@@ -323,7 +328,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SubRAV for JSON transport
    */
-  private static serializeSubRAV(subRav: SubRAV): Record<string, string> {
+  private static serializeSubRAV(subRav: SubRAV): SerializableSubRAV {
     return {
       version: subRav.version.toString(),
       chainId: subRav.chainId.toString(),
@@ -338,7 +343,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SubRAV from JSON transport
    */
-  private static deserializeSubRAV(data: Record<string, string>): SubRAV {
+  private static deserializeSubRAV(data: SerializableSubRAV): SubRAV {
     return {
       version: parseInt(data.version),
       chainId: BigInt(data.chainId),
@@ -355,7 +360,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    */
   private static serializeSignedSubRAV(
     signedSubRav: SignedSubRAV | undefined
-  ): Record<string, any> | undefined {
+  ): SerializableSignedSubRAV | undefined {
     if (!signedSubRav) {
       return undefined;
     }
@@ -370,7 +375,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Helper: Deserialize SignedSubRAV from JSON transport
    */
   private static deserializeSignedSubRAV(
-    data: Record<string, any> | undefined
+    data: SerializableSignedSubRAV | undefined
   ): SignedSubRAV | undefined {
     if (!data) {
       return undefined;

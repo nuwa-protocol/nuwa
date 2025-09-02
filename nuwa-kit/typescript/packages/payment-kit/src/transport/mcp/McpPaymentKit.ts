@@ -92,7 +92,10 @@ export class McpPaymentKit {
         // Prefer using headerValue from preProcess (may include pending SubRAV)
         if ((ctx as any).state?.headerValue) {
           const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-          return { data: undefined, __nuwa_payment: this.toStructured(decoded) } as any;
+          return {
+            data: undefined,
+            __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded),
+          } as any;
         }
         // Fallback to minimal structured error (no subRAV)
         const decoded = {
@@ -100,7 +103,7 @@ export class McpPaymentKit {
           clientTxRef: ctx.meta.clientTxRef,
           version: 1,
         } as any;
-        return { data: undefined, __nuwa_payment: this.toStructured(decoded) } as any;
+        return { data: undefined, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
       }
 
       // Step B: business handler
@@ -112,7 +115,7 @@ export class McpPaymentKit {
       // Prefer preProcess header (402) if present and no structured payment in settled
       if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
         const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-        return { data: result, __nuwa_payment: this.toStructured(decoded) } as any;
+        return { data: result, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
       }
       return settled;
     };
