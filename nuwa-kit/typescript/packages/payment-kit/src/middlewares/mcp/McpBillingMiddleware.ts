@@ -2,7 +2,11 @@ import { PaymentProcessor } from '../../core/PaymentProcessor';
 import type { BillingContext } from '../../billing';
 import type { BillingRule, RuleProvider } from '../../billing';
 import { findRule } from '../../billing/core/rule-matcher';
-import type { PaymentHeaderPayload, PaymentResponsePayload } from '../../core/types';
+import type {
+  PaymentHeaderPayload,
+  PaymentResponsePayload,
+  SerializableResponsePayload,
+} from '../../core/types';
 import { HttpPaymentCodec } from '../http/HttpPaymentCodec';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
@@ -28,7 +32,7 @@ export interface McpRequestContext {
 
 export interface McpResponseContext<T = any> {
   data: T;
-  __nuwa_payment?: ReturnType<McpBillingMiddleware['buildStructuredPaymentResult']> | undefined;
+  __nuwa_payment?: SerializableResponsePayload | undefined;
 }
 
 export class McpBillingMiddleware {
@@ -65,7 +69,7 @@ export class McpBillingMiddleware {
     usage?: number
   ): Promise<McpResponseContext<T>> {
     const settled = this.processor.settle(ctx, usage);
-    let structured: McpResponseContext<T>['__nuwa_payment'];
+    let structured: SerializableResponsePayload | undefined;
 
     if (settled.state?.headerValue) {
       const decoded = HttpPaymentCodec.parseResponseHeader(settled.state.headerValue);
@@ -120,19 +124,10 @@ export class McpBillingMiddleware {
     };
   }
 
-  private buildStructuredPaymentResult(decoded: PaymentResponsePayload) {
-    return {
-      version: decoded.version,
-      clientTxRef: decoded.clientTxRef,
-      serviceTxRef: decoded.serviceTxRef,
-      subRav: decoded.subRav
-        ? ((HttpPaymentCodec as any).serializeSubRAV?.(decoded.subRav) ??
-          serializeSubRAV(decoded.subRav))
-        : undefined,
-      cost: decoded.cost !== undefined ? decoded.cost.toString() : undefined,
-      costUsd: decoded.costUsd !== undefined ? decoded.costUsd.toString() : undefined,
-      error: decoded.error,
-    } as any;
+  private buildStructuredPaymentResult(
+    decoded: PaymentResponsePayload
+  ): SerializableResponsePayload {
+    return HttpPaymentCodec.toJSONResponse(decoded);
   }
 }
 
@@ -162,14 +157,4 @@ McpBillingMiddleware.prototype.extractDidInfo = async function (
   }
 };
 
-function serializeSubRAV(subRav: any): Record<string, string> {
-  return {
-    version: String(subRav.version),
-    chainId: String(subRav.chainId),
-    channelId: subRav.channelId,
-    channelEpoch: String(subRav.channelEpoch),
-    vmIdFragment: subRav.vmIdFragment,
-    accumulatedAmount: String(subRav.accumulatedAmount),
-    nonce: String(subRav.nonce),
-  };
-}
+// serializeSubRAV helper removed; HttpPaymentCodec handles JSON serialization
