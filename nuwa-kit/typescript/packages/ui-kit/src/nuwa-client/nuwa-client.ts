@@ -7,10 +7,10 @@ import {
 } from "penpal";
 
 // Default timeout for Penpal connections
-export const NUWA_CLIENT_TIMEOUT = 5000;
+export const NUWA_CLIENT_TIMEOUT = 1000;
 
 // Default timeout for method calls
-export const NUWA_METHOD_TIMEOUT = 10000;
+export const NUWA_METHOD_TIMEOUT = 2000;
 
 // Re-export Penpal error codes for client use
 export { ErrorCode } from "penpal";

@@ -1,6 +1,7 @@
 import type { BlockNoteEditor } from "@blocknote/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PostMessageMCPTransport } from "@nuwa-ai/ui-kit";
+import { useEffect } from "react";
 import { z } from "zod";
 
 /**
@@ -8,7 +9,7 @@ import { z } from "zod";
  * @param editor The BlockNote editor instance
  * @returns Object containing the MCP server and transport
  */
-export const createNoteMCP = (editor: BlockNoteEditor) => {
+const createNoteMCP = (editor: BlockNoteEditor) => {
 	const transport = new PostMessageMCPTransport({
 		targetWindow: window.parent,
 		targetOrigin: "*",
@@ -49,4 +50,23 @@ export const createNoteMCP = (editor: BlockNoteEditor) => {
 	);
 
 	return { server, transport };
+};
+
+export const useNoteMCP = (editor: BlockNoteEditor) => {
+	// Initialize MCP server
+	// biome-ignore lint/correctness/useExhaustiveDependencies: suppress
+	useEffect(() => {
+		const { server, transport } = createNoteMCP(editor);
+		try {
+			// Connect server to transport
+			server.connect(transport);
+		} catch (error) {
+			console.error("MCP server error:", error);
+		}
+
+		// clean up on unmount
+		return () => {
+			server.close();
+		};
+	}, []);
 };

@@ -1,10 +1,14 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useEffect, useRef } from "react";
-import { createNoteMCP } from "../utils/note-mcp";
+import { useNuwaClient } from "@nuwa-ai/ui-kit";
+import { useState } from "react";
+import { useNoteMCP } from "../hooks/use-note-mcp";
 import "@blocknote/mantine/style.css";
 
 export default function NotePage() {
+  const [isConnected, setIsConnected] = useState(false);
+
+  // create blocknote editor
   const editor = useCreateBlockNote({
     initialContent: [
       {
@@ -16,28 +20,118 @@ export default function NotePage() {
       },
     ],
   });
-  const { server, transport } = createNoteMCP(editor);
 
-  // Prevent double initialization in React Strict Mode
-  const isServerInitialized = useRef(false);
-  // Initialize MCP server with cleanup on unmount
-  // biome-ignore lint/correctness/useExhaustiveDependencies: suppress
-  useEffect(() => {
-    // Early return if server already initialized (prevents double initialization)
-    if (isServerInitialized.current) {
-      try {
-        // Connect server to transport
-        server.connect(transport);
-      } catch (error) {
-        console.error("MCP server error:", error);
-      }
+
+  // connect to Nuwa Client on mount and obtain nuwa client methods
+  const { sendPrompt, addSelection, saveState, getState } = useNuwaClient({
+    onConnected: () => setIsConnected(true),
+    onError: (error) => {
+      console.error("Nuwa client error:", error);
+      setIsConnected(false);
+    },
+  });
+
+  // start MCP server for Nuwa Client to connect
+  useNoteMCP(editor);
+
+
+  const handleSendNote = async () => {
+    const content = JSON.stringify(editor.document);
+    try {
+      await sendPrompt(`Here's my note content: ${content}`);
+    } catch (error) {
+      console.error("Failed to send note:", error);
     }
-    isServerInitialized.current = true;
-  }, []);
+  };
+
+  const handleAddNoteSelection = async () => {
+    const content = JSON.stringify(editor.document);
+    try {
+      await addSelection("Note Content", content);
+    } catch (error) {
+      console.error("Failed to add note selection:", error);
+    }
+  };
+
+  const handleSaveNote = async () => {
+    const content = editor.document;
+    try {
+      await saveState({ noteContent: content, timestamp: Date.now() });
+    } catch (error) {
+      console.error("Failed to save note:", error);
+    }
+  };
+
+  const handleLoadNote = async () => {
+    try {
+      const savedData = await getState();
+      if (savedData?.noteContent) {
+        editor.replaceBlocks(editor.document, savedData.noteContent);
+      }
+    } catch (error) {
+      console.error("Failed to load note:", error);
+    }
+  };
 
   return (
-    <div className="h-screen w-screen py-10 max-w-5xl mx-auto">
-      <BlockNoteView editor={editor} />
+    <div className="h-screen w-screen flex flex-col max-w-5xl mx-auto">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-xl font-semibold text-gray-800">Note Editor</h1>
+            <div className="flex items-center">
+              <div
+                className={`w-2 h-2 rounded-full mr-2 ${isConnected ? "bg-green-500" : "bg-red-500 animate-pulse"
+                  }`}
+              />
+              <span className="text-sm text-gray-600">
+                {isConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex space-x-2">
+            <button
+              type="button"
+              onClick={handleSendNote}
+              disabled={!isConnected}
+              className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
+            >
+              Send Prompt
+            </button>
+            <button
+              type="button"
+              onClick={handleAddNoteSelection}
+              disabled={!isConnected}
+              className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:bg-gray-300 transition-colors"
+            >
+              Add Selection
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveNote}
+              disabled={!isConnected}
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:bg-gray-300 transition-colors"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={handleLoadNote}
+              disabled={!isConnected}
+              className="px-3 py-2 bg-orange-500 text-white text-sm rounded hover:bg-orange-600 disabled:bg-gray-300 transition-colors"
+            >
+              Load
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Editor */}
+      <div className="flex-1 py-10 px-6">
+        <BlockNoteView editor={editor} />
+      </div>
     </div>
   );
 }
