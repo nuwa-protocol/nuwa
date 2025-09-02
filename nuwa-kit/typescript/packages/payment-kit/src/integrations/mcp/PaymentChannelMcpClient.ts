@@ -39,6 +39,7 @@ export class PaymentChannelMcpClient {
   private paymentState: PaymentState;
   private mcpClient: any | undefined;
   private notificationsSubscribed = false;
+  private lastContents: any[] | undefined;
 
   constructor(options: McpPayerOptions) {
     this.options = options;
@@ -99,24 +100,29 @@ export class PaymentChannelMcpClient {
     }
     let data: any = result as any;
     let container: any = undefined;
-    // If server returns MCP content envelope, unwrap JSON text
+    // If server returns MCP content envelope, unwrap JSON text and payment resource
+    this.lastContents = undefined;
     if (
       result &&
       typeof result === 'object' &&
       (result as any).content &&
       Array.isArray((result as any).content)
     ) {
-      const first = (result as any).content[0];
-      if (first && first.type === 'text' && typeof first.text === 'string') {
+      const contents = (result as any).content as any[];
+      this.lastContents = contents;
+      // Prefer explicit data content if present; fallback to first text
+      const dataItem = contents.find(c => c?.type === 'text') || contents[0];
+      if (dataItem && dataItem.type === 'text' && typeof dataItem.text === 'string') {
         try {
-          container = JSON.parse(first.text);
-          data = container;
-          if (container && typeof container === 'object' && 'data' in container) {
-            data = container.data;
-          }
+          data = JSON.parse(dataItem.text);
         } catch {
-          data = first.text as any;
+          data = dataItem.text as any;
         }
+      }
+      // Extract payment resource via codec helper
+      const payment = HttpPaymentCodec.parseMcpPaymentFromContents(contents);
+      if (payment) {
+        container = { __nuwa_payment: payment };
       }
     } else if (result && typeof result === 'object' && 'data' in result) {
       data = (result as any).data;
@@ -143,6 +149,7 @@ export class PaymentChannelMcpClient {
           Array.isArray((result as any).content)
         ) {
           const first = (result as any).content[0];
+          this.lastContents = (result as any).content as any[];
           if (first && first.type === 'text' && typeof first.text === 'string') {
             try {
               const parsed = JSON.parse(first.text);
@@ -159,6 +166,10 @@ export class PaymentChannelMcpClient {
 
     const paymentInfo = await this.handlePaymentFromResult(container ?? result, clientTxRef);
     return { data, payment: paymentInfo };
+  }
+
+  getLastContents(): any[] | undefined {
+    return this.lastContents;
   }
 
   getPendingSubRAV(): SubRAV | null {

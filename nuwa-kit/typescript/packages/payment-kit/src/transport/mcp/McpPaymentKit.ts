@@ -22,6 +22,7 @@ import type { ApiContext } from '../../types/api';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { validateSerializableResponsePayload } from './ToolSchema';
+import { serializeJson } from '../../utils/json';
 
 export interface McpPaymentKitOptions {
   serviceId: string;
@@ -115,10 +116,9 @@ export class McpPaymentKit {
       // Prefer using headerValue from preProcess (may include pending SubRAV)
       if ((ctx as any).state?.headerValue) {
         const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-        return {
-          data: undefined,
-          __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded),
-        } as any;
+        const payment = HttpPaymentCodec.toJSONResponse(decoded);
+        const content: any[] = [HttpPaymentCodec.buildMcpPaymentResource(payment as any)];
+        return { content } as any;
       }
       // Fallback to minimal structured error (no subRAV)
       const decoded = {
@@ -126,7 +126,8 @@ export class McpPaymentKit {
         clientTxRef: ctx.meta.clientTxRef,
         version: 1,
       } as any;
-      return { data: undefined, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
+      const paymentOnly = HttpPaymentCodec.toJSONResponse(decoded);
+      return { content: [HttpPaymentCodec.buildMcpPaymentResource(paymentOnly as any)] } as any;
     }
 
     // Step B: business handler — pass didInfo via FastMCP context rather than mutating params
@@ -144,21 +145,48 @@ export class McpPaymentKit {
       const issues = validateSerializableResponsePayload(payment);
       if (issues && issues.length) {
         return {
-          data: undefined,
+          content: [
+            {
+              type: 'text',
+              text: serializeJson({
+                error: {
+                  code: 'INTERNAL_ERROR',
+                  message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+                },
+              }),
+            },
+          ],
           error: {
             code: 'INTERNAL_ERROR',
             message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
           },
         } as any;
       }
-      return { data: result, __nuwa_payment: payment } as any;
+      const content: any[] = [];
+      if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+        content.push(...(result as any).content);
+      } else if (result !== undefined) {
+        content.push({ type: 'text', text: serializeJson(result) });
+      }
+      content.push(HttpPaymentCodec.buildMcpPaymentResource(payment as any));
+      return { content } as any;
     }
     // Validate structured payment if exists
     if (settled?.__nuwa_payment) {
       const issues = validateSerializableResponsePayload(settled.__nuwa_payment);
       if (issues && issues.length) {
         return {
-          data: undefined,
+          content: [
+            {
+              type: 'text',
+              text: serializeJson({
+                error: {
+                  code: 'INTERNAL_ERROR',
+                  message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+                },
+              }),
+            },
+          ],
           error: {
             code: 'INTERNAL_ERROR',
             message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
@@ -166,7 +194,24 @@ export class McpPaymentKit {
         } as any;
       }
     }
-    return settled;
+    // Build MCP content array, separating payment info as a dedicated resource item
+    const content: any[] = [];
+    const dataPayload = settled?.data ?? result;
+    if (
+      dataPayload &&
+      typeof dataPayload === 'object' &&
+      Array.isArray((dataPayload as any).content)
+    ) {
+      content.push(...(dataPayload as any).content);
+    } else if (dataPayload !== undefined) {
+      content.push({ type: 'text', text: serializeJson(dataPayload) });
+    }
+    if ((settled as any)?.__nuwa_payment) {
+      content.push(
+        HttpPaymentCodec.buildMcpPaymentResource((settled as any).__nuwa_payment as any)
+      );
+    }
+    return { content } as any;
   }
 
   listTools(): string[] {

@@ -341,6 +341,14 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(analyzeResult.payment!.cost).toBe(BigInt('10000000')); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     expect(analyzeResult.payment!.nonce).toBeGreaterThan(0n);
 
+    // Assert nuwa:payment resource exists in contents
+    const contents1 = mcpClient.getLastContents();
+    expect(Array.isArray(contents1)).toBe(true);
+    const paymentRes1 = (contents1 || []).find(
+      (c: any) => c?.type === 'resource' && c.resource?.uri === 'nuwa:payment'
+    );
+    expect(!!paymentRes1).toBe(true);
+
     console.log('✅ Analyze response:', analyzeResult.data);
     console.log(`💰 Analyze payment - ${formatPaymentInfo(analyzeResult.payment!)}`);
 
@@ -362,6 +370,14 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(processResult.payment).toBeTruthy();
     expect(processResult.payment!.cost).toBe(BigInt('100000000')); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     expect(processResult.payment!.nonce).toBeGreaterThan(analyzeResult.payment!.nonce);
+
+    // Assert nuwa:payment resource exists in contents
+    const contents2 = mcpClient.getLastContents();
+    expect(Array.isArray(contents2)).toBe(true);
+    const paymentRes2 = (contents2 || []).find(
+      (c: any) => c?.type === 'resource' && c.resource?.uri === 'nuwa:payment'
+    );
+    expect(!!paymentRes2).toBe(true);
 
     console.log('✅ Process response:', processResult.data);
     console.log(`💰 Process payment - ${formatPaymentInfo(processResult.payment!)}`);

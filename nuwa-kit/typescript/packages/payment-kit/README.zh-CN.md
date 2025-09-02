@@ -312,6 +312,47 @@ if (pendingSubRAV) {
 }
 ```
 
+#### MCP 支付内容格式（服务端响应）
+
+- 业务结果作为常规 MCP `content` 返回（例如 `type: "text"`，或你的工具原生支持的其他类型）。
+- 支付信息以独立的资源内容项追加：
+
+```json
+{
+  "type": "resource",
+  "resource": {
+    "uri": "nuwa:payment",
+    "mimeType": "application/vnd.nuwa.payment+json",
+    "text": "{\"version\":1,\"clientTxRef\":\"...\",\"serviceTxRef\":\"...\",\"subRav\":{...},\"cost\":\"...\",\"costUsd\":\"...\"}"
+  }
+}
+```
+
+- `resource.text` 中的 JSON 遵循 `SerializableResponsePayload`（所有 BigInt 使用字符串）。
+- 提供辅助方法：
+  - 服务端：`HttpPaymentCodec.buildMcpPaymentResource(payload)`
+  - 客户端：`HttpPaymentCodec.parseMcpPaymentFromContents(contents)`
+
+#### MCP 工具参数：保留键合并与严格校验
+
+- 每个工具参数的 schema 会合并保留键：
+  - `__nuwa_auth`（字符串；由 IdentityKit 生成的 DIDAuthV1 授权头）
+  - `__nuwa_payment`（对象；`SerializableRequestPayload` 形状的序列化请求负载）
+- 注册器通过 `buildParametersSchema(userSchema, { mergeReserved: true })` 与 `compileStandardSchema(...)`（Ajv + formats）编译，确保在 FastMCP 边界进行严格校验。
+
+客户端每次调用最小的 `__nuwa_payment` 结构：
+
+```json
+{
+  "version": 1,
+  "clientTxRef": "<uuid>",
+  "maxAmount": "<string-amount>?",
+  "signedSubRav": { "subRav": { ... }, "signature": "..." }?
+}
+```
+
+服务端校验并结算后，在响应中追加上述支付资源项。
+
 ### SubRAV BCS 序列化
 
 ```typescript

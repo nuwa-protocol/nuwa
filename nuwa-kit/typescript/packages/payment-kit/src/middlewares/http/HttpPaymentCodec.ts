@@ -20,6 +20,9 @@ import type {
  */
 export class HttpPaymentCodec implements PaymentCodec {
   private static readonly HEADER_NAME = 'X-Payment-Channel-Data';
+  // MCP content constants
+  static readonly MCP_PAYMENT_URI = 'nuwa:payment';
+  static readonly MCP_PAYMENT_MIME = 'application/vnd.nuwa.payment+json';
 
   /**
    * Encode payment header payload for HTTP request header (new interface)
@@ -380,5 +383,54 @@ export class HttpPaymentCodec implements PaymentCodec {
       subRav: this.deserializeSubRAV(data.subRav),
       signature: MultibaseCodec.decodeBase64url(data.signature),
     };
+  }
+
+  // ==========================================================================
+  // MCP Content helpers (resource content for payment payload)
+  // ==========================================================================
+
+  /** Build a FastMCP-compatible resource content item carrying payment payload */
+  static buildMcpPaymentResource(payload: SerializableResponsePayload): any {
+    return {
+      type: 'resource',
+      resource: {
+        uri: this.MCP_PAYMENT_URI,
+        mimeType: this.MCP_PAYMENT_MIME,
+        text: JSON.stringify(payload),
+      },
+    };
+  }
+
+  /** Try to parse payment payload from a FastMCP content array */
+  static parseMcpPaymentFromContents(
+    contents: any[] | undefined
+  ): SerializableResponsePayload | undefined {
+    if (!Array.isArray(contents)) return undefined;
+    const item = contents.find(
+      c =>
+        c &&
+        c.type === 'resource' &&
+        c.resource &&
+        (c.resource.uri === this.MCP_PAYMENT_URI || c.resource.mimeType === this.MCP_PAYMENT_MIME)
+    );
+    try {
+      const text = item?.resource?.text;
+      if (!text || typeof text !== 'string') return undefined;
+      return JSON.parse(text) as SerializableResponsePayload;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Attach payment resource to an existing content array (non-mutating) */
+  static attachPaymentResource(
+    contents: any[] | undefined,
+    payload?: SerializableResponsePayload
+  ): any[] {
+    const out: any[] = Array.isArray(contents) ? [...contents] : [];
+    if (payload) {
+      out.push(this.buildMcpPaymentResource(payload));
+    }
+    return out;
   }
 }

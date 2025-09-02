@@ -7,6 +7,17 @@ import { FastMCP } from 'fastmcp';
 import { buildParametersSchema, compileStandardSchema } from './ToolSchema';
 import { serializeJson } from '../../utils/json';
 
+function toMcpToolResult(raw: any): any {
+  // MCP规范：返回 ToolResult，仅包含 content。将业务数据与支付信息包装为首个 text JSON。
+  const container: any = {};
+  if (raw && typeof raw === 'object' && 'data' in raw) container.data = (raw as any).data;
+  else container.data = raw;
+  if (raw && typeof raw === 'object' && (raw as any).__nuwa_payment) {
+    container.__nuwa_payment = (raw as any).__nuwa_payment;
+  }
+  return { content: [{ type: 'text', text: serializeJson(container) }] } as any;
+}
+
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
   register?: (registrar: PaymentMcpToolRegistrar) => void;
@@ -57,8 +68,7 @@ export class PaymentMcpToolRegistrar {
       description,
       parameters: compiled,
       async execute(params: any, context: any) {
-        const raw = await kitRef.invoke(name, params, context);
-        return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
+        return await kitRef.invoke(name, params, context);
       },
     });
   }
@@ -122,8 +132,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       description: `Built-in payment tool: ${name}`,
       parameters: compileStandardSchema(buildParametersSchema(undefined, { mergeReserved: true })),
       async execute(params: any, context: any) {
-        const raw = await kit.invoke(name, params, context);
-        return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
+        return await kit.invoke(name, params, context);
       },
     });
   }

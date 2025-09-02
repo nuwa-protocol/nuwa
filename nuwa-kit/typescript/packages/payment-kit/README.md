@@ -344,6 +344,47 @@ if (pendingSubRAV) {
 }
 ```
 
+#### MCP Payment Content Format (Server Responses)
+
+- Business result is returned as normal MCP `content` (e.g., `type: "text"`, or any supported content types your tool emits).
+- Payment info is always appended as a dedicated resource content item:
+
+```json
+{
+  "type": "resource",
+  "resource": {
+    "uri": "nuwa:payment",
+    "mimeType": "application/vnd.nuwa.payment+json",
+    "text": "{\"version\":1,\"clientTxRef\":\"...\",\"serviceTxRef\":\"...\",\"subRav\":{...},\"cost\":\"...\",\"costUsd\":\"...\"}"
+  }
+}
+```
+
+- The JSON inside `resource.text` conforms to `SerializableResponsePayload` (BigInt fields are strings).
+- Helpers are provided:
+  - Server: `HttpPaymentCodec.buildMcpPaymentResource(payload)`
+  - Client: `HttpPaymentCodec.parseMcpPaymentFromContents(contents)`
+
+#### MCP Tool Parameters: Reserved Keys and Strict Validation
+
+- Reserved keys merged into each tool parameters schema:
+  - `__nuwa_auth` (string; DIDAuthV1 authorization header produced by IdentityKit)
+  - `__nuwa_payment` (object; serialized request payload with shape `SerializableRequestPayload`)
+- The registrar compiles schemas using `buildParametersSchema(userSchema, { mergeReserved: true })` and `compileStandardSchema(...)` (Ajv + formats), enforcing strict validation at FastMCP boundary.
+
+Minimal shape of `__nuwa_payment` provided by client per call:
+
+```json
+{
+  "version": 1,
+  "clientTxRef": "<uuid>",
+  "maxAmount": "<string-amount>?",
+  "signedSubRav": { "subRav": { ... }, "signature": "..." }?
+}
+```
+
+The server validates and settles payment, then emits the payment resource item (see above).
+
 ## 🔧 Development
 
 ### Build
