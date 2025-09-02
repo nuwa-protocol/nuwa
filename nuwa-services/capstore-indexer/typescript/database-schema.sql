@@ -119,6 +119,57 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to increment favorites count for a cap
+CREATE OR REPLACE FUNCTION increment_cap_favorites(p_cap_id TEXT)
+RETURNS VOID AS $$
+BEGIN
+  -- Insert or update the cap_stats record, incrementing favorites
+  INSERT INTO cap_stats (cap_id, favorites, updated_at)
+  VALUES (p_cap_id, 1, NOW())
+  ON CONFLICT (cap_id)
+  DO UPDATE SET 
+    favorites = cap_stats.favorites + 1,
+    updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to decrement favorites count for a cap
+CREATE OR REPLACE FUNCTION decrement_cap_favorites(p_cap_id TEXT)
+RETURNS VOID AS $$
+BEGIN
+  -- Update the cap_stats record, decrementing favorites (but not below 0)
+  UPDATE cap_stats
+  SET 
+    favorites = GREATEST(favorites - 1, 0),
+    updated_at = NOW()
+  WHERE cap_id = p_cap_id;
+END;
+$$ LANGUAGE plpgsql;
+
 --
 -- ALTER TABLE cap_data
 -- ADD COLUMN enable BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Script to create default cap_stats records for all existing cap_data records
+-- This ensures that all CAPs have stats records for proper sorting and querying
+
+-- Insert default cap_stats records for cap_data records that don't have stats yet
+INSERT INTO cap_stats (cap_id, downloads, favorites, rating_count, average_rating, created_at, updated_at)
+SELECT 
+  id as cap_id,
+  0 as downloads,
+  0 as favorites,
+  0 as rating_count,
+  0.0 as average_rating,
+  NOW() as created_at,
+  NOW() as updated_at
+FROM cap_data
+WHERE id NOT IN (
+  SELECT cap_id FROM cap_stats
+)
+ON CONFLICT (cap_id) DO NOTHING;
+
+-- Verify the result
+-- SELECT COUNT(*) as total_caps FROM cap_data;
+-- SELECT COUNT(*) as total_stats FROM cap_stats;
+-- SELECT COUNT(*) as caps_without_stats FROM cap_data WHERE id NOT IN (SELECT cap_id FROM cap_stats);

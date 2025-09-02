@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import {PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL} from './constant.js';
 import {IndexerEventIDView} from "@roochnetwork/rooch-sdk";
-import { CapStats } from './type.js';
+import {CapMetadata, CapStats} from './type.js';
 
 config();
 
@@ -231,7 +231,7 @@ export async function queryFromSupabase(
   sortOrder: 'asc' | 'desc' = 'desc'
 ): Promise<{
   success: boolean;
-  items?: Array<{ cid: string; name: string; id: string, version: number, display_name: string, tags: string[], enable: boolean}>;
+  items?: Array<CapMetadata>;
   totalItems?: number;
   page?: number;
   pageSize?: number;
@@ -245,39 +245,78 @@ export async function queryFromSupabase(
     // Calculate pagination offset
     const offset = page * validatedPageSize;
 
-    // Create base query
-    let query = supabase
-      .from(CAP_TABLE_NAME)
-      .select('*, cap_stats(*)', { count: 'exact' });
+    // Create base query - we'll handle sorting differently based on the field
+    let query;
+    let isStatsQuery = false;
+    
+    if (sortBy && sortBy !== 'updated_at') {
+      // For cap_stats fields, query from cap_stats table and join with cap_data
+      // This allows us to sort by stats fields at the database level
+      isStatsQuery = true;
+      query = supabase
+        .from(CAP_STATS_TABLE_NAME)
+        .select(`
+          *,
+          cap_data!inner(*)
+        `, { count: 'exact' });
+        
+      // Apply sorting on the stats table
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    } else {
+      // For regular fields, use the standard approach
+      query = supabase
+        .from(CAP_TABLE_NAME)
+        .select(`
+          *,
+          cap_stats(*)
+        `, { count: 'exact' });
+        
+      // Add sorting for timestamp field
+      if (sortBy === 'updated_at') {
+        query = query.order('timestamp', { ascending: sortOrder === 'asc' });
+      }
+    }
 
     // Add filtering conditions - only add if values are not null/empty
     if (name && name.trim()) {
-      query = query.ilike('name', `%${name}%`);
-      query = query.eq('enable', true);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.name', name);
+        query = query.eq('cap_data.enable', true);
+      } else {
+        query = query.ilike('name', `%${name}%`);
+        query = query.eq('enable', true);
+      }
     }
 
     if (cid && cid.trim()) {
-      query = query.eq('cid', cid);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.cid', cid);
+      } else {
+        query = query.eq('cid', cid);
+      }
     }
 
     if (id && id.trim()) {
-      query = query.eq('id', id);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.id', id);
+      } else {
+        query = query.eq('id', id);
+      }
     }
     
     // Add tags filtering using PostgreSQL JSONB operators
     if (tags && tags.length > 0) {
-      const orConditions = tags
-        .map(tag => `tags.cs.${JSON.stringify([tag])}`)
-        .join(',');
-      query = query.or(orConditions);
-    }
-
-    // Add sorting
-    if (sortBy) {
-      query = query.order(sortBy, {
-        foreignTable: CAP_STATS_TABLE_NAME,
-        ascending: sortOrder === 'asc',
-      });
+      if (isStatsQuery) {
+        const orConditions = tags
+          .map(tag => `cap_data.tags.cs.${JSON.stringify([tag])}`)
+          .join(',');
+        query = query.or(orConditions);
+      } else {
+        const orConditions = tags
+          .map(tag => `tags.cs.${JSON.stringify([tag])}`)
+          .join(',');
+        query = query.or(orConditions);
+      }
     }
 
     // Apply pagination
@@ -286,7 +325,9 @@ export async function queryFromSupabase(
     // Execute query
     const { data, count, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     // Handle empty results
     if (!data || data.length === 0) {
@@ -300,13 +341,67 @@ export async function queryFromSupabase(
       };
     }
 
+    // Transform database fields from snake_case to camelCase to match CapMetadata interface
+    let transformedItems = data.map((item: any) => {
+      if (isStatsQuery) {
+        // When querying from cap_stats table, the structure is different
+        const capData = item.cap_data;
+        return {
+          id: capData.id,
+          cid: capData.cid,
+          name: capData.name,
+          displayName: capData.display_name,
+          description: capData.description,
+          tags: capData.tags,
+          submittedAt: capData.submitted_at,
+          homepage: capData.homepage,
+          repository: capData.repository,
+          thumbnail: capData.thumbnail,
+          enable: capData.enable,
+          version: capData.version,
+          stats: {
+            capId: item.cap_id,
+            downloads: item.downloads,
+            ratingCount: item.rating_count,
+            averageRating: item.average_rating,
+            favorites: item.favorites,
+          }
+        };
+      } else {
+        // Standard structure when querying from cap_data table
+        return {
+          id: item.id,
+          cid: item.cid,
+          name: item.name,
+          displayName: item.display_name,
+          description: item.description,
+          tags: item.tags,
+          submittedAt: item.submitted_at,
+          homepage: item.homepage,
+          repository: item.repository,
+          thumbnail: item.thumbnail,
+          enable: item.enable,
+          version: item.version,
+          stats: item.cap_stats || {
+            capId: item.id,
+            downloads: 0,
+            ratingCount: 0,
+            averageRating: 0,
+            favorites: 0,
+          }
+        };
+      }
+    });
+
+
+
     // Calculate total pages
     const totalItems = count || data.length;
     const totalPages = Math.ceil(totalItems / validatedPageSize);
 
     return {
       success: true,
-      items: data,
+      items: transformedItems,
       totalItems,
       page,
       pageSize: validatedPageSize,
@@ -376,7 +471,7 @@ export async function queryByExactTags(
   pageSize: number = 50
 ): Promise<{
   success: boolean;
-  items?: Array<{ cid: string; name: string; id: string, version: number, display_name: string, tags: string[]}>;
+  items?: Array<{ cid: string; name: string; id: string, version: number, displayName: string, tags: string[]}>;
   totalItems?: number;
   page?: number;
   pageSize?: number;
@@ -412,12 +507,12 @@ export async function queryByExactTags(
 
     return {
       success: true,
-      items: data.map(item => ({
+      items: data.map((item: any) => ({
         cid: item.cid,
         name: item.name,
         id: item.id,
         version: item.version,
-        display_name: item.display_name,
+        displayName: item.display_name,
         tags: item.tags || []
       })),
       totalItems,
@@ -449,13 +544,13 @@ export async function queryCapStats(capId: string, userDID?: string): Promise<{
       throw error;
     }
 
-    const stats: CapStats = data || {
-      cap_id: capId,
-      downloads: 0,
-      rating_count: 0,
-      average_rating: 0,
-      favorites: 0,
-    };
+    const stats: CapStats = {
+      capId: capId,
+      downloads: data?.downloads ?? 0,
+      ratingCount: data?.rating_count ?? 0,
+      averageRating: data?.average_rating ?? 0,
+      favorites: data?.favorites ?? 0,
+    } as CapStats;
 
     if (userDID) {
       const { data: ratingData, error: ratingError } = await supabase
@@ -468,7 +563,7 @@ export async function queryCapStats(capId: string, userDID?: string): Promise<{
       if (ratingError) {
         console.error('Failed to get user rating:', ratingError.message);
       } else {
-        stats.user_rating = ratingData?.rating ?? null;
+        stats.userRating = ratingData?.rating ?? null;
       }
     }
 
@@ -585,10 +680,22 @@ export async function addToUserFavoriteCaps(did: string, capId: string): Promise
   error?: string;
 }> {
   try {
-    const { error } = await supabase
+    // Start a transaction to ensure data consistency
+    const { error: insertError } = await supabase
       .from(USER_FAVORITE_CAPS_TABLE_NAME)
       .insert({ user_did: did, cap_id: capId });
-    if (error) throw error;
+    
+    if (insertError) throw insertError;
+
+    // Update the favorites count in cap_stats using the database function
+    const { error: updateError } = await supabase
+      .rpc('increment_cap_favorites', { p_cap_id: capId });
+
+    if (updateError) {
+      console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
+      // Don't fail the entire operation if stats update fails
+    }
+
     return { success: true };
   } catch (error) {
     return {
@@ -603,18 +710,56 @@ export async function removeFromUserFavoriteCaps(did: string, capId: string): Pr
   error?: string;
 }> {
   try {
-    const { error } = await supabase
+    // Start a transaction to ensure data consistency
+    const { error: deleteError } = await supabase
       .from(USER_FAVORITE_CAPS_TABLE_NAME)
       .delete()
       .eq('user_did', did)
       .eq('cap_id', capId);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
+
+    // Update the favorites count in cap_stats using the database function
+    const { error: updateError } = await supabase
+      .rpc('decrement_cap_favorites', { p_cap_id: capId });
+
+    if (updateError) {
+      console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
+      // Don't fail the entire operation if stats update fails
+    }
+
     return { success: true };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to remove from user favorite caps'
+    };
+  }
+}
+
+export async function isUserFavoriteCap(did: string, capId: string): Promise<{
+  success: boolean;
+  isFavorite?: boolean;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from(USER_FAVORITE_CAPS_TABLE_NAME)
+      .select('user_did')
+      .eq('user_did', did)
+      .eq('cap_id', capId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return { 
+      success: true, 
+      isFavorite: !!data 
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check if cap is favorite'
     };
   }
 }

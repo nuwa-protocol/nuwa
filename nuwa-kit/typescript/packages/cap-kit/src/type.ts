@@ -99,6 +99,7 @@ export const ResultCapMetadataSchema = z.object({
   homepage: z.string().optional(),
   repository: z.string().optional(),
   thumbnail: CapThumbnailSchema,
+  stats: CapStatsSchema
 });
 
 // Inferred TypeScript types from Zod schemas

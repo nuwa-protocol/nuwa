@@ -1,10 +1,37 @@
 import z from "zod";
-import { addToUserFavoriteCaps, removeFromUserFavoriteCaps } from "../supabase";
+import { addToUserFavoriteCaps, removeFromUserFavoriteCaps, isUserFavoriteCap } from "../supabase";
 import { Result } from "../type";
 
-async function favoriteCap({ capId, action }: { capId: string, action: 'add' | 'remove' }, context: any) {
+async function favoriteCap({ capId, action }: { capId: string, action: 'add' | 'remove' | 'isFavorite' }, context: any) {
   try {
     const userDID = context.session.did;
+    
+    if (action === "isFavorite") {
+      const result = await isUserFavoriteCap(userDID, capId);
+      
+      if (!result.success) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              code: 404,
+              error: result.error || 'Failed to check if cap is favorite',
+            } as Result)
+          }]
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            code: 200,
+            isFavorite: result.isFavorite,
+          } as Result)
+        }]
+      };
+    }
+
     let result: {
       success: boolean;
       error?: string;
@@ -54,7 +81,7 @@ export const favoriteCapTool = {
   description: "favorite cap",
   parameters: z.object({
     capId: z.string().describe("Cap ID"),
-    action: z.enum(["add", "remove"]).describe("Action to perform")
+    action: z.enum(["add", "remove", "isFavorite"]).describe("Action to perform")
   }),
   annotations: {
     readOnlyHint: true,

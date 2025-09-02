@@ -117,16 +117,7 @@ export class CapKit {
       const transformedItems = queryResult.data.items.map((item: any) => {
         const thumbnailType = JSON.parse(item.thumbnail)
         return {
-          id: item.id,
-          cid: item.cid,
-          name: item.name,
-          version: item.version,
-          displayName: item.display_name,
-          description: item.description,
-          tags: item.tags,
-          submittedAt: item.submitted_at,
-          homepage: item.homepage,
-          repository: item.repository,
+          ...item,
           thumbnail: thumbnailType
         }
       });
@@ -252,7 +243,7 @@ export class CapKit {
     }
   }
   
-  async favorite(capId: string, action: 'add' | 'remove'): Promise<Result<boolean>> {
+  async favorite(capId: string, action: 'add' | 'remove' | 'isFavorite'): Promise<Result<boolean>> {
     const client = await buildClient(this.mcpUrl, this.signer);
 
     try {
@@ -275,10 +266,18 @@ export class CapKit {
         throw new Error((result.content as any) ?.[0]?.text || 'Unknown error');
       }
 
-      return {
-        code: 200,
-        data: true
-      } as Result<boolean>;
+      if (action === 'isFavorite') {
+        const data = JSON.parse(result.content[0].text)
+        return {
+          code: 200,
+          data: data.isFavorite
+        } as Result<boolean>;
+      } else {
+        return {
+          code: 200,
+          data: true
+        } as Result<boolean>;
+      }
     } finally {
       await client.close();
     }

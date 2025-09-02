@@ -87,7 +87,7 @@ describe('Supabase Read Functions', () => {
             expect(item).toHaveProperty('name');
             expect(item).toHaveProperty('id');
             expect(item).toHaveProperty('version');
-            expect(item).toHaveProperty('display_name');
+            expect(item).toHaveProperty('displayName');
             expect(item).toHaveProperty('tags');
             expect(Array.isArray(item.tags)).toBe(true);
           });
@@ -283,13 +283,13 @@ describe('Supabase Read Functions', () => {
             expect(item).toHaveProperty('name');
             expect(item).toHaveProperty('id');
             expect(item).toHaveProperty('version');
-            expect(item).toHaveProperty('display_name');
+            expect(item).toHaveProperty('displayName');
             expect(item).toHaveProperty('tags');
             expect(typeof item.cid).toBe('string');
             expect(typeof item.name).toBe('string');
             expect(typeof item.id).toBe('string');
             expect(typeof item.version).toBe('number');
-            expect(typeof item.display_name).toBe('string');
+            expect(typeof item.displayName).toBe('string');
             expect(Array.isArray(item.tags)).toBe(true);
           });
         }

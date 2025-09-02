@@ -15,6 +15,9 @@ describe("CapKit", () => {
     const cap = all.data?.items[0]
     const result = await capKit.favorite(cap?.id || '', 'add')
     expect(result.code).toBe(200);
+    const isFavorite = await capKit.favorite(cap?.id || '', 'isFavorite')
+    expect(isFavorite.code).toBe(200);
+    expect(isFavorite.data).toEqual(true)
 
     const fav = await capKit.queryMyFavorite()
     expect(fav.code).toBe(200);
@@ -22,6 +25,9 @@ describe("CapKit", () => {
 
     const result1 = await capKit.favorite(cap?.id || '', 'remove')
     expect(result1.code).toBe(200);
+    const isFavorite1 = await capKit.favorite(cap?.id || '', 'isFavorite')
+    expect(isFavorite1.code).toBe(200);
+    expect(isFavorite1.data).toEqual(false)
 
     const fav1 = await capKit.queryMyFavorite()
     expect(fav1.code).toBe(200);

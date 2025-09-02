@@ -7,6 +7,9 @@ export interface Result {
 }
 
 export interface CapMetadata {
+  id: string,
+  cid: string,
+  name: string,
   displayName: string,
   description: string,
   tags: string[],
@@ -14,16 +17,16 @@ export interface CapMetadata {
   homepage: string,
   repository: string,
   thumbnail: string,
-  enable: boolean
-};
+  enable: boolean,
+  version?: number,
+  stats: CapStats
+}
 
 export interface CapStats {
-  cap_id: string;
+  capId: string;
   downloads: number;
-  rating_count: number;
-  average_rating: number;
+  ratingCount: number;
+  averageRating: number;
   favorites: number;
-  created_at?: string;
-  updated_at?: string;
-  user_rating?: number | null;
+  userRating?: number | null;
 }
