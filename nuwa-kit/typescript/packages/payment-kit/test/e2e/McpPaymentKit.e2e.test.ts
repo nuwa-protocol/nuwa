@@ -12,7 +12,7 @@
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { PaymentChannelMcpClient } from '../../src/integrations/mcp/PaymentChannelMcpClient';
-import { startFastMcpServer } from '../../src/transport/mcp/FastMcpStarter';
+import { createFastMcpServer } from '../../src/transport/mcp/FastMcpStarter';
 import { PaymentHubClient } from '../../src/client/PaymentHubClient';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import type { AssetInfo, PaymentInfo } from '../../src/core/types';
@@ -95,7 +95,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     const port = 8080 + Math.floor(Math.random() * 1000); // Random port to avoid conflicts
     serverUrl = `http://localhost:${port}/mcp`;
 
-    mcpServer = await startFastMcpServer({
+    const app = await createFastMcpServer({
       serviceId: 'mcp-e2e-test-service',
       signer: payee.signer,
       defaultAssetId: testAsset.assetId,
@@ -103,104 +103,86 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       network: 'local',
       port,
       debug: true,
+    });
 
-      // Register test tools
-      tools: {
-        // FREE tool
-        hello: {
-          description: 'Say hello (FREE)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Name to greet' },
-            },
-          },
-          handler: async (params: any) => {
-            return {
-              message: `Hello, ${params.name || 'World'}!`,
-              timestamp: new Date().toISOString(),
-            };
-          },
-          options: { pricePicoUSD: BigInt(0) }, // FREE
-        },
+    // FREE tool
+    app.freeTool({
+      name: 'hello',
+      description: 'Say hello (FREE)',
+      parameters: {
+        type: 'object',
+        properties: { name: { type: 'string', description: 'Name to greet' } },
+      },
+      execute: async (params: any) => ({
+        message: `Hello, ${params.name || 'World'}!`,
+        timestamp: new Date().toISOString(),
+      }),
+    });
 
-        // Paid tool
-        analyze: {
-          description: 'Analyze data (paid service)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              data: { type: 'string', description: 'Data to analyze' },
-            },
-          },
-          handler: async (params: any) => {
-            // Simulate some computation
-            await new Promise(resolve => setTimeout(resolve, 50));
-            return {
-              analysis: `Analysis of "${params.data}": This data contains ${params.data.length} characters.`,
-              confidence: 0.95,
-              timestamp: new Date().toISOString(),
-            };
-          },
-          options: { pricePicoUSD: BigInt(1000000000) }, // 0.001 USD
-        },
-
-        // Expensive tool
-        process: {
-          description: 'Process complex data (expensive)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              operation: { type: 'string', description: 'Operation to perform' },
-            },
-          },
-          handler: async (params: any) => {
-            // Simulate expensive computation
-            await new Promise(resolve => setTimeout(resolve, 100));
-            return {
-              result: `Processed operation: ${params.operation}`,
-              complexity: 'high',
-              timestamp: new Date().toISOString(),
-            };
-          },
-          options: { pricePicoUSD: BigInt(10000000000) }, // 0.01 USD
-        },
-
-        // Streaming tool
-        stream_data: {
-          description: 'Stream data chunks (paid per call)',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              count: { type: 'number', description: 'Number of chunks to stream' },
-            },
-          },
-          handler: async (params: any) => {
-            const count = params.count || 3;
-            const chunks: any[] = [];
-
-            for (let i = 0; i < count; i++) {
-              chunks.push({
-                chunk: i + 1,
-                data: `Streaming chunk ${i + 1}/${count}`,
-                timestamp: new Date().toISOString(),
-              });
-
-              // Simulate streaming delay
-              if (i < count - 1) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-            }
-
-            return { chunks, total: count };
-          },
-          options: {
-            pricePicoUSD: BigInt(500000000), // 0.0005 USD
-            streaming: true,
-          },
-        },
+    // Paid tool
+    app.paidTool({
+      name: 'analyze',
+      description: 'Analyze data (paid service)',
+      pricePicoUSD: BigInt(1000000000), // 0.001 USD
+      parameters: {
+        type: 'object',
+        properties: { data: { type: 'string', description: 'Data to analyze' } },
+      },
+      execute: async (params: any) => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return {
+          analysis: `Analysis of "${params.data}": This data contains ${params.data.length} characters.`,
+          confidence: 0.95,
+          timestamp: new Date().toISOString(),
+        };
       },
     });
+
+    // Expensive tool
+    app.paidTool({
+      name: 'process',
+      description: 'Process complex data (expensive)',
+      pricePicoUSD: BigInt(10000000000), // 0.01 USD
+      parameters: {
+        type: 'object',
+        properties: { operation: { type: 'string', description: 'Operation to perform' } },
+      },
+      execute: async (params: any) => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return {
+          result: `Processed operation: ${params.operation}`,
+          complexity: 'high',
+          timestamp: new Date().toISOString(),
+        };
+      },
+    });
+
+    // Streaming tool
+    app.paidTool({
+      name: 'stream_data',
+      description: 'Stream data chunks (paid per call)',
+      pricePicoUSD: BigInt(500000000), // 0.0005 USD
+      streaming: true,
+      parameters: {
+        type: 'object',
+        properties: { count: { type: 'number', description: 'Number of chunks to stream' } },
+      },
+      execute: async (params: any) => {
+        const count = params.count || 3;
+        const chunks: any[] = [];
+        for (let i = 0; i < count; i++) {
+          chunks.push({
+            chunk: i + 1,
+            data: `Streaming chunk ${i + 1}/${count}`,
+            timestamp: new Date().toISOString(),
+          });
+          if (i < count - 1) await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return { chunks, total: count };
+      },
+    });
+
+    mcpServer = await app.start();
 
     // Create MCP client
     mcpClient = new PaymentChannelMcpClient({

@@ -15,6 +15,7 @@
 - **链兼容**: 抽象化设计，当前支持 Rooch，未来可扩展到其他区块链
 - **HTTP 客户端**: 提供 `PaymentChannelHttpClient`，自动处理 `X-Payment-Channel-Data` 协议头、通道建立与支付跟踪
 - **API 服务端集成**: 提供 `ExpressPaymentKit`，一行挂载支付能力与计费规则（内置按请求/按用量策略、自动结算与管理端点）
+- **MCP 集成**: 提供 `McpPaymentKit` 与 `PaymentChannelMcpClient`，为 MCP 工具提供支付通道能力
 - **类型安全**: 100% TypeScript 实现，提供完整的类型定义
 
 ### 流式输出支持（SSE/NDJSON）
@@ -246,6 +247,71 @@ class SubRAVSigner {
 }
 ```
 
+### MCP（Model Context Protocol）集成
+
+Payment Kit 为 MCP 场景提供完整的支付通道支持，便于 AI Agent 在调用 MCP 工具时进行计费与结算。
+
+#### MCP 服务端
+
+```typescript
+import { createFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+
+// 1) 创建 MCP 服务
+const app = await createFastMcpServer({
+  serviceId: 'my-ai-service',
+  port: 8080,
+  debug: true,
+});
+
+// 2) 逐个注册工具（FREE / 付费）
+app.freeTool({
+  name: 'hello',
+  description: '打招呼',
+  parameters: { type: 'object', properties: { name: { type: 'string' } } },
+  execute: async ({ name }) => ({ message: `Hello, ${name || 'World'}!` }),
+});
+
+app.paidTool({
+  name: 'analyze',
+  description: '数据分析（付费）',
+  pricePicoUSD: 1_000_000_000n, // 0.001 USD
+  parameters: { type: 'object', properties: { data: { type: 'string' } } },
+  execute: async ({ data }) => ({ analysis: `Analysis of "${data}"` }),
+});
+
+// 3) 启动服务
+await app.start();
+```
+
+#### MCP 客户端
+
+```typescript
+import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit/mcp';
+import { createTestSigner } from '@nuwa-ai/identity-kit/testHelpers';
+
+const signer = await createTestSigner();
+const client = new PaymentChannelMcpClient({
+  baseUrl: 'http://localhost:8080/mcp',
+  signer,
+});
+
+// 付费调用示例
+const result = await client.call('analyze', { data: '待分析文本' });
+console.log('响应:', result.data);
+console.log('支付信息:', result.payment);
+
+// 内置 FREE 工具
+const health = await client.healthCheck();
+const recovery = await client.recoverFromService();
+
+// 提交待签 SubRAV（如有）
+const pendingSubRAV = client.getPendingSubRAV();
+if (pendingSubRAV) {
+  const signedSubRAV = await client.getPayerClient().signSubRAV(pendingSubRAV);
+  await client.commitSubRAV(signedSubRAV);
+}
+```
+
 ### SubRAV BCS 序列化
 
 ```typescript
@@ -292,9 +358,13 @@ pnpm test
 
 ### 📚 示例参考
 
-- 参考示例：`nuwa-kit/typescript/examples/payment-kit-integration`
+- HTTP 集成示例：`nuwa-kit/typescript/examples/payment-kit-integration`
   - 客户端 CLI：`src/client-cli.ts`（演示 `PaymentChannelHttpClient`、`PaymentChannelAdminClient` 的用法）
   - 服务端示例：`src/server.ts`（演示 `createExpressPaymentKitFromEnv` 与多种计费策略）
+
+- MCP 集成示例：`nuwa-kit/typescript/packages/payment-kit/examples`
+  - MCP Server：`mcp-server.ts`（演示使用 `createFastMcpServer` 逐个注册 FREE/付费工具）
+  - MCP Client：`mcp-client.ts`（演示 `PaymentChannelMcpClient` 的用法与支付流程）
 
 ## 📄 许可证
 

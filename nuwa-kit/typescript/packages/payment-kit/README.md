@@ -278,30 +278,33 @@ Payment Kit provides full support for MCP with payment channels, enabling AI age
 #### MCP Server
 
 ```typescript
-import { startFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+import { createFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
 
-const server = await startFastMcpServer({
+// 1) Create server
+const app = await createFastMcpServer({
   serviceId: 'my-ai-service',
   port: 8080,
   debug: true,
-  
-  // Register custom tools
-  tools: {
-    'analyze': {
-      description: 'Analyze data (paid service)',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          data: { type: 'string', description: 'Data to analyze' }
-        }
-      },
-      handler: async (params) => {
-        return { analysis: `Analysis of "${params.data}"` };
-      },
-      options: { pricePicoUSD: BigInt(1000) }, // 0.001 USD
-    },
-  },
 });
+
+// 2) Register tools (FREE/paid)
+app.freeTool({
+  name: 'hello',
+  description: 'Say hello',
+  parameters: { type: 'object', properties: { name: { type: 'string' } } },
+  execute: async ({ name }) => ({ message: `Hello, ${name || 'World'}!` }),
+});
+
+app.paidTool({
+  name: 'analyze',
+  description: 'Analyze data (paid service)',
+  pricePicoUSD: 1_000_000_000n, // 0.001 USD
+  parameters: { type: 'object', properties: { data: { type: 'string' } } },
+  execute: async ({ data }) => ({ analysis: `Analysis of "${data}"` }),
+});
+
+// 3) Start server
+await app.start();
 ```
 
 #### MCP Client
@@ -368,7 +371,7 @@ See [DESIGN.md](./DESIGN.md)
   - Server: `src/server.ts` (demonstrates `createExpressPaymentKitFromEnv` with multiple billing strategies)
 
 - **MCP Integration**: `examples/`
-  - MCP Server: `mcp-server.ts` (demonstrates `startFastMcpServer` with FREE and paid tools)
+  - MCP Server: `mcp-server.ts` (demonstrates `createFastMcpServer` with FREE and paid tools)
   - MCP Client: `mcp-client.ts` (demonstrates `PaymentChannelMcpClient` usage and payment flows)
 
 ## 📄 License
