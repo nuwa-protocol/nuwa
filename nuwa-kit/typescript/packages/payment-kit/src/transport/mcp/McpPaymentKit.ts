@@ -107,9 +107,11 @@ export class McpPaymentKit {
         return { data: undefined, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
       }
 
-      // Step B: business handler
-      const enrichedParams = ctx?.meta?.didInfo ? { ...params, didInfo: ctx.meta.didInfo } : params;
-      const result = await handler(enrichedParams, meta);
+      // Step B: business handler — pass didInfo via FastMCP context rather than mutating params
+      const contextWithDid = ctx?.meta?.didInfo
+        ? { ...(meta || {}), didInfo: ctx.meta.didInfo }
+        : meta;
+      const result = await handler(params, contextWithDid);
 
       // Step C/D: settle + persist
       const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
@@ -194,8 +196,10 @@ export class McpPaymentKit {
 
     for (const [key, cfg] of Object.entries(BuiltInApiHandlers)) {
       const methodName = mapName(key);
-      const handler = async (params: any) => {
-        const res = await cfg.handler(ctx as any, params);
+      const handler = async (params: any, context?: any) => {
+        // Built-in handlers expect DID info on the request object; enrich from FastMCP context
+        const req = context?.didInfo ? { ...params, didInfo: context.didInfo } : params;
+        const res = await cfg.handler(ctx as any, req);
         if (methodName === 'nuwa.health') {
           // Return flat object expected by tests
           return {
