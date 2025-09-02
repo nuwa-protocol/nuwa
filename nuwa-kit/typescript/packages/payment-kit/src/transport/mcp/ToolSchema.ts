@@ -9,7 +9,46 @@ export const ReservedParamsSchema: any = {
   type: 'object',
   properties: {
     __nuwa_auth: { type: 'string' },
-    __nuwa_payment: { type: 'object' }, // request payment envelope (loose by design)
+    __nuwa_payment: {
+      type: 'object',
+      properties: {
+        version: { type: 'number' },
+        clientTxRef: { type: 'string' },
+        maxAmount: { type: 'string' },
+        signedSubRav: {
+          type: 'object',
+          properties: {
+            subRav: {
+              type: 'object',
+              properties: {
+                version: { type: 'string' },
+                chainId: { type: 'string' },
+                channelId: { type: 'string' },
+                channelEpoch: { type: 'string' },
+                vmIdFragment: { type: 'string' },
+                accumulatedAmount: { type: 'string' },
+                nonce: { type: 'string' },
+              },
+              required: [
+                'version',
+                'chainId',
+                'channelId',
+                'channelEpoch',
+                'vmIdFragment',
+                'accumulatedAmount',
+                'nonce',
+              ],
+              additionalProperties: false,
+            },
+            signature: { type: 'string' },
+          },
+          required: ['subRav', 'signature'],
+          additionalProperties: false,
+        },
+      },
+      required: ['version', 'clientTxRef'],
+      additionalProperties: true,
+    },
   },
   additionalProperties: true,
 };

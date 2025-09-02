@@ -9,6 +9,7 @@ import type {
   SerializableResponsePayload,
   SerializableSubRAV,
   SerializableSignedSubRAV,
+  SerializableRequestPayload,
 } from '../../core/types';
 
 /**
@@ -126,19 +127,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Build HTTP request header value
    */
   static buildRequestHeader(payload: PaymentRequestPayload): string {
-    // Convert payload to serializable format
-    const serializable: any = {
-      maxAmount: payload.maxAmount.toString(),
-      clientTxRef: payload.clientTxRef,
-      version: payload.version.toString(),
-    };
-
-    // signedSubRav is now optional
-    if (payload.signedSubRav) {
-      serializable.signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
-    }
-
-    // Convert to JSON and encode
+    const serializable = this.toJSONRequest(payload);
     const json = JSON.stringify(serializable);
     return MultibaseCodec.encodeBase64url(json);
   }
@@ -150,24 +139,7 @@ export class HttpPaymentCodec implements PaymentCodec {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
-
-      // clientTxRef is now required
-      if (!data.clientTxRef) {
-        throw new Error('clientTxRef is required in payment header');
-      }
-
-      const result: PaymentRequestPayload = {
-        maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0), // Handle old format without maxAmount
-        clientTxRef: data.clientTxRef,
-        version: parseInt(data.version) || 1,
-      };
-
-      // signedSubRav is now optional
-      if (data.signedSubRav) {
-        result.signedSubRav = this.deserializeSignedSubRAV(data.signedSubRav);
-      }
-
-      return result;
+      return this.fromJSONRequest(data as SerializableRequestPayload);
     } catch (error) {
       throw new Error(`Failed to parse request header: ${error}`);
     }
@@ -238,6 +210,29 @@ export class HttpPaymentCodec implements PaymentCodec {
       payload.error = { code: String((data as any).errorCode), message: (data as any).message };
     }
     return payload;
+  }
+
+  // Structured JSON helpers for PaymentRequestPayload (for MCP and others)
+  static toJSONRequest(payload: PaymentRequestPayload): SerializableRequestPayload {
+    const out: SerializableRequestPayload = {
+      version: payload.version ?? 1,
+      clientTxRef: payload.clientTxRef,
+    };
+    if (payload.maxAmount !== undefined) (out as any).maxAmount = payload.maxAmount.toString();
+    if (payload.signedSubRav)
+      (out as any).signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
+    return out;
+  }
+
+  static fromJSONRequest(data: SerializableRequestPayload): PaymentRequestPayload {
+    if (!data?.clientTxRef) throw new Error('clientTxRef is required in payment header');
+    const out: PaymentRequestPayload = {
+      version: data.version ?? 1,
+      clientTxRef: data.clientTxRef,
+      maxAmount: (data as any).maxAmount ? BigInt((data as any).maxAmount) : BigInt(0),
+      signedSubRav: data.signedSubRav ? this.deserializeSignedSubRAV(data.signedSubRav) : undefined,
+    };
+    return out;
   }
 
   /**

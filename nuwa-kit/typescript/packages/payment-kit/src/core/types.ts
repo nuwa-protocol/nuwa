@@ -98,6 +98,18 @@ export type HttpRequestPayload = PaymentRequestPayload;
 export type PaymentHeaderPayload = PaymentRequestPayload;
 
 /**
+ * JSON-serializable PaymentRequestPayload for embedding into JSON bodies (e.g., MCP)
+ * - bigint fields become strings
+ * - signedSubRav is SerializableSignedSubRAV
+ */
+export interface SerializableRequestPayload {
+  version: number;
+  clientTxRef: string;
+  maxAmount?: string; // optional for FREE paths
+  signedSubRav?: SerializableSignedSubRAV;
+}
+
+/**
  * Payment response header payload (protocol-level)
  * - Success: include subRav + cost
  * - Error: include error { code, message? }

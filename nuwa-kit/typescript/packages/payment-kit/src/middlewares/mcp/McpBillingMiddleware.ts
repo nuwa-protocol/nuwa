@@ -6,6 +6,7 @@ import type {
   PaymentRequestPayload,
   PaymentResponsePayload,
   SerializableResponsePayload,
+  SerializableRequestPayload,
 } from '../../core/types';
 import { HttpPaymentCodec } from '../http/HttpPaymentCodec';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
@@ -20,14 +21,8 @@ export interface McpRequestContext {
   method: string; // tool name, e.g., 'nuwa.health' or business tool
   params: Record<string, any> & {
     __nuwa_auth?: string;
-    __nuwa_payment?: {
-      version?: number;
-      clientTxRef?: string;
-      maxAmount?: string;
-      signedSubRav?: any;
-    };
+    __nuwa_payment?: SerializableRequestPayload;
   };
-  meta?: Record<string, any>;
 }
 
 export interface McpResponseContext<T = any> {
