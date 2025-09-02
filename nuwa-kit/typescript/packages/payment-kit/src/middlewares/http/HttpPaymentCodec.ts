@@ -93,25 +93,20 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Decode HTTP response header to SubRAV proposal
    */
-  decodeResponse(encoded: string): {
-    subRAV?: SubRAV;
-    cost?: bigint;
-    serviceTxRef?: string;
-    metadata?: any;
-    error?: { code: string; message?: string };
-    version?: number;
-  } {
+  decodeResponse(encoded: string) {
     try {
       const payload = HttpPaymentCodec.parseResponseHeader(encoded);
 
-      return {
-        subRAV: payload.subRav,
+      const out: HttpResponsePayload = {
+        subRav: payload.subRav,
         cost: payload.cost,
+        costUsd: payload.costUsd,
+        clientTxRef: payload.clientTxRef,
         serviceTxRef: payload.serviceTxRef,
-        metadata: payload.clientTxRef ? { clientTxRef: payload.clientTxRef } : undefined,
         error: payload.error,
         version: payload.version,
-      };
+      } as HttpResponsePayload;
+      return out;
     } catch (error) {
       throw new DecodingError(
         'Failed to decode HTTP response payment data',
