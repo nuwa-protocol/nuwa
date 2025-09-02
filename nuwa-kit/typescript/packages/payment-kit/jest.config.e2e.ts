@@ -2,7 +2,7 @@ import type { Config } from 'jest';
 
 const config: Config = {
   // Base configuration
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   
   // Test file patterns for E2E tests
@@ -25,8 +25,24 @@ const config: Config = {
   
   // Transform configuration
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.tsx?$': ['ts-jest', {
+      useESM: true,
+      tsconfig: {
+        moduleResolution: 'node',
+        allowSyntheticDefaultImports: true,
+        esModuleInterop: true,
+        module: 'esnext',
+      },
+    }],
+    '^.+\\.jsx?$': ['ts-jest', {
+      useESM: true,
+    }],
   },
+  
+  // Transform ignore patterns - allow transforming ES modules in node_modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(fastmcp|@modelcontextprotocol|ai))',
+  ],
   
   // File extensions to consider
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
@@ -50,17 +66,8 @@ const config: Config = {
   // Module paths
   modulePaths: ['<rootDir>/src'],
   
-  // Globals for ts-jest
-  globals: {
-    'ts-jest': {
-      useESM: false,
-      tsconfig: {
-        moduleResolution: 'node',
-        allowSyntheticDefaultImports: true,
-        esModuleInterop: true,
-      },
-    },
-  },
+  // Enable experimental ESM support
+  extensionsToTreatAsEsm: ['.ts'],
   
   // Run tests serially to avoid conflicts with blockchain state
   maxWorkers: 1,

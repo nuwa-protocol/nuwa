@@ -15,6 +15,7 @@ TypeScript/JavaScript SDK based on the “NIP-4 Unidirectional Payment Channel C
 - **Chain Agnostic**: Abstract design; Rooch supported today, extensible to others
 - **HTTP Client**: `PaymentChannelHttpClient` handles `X-Payment-Channel-Data`, channel lifecycle, and payment tracking
 - **API Server Integration**: `ExpressPaymentKit` mounts payment and billing with one line (built-in per-request/per-usage strategies, auto-settlement, and admin endpoints)
+- **MCP Support**: `McpPaymentKit` and `PaymentChannelMcpClient` provide full Model Context Protocol integration with payment channels
 - **Type-safe**: 100% TypeScript with complete typings
 
 ### Streaming support (SSE/NDJSON)
@@ -270,6 +271,76 @@ const decoded = SubRAVCodec.decode(encoded);
 const fromHex = SubRAVCodec.fromHex(hex);
 ```
 
+### MCP (Model Context Protocol) Integration
+
+Payment Kit provides full support for MCP with payment channels, enabling AI agents to make paid API calls.
+
+#### MCP Server
+
+```typescript
+import { startFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+
+const server = await startFastMcpServer({
+  serviceId: 'my-ai-service',
+  port: 8080,
+  debug: true,
+  
+  // Register custom tools
+  tools: {
+    'analyze': {
+      description: 'Analyze data (paid service)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          data: { type: 'string', description: 'Data to analyze' }
+        }
+      },
+      handler: async (params) => {
+        return { analysis: `Analysis of "${params.data}"` };
+      },
+      options: { pricePicoUSD: BigInt(1000) }, // 0.001 USD
+    },
+  },
+});
+```
+
+#### MCP Client
+
+```typescript
+import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit/mcp';
+import { createTestSigner } from '@nuwa-ai/identity-kit/testHelpers';
+
+const signer = await createTestSigner();
+const client = new PaymentChannelMcpClient({
+  baseUrl: 'http://localhost:8080/mcp',
+  signer,
+  // Optional: Use persistent storage (default is in-memory)
+  // storageOptions: {
+  //   channelRepo: createSqlChannelRepo(connectionString),
+  //   namespace: 'my-ai-agent', // Useful for multi-service scenarios
+  // },
+});
+
+// Make paid tool calls
+const result = await client.call('analyze', { 
+  data: 'Sample data for analysis' 
+});
+
+console.log('Response:', result.data);
+console.log('Payment info:', result.payment);
+
+// Built-in payment management
+const health = await client.healthCheck(); // FREE
+const recovery = await client.recoverFromService(); // FREE
+
+// Commit pending SubRAVs
+const pendingSubRAV = client.getPendingSubRAV();
+if (pendingSubRAV) {
+  const signedSubRAV = await client.getPayerClient().signSubRAV(pendingSubRAV);
+  await client.commitSubRAV(signedSubRAV);
+}
+```
+
 ## 🔧 Development
 
 ### Build
@@ -292,9 +363,13 @@ See [DESIGN.md](./DESIGN.md)
 
 ### 📚 Examples
 
-- Example project: `nuwa-kit/typescript/examples/payment-kit-integration`
+- **HTTP Integration**: `nuwa-kit/typescript/examples/payment-kit-integration`
   - Client CLI: `src/client-cli.ts` (demonstrates `PaymentChannelHttpClient` and `PaymentChannelAdminClient`)
   - Server: `src/server.ts` (demonstrates `createExpressPaymentKitFromEnv` with multiple billing strategies)
+
+- **MCP Integration**: `examples/`
+  - MCP Server: `mcp-server.ts` (demonstrates `startFastMcpServer` with FREE and paid tools)
+  - MCP Client: `mcp-client.ts` (demonstrates `PaymentChannelMcpClient` usage and payment flows)
 
 ## 📄 License
 

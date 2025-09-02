@@ -34,6 +34,11 @@
       "browser": "./dist/browser/storage/indexeddb/index.js",
       "import": "./dist/node/empty.js",
       "require": "./dist/node/empty.cjs"
+    },
+    "./mcp": {
+      "types": "./dist/node/transport/mcp/index.d.ts",
+      "import": "./dist/node/transport/mcp/index.js",
+      "require": "./dist/node/transport/mcp/index.cjs"
     }
   },
   "scripts": {
@@ -43,9 +48,12 @@
     "test:coverage": "jest --config=jest.config.json --coverage",
     "test:watch": "jest --config=jest.config.json --watch",
     "test:integration": "jest --config=jest.config.json --testPathPattern=integration",
+    "test:mcp": "jest --config=jest.config.json --testPathPattern=mcp",
+    "test:mcp:watch": "jest --config=jest.config.json --testPathPattern=mcp --watch",
     "test:e2e": "jest --config=jest.config.e2e.ts --runInBand",
-    "test:e2e:local": "ROOCH_NODE_URL=http://localhost:6767 PAYMENT_E2E=1 jest --config=jest.config.e2e.ts --runInBand",
-    "test:e2e:debug": "ROOCH_NODE_URL=http://localhost:6767 PAYMENT_E2E=1 DEBUG_E2E=1 jest --config=jest.config.e2e.ts --runInBand --verbose",
+    "test:e2e:http": "NODE_OPTIONS='--experimental-vm-modules' ROOCH_NODE_URL=http://localhost:6767 PAYMENT_E2E=1 jest --config=jest.config.e2e.ts --runInBand --testPathPattern=HttpPaymentKit",
+    "test:e2e:local": "pnpm test:e2e:http && pnpm test:e2e:mcp",
+    "test:e2e:mcp": "NODE_OPTIONS='--experimental-vm-modules' ROOCH_NODE_URL=http://localhost:6767 PAYMENT_E2E=1 jest --config=jest.config.e2e.ts --runInBand --testPathPattern=McpPaymentKit",
     "test:e2e:verify": "ts-node --esm test/e2e/verify-setup.ts",
     "clean": "rimraf dist",
     "lint": "eslint . --ext .ts",
@@ -100,10 +108,13 @@
     "typescript": "^5.3.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "@nuwa-ai/identity-kit": "workspace:*",
     "@roochnetwork/rooch-sdk": "^0.3.6",
     "@types/js-yaml": "^4.0.9",
     "@types/pg": "^8.15.4",
+    "ai": "^4.3.16",
+    "fastmcp": "^3.5.0",
     "js-yaml": "^4.1.0",
     "lossless-json": "^4.1.1",
     "on-headers": "^1.1.0",
@@ -116,8 +127,12 @@
     "pg": ">=8"
   },
   "peerDependenciesMeta": {
-    "express": { "optional": true },
-    "pg": { "optional": true }
+    "express": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
   },
   "tsup": {
     "clean": true,
@@ -131,11 +146,15 @@
       "browser/integrations/http/index": "src/integrations/http/index.ts",
       "node/integrations/http/index": "src/integrations/http/index.ts",
       "node/transport/express/index": "src/transport/express/index.ts",
+      "node/transport/mcp/index": "src/transport/mcp/index.ts",
       "node/storage/sql/index": "src/storage/sql/index.ts",
       "browser/storage/indexeddb/index": "src/storage/indexeddb/index.ts",
       "node/empty": "src/node/empty.ts"
     },
-    "format": ["esm", "cjs"],
+    "format": [
+      "esm",
+      "cjs"
+    ],
     "outDir": "dist",
     "platform": "neutral",
     "target": "es2020"
