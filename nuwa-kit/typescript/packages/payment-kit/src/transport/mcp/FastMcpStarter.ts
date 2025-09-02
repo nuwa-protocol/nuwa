@@ -46,20 +46,18 @@ export class PaymentMcpToolRegistrar {
     const { name, description, handler, pricePicoUSD, streaming, schema } = args;
     // Register with billing (enables pricing/settlement)
     this.kit.register(name, { pricing: pricePicoUSD, streaming }, handler);
-    const kHandlers = this.kit.getHandlers();
-    // Register with FastMCP (expose tool)
+    // Register with FastMCP (expose tool) via unified kit.invoke
     const compiled =
       schema && typeof schema === 'object' && schema['~standard']
         ? schema
         : compileStandardSchema(buildParametersSchema(schema, { mergeReserved: true }));
+    const kitRef = this.kit;
     this.server.addTool({
       name,
       description,
       parameters: compiled,
       async execute(params: any, context: any) {
-        const raw = await (kHandlers[name]
-          ? kHandlers[name](params, context)
-          : handler(params, context));
+        const raw = await kitRef.invoke(name, params, context);
         return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
       },
     });
@@ -118,14 +116,13 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
   const kit = await createMcpPaymentKit(opts);
 
   // Register built-in payment tools (FREE)
-  const handlers = kit.getHandlers();
-  for (const [name, fn] of Object.entries(handlers)) {
+  for (const name of kit.listTools()) {
     server.addTool({
       name,
       description: `Built-in payment tool: ${name}`,
       parameters: compileStandardSchema(buildParametersSchema(undefined, { mergeReserved: true })),
       async execute(params: any, context: any) {
-        const raw = await fn(params, context);
+        const raw = await kit.invoke(name, params, context);
         return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
       },
     });

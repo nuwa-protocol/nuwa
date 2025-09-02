@@ -119,6 +119,18 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       }),
     });
 
+    // FREE tool that reads DID from FastMCP context
+    app.freeTool({
+      name: 'whoami',
+      description: 'Return signer DID from context (FREE)',
+      parameters: { type: 'object', properties: {} },
+      execute: async (_params: any, context?: any) => ({
+        signerDid: context?.didInfo?.did || null,
+        keyId: context?.didInfo?.keyId || null,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
     // Paid tool
     app.paidTool({
       name: 'analyze',
@@ -287,6 +299,22 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log('✅ Payment info:', result.payment || 'None (FREE)');
 
     console.log('🎉 FREE business tool test successful!');
+  }, 60000);
+
+  test('DID available in handler via FastMCP context', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🪪 Testing DID exposure via context in handler');
+    const result = await mcpClient.call('whoami', {});
+    expect(result.data).toEqual(
+      expect.objectContaining({
+        signerDid: payer.did,
+        keyId: `${payer.did}#${payer.vmIdFragment}`,
+        timestamp: expect.any(String),
+      })
+    );
+    expect(result.payment).toBeUndefined(); // FREE tool
+    console.log('✅ DID from context:', result.data);
   }, 60000);
 
   test('Paid business tools with payment flow', async () => {

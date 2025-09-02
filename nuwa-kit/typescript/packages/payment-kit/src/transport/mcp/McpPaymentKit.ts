@@ -38,6 +38,14 @@ export class McpPaymentKit {
   private readonly billableRouter: BillableRouter;
   private readonly middleware: McpBillingMiddleware;
   private readonly logger: DebugLogger;
+  private readonly handlers: Map<
+    string,
+    {
+      handler: (params: any, context?: any) => Promise<any>;
+      options: RouteOptions;
+      ruleId?: string;
+    }
+  >;
 
   constructor(
     private readonly opts: McpPaymentKitOptions,
@@ -67,6 +75,7 @@ export class McpPaymentKit {
       ruleProvider: this.billableRouter,
       debug: opts.debug,
     });
+    this.handlers = new Map();
   }
 
   register(
@@ -84,74 +93,87 @@ export class McpPaymentKit {
       ruleId
     );
     // Store handler mapping
-    (this as any)._handlers = (this as any)._handlers || {};
-    (this as any)._handlers[name] = async (params: any, meta?: any) => {
-      // Step A: preProcess
-      const ctx = await this.middleware.handleWithNewAPI(name, params, meta);
-      if (!ctx) return handler(params, meta);
-      if (ctx.state?.error) {
-        // Prefer using headerValue from preProcess (may include pending SubRAV)
-        if ((ctx as any).state?.headerValue) {
-          const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-          return {
-            data: undefined,
-            __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded),
-          } as any;
-        }
-        // Fallback to minimal structured error (no subRAV)
-        const decoded = {
-          error: ctx.state.error,
-          clientTxRef: ctx.meta.clientTxRef,
-          version: 1,
-        } as any;
-        return { data: undefined, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
-      }
-
-      // Step B: business handler — pass didInfo via FastMCP context rather than mutating params
-      const contextWithDid = ctx?.meta?.didInfo
-        ? { ...(meta || {}), didInfo: ctx.meta.didInfo }
-        : meta;
-      const result = await handler(params, contextWithDid);
-
-      // Step C/D: settle + persist
-      const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
-      // Prefer preProcess header (402) if present and no structured payment in settled
-      if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
-        const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-        const payment = HttpPaymentCodec.toJSONResponse(decoded);
-        const issues = validateSerializableResponsePayload(payment);
-        if (issues && issues.length) {
-          return {
-            data: undefined,
-            error: {
-              code: 'INTERNAL_ERROR',
-              message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-            },
-          } as any;
-        }
-        return { data: result, __nuwa_payment: payment } as any;
-      }
-      // Validate structured payment if exists
-      if (settled?.__nuwa_payment) {
-        const issues = validateSerializableResponsePayload(settled.__nuwa_payment);
-        if (issues && issues.length) {
-          return {
-            data: undefined,
-            error: {
-              code: 'INTERNAL_ERROR',
-              message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-            },
-          } as any;
-        }
-      }
-      return settled;
-    };
+    this.handlers.set(name, { handler, options, ruleId });
     return this;
   }
 
-  getHandlers(): Record<string, (params: any, meta?: any) => Promise<any>> {
-    return { ...((this as any)._handlers || {}) };
+  async invoke(name: string, params: any, context?: any): Promise<any> {
+    const entry = this.handlers.get(name);
+    if (!entry) {
+      return {
+        error: {
+          code: 'METHOD_NOT_FOUND',
+          message: `Tool '${name}' not found`,
+        },
+      } as any;
+    }
+
+    // Step A: preProcess
+    const ctx = await this.middleware.handleWithNewAPI(name, params, context);
+    if (!ctx) return entry.handler(params, context);
+    if (ctx.state?.error) {
+      // Prefer using headerValue from preProcess (may include pending SubRAV)
+      if ((ctx as any).state?.headerValue) {
+        const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
+        return {
+          data: undefined,
+          __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded),
+        } as any;
+      }
+      // Fallback to minimal structured error (no subRAV)
+      const decoded = {
+        error: ctx.state.error,
+        clientTxRef: ctx.meta.clientTxRef,
+        version: 1,
+      } as any;
+      return { data: undefined, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
+    }
+
+    // Step B: business handler — pass didInfo via FastMCP context rather than mutating params
+    const contextWithDid = ctx?.meta?.didInfo
+      ? { ...(context || {}), didInfo: ctx.meta.didInfo }
+      : context;
+    const result = await entry.handler(params, contextWithDid);
+
+    // Step C/D: settle + persist
+    const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
+    // Prefer preProcess header (402) if present and no structured payment in settled
+    if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
+      const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
+      const payment = HttpPaymentCodec.toJSONResponse(decoded);
+      const issues = validateSerializableResponsePayload(payment);
+      if (issues && issues.length) {
+        return {
+          data: undefined,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+          },
+        } as any;
+      }
+      return { data: result, __nuwa_payment: payment } as any;
+    }
+    // Validate structured payment if exists
+    if (settled?.__nuwa_payment) {
+      const issues = validateSerializableResponsePayload(settled.__nuwa_payment);
+      if (issues && issues.length) {
+        return {
+          data: undefined,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+          },
+        } as any;
+      }
+    }
+    return settled;
   }
+
+  listTools(): string[] {
+    return Array.from(this.handlers.keys());
+  }
+
+  // getHandlers removed in favor of listTools() + invoke()
 
   /** Register built-in Nuwa handlers as MCP tools with billing options */
   registerBuiltIns(): this {
