@@ -274,12 +274,13 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log('✅ Discovery successful:', discovery.data);
 
     // Test recovery
-    const recovery = await mcpClient.recoverFromService();
-    expect(recovery).toEqual(
-      expect.objectContaining({
-        channels: expect.any(Array),
-      })
-    );
+    const recoveryRaw = await mcpClient.recoverFromService();
+    const recovery =
+      recoveryRaw && (recoveryRaw as any).success ? (recoveryRaw as any).data : recoveryRaw;
+
+    // channel/subChannel may be null for first-time clients
+    expect(recovery).toHaveProperty('channel');
+    expect(recovery).toHaveProperty('subChannel');
     console.log('✅ Recovery successful:', recovery);
 
     console.log('🎉 Built-in FREE endpoints test successful!');
@@ -586,14 +587,17 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log(`💰 Recovery test 2 - ${formatPaymentInfo(result2.payment!)}`);
 
     // Test recovery
-    const recoveryData = await mcpClient.recoverFromService();
+    const recoveryRaw = await mcpClient.recoverFromService();
+    const recoveryData =
+      recoveryRaw && (recoveryRaw as any).success ? (recoveryRaw as any).data : recoveryRaw;
 
-    expect(recoveryData.channels).toBeTruthy();
-    expect(recoveryData.channels.length).toBeGreaterThan(0);
+    expect(recoveryData).toBeTruthy();
     expect(recoveryData.timestamp).toBeTruthy();
+    expect(recoveryData.channel).toBeTruthy();
+    expect(recoveryData.channel.channelId).toEqual(expect.any(String));
 
     console.log('✅ Recovery data retrieved:', {
-      channelCount: recoveryData.channels.length,
+      channelCount: recoveryData.channel ? 1 : 0,
       timestamp: recoveryData.timestamp,
     });
 

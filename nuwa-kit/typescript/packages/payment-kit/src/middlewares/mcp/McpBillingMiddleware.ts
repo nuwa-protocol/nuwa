@@ -49,7 +49,11 @@ export class McpBillingMiddleware {
     if (!rule) return null;
 
     const paymentData = this.extractPaymentData(params);
-    const ctx = this.buildBillingContext(method, paymentData || undefined, rule, meta);
+    const didInfo = await this.extractDidInfo(params?.__nuwa_auth);
+    const ctx = this.buildBillingContext(method, paymentData || undefined, rule, {
+      ...(meta || {}),
+      didInfo,
+    });
     const processed = await this.processor.preProcess(ctx);
     return processed;
   }
@@ -77,18 +81,22 @@ export class McpBillingMiddleware {
   }
 
   private findBillingRule(toolName: string): BillingRule | undefined {
-    const meta = { method: 'MCP', path: `/tool/${toolName}` };
+    // Match BillableRouter's HTTP-style rules
+    const meta = { method: 'POST', path: `/tool/${toolName}` } as any;
     return findRule(meta, this.ruleProvider.getRules());
   }
 
   private extractPaymentData(params: any): PaymentHeaderPayload | null {
     const p = params?.__nuwa_payment;
     if (!p) return null;
+    const signed = p.signedSubRav
+      ? ((HttpPaymentCodec as any).deserializeSignedSubRAV?.(p.signedSubRav) ?? p.signedSubRav)
+      : undefined;
     return {
       version: p.version || 1,
       clientTxRef: p.clientTxRef,
       maxAmount: p.maxAmount ? BigInt(p.maxAmount) : BigInt(0),
-      signedSubRav: p.signedSubRav,
+      signedSubRav: signed,
     } as PaymentHeaderPayload;
   }
 
@@ -127,6 +135,32 @@ export class McpBillingMiddleware {
     } as any;
   }
 }
+
+// Import here to avoid circular deps at top
+import { DIDAuth } from '@nuwa-ai/identity-kit';
+
+// Extend class with method implementation
+export interface McpBillingMiddleware {
+  extractDidInfo: (authHeader?: string) => Promise<{ did: string; keyId: string } | undefined>;
+}
+
+McpBillingMiddleware.prototype.extractDidInfo = async function (
+  authHeader?: string
+): Promise<{ did: string; keyId: string } | undefined> {
+  if (!authHeader) return undefined;
+  try {
+    // Verify and parse DIDAuthV1 header
+    const resolver = (this as any).processor?.['config']?.didResolver;
+    if (!resolver) return undefined;
+    const verify = await DIDAuth.v1.verifyAuthHeader(authHeader, resolver);
+    if (!verify.ok || !verify.signedObject) return undefined;
+    const sig = verify.signedObject.signature;
+    if (!sig?.signer_did || !sig?.key_id) return undefined;
+    return { did: sig.signer_did, keyId: sig.key_id };
+  } catch {
+    return undefined;
+  }
+};
 
 function serializeSubRAV(subRav: any): Record<string, string> {
   return {

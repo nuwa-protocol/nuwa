@@ -4,6 +4,7 @@
 import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
 import type { Server } from 'http';
 import { FastMCP } from 'fastmcp';
+import { serializeJson } from '../../utils/json';
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
@@ -44,7 +45,7 @@ export async function startFastMcpServer(opts: FastMcpServerOptions): Promise<Se
       parameters: passThroughParameters,
       async execute(params: any, context: any) {
         const raw = await fn(params, context);
-        return { content: [{ type: 'text', text: JSON.stringify(raw) }] } as any;
+        return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
       },
     });
   }
@@ -61,6 +62,7 @@ export async function startFastMcpServer(opts: FastMcpServerOptions): Promise<Se
         pricing: tool.options.pricePicoUSD,
       };
       kit.register(name, routeOptions, tool.handler);
+      const kHandlers = kit.getHandlers();
 
       // Add to FastMCP server
       server.addTool({
@@ -68,8 +70,10 @@ export async function startFastMcpServer(opts: FastMcpServerOptions): Promise<Se
         description: tool.description,
         parameters: passThroughParameters,
         async execute(params: any, context: any) {
-          const raw = await tool.handler(params, context);
-          return { content: [{ type: 'text', text: JSON.stringify(raw) }] } as any;
+          const raw = await (kHandlers[name]
+            ? kHandlers[name](params, context)
+            : tool.handler(params, context));
+          return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
         },
       });
     }

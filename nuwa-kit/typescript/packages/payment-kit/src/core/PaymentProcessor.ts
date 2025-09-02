@@ -285,13 +285,29 @@ export class PaymentProcessor {
           ravResult.decision,
           ravResult.error
         );
+        // Do NOT generate new proposal here; just return error
+        // If we have latestPendingSubRav, attach it to header for client to sign
+        if (pctx.state.latestPendingSubRav) {
+          try {
+            const decoded = {
+              version: 1,
+              clientTxRef: pctx.meta.clientTxRef,
+              serviceTxRef: pctx.state.serviceTxRef,
+              subRav: pctx.state.latestPendingSubRav,
+              error: ravResult.error,
+            } as any;
+            pctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(decoded);
+          } catch (e) {
+            this.log('⚠️ Failed to attach pending SubRAV to error header:', e);
+          }
+        }
         return this.fail(
           pctx,
           {
             code: (ravResult.error?.code as PaymentError['code']) ?? 'INTERNAL_SERVER_ERROR',
             message: ravResult.error?.message ?? 'Verification decision error',
           },
-          { attachHeader: false }
+          { attachHeader: true }
         );
       }
 

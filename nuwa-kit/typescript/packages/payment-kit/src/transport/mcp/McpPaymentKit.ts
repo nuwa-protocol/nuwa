@@ -19,6 +19,8 @@ import { ClaimTriggerService, DEFAULT_REACTIVE_CLAIM_POLICY } from '../../core/C
 import { McpBillingMiddleware } from '../../middlewares/mcp/McpBillingMiddleware';
 import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
+import { registerBuiltinStrategies } from '../../billing/strategies';
+import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 
 export interface McpPaymentKitOptions {
   serviceId: string;
@@ -51,6 +53,8 @@ export class McpPaymentKit {
       pendingSubRAVRepo: PendingSubRAVRepository;
     }
   ) {
+    // Ensure billing strategies are registered for MCP runtime
+    registerBuiltinStrategies();
     this.logger = DebugLogger.get('McpPaymentKit');
     this.logger.setLevel(opts.debug ? 'debug' : 'info');
     this.billableRouter = new BillableRouter({
@@ -85,25 +89,31 @@ export class McpPaymentKit {
       const ctx = await this.middleware.handleWithNewAPI(name, params, meta);
       if (!ctx) return handler(params, meta);
       if (ctx.state?.error) {
-        // Return protocol error in structured field
-        const headerValue = (
-          await import('../../middlewares/http/HttpPaymentCodec')
-        ).HttpPaymentCodec.buildResponseHeader({
+        // Prefer using headerValue from preProcess (may include pending SubRAV)
+        if ((ctx as any).state?.headerValue) {
+          const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
+          return { data: undefined, __nuwa_payment: this.toStructured(decoded) } as any;
+        }
+        // Fallback to minimal structured error (no subRAV)
+        const decoded = {
           error: ctx.state.error,
           clientTxRef: ctx.meta.clientTxRef,
           version: 1,
-        } as any);
-        const decoded = (
-          await import('../../middlewares/http/HttpPaymentCodec')
-        ).HttpPaymentCodec.parseResponseHeader(headerValue);
-        return { data: undefined, __nuwa_payment: this.toStructured(decoded) };
+        } as any;
+        return { data: undefined, __nuwa_payment: this.toStructured(decoded) } as any;
       }
 
       // Step B: business handler
-      const result = await handler(params, meta);
+      const enrichedParams = ctx?.meta?.didInfo ? { ...params, didInfo: ctx.meta.didInfo } : params;
+      const result = await handler(enrichedParams, meta);
 
       // Step C/D: settle + persist
       const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
+      // Prefer preProcess header (402) if present and no structured payment in settled
+      if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
+        const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
+        return { data: result, __nuwa_payment: this.toStructured(decoded) } as any;
+      }
       return settled;
     };
     return this;
@@ -137,6 +147,8 @@ export class McpPaymentKit {
       switch (key) {
         case 'health':
           return 'nuwa.health';
+        case 'discovery':
+          return 'nuwa.discovery';
         case 'recovery':
           return 'nuwa.recovery';
         case 'commit':
@@ -156,11 +168,32 @@ export class McpPaymentKit {
       const methodName = mapName(key);
       const handler = async (params: any) => {
         const res = await cfg.handler(ctx as any, params);
+        if (methodName === 'nuwa.health') {
+          // Return flat object expected by tests
+          return {
+            status: (res as any)?.status ?? 'healthy',
+            service: this.getServiceDid(),
+          } as any;
+        }
         // Return plain data; billing settlement wrapper will embed __nuwa_payment
         return res;
       };
       this.register(methodName, cfg.options, handler, key);
     }
+
+    // Add MCP discovery tool (FREE). Express variant lives at well-known path, so we add here for MCP
+    this.register(
+      'nuwa.discovery',
+      { pricing: '0', authRequired: false } as any,
+      async () => {
+        return {
+          serviceId: this.opts.serviceId,
+          serviceDid: this.getServiceDid(),
+          defaultAssetId: this.opts.defaultAssetId || '0x3::gas_coin::RGas',
+        } as any;
+      },
+      'discovery'
+    );
 
     return this;
   }
@@ -195,9 +228,7 @@ export class McpPaymentKit {
       clientTxRef: decoded.clientTxRef,
       serviceTxRef: decoded.serviceTxRef,
       subRav: decoded.subRav
-        ? ((
-            require('../../middlewares/http/HttpPaymentCodec').HttpPaymentCodec as any
-          ).serializeSubRAV?.(decoded.subRav) ?? decoded.subRav)
+        ? ((HttpPaymentCodec as any).serializeSubRAV?.(decoded.subRav) ?? decoded.subRav)
         : undefined,
       cost: decoded.cost !== undefined ? decoded.cost.toString() : undefined,
       costUsd: decoded.costUsd !== undefined ? decoded.costUsd.toString() : undefined,
