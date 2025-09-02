@@ -21,6 +21,7 @@ import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
+import { validateSerializableResponsePayload } from './ToolSchema';
 
 export interface McpPaymentKitOptions {
   serviceId: string;
@@ -115,7 +116,31 @@ export class McpPaymentKit {
       // Prefer preProcess header (402) if present and no structured payment in settled
       if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
         const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-        return { data: result, __nuwa_payment: HttpPaymentCodec.toJSONResponse(decoded) } as any;
+        const payment = HttpPaymentCodec.toJSONResponse(decoded);
+        const issues = validateSerializableResponsePayload(payment);
+        if (issues && issues.length) {
+          return {
+            data: undefined,
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+            },
+          } as any;
+        }
+        return { data: result, __nuwa_payment: payment } as any;
+      }
+      // Validate structured payment if exists
+      if (settled?.__nuwa_payment) {
+        const issues = validateSerializableResponsePayload(settled.__nuwa_payment);
+        if (issues && issues.length) {
+          return {
+            data: undefined,
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
+            },
+          } as any;
+        }
       }
       return settled;
     };

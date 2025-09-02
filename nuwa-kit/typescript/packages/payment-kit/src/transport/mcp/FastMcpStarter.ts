@@ -4,6 +4,7 @@
 import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
 import type { Server } from 'http';
 import { FastMCP } from 'fastmcp';
+import { buildParametersSchema, compileStandardSchema } from './ToolSchema';
 import { serializeJson } from '../../utils/json';
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
@@ -18,12 +19,7 @@ export class PaymentMcpToolRegistrar {
     private readonly server: FastMCP,
     private readonly kit: McpPaymentKit
   ) {
-    this.passThroughParameters = {
-      ['~standard']: {
-        version: '1.0.0',
-        validate: async (input: any) => ({ value: input, issues: undefined }),
-      },
-    };
+    this.passThroughParameters = undefined;
   }
 
   markStarted(): void {
@@ -52,13 +48,14 @@ export class PaymentMcpToolRegistrar {
     this.kit.register(name, { pricing: pricePicoUSD, streaming }, handler);
     const kHandlers = this.kit.getHandlers();
     // Register with FastMCP (expose tool)
+    const compiled =
+      schema && typeof schema === 'object' && schema['~standard']
+        ? schema
+        : compileStandardSchema(buildParametersSchema(schema, { mergeReserved: true }));
     this.server.addTool({
       name,
       description,
-      parameters:
-        schema && typeof schema === 'object' && schema['~standard']
-          ? schema
-          : this.passThroughParameters,
+      parameters: compiled,
       async execute(params: any, context: any) {
         const raw = await (kHandlers[name]
           ? kHandlers[name](params, context)
@@ -126,13 +123,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     server.addTool({
       name,
       description: `Built-in payment tool: ${name}`,
-      parameters: {
-        ['~standard']: {
-          version: 1,
-          vendor: 'nuwa',
-          validate: async (input: any) => ({ value: input, issues: undefined }),
-        },
-      },
+      parameters: compileStandardSchema(buildParametersSchema(undefined, { mergeReserved: true })),
       async execute(params: any, context: any) {
         const raw = await fn(params, context);
         return { content: [{ type: 'text', text: serializeJson(raw) }] } as any;
