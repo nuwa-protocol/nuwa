@@ -1,6 +1,6 @@
 import z from "zod";
-import { queryCapStats as queryCapStatsFromSupabase } from "../supabase";
-import { Result } from "../type";
+import { queryCapStats as queryCapStatsFromSupabase } from "../supabase.js";
+import { Result } from "../type.js";
 
 async function queryCapStats({ capId }: { capId: string }, context: any) {
   try {

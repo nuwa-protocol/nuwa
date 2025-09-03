@@ -1,6 +1,6 @@
 import z from "zod";
-import { queryFromSupabase, updateCapEnable } from "../supabase";
-import { Result } from "../type";
+import { queryFromSupabase, updateCapEnable } from "../supabase.js";
+import { Result } from "../type.js";
 
 async function updateEnableCap({ capId, action }: { capId: string, action: 'enable' | 'disable' }, context: any) {
   try {

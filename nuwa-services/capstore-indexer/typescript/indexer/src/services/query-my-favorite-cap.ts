@@ -1,6 +1,6 @@
 import z from "zod";
-import { queryUserFavoriteCaps } from "../supabase";
-import { Result } from "../type";
+import { queryUserFavoriteCaps } from "../supabase.js";
+import { Result } from "../type.js";
 
 async function queryMyFavoriteCap({ page, pageSize }: { page?: number, pageSize?: number }, context: any) {
   try {

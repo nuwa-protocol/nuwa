@@ -1,7 +1,7 @@
 import z from "zod";
-import { ipfsClient } from "./service";
-import { Result } from "../type";
-import { incrementCapDownloads, queryFromSupabase } from "../supabase";
+import { ipfsClient } from "./service.js";
+import { Result } from "../type.js";
+import { incrementCapDownloads, queryFromSupabase } from "../supabase.js";
 
 async function downloadCap({ cid, dataFormat }: { cid: string, dataFormat: 'base64' | 'utf8' }, context: any) {
   try {

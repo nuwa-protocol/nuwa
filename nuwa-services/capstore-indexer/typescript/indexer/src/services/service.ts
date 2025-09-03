@@ -1,17 +1,17 @@
 import {DIDAuth, initRoochVDR, VDRRegistry} from "@nuwa-ai/identity-kit";
-import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "../constant";
+import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "../constant.js";
 import { FastMCP } from "fastmcp";
 import { config } from "dotenv";
 import { create } from 'ipfs-http-client';
-import { uploadCapTool } from "./upload-cap";
-import { downloadCapTool } from "./download-cap";
-import { favoriteCapTool } from "./favorite-cap";
-import { queryCapByIDTool } from "./query-cap-by-id";
-import { queryCapByNameTool } from "./query-cap-by-name";
-import { queryCapStatsTool } from "./query-cap-stas";
-import { queryMyFavoriteCapTool } from "./query-my-favorite-cap";
-import { rateCapTool } from "./rate-cap";
-import { updateEnableCapTool } from "./update-enable-cap";
+import { uploadCapTool } from "./upload-cap.js";
+import { downloadCapTool } from "./download-cap.js";
+import { favoriteCapTool } from "./favorite-cap.js";
+import { queryCapByIDTool } from "./query-cap-by-id.js";
+import { queryCapByNameTool } from "./query-cap-by-name.js";
+import { queryCapStatsTool } from "./query-cap-stas.js";
+import { queryMyFavoriteCapTool } from "./query-my-favorite-cap.js";
+import { rateCapTool } from "./rate-cap.js";
+import { updateEnableCapTool } from "./update-enable-cap.js";
 
 // Load environment variables
 config();

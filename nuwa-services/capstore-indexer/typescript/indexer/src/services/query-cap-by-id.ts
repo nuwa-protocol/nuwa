@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { queryFromSupabase } from "../supabase";
-import type { Result } from "../type";
+import { queryFromSupabase } from "../supabase.js";
+import type { Result } from "../type.js";
 
 async function queryCapByID(args: { id?: string, cid?: string }) {
   try {

@@ -1,8 +1,8 @@
 import z from "zod";
 import { Readable } from 'node:stream';
-import { ipfsClient } from "./service";
+import { ipfsClient } from "./service.js";
 import { CID } from 'multiformats/cid';
-import { Result } from "../type";
+import { Result } from "../type.js";
 
 async function uploadCap({ fileName, fileData, pin }: { fileName: string, fileData: string, pin: boolean }, context: any) {
   try {

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { queryFromSupabase, rateCap as rateCapInSupabase } from "../supabase";
-import type { Result } from "../type";
+import { queryFromSupabase, rateCap as rateCapInSupabase } from "../supabase.js";
+import type { Result } from "../type.js";
 
 async function rateCap({ capId, rating }: { capId: string, rating: number }, context: any) {
   try {

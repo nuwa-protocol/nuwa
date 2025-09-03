@@ -1,6 +1,6 @@
 import { getRoochNodeUrl } from "@roochnetwork/rooch-sdk";
 import { config } from "dotenv";
-import type { Target } from "./type";
+import type { Target } from "./type.js";
 
 config();
 
