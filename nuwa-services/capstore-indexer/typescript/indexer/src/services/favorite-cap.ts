@@ -1,6 +1,6 @@
 import z from "zod";
-import { addToUserFavoriteCaps, removeFromUserFavoriteCaps, isUserFavoriteCap } from "../supabase";
-import { Result } from "../type";
+import { addToUserFavoriteCaps, removeFromUserFavoriteCaps, isUserFavoriteCap } from "../supabase.js";
+import { Result } from "../type.js"; 
 
 async function favoriteCap({ capId, action }: { capId: string, action: 'add' | 'remove' | 'isFavorite' }, context: any) {
   try {

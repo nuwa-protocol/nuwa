@@ -1,6 +1,6 @@
 import z from "zod";
-import { queryFromSupabase } from "../supabase";
-import { Result } from "../type";
+import { queryFromSupabase } from "../supabase.js";
+import { Result } from "../type.js";
 
 async function queryCapByName(args: { 
   name?: string, 
