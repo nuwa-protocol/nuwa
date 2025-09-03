@@ -184,8 +184,8 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
       '@nuwa-ai/identity-kit':
-        specifier: 0.5.1
-        version: 0.5.1(typescript@5.4.5)
+        specifier: workspace:*
+        version: link:../identity-kit
       '@roochnetwork/rooch-sdk':
         specifier: ^0.3.6
         version: 0.3.6(typescript@5.4.5)
@@ -1390,9 +1390,6 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
-
-  '@nuwa-ai/identity-kit@0.5.1':
-    resolution: {integrity: sha512-4IAAAs/NEg97rvLcp0OTxAHsXFU5Z7JojzXViDGrlVYQBlcNMV7wjghpDZYf2d1EHc04CthIzE/N9BeF4g9Xtg==}
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -6616,16 +6613,6 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
-
-  '@nuwa-ai/identity-kit@0.5.1(typescript@5.4.5)':
-    dependencies:
-      '@noble/curves': 1.9.1
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.4.5)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
 
   '@opentelemetry/api@1.9.0': {}
 
