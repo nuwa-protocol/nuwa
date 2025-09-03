@@ -1,11 +1,10 @@
 {
   "buildCommand": "cd ../.. && pnpm --filter @nuwa-ai/ui-kit build && cd examples/cap-ui && pnpm build",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/[^.]+",
-      "dest": "/",
-      "status": 200
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
