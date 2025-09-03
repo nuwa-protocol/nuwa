@@ -3,7 +3,8 @@
 
 import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
 import type { Server } from 'http';
-import { FastMCP } from 'fastmcp';
+import { FastMCP, FastMCPSession } from 'fastmcp';
+import { startHTTPServer } from 'mcp-proxy';
 import { buildParametersSchema, compileStandardSchema } from './ToolSchema';
 import { serializeJson } from '../../utils/json';
 
@@ -20,12 +21,19 @@ function toMcpToolResult(raw: any): any {
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
+  endpoint?: `/${string}`;
   register?: (registrar: PaymentMcpToolRegistrar) => void;
+  wellKnown?: {
+    enabled?: boolean;
+    path?: `/${string}`; // default: '/.well-known/nuwa-payment/info'
+    discovery: () => Promise<any> | any; // should conform to ServiceDiscoverySchema
+  };
 }
 
 export class PaymentMcpToolRegistrar {
   private readonly passThroughParameters: any;
   private started = false;
+  registeredTools: any[] = [];
   constructor(
     private readonly server: FastMCP,
     private readonly kit: McpPaymentKit
@@ -63,14 +71,16 @@ export class PaymentMcpToolRegistrar {
         ? schema
         : compileStandardSchema(buildParametersSchema(schema, { mergeReserved: true }));
     const kitRef = this.kit;
-    this.server.addTool({
+    const toolDef = {
       name,
       description,
       parameters: compiled,
       async execute(params: any, context: any) {
         return await kitRef.invoke(name, params, context);
       },
-    });
+    } as any;
+    this.server.addTool(toolDef);
+    this.registeredTools.push(toolDef);
   }
 
   freeTool(args: {
@@ -91,6 +101,10 @@ export class PaymentMcpToolRegistrar {
     schema?: any;
   }): void {
     this.addTool(args);
+  }
+
+  getTools(): any[] {
+    return this.registeredTools.slice();
   }
 }
 
@@ -125,27 +139,113 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
   });
   const kit = await createMcpPaymentKit(opts);
 
-  // Register built-in payment tools (FREE)
+  // Register built-in payment tools (FREE) via registrar to ensure new sessions include them
+  const bootstrapRegistrar = new PaymentMcpToolRegistrar(server, kit);
+  // Register each tool from kit, but the handler will delegate to kit.invoke
+  // This ensures tools are available to FastMCP sessions
   for (const name of kit.listTools()) {
-    server.addTool({
+    const toolDef = {
       name,
       description: `Built-in payment tool: ${name}`,
       parameters: compileStandardSchema(buildParametersSchema(undefined, { mergeReserved: true })),
       async execute(params: any, context: any) {
         return await kit.invoke(name, params, context);
       },
-    });
+    } as any;
+    server.addTool(toolDef);
+    bootstrapRegistrar.registeredTools.push(toolDef);
   }
 
-  const registrar = new PaymentMcpToolRegistrar(server, kit);
+  const registrar = bootstrapRegistrar;
 
   const start = async () => {
-    await server.start({
-      transportType: 'httpStream',
-      httpStream: { port: opts.port || 8080, endpoint: '/mcp' },
+    const sessions: FastMCPSession[] = [];
+    let sessionCounter = 0;
+    const port = opts.port || 8080;
+    const endpoint = opts.endpoint || '/mcp';
+    const wellKnownEnabled =
+      opts.wellKnown?.enabled !== false && typeof opts.wellKnown?.discovery === 'function';
+    const wellKnownPath = (opts.wellKnown?.path ||
+      '/.well-known/nuwa-payment/info') as `/${string}`;
+
+    const httpServer = await startHTTPServer({
+      port,
+      streamEndpoint: endpoint,
+      createServer: async _req => {
+        const session = new FastMCPSession({
+          name: opts.serviceId || 'nuwa-mcp-server',
+          version: '1.0.0',
+          ping: undefined,
+          prompts: [],
+          resources: [],
+          resourcesTemplates: [],
+          roots: { enabled: true },
+          tools: registrar.getTools(),
+          transportType: 'httpStream',
+        } as any);
+        (session as any).__sessionId = ++sessionCounter;
+        return session;
+      },
+      onConnect: async session => {
+        sessions.push(session);
+        // Register all tools to the new session via FastMCP internal handlers
+        // We rely on FastMCP having already had tools added via registrar
+        // Emit-like behavior is not exposed; sessions will receive handlers on creation
+      },
+      onClose: async session => {
+        const idx = sessions.indexOf(session as any);
+        if (idx >= 0) sessions.splice(idx, 1);
+      },
+      onUnhandledRequest: async (req, res) => {
+        try {
+          const url = new URL(req.url || '', 'http://localhost');
+          // Health endpoint (parity with FastMCP default)
+          if (req.method === 'GET' && url.pathname === '/health') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' }).end('✓ Ok');
+            return;
+          }
+          // Ready endpoint (parity with FastMCP default)
+          if (req.method === 'GET' && url.pathname === '/ready') {
+            const readySessions = sessions.filter(s => (s as any).isReady).length;
+            const totalSessions = sessions.length;
+            const allReady = readySessions === totalSessions && totalSessions > 0;
+            const payload = {
+              ready: readySessions,
+              status: allReady ? 'ready' : totalSessions === 0 ? 'no_sessions' : 'initializing',
+              total: totalSessions,
+            };
+            res
+              .writeHead(allReady ? 200 : 503, { 'Content-Type': 'application/json' })
+              .end(JSON.stringify(payload));
+            return;
+          }
+          // Well-known discovery endpoint (no auth)
+          if (wellKnownEnabled && req.method === 'GET' && url.pathname === wellKnownPath) {
+            try {
+              const body = await Promise.resolve(opts.wellKnown!.discovery());
+              res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+            } catch (e: any) {
+              res
+                .writeHead(500, { 'Content-Type': 'application/json' })
+                .end(JSON.stringify({ error: e?.message || 'internal error' }));
+            }
+            return;
+          }
+          res.writeHead(404).end();
+        } catch (e) {
+          try {
+            res.writeHead(500).end();
+          } catch {}
+        }
+      },
     });
+
     registrar.markStarted();
-    return server as any as Server;
+    console.debug('[FastMcpStarter] registered tools', {
+      tools: registrar.getTools().map(t => t.name),
+      total: registrar.getTools().length,
+    } as any);
+    return httpServer as any as Server;
   };
 
   const addTool = (def: {

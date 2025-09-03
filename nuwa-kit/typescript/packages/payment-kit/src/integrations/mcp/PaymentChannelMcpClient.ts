@@ -15,8 +15,10 @@ import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDefaultChannelRepo } from '../http/internal/LocalStore';
+import { RequestScheduler } from '../http/internal/RequestScheduler';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
+import { McpChannelManager } from './McpChannelManager';
 
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
@@ -48,6 +50,9 @@ export class PaymentChannelMcpClient {
   private mcpClient: any | undefined;
   private notificationsSubscribed = false;
   private lastContents: any[] | undefined;
+  private scheduler: RequestScheduler = new RequestScheduler();
+  private cachedDiscovery: any | undefined;
+  private channelManager?: McpChannelManager;
 
   constructor(options: McpPayerOptions) {
     this.options = options;
@@ -74,6 +79,24 @@ export class PaymentChannelMcpClient {
       storageOptions: {
         channelRepo,
       },
+    });
+    // Initialize MCP ChannelManager
+    this.channelManager = new McpChannelManager({
+      baseUrl: options.baseUrl,
+      payerClient: this.payerClient,
+      paymentState: this.paymentState,
+      signer: options.signer,
+      keyId: options.keyId,
+      payerDid: options.payerDid,
+      payeeDid: options.payeeDid,
+      defaultAssetId: options.defaultAssetId,
+      fetchImpl: (globalThis as any).fetch?.bind(globalThis),
+      mcpCall: async (name: string, params?: any) => {
+        const client = await this.ensureClient();
+        const res = await client.callTool({ name, arguments: params || {} });
+        return res;
+      },
+      autoRecover: false,
     });
   }
 
@@ -121,58 +144,80 @@ export class PaymentChannelMcpClient {
     method: string,
     params?: any
   ): Promise<{ content: any[]; payment?: PaymentInfo }> {
-    const clientTxRef = crypto.randomUUID();
-    const client = await this.ensureClient();
-    await this.ensureNotificationSubscription();
-    await this.ensureChannelReady();
-    const reqParams = await this.buildParams(method, params, clientTxRef);
+    const handle = this.scheduler.enqueue(async (_release, signal) => {
+      if (signal.aborted) throw new Error('Request aborted');
+      const clientTxRef = crypto.randomUUID();
+      await this.ensureDiscovery();
+      if (signal.aborted) throw new Error('Request aborted');
+      const client = await this.ensureClient();
+      await this.ensureNotificationSubscription();
+      // Skip ensureChannelReady for info/free tools to avoid recursive recovery loops
+      const infoTools = new Set([
+        'nuwa.health',
+        'nuwa.discovery',
+        'nuwa.recovery',
+        'nuwa.admin.status',
+        'nuwa.subrav.query',
+      ]);
+      if (!infoTools.has(method)) {
+        await this.ensureChannelReady();
+      }
+      if (signal.aborted) throw new Error('Request aborted');
 
-    let result = await client.callTool({ name: method, arguments: reqParams });
+      const reqParams = await this.buildParams(method, params, clientTxRef);
+      let result = await client.callTool({ name: method, arguments: reqParams });
 
-    let content: any[] = [];
-    let paymentPayload: any | undefined;
-    this.lastContents = undefined;
-    if (
-      result &&
-      typeof result === 'object' &&
-      (result as any).content &&
-      Array.isArray((result as any).content)
-    ) {
-      content = (result as any).content as any[];
-      this.lastContents = content;
-      paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
-    }
+      let content: any[] = [];
+      let paymentPayload: any | undefined;
+      this.lastContents = undefined;
+      if (
+        result &&
+        typeof result === 'object' &&
+        (result as any).content &&
+        Array.isArray((result as any).content)
+      ) {
+        content = (result as any).content as any[];
+        this.lastContents = content;
+        paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
+      }
 
-    // Handle 402 sign-and-retry
-    const maybePayment = paymentPayload;
-    if (maybePayment && maybePayment.error?.code === 'PAYMENT_REQUIRED' && maybePayment.subRav) {
-      try {
-        const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
-        const signed = await this.payerClient.signSubRAV(subRav);
-        const retryParams = await this.buildParams(method, params, clientTxRef);
-        const newReqPayload: PaymentRequestPayload = {
-          version: 1,
-          clientTxRef,
-          maxAmount: BigInt(0),
-          signedSubRav: signed,
-        };
-        retryParams.__nuwa_payment = HttpPaymentCodec.toJSONRequest(newReqPayload);
-        result = await client.callTool({ name: method, arguments: retryParams });
-        if (
-          result &&
-          typeof result === 'object' &&
-          (result as any).content &&
-          Array.isArray((result as any).content)
-        ) {
-          content = (result as any).content as any[];
-          this.lastContents = content;
-          paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
-        }
-      } catch {}
-    }
+      const maybePayment = paymentPayload;
+      // Only retry for non-builtin (business) tools; builtin nuwa.* should never trigger payment flow
+      if (
+        !method.startsWith('nuwa.') &&
+        maybePayment &&
+        maybePayment.error?.code === 'PAYMENT_REQUIRED' &&
+        maybePayment.subRav
+      ) {
+        try {
+          const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
+          const signed = await this.payerClient.signSubRAV(subRav);
+          const retryParams = await this.buildParams(method, params, clientTxRef);
+          const newReqPayload: PaymentRequestPayload = {
+            version: 1,
+            clientTxRef,
+            maxAmount: BigInt(0),
+            signedSubRav: signed,
+          };
+          retryParams.__nuwa_payment = HttpPaymentCodec.toJSONRequest(newReqPayload);
+          result = await client.callTool({ name: method, arguments: retryParams });
+          if (
+            result &&
+            typeof result === 'object' &&
+            (result as any).content &&
+            Array.isArray((result as any).content)
+          ) {
+            content = (result as any).content as any[];
+            this.lastContents = content;
+            paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
+          }
+        } catch {}
+      }
 
-    const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
-    return { content, payment: paymentInfo };
+      const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
+      return { content, payment: paymentInfo } as { content: any[]; payment?: PaymentInfo };
+    });
+    return await handle.promise;
   }
 
   getLastContents(): any[] | undefined {
@@ -237,19 +282,29 @@ export class PaymentChannelMcpClient {
 
   private async ensureChannelReady(): Promise<void> {
     try {
-      const payerDid = this.options.payerDid || (await this.options.signer.getDid());
-      const payeeDid = this.options.payeeDid;
-      const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
-      if (!payeeDid) return;
-      const channelId = deriveChannelId(payerDid, payeeDid, assetId);
-      try {
-        await this.payerClient.getChannelInfo(channelId);
-        return; // exists
-      } catch {
-        // open if missing
-        await this.payerClient.openChannelWithSubChannel({ payeeDid, assetId });
-      }
-    } catch {}
+      await this.channelManager?.ensureChannelReady();
+    } catch (e) {
+      this.logger.debug('ensureChannelReady failed:', e);
+      throw e instanceof Error ? e : new Error(String(e));
+    }
+  }
+
+  private async ensureDiscovery(): Promise<any | undefined> {
+    if (this.cachedDiscovery) return this.cachedDiscovery;
+    try {
+      const base = new URL(String(this.options.baseUrl));
+      const origin = `${base.protocol}//${base.host}`;
+      const url = `${origin}/.well-known/nuwa-payment/info`;
+      const fetchImpl: any = (globalThis as any).fetch?.bind(globalThis);
+      if (!fetchImpl) return undefined;
+      const res = await fetchImpl(url, { method: 'GET', headers: { Accept: 'application/json' } });
+      if (!res.ok) return undefined;
+      const json = await res.json();
+      this.cachedDiscovery = json;
+      return json;
+    } catch {
+      return undefined;
+    }
   }
 
   private async ensureClient(): Promise<any> {
@@ -327,14 +382,12 @@ export class PaymentChannelMcpClient {
   }
 
   async recoverFromService(): Promise<any> {
-    const res = await this.call<any>('nuwa.recovery');
-    return res.data;
+    const res = await this.channelManager?.recoverFromService();
+    return res as any;
   }
 
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: true }> {
-    const res = await this.call<any>('nuwa.commit', {
-      signedSubRav: HttpPaymentCodec.serializeSignedSubRAV(signedSubRAV),
-    });
+    await this.channelManager?.commitSubRAV(signedSubRAV);
     return { success: true };
   }
 }

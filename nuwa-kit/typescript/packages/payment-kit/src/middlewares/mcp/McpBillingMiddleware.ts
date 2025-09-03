@@ -49,6 +49,18 @@ export class McpBillingMiddleware {
 
     const paymentData = this.extractPaymentData(params);
     const didInfo = await this.extractDidInfo(params?.__nuwa_auth);
+    // Enforce auth when rule requires it (note: recovery requires auth)
+    if ((rule as any)?.authRequired && !params?.__nuwa_auth) {
+      const unauthorizedCtx = this.buildBillingContext(method, paymentData || undefined, rule, {
+        ...(meta || {}),
+        didInfo,
+      });
+      (unauthorizedCtx as any).state = {
+        error: { code: 'UNAUTHORIZED', message: 'Authorization required' },
+      };
+      return unauthorizedCtx;
+    }
+    // (no-op)
     const ctx = this.buildBillingContext(method, paymentData || undefined, rule, {
       ...(meta || {}),
       didInfo,
@@ -64,6 +76,7 @@ export class McpBillingMiddleware {
     usage?: number
   ): Promise<McpResponseContext<T>> {
     const settled = this.processor.settle(ctx, usage);
+
     let structured: SerializableResponsePayload | undefined;
 
     if (settled.state?.headerValue) {

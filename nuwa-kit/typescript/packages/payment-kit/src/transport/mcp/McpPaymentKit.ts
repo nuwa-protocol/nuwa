@@ -99,6 +99,8 @@ export class McpPaymentKit {
   }
 
   async invoke(name: string, params: any, context?: any): Promise<any> {
+    const rid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
     const entry = this.handlers.get(name);
     if (!entry) {
       return {
@@ -109,9 +111,20 @@ export class McpPaymentKit {
       } as any;
     }
 
-    // Step A: preProcess
-    const ctx = await this.middleware.handleWithNewAPI(name, params, context);
-    if (!ctx) return entry.handler(params, context);
+    // Step A: preProcess (billable or other tools)
+    const contextWithRid = { ...(context || {}), requestId: rid } as any;
+    const ctx = await this.middleware.handleWithNewAPI(name, params, contextWithRid);
+    if (!ctx) {
+      const result = await entry.handler(params, context);
+      const content: any[] = [];
+      if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+        content.push(...(result as any).content);
+      } else if (result !== undefined) {
+        content.push({ type: 'text', text: serializeJson(result) });
+      }
+
+      return { content } as any;
+    }
     if (ctx.state?.error) {
       // Prefer using headerValue from preProcess (may include pending SubRAV)
       if ((ctx as any).state?.headerValue) {
@@ -137,6 +150,17 @@ export class McpPaymentKit {
     const result = await entry.handler(params, contextWithDid);
 
     // Step C/D: settle + persist
+    // If middleware flagged to skip billing (e.g., nuwa.recovery), return plain result
+    if ((ctx as any).__skipBilling) {
+      const content: any[] = [];
+      if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+        content.push(...(result as any).content);
+      } else if (result !== undefined) {
+        content.push({ type: 'text', text: serializeJson(result) });
+      }
+
+      return { content } as any;
+    }
     const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
     // Prefer preProcess header (402) if present and no structured payment in settled
     if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
@@ -211,6 +235,7 @@ export class McpPaymentKit {
         HttpPaymentCodec.buildMcpPaymentResource((settled as any).__nuwa_payment as any)
       );
     }
+    this.logger.debug('MCP invoke end', { rid, name } as any);
     return { content } as any;
   }
 
@@ -263,21 +288,21 @@ export class McpPaymentKit {
 
     for (const [key, cfg] of Object.entries(BuiltInApiHandlers)) {
       const methodName = mapName(key);
+      const routeOptions =
+        key === 'recovery'
+          ? ({ ...(cfg.options as any), authRequired: true, pricing: '0' } as any)
+          : cfg.options;
       const handler = async (params: any, context?: any) => {
         // Built-in handlers expect DID info on the request object; enrich from FastMCP context
         const req = context?.didInfo ? { ...params, didInfo: context.didInfo } : params;
         const res = await cfg.handler(ctx as any, req);
-        if (methodName === 'nuwa.health') {
-          // Return flat object expected by tests
-          return {
-            status: (res as any)?.status ?? 'healthy',
-            service: this.getServiceDid(),
-          } as any;
-        }
         // Return plain data; billing settlement wrapper will embed __nuwa_payment
+        if (res && typeof res === 'object' && 'success' in (res as any) && 'data' in (res as any)) {
+          return (res as any).data;
+        }
         return res;
       };
-      this.register(methodName, cfg.options, handler, key);
+      this.register(methodName, routeOptions, handler, key);
     }
 
     // Add MCP discovery tool (FREE). Express variant lives at well-known path, so we add here for MCP
@@ -285,6 +310,7 @@ export class McpPaymentKit {
       'nuwa.discovery',
       { pricing: '0', authRequired: false } as any,
       async () => {
+        this.logger.debug('MCP built-in nuwa.discovery executed');
         return {
           serviceId: this.opts.serviceId,
           serviceDid: this.getServiceDid(),
@@ -293,6 +319,11 @@ export class McpPaymentKit {
       },
       'discovery'
     );
+
+    this.logger.debug('MCP built-in tools registered', {
+      tools: this.listTools(),
+      total: this.listTools().length,
+    } as any);
 
     return this;
   }
