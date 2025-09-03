@@ -326,7 +326,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SubRAV for JSON transport
    */
-  private static serializeSubRAV(subRav: SubRAV): SerializableSubRAV {
+  public static serializeSubRAV(subRav: SubRAV): SerializableSubRAV {
     return {
       version: subRav.version.toString(),
       chainId: subRav.chainId.toString(),
@@ -341,7 +341,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SubRAV from JSON transport
    */
-  private static deserializeSubRAV(data: SerializableSubRAV): SubRAV {
+  public static deserializeSubRAV(data: SerializableSubRAV): SubRAV {
     return {
       version: parseInt(data.version),
       chainId: BigInt(data.chainId),
@@ -356,7 +356,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SignedSubRAV for JSON transport
    */
-  private static serializeSignedSubRAV(
+  public static serializeSignedSubRAV(
     signedSubRav: SignedSubRAV | undefined
   ): SerializableSignedSubRAV | undefined {
     if (!signedSubRav) {
@@ -372,7 +372,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SignedSubRAV from JSON transport
    */
-  private static deserializeSignedSubRAV(
+  public static deserializeSignedSubRAV(
     data: SerializableSignedSubRAV | undefined
   ): SignedSubRAV | undefined {
     if (!data) {

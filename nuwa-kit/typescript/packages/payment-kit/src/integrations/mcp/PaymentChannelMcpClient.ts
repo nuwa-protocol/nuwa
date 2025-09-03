@@ -1,4 +1,12 @@
-import type { PaymentResult, SubRAV, SignedSubRAV, PaymentInfo } from '../../core/types';
+import type {
+  PaymentResult,
+  SubRAV,
+  SignedSubRAV,
+  PaymentInfo,
+  SerializableResponsePayload,
+  SerializableRequestPayload,
+  PaymentRequestPayload,
+} from '../../core/types';
 import { PaymentChannelPayerClient } from '../../client/PaymentChannelPayerClient';
 import { PaymentChannelFactory } from '../../factory/chainFactory';
 import { DebugLogger, DIDAuth, type SignerInterface } from '@nuwa-ai/identity-kit';
@@ -69,38 +77,60 @@ export class PaymentChannelMcpClient {
     });
   }
 
+  /**
+   * Call a tool with payment, this is a convenience method that returns the first text as data for convenience API
+   * @param method - The method to call
+   * @param params - The parameters to pass to the tool
+   * @returns The result of the tool call
+   */
   async call<T = any>(method: string, params?: any): Promise<PaymentResult<T>> {
+    const { content, payment } = await this.callToolWithPayment(method, params);
+    // Extract first text as data for convenience API
+    let data: any = undefined;
+    const dataItem = Array.isArray(content)
+      ? content.find((c: any) => c?.type === 'text') || content[0]
+      : undefined;
+    if (dataItem && dataItem.type === 'text' && typeof dataItem.text === 'string') {
+      try {
+        data = JSON.parse(dataItem.text);
+      } catch {
+        data = dataItem.text as any;
+      }
+    }
+    return { data, payment };
+  }
+
+  /**
+   * Call a tool returns the content of the tool call
+   * @param name - The name of the tool to call
+   * @param args - The parameters to pass to the tool
+   * @returns The content of the tool call
+   */
+  async callTool(name: string, args?: any): Promise<{ content: any[] }> {
+    const { content } = await this.callToolWithPayment(name, args);
+    return { content };
+  }
+
+  /**
+   * Call a tool with payment
+   * @param method - The name of the tool to call
+   * @param params - The parameters to pass to the tool
+   * @returns The content of the tool call and the payment info
+   */
+  async callToolWithPayment(
+    method: string,
+    params?: any
+  ): Promise<{ content: any[]; payment?: PaymentInfo }> {
     const clientTxRef = crypto.randomUUID();
     const client = await this.ensureClient();
     await this.ensureNotificationSubscription();
     await this.ensureChannelReady();
     const reqParams = await this.buildParams(method, params, clientTxRef);
 
-    // Debug: list tools once for visibility
-    try {
-      const listed = await client.listTools();
-      this.logger.debug(
-        `listTools(): ${JSON.stringify(listed && listed.tools ? listed.tools.map((t: any) => t.name) : [])}`
-      );
-    } catch {}
-
-    // Call the tool directly via MCP SDK
     let result = await client.callTool({ name: method, arguments: reqParams });
 
-    // Inline frame fallback on result container
-    if (result && typeof result === 'object' && (result as any).__nuwa_payment_header__) {
-      try {
-        const decoded = HttpPaymentCodec.parseResponseHeader(
-          (result as any).__nuwa_payment_header__
-        );
-        if (decoded?.subRav) {
-          this.paymentState.setPendingSubRAV(decoded.subRav);
-        }
-      } catch {}
-    }
-    let data: any = result as any;
-    let container: any = undefined;
-    // If server returns MCP content envelope, unwrap JSON text and payment resource
+    let content: any[] = [];
+    let paymentPayload: any | undefined;
     this.lastContents = undefined;
     if (
       result &&
@@ -108,64 +138,41 @@ export class PaymentChannelMcpClient {
       (result as any).content &&
       Array.isArray((result as any).content)
     ) {
-      const contents = (result as any).content as any[];
-      this.lastContents = contents;
-      // Prefer explicit data content if present; fallback to first text
-      const dataItem = contents.find(c => c?.type === 'text') || contents[0];
-      if (dataItem && dataItem.type === 'text' && typeof dataItem.text === 'string') {
-        try {
-          data = JSON.parse(dataItem.text);
-        } catch {
-          data = dataItem.text as any;
-        }
-      }
-      // Extract payment resource via codec helper
-      const payment = HttpPaymentCodec.parseMcpPaymentFromContents(contents);
-      if (payment) {
-        container = { __nuwa_payment: payment };
-      }
-    } else if (result && typeof result === 'object' && 'data' in result) {
-      data = (result as any).data;
+      content = (result as any).content as any[];
+      this.lastContents = content;
+      paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
     }
-    // Handle 402: pending proposal requires signature → sign and retry once
-    const containerOrResult: any = container ?? result;
-    const maybePayment = containerOrResult?.__nuwa_payment;
+
+    // Handle 402 sign-and-retry
+    const maybePayment = paymentPayload;
     if (maybePayment && maybePayment.error?.code === 'PAYMENT_REQUIRED' && maybePayment.subRav) {
       try {
-        const subRav =
-          (HttpPaymentCodec as any).deserializeSubRAV?.(maybePayment.subRav) ?? maybePayment.subRav;
+        const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
         const signed = await this.payerClient.signSubRAV(subRav);
-        // retry with signedSubRav
         const retryParams = await this.buildParams(method, params, clientTxRef);
-        retryParams.__nuwa_payment = retryParams.__nuwa_payment || {};
-        retryParams.__nuwa_payment.signedSubRav =
-          (HttpPaymentCodec as any).serializeSignedSubRAV?.(signed) ?? signed;
+        const newReqPayload: PaymentRequestPayload = {
+          version: 1,
+          clientTxRef,
+          maxAmount: BigInt(0),
+          signedSubRav: signed,
+        };
+        retryParams.__nuwa_payment = HttpPaymentCodec.toJSONRequest(newReqPayload);
         result = await client.callTool({ name: method, arguments: retryParams });
-        // unwrap again
         if (
           result &&
           typeof result === 'object' &&
           (result as any).content &&
           Array.isArray((result as any).content)
         ) {
-          const first = (result as any).content[0];
-          this.lastContents = (result as any).content as any[];
-          if (first && first.type === 'text' && typeof first.text === 'string') {
-            try {
-              const parsed = JSON.parse(first.text);
-              container = parsed;
-              data =
-                parsed && typeof parsed === 'object' && 'data' in parsed ? parsed.data : parsed;
-            } catch {}
-          }
-        } else if (result && typeof result === 'object' && 'data' in result) {
-          data = (result as any).data;
+          content = (result as any).content as any[];
+          this.lastContents = content;
+          paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
         }
       } catch {}
     }
 
-    const paymentInfo = await this.handlePaymentFromResult(container ?? result, clientTxRef);
-    return { data, payment: paymentInfo };
+    const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
+    return { content, payment: paymentInfo };
   }
 
   getLastContents(): any[] | undefined {
@@ -183,14 +190,13 @@ export class PaymentChannelMcpClient {
   private async buildParams(method: string, userParams: any, clientTxRef: string) {
     const payerDid = this.options.payerDid || (await this.options.signer.getDid());
     const signedSubRav = await this.buildSignedSubRavIfNeeded();
-    const payment = {
+    const reqPayload: PaymentRequestPayload = {
       version: 1,
       clientTxRef,
-      maxAmount: undefined as any,
-      signedSubRav: signedSubRav
-        ? ((HttpPaymentCodec as any).serializeSignedSubRAV?.(signedSubRav) ?? signedSubRav)
-        : undefined,
+      maxAmount: BigInt(0),
+      signedSubRav: signedSubRav || undefined,
     };
+    const payment: SerializableRequestPayload = HttpPaymentCodec.toJSONRequest(reqPayload);
     const __nuwa_auth = await this.generateAuthToken(payerDid, method, clientTxRef);
     const params = { ...(userParams || {}), __nuwa_auth, __nuwa_payment: payment };
     // Normalize BigInt and other non-JSON-native types using lossless-json, then parse back
@@ -283,37 +289,27 @@ export class PaymentChannelMcpClient {
     } catch {}
   }
 
-  private async handlePaymentFromResult(
-    result: any,
+  private async toPaymentInfoFromPayload(
+    payload: SerializableResponsePayload | undefined,
     clientTxRef: string
   ): Promise<PaymentInfo | undefined> {
-    const p = result?.__nuwa_payment;
-    if (!p) return undefined;
+    if (!payload) return undefined;
     try {
-      const decoded = {
-        version: p.version || 1,
-        clientTxRef: p.clientTxRef || clientTxRef,
-        serviceTxRef: p.serviceTxRef,
-        subRav: p.subRav
-          ? ((HttpPaymentCodec as any).deserializeSubRAV?.(p.subRav) ?? p.subRav)
-          : undefined,
-        cost: p.cost !== undefined ? BigInt(p.cost) : undefined,
-        costUsd: p.costUsd !== undefined ? BigInt(p.costUsd) : undefined,
-        error: p.error,
-      };
+      const decoded = HttpPaymentCodec.fromJSONResponse(payload);
       if (decoded.subRav) {
         this.paymentState.setPendingSubRAV(decoded.subRav);
       }
       if (decoded.error || decoded.cost === undefined || !decoded.subRav) return undefined;
       return {
-        clientTxRef: decoded.clientTxRef,
+        clientTxRef: decoded.clientTxRef ?? clientTxRef,
         serviceTxRef: decoded.serviceTxRef,
         cost: decoded.cost,
         costUsd: decoded.costUsd ?? BigInt(0),
         nonce: decoded.subRav.nonce,
         channelId: decoded.subRav.channelId,
         vmIdFragment: decoded.subRav.vmIdFragment,
-        assetId: this.options.defaultAssetId || '0x3::gas_coin::RGas',
+        //TODO get assetId from channelInfo
+        assetId: this.options.defaultAssetId ?? '0x3::gas_coin::RGas',
         timestamp: new Date().toISOString(),
       };
     } catch {
@@ -337,7 +333,7 @@ export class PaymentChannelMcpClient {
 
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: true }> {
     const res = await this.call<any>('nuwa.commit', {
-      signedSubRav: (HttpPaymentCodec as any).serializeSignedSubRAV?.(signedSubRAV) ?? signedSubRAV,
+      signedSubRav: HttpPaymentCodec.serializeSignedSubRAV(signedSubRAV),
     });
     return { success: true };
   }
