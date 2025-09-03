@@ -427,10 +427,10 @@ describe('Cap Stats and Favorites', () => {
       const result = await queryCapStats(testCapId);
       expect(result.success).toBe(true);
       if (result.stats) {
-        expect(result.stats.cap_id).toBe(testCapId);
+        expect(result.stats.capId).toBe(testCapId);
         expect(typeof result.stats.downloads).toBe('number');
-        expect(typeof result.stats.rating_count).toBe('number');
-        expect(typeof result.stats.average_rating).toBe('number');
+        expect(typeof result.stats.ratingCount).toBe('number');
+        expect(typeof result.stats.averageRating).toBe('number');
         expect(typeof result.stats.favorites).toBe('number');
       }
     }, 10000);
@@ -442,7 +442,7 @@ describe('Cap Stats and Favorites', () => {
       const result = await queryCapStats(testCapId, testUserDid);
       expect(result.success).toBe(true);
       if (result.stats) {
-        expect(result.stats.user_rating).toBe(4);
+        expect(result.stats.userRating).toBe(4);
       }
       
       // Check that user_rating is not present when userId is not provided
@@ -461,8 +461,8 @@ describe('Cap Stats and Favorites', () => {
       const statsResult = await queryCapStats(testCapId);
       expect(statsResult.success).toBe(true);
       if (statsResult.stats) {
-        expect(statsResult.stats.rating_count).toBeGreaterThan(0);
-        expect(statsResult.stats.average_rating).toBeGreaterThan(0);
+        expect(statsResult.stats.ratingCount).toBeGreaterThan(0);
+        expect(statsResult.stats.averageRating).toBeGreaterThan(0);
       }
 
       // Rate the cap with a score of 1 by the same user to test update
@@ -471,7 +471,7 @@ describe('Cap Stats and Favorites', () => {
       
       const finalStats = await queryCapStats(testCapId);
        if (finalStats.success && finalStats.stats) {
-        expect(finalStats.stats.average_rating).toBeLessThan(5);
+        expect(finalStats.stats.averageRating).toBeLessThan(5);
       }
     }, 10000);
 
