@@ -2,10 +2,16 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { config } from 'dotenv';
 import { 
   queryFromSupabase,
-  getAllTags, 
+  queryAllTags, 
   queryByExactTags,
-  getLastCursor,
-  getLastUpdateCursor
+  queryLastRegisterEventCursor,
+  queryLastUpdateCursor,
+  queryCapStats,
+  rateCap,
+  addToUserFavoriteCaps,
+  queryUserFavoriteCaps,
+  removeFromUserFavoriteCaps,
+  incrementCapDownloads
 } from '../src/supabase.js';
 
 // Load environment variables for testing
@@ -81,7 +87,7 @@ describe('Supabase Read Functions', () => {
             expect(item).toHaveProperty('name');
             expect(item).toHaveProperty('id');
             expect(item).toHaveProperty('version');
-            expect(item).toHaveProperty('display_name');
+            expect(item).toHaveProperty('displayName');
             expect(item).toHaveProperty('tags');
             expect(Array.isArray(item.tags)).toBe(true);
           });
@@ -119,7 +125,7 @@ describe('Supabase Read Functions', () => {
 
     it('should handle tags filtering', async () => {
       // First get all available tags to use a real tag for testing
-      const tagsResult = await getAllTags();
+      const tagsResult = await queryAllTags();
       let testTags = ['Coding']; // Default test tag
 
       if (tagsResult.success && tagsResult.tags && tagsResult.tags.length > 0) {
@@ -176,11 +182,23 @@ describe('Supabase Read Functions', () => {
         expect(result.totalPages).toBe(Math.ceil((result.totalItems || 0) / 5));
       }
     }, 10000);
+
+    it('should handle sorting by average_rating', async () => {
+      const result = await queryFromSupabase(null, null, null, null, 0, 10, 'average_rating', 'desc');
+      
+      expect(result).toHaveProperty('success');
+      if (result.success && result.items && result.items.length > 1) {
+        const ratings = result.items.map((item: any) => item.cap_stats?.average_rating || 0);
+        for (let i = 0; i < ratings.length - 1; i++) {
+          expect(ratings[i]).toBeGreaterThanOrEqual(ratings[i+1]);
+        }
+      }
+    }, 10000);
   });
 
   describe('getAllTags', () => {
     it('should return all unique tags', async () => {
-      const result = await getAllTags();
+      const result = await queryAllTags();
       
       expect(result).toHaveProperty('success');
       expect(typeof result.success).toBe('boolean');
@@ -210,7 +228,7 @@ describe('Supabase Read Functions', () => {
     }, 10000);
 
     it('should handle empty tag results', async () => {
-      const result = await getAllTags();
+      const result = await queryAllTags();
       
       expect(result).toHaveProperty('success');
       if (result.success && result.tags) {
@@ -265,13 +283,13 @@ describe('Supabase Read Functions', () => {
             expect(item).toHaveProperty('name');
             expect(item).toHaveProperty('id');
             expect(item).toHaveProperty('version');
-            expect(item).toHaveProperty('display_name');
+            expect(item).toHaveProperty('displayName');
             expect(item).toHaveProperty('tags');
             expect(typeof item.cid).toBe('string');
             expect(typeof item.name).toBe('string');
             expect(typeof item.id).toBe('string');
             expect(typeof item.version).toBe('number');
-            expect(typeof item.display_name).toBe('string');
+            expect(typeof item.displayName).toBe('string');
             expect(Array.isArray(item.tags)).toBe(true);
           });
         }
@@ -298,16 +316,12 @@ describe('Supabase Read Functions', () => {
 
   describe('Tags Query Debug', () => {
     it('should debug tags filtering issue', async () => {
-      console.log('🔍 调试标签过滤问题...');
       
       // Test 1: Get all available tags first
-      console.log('1. 获取所有可用标签...');
-      const tagsResult = await getAllTags();
-      console.log('Tags result:', JSON.stringify(tagsResult, null, 2));
+      const tagsResult = await queryAllTags();
       
       if (tagsResult.success && tagsResult.tags && tagsResult.tags.length > 0) {
         const firstTag = tagsResult.tags[0];
-        console.log(`2. 使用第一个标签进行测试: "${firstTag}"`);
         
         // Test 2: Query with single tag
         const singleTagResult = await queryFromSupabase(null, null, null, [firstTag]);
@@ -315,7 +329,7 @@ describe('Supabase Read Functions', () => {
         
         expect(singleTagResult).toHaveProperty('success');
         if (!singleTagResult.success) {
-          console.error('单标签查询失败:', singleTagResult.error);
+          console.error('single tag query failed:', singleTagResult.error);
         }
         
         // Test 3: Query with multiple tags if more available
@@ -325,11 +339,11 @@ describe('Supabase Read Functions', () => {
           
           expect(multipleTagsResult).toHaveProperty('success');
           if (!multipleTagsResult.success) {
-            console.error('多标签查询失败:', multipleTagsResult.error);
+            console.error('multiple tags query failed:', multipleTagsResult.error);
           }
         }
       } else {
-        console.log('数据库中没有可用的标签，跳过标签测试');
+        console.log('no tags available');
       }
     }, 20000);
   });
@@ -337,7 +351,7 @@ describe('Supabase Read Functions', () => {
   describe('Cursor Management', () => {
     describe('getLastCursor', () => {
       it('should return cursor or null', async () => {
-        const result = await getLastCursor();
+        const result = await queryLastRegisterEventCursor();
         
         // Should return either a valid cursor object or null
         if (result !== null) {
@@ -351,13 +365,13 @@ describe('Supabase Read Functions', () => {
 
       it('should not throw errors', async () => {
         // Should handle any database issues gracefully
-        await expect(getLastCursor()).resolves.not.toThrow();
+        await expect(queryLastRegisterEventCursor()).resolves.not.toThrow();
       }, 10000);
     });
 
     describe('getLastUpdateCursor', () => {
       it('should return cursor or null', async () => {
-        const result = await getLastUpdateCursor();
+        const result = await queryLastUpdateCursor();
         
         // Should return either a valid cursor object or null
         if (result !== null) {
@@ -371,7 +385,7 @@ describe('Supabase Read Functions', () => {
 
       it('should not throw errors', async () => {
         // Should handle any database issues gracefully
-        await expect(getLastUpdateCursor()).resolves.not.toThrow();
+        await expect(queryLastUpdateCursor()).resolves.not.toThrow();
       }, 10000);
     });
   });
@@ -393,5 +407,128 @@ describe('Supabase Read Functions', () => {
         expect(result.error).not.toMatch(/network/i);
       }
     }, 15000);
+  });
+});
+
+
+describe('Cap Stats and Favorites', () => {
+  const testCapId = 'test-cap-id-for-stats';
+  const testUserDid = 'test-user-did-for-favorites';
+
+  beforeAll(async () => {
+    // Verify environment variables are set
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+      throw new Error('Please set SUPABASE_URL and SUPABASE_KEY environment variables for testing');
+    }
+  });
+
+  describe('Cap Stats Management', () => {
+    it('should get stats for a cap', async () => {
+      const result = await queryCapStats(testCapId);
+      expect(result.success).toBe(true);
+      if (result.stats) {
+        expect(result.stats.capId).toBe(testCapId);
+        expect(typeof result.stats.downloads).toBe('number');
+        expect(typeof result.stats.ratingCount).toBe('number');
+        expect(typeof result.stats.averageRating).toBe('number');
+        expect(typeof result.stats.favorites).toBe('number');
+      }
+    }, 10000);
+
+    it('should get user-specific rating when userId is provided', async () => {
+      // First, rate a cap to ensure there is a rating to fetch
+      await rateCap(testUserDid, testCapId, 4);
+
+      const result = await queryCapStats(testCapId, testUserDid);
+      expect(result.success).toBe(true);
+      if (result.stats) {
+        expect(result.stats.userRating).toBe(4);
+      }
+      
+      // Check that user_rating is not present when userId is not provided
+      const resultWithoutUser = await queryCapStats(testCapId);
+      expect(resultWithoutUser.success).toBe(true);
+      if (resultWithoutUser.stats) {
+        expect(resultWithoutUser.stats).not.toHaveProperty('user_rating');
+      }
+    }, 10000);
+
+    it('should rate a cap and update stats', async () => {
+      // Rate the cap with a score of 5
+      const ratingResult = await rateCap(testUserDid, testCapId, 5);
+      expect(ratingResult.success).toBe(true);
+
+      const statsResult = await queryCapStats(testCapId);
+      expect(statsResult.success).toBe(true);
+      if (statsResult.stats) {
+        expect(statsResult.stats.ratingCount).toBeGreaterThan(0);
+        expect(statsResult.stats.averageRating).toBeGreaterThan(0);
+      }
+
+      // Rate the cap with a score of 1 by the same user to test update
+      const secondRatingResult = await rateCap(testUserDid, testCapId, 1);
+      expect(secondRatingResult.success).toBe(true);
+      
+      const finalStats = await queryCapStats(testCapId);
+       if (finalStats.success && finalStats.stats) {
+        expect(finalStats.stats.averageRating).toBeLessThan(5);
+      }
+    }, 10000);
+
+    it('should increment cap downloads', async () => {
+      // Get initial download count
+      const initialStats = await queryCapStats(testCapId);
+      expect(initialStats.success).toBe(true);
+      const initialDownloads = initialStats.stats?.downloads || 0;
+
+      // Increment downloads
+      const incrementResult = await incrementCapDownloads(testCapId);
+      expect(incrementResult.success).toBe(true);
+
+      // Verify download count increased
+      const updatedStats = await queryCapStats(testCapId);
+      expect(updatedStats.success).toBe(true);
+      if (updatedStats.stats) {
+        expect(updatedStats.stats.downloads).toBe(initialDownloads + 1);
+      }
+    }, 10000);
+  });
+
+  describe('User Favorites Management', () => {
+    it('should add a cap to user favorites', async () => {
+      // Clean up first, in case of leftover data from previous failed tests
+      await removeFromUserFavoriteCaps(testUserDid, testCapId);
+      const result = await addToUserFavoriteCaps(testUserDid, testCapId);
+      expect(result.success).toBe(true);
+    }, 10000);
+
+    it('should get user favorite caps', async () => {
+      // Ensure there is at least one favorite to get
+      await addToUserFavoriteCaps(testUserDid, testCapId);
+      
+      const result = await queryUserFavoriteCaps(testUserDid);
+      expect(result.success).toBe(true);
+      expect(Array.isArray(result.items)).toBe(true);
+
+      if (result.items && result.items.length > 0) {
+        const fav = result.items.find(item => item.id === testCapId);
+        expect(fav).toBeDefined();
+        expect(fav.id).toBe(testCapId);
+      }
+    }, 10000);
+
+    it('should remove a cap from user favorites', async () => {
+      // Ensure the favorite exists before trying to remove it
+      await addToUserFavoriteCaps(testUserDid, testCapId);
+      
+      const result = await removeFromUserFavoriteCaps(testUserDid, testCapId);
+      expect(result.success).toBe(true);
+
+      const favorites = await queryUserFavoriteCaps(testUserDid);
+      if (favorites.success && favorites.items) {
+        const fav = favorites.items.find(item => item.id === testCapId);
+        expect(fav).toBeUndefined();
+      }
+    }, 10000);
   });
 });

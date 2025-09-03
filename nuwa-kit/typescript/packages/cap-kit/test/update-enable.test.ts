@@ -9,13 +9,14 @@ describe("CapKit", () => {
     capKit = a;
   })
 
-  it("should query cap by id", async () => {
-    const all = await capKit.queryWithName()
+  it("should favorite a cap", async () => {
+    const all = await capKit.queryByName()
 
     const cap = all.data?.items[0]
-    const result = await capKit.queryCapWithID(cap?.cid || '')
-    const result1 = await capKit.queryCapWithID(cap?.id || '')
+    const result = await capKit.updateEnableCap(cap?.id || '', 'enable')
+    expect(result.code).toBe(200);
 
-    console.log(result)
+    const result1 = await capKit.updateEnableCap(cap?.id || '', 'disable')
+    expect(result1.code).toBe(200);
   }, 150000);
 });

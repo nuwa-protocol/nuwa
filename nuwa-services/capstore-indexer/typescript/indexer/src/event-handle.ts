@@ -1,6 +1,7 @@
 import axios from "axios";
 import yaml from "js-yaml";
-import {getLastCursor, getLastUpdateCursor, saveCursor, saveUpdateCursor, storeToSupabase} from './supabase.js';
+import {queryLastRegisterEventCursor,
+   queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor} from './supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
 import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "./constant.js";
 
@@ -42,7 +43,7 @@ export async function fetchAndParseYaml(cid: string): Promise<any> {
 export async function syncCap(cid: string): Promise<any> {
   try {
     const yamlData = await fetchAndParseYaml(cid);
-    await storeToSupabase(yamlData, cid, 0);
+    await saveCapToSupabase(yamlData, cid, 0);
   } catch(e: any) {
     throw new Error(`Failed to sync CapStore: ${(e as Error).message}`);
   }
@@ -58,7 +59,7 @@ export async function syncCap(cid: string): Promise<any> {
 export async function processRoochRegisterEvent() {
   try {
     const client = new RoochClient({url: ROOCH_NODE_URL});
-    const lastCursor = await getLastCursor();
+    const lastCursor = await queryLastRegisterEventCursor();
     const events = await client.queryEvents({
       filter: {
         event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,
@@ -86,7 +87,7 @@ export async function processRoochRegisterEvent() {
 
       try {
         const yamlData = await fetchAndParseYaml(cid);
-        await storeToSupabase(yamlData, cid, 0);
+        await saveCapToSupabase(yamlData, cid, 0);
       } catch (e) {
         processedEvents.push(cid);
         console.log(`dirty data ${cid} `, e.message)
@@ -98,7 +99,7 @@ export async function processRoochRegisterEvent() {
 
     // Only update cursor if all events were processed successfully
     if (events.data.length > 0 && events.next_cursor) {
-      await saveCursor(events.next_cursor);
+      await saveRegisterEventCursor(events.next_cursor);
       console.log(`Updated cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`);
     } else if (events.data.length > 0) {
       console.log(`Processed ${processedEvents.length} events but no new cursor to save`);
@@ -124,7 +125,7 @@ export async function processRoochRegisterEvent() {
 export async function processRoochUpdateEvent() {
   try {
     const client = new RoochClient({url: ROOCH_NODE_URL});
-    const lastCursor = await getLastUpdateCursor();
+    const lastCursor = await queryLastUpdateCursor();
     const events = await client.queryEvents({
       filter: {
         event_type: `${PACKAGE_ID}::acp_registry::UpdateEvent`,
@@ -152,7 +153,7 @@ export async function processRoochUpdateEvent() {
       
       try {
         const yamlData = await fetchAndParseYaml(cid);
-        await storeToSupabase(yamlData, cid, version);
+        await saveCapToSupabase(yamlData, cid, version);
       } catch (e) {
         processedEvents.push(cid);
         console.log(`dirty data ${cid} `, e.message)
@@ -165,7 +166,7 @@ export async function processRoochUpdateEvent() {
     // Only update cursor if all events were processed successfully
     if (events.data.length > 0 && events.next_cursor) {
       console.log('update-next',events.next_cursor)
-      await saveUpdateCursor(events.next_cursor);
+      await saveUpdateEventCursor(events.next_cursor);
       console.log(`Updated update cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`);
     } else if (events.data.length > 0) {
       console.log(`Processed ${processedEvents.length} update events but no new cursor to save`);

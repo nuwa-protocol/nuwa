@@ -6,7 +6,10 @@ export interface Result {
   data?: any;
 }
 
-export interface CapMetadataSchema {
+export interface CapMetadata {
+  id: string,
+  cid: string,
+  name: string,
   displayName: string,
   description: string,
   tags: string[],
@@ -14,4 +17,16 @@ export interface CapMetadataSchema {
   homepage: string,
   repository: string,
   thumbnail: string,
-};
+  enable: boolean,
+  version?: number,
+  stats: CapStats
+}
+
+export interface CapStats {
+  capId: string;
+  downloads: number;
+  ratingCount: number;
+  averageRating: number;
+  favorites: number;
+  userRating?: number | null;
+}

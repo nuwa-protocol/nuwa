@@ -2,11 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import {PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL} from './constant.js';
 import {IndexerEventIDView} from "@roochnetwork/rooch-sdk";
+import {CapMetadata, CapStats} from './type.js';
 
 config();
 
 const CAP_SYNC_TABLE_NAME = "cap_sync_state";
 const CAP_TABLE_NAME = "cap_data"
+const CAP_STATS_TABLE_NAME = "cap_stats";
+const USER_FAVORITE_CAPS_TABLE_NAME = "user_favorite_caps";
+const USER_CAP_RATINGS_TABLE_NAME = "user_cap_ratings";
 
 /**
  * Serializes an IndexerEventIDView cursor to a JSON string
@@ -41,7 +45,7 @@ function deserializeCursor(cursorStr: string | null): IndexerEventIDView | null 
  * Retrieves the last processed cursor for RegisterEvent synchronization
  * @returns Promise<IndexerEventIDView | null> - The last cursor or null if not found
  */
-export async function getLastCursor(): Promise<IndexerEventIDView | null> {
+export async function queryLastRegisterEventCursor(): Promise<IndexerEventIDView | null> {
   try {
     const { data, error } = await supabase
       .from(CAP_SYNC_TABLE_NAME)
@@ -64,7 +68,7 @@ export async function getLastCursor(): Promise<IndexerEventIDView | null> {
  * Saves the current cursor position for RegisterEvent synchronization
  * @param cursor - The cursor position to save
  */
-export async function saveCursor(cursor: IndexerEventIDView | null) {
+export async function saveRegisterEventCursor(cursor: IndexerEventIDView | null) {
   try {
     const cursorStr = serializeCursor(cursor);
     const { error } = await supabase
@@ -89,7 +93,7 @@ export async function saveCursor(cursor: IndexerEventIDView | null) {
  * Retrieves the last processed cursor for UpdateEvent synchronization
  * @returns Promise<IndexerEventIDView | null> - The last update cursor or null if not found
  */
-export async function getLastUpdateCursor(): Promise<IndexerEventIDView | null> {
+export async function queryLastUpdateCursor(): Promise<IndexerEventIDView | null> {
   try {
     const { data, error } = await supabase
       .from(CAP_SYNC_TABLE_NAME)
@@ -112,7 +116,7 @@ export async function getLastUpdateCursor(): Promise<IndexerEventIDView | null> 
  * Saves the current cursor position for UpdateEvent synchronization
  * @param cursor - The cursor position to save for update events
  */
-export async function saveUpdateCursor(cursor: IndexerEventIDView | null) {
+export async function saveUpdateEventCursor(cursor: IndexerEventIDView | null) {
   try {
     const cursorStr = serializeCursor(cursor);
     const { error } = await supabase
@@ -143,7 +147,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
  * @param version - Version number of the CAP
  * @throws Error if database operations fail
  */
-export async function storeToSupabase(
+export async function saveCapToSupabase(
   data: any,
   cid: string,
   version: number,
@@ -198,6 +202,8 @@ export async function storeToSupabase(
       console.log(`✅ Updated ${id} from version ${existingData.version} to ${version}, CID: ${cid}`);
     } else {
       console.log(`✅ Inserted new record for ${id}, version ${version}, CID: ${cid}`);
+      // Initialize stats for new cap
+      await supabase.from(CAP_STATS_TABLE_NAME).insert({ cap_id: id });
     }
   } catch (error) {
     console.error(`❌ Failed to store ${data.id} to Supabase:`, (error as Error).message);
@@ -220,10 +226,12 @@ export async function queryFromSupabase(
   cid?: string | null,
   tags?: string[] | null,
   page: number = 0,
-  pageSize: number = 50
+  pageSize: number = 50,
+  sortBy?: 'average_rating' | 'downloads' | 'favorites' | 'rating_count' | 'updated_at' | null,
+  sortOrder: 'asc' | 'desc' = 'desc'
 ): Promise<{
   success: boolean;
-  items?: Array<{ cid: string; name: string; id: string, version: number, display_name: string, tags: string[]}>;
+  items?: Array<CapMetadata>;
   totalItems?: number;
   page?: number;
   pageSize?: number;
@@ -237,29 +245,78 @@ export async function queryFromSupabase(
     // Calculate pagination offset
     const offset = page * validatedPageSize;
 
-    // Create base query
-    let query = supabase
-      .from(CAP_TABLE_NAME)
-      .select('cid, name, id, version, display_name, tags, description, submitted_at, homepage, repository, thumbnail', { count: 'exact' });
+    // Create base query - we'll handle sorting differently based on the field
+    let query;
+    let isStatsQuery = false;
+    
+    if (sortBy && sortBy !== 'updated_at') {
+      // For cap_stats fields, query from cap_stats table and join with cap_data
+      // This allows us to sort by stats fields at the database level
+      isStatsQuery = true;
+      query = supabase
+        .from(CAP_STATS_TABLE_NAME)
+        .select(`
+          *,
+          cap_data!inner(*)
+        `, { count: 'exact' });
+        
+      // Apply sorting on the stats table
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+    } else {
+      // For regular fields, use the standard approach
+      query = supabase
+        .from(CAP_TABLE_NAME)
+        .select(`
+          *,
+          cap_stats(*)
+        `, { count: 'exact' });
+        
+      // Add sorting for timestamp field
+      if (sortBy === 'updated_at') {
+        query = query.order('timestamp', { ascending: sortOrder === 'asc' });
+      }
+    }
 
     // Add filtering conditions - only add if values are not null/empty
     if (name && name.trim()) {
-      query = query.ilike('name', `%${name}%`);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.name', name);
+        query = query.eq('cap_data.enable', true);
+      } else {
+        query = query.ilike('name', `%${name}%`);
+        query = query.eq('enable', true);
+      }
     }
+
     if (cid && cid.trim()) {
-      query = query.eq('cid', `%${cid}%`);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.cid', cid);
+      } else {
+        query = query.eq('cid', cid);
+      }
     }
+
     if (id && id.trim()) {
-      query = query.eq('id', id);
+      if (isStatsQuery) {
+        query = query.eq('cap_data.id', id);
+      } else {
+        query = query.eq('id', id);
+      }
     }
     
     // Add tags filtering using PostgreSQL JSONB operators
-    // TODO TAGS
     if (tags && tags.length > 0) {
-      const orConditions = tags
-        .map(tag => `tags.cs.${JSON.stringify([tag])}`)
-        .join(',');
-      query = query.or(orConditions);
+      if (isStatsQuery) {
+        const orConditions = tags
+          .map(tag => `cap_data.tags.cs.${JSON.stringify([tag])}`)
+          .join(',');
+        query = query.or(orConditions);
+      } else {
+        const orConditions = tags
+          .map(tag => `tags.cs.${JSON.stringify([tag])}`)
+          .join(',');
+        query = query.or(orConditions);
+      }
     }
 
     // Apply pagination
@@ -268,7 +325,9 @@ export async function queryFromSupabase(
     // Execute query
     const { data, count, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     // Handle empty results
     if (!data || data.length === 0) {
@@ -282,13 +341,67 @@ export async function queryFromSupabase(
       };
     }
 
+    // Transform database fields from snake_case to camelCase to match CapMetadata interface
+    let transformedItems = data.map((item: any) => {
+      if (isStatsQuery) {
+        // When querying from cap_stats table, the structure is different
+        const capData = item.cap_data;
+        return {
+          id: capData.id,
+          cid: capData.cid,
+          name: capData.name,
+          displayName: capData.display_name,
+          description: capData.description,
+          tags: capData.tags,
+          submittedAt: capData.submitted_at,
+          homepage: capData.homepage,
+          repository: capData.repository,
+          thumbnail: capData.thumbnail,
+          enable: capData.enable,
+          version: capData.version,
+          stats: {
+            capId: item.cap_id,
+            downloads: item.downloads,
+            ratingCount: item.rating_count,
+            averageRating: item.average_rating,
+            favorites: item.favorites,
+          }
+        };
+      } else {
+        // Standard structure when querying from cap_data table
+        return {
+          id: item.id,
+          cid: item.cid,
+          name: item.name,
+          displayName: item.display_name,
+          description: item.description,
+          tags: item.tags,
+          submittedAt: item.submitted_at,
+          homepage: item.homepage,
+          repository: item.repository,
+          thumbnail: item.thumbnail,
+          enable: item.enable,
+          version: item.version,
+          stats: item.cap_stats || {
+            capId: item.id,
+            downloads: 0,
+            ratingCount: 0,
+            averageRating: 0,
+            favorites: 0,
+          }
+        };
+      }
+    });
+
+
+
     // Calculate total pages
     const totalItems = count || data.length;
     const totalPages = Math.ceil(totalItems / validatedPageSize);
 
     return {
       success: true,
-      items: data,
+      items: transformedItems,
       totalItems,
       page,
       pageSize: validatedPageSize,
@@ -306,7 +419,7 @@ export async function queryFromSupabase(
  * Retrieves all unique tags from the CAP database
  * @returns Promise with array of unique tags
  */
-export async function getAllTags(): Promise<{
+export async function queryAllTags(): Promise<{
   success: boolean;
   tags?: string[];
   error?: string;
@@ -358,7 +471,7 @@ export async function queryByExactTags(
   pageSize: number = 50
 ): Promise<{
   success: boolean;
-  items?: Array<{ cid: string; name: string; id: string, version: number, display_name: string, tags: string[]}>;
+  items?: Array<{ cid: string; name: string; id: string, version: number, displayName: string, tags: string[]}>;
   totalItems?: number;
   page?: number;
   pageSize?: number;
@@ -394,12 +507,12 @@ export async function queryByExactTags(
 
     return {
       success: true,
-      items: data.map(item => ({
+      items: data.map((item: any) => ({
         cid: item.cid,
         name: item.name,
         id: item.id,
         version: item.version,
-        display_name: item.display_name,
+        displayName: item.display_name,
         tags: item.tags || []
       })),
       totalItems,
@@ -411,6 +524,258 @@ export async function queryByExactTags(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to query by exact tags'
+    };
+  }
+}
+
+export async function queryCapStats(capId: string, userDID?: string): Promise<{
+  success: boolean;
+  stats?: CapStats;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from(CAP_STATS_TABLE_NAME)
+      .select('*')
+      .eq('cap_id', capId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const stats: CapStats = {
+      capId: capId,
+      downloads: data?.downloads ?? 0,
+      ratingCount: data?.rating_count ?? 0,
+      averageRating: data?.average_rating ?? 0,
+      favorites: data?.favorites ?? 0,
+    } as CapStats;
+
+    if (userDID) {
+      const { data: ratingData, error: ratingError } = await supabase
+        .from(USER_CAP_RATINGS_TABLE_NAME)
+        .select('rating')
+        .eq('user_did', userDID)
+        .eq('cap_id', capId)
+        .maybeSingle();
+
+      if (ratingError) {
+        console.error('Failed to get user rating:', ratingError.message);
+      } else {
+        stats.userRating = ratingData?.rating ?? null;
+      }
+    }
+
+    return { success: true, stats: stats };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get cap stats'
+    };
+  }
+}
+
+export async function rateCap(userDID: string, capId: string, rating: number): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  if (rating < 1 || rating > 5) {
+    return {
+      success: false,
+      error: 'Rating must be between 1 and 5',
+    };
+  }
+
+  try {
+    const { error } = await supabase.rpc('rate_cap', {
+      p_user_did: userDID,
+      p_cap_id: capId,
+      p_rating: rating
+    });
+
+    if (error) {
+        throw new Error(`Supabase RPC failed: ${error.message}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to rate cap'
+    };
+  }
+}
+
+export async function incrementCapDownloads(capId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const { error } = await supabase.rpc('increment_cap_downloads', {
+      p_cap_id: capId
+    });
+
+    if (error) {
+      throw new Error(`Supabase RPC failed: ${error.message}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to increment cap downloads'
+    };
+  }
+}
+
+export async function queryUserFavoriteCaps(did: string, page: number = 0, pageSize: number = 50): Promise<{
+  success: boolean;
+  items?: any[];
+  totalItems?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
+  error?: string;
+}> {
+    try {
+        const validatedPageSize = Math.min(pageSize, 50);
+        const offset = page * validatedPageSize;
+
+        const { data, count, error } = await supabase
+            .from(USER_FAVORITE_CAPS_TABLE_NAME)
+            .select(`
+                cap_data (
+                    *,
+                    cap_stats (*)
+                )
+            `, { count: 'exact' })
+            .eq('user_did', did)
+            .range(offset, offset + validatedPageSize - 1);
+
+        if (error) throw error;
+
+        const items = data?.map((fav: any) => fav.cap_data) || [];
+        const totalItems = count || items.length;
+        const totalPages = Math.ceil(totalItems / validatedPageSize);
+
+        return {
+            success: true,
+            items,
+            totalItems,
+            page,
+            pageSize: validatedPageSize,
+            totalPages,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get user favorite caps'
+        };
+    }
+}
+
+export async function addToUserFavoriteCaps(did: string, capId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Start a transaction to ensure data consistency
+    const { error: insertError } = await supabase
+      .from(USER_FAVORITE_CAPS_TABLE_NAME)
+      .insert({ user_did: did, cap_id: capId });
+    
+    if (insertError) throw insertError;
+
+    // Update the favorites count in cap_stats using the database function
+    const { error: updateError } = await supabase
+      .rpc('increment_cap_favorites', { p_cap_id: capId });
+
+    if (updateError) {
+      console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
+      // Don't fail the entire operation if stats update fails
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to add to user favorite caps'
+    };
+  }
+}
+
+export async function removeFromUserFavoriteCaps(did: string, capId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Start a transaction to ensure data consistency
+    const { error: deleteError } = await supabase
+      .from(USER_FAVORITE_CAPS_TABLE_NAME)
+      .delete()
+      .eq('user_did', did)
+      .eq('cap_id', capId);
+
+    if (deleteError) throw deleteError;
+
+    // Update the favorites count in cap_stats using the database function
+    const { error: updateError } = await supabase
+      .rpc('decrement_cap_favorites', { p_cap_id: capId });
+
+    if (updateError) {
+      console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
+      // Don't fail the entire operation if stats update fails
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to remove from user favorite caps'
+    };
+  }
+}
+
+export async function isUserFavoriteCap(did: string, capId: string): Promise<{
+  success: boolean;
+  isFavorite?: boolean;
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from(USER_FAVORITE_CAPS_TABLE_NAME)
+      .select('user_did')
+      .eq('user_did', did)
+      .eq('cap_id', capId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return { 
+      success: true, 
+      isFavorite: !!data 
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check if cap is favorite'
+    };
+  }
+}
+
+export async function updateCapEnable(capId: string, enable: boolean): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const { error } = await supabase.from(CAP_TABLE_NAME).update({ enable: enable }).eq('id', capId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update cap enable'
     };
   }
 }

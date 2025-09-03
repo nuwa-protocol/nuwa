@@ -75,19 +75,23 @@ describe("CapKit", () => {
 
   it("should register a cap", async () => {
     const did = await signer.getDid();
+    
     const result = await capKit.registerCap(buildCap(did, 'test_cap'));
+    expect(result).toBeDefined();
+    
     await new Promise(resolve => setTimeout(resolve, 10000));
-    const download1 = await capKit.downloadCap(result);
-    const result2 = await capKit.registerCap(buildCap(did, 'test_cap1'));
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    const download2 = await capKit.downloadCap(result2);
-    console.log(result)
-    console.log(result2)
-    console.log(download1)
-    console.log(download2)
-    const result3 = await capKit.queryWithName('test');
+    const download1 = await capKit.downloadByCID(result || '');
+    expect(download1).toBeDefined();
 
-    console.log(result3)
+    const result2 = await capKit.registerCap(buildCap(did, 'test_cap1'));
+    expect(result2).toBeDefined();
+
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    const download2 = await capKit.downloadByCID(result2 || '');
+    expect(download2).toBeDefined();
+
+    const result3 = await capKit.queryByName('test_cap');
+    expect(result3.code).toBe(200);
 
   }, 1000000); // 30 second timeout for blockchain operations
 });
