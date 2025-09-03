@@ -1,26 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { NuwaClient, type NuwaClientOptions } from "./nuwa-client";
-import type { PromptOptions } from "./types";
 
 export interface useNuwaClientProps extends NuwaClientOptions {
 	autoAdjustHeight?: boolean;
+	onConnected?: () => void;
+	onError?: (error: Error) => void;
 }
 
 export interface useNuwaClientReturn {
 	nuwaClient: NuwaClient | null;
-	isConnected: boolean;
-	isConnecting: boolean;
-	error: string | null;
 
 	// Convenience methods
-	sendPrompt: (prompt: string, options?: PromptOptions) => Promise<void>;
-	sendLog: (log: string) => Promise<void>;
+	sendPrompt: (prompt: string) => Promise<void>;
 	setHeight: (height: string | number) => Promise<void>;
-
-	// Connection management
-	connect: () => Promise<void>;
-	disconnect: () => void;
-	reconnect: () => Promise<void>;
+	addSelection: (
+		label: string,
+		message: string | Record<string, any>,
+	) => Promise<void>;
+	saveState: <T = any>(state: T) => Promise<void>;
+	getState: <T = any>() => Promise<T | null>;
 
 	// Auto height management
 	containerRef: React.RefObject<HTMLDivElement>;
@@ -29,154 +27,73 @@ export interface useNuwaClientReturn {
 /**
  * React hook for Nuwa Client
  * Provides reactive state management for parent communication
+ * Auto-connects on mount and provides callbacks for connection events
  */
 export function useNuwaClient(
 	props: useNuwaClientProps = {},
 ): useNuwaClientReturn {
-	const { autoAdjustHeight = false, ...nuwaClientOptions } = props;
+	const {
+		autoAdjustHeight = false,
+		onConnected,
+		onError,
+		...nuwaClientOptions
+	} = props;
 
-	const [isConnected, setIsConnected] = useState(false);
-	const [isConnecting, setIsConnecting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const nuwaClientRef = useRef<NuwaClient | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const nuwaClientRef = useRef<NuwaClient | null>(null);
 
-	// Initialize NuwaClient
-	// biome-ignore lint/correctness/useExhaustiveDependencies: only run once on mount
-	useEffect(() => {
-		const nuwaClient = new NuwaClient({
+	if (!nuwaClientRef.current) {
+		nuwaClientRef.current = new NuwaClient({
 			autoConnect: false, // We'll manage connection manually for better React integration
 			...nuwaClientOptions,
 		});
+	}
 
-		nuwaClientRef.current = nuwaClient;
+	const nuwaClient = nuwaClientRef.current;
 
-		// Auto-connect by default
-		handleConnect();
+	// Update height function for auto-adjust functionality
+	const updateHeight = () => {
+		if (autoAdjustHeight && containerRef.current && nuwaClient) {
+			const height = containerRef.current.scrollHeight;
+			nuwaClient.setHeight(height).catch((err) => {
+				console.warn("Failed to auto-adjust height:", err);
+			});
+		}
+	};
+
+	// Initialize NuwaClient and auto-connect
+	// biome-ignore lint/correctness/useExhaustiveDependencies: only run once on mount
+	useEffect(() => {
+		// Auto-connect
+		const connect = async () => {
+			try {
+				await nuwaClient.connect();
+				onConnected?.();
+				
+				// Trigger initial height update after connection
+				setTimeout(updateHeight, 0);
+			} catch (err) {
+				const error =
+					err instanceof Error ? err : new Error("Connection failed");
+				onError?.(error);
+			}
+		};
+
+		connect();
 
 		// Cleanup on unmount
 		return () => {
 			if (nuwaClientRef.current) {
-				nuwaClientRef.current.disconnect();
+				nuwaClient.disconnect();
+				nuwaClientRef.current = null;
 			}
 		};
 	}, []); // Only run once on mount
 
-	const handleConnect = async () => {
-		if (!nuwaClientRef.current || isConnecting) return;
-
-		setIsConnecting(true);
-		setError(null);
-
-		try {
-			await nuwaClientRef.current.connect();
-			setIsConnected(true);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Connection failed";
-			setError(errorMessage);
-			setIsConnected(false);
-		} finally {
-			setIsConnecting(false);
-		}
-	};
-
-	const handleDisconnect = () => {
-		if (nuwaClientRef.current) {
-			nuwaClientRef.current.disconnect();
-			setIsConnected(false);
-			setError(null);
-		}
-	};
-
-	const handleReconnect = async () => {
-		if (!nuwaClientRef.current) return;
-
-		setIsConnecting(true);
-		setError(null);
-
-		try {
-			await nuwaClientRef.current.reconnect();
-			setIsConnected(true);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Reconnection failed";
-			setError(errorMessage);
-			setIsConnected(false);
-		} finally {
-			setIsConnecting(false);
-		}
-	};
-
-	// Convenience methods that handle errors gracefully
-	const sendPrompt = async (
-		prompt: string,
-		options?: PromptOptions,
-	): Promise<void> => {
-		if (!nuwaClientRef.current) {
-			throw new Error("NuwaClient not initialized");
-		}
-
-		try {
-			await nuwaClientRef.current.sendPrompt(prompt, options);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Send prompt failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
-	const sendLog = async (log: string): Promise<void> => {
-		if (!nuwaClientRef.current) {
-			throw new Error("NuwaClient not initialized");
-		}
-
-		try {
-			await nuwaClientRef.current.sendLog(log);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Send message failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
-	const setHeight = async (height: string | number): Promise<void> => {
-		if (!nuwaClientRef.current) {
-			throw new Error("NuwaClient not initialized");
-		}
-
-		try {
-			await nuwaClientRef.current.setHeight(height);
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error ? err.message : "Set height failed";
-			setError(errorMessage);
-			throw err;
-		}
-	};
-
 	// Auto adjust height functionality
 	// biome-ignore lint/correctness/useExhaustiveDependencies: sufficient deps
 	useEffect(() => {
-		if (
-			!autoAdjustHeight ||
-			!nuwaClientRef.current ||
-			!containerRef.current ||
-			!isConnected
-		)
-			return;
-
-		const updateHeight = () => {
-			if (containerRef.current) {
-				const height = containerRef.current.scrollHeight;
-				setHeight(height).catch((err) => {
-					console.warn("Failed to auto-adjust height:", err);
-				});
-			}
-		};
+		if (!autoAdjustHeight || !containerRef.current) return;
 
 		// Create a MutationObserver to watch for DOM changes
 		const observer = new MutationObserver(() => {
@@ -195,30 +112,22 @@ export function useNuwaClient(
 		// Also listen for window resize
 		window.addEventListener("resize", updateHeight);
 
-		// Initial height update
-		updateHeight();
-
 		return () => {
 			observer.disconnect();
 			window.removeEventListener("resize", updateHeight);
 		};
-	}, [autoAdjustHeight, isConnected]);
+	}, [autoAdjustHeight]);
 
 	return {
 		nuwaClient: nuwaClientRef.current,
-		isConnected,
-		isConnecting,
-		error,
 
-		// Convenience methods
-		sendPrompt,
-		sendLog,
-		setHeight,
-
-		// Connection management
-		connect: handleConnect,
-		disconnect: handleDisconnect,
-		reconnect: handleReconnect,
+		// Convenience methods - bind to preserve 'this' context
+		sendPrompt: (prompt: string) => nuwaClient.sendPrompt(prompt),
+		setHeight: (height: string | number) => nuwaClient.setHeight(height),
+		addSelection: (label: string, message: string | Record<string, any>) => 
+			nuwaClient.addSelection(label, message),
+		saveState: <T = any>(state: T) => nuwaClient.saveState(state),
+		getState: <T = any>() => nuwaClient.getState<T>(),
 
 		// Auto height management
 		containerRef: containerRef as React.RefObject<HTMLDivElement>,

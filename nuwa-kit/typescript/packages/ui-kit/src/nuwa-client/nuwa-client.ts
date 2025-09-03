@@ -1,26 +1,36 @@
-import { connect, type RemoteProxy, type Reply, WindowMessenger } from "penpal";
-import { CapUIError, TransportError } from "../types";
-import type { AIResponse, PromptOptions } from "./types";
+import {
+	CallOptions,
+	connect,
+	type RemoteProxy,
+	type Reply,
+	WindowMessenger,
+} from "penpal";
+
+// Default timeout for Penpal connections
+export const NUWA_CLIENT_TIMEOUT = 1000;
+
+// Default timeout for method calls
+export const NUWA_METHOD_TIMEOUT = 2000;
+
+// Re-export Penpal error codes for client use
+export { ErrorCode } from "penpal";
+
+// Types for selection functionality
+export interface Selection {
+	name: string;
+	message: string | Record<string, any>;
+}
 
 /**
- * Interface for parent functions that can be called by child iframes
+ * Interface for Nuwa client methods that can be called by child iframes
  */
-export interface ParentFunctions {
+export interface NuwaClientMethods {
 	/**
 	 * Send a prompt to the AI backend
 	 * @param prompt The prompt text to send
-	 * @param options Optional configuration for the request
-	 * @returns Promise resolving to the AI response
+	 * @returns Promise resolving when prompt is sent
 	 */
-	sendPrompt(prompt: string, options?: PromptOptions): Promise<void>;
-
-	/**
-	 * Send a message to the parent application
-	 * @param type Message type identifier
-	 * @param payload Message payload data
-	 * @returns Promise resolving when message is sent
-	 */
-	sendLog(log: string): Promise<void>;
+	sendPrompt(prompt: string): Promise<void>;
 
 	/**
 	 * Set the height of the iframe (convenience method)
@@ -28,85 +38,75 @@ export interface ParentFunctions {
 	 * @returns Promise resolving when height is set
 	 */
 	setHeight?(height: string | number): Promise<void>;
-}
-
-/**
- * Parent handler interface - implemented by parent applications
- * to handle calls from child iframes
- */
-export interface ParentHandler {
-	/**
-	 * Handle prompt requests from child
-	 */
-	onSendPrompt?(
-		prompt: string,
-		options?: PromptOptions,
-		origin?: string,
-	): Promise<AIResponse>;
 
 	/**
-	 * Handle messages from child
+	 * Add a selection to the parent Nuwa client
+	 * @param label The label/name for the selection
+	 * @param message The message content (string or object)
+	 * @returns Promise resolving when selection is sent
 	 */
-	onSendLog?(log: string, origin?: string): Promise<void>;
+	addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Promise<void>;
 
 	/**
-	 * Handle height change requests from child
+	 * Save state data to the parent Nuwa client
+	 * @param state State data to save
+	 * @returns Promise resolving when state is saved
 	 */
-	onSetHeight?(height: string | number, origin?: string): Promise<void>;
-}
+	saveState<T = any>(state: T): Promise<void>;
 
-/**
- * Base configuration for parent applications
- */
-export interface ParentConfig {
-	allowedOrigins?: string[];
-	securityPolicy?: Partial<import("./types.js").SecurityPolicy>;
-	debug?: boolean;
-	timeout?: number;
-}
-
-/**
- * Base configuration for child applications
- */
-export interface ChildConfig {
-	parentOrigin?: string;
-	timeout?: number;
-	debug?: boolean;
-	connectionInfo?: import("./types.js").ConnectionInfo;
+	/**
+	 * Retrieve state data from the parent Nuwa client
+	 * @returns Promise resolving with the saved state
+	 */
+	getState<T = any>(): Promise<T | null>;
 }
 
 // Penpal-specific parent methods interface
-// Maps shared ParentFunctions to Penpal Reply format
+// Maps shared NuwaClientMethods to Penpal Reply format
 type PenpalParentMethods = {
-	sendPrompt(prompt: string, options?: PromptOptions): Reply<AIResponse>;
-	sendLog(log: string): Reply<void>;
+	sendPrompt(prompt: string): Reply<void>;
 	setHeight(height: string | number): Reply<void>;
+	addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Reply<void>;
+	saveState(state: any): Reply<void>;
+	getState(): Reply<any>;
 };
 
-export interface NuwaClientOptions extends ChildConfig {
+export interface NuwaClientOptions {
 	allowedOrigins?: string[];
 	timeout?: number;
 	autoConnect?: boolean;
+	debug?: boolean;
+	methodTimeout?: number;
 }
 
 /**
  * NuwaClient - Simple iframe communication using Penpal
- * Implements shared ParentFunctions interface for consistency
+ * Implements shared NuwaClientMethods interface for consistency
  */
-export class NuwaClient implements ParentFunctions {
+export class NuwaClient implements NuwaClientMethods {
 	private parentMethods: RemoteProxy<PenpalParentMethods> | null = null;
 	private connectionStatus: boolean = false;
 	private connectionPromise: Promise<void> | null = null;
 	private options: NuwaClientOptions;
+	private methodTimeout: number;
 
 	constructor(options: NuwaClientOptions = {}) {
 		this.options = {
 			allowedOrigins: ["*"],
-			timeout: 5000,
+			timeout: NUWA_CLIENT_TIMEOUT,
 			debug: false,
 			autoConnect: true,
+			methodTimeout: NUWA_METHOD_TIMEOUT,
 			...options,
 		};
+
+		this.methodTimeout = this.options.methodTimeout || NUWA_METHOD_TIMEOUT;
 
 		if (this.options.autoConnect) {
 			// Auto-connect when instantiated
@@ -134,6 +134,13 @@ export class NuwaClient implements ParentFunctions {
 		try {
 			this.log("Establishing connection to parent");
 
+			// Check if we're in a proper iframe context
+			if (window.parent === window) {
+				throw new Error(
+					"No parent window found - this component must be embedded in an iframe",
+				);
+			}
+
 			const messenger = new WindowMessenger({
 				remoteWindow: window.parent,
 				allowedOrigins: this.options.allowedOrigins || ["*"],
@@ -141,7 +148,8 @@ export class NuwaClient implements ParentFunctions {
 
 			const conn = connect<PenpalParentMethods>({
 				messenger,
-				timeout: this.options.timeout || 5000,
+				timeout: this.options.timeout || NUWA_CLIENT_TIMEOUT,
+				// log: debug("Child"),
 			});
 
 			this.parentMethods = await conn.promise;
@@ -151,42 +159,28 @@ export class NuwaClient implements ParentFunctions {
 		} catch (error) {
 			this.log("Failed to connect to parent", error);
 			this.connectionStatus = false;
-			throw new TransportError(`Connection failed: ${error}`);
+			throw error;
 		}
 	}
 
-	// === ParentFunctions Implementation ===
+	// === NuwaClientMethods Implementation ===
 
 	/**
 	 * Send prompt to the parent Nuwa Client
 	 */
-	async sendPrompt(prompt: string, options?: PromptOptions): Promise<void> {
+	async sendPrompt(prompt: string): Promise<void> {
 		await this.ensureConnected();
 
+		this.log("Sending prompt", {
+			prompt: prompt.substring(0, 100) + "...",
+		});
 		try {
-			this.log("Sending prompt", {
-				prompt: prompt.substring(0, 100) + "...",
-				options,
-			});
-			await this.parentMethods!.sendPrompt(prompt, options);
-		} catch (error) {
-			this.log("Send prompt failed", error);
-			throw new CapUIError(`Send prompt failed: ${error}`);
-		}
-	}
-
-	/**
-	 * Send log to the parent Nuwa Client
-	 */
-	async sendLog(log: string): Promise<void> {
-		await this.ensureConnected();
-
-		try {
-			this.log("Sending log", { log });
-			await this.parentMethods!.sendLog(log);
-		} catch (error) {
-			this.log("Send log failed", error);
-			throw new CapUIError(`Send log failed: ${error}`);
+			await this.parentMethods!.sendPrompt(
+				prompt,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("sendPrompt", error);
 		}
 	}
 
@@ -196,12 +190,74 @@ export class NuwaClient implements ParentFunctions {
 	async setHeight(height: string | number): Promise<void> {
 		await this.ensureConnected();
 
+		this.log("Setting height", { height });
 		try {
-			this.log("Setting height", { height });
-			await this.parentMethods!.setHeight(height);
-		} catch (error) {
-			this.log("Set height failed", error);
-			throw new CapUIError(`Set height failed: ${error}`);
+			await this.parentMethods!.setHeight(
+				height,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("setHeight", error);
+		}
+	}
+
+	/**
+	 * Add a selection to the parent Nuwa client
+	 */
+	async addSelection(
+		label: string,
+		message: string | Record<string, any>,
+	): Promise<void> {
+		await this.ensureConnected();
+
+		// Convert message to string if it's an object
+		const normalizedMessage =
+			typeof message === "string" ? message : JSON.stringify(message);
+
+		this.log("Sending selection", { name: label });
+		try {
+			await this.parentMethods!.addSelection(
+				label,
+				normalizedMessage,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("addSelection", error);
+		}
+	}
+
+	/**
+	 * Save state data to the parent Nuwa client
+	 */
+	async saveState<T = any>(state: T): Promise<void> {
+		await this.ensureConnected();
+
+		this.log("Saving state", { stateType: typeof state });
+		try {
+			await this.parentMethods!.saveState(
+				state,
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+		} catch (error: any) {
+			this.handleMethodError("saveState", error);
+		}
+	}
+
+	/**
+	 * Retrieve state data from the parent Nuwa client
+	 */
+	async getState<T = any>(): Promise<T | null> {
+		await this.ensureConnected();
+
+		this.log("Getting state");
+		try {
+			const state = await this.parentMethods!.getState(
+				new CallOptions({ timeout: this.methodTimeout }),
+			);
+			return state as T | null;
+		} catch (error: any) {
+			this.handleMethodError("getState", error);
+			return null; // This will never be reached due to handleMethodError throwing
 		}
 	}
 
@@ -252,9 +308,26 @@ export class NuwaClient implements ParentFunctions {
 		};
 	}
 
+	/**
+	 * Handle method call errors with proper error codes
+	 */
+	private handleMethodError(methodName: string, error: any): never {
+		this.log(`${methodName} failed`, error);
+
+		// Create a structured error with code
+		const structuredError = new Error(
+			`${methodName} failed: ${error.message || error}`,
+		);
+		(structuredError as any).code = error.code || "METHOD_CALL_ERROR";
+		(structuredError as any).originalError = error;
+		(structuredError as any).method = methodName;
+
+		throw structuredError;
+	}
+
 	private log(message: string, data?: any): void {
 		if (this.options.debug) {
-			console.log(`[NuwaClient] ${message}`, data);
+			console.debug(`[NuwaClient] ${message}`, data);
 		}
 	}
 }
