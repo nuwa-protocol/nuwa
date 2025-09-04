@@ -683,21 +683,6 @@ export class PaymentChannelHttpClient {
     if (pending && pending.channelId === channelId && pending.vmIdFragment === vmIdFragment) {
       authorizedAccumulated = pending.accumulatedAmount;
       latestSubRavNonce = pending.nonce;
-    } else {
-      // Try to recover from service
-      try {
-        const recovery = await this.channelManager.recoverFromService();
-        if (
-          recovery.pendingSubRav &&
-          recovery.pendingSubRav.channelId === channelId &&
-          recovery.pendingSubRav.vmIdFragment === vmIdFragment
-        ) {
-          authorizedAccumulated = recovery.pendingSubRav.accumulatedAmount;
-          latestSubRavNonce = recovery.pendingSubRav.nonce;
-        }
-      } catch (e) {
-        this.log('[unsettled.recover.error]', e);
-      }
     }
 
     if (authorizedAccumulated === undefined) {
@@ -752,16 +737,8 @@ export class PaymentChannelHttpClient {
    * Try to recover pending SubRAV if needed
    */
   private async tryRecoverPendingIfNeeded(): Promise<void> {
-    if (!this.paymentState.getPendingSubRAV()) {
-      try {
-        const recoveryData = await this.channelManager.recoverFromService();
-        if (recoveryData.pendingSubRav) {
-          this.paymentState.setPendingSubRAV(recoveryData.pendingSubRav);
-        }
-      } catch (error) {
-        this.log('Recovery failed:', error);
-      }
-    }
+    // No-op: auto recovery disabled in favor of 402 auto-retry
+    return;
   }
 
   /**
