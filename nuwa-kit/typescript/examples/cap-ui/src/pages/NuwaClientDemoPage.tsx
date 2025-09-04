@@ -3,7 +3,7 @@ import { useState } from "react";
 
 type TabType = "prompt" | "selection" | "state";
 
-export default function TestPage() {
+export default function NuwaClientDemoPage() {
     const [activeTab, setActiveTab] = useState<TabType>("prompt");
     const [inputValue, setInputValue] = useState("");
     const [selectionLabel, setSelectionLabel] = useState("");
@@ -11,35 +11,29 @@ export default function TestPage() {
     const [stateData, setStateData] = useState("");
     const [savedState, setSavedState] = useState<any>(null);
 
-    // Connection state managed locally since the hook no longer provides it
-    const [isConnected, setIsConnected] = useState(false);
+    // Connection state is now provided by the hook
     const [error, setError] = useState<string | null>(null);
 
     const {
         nuwaClient,
-        sendPrompt,
-        addSelection,
-        saveState,
-        getState,
+        isConnected: isNuwaConnected,
         containerRef,
     } = useNuwaClient({
         autoAdjustHeight: true,
         debug: true,
         onConnected: () => {
             console.log("Connected to parent!");
-            setIsConnected(true);
             setError(null);
         },
         onError: (err) => {
             console.error("Connection error:", err);
-            setIsConnected(false);
             setError(err.message);
         },
     });
 
     const handleSendPrompt = async () => {
         try {
-            await sendPrompt(inputValue || "Hello from child iframe page");
+            await nuwaClient.sendPrompt(inputValue || "Hello from child iframe page");
             setInputValue("");
         } catch (err) {
             console.error("Failed to send prompt:", err);
@@ -49,7 +43,7 @@ export default function TestPage() {
 
     const handleAddSelection = async () => {
         try {
-            await addSelection(
+            await nuwaClient.addSelection(
                 selectionLabel || "Test Selection",
                 selectionMessage || "This is a test selection message",
             );
@@ -69,7 +63,7 @@ export default function TestPage() {
                     timestamp: Date.now(),
                     message: "Test state data",
                 };
-            await saveState(dataToSave);
+            await nuwaClient.saveState(dataToSave);
             setSavedState(dataToSave);
             setStateData("");
         } catch (err) {
@@ -80,7 +74,7 @@ export default function TestPage() {
 
     const handleGetState = async () => {
         try {
-            const state = await getState();
+            const state = await nuwaClient.getState();
             setSavedState(state);
         } catch (err) {
             console.error("Failed to get state:", err);
@@ -104,13 +98,13 @@ export default function TestPage() {
                     </h2>
                     <div className="flex items-center mt-2">
                         <div
-                            className={`w-2 h-2 rounded-full mr-2 ${isConnected
+                            className={`w-2 h-2 rounded-full mr-2 ${isNuwaConnected
                                 ? "bg-green-500"
                                 : "bg-red-500 animate-pulse"
                                 }`}
                         ></div>
                         <span className="text-sm text-gray-600">
-                            {isConnected ? "Connected" : "Disconnected"}
+                            {isNuwaConnected ? "Connected" : "Disconnected"}
                         </span>
                     </div>
                     {error && (
@@ -154,7 +148,7 @@ export default function TestPage() {
                             <button
                                 type="button"
                                 onClick={handleSendPrompt}
-                                disabled={!isConnected}
+                                disabled={!isNuwaConnected}
                                 className="w-full px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
                             >
                                 Send Prompt
@@ -180,7 +174,7 @@ export default function TestPage() {
                             <button
                                 type="button"
                                 onClick={handleAddSelection}
-                                disabled={!isConnected}
+                                disabled={!isNuwaConnected}
                                 className="w-full px-3 py-2 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 transition-colors"
                             >
                                 Add Selection
@@ -201,7 +195,7 @@ export default function TestPage() {
                                 <button
                                     type="button"
                                     onClick={handleSaveState}
-                                    disabled={!isConnected}
+                                    disabled={!isNuwaConnected}
                                     className="flex-1 px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:bg-gray-300 transition-colors"
                                 >
                                     Save
@@ -209,7 +203,7 @@ export default function TestPage() {
                                 <button
                                     type="button"
                                     onClick={handleGetState}
-                                    disabled={!isConnected}
+                                    disabled={!isNuwaConnected}
                                     className="flex-1 px-3 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:bg-gray-300 transition-colors"
                                 >
                                     Get

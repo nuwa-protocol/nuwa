@@ -269,12 +269,6 @@ export class NuwaClient implements NuwaClientMethods {
 		}
 	}
 
-	/**
-	 * Check if connected to parent Nuwa Client
-	 */
-	get isConnected(): boolean {
-		return this.connectionStatus && !!this.parentMethods;
-	}
 
 	/**
 	 * Reconnect to parent if connection is lost
@@ -299,11 +293,9 @@ export class NuwaClient implements NuwaClientMethods {
 	 * Get connection statistics
 	 */
 	getStats(): {
-		isConnected: boolean;
 		options: NuwaClientOptions;
 	} {
 		return {
-			isConnected: this.isConnected,
 			options: this.options,
 		};
 	}
