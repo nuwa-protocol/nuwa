@@ -19,6 +19,7 @@ import { RequestScheduler } from '../http/internal/RequestScheduler';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
 import { McpChannelManager } from './McpChannelManager';
+import { PaymentKitError } from '../../errors/PaymentKitError';
 
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
@@ -40,6 +41,7 @@ export interface McpPayerOptions {
     /** Namespace for storage keys (useful for multi-service scenarios) */
     namespace?: string;
   };
+  maxAmount: bigint;
 }
 
 export class PaymentChannelMcpClient {
@@ -182,21 +184,21 @@ export class PaymentChannelMcpClient {
       }
 
       const maybePayment = paymentPayload;
-      // Only retry for non-builtin (business) tools; builtin nuwa.* should never trigger payment flow
-      if (
-        !method.startsWith('nuwa.') &&
-        maybePayment &&
-        maybePayment.error?.code === 'PAYMENT_REQUIRED' &&
-        maybePayment.subRav
-      ) {
+      // Unified retry: when server indicates PAYMENT_REQUIRED with unsignedSubRAV, sign and retry once
+      console.log('maybePayment', maybePayment);
+      if (maybePayment && maybePayment.error?.code === 'PAYMENT_REQUIRED' && maybePayment.subRav) {
         try {
+          this.logger.debug('retry call', {
+            method,
+            clientTxRef,
+          });
           const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
           const signed = await this.payerClient.signSubRAV(subRav);
           const retryParams = await this.buildParams(method, params, clientTxRef);
           const newReqPayload: PaymentRequestPayload = {
             version: 1,
             clientTxRef,
-            maxAmount: BigInt(0),
+            maxAmount: this.options.maxAmount,
             signedSubRav: signed,
           };
           retryParams.__nuwa_payment = HttpPaymentCodec.toJSONRequest(newReqPayload);
@@ -211,7 +213,24 @@ export class PaymentChannelMcpClient {
             this.lastContents = content;
             paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
           }
-        } catch {}
+        } catch {
+          this.logger.debug('retry call failed', {
+            method,
+            clientTxRef,
+          });
+        }
+      }
+
+      // If payment still indicates an error at this point, throw a structured error
+      if (paymentPayload && (paymentPayload as any).error) {
+        const err = (paymentPayload as any).error as { code?: string; message?: string };
+        const svc = (paymentPayload as any).serviceTxRef;
+        const cRef = (paymentPayload as any).clientTxRef ?? clientTxRef;
+        const code = err?.code || 'PAYMENT_ERROR';
+        const message = err?.message || 'Payment negotiation failed';
+        const details = { code, message, clientTxRef: cRef, serviceTxRef: svc } as any;
+        const errObj = new PaymentKitError(code, message, details);
+        throw errObj;
       }
 
       const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
@@ -238,7 +257,7 @@ export class PaymentChannelMcpClient {
     const reqPayload: PaymentRequestPayload = {
       version: 1,
       clientTxRef,
-      maxAmount: BigInt(0),
+      maxAmount: this.options.maxAmount,
       signedSubRav: signedSubRav || undefined,
     };
     const payment: SerializableRequestPayload = HttpPaymentCodec.toJSONRequest(reqPayload);

@@ -217,6 +217,8 @@ export class McpChannelManager {
       signedSubRav: HttpPaymentCodec.serializeSignedSubRAV(signedSubRAV),
       __nuwa_auth: auth,
     });
+    //clear pending subrav
+    this.options.paymentState.clearPendingSubRAV();
   }
 
   private async applyRecovery(
