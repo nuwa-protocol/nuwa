@@ -5,7 +5,13 @@
  * JavaScript runtime (browser / worker / Node) without modification.
  */
 
-import type { ChannelInfo, SignedSubRAV, SubRAV, SubChannelInfo } from '../../core/types';
+import type {
+  ChannelInfo,
+  SignedSubRAV,
+  SubRAV,
+  SubChannelInfo,
+  PaymentResponsePayload,
+} from '../../core/types';
 import type { RateResult } from '../rate/types';
 import type { PaymentError } from '../../errors/codes';
 
@@ -65,6 +71,9 @@ export interface BillingContext {
 
     // Protocol-level error (used to short-circuit response with error header)
     error?: PaymentError;
+
+    // Unified, protocol-agnostic response payload for rendering by adapters (HTTP/MCP)
+    responsePayload?: PaymentResponsePayload;
 
     // Step D: Persistence
     persisted?: boolean;

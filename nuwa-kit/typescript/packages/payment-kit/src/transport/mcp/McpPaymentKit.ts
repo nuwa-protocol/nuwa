@@ -126,14 +126,20 @@ export class McpPaymentKit {
       return { content } as any;
     }
     if (ctx.state?.error) {
-      // Prefer using headerValue from preProcess (may include pending SubRAV)
-      if ((ctx as any).state?.headerValue) {
-        const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
+      // Prefer structured response payload populated in preProcess (includes pending subRav)
+      if (ctx.state.responsePayload) {
+        const payment = HttpPaymentCodec.toJSONResponse(ctx.state.responsePayload);
+        const content: any[] = [HttpPaymentCodec.buildMcpPaymentResource(payment as any)];
+        return { content } as any;
+      }
+      // Fallback to header if present
+      if (ctx.state.headerValue) {
+        const decoded = HttpPaymentCodec.parseResponseHeader(ctx.state.headerValue);
         const payment = HttpPaymentCodec.toJSONResponse(decoded);
         const content: any[] = [HttpPaymentCodec.buildMcpPaymentResource(payment as any)];
         return { content } as any;
       }
-      // Fallback to minimal structured error (no subRAV)
+      // Final fallback to minimal structured error (no subRAV)
       const decoded = {
         error: ctx.state.error,
         clientTxRef: ctx.meta.clientTxRef,
@@ -162,62 +168,7 @@ export class McpPaymentKit {
       return { content } as any;
     }
     const settled = await this.middleware.settle(ctx, result, (result as any)?.__usage);
-    // Prefer preProcess header (402) if present and no structured payment in settled
-    if ((ctx as any).state?.headerValue && !settled.__nuwa_payment) {
-      const decoded = HttpPaymentCodec.parseResponseHeader((ctx as any).state.headerValue);
-      const payment = HttpPaymentCodec.toJSONResponse(decoded);
-      const issues = validateSerializableResponsePayload(payment);
-      if (issues && issues.length) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: serializeJson({
-                error: {
-                  code: 'INTERNAL_ERROR',
-                  message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-                },
-              }),
-            },
-          ],
-          error: {
-            code: 'INTERNAL_ERROR',
-            message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-          },
-        } as any;
-      }
-      const content: any[] = [];
-      if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
-        content.push(...(result as any).content);
-      } else if (result !== undefined) {
-        content.push({ type: 'text', text: serializeJson(result) });
-      }
-      content.push(HttpPaymentCodec.buildMcpPaymentResource(payment as any));
-      return { content } as any;
-    }
-    // Validate structured payment if exists
-    if (settled?.__nuwa_payment) {
-      const issues = validateSerializableResponsePayload(settled.__nuwa_payment);
-      if (issues && issues.length) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: serializeJson({
-                error: {
-                  code: 'INTERNAL_ERROR',
-                  message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-                },
-              }),
-            },
-          ],
-          error: {
-            code: 'INTERNAL_ERROR',
-            message: `Invalid __nuwa_payment: ${issues.join('; ')}`,
-          },
-        } as any;
-      }
-    }
+
     // Build MCP content array, separating payment info as a dedicated resource item
     const content: any[] = [];
     const dataPayload = settled?.data ?? result;

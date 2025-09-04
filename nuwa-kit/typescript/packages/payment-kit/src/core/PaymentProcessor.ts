@@ -286,7 +286,7 @@ export class PaymentProcessor {
           ravResult.error
         );
         // Do NOT generate new proposal here; just return error
-        // If we have latestPendingSubRav, attach it to header for client to sign
+        // If we have latestPendingSubRav, attach it to payload for client to sign
         if (pctx.state.latestPendingSubRav) {
           try {
             const decoded = {
@@ -295,19 +295,29 @@ export class PaymentProcessor {
               serviceTxRef: pctx.state.serviceTxRef,
               subRav: pctx.state.latestPendingSubRav,
               error: ravResult.error,
-            } as any;
-            pctx.state.headerValue = HttpPaymentCodec.buildResponseHeader(decoded);
+            };
+            // Store structured payload for later rendering (HTTP header or MCP JSON)
+            pctx.state.responsePayload = decoded;
           } catch (e) {
-            this.log('⚠️ Failed to attach pending SubRAV to error header:', e);
+            this.log('⚠️ Failed to attach pending SubRAV to error payload:', e);
           }
+        } else {
+          // No pending available: still expose an error payload without subRav
+          pctx.state.responsePayload = {
+            version: 1,
+            clientTxRef: pctx.meta.clientTxRef,
+            serviceTxRef: pctx.state.serviceTxRef,
+            error: ravResult.error,
+          };
         }
+        // Avoid auto-attaching a separate error header here to prevent overwriting payload-based header later
         return this.fail(
           pctx,
           {
             code: (ravResult.error?.code as PaymentError['code']) ?? 'INTERNAL_SERVER_ERROR',
             message: ravResult.error?.message ?? 'Verification decision error',
           },
-          { attachHeader: true }
+          { attachHeader: false }
         );
       }
 
@@ -500,6 +510,15 @@ export class PaymentProcessor {
           pctx.state.serviceTxRef = serviceTxRef;
           pctx.state.nonce = unsignedSubRAV.nonce;
           pctx.state.headerValue = headerValue;
+          // Also persist structured payload for protocol-agnostic rendering
+          pctx.state.responsePayload = {
+            subRav: unsignedSubRAV,
+            cost: finalCost,
+            costUsd: usdCost,
+            clientTxRef: pctx.meta.clientTxRef,
+            serviceTxRef,
+            version: 1,
+          };
         }
 
         this.log('✅ Billing settled successfully');
@@ -763,6 +782,10 @@ export class PaymentProcessor {
     try {
       if (!ctx.state.serviceTxRef) {
         ctx.state.serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      }
+      // If responsePayload already exists, prefer it and avoid overriding
+      if ((ctx.state as any).responsePayload) {
+        return;
       }
       ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader({
         error,

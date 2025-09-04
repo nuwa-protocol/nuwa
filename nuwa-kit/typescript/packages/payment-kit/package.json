@@ -117,6 +117,7 @@
     "@types/pg": "^8.15.4",
     "ai": "^4.3.16",
     "fastmcp": "^3.5.0",
+    "mcp-proxy": "^5.5.4",
     "js-yaml": "^4.1.0",
     "lossless-json": "^4.1.1",
     "on-headers": "^1.1.0",

@@ -384,6 +384,9 @@ importers:
       lossless-json:
         specifier: ^4.1.1
         version: 4.1.1
+      mcp-proxy:
+        specifier: ^5.5.4
+        version: 5.5.6
       on-headers:
         specifier: ^1.1.0
         version: 1.1.0
@@ -3662,6 +3665,10 @@ packages:
 
   mcp-proxy@5.1.1:
     resolution: {integrity: sha512-7FTIRIdHjZL7/sRBQ2/FiyQZDV3tJGBANJ9UV5VTiSaOOkDs8F1boY+EP4X/Blcme8eWVFjzmfx9LqdXA/ZHRQ==}
+    hasBin: true
+
+  mcp-proxy@5.5.6:
+    resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
     hasBin: true
 
   mdast-util-find-and-replace@3.0.2:
@@ -9647,6 +9654,8 @@ snapshots:
       yargs: 18.0.0
     transitivePeerDependencies:
       - supports-color
+
+  mcp-proxy@5.5.6: {}
 
   mdast-util-find-and-replace@3.0.2:
     dependencies:

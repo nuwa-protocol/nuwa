@@ -79,7 +79,11 @@ export class McpBillingMiddleware {
 
     let structured: SerializableResponsePayload | undefined;
 
-    if (settled.state?.headerValue) {
+    // Prefer structured payload on state for protocol-agnostic rendering
+    const payload = settled.state?.responsePayload;
+    if (payload) {
+      structured = HttpPaymentCodec.toJSONResponse(payload);
+    } else if (settled.state?.headerValue) {
       const decoded = HttpPaymentCodec.parseResponseHeader(settled.state.headerValue);
       structured = this.buildStructuredPaymentResult(decoded);
     }

@@ -183,10 +183,15 @@ export class HttpPaymentCodec implements PaymentCodec {
       clientTxRef: payload.clientTxRef,
       serviceTxRef: payload.serviceTxRef,
     };
-    if (payload.subRav && payload.cost !== undefined) {
-      (out as any).subRav = this.serializeSubRAV(payload.subRav);
-      (out as any).cost = payload.cost.toString();
-      if (payload.costUsd !== undefined) (out as any).costUsd = payload.costUsd.toString();
+    // Always include subRav when present, even if cost is undefined (e.g., PAYMENT_REQUIRED 402)
+    if (payload.subRav) {
+      out.subRav = this.serializeSubRAV(payload.subRav);
+    }
+    if (payload.cost !== undefined) {
+      out.cost = payload.cost.toString();
+    }
+    if (payload.costUsd !== undefined) {
+      out.costUsd = payload.costUsd.toString();
     }
     if (payload.error) {
       out.error = payload.error;
@@ -201,16 +206,14 @@ export class HttpPaymentCodec implements PaymentCodec {
       serviceTxRef: data?.serviceTxRef,
     } as HttpResponsePayload;
 
-    if (data?.subRav && (data as any).cost !== undefined) {
+    if (data?.subRav) {
       payload.subRav = this.deserializeSubRAV(data.subRav as unknown as SerializableSubRAV);
-      const costStr = (data as any).cost;
-      if (costStr !== undefined) payload.cost = BigInt(costStr);
-      if ((data as any).costUsd !== undefined) payload.costUsd = BigInt((data as any).costUsd);
     }
-    if ((data as any)?.error) {
-      payload.error = (data as any).error as any;
-    } else if ((data as any)?.errorCode !== undefined) {
-      payload.error = { code: String((data as any).errorCode), message: (data as any).message };
+    const costStr = (data as any).cost;
+    if (costStr !== undefined) payload.cost = BigInt(costStr);
+    if (data.costUsd !== undefined) payload.costUsd = BigInt(data.costUsd);
+    if (data?.error) {
+      payload.error = data.error as any;
     }
     return payload;
   }
@@ -221,9 +224,8 @@ export class HttpPaymentCodec implements PaymentCodec {
       version: payload.version ?? 1,
       clientTxRef: payload.clientTxRef,
     };
-    if (payload.maxAmount !== undefined) (out as any).maxAmount = payload.maxAmount.toString();
-    if (payload.signedSubRav)
-      (out as any).signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
+    if (payload.maxAmount !== undefined) out.maxAmount = payload.maxAmount.toString();
+    if (payload.signedSubRav) out.signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
     return out;
   }
 
@@ -232,7 +234,7 @@ export class HttpPaymentCodec implements PaymentCodec {
     const out: PaymentRequestPayload = {
       version: data.version ?? 1,
       clientTxRef: data.clientTxRef,
-      maxAmount: (data as any).maxAmount ? BigInt((data as any).maxAmount) : BigInt(0),
+      maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0),
       signedSubRav: data.signedSubRav ? this.deserializeSignedSubRAV(data.signedSubRav) : undefined,
     };
     return out;
