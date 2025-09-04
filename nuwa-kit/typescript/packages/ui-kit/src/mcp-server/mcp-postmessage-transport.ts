@@ -58,7 +58,7 @@ export class PostMessageMCPTransport implements Transport {
 	>();
 
 	constructor(options: PostMessageMCPTransportOptions = {}) {
-		this.targetWindow = options.targetWindow || null;
+		this.targetWindow = options.targetWindow || window.parent;
 		this.targetOrigin = options.targetOrigin || "*";
 		this.allowedOrigins = options.allowedOrigins || ["*"];
 		this.timeout = options.timeout || 30000;

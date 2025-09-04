@@ -1,5 +1,3 @@
-'use client';
-
 import cx from 'classnames';
 import { format, isWithinInterval } from 'date-fns';
 import { useEffect, useState } from 'react';
@@ -261,7 +259,7 @@ export function Weather({
             )}
         >
             <div className="absolute inset-0 bg-white/10 backdrop-blur-sm rounded-3xl" />
-            
+
             <div className="relative z-10 flex flex-row justify-between items-start">
                 <div className="flex flex-row gap-4 items-center">
                     <div
@@ -312,8 +310,8 @@ export function Weather({
 
             <div className="relative z-10 grid grid-cols-5 md:grid-cols-6 gap-2">
                 {displayTimes.map((time, index) => (
-                    <div 
-                        key={time} 
+                    <div
+                        key={time}
                         className="flex flex-col items-center gap-2 p-2 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 hover:scale-105 animate-in fade-in slide-in-from-bottom-2 duration-300"
                         style={{ animationDelay: `${index * 50}ms` }}
                     >
@@ -337,7 +335,7 @@ export function Weather({
                     </div>
                 ))}
             </div>
-            
+
             <div className="absolute -inset-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-3xl blur-xl" />
         </div>
     );

@@ -1,12 +1,10 @@
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import { useNuwaClient } from "@nuwa-ai/ui-kit";
-import { useState } from "react";
 import { useNoteMCP } from "../hooks/use-note-mcp";
 import "@blocknote/mantine/style.css";
 
 export default function NotePage() {
-  const [isConnected, setIsConnected] = useState(false);
 
   // create blocknote editor
   const editor = useCreateBlockNote({
@@ -23,11 +21,9 @@ export default function NotePage() {
 
 
   // connect to Nuwa Client on mount and obtain nuwa client methods
-  const { sendPrompt, addSelection, saveState, getState } = useNuwaClient({
-    onConnected: () => setIsConnected(true),
+  const { nuwaClient, isConnected: isNuwaConnected } = useNuwaClient({
     onError: (error) => {
       console.error("Nuwa client error:", error);
-      setIsConnected(false);
     },
   });
 
@@ -38,7 +34,7 @@ export default function NotePage() {
   const handleSendNote = async () => {
     const content = JSON.stringify(editor.document);
     try {
-      await sendPrompt(`Here's my note content: ${content}`);
+      await nuwaClient.sendPrompt(`Here's my note content: ${content}`);
     } catch (error) {
       console.error("Failed to send note:", error);
     }
@@ -47,7 +43,7 @@ export default function NotePage() {
   const handleAddNoteSelection = async () => {
     const content = JSON.stringify(editor.document);
     try {
-      await addSelection("Note Content", content);
+      await nuwaClient.addSelection("Note Content", content);
     } catch (error) {
       console.error("Failed to add note selection:", error);
     }
@@ -56,7 +52,7 @@ export default function NotePage() {
   const handleSaveNote = async () => {
     const content = editor.document;
     try {
-      await saveState({ noteContent: content, timestamp: Date.now() });
+      await nuwaClient.saveState({ noteContent: content, timestamp: Date.now() });
     } catch (error) {
       console.error("Failed to save note:", error);
     }
@@ -64,7 +60,7 @@ export default function NotePage() {
 
   const handleLoadNote = async () => {
     try {
-      const savedData = await getState();
+      const savedData = await nuwaClient.getState();
       if (savedData?.noteContent) {
         editor.replaceBlocks(editor.document, savedData.noteContent);
       }
@@ -82,11 +78,11 @@ export default function NotePage() {
             <h1 className="text-xl font-semibold text-gray-800">Note Editor</h1>
             <div className="flex items-center">
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${isConnected ? "bg-green-500" : "bg-red-500 animate-pulse"
+                className={`w-2 h-2 rounded-full mr-2 ${isNuwaConnected ? "bg-green-500" : "bg-red-500 animate-pulse"
                   }`}
               />
               <span className="text-sm text-gray-600">
-                {isConnected ? "Connected" : "Disconnected"}
+                {isNuwaConnected ? "Connected" : "Disconnected"}
               </span>
             </div>
           </div>
@@ -95,7 +91,7 @@ export default function NotePage() {
             <button
               type="button"
               onClick={handleSendNote}
-              disabled={!isConnected}
+              disabled={!isNuwaConnected}
               className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
             >
               Send Prompt
@@ -103,7 +99,7 @@ export default function NotePage() {
             <button
               type="button"
               onClick={handleAddNoteSelection}
-              disabled={!isConnected}
+              disabled={!isNuwaConnected}
               className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:bg-gray-300 transition-colors"
             >
               Add Selection
@@ -111,7 +107,7 @@ export default function NotePage() {
             <button
               type="button"
               onClick={handleSaveNote}
-              disabled={!isConnected}
+              disabled={!isNuwaConnected}
               className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:bg-gray-300 transition-colors"
             >
               Save
@@ -119,7 +115,7 @@ export default function NotePage() {
             <button
               type="button"
               onClick={handleLoadNote}
-              disabled={!isConnected}
+              disabled={!isNuwaConnected}
               className="px-3 py-2 bg-orange-500 text-white text-sm rounded hover:bg-orange-600 disabled:bg-gray-300 transition-colors"
             >
               Load
