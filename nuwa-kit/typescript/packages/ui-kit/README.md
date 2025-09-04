@@ -166,6 +166,50 @@ server.registerTool(
 server.connect(transport);
 ```
 
+### Returning UI Resources from MCP Tools
+
+You can return UI resources from your MCP tools to tell the client to render specific UI components:
+
+```javascript
+import { createUIToolResult } from '@nuwa-ai/ui-kit';
+
+server.registerTool(
+  "show_dashboard",
+  {
+    title: "Show Dashboard",
+    description: "Display the analytics dashboard UI",
+    inputSchema: {
+      period: z.string().describe("Time period for analytics"),
+    },
+  },
+  ({ period }) => {
+    // Return a UI resource that tells the client to render UI at the given path
+    return createUIToolResult(
+      `/dashboard?period=${period}`,
+      "Analytics Dashboard",
+      `Dashboard showing ${period} analytics data`
+    );
+  },
+);
+```
+
+The client will receive this resource and construct the full URL using its known origin to render your UI component.
+
+**UI Resource Type:**
+```typescript
+interface UIResource {
+  uri: string;                           // capui://Dashboard
+  name: string;                          // "Analytics Dashboard"
+  description?: string;                  // Optional description
+  mimeType: "text/x-nuwa-capui-path";   // MIME type identifier
+  path: string;                          // "/dashboard?period=week"
+}
+```
+
+**Helper Functions:**
+- `createUIResource(path, name?, description?)` - Create a UI resource
+- `createUIToolResult(path, name?, description?)` - Create a complete tool result with UI resource
+
 ### Complete Example with React Hook
 
 ```jsx

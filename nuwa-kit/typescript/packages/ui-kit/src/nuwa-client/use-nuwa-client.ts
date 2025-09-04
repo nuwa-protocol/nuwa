@@ -34,7 +34,6 @@ export function useNuwaClient(
 	const [isConnected, setIsConnected] = useState(false);
 
 	const nuwaClient = new NuwaClient({
-		autoConnect: false, // We'll manage connection manually for better React integration
 		...nuwaClientOptions,
 	});
 

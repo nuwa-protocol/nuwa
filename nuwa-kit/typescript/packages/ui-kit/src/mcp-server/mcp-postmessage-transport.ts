@@ -3,7 +3,7 @@ import type {
 	JSONRPCRequest,
 	JSONRPCResponse,
 } from "@modelcontextprotocol/sdk/types";
-import { SecurityError, TransportError } from "../types";
+import { SecurityError, TransportError } from "./types";
 
 export interface PostMessageMCPTransportOptions {
 	targetWindow?: Window;
