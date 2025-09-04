@@ -185,7 +185,6 @@ export class PaymentChannelMcpClient {
 
       const maybePayment = paymentPayload;
       // Unified retry: when server indicates PAYMENT_REQUIRED with unsignedSubRAV, sign and retry once
-      console.log('maybePayment', maybePayment);
       if (maybePayment && maybePayment.error?.code === 'PAYMENT_REQUIRED' && maybePayment.subRav) {
         try {
           this.logger.debug('retry call', {
@@ -348,15 +347,7 @@ export class PaymentChannelMcpClient {
       const subscribe = (client as any).on?.bind?.(client);
       if (typeof subscribe === 'function') {
         subscribe('notification', (msg: any) => {
-          try {
-            if (!msg || typeof msg !== 'object') return;
-            if (msg.method === 'nuwa/payment' && msg.params?.headerValue) {
-              const decoded = HttpPaymentCodec.parseResponseHeader(msg.params.headerValue);
-              if (decoded?.subRav) {
-                this.paymentState.setPendingSubRAV(decoded.subRav);
-              }
-            }
-          } catch {}
+          if (!msg || typeof msg !== 'object') return;
         });
         this.notificationsSubscribed = true;
       }

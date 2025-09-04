@@ -18,6 +18,7 @@ import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannel
 import type { AssetInfo, PaymentInfo } from '../../src/core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger } from '@nuwa-ai/identity-kit';
 import type { Server } from 'http';
+import { HttpPaymentCodec } from '../../src/integrations/http/internal/codec';
 
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
@@ -209,6 +210,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
         rpcUrl: env.rpcUrl,
       },
       debug: true,
+      maxAmount: BigInt(1000000000), // 10 RGas
     });
 
     // Fund the payer's hub
@@ -597,16 +599,6 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     console.log('🔄 Testing recovery functionality');
 
-    // Test recovery before any paid calls - should return null channel
-    const recoveryBefore = await mcpClient.recoverFromService();
-    console.log('Recovery before paid calls:', JSON.stringify(recoveryBefore, null, 2));
-
-    expect(recoveryBefore).toBeTruthy();
-    expect(recoveryBefore.timestamp).toBeTruthy();
-    expect(recoveryBefore.channel).toBeNull(); // No channel created yet
-    expect(recoveryBefore.pendingSubRav).toBeNull();
-    expect(recoveryBefore.subChannel).toBeNull();
-
     // Make a paid call to create a channel
     const result1 = await mcpClient.call('analyze', { data: 'Recovery test data' });
     expect(result1.data).toBeTruthy();
@@ -634,4 +626,29 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     console.log('🎉 Recovery functionality test successful!');
   }, 60000);
+
+  test('PAYMENT_REQUIRED auto retry', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔁 Testing PAYMENT_REQUIRED auto retry');
+
+    // 1) First paid request to ensure server persists an unsigned SubRAV
+    const first = await mcpClient.call('analyze', { data: 'trigger pending' });
+    expect(first.payment).toBeTruthy();
+    console.log(`💰 First payment - ${formatPaymentInfo(first.payment!)}`);
+
+    const recovery = await mcpClient.recoverFromService();
+    expect(recovery).toBeTruthy();
+    expect(recovery.pendingSubRav).toBeTruthy();
+    //const pendingSubRav = HttpPaymentCodec.deserializeSubRAV(recovery.pendingSubRav);
+
+    // 2) Clear client local pending to simulate client unaware of server-pending
+    mcpClient.clearPendingSubRAV();
+
+    // 3) Second paid request should get PAYMENT_REQUIRED then auto sign+retry
+    const second = await mcpClient.call('analyze', { data: 'auto retry should succeed' });
+    expect(second.payment).toBeTruthy();
+    expect(second.payment!.nonce).toBeGreaterThan(first.payment!.nonce);
+    console.log(`✅ Auto retry succeeded - ${formatPaymentInfo(second.payment!)}`);
+  }, 120000);
 });

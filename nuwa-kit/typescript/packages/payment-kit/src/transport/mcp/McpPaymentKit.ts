@@ -132,13 +132,7 @@ export class McpPaymentKit {
         const content: any[] = [HttpPaymentCodec.buildMcpPaymentResource(payment as any)];
         return { content } as any;
       }
-      // Fallback to header if present
-      if (ctx.state.headerValue) {
-        const decoded = HttpPaymentCodec.parseResponseHeader(ctx.state.headerValue);
-        const payment = HttpPaymentCodec.toJSONResponse(decoded);
-        const content: any[] = [HttpPaymentCodec.buildMcpPaymentResource(payment as any)];
-        return { content } as any;
-      }
+      // No header fallback in MCP path
       // Final fallback to minimal structured error (no subRAV)
       const decoded = {
         error: ctx.state.error,

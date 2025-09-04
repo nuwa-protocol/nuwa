@@ -83,9 +83,6 @@ export class McpBillingMiddleware {
     const payload = settled.state?.responsePayload;
     if (payload) {
       structured = HttpPaymentCodec.toJSONResponse(payload);
-    } else if (settled.state?.headerValue) {
-      const decoded = HttpPaymentCodec.parseResponseHeader(settled.state.headerValue);
-      structured = this.buildStructuredPaymentResult(decoded);
     }
 
     // Persist if needed

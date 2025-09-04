@@ -65,7 +65,6 @@ export interface BillingContext {
 
     // Step C: Issuing
     unsignedSubRav?: SubRAV;
-    headerValue?: string;
     serviceTxRef?: string;
     nonce?: bigint;
 

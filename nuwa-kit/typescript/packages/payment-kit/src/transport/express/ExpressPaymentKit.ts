@@ -444,13 +444,18 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                   if (!headerWritten) {
                     try {
                       this.ensureExposeHeader(res);
-                      if (settled?.state?.headerValue) {
-                        res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
-                      }
+                      const payload = settled?.state?.responsePayload;
+                      const header = payload
+                        ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                        : undefined;
+                      if (header) res.setHeader('X-Payment-Channel-Data', header);
                     } catch {}
                   }
                   try {
-                    const headerValue: string | undefined = settled?.state?.headerValue;
+                    const payload = settled?.state?.responsePayload;
+                    const headerValue: string | undefined = payload
+                      ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                      : undefined;
                     if (headerValue) {
                       const ct = (res.getHeader('Content-Type') as string) || '';
                       const sseObj = { nuwa_payment_header: headerValue };
@@ -503,9 +508,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                   // Trailers are not widely supported; rely on polling/in-band. Still expose header if possible.
                   try {
                     this.ensureExposeHeader(res);
-                    if (settled?.state?.headerValue) {
-                      res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
-                    }
+                    const payload = settled?.state?.responsePayload;
+                    const header = payload
+                      ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                      : undefined;
+                    if (header) res.setHeader('X-Payment-Channel-Data', header);
                   } catch {}
                 }
                 if (settled?.state?.unsignedSubRav) {
