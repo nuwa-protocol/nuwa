@@ -1287,4 +1287,38 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
 
     console.log('🎉 PaymentHub balance depletion error handling test successful!');
   }, 180000);
+
+  test('PAYMENT_REQUIRED auto retry (HTTP)', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔁 Testing PAYMENT_REQUIRED auto retry (HTTP)');
+
+    // Use an isolated client to avoid cross-test state affecting nonces
+    const isolatedClient = await createHttpClient({
+      baseUrl: billingServerInstance.baseURL,
+      env: payer.identityEnv,
+      maxAmount: BigInt('50000000000'),
+      debug: true,
+      mappingStore: new MemoryHostChannelMappingStore(),
+    });
+
+    // 1) First paid request to ensure server persists an unsigned SubRAV
+    const first = await isolatedClient.get('/echo?q=trigger%20pending');
+    expect(first.payment).toBeTruthy();
+    console.log(`💰 First payment - ${formatPaymentInfo(first.payment!)}`);
+
+    // 2) Query recovery to ensure server has pending (simulates server-side state)
+    const recovery = await isolatedClient.recoverFromService();
+    expect(recovery).toBeTruthy();
+    expect(recovery.pendingSubRav).toBeTruthy();
+
+    // 3) Clear client local pending to simulate client unaware of server-pending
+    isolatedClient.clearPendingSubRAV();
+
+    // 4) Second paid request should receive 402 with pending SubRAV, then auto sign+retry
+    const second = await isolatedClient.get('/echo?q=auto%20retry%20should%20succeed');
+    expect(second.payment).toBeTruthy();
+    expect(second.payment!.nonce).toBeGreaterThan(first.payment!.nonce);
+    console.log(`✅ Auto retry succeeded (HTTP) - ${formatPaymentInfo(second.payment!)}`);
+  }, 120000);
 });

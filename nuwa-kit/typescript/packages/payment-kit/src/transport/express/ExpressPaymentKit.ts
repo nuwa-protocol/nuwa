@@ -399,7 +399,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           if (billingContext.state?.error) {
             const err = billingContext.state.error as { code: string; message?: string };
             const status = this.mapErrorCodeToHttpStatus(err.code);
-            const headerValue = this.buildProtocolErrorHeader(req, err);
+            // Prefer structured responsePayload (may include pending subRav for auto-retry)
+            const payload = billingContext.state.responsePayload;
+            const headerValue = payload
+              ? HttpPaymentCodec.buildResponseHeader(payload)
+              : this.buildProtocolErrorHeader(req, err);
             this.ensureExposeHeader(res);
             res.setHeader(HttpPaymentCodec.getHeaderName(), headerValue);
 
@@ -530,6 +534,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
         next();
       } catch (error) {
+        // Detailed trace logging for 500 errors
+        try {
+          this.logger.error('[billingWrapper.500]', {
+            method: req.method,
+            url: req.originalUrl || req.url,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          } as any);
+        } catch {}
+
         res.status(500).json({
           error: 'Payment processing failed',
           details: error instanceof Error ? error.message : String(error),
