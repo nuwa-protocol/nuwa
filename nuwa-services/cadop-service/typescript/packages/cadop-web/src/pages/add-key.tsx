@@ -3,11 +3,18 @@ import {
   MultibaseCodec,
   type OperationalKeyInfo,
   type VerificationRelationship,
-} from '@nuwa-ai/identity-kit';
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Key, Plus, ShieldCheck } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+} from "@nuwa-ai/identity-kit";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Key,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Alert,
   AlertDescription,
@@ -17,14 +24,13 @@ import {
   FixedCardLayout,
   FixedCardLoading,
   Tag,
-} from '@/components/ui';
-import { useDIDService } from '@/hooks/useDIDService';
-import { AgentSelector } from '../components/AgentSelector';
-import { useAuth } from '../lib/auth/AuthContext';
-import { PasskeyService } from '../lib/passkey/PasskeyService';
+} from "@/components/ui";
+import { useDIDService } from "@/hooks/useDIDService";
+import { AgentSelector } from "../components/AgentSelector";
+import { useAuth } from "../lib/auth/AuthContext";
+import { PasskeyService } from "../lib/passkey/PasskeyService";
 
 export function AddKeyPage() {
-  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { userDid, isAuthenticated, signInWithDid } = useAuth();
@@ -45,22 +51,26 @@ export function AddKeyPage() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   // Parse payload parameter
   useEffect(() => {
-    const payloadParam = searchParams.get('payload');
+    const payloadParam = searchParams.get("payload");
     if (!payloadParam) {
-      setError('Missing payload parameter');
+      setError("Missing payload parameter");
       return;
     }
 
     try {
       // Base64URL decode
-      const decodedPayload = MultibaseCodec.decodeBase64urlToString(payloadParam);
-      const parsedPayload = JSON.parse(decodedPayload) as AddKeyRequestPayloadV1;
+      const decodedPayload =
+        MultibaseCodec.decodeBase64urlToString(payloadParam);
+      const parsedPayload = JSON.parse(
+        decodedPayload,
+      ) as AddKeyRequestPayloadV1;
 
       // Validate required fields
       if (
@@ -69,7 +79,7 @@ export function AddKeyPage() {
         !parsedPayload.redirectUri ||
         !parsedPayload.state
       ) {
-        throw new Error('Invalid payload: missing required fields');
+        throw new Error("Invalid payload: missing required fields");
       }
 
       setPayload(parsedPayload);
@@ -79,13 +89,15 @@ export function AddKeyPage() {
         setSelectedAgentDid(parsedPayload.agentDid);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to parse payload';
+      const message =
+        err instanceof Error ? err.message : "Failed to parse payload";
       setError(`Invalid payload format: ${message}`);
     }
   }, [searchParams]);
 
   // Obtain didService via the shared hook once agent DID has been chosen
-  const { didService, error: didServiceError } = useDIDService(selectedAgentDid);
+  const { didService, error: didServiceError } =
+    useDIDService(selectedAgentDid);
 
   // Authenticate user if not already authenticated
   useEffect(() => {
@@ -98,10 +110,11 @@ export function AddKeyPage() {
           if (userDidResult) {
             signInWithDid(userDidResult);
           } else {
-            throw new Error('Authentication failed');
+            throw new Error("Authentication failed");
           }
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Authentication failed';
+          const message =
+            err instanceof Error ? err.message : "Authentication failed";
           setError(`Login error: ${message}`);
         } finally {
           setLoading(false);
@@ -126,24 +139,28 @@ export function AddKeyPage() {
       const keyInfo: OperationalKeyInfo = {
         type: payload.verificationMethod.type,
         controller: selectedAgentDid,
-        idFragment: payload.verificationMethod.idFragment || `key-${Date.now()}`,
+        idFragment:
+          payload.verificationMethod.idFragment || `key-${Date.now()}`,
         publicKeyMaterial: MultibaseCodec.decodeBase58btc(
-          payload.verificationMethod.publicKeyMultibase || ''
+          payload.verificationMethod.publicKeyMultibase || "",
         ),
       };
 
       const keyId = await didService.addVerificationMethod(
         keyInfo,
-        payload.verificationRelationships as VerificationRelationship[]
+        payload.verificationRelationships as VerificationRelationship[],
       );
 
       const redirectUrl = new URL(payload.redirectUri);
-      redirectUrl.searchParams.append('success', '1');
-      redirectUrl.searchParams.append('key_id', keyId);
-      redirectUrl.searchParams.append('agent', selectedAgentDid);
-      redirectUrl.searchParams.append('state', payload.state);
+      redirectUrl.searchParams.append("success", "1");
+      redirectUrl.searchParams.append("key_id", keyId);
+      redirectUrl.searchParams.append("agent", selectedAgentDid);
+      redirectUrl.searchParams.append("state", payload.state);
 
-      if (payload.redirectUri.startsWith(window.location.origin) && window.opener) {
+      if (
+        payload.redirectUri.startsWith(window.location.origin) &&
+        window.opener
+      ) {
         window.opener.postMessage(
           {
             success: 1,
@@ -151,25 +168,15 @@ export function AddKeyPage() {
             agent: selectedAgentDid,
             state: payload.state,
           },
-          new URL(payload.redirectUri).origin
+          new URL(payload.redirectUri).origin,
         );
         window.close();
       } else {
         window.location.href = redirectUrl.toString();
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('common.error');
+      const message = err instanceof Error ? err.message : "Common Error";
       setError(message);
-
-      try {
-        const redirectUrl = new URL(payload.redirectUri);
-        redirectUrl.searchParams.append('success', '0');
-        redirectUrl.searchParams.append('error', encodeURIComponent(message));
-        redirectUrl.searchParams.append('state', payload.state);
-        window.location.href = redirectUrl.toString();
-      } catch (redirectErr) {
-        console.error('Failed to redirect with error:', redirectErr);
-      }
     } finally {
       setProcessing(false);
     }
@@ -179,21 +186,28 @@ export function AddKeyPage() {
     if (payload) {
       try {
         const redirectUrl = new URL(payload.redirectUri);
-        redirectUrl.searchParams.append('success', '0');
-        redirectUrl.searchParams.append('error', 'User canceled');
-        redirectUrl.searchParams.append('state', payload.state);
+        redirectUrl.searchParams.append("success", "0");
+        // If there's an error state, include it in the redirect
+        if (error) {
+          redirectUrl.searchParams.append("error", encodeURIComponent(error));
+        } else {
+          redirectUrl.searchParams.append("error", "User canceled");
+        }
+        redirectUrl.searchParams.append("state", payload.state);
         window.location.href = redirectUrl.toString();
       } catch {
         // If redirect fails, go back to home
-        navigate('/');
+        navigate("/");
       }
     } else {
-      navigate('/');
+      navigate("/");
     }
   };
 
   // Check if high risk permissions are requested (from payload initial relationships)
-  const hasHighRiskPermission = payload?.verificationRelationships.includes('capabilityDelegation');
+  const hasHighRiskPermission = payload?.verificationRelationships.includes(
+    "capabilityDelegation",
+  );
 
   if (!payload) {
     return (
@@ -208,13 +222,18 @@ export function AddKeyPage() {
   }
 
   if (!isAuthenticated) {
-    return <FixedCardLoading title="Authenticating" message="Waiting for authentication..." />;
+    return (
+      <FixedCardLoading
+        title="Authenticating"
+        message="Waiting for authentication..."
+      />
+    );
   }
 
   return (
     <FixedCardLayout
       icon={<Key className="h-12 w-12 text-primary-600" />}
-      title={t('Authorization Request')}
+      title={"Authorization Request"}
       actions={
         <FixedCardActions>
           <FixedCardActionButton
@@ -224,19 +243,25 @@ export function AddKeyPage() {
             size="lg"
           >
             <ShieldCheck className="mr-2 h-4 w-4" />
-            {t('Authorize')}
+            {"Authorize"}
           </FixedCardActionButton>
-          <FixedCardActionButton variant="outline" onClick={handleCancel} disabled={processing}>
+          <FixedCardActionButton
+            variant="outline"
+            onClick={handleCancel}
+            disabled={processing}
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {t('common.cancel')}
+            {"Cancel"}
           </FixedCardActionButton>
         </FixedCardActions>
       }
     >
       {(error || didServiceError) && (
         <Alert variant="destructive" className="mb-6">
-          <AlertTitle>{t('common.error')}</AlertTitle>
-          <AlertDescription>{`${error || didServiceError || 'Something went wrong'}. Please try with another DID.`}</AlertDescription>
+          <AlertTitle className="text-md font-semibold">{`Service Unavailable`}</AlertTitle>
+          <AlertDescription className="break-words overflow-hidden text-sm">
+            {`Please try again later or try another DID.`}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -257,9 +282,11 @@ export function AddKeyPage() {
             <button
               type="button"
               onClick={() => {
-                const payloadParam = searchParams.get('payload');
+                const payloadParam = searchParams.get("payload");
                 if (payloadParam) {
-                  navigate(`/create-agent-did?payload=${encodeURIComponent(payloadParam)}`);
+                  navigate(
+                    `/create-agent-did?payload=${encodeURIComponent(payloadParam)}`,
+                  );
                 }
               }}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md transition-colors"
@@ -277,8 +304,9 @@ export function AddKeyPage() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>High Risk Permission</AlertTitle>
             <AlertDescription>
-              This key request permission delegation allows it to manage other keys and modify your
-              DID document. Only granted to highly trusted devices/environments.
+              This key request permission delegation allows it to manage other
+              keys and modify your DID document. Only granted to highly trusted
+              devices/environments.
             </AlertDescription>
           </Alert>
         )}
@@ -302,26 +330,32 @@ export function AddKeyPage() {
             <div className="space-y-3 text-sm bg-gray-50 rounded border p-4">
               <div className="flex justify-between">
                 <span className="text-gray-500">Key Type</span>
-                <span className="text-gray-900 font-medium">{payload.verificationMethod.type}</span>
+                <span className="text-gray-900 font-medium">
+                  {payload.verificationMethod.type}
+                </span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-gray-500">Key ID</span>
                 <span className="text-gray-900">
-                  {payload.verificationMethod.idFragment || 'Auto-generated'}
+                  {payload.verificationMethod.idFragment || "Auto-generated"}
                 </span>
               </div>
 
               <div>
                 <div className="text-gray-500 mb-2">Permissions</div>
                 <div className="flex flex-wrap gap-1">
-                  {payload.verificationRelationships.map(rel => (
+                  {payload.verificationRelationships.map((rel) => (
                     <Tag
                       key={rel}
-                      variant={rel === 'capabilityDelegation' ? 'danger' : 'default'}
+                      variant={
+                        rel === "capabilityDelegation" ? "danger" : "default"
+                      }
                       className="flex items-center gap-1 text-xs"
                     >
-                      {rel === 'capabilityDelegation' && <AlertTriangle className="h-3 w-3" />}
+                      {rel === "capabilityDelegation" && (
+                        <AlertTriangle className="h-3 w-3" />
+                      )}
                       <span>{rel}</span>
                     </Tag>
                   ))}
