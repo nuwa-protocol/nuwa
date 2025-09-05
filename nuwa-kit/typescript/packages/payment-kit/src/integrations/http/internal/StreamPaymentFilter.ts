@@ -7,7 +7,7 @@ export interface InBandPaymentPayload {
   headerValue: string;
 }
 
-/// The default value of queueHWM
+// The default value of queueHWM
 const DEFAULT_QUEUE_HWM: number = 16;
 
 export function wrapAndFilterInBandFrames(
