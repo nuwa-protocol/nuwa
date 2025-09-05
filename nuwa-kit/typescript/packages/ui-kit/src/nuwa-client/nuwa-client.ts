@@ -62,6 +62,7 @@ export interface NuwaClientMethods {
 	 * @returns Promise resolving with the saved state
 	 */
 	getState<T = any>(): Promise<T | null>;
+
 }
 
 // Penpal-specific parent methods interface
@@ -80,7 +81,6 @@ type PenpalParentMethods = {
 export interface NuwaClientOptions {
 	allowedOrigins?: string[];
 	timeout?: number;
-	autoConnect?: boolean;
 	debug?: boolean;
 	methodTimeout?: number;
 }
@@ -101,19 +101,11 @@ export class NuwaClient implements NuwaClientMethods {
 			allowedOrigins: ["*"],
 			timeout: NUWA_CLIENT_TIMEOUT,
 			debug: false,
-			autoConnect: true,
 			methodTimeout: NUWA_METHOD_TIMEOUT,
 			...options,
 		};
 
 		this.methodTimeout = this.options.methodTimeout || NUWA_METHOD_TIMEOUT;
-
-		if (this.options.autoConnect) {
-			// Auto-connect when instantiated
-			this.connect().catch((error) => {
-				this.log("Auto-connect failed", error);
-			});
-		}
 
 		this.log("NuwaClient initialized", this.options);
 	}
@@ -261,6 +253,7 @@ export class NuwaClient implements NuwaClientMethods {
 		}
 	}
 
+
 	// === Connection Management ===
 
 	private async ensureConnected(): Promise<void> {
@@ -268,7 +261,6 @@ export class NuwaClient implements NuwaClientMethods {
 			await this.connect();
 		}
 	}
-
 
 	/**
 	 * Reconnect to parent if connection is lost

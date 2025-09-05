@@ -70,7 +70,7 @@ export default function NotePage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col max-w-5xl mx-auto">
+    <div className="h-screen w-screen flex flex-col max-w-5xl mx-auto bg-white">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -92,7 +92,7 @@ export default function NotePage() {
               type="button"
               onClick={handleSendNote}
               disabled={!isNuwaConnected}
-              className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
+              className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300  transition-colors"
             >
               Send Prompt
             </button>
@@ -100,7 +100,7 @@ export default function NotePage() {
               type="button"
               onClick={handleAddNoteSelection}
               disabled={!isNuwaConnected}
-              className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:bg-gray-300 transition-colors"
+              className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:bg-gray-300  transition-colors"
             >
               Add Selection
             </button>
@@ -108,7 +108,7 @@ export default function NotePage() {
               type="button"
               onClick={handleSaveNote}
               disabled={!isNuwaConnected}
-              className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:bg-gray-300 transition-colors"
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:bg-gray-300  transition-colors"
             >
               Save
             </button>
@@ -125,8 +125,8 @@ export default function NotePage() {
       </header>
 
       {/* Editor */}
-      <div className="flex-1 py-10 px-6">
-        <BlockNoteView editor={editor} />
+      <div className="flex-1 py-10 px-6 bg-white">
+        <BlockNoteView editor={editor} theme={'light'} />
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import WeatherPage from "./pages/WeatherPage";
 function App() {
   return (
     <Router>
-      <div className="font-sans antialiased">
+      <div className="font-sans antialiased bg-background">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/weather" element={<WeatherPage />} />
