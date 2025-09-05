@@ -138,11 +138,9 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
           requestId: d.requestId,
           statusText: d.statusText,
         } as any;
-        try {
-          if (upstream && (upstream as any).details) {
-            logger.error('[gateway][stream] upstream error details:', (upstream as any).details);
-          }
-        } catch {}
+        if (upstream && (upstream as any).details) {
+          logger.error('[gateway][stream] upstream error details:', (upstream as any).details);
+        }
         meta.upstream_status_code = status;
         meta.upstream_duration_ms = Date.now() - started;
         (res as any).locals.upstream = meta;
@@ -152,8 +150,12 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
           const payload = { error: { message: errMsg, type: safeDetails.type, code: safeDetails.code, status } };
           res.write(`data: ${JSON.stringify(payload)}\n\n`);
           res.write('data: [DONE]\n\n');
-        } catch {}
-        try { res.end(); } catch {}
+        } catch (writeErr) {
+          logger.warn('[gateway][stream] failed to write SSE error payload:', writeErr);
+        }
+        try { res.end(); } catch (endErr) {
+          logger.warn('[gateway][stream] failed to end SSE after error:', endErr);
+        }
         return;
       }
 
@@ -163,29 +165,33 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
       upstream.data.on('data', (chunk: Buffer) => {
         bytes += chunk.length;
         const s = chunk.toString();
-        try {
-          if (s.includes('"usage"')) {
-            const lines = s.split('\n');
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (trimmed === 'data: [DONE]') {
-                (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
-                if (!closed && !res.destroyed) {
-                  closed = true;
-                  try { res.end(); } catch {}
-                  try { upstream.data.destroy(); } catch {}
-                }
-                break;
-              }
-              if (line.startsWith('data: ') && line.includes('"usage"')) {
-                const obj = JSON.parse(line.slice(6));
-                if (obj?.usage?.cost) usageUsd = obj.usage.cost;
+        if (!closed && !res.destroyed) {
+          // Always forward upstream bytes first to avoid truncating frames in the same chunk
+          try { res.write(chunk); } catch (chunkErr) {
+            logger.warn('[gateway][stream] failed to forward upstream chunk:', chunkErr);
+          }
+        }
+        const lines = s.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed === 'data: [DONE]') {
+            (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
+            if (!closed && !res.destroyed) {
+              closed = true;
+              try { res.end(); } catch (endErr) {
+                logger.warn('[gateway][stream] failed to end SSE on DONE:', endErr);
               }
             }
+            break;
           }
-        } catch {}
-        if (!closed && !res.destroyed) {
-          res.write(chunk);
+          if (line.startsWith('data: ') && line.includes('"usage"')) {
+            try {
+              const obj = JSON.parse(line.slice(6));
+              if (obj?.usage?.cost) usageUsd = obj.usage.cost;
+            } catch (parseErr) {
+              logger.debug('[gateway][stream] failed to parse usage from SSE line');
+            }
+          }
         }
       });
       upstream.data.on('end', () => {
@@ -205,7 +211,7 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
         meta.upstream_status_code = upstream.status;
         meta.upstream_duration_ms = Date.now() - started;
         (res as any).locals.upstream = meta;
-        try { logger.error('[gateway][stream] upstream stream error:', err); } catch {}
+        logger.error('[gateway][stream] upstream stream error:', err);
         if (!closed) {
           closed = true;
           try {
@@ -213,12 +219,18 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
             const payload = { error: { message: 'Upstream stream error', status: upstream.status } } as any;
             res.write(`data: ${JSON.stringify(payload)}\n\n`);
             res.write('data: [DONE]\n\n');
-          } catch {}
-          try { res.end(); } catch {}
+          } catch (writeErr) {
+            logger.warn('[gateway][stream] failed to write SSE upstream error payload:', writeErr);
+          }
+          try { res.end(); } catch (endErr) {
+            logger.warn('[gateway][stream] failed to end SSE after upstream error:', endErr);
+          }
         }
       });
       res.on('close', () => {
-        try { upstream.data.destroy(); } catch {}
+        try { upstream.data.destroy(); } catch (destroyErr) {
+          logger.debug('[gateway][stream] failed to destroy upstream on close');
+        }
       });
     } catch (e) {
       meta.upstream_duration_ms = Date.now() - started;
@@ -512,14 +524,12 @@ async function proxyNonStream(req: Request): Promise<ProxyResult> {
   }
 
   meta.upstream_status_code = resp.status;
-  try {
-    const hdrs = resp.headers || {};
-    meta.upstream_headers_subset = {
-      'x-usage': hdrs['x-usage'],
-      'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
-      'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
-    };
-  } catch {}
+  const hdrs = (resp as any).headers || {};
+  meta.upstream_headers_subset = {
+    'x-usage': hdrs['x-usage'],
+    'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
+    'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
+  };
 
   const responseData = provider.parseResponse(resp);
   const usageCostUSD: number | undefined = responseData?.usage?.cost;

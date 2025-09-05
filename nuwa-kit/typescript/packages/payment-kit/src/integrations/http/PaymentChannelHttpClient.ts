@@ -917,6 +917,7 @@ export class PaymentChannelHttpClient {
           async p => {
             try {
               const decoded = this.paymentProtocol.parseResponseHeader((p as any).headerValue);
+              this.log('[inband.decode payment response]', decoded);
               if (decoded?.subRav && decoded.cost !== undefined) {
                 await this.handleProtocolSuccess({
                   type: 'success',
@@ -926,13 +927,33 @@ export class PaymentChannelHttpClient {
                   costUsd: decoded.costUsd as bigint | undefined,
                   serviceTxRef: decoded.serviceTxRef,
                 });
+              } else if ((decoded as any)?.error) {
+                // Streamed protocol-level error
+                await this.handleProtocolError({
+                  type: 'error',
+                  clientTxRef: (decoded as any).clientTxRef,
+                  err: new PaymentKitError(
+                    (decoded as any).error.code,
+                    (decoded as any).error.message || 'Payment error (stream)'
+                  ),
+                });
               }
             } catch (e) {
               this.log('[inband.decode.error]', e);
             }
           },
           (...args: any[]) => this.log(...args),
-          onActivity
+          onActivity,
+          ({ sawPayment }) => {
+            try {
+              if (!sawPayment && context.clientTxRef) {
+                // Only resolve THIS request as free, do not affect parallel requests
+                this.requestManager.resolveByRef(context.clientTxRef, undefined);
+              }
+            } catch (e) {
+              this.log('[onFinish.error]', e);
+            }
+          }
         );
 
         // Mark as streaming

@@ -7,11 +7,16 @@ export interface InBandPaymentPayload {
   headerValue: string;
 }
 
+// The default value of queueHWM
+const DEFAULT_QUEUE_HWM: number = 16;
+
 export function wrapAndFilterInBandFrames(
   response: Response,
   onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
   log: (...args: any[]) => void,
-  onActivity?: () => void
+  onActivity?: () => void,
+  onFinish?: (opts: { sawPayment: boolean }) => void,
+  options?: { backgroundDrain?: boolean; queueHWM?: number }
 ): Response {
   const originalBody = response.body as ReadableStream<Uint8Array> | null;
   if (!originalBody || typeof (originalBody as any).getReader !== 'function') {
@@ -26,9 +31,12 @@ export function wrapAndFilterInBandFrames(
   const isSSE = ct.includes('text/event-stream');
   const isNDJSON = ct.includes('application/x-ndjson');
 
+  let sawPayment = false;
+
   // After payment frame is handled, proactively close the filtered stream to avoid hanging
   const afterPayment = (controller: ReadableStreamDefaultController<Uint8Array>) => {
     try {
+      sawPayment = true;
       controller.close();
       try {
         reader.cancel();
@@ -40,44 +48,106 @@ export function wrapAndFilterInBandFrames(
     }
   };
 
-  const parser: InBandParser = isSSE
-    ? new SseInbandParser(textEncoder, onPayment, log, afterPayment)
-    : new NdjsonInbandParser(textEncoder, onPayment, log, afterPayment);
+  const isBg = options?.backgroundDrain !== false; // default true
 
-  const filtered = new ReadableStream<Uint8Array>({
-    async pull(controller) {
+  const shouldEmit = (controller: ReadableStreamDefaultController<Uint8Array>): boolean => {
+    if (isBg) {
+      const ds = (controller as any).desiredSize as number | undefined;
+      if (typeof ds === 'number' && ds <= 0) return false;
+    }
+    return true;
+  };
+
+  const parser: InBandParser = isSSE
+    ? new SseInbandParser(textEncoder, onPayment, log, afterPayment, onActivity, shouldEmit)
+    : new NdjsonInbandParser(textEncoder, onPayment, log, afterPayment, onActivity, shouldEmit);
+
+  const makeBackgroundLoop = (controller: ReadableStreamDefaultController<Uint8Array>) => {
+    (async () => {
       try {
-        const { value, done } = await reader.read();
-        if (done) {
-          await parser.flush(controller);
-          controller.close();
-          return;
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (!value) continue;
+          try {
+            onActivity?.();
+          } catch (e) {
+            log('[bg.onActivity.error]', e as any);
+          }
+          const chunkText = textDecoder.decode(value, { stream: true });
+          await parser.process(chunkText, controller);
         }
-        if (!value) return;
+        await parser.flush(controller);
+        controller.close();
         try {
-          onActivity?.();
+          onFinish?.({ sawPayment });
         } catch (e) {
-          log('[pull.onActivity.error]', e);
+          log('[finish.error]', e as any);
         }
-        const chunkText = textDecoder.decode(value, { stream: true });
-        await parser.process(chunkText, controller);
       } catch (e) {
         try {
           reader.cancel();
-        } catch (e) {
-          log('[pull.error]', e);
-        }
-        controller.error(e);
+        } catch {}
+        controller.error(e as any);
       }
-    },
-    cancel() {
-      try {
-        reader.cancel();
-      } catch (e) {
-        log('[cancel.error]', e);
-      }
-    },
-  });
+    })();
+  };
+
+  const filtered = isBg
+    ? new ReadableStream<Uint8Array>(
+        {
+          start(controller) {
+            makeBackgroundLoop(controller);
+          },
+          cancel() {
+            try {
+              reader.cancel();
+            } catch (e) {
+              log('[cancel.error]', e);
+            }
+          },
+        },
+        { highWaterMark: options?.queueHWM ?? DEFAULT_QUEUE_HWM }
+      )
+    : new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          try {
+            const { value, done } = await reader.read();
+            if (done) {
+              await parser.flush(controller);
+              controller.close();
+              try {
+                onFinish?.({ sawPayment });
+              } catch (e) {
+                log('[finish.error]', e as any);
+              }
+              return;
+            }
+            if (!value) return;
+            try {
+              onActivity?.();
+            } catch (e) {
+              log('[pull.onActivity.error]', e);
+            }
+            const chunkText = textDecoder.decode(value, { stream: true });
+            await parser.process(chunkText, controller);
+          } catch (e) {
+            try {
+              reader.cancel();
+            } catch (e) {
+              log('[pull.error]', e);
+            }
+            controller.error(e);
+          }
+        },
+        cancel() {
+          try {
+            reader.cancel();
+          } catch (e) {
+            log('[cancel.error]', e);
+          }
+        },
+      });
 
   const headers = new Headers(response.headers);
   headers.delete('content-length');
@@ -108,8 +178,44 @@ class SseInbandParser implements InBandParser {
     private encoder: TextEncoder,
     private onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
     private log: (...args: any[]) => void,
-    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void
+    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void,
+    private onTick?: () => void,
+    private shouldEmit?: (c: ReadableStreamDefaultController<Uint8Array>) => boolean
   ) {}
+
+  private extractPaymentHeaderFromEventLines(lines: string[]): string | null {
+    for (const l of lines) {
+      const m = l.match(/^data:\s*(.+)$/);
+      if (!m) continue;
+      try {
+        const o = JSON.parse(m[1]);
+        const header = o?.nuwa_payment_header || o?.__nuwa_payment_header__;
+        this.log('[extractPaymentHeaderFromEventLines]', header);
+        if (typeof header === 'string') return header;
+      } catch {}
+    }
+    return null;
+  }
+
+  private async handleEvent(
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ): Promise<void> {
+    const headerValue = this.extractPaymentHeaderFromEventLines(this.pendingEvent);
+    if (!headerValue) {
+      for (const out of this.pendingEvent) {
+        const bytes = this.encoder.encode(out + '\n');
+        if (!this.shouldEmit || this.shouldEmit(controller)) controller.enqueue(bytes);
+      }
+      this.pendingEvent = [];
+      return;
+    }
+    try {
+      this.onTick?.();
+    } catch {}
+    await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+    this.onAfterPayment(controller);
+    this.pendingEvent = [];
+  }
 
   async process(
     textChunk: string,
@@ -119,36 +225,16 @@ class SseInbandParser implements InBandParser {
     const lines = this.buffer.split(/\r?\n/);
     this.buffer = lines.pop() ?? '';
     for (const line of lines) {
+      try {
+        this.onTick?.();
+      } catch {}
       this.pendingEvent.push(line);
       if (line === '') {
-        const isPayment = this.pendingEvent.some(l => {
-          const m = l.match(/^data:\s*(.+)$/);
-          if (!m) return false;
-          try {
-            const o = JSON.parse(m[1]);
-            return !!(o?.nuwa_payment_header || o?.__nuwa_payment_header__);
-          } catch {
-            return false;
-          }
-        });
-        if (!isPayment) {
-          for (const out of this.pendingEvent) controller.enqueue(this.encoder.encode(out + '\n'));
-        } else {
-          try {
-            const dataLine = this.pendingEvent.find(l => l.startsWith('data: '));
-            if (dataLine) {
-              const payload = JSON.parse(dataLine.slice(6));
-              const headerValue = payload?.nuwa_payment_header || payload?.__nuwa_payment_header__;
-              if (typeof headerValue === 'string') {
-                await safeHandlePayment({ headerValue }, this.onPayment, this.log);
-                this.onAfterPayment(controller);
-              }
-            }
-          } catch (e) {
-            this.log('[process.error]', e);
-          }
+        try {
+          await this.handleEvent(controller);
+        } catch (e) {
+          this.log('[process.error]', e);
         }
-        this.pendingEvent = [];
       }
     }
   }
@@ -156,34 +242,11 @@ class SseInbandParser implements InBandParser {
   async flush(controller: ReadableStreamDefaultController<Uint8Array>): Promise<void> {
     if (!this.buffer) return;
     this.pendingEvent.push(this.buffer);
-    const isPayment = this.pendingEvent.some(l => {
-      const m = l.match(/^data:\s*(.+)$/);
-      if (!m) return false;
-      try {
-        const o = JSON.parse(m[1]);
-        return !!(o?.nuwa_payment_header || o?.__nuwa_payment_header__);
-      } catch {
-        return false;
-      }
-    });
-    if (!isPayment) {
-      for (const out of this.pendingEvent) controller.enqueue(this.encoder.encode(out + '\n'));
-    } else {
-      try {
-        const dataLine = this.pendingEvent.find(l => l.startsWith('data: '));
-        if (dataLine) {
-          const payload = JSON.parse(dataLine.slice(6));
-          const headerValue = payload?.nuwa_payment_header || payload?.__nuwa_payment_header__;
-          if (typeof headerValue === 'string') {
-            await safeHandlePayment({ headerValue }, this.onPayment, this.log);
-            this.onAfterPayment(controller);
-          }
-        }
-      } catch (e) {
-        this.log('[flush.error]', e);
-      }
+    try {
+      await this.handleEvent(controller);
+    } catch (e) {
+      this.log('[flush.error]', e);
     }
-    this.pendingEvent = [];
     this.buffer = '';
   }
 }
@@ -194,8 +257,40 @@ class NdjsonInbandParser implements InBandParser {
     private encoder: TextEncoder,
     private onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
     private log: (...args: any[]) => void,
-    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void
+    private onAfterPayment: (controller: ReadableStreamDefaultController<Uint8Array>) => void,
+    private onTick?: () => void,
+    private shouldEmit?: (c: ReadableStreamDefaultController<Uint8Array>) => boolean
   ) {}
+
+  private extractPaymentHeaderFromLine(t: string): string | null {
+    try {
+      const obj = JSON.parse(t);
+      const headerValue = obj?.__nuwa_payment_header__ || obj?.nuwa_payment_header;
+      this.log('[extractPaymentHeaderFromLine]', headerValue);
+      return typeof headerValue === 'string' ? headerValue : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async handleLine(
+    line: string,
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ): Promise<void> {
+    const t = line.trim();
+    if (!t) return;
+    const headerValue = this.extractPaymentHeaderFromLine(t);
+    if (!headerValue) {
+      const bytes = this.encoder.encode(line + '\n');
+      if (!this.shouldEmit || this.shouldEmit(controller)) controller.enqueue(bytes);
+      return;
+    }
+    try {
+      this.onTick?.();
+    } catch {}
+    await safeHandlePayment({ headerValue }, this.onPayment, this.log);
+    this.onAfterPayment(controller);
+  }
 
   async process(
     textChunk: string,
@@ -205,40 +300,24 @@ class NdjsonInbandParser implements InBandParser {
     const lines = this.buffer.split(/\r?\n/);
     this.buffer = lines.pop() ?? '';
     for (const line of lines) {
-      const t = line.trim();
-      if (!t) continue;
-      let drop = false;
       try {
-        const obj = JSON.parse(t);
-        const headerValue = obj?.__nuwa_payment_header__ || obj?.nuwa_payment_header;
-        if (typeof headerValue === 'string') {
-          drop = true;
-          await safeHandlePayment({ headerValue }, this.onPayment, this.log);
-          this.onAfterPayment(controller);
-        }
+        this.onTick?.();
+      } catch {}
+      try {
+        await this.handleLine(line, controller);
       } catch (e) {
         this.log('[process.error]', e);
       }
-      if (!drop) controller.enqueue(this.encoder.encode(line + '\n'));
     }
   }
 
   async flush(controller: ReadableStreamDefaultController<Uint8Array>): Promise<void> {
     if (!this.buffer) return;
-    const t = this.buffer.trim();
-    let drop = false;
     try {
-      const obj = JSON.parse(t);
-      const headerValue = obj?.__nuwa_payment_header__ || obj?.nuwa_payment_header;
-      if (typeof headerValue === 'string') {
-        drop = true;
-        await safeHandlePayment({ headerValue }, this.onPayment, this.log);
-        this.onAfterPayment(controller);
-      }
+      await this.handleLine(this.buffer, controller);
     } catch (e) {
       this.log('[flush.error]', e);
     }
-    if (!drop) controller.enqueue(this.encoder.encode(this.buffer + '\n'));
     this.buffer = '';
   }
 }
