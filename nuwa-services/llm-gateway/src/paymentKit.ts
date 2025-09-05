@@ -163,30 +163,30 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
       upstream.data.on('data', (chunk: Buffer) => {
         bytes += chunk.length;
         const s = chunk.toString();
+        if (!closed && !res.destroyed) {
+          // Always forward upstream bytes first to avoid truncating frames in the same chunk
+          try { res.write(chunk); } catch {}
+        }
         try {
-          if (s.includes('"usage"')) {
-            const lines = s.split('\n');
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (trimmed === 'data: [DONE]') {
-                (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
-                if (!closed && !res.destroyed) {
-                  closed = true;
-                  try { res.end(); } catch {}
-                  try { upstream.data.destroy(); } catch {}
-                }
-                break;
+          const lines = s.split('\n');
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === 'data: [DONE]') {
+              (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
+              if (!closed && !res.destroyed) {
+                closed = true;
+                try { res.end(); } catch {}
               }
-              if (line.startsWith('data: ') && line.includes('"usage"')) {
+              break;
+            }
+            if (line.startsWith('data: ') && line.includes('"usage"')) {
+              try {
                 const obj = JSON.parse(line.slice(6));
                 if (obj?.usage?.cost) usageUsd = obj.usage.cost;
-              }
+              } catch {}
             }
           }
         } catch {}
-        if (!closed && !res.destroyed) {
-          res.write(chunk);
-        }
       });
       upstream.data.on('end', () => {
         (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
