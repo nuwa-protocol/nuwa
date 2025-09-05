@@ -7,6 +7,9 @@ export interface InBandPaymentPayload {
   headerValue: string;
 }
 
+/// The default value of queueHWM
+const DEFAULT_QUEUE_HWM: number = 16;
+
 export function wrapAndFilterInBandFrames(
   response: Response,
   onPayment: (payload: InBandPaymentPayload) => void | Promise<void>,
@@ -104,7 +107,7 @@ export function wrapAndFilterInBandFrames(
             }
           },
         },
-        { highWaterMark: options?.queueHWM ?? 8 }
+        { highWaterMark: options?.queueHWM ?? DEFAULT_QUEUE_HWM }
       )
     : new ReadableStream<Uint8Array>({
         async pull(controller) {
@@ -182,12 +185,12 @@ class SseInbandParser implements InBandParser {
 
   private extractPaymentHeaderFromEventLines(lines: string[]): string | null {
     for (const l of lines) {
-      console.log('l', l);
       const m = l.match(/^data:\s*(.+)$/);
       if (!m) continue;
       try {
         const o = JSON.parse(m[1]);
         const header = o?.nuwa_payment_header || o?.__nuwa_payment_header__;
+        this.log('[extractPaymentHeaderFromEventLines]', header);
         if (typeof header === 'string') return header;
       } catch {}
     }
@@ -263,6 +266,7 @@ class NdjsonInbandParser implements InBandParser {
     try {
       const obj = JSON.parse(t);
       const headerValue = obj?.__nuwa_payment_header__ || obj?.nuwa_payment_header;
+      this.log('[extractPaymentHeaderFromLine]', headerValue);
       return typeof headerValue === 'string' ? headerValue : null;
     } catch {
       return null;
