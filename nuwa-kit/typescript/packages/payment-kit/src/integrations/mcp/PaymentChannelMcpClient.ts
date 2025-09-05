@@ -341,17 +341,9 @@ export class PaymentChannelMcpClient {
   }
 
   private async ensureNotificationSubscription(): Promise<void> {
-    if (this.notificationsSubscribed) return;
-    const client = await this.ensureClient();
-    try {
-      const subscribe = (client as any).on?.bind?.(client);
-      if (typeof subscribe === 'function') {
-        subscribe('notification', (msg: any) => {
-          if (!msg || typeof msg !== 'object') return;
-        });
-        this.notificationsSubscribed = true;
-      }
-    } catch {}
+    // Placeholder for future resources/subscribe implementation.
+    // Tool streaming is not supported; do not subscribe to tool notifications.
+    return;
   }
 
   private async toPaymentInfoFromPayload(

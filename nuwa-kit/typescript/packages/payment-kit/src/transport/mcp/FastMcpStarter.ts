@@ -58,13 +58,12 @@ export class PaymentMcpToolRegistrar {
     description: string;
     handler: (params: any, context?: any) => Promise<any>;
     pricePicoUSD: bigint;
-    streaming?: boolean;
     schema?: any;
   }): void {
     this.ensureNotStarted();
-    const { name, description, handler, pricePicoUSD, streaming, schema } = args;
+    const { name, description, handler, pricePicoUSD, schema } = args;
     // Register with billing (enables pricing/settlement)
-    this.kit.register(name, { pricing: pricePicoUSD, streaming }, handler);
+    this.kit.register(name, { pricing: pricePicoUSD }, handler);
     // Register with FastMCP (expose tool) via unified kit.invoke
     const compiled =
       schema && typeof schema === 'object' && schema['~standard']
@@ -97,7 +96,6 @@ export class PaymentMcpToolRegistrar {
     description: string;
     pricePicoUSD: bigint;
     handler: (params: any, context?: any) => Promise<any>;
-    streaming?: boolean;
     schema?: any;
   }): void {
     this.addTool(args);
@@ -114,7 +112,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     description: string;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
-    nuwa?: { pricePicoUSD?: bigint; streaming?: boolean };
+    nuwa?: { pricePicoUSD?: bigint };
   }) => void;
   freeTool: (def: {
     name: string;
@@ -126,7 +124,6 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     name: string;
     description: string;
     pricePicoUSD: bigint;
-    streaming?: boolean;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
   }) => void;
@@ -253,14 +250,13 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     description: string;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
-    nuwa?: { pricePicoUSD?: bigint; streaming?: boolean };
+    nuwa?: { pricePicoUSD?: bigint };
   }) => {
     registrar.addTool({
       name: def.name,
       description: def.description,
       schema: def.parameters,
       pricePicoUSD: def.nuwa?.pricePicoUSD ?? 0n,
-      streaming: def.nuwa?.streaming,
       handler: async (params, context) => def.execute(params, context),
     });
   };
@@ -283,7 +279,6 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     name: string;
     description: string;
     pricePicoUSD: bigint;
-    streaming?: boolean;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
   }) => {
@@ -291,7 +286,6 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       name: def.name,
       description: def.description,
       pricePicoUSD: def.pricePicoUSD,
-      streaming: def.streaming,
       schema: def.parameters,
       handler: async (params, context) => def.execute(params, context),
     });

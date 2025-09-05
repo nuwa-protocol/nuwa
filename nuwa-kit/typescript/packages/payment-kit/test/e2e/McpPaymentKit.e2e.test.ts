@@ -170,28 +170,21 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       },
     });
 
-    // Streaming tool
+    // Slow tool for non-stream testing (useful for concurrency or latency scenarios)
     app.paidTool({
-      name: 'stream_data',
-      description: 'Stream data chunks (paid per call)',
+      name: 'slow_process',
+      description: 'Simulate a slow business operation (paid)',
       pricePicoUSD: BigInt(500000000), // 0.0005 USD
-      streaming: true,
       parameters: {
         type: 'object',
-        properties: { count: { type: 'number', description: 'Number of chunks to stream' } },
+        properties: {
+          delayMs: { type: 'number', description: 'Artificial delay in milliseconds' },
+        },
       },
       execute: async (params: any) => {
-        const count = params.count || 3;
-        const chunks: any[] = [];
-        for (let i = 0; i < count; i++) {
-          chunks.push({
-            chunk: i + 1,
-            data: `Streaming chunk ${i + 1}/${count}`,
-            timestamp: new Date().toISOString(),
-          });
-          if (i < count - 1) await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        return { chunks, total: count };
+        const delayMs = typeof params?.delayMs === 'number' ? params.delayMs : 300;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        return { ok: true, delayMs, timestamp: new Date().toISOString() } as any;
       },
     });
 
@@ -388,44 +381,29 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log('🎉 Paid business tools test successful!');
   }, 120000);
 
-  test('Streaming tool with payment settlement', async () => {
+  test('Slow tool with payment settlement (non-stream)', async () => {
     if (!shouldRunE2ETests()) return;
 
-    console.log('📡 Testing streaming tool with payment settlement');
+    console.log('🐢 Testing slow tool with payment settlement');
 
-    const streamResult = await mcpClient.call('stream_data', { count: 3 });
+    const streamResult = await mcpClient.call('slow_process', { delayMs: 300 });
 
     expect(streamResult.data).toEqual(
       expect.objectContaining({
-        chunks: expect.arrayContaining([
-          expect.objectContaining({
-            chunk: 1,
-            data: expect.stringContaining('Streaming chunk 1/3'),
-            timestamp: expect.any(String),
-          }) as any,
-          expect.objectContaining({
-            chunk: 2,
-            data: expect.stringContaining('Streaming chunk 2/3'),
-            timestamp: expect.any(String),
-          }) as any,
-          expect.objectContaining({
-            chunk: 3,
-            data: expect.stringContaining('Streaming chunk 3/3'),
-            timestamp: expect.any(String),
-          }) as any,
-        ]),
-        total: 3,
+        ok: true,
+        delayMs: 300,
+        timestamp: expect.any(String),
       })
     );
 
-    // Should have payment info for streaming
+    // Should have payment info
     expect(streamResult.payment).toBeTruthy();
     expect(streamResult.payment!.cost).toBe(BigInt('5000000')); // 500,000,000 picoUSD ÷ 100 picoUSD/unit = 5,000,000 RGas base units
 
-    console.log('✅ Stream response:', streamResult.data);
-    console.log(`💰 Stream payment - ${formatPaymentInfo(streamResult.payment!)}`);
+    console.log('✅ Slow tool response:', streamResult.data);
+    console.log(`💰 Slow tool payment - ${formatPaymentInfo(streamResult.payment!)}`);
 
-    console.log('🎉 Streaming tool test successful!');
+    console.log('🎉 Slow tool test successful!');
   }, 120000);
 
   test('Multiple requests with nonce progression', async () => {
