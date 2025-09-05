@@ -6,18 +6,6 @@ import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
 import { buildParametersSchema, compileStandardSchema } from './ToolSchema';
-import { serializeJson } from '../../utils/json';
-
-function toMcpToolResult(raw: any): any {
-  // MCP规范：返回 ToolResult，仅包含 content。将业务数据与支付信息包装为首个 text JSON。
-  const container: any = {};
-  if (raw && typeof raw === 'object' && 'data' in raw) container.data = (raw as any).data;
-  else container.data = raw;
-  if (raw && typeof raw === 'object' && (raw as any).__nuwa_payment) {
-    container.__nuwa_payment = (raw as any).__nuwa_payment;
-  }
-  return { content: [{ type: 'text', text: serializeJson(container) }] } as any;
-}
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
@@ -31,15 +19,12 @@ export interface FastMcpServerOptions extends McpPaymentKitOptions {
 }
 
 export class PaymentMcpToolRegistrar {
-  private readonly passThroughParameters: any;
   private started = false;
   registeredTools: any[] = [];
   constructor(
     private readonly server: FastMCP,
     private readonly kit: McpPaymentKit
-  ) {
-    this.passThroughParameters = undefined;
-  }
+  ) {}
 
   markStarted(): void {
     this.started = true;

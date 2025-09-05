@@ -21,7 +21,6 @@ import { BuiltInApiHandlers } from '../../api';
 import type { ApiContext } from '../../types/api';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
-import { validateSerializableResponsePayload } from './ToolSchema';
 import { serializeJson } from '../../utils/json';
 
 export interface McpPaymentKitOptions {
@@ -294,20 +293,6 @@ export class McpPaymentKit {
       channelRepo: this.deps.channelRepo,
       ravRepo: this.deps.ravRepo,
       pendingSubRAVRepo: this.deps.pendingSubRAVRepo,
-    };
-  }
-
-  private toStructured(decoded: any) {
-    return {
-      version: decoded.version,
-      clientTxRef: decoded.clientTxRef,
-      serviceTxRef: decoded.serviceTxRef,
-      subRav: decoded.subRav
-        ? ((HttpPaymentCodec as any).serializeSubRAV?.(decoded.subRav) ?? decoded.subRav)
-        : undefined,
-      cost: decoded.cost !== undefined ? decoded.cost.toString() : undefined,
-      costUsd: decoded.costUsd !== undefined ? decoded.costUsd.toString() : undefined,
-      error: decoded.error,
     };
   }
 }
