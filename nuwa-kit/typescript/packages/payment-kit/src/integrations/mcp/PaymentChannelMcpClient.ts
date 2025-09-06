@@ -20,6 +20,8 @@ import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
 import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
+import type { ZodTypeAny } from 'zod';
+import { HealthResponseSchema, type HealthResponse } from '../../schema';
 
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
@@ -108,20 +110,14 @@ export class PaymentChannelMcpClient {
    * @param params - The parameters to pass to the tool
    * @returns The result of the tool call
    */
-  async call<T = any>(method: string, params?: any): Promise<PaymentResult<T>> {
+  async call<T = any>(
+    method: string,
+    params?: any,
+    schema?: ZodTypeAny
+  ): Promise<PaymentResult<T>> {
     const { content, payment } = await this.callToolWithPayment(method, params);
-    // Extract first text as data for convenience API
-    let data: any = undefined;
-    const dataItem = Array.isArray(content)
-      ? content.find((c: any) => c?.type === 'text') || content[0]
-      : undefined;
-    if (dataItem && dataItem.type === 'text' && typeof dataItem.text === 'string') {
-      try {
-        data = JSON.parse(dataItem.text);
-      } catch {
-        data = dataItem.text as any;
-      }
-    }
+    const raw = this.parseFirstJsonText<any>(content);
+    const data = schema ? (schema.parse(raw) as T) : (raw as T);
     return { data, payment };
   }
 
@@ -249,6 +245,22 @@ export class PaymentChannelMcpClient {
   clearPendingSubRAV(): void {
     this.paymentState.clearPendingSubRAV();
   }
+
+  private parseFirstJsonText<T>(content: any[]): T | undefined {
+    const dataItem = Array.isArray(content)
+      ? content.find((c: any) => c?.type === 'text') || content[0]
+      : undefined;
+    if (dataItem && dataItem.type === 'text' && typeof dataItem.text === 'string') {
+      try {
+        return JSON.parse(dataItem.text) as T;
+      } catch {
+        return dataItem.text as any;
+      }
+    }
+    return undefined;
+  }
+
+  // Schema should be provided by call sites for strong typing, no internal mapping
 
   private async buildParams(method: string, userParams: any, clientTxRef: string) {
     const payerDid = this.options.payerDid || (await this.options.signer.getDid());
@@ -378,8 +390,8 @@ export class PaymentChannelMcpClient {
     return this.payerClient;
   }
 
-  async healthCheck(): Promise<any> {
-    const res = await this.call<any>('nuwa.health');
+  async healthCheck(): Promise<HealthResponse> {
+    const res = await this.call<HealthResponse>('nuwa.health', undefined, HealthResponseSchema);
     return res.data;
   }
 

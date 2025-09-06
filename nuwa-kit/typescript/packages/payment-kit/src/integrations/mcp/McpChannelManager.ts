@@ -32,9 +32,6 @@ export class McpChannelManager {
   private discoveredBasePath?: string;
   private ensureReadyPromise?: Promise<void>;
   private recoveringPromise?: Promise<RecoveryResponse>;
-  private inRecovery: boolean = false;
-  private lastRecoveryAt: number = 0;
-  private readonly minRecoveryIntervalMs: number = 1000;
 
   constructor(options: McpChannelManagerOptions) {
     this.options = options;
@@ -163,25 +160,7 @@ export class McpChannelManager {
   }
 
   async recoverFromService(): Promise<RecoveryResponse> {
-    // singleflight to avoid recursion storms
-    const now = Date.now();
-    if (now - this.lastRecoveryAt < this.minRecoveryIntervalMs && this.recoveringPromise) {
-      this.logger.debug('recoverFromService: returning existing promise (throttled)');
-      return this.recoveringPromise;
-    }
-    if (!this.recoveringPromise) {
-      this.inRecovery = true;
-      this.lastRecoveryAt = now;
-      this.recoveringPromise = this.doRecoverFromService()
-        .catch(err => {
-          throw err;
-        })
-        .finally(() => {
-          this.inRecovery = false;
-          this.recoveringPromise = undefined;
-        });
-    }
-    return this.recoveringPromise;
+    return this.doRecoverFromService();
   }
 
   private async doRecoverFromService(): Promise<RecoveryResponse> {

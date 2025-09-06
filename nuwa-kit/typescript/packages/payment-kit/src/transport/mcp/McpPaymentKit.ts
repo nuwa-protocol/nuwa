@@ -18,10 +18,11 @@ import { HubBalanceService } from '../../core/HubBalanceService';
 import { ClaimTriggerService, DEFAULT_REACTIVE_CLAIM_POLICY } from '../../core/ClaimTriggerService';
 import { McpBillingMiddleware } from '../../middlewares/mcp/McpBillingMiddleware';
 import { BuiltInApiHandlers } from '../../api';
-import type { ApiContext } from '../../types/api';
+import { ErrorCode, type ApiContext } from '../../types/api';
 import { registerBuiltinStrategies } from '../../billing/strategies';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { serializeJson } from '../../utils/json';
+import { PaymentKitError } from '../../errors/PaymentKitError';
 
 export interface McpPaymentKitOptions {
   serviceId: string;
@@ -232,19 +233,29 @@ export class McpPaymentKit {
 
     for (const [key, cfg] of Object.entries(BuiltInApiHandlers)) {
       const methodName = mapName(key);
-      const routeOptions =
-        key === 'recovery'
-          ? ({ ...(cfg.options as any), authRequired: true, pricing: '0' } as any)
-          : cfg.options;
+      const routeOptions = cfg.options;
       const handler = async (params: any, context?: any) => {
         // Built-in handlers expect DID info on the request object; enrich from FastMCP context
         const req = context?.didInfo ? { ...params, didInfo: context.didInfo } : params;
         const res = await cfg.handler(ctx as any, req);
-        // Return plain data; billing settlement wrapper will embed __nuwa_payment
-        if (res && typeof res === 'object' && 'success' in (res as any) && 'data' in (res as any)) {
+        // If handler follows ApiResponse envelope, normalize:
+        if (res && typeof res === 'object' && 'success' in (res as any)) {
+          const ok = Boolean((res as any).success);
+          if (!ok) {
+            const e = (res as any).error;
+            // Throw error → FastMCP 将按 JSON-RPC error 返回
+            throw new PaymentKitError(
+              e?.code || 'INTERNAL_ERROR',
+              e?.message || 'Error',
+              e?.httpStatus || 500,
+              e?.details
+            );
+          }
           return (res as any).data;
+        } else {
+          this.logger.error('Unexpect api response:', res);
+          throw new PaymentKitError(ErrorCode.INTERNAL_ERROR, 'Unexpect api response');
         }
-        return res;
       };
       this.register(methodName, routeOptions, handler, key);
     }
