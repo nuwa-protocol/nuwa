@@ -3,9 +3,13 @@ import type { SignedSubRAV, SubRAV } from '../../core/types';
 import type { PaymentCodec } from '../../codecs/PaymentCodec';
 import { EncodingError, DecodingError } from '../../codecs/PaymentCodec';
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   HttpRequestPayload,
   PaymentResponsePayload as HttpResponsePayload,
+  SerializableResponsePayload,
+  SerializableSubRAV,
+  SerializableSignedSubRAV,
+  SerializableRequestPayload,
 } from '../../core/types';
 
 /**
@@ -16,11 +20,14 @@ import type {
  */
 export class HttpPaymentCodec implements PaymentCodec {
   private static readonly HEADER_NAME = 'X-Payment-Channel-Data';
+  // MCP content constants
+  static readonly MCP_PAYMENT_URI = 'nuwa:payment';
+  static readonly MCP_PAYMENT_MIME = 'application/vnd.nuwa.payment+json';
 
   /**
    * Encode payment header payload for HTTP request header (new interface)
    */
-  encodePayload(payload: PaymentHeaderPayload): string {
+  encodePayload(payload: PaymentRequestPayload): string {
     try {
       return HttpPaymentCodec.buildRequestHeader(payload);
     } catch (error) {
@@ -34,7 +41,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Decode HTTP request header to payment header payload (new interface)
    */
-  decodePayload(encoded: string): PaymentHeaderPayload {
+  decodePayload(encoded: string): PaymentRequestPayload {
     try {
       return HttpPaymentCodec.parseRequestHeader(encoded);
     } catch (error) {
@@ -93,25 +100,20 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Decode HTTP response header to SubRAV proposal
    */
-  decodeResponse(encoded: string): {
-    subRAV?: SubRAV;
-    cost?: bigint;
-    serviceTxRef?: string;
-    metadata?: any;
-    error?: { code: string; message?: string };
-    version?: number;
-  } {
+  decodeResponse(encoded: string) {
     try {
       const payload = HttpPaymentCodec.parseResponseHeader(encoded);
 
-      return {
-        subRAV: payload.subRav,
+      const out: HttpResponsePayload = {
+        subRav: payload.subRav,
         cost: payload.cost,
+        costUsd: payload.costUsd,
+        clientTxRef: payload.clientTxRef,
         serviceTxRef: payload.serviceTxRef,
-        metadata: payload.clientTxRef ? { clientTxRef: payload.clientTxRef } : undefined,
         error: payload.error,
         version: payload.version,
-      };
+      } as HttpResponsePayload;
+      return out;
     } catch (error) {
       throw new DecodingError(
         'Failed to decode HTTP response payment data',
@@ -127,20 +129,8 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Build HTTP request header value
    */
-  static buildRequestHeader(payload: PaymentHeaderPayload): string {
-    // Convert payload to serializable format
-    const serializable: any = {
-      maxAmount: payload.maxAmount.toString(),
-      clientTxRef: payload.clientTxRef,
-      version: payload.version.toString(),
-    };
-
-    // signedSubRav is now optional
-    if (payload.signedSubRav) {
-      serializable.signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
-    }
-
-    // Convert to JSON and encode
+  static buildRequestHeader(payload: PaymentRequestPayload): string {
+    const serializable = this.toJSONRequest(payload);
     const json = JSON.stringify(serializable);
     return MultibaseCodec.encodeBase64url(json);
   }
@@ -148,28 +138,11 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Parse HTTP request header value
    */
-  static parseRequestHeader(headerValue: string): PaymentHeaderPayload {
+  static parseRequestHeader(headerValue: string): PaymentRequestPayload {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
       const data = JSON.parse(json);
-
-      // clientTxRef is now required
-      if (!data.clientTxRef) {
-        throw new Error('clientTxRef is required in payment header');
-      }
-
-      const result: PaymentHeaderPayload = {
-        maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0), // Handle old format without maxAmount
-        clientTxRef: data.clientTxRef,
-        version: parseInt(data.version) || 1,
-      };
-
-      // signedSubRav is now optional
-      if (data.signedSubRav) {
-        result.signedSubRav = this.deserializeSignedSubRAV(data.signedSubRav);
-      }
-
-      return result;
+      return this.fromJSONRequest(data as SerializableRequestPayload);
     } catch (error) {
       throw new Error(`Failed to parse request header: ${error}`);
     }
@@ -179,24 +152,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Build HTTP response header value
    */
   static buildResponseHeader(payload: HttpResponsePayload): string {
-    const serializable: any = {
-      clientTxRef: payload.clientTxRef,
-      serviceTxRef: payload.serviceTxRef,
-      version: (payload.version ?? 1).toString(),
-    };
-
-    if (payload.subRav && payload.cost !== undefined) {
-      serializable.subRav = this.serializeSubRAV(payload.subRav);
-      serializable.cost = payload.cost.toString();
-      if (payload.costUsd !== undefined) {
-        serializable.costUsd = payload.costUsd.toString();
-      }
-    }
-
-    if (payload.error) {
-      serializable.error = payload.error;
-    }
-
+    const serializable = this.toJSONResponse(payload);
     const json = JSON.stringify(serializable);
     return MultibaseCodec.encodeBase64url(json);
   }
@@ -207,37 +163,81 @@ export class HttpPaymentCodec implements PaymentCodec {
   static parseResponseHeader(headerValue: string): HttpResponsePayload {
     try {
       const json = MultibaseCodec.decodeBase64urlToString(headerValue);
-      const data = JSON.parse(json);
-
-      const payload: HttpResponsePayload = {
-        clientTxRef: data.clientTxRef,
-        serviceTxRef: data.serviceTxRef,
-        version: parseInt(data.version) || 1,
-      } as HttpResponsePayload;
-
-      // Success path
-      if (data.subRav && (data.cost !== undefined || data.amountDebited !== undefined)) {
-        payload.subRav = this.deserializeSubRAV(data.subRav);
-        // Support old amountDebited for early servers
-        const costStr = data.cost ?? data.amountDebited;
-        payload.cost = costStr !== undefined ? BigInt(costStr) : undefined;
-        if (data.costUsd !== undefined) {
-          payload.costUsd = BigInt(data.costUsd);
-        }
-      }
-
-      // Error path
-      if (data.error) {
-        payload.error = data.error;
-      } else if (data.errorCode !== undefined) {
-        // Map legacy numeric errorCode to string code
-        payload.error = { code: String(data.errorCode), message: data.message };
-      }
-
-      return payload;
+      const data: any = JSON.parse(json);
+      return this.fromJSONResponse(data as SerializableResponsePayload);
     } catch (error) {
       throw new Error(`Failed to parse response header: ${error}`);
     }
+  }
+
+  // ============================================================================
+  // Structured JSON helpers for PaymentResponsePayload (for MCP and others)
+  // Note: subRav is serialized as JSON (not encoded string) for readability.
+  // In a future revision, we may add an additional encoded field (e.g., subRavHeader)
+  // without breaking compatibility.
+  // ============================================================================
+
+  static toJSONResponse(payload: HttpResponsePayload): SerializableResponsePayload {
+    const out: SerializableResponsePayload = {
+      version: payload.version ?? 1,
+      clientTxRef: payload.clientTxRef,
+      serviceTxRef: payload.serviceTxRef,
+    };
+    // Always include subRav when present, even if cost is undefined (e.g., PAYMENT_REQUIRED 402)
+    if (payload.subRav) {
+      out.subRav = this.serializeSubRAV(payload.subRav);
+    }
+    if (payload.cost !== undefined) {
+      out.cost = payload.cost.toString();
+    }
+    if (payload.costUsd !== undefined) {
+      out.costUsd = payload.costUsd.toString();
+    }
+    if (payload.error) {
+      out.error = payload.error;
+    }
+    return out;
+  }
+
+  static fromJSONResponse(data: SerializableResponsePayload): HttpResponsePayload {
+    const payload: HttpResponsePayload = {
+      version: data?.version ? Number(data.version) : 1,
+      clientTxRef: data?.clientTxRef,
+      serviceTxRef: data?.serviceTxRef,
+    } as HttpResponsePayload;
+
+    if (data?.subRav) {
+      payload.subRav = this.deserializeSubRAV(data.subRav as unknown as SerializableSubRAV);
+    }
+    const costStr = (data as any).cost;
+    if (costStr !== undefined) payload.cost = BigInt(costStr);
+    if (data.costUsd !== undefined) payload.costUsd = BigInt(data.costUsd);
+    if (data?.error) {
+      payload.error = data.error as any;
+    }
+    return payload;
+  }
+
+  // Structured JSON helpers for PaymentRequestPayload (for MCP and others)
+  static toJSONRequest(payload: PaymentRequestPayload): SerializableRequestPayload {
+    const out: SerializableRequestPayload = {
+      version: payload.version ?? 1,
+      clientTxRef: payload.clientTxRef,
+    };
+    if (payload.maxAmount !== undefined) out.maxAmount = payload.maxAmount.toString();
+    if (payload.signedSubRav) out.signedSubRav = this.serializeSignedSubRAV(payload.signedSubRav);
+    return out;
+  }
+
+  static fromJSONRequest(data: SerializableRequestPayload): PaymentRequestPayload {
+    if (!data?.clientTxRef) throw new Error('clientTxRef is required in payment header');
+    const out: PaymentRequestPayload = {
+      version: data.version ?? 1,
+      clientTxRef: data.clientTxRef,
+      maxAmount: data.maxAmount ? BigInt(data.maxAmount) : BigInt(0),
+      signedSubRav: data.signedSubRav ? this.deserializeSignedSubRAV(data.signedSubRav) : undefined,
+    };
+    return out;
   }
 
   /**
@@ -274,7 +274,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Extract payment data from request headers
    */
-  static extractPaymentData(headers: Record<string, string>): PaymentHeaderPayload | null {
+  static extractPaymentData(headers: Record<string, string>): PaymentRequestPayload | null {
     const headerValue =
       headers[this.getHeaderName().toLowerCase()] || headers[this.getHeaderName()];
 
@@ -307,7 +307,7 @@ export class HttpPaymentCodec implements PaymentCodec {
    * Validate payment requirements for a request
    */
   static validatePaymentRequirement(
-    paymentData: PaymentHeaderPayload | null,
+    paymentData: PaymentRequestPayload | null,
     requiredAmount: bigint
   ): { valid: boolean; error?: string } {
     if (!paymentData) {
@@ -328,7 +328,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SubRAV for JSON transport
    */
-  private static serializeSubRAV(subRav: SubRAV): Record<string, string> {
+  public static serializeSubRAV(subRav: SubRAV): SerializableSubRAV {
     return {
       version: subRav.version.toString(),
       chainId: subRav.chainId.toString(),
@@ -343,7 +343,7 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SubRAV from JSON transport
    */
-  private static deserializeSubRAV(data: Record<string, string>): SubRAV {
+  public static deserializeSubRAV(data: SerializableSubRAV): SubRAV {
     return {
       version: parseInt(data.version),
       chainId: BigInt(data.chainId),
@@ -358,9 +358,9 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Serialize SignedSubRAV for JSON transport
    */
-  private static serializeSignedSubRAV(
+  public static serializeSignedSubRAV(
     signedSubRav: SignedSubRAV | undefined
-  ): Record<string, any> | undefined {
+  ): SerializableSignedSubRAV | undefined {
     if (!signedSubRav) {
       return undefined;
     }
@@ -374,8 +374,8 @@ export class HttpPaymentCodec implements PaymentCodec {
   /**
    * Helper: Deserialize SignedSubRAV from JSON transport
    */
-  private static deserializeSignedSubRAV(
-    data: Record<string, any> | undefined
+  public static deserializeSignedSubRAV(
+    data: SerializableSignedSubRAV | undefined
   ): SignedSubRAV | undefined {
     if (!data) {
       return undefined;
@@ -385,5 +385,54 @@ export class HttpPaymentCodec implements PaymentCodec {
       subRav: this.deserializeSubRAV(data.subRav),
       signature: MultibaseCodec.decodeBase64url(data.signature),
     };
+  }
+
+  // ==========================================================================
+  // MCP Content helpers (resource content for payment payload)
+  // ==========================================================================
+
+  /** Build a FastMCP-compatible resource content item carrying payment payload */
+  static buildMcpPaymentResource(payload: SerializableResponsePayload): any {
+    return {
+      type: 'resource',
+      resource: {
+        uri: this.MCP_PAYMENT_URI,
+        mimeType: this.MCP_PAYMENT_MIME,
+        text: JSON.stringify(payload),
+      },
+    };
+  }
+
+  /** Try to parse payment payload from a FastMCP content array */
+  static parseMcpPaymentFromContents(
+    contents: any[] | undefined
+  ): SerializableResponsePayload | undefined {
+    if (!Array.isArray(contents)) return undefined;
+    const item = contents.find(
+      c =>
+        c &&
+        c.type === 'resource' &&
+        c.resource &&
+        (c.resource.uri === this.MCP_PAYMENT_URI || c.resource.mimeType === this.MCP_PAYMENT_MIME)
+    );
+    try {
+      const text = item?.resource?.text;
+      if (!text || typeof text !== 'string') return undefined;
+      return JSON.parse(text) as SerializableResponsePayload;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Attach payment resource to an existing content array (non-mutating) */
+  static attachPaymentResource(
+    contents: any[] | undefined,
+    payload?: SerializableResponsePayload
+  ): any[] {
+    const out: any[] = Array.isArray(contents) ? [...contents] : [];
+    if (payload) {
+      out.push(this.buildMcpPaymentResource(payload));
+    }
+    return out;
   }
 }

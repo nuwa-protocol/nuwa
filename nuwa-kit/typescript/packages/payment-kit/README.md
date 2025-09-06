@@ -15,6 +15,7 @@ TypeScript/JavaScript SDK based on the “NIP-4 Unidirectional Payment Channel C
 - **Chain Agnostic**: Abstract design; Rooch supported today, extensible to others
 - **HTTP Client**: `PaymentChannelHttpClient` handles `X-Payment-Channel-Data`, channel lifecycle, and payment tracking
 - **API Server Integration**: `ExpressPaymentKit` mounts payment and billing with one line (built-in per-request/per-usage strategies, auto-settlement, and admin endpoints)
+- **MCP Support**: `McpPaymentKit` and `PaymentChannelMcpClient` provide full Model Context Protocol integration with payment channels
 - **Type-safe**: 100% TypeScript with complete typings
 
 ### Streaming support (SSE/NDJSON)
@@ -270,6 +271,120 @@ const decoded = SubRAVCodec.decode(encoded);
 const fromHex = SubRAVCodec.fromHex(hex);
 ```
 
+### MCP (Model Context Protocol) Integration
+
+Payment Kit provides full support for MCP with payment channels, enabling AI agents to make paid API calls.
+
+#### MCP Server
+
+```typescript
+import { createFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+
+// 1) Create server
+const app = await createFastMcpServer({
+  serviceId: 'my-ai-service',
+  port: 8080,
+  debug: true,
+});
+
+// 2) Register tools (FREE/paid)
+app.freeTool({
+  name: 'hello',
+  description: 'Say hello',
+  parameters: { type: 'object', properties: { name: { type: 'string' } } },
+  execute: async ({ name }) => ({ message: `Hello, ${name || 'World'}!` }),
+});
+
+app.paidTool({
+  name: 'analyze',
+  description: 'Analyze data (paid service)',
+  pricePicoUSD: 1_000_000_000n, // 0.001 USD
+  parameters: { type: 'object', properties: { data: { type: 'string' } } },
+  execute: async ({ data }) => ({ analysis: `Analysis of "${data}"` }),
+});
+
+// 3) Start server
+await app.start();
+```
+
+#### MCP Client
+
+```typescript
+import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit/mcp';
+import { createTestSigner } from '@nuwa-ai/identity-kit/testHelpers';
+
+const signer = await createTestSigner();
+const client = new PaymentChannelMcpClient({
+  baseUrl: 'http://localhost:8080/mcp',
+  signer,
+  // Optional: Use persistent storage (default is in-memory)
+  // storageOptions: {
+  //   channelRepo: createSqlChannelRepo(connectionString),
+  //   namespace: 'my-ai-agent', // Useful for multi-service scenarios
+  // },
+});
+
+// Make paid tool calls
+const result = await client.call('analyze', { 
+  data: 'Sample data for analysis' 
+});
+
+console.log('Response:', result.data);
+console.log('Payment info:', result.payment);
+
+// Built-in payment management
+const health = await client.healthCheck(); // FREE
+const recovery = await client.recoverFromService(); // FREE
+
+// Commit pending SubRAVs
+const pendingSubRAV = client.getPendingSubRAV();
+if (pendingSubRAV) {
+  const signedSubRAV = await client.getPayerClient().signSubRAV(pendingSubRAV);
+  await client.commitSubRAV(signedSubRAV);
+}
+```
+
+#### MCP Payment Content Format (Server Responses)
+
+- Business result is returned as normal MCP `content` (e.g., `type: "text"`, or any supported content types your tool emits).
+- Payment info is always appended as a dedicated resource content item:
+
+```json
+{
+  "type": "resource",
+  "resource": {
+    "uri": "nuwa:payment",
+    "mimeType": "application/vnd.nuwa.payment+json",
+    "text": "{\"version\":1,\"clientTxRef\":\"...\",\"serviceTxRef\":\"...\",\"subRav\":{...},\"cost\":\"...\",\"costUsd\":\"...\"}"
+  }
+}
+```
+
+- The JSON inside `resource.text` conforms to `SerializableResponsePayload` (BigInt fields are strings).
+- Helpers are provided:
+  - Server: `HttpPaymentCodec.buildMcpPaymentResource(payload)`
+  - Client: `HttpPaymentCodec.parseMcpPaymentFromContents(contents)`
+
+#### MCP Tool Parameters: Reserved Keys and Strict Validation
+
+- Reserved keys merged into each tool parameters schema:
+  - `__nuwa_auth` (string; DIDAuthV1 authorization header produced by IdentityKit)
+  - `__nuwa_payment` (object; serialized request payload with shape `SerializableRequestPayload`)
+- The registrar compiles schemas using `buildParametersSchema(userSchema, { mergeReserved: true })` and `compileStandardSchema(...)` (Ajv + formats), enforcing strict validation at FastMCP boundary.
+
+Minimal shape of `__nuwa_payment` provided by client per call:
+
+```json
+{
+  "version": 1,
+  "clientTxRef": "<uuid>",
+  "maxAmount": "<string-amount>?",
+  "signedSubRav": { "subRav": { ... }, "signature": "..." }?
+}
+```
+
+The server validates and settles payment, then emits the payment resource item (see above).
+
 ## 🔧 Development
 
 ### Build
@@ -292,9 +407,13 @@ See [DESIGN.md](./DESIGN.md)
 
 ### 📚 Examples
 
-- Example project: `nuwa-kit/typescript/examples/payment-kit-integration`
+- **HTTP Integration**: `nuwa-kit/typescript/examples/payment-kit-integration`
   - Client CLI: `src/client-cli.ts` (demonstrates `PaymentChannelHttpClient` and `PaymentChannelAdminClient`)
   - Server: `src/server.ts` (demonstrates `createExpressPaymentKitFromEnv` with multiple billing strategies)
+
+- **MCP Integration**: `examples/`
+  - MCP Server: `mcp-server.ts` (demonstrates `createFastMcpServer` with FREE and paid tools)
+  - MCP Client: `mcp-client.ts` (demonstrates `PaymentChannelMcpClient` usage and payment flows)
 
 ## 📄 License
 

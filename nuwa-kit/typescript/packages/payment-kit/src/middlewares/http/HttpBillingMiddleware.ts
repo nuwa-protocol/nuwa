@@ -11,7 +11,7 @@ import type { PaymentProcessorConfig } from '../../core/PaymentProcessor';
 import type { BillingContext } from '../../billing';
 import { HttpPaymentCodec } from './HttpPaymentCodec';
 import type {
-  PaymentHeaderPayload,
+  PaymentRequestPayload,
   HttpRequestPayload,
   HttpResponsePayload,
   SignedSubRAV,
@@ -127,7 +127,7 @@ export class HttpBillingMiddleware {
         this.log(`📋 Context state:`, {
           signedSubRavVerified: processedCtx.state.signedSubRavVerified,
           cost: processedCtx.state.cost,
-          headerValue: !!processedCtx.state.headerValue,
+          responsePayload: !!processedCtx.state.responsePayload,
         });
       }
       return processedCtx;
@@ -153,14 +153,15 @@ export class HttpBillingMiddleware {
         return true; // Successfully handled, no header needed
       }
 
-      if (!settledCtx.state?.headerValue) {
-        this.log('⚠️ No header value generated during settlement');
+      // Prefer responsePayload; fallback to legacy headerValue
+      const payload = settledCtx.state?.responsePayload;
+      const header = payload ? HttpPaymentCodec.buildResponseHeader(payload as any) : undefined;
+      if (!header) {
+        this.log('⚠️ No payment header generated during settlement');
         return false;
       }
-
-      // Add response header if adapter provided
       if (resAdapter) {
-        resAdapter.setHeader('X-Payment-Channel-Data', settledCtx.state.headerValue);
+        resAdapter.setHeader('X-Payment-Channel-Data', header);
         this.log('✅ Payment header added to response synchronously');
       }
 
@@ -231,7 +232,7 @@ export class HttpBillingMiddleware {
    */
   extractPaymentData(
     headers: Record<string, string | string[] | undefined>
-  ): PaymentHeaderPayload | null {
+  ): PaymentRequestPayload | null {
     const headerValue = HttpPaymentCodec.extractPaymentHeader(headers);
 
     if (!headerValue) {
@@ -250,7 +251,7 @@ export class HttpBillingMiddleware {
    */
   private buildBillingContext(
     req: GenericHttpRequest,
-    paymentData?: PaymentHeaderPayload,
+    paymentData?: PaymentRequestPayload,
     billingRule?: BillingRule
   ): BillingContext {
     return {

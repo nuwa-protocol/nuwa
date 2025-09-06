@@ -1,4 +1,9 @@
-import type { SignedSubRAV } from '../core/types';
+import type {
+  SignedSubRAV,
+  SubRAV,
+  PaymentRequestPayload,
+  PaymentResponsePayload,
+} from '../core/types';
 
 /**
  * Protocol-agnostic payment codec interface
@@ -6,7 +11,26 @@ import type { SignedSubRAV } from '../core/types';
  * Implementations handle encoding/decoding of payment data
  * for specific protocols (HTTP, MCP, A2A, etc.)
  */
-export interface PaymentCodec {}
+export interface PaymentCodec {
+  // Request-side encode/decode
+  encodePayload(payload: PaymentRequestPayload): string | Record<string, any>;
+  decodePayload(input: string | Record<string, any>): PaymentRequestPayload;
+
+  // Response-side encode/decode
+  encodeResponse(
+    subRAV: SubRAV,
+    cost: bigint,
+    serviceTxRef: string,
+    metadata?: any
+  ): string | Record<string, any>;
+
+  encodeError(
+    error: { code: string; message?: string },
+    metadata?: { clientTxRef?: string; serviceTxRef?: string; version?: number }
+  ): string | Record<string, any>;
+
+  decodeResponse(input: string | Record<string, any>): PaymentResponsePayload;
+}
 
 /**
  * Error types for codec operations
