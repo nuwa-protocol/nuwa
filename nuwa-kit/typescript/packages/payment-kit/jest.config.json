@@ -39,5 +39,8 @@
   "silent": false,
   "moduleNameMapper": {
     "^@nuwa-ai/identity-kit/testHelpers$": "<rootDir>/../identity-kit/src/testHelpers/index.ts"
-  }
+  },
+  "testPathIgnorePatterns": [
+    "<rootDir>/test/e2e/"
+  ]
 } 
