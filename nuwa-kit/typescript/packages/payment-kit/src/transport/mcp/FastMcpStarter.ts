@@ -21,6 +21,9 @@ export interface FastMcpServerOptions extends McpPaymentKitOptions {
 export class PaymentMcpToolRegistrar {
   private started = false;
   registeredTools: any[] = [];
+  registeredPrompts: any[] = [];
+  registeredResources: any[] = [];
+  registeredResourceTemplates: any[] = [];
   constructor(
     private readonly server: FastMCP,
     private readonly kit: McpPaymentKit
@@ -89,6 +92,75 @@ export class PaymentMcpToolRegistrar {
   getTools(): any[] {
     return this.registeredTools.slice();
   }
+
+  addPrompt(def: {
+    name: string;
+    description: string;
+    arguments?: any[];
+    load: (args: any) => Promise<string> | string;
+  }): void {
+    this.ensureNotStarted();
+    const promptDef = {
+      name: def.name,
+      description: def.description,
+      arguments: def.arguments || [],
+      async load(args: any) {
+        return await def.load(args);
+      },
+    } as any;
+    this.server.addPrompt(promptDef);
+    this.registeredPrompts.push(promptDef);
+  }
+
+  addResource(def: {
+    uri: string;
+    name: string;
+    mimeType: string;
+    load: () => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
+  }): void {
+    this.ensureNotStarted();
+    const resDef = {
+      uri: def.uri,
+      name: def.name,
+      mimeType: def.mimeType,
+      async load() {
+        return await def.load();
+      },
+    } as any;
+    this.server.addResource(resDef);
+    this.registeredResources.push(resDef);
+  }
+
+  addResourceTemplate(def: {
+    uriTemplate: string;
+    name: string;
+    mimeType: string;
+    arguments?: any[];
+    load: (args: any) => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
+  }): void {
+    this.ensureNotStarted();
+    const tplDef = {
+      uriTemplate: def.uriTemplate,
+      name: def.name,
+      mimeType: def.mimeType,
+      arguments: def.arguments || [],
+      async load(args: any) {
+        return await def.load(args);
+      },
+    } as any;
+    this.server.addResourceTemplate(tplDef);
+    this.registeredResourceTemplates.push(tplDef);
+  }
+
+  getPrompts(): any[] {
+    return this.registeredPrompts.slice();
+  }
+  getResources(): any[] {
+    return this.registeredResources.slice();
+  }
+  getResourceTemplates(): any[] {
+    return this.registeredResourceTemplates.slice();
+  }
 }
 
 export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
@@ -111,6 +183,25 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     pricePicoUSD: bigint;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
+  }) => void;
+  addPrompt: (def: {
+    name: string;
+    description: string;
+    arguments?: any[];
+    load: (args: any) => Promise<string> | string;
+  }) => void;
+  addResource: (def: {
+    uri: string;
+    name: string;
+    mimeType: string;
+    load: () => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
+  }) => void;
+  addResourceTemplate: (def: {
+    uriTemplate: string;
+    name: string;
+    mimeType: string;
+    arguments?: any[];
+    load: (args: any) => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
   }) => void;
   start: () => Promise<Server>;
   getInner: () => { server: FastMCP; kit: McpPaymentKit };
@@ -158,9 +249,9 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
           name: opts.serviceId || 'nuwa-mcp-server',
           version: '1.0.0',
           ping: undefined,
-          prompts: [],
-          resources: [],
-          resourcesTemplates: [],
+          prompts: registrar.getPrompts(),
+          resources: registrar.getResources(),
+          resourcesTemplates: registrar.getResourceTemplates(),
           roots: { enabled: true },
           tools: registrar.getTools(),
           transportType: 'httpStream',
@@ -278,5 +369,42 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
 
   const getInner = () => ({ server, kit });
 
-  return { addTool, freeTool, paidTool, start, getInner };
+  const addPrompt = (def: {
+    name: string;
+    description: string;
+    arguments?: any[];
+    load: (args: any) => Promise<string> | string;
+  }) => {
+    registrar.addPrompt(def);
+  };
+
+  const addResource = (def: {
+    uri: string;
+    name: string;
+    mimeType: string;
+    load: () => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
+  }) => {
+    registrar.addResource(def);
+  };
+
+  const addResourceTemplate = (def: {
+    uriTemplate: string;
+    name: string;
+    mimeType: string;
+    arguments?: any[];
+    load: (args: any) => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
+  }) => {
+    registrar.addResourceTemplate(def);
+  };
+
+  return {
+    addTool,
+    freeTool,
+    paidTool,
+    addPrompt,
+    addResource,
+    addResourceTemplate,
+    start,
+    getInner,
+  };
 }

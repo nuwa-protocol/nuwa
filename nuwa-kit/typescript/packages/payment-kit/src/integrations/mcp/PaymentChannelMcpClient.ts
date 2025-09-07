@@ -133,6 +133,77 @@ export class PaymentChannelMcpClient {
   }
 
   /**
+   * List prompts exposed by the server (FREE, no payment).
+   */
+  async listPrompts(): Promise<any> {
+    const client = await this.ensureClient();
+    if (typeof client.listPrompts === 'function') {
+      return await client.listPrompts();
+    }
+    // Fallback: some clients expose prompts()
+    if (typeof client.prompts === 'function') {
+      return await client.prompts();
+    }
+    return {};
+  }
+
+  /**
+   * Load a prompt by name and return string content (FREE, no payment).
+   */
+  async loadPrompt(name: string, args?: any): Promise<string> {
+    const client = await this.ensureClient();
+    if (typeof client.getPrompt === 'function') {
+      const res = await client.getPrompt({ name, arguments: args || {} });
+      return this.extractStringFromPromptResult(res);
+    }
+    // Fallback shape (AI-SDK style): tools().prompt.execute
+    if (typeof client.prompts === 'function') {
+      const prompts = await client.prompts();
+      const p = prompts?.[name];
+      if (p && typeof p.load === 'function') {
+        const out = await p.load(args || {});
+        return typeof out === 'string' ? out : JSON.stringify(out);
+      }
+    }
+    throw new Error(`Prompt '${name}' not available`);
+  }
+
+  /**
+   * List resources (FREE, no payment).
+   */
+  async listResources(): Promise<any[]> {
+    const client = await this.ensureClient();
+    if (typeof client.listResources === 'function') {
+      return await client.listResources();
+    }
+    return [];
+  }
+
+  /**
+   * List resource templates (FREE, no payment).
+   */
+  async listResourceTemplates(): Promise<any[]> {
+    const client = await this.ensureClient();
+    if (typeof client.listResourceTemplates === 'function') {
+      return await client.listResourceTemplates();
+    }
+    return [];
+  }
+
+  /**
+   * Read a resource. Accepts either uri string or parameter object.
+   */
+  async readResource(params: string | { uri: string; [key: string]: any }): Promise<any> {
+    const client = await this.ensureClient();
+    const p = typeof params === 'string' ? { uri: params } : params;
+    if (typeof client.readResource === 'function') {
+      const res = await client.readResource(p);
+      return this.normalizeResourceResult(res);
+    }
+    throw new Error('readResource not supported by underlying MCP client');
+  }
+
+  /**
    * Call a tool with payment
    * @param method - The name of the tool to call
    * @param params - The parameters to pass to the tool
@@ -388,6 +459,48 @@ export class PaymentChannelMcpClient {
 
   getPayerClient(): PaymentChannelPayerClient {
     return this.payerClient;
+  }
+
+  private extractStringFromPromptResult(res: any): string {
+    if (typeof res === 'string') return res;
+    if (res && typeof res === 'object') {
+      // Try common shapes
+      if (Array.isArray(res.content)) {
+        const textItem = res.content.find((c: any) => c?.type === 'text');
+        if (textItem?.text) return String(textItem.text);
+      }
+      if (typeof res.text === 'string') return res.text;
+    }
+    try {
+      return JSON.stringify(res);
+    } catch {
+      return String(res);
+    }
+  }
+
+  private normalizeResourceResult(
+    res: any
+  ): { text?: string; blob?: any; mimeType?: string } | any {
+    try {
+      if (typeof res === 'string') return { text: res };
+      if (res && typeof res === 'object') {
+        if (typeof res.text === 'string')
+          return { text: res.text, mimeType: (res as any).mimeType };
+        if (res.type === 'text' && typeof res.text === 'string') return { text: res.text };
+        const contents = (res as any).contents || (res as any).content;
+        if (Array.isArray(contents)) {
+          const textItem = contents.find(
+            (c: any) => c?.type === 'text' && typeof c.text === 'string'
+          );
+          if (textItem) return { text: String(textItem.text), mimeType: textItem.mimeType };
+          const anyItem = contents[0];
+          if (anyItem && (anyItem.blob || anyItem.data)) {
+            return { blob: anyItem.blob || anyItem.data, mimeType: anyItem.mimeType };
+          }
+        }
+      }
+    } catch {}
+    return res;
   }
 
   async healthCheck(): Promise<HealthResponse> {

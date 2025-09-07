@@ -170,6 +170,35 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       },
     });
 
+    // Register FREE prompt and resources
+    app.addPrompt({
+      name: 'shout',
+      description: 'Uppercase and wrap text',
+      arguments: [{ name: 'text', description: 'Text to transform', required: true }],
+      async load({ text }: { text: string }) {
+        return `>>> ${String(text || '').toUpperCase()} <<<`;
+      },
+    });
+
+    app.addResource({
+      uri: 'info://version',
+      name: 'Server Version Info',
+      mimeType: 'text/plain',
+      async load() {
+        return { text: 'MCP E2E test server' } as any;
+      },
+    });
+
+    app.addResourceTemplate({
+      uriTemplate: 'greet://{name}',
+      name: 'Greeting message',
+      mimeType: 'text/plain',
+      arguments: [{ name: 'name', description: 'Name to greet', required: true }],
+      async load({ name }: { name: string }) {
+        return { text: `Hello, ${name}!` } as any;
+      },
+    });
+
     // Slow tool for non-stream testing (useful for concurrency or latency scenarios)
     app.paidTool({
       name: 'slow_process',
@@ -268,6 +297,36 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log('✅ Recovery successful:', recovery);
 
     console.log('🎉 Built-in FREE endpoints test successful!');
+  }, 60000);
+
+  test('Prompt and Resources (FREE)', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('📝 Testing FREE prompt and resources');
+
+    // Prompts list should be available
+    const prompts = await mcpClient.listPrompts();
+    expect(prompts).toBeTruthy();
+
+    // Load the demo shout prompt
+    const shout = await mcpClient.loadPrompt('shout', { text: 'mcp' });
+    expect(typeof shout).toBe('string');
+    expect(shout.includes('MCP')).toBe(true);
+
+    // Resources list
+    const resources = await mcpClient.listResources();
+    expect(Array.isArray(resources) || typeof resources === 'object').toBeTruthy();
+
+    // Read a static resource
+    const info = await mcpClient.readResource('info://version');
+    // Only assert that some payload is returned; resource shapes may vary across clients
+    expect(info).toBeTruthy();
+
+    // Read a template resource
+    const greet = await mcpClient.readResource('greet://Nuwa');
+    expect(greet).toBeTruthy();
+
+    console.log('✅ Prompt and Resources (FREE) test successful!');
   }, 60000);
 
   test('FREE business tool', async () => {
