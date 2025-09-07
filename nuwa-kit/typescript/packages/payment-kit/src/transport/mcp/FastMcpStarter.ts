@@ -1,7 +1,14 @@
 // Optional convenience starter for FastMCP
 // Users can import this to quickly start an MCP server with billing enabled.
 
-import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
+import {
+  McpPaymentKit,
+  createMcpPaymentKit,
+  McpPaymentKitOptions,
+  createMcpPaymentKitFromEnv,
+} from './McpPaymentKit';
+import type { IdentityEnv } from '@nuwa-ai/identity-kit';
+import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
@@ -16,6 +23,23 @@ export interface FastMcpServerOptions extends McpPaymentKitOptions {
     path?: `/${string}`; // default: '/.well-known/nuwa-payment/info'
     discovery: () => Promise<any> | any; // should conform to ServiceDiscoverySchema
   };
+}
+
+/**
+ * Convenience: start FastMCP server using IdentityEnv (env.keyManager + VDR chain config)
+ */
+export async function createFastMcpServerFromEnv(
+  env: IdentityEnv,
+  opts: Omit<FastMcpServerOptions, 'signer' | 'rpcUrl' | 'network'>
+) {
+  const chain = getChainConfigFromEnv(env);
+  return createFastMcpServer({
+    ...opts,
+    signer: env.keyManager,
+    rpcUrl: chain.rpcUrl,
+    network: chain.network,
+    debug: opts.debug ?? chain.debug,
+  });
 }
 
 export class PaymentMcpToolRegistrar {

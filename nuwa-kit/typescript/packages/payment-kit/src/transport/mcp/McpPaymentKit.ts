@@ -1,6 +1,6 @@
 import { BillableRouter } from '../express/BillableRouter';
 import type { RouteOptions } from '../express/BillableRouter';
-import type { SignerInterface, DIDResolver } from '@nuwa-ai/identity-kit';
+import type { SignerInterface, DIDResolver, IdentityEnv } from '@nuwa-ai/identity-kit';
 import { VDRRegistry, RoochVDR, DIDAuth, DebugLogger } from '@nuwa-ai/identity-kit';
 import { RoochPaymentChannelContract } from '../../rooch/RoochPaymentChannelContract';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
@@ -23,6 +23,7 @@ import { registerBuiltinStrategies } from '../../billing/strategies';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { serializeJson } from '../../utils/json';
 import { PaymentKitError } from '../../errors/PaymentKitError';
+import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 
 export interface McpPaymentKitOptions {
   serviceId: string;
@@ -378,4 +379,21 @@ export async function createMcpPaymentKit(config: McpPaymentKitOptions) {
     ravRepo,
     pendingSubRAVRepo,
   }).registerBuiltIns();
+}
+
+/**
+ * Convenience: create McpPaymentKit from IdentityEnv (uses env.keyManager as signer and chain config from VDR)
+ */
+export async function createMcpPaymentKitFromEnv(
+  env: IdentityEnv,
+  cfg: Omit<McpPaymentKitOptions, 'signer' | 'rpcUrl' | 'network'>
+) {
+  const chain = getChainConfigFromEnv(env);
+  return createMcpPaymentKit({
+    ...cfg,
+    signer: env.keyManager,
+    rpcUrl: chain.rpcUrl,
+    network: chain.network,
+    debug: cfg.debug ?? chain.debug,
+  });
 }
