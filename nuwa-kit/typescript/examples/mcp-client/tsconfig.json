@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "module": "esnext",
+    "module": "nodenext",
     "target": "es2020",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]

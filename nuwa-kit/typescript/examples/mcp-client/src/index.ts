@@ -1,14 +1,8 @@
-import { experimental_createMCPClient as createMCPClient } from "ai";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import {
-  DIDAuth,
-  CryptoUtils,
-  MultibaseCodec,
-  KeyType,
-} from "@nuwa-ai/identity-kit";
+import { CryptoUtils, MultibaseCodec, KeyType, IdentityEnvBuilder, IdentityEnv, IdentityKit, KeyStore, MemoryKeyStore } from "@nuwa-ai/identity-kit";
+import { createMcpClient } from "@nuwa-ai/payment-kit/mcp";
 import { randomUUID } from "crypto";
 import fs from "fs/promises";
-import os from "os";
+import os, { networkInterfaces } from "os";
 import path from "path";
 import http from "http";
 import { URL } from "url";
@@ -205,24 +199,44 @@ function createLocalSigner(cfg: StoredConfig): SignerInterface {
   };
 }
 
-/************************************************************
- * Build Authorization header helper
- ************************************************************/
+function createLocalKeyStore(cfg: StoredConfig): KeyStore {
+  const privateKeyBytes = MultibaseCodec.decodeBase58btc(cfg.privateKeyMultibase);
+  const publicKeyBytes = MultibaseCodec.decodeBase58btc(cfg.publicKeyMultibase);
+  const fullId = cfg.keyId.includes("#") ? cfg.keyId : `${cfg.agentDid}#${cfg.keyId}`;
 
-async function buildAuthHeader(
-  body: unknown,
-  cfg: StoredConfig,
-  signer: SignerInterface
-): Promise<string> {
-  const payload = {
-    operation: "mcp-json-rpc",
-    params: { body },
-  } as const;
-
-  const signedObject = await DIDAuth.v1.createSignature(payload, signer, cfg.keyId);
-
-  return DIDAuth.v1.toAuthorizationHeader(signedObject);
+  return {
+    async listKeyIds(): Promise<string[]> {
+      return [fullId];
+    },
+    async load(keyId?: string) {
+      if (!keyId || keyId === fullId) {
+        return {
+          keyId: fullId,
+          keyType: cfg.keyType,
+          publicKeyMultibase: cfg.publicKeyMultibase,
+          privateKeyMultibase: cfg.privateKeyMultibase,
+          meta: { source: "local-config" },
+        } as any;
+      }
+      return null;
+    },
+    async save(_key) {
+      // No-op: keys are persisted in local JSON config already
+      return;
+    },
+    async clear(_keyId?: string) {
+      // No-op: not mutating the local JSON config here
+      return;
+    },
+    async sign(keyId: string, data: Uint8Array): Promise<Uint8Array> {
+      if (keyId !== fullId) {
+        throw new Error(`Unknown keyId ${keyId}`);
+      }
+      return CryptoUtils.sign(data, privateKeyBytes, cfg.keyType);
+    },
+  };
 }
+
 
 /************************************************************
  * Main
@@ -235,36 +249,34 @@ async function main() {
     config = await connectToCadop(cadopDomain);
   }
 
-  const signer = createLocalSigner(config);
-
-  // Build a static Authorization header for the initial connection. The
-  // StreamableHTTPClientTransport API no longer exposes a per-request
-  // callback, so we embed a pre-computed signature here for demo purposes.
-  const staticAuthHeader = await buildAuthHeader({}, config, signer);
-
-  const transport = new StreamableHTTPClientTransport(
-    new URL("http://localhost:8080/mcp"),
-    {
-      requestInit: {
-        headers: {
-          Authorization: staticAuthHeader,
-        },
-      }
-    } as any
-  );
-
-  const client = await createMCPClient({ transport });
-
-  console.log("Fetching remote tool list…");
-  const tools = await client.tools();
-  console.log("Remote tools:", Object.keys(tools));
-  const echoTool = tools.echo;
-  const echoResult = await echoTool.execute({ text: "Hello from MCP CLI"}, {
-    toolCallId: "123",
-    messages: [],
+  const keyStore = createLocalKeyStore(config);
+  // Build IdentityEnv and preload KeyManager state
+  const env = await IdentityKit.bootstrap({
+    method: "rooch",
+    keyStore: keyStore,
+    vdrOptions: {
+      network: "test",
+    },
   });
-  console.log("Echo result:", echoResult);
-  await client.close();
+  // Note: for demo purposes we only need env.keyManager as signer; DID/key import not required here
+
+  const payer = await createMcpClient(env as any, {
+    baseUrl: process.env.MCP_URL || "http://localhost:8080/mcp",
+    keyId: config.keyId,
+    payerDid: config.agentDid,
+    defaultAssetId: "0x3::gas_coin::RGas",
+    maxAmount: BigInt(10_000_000),
+    debug: true,
+  });
+
+  console.log("Calling nuwa.health via PaymentChannelMcpClient…");
+  const health = await payer.healthCheck();
+  console.log("Health:", health);
+
+  console.log("Calling nuwa.discovery…");
+  const { content } = await payer.callTool("nuwa.discovery");
+  const discoveryText = content.find((c: any) => c?.type === "text");
+  console.log("Discovery:", discoveryText?.text || content);
 }
 
 main().catch(err => {

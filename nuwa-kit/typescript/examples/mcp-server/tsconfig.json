@@ -1,12 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "moduleResolution": "node",
-    "module": "esnext",
+    "moduleResolution": "nodenext",
+    "module": "nodenext",
     "target": "es2020",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
   "include": ["src/**/*"]
 } 

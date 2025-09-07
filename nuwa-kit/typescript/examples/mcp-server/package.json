@@ -11,9 +11,11 @@
   "dependencies": {
     "fastmcp": "^3.5.0",
     "zod": "^3.25.0",
-    "@nuwa-ai/identity-kit": "workspace:*"
+    "@nuwa-ai/identity-kit": "workspace:*",
+    "@nuwa-ai/payment-kit": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20.11.30",
     "tsx": "^4.7.0",
     "typescript": "~5.4.0"
   }
