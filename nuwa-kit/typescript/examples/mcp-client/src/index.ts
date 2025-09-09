@@ -167,38 +167,6 @@ function waitForCallback(expectedState: string): Promise<CallbackResult> {
  * Simple signer implementation compatible with Identity Kit
  ************************************************************/
 
-import type { SignerInterface } from "@nuwa-ai/identity-kit";
-
-function createLocalSigner(cfg: StoredConfig): SignerInterface {
-  const privateKeyBytes = MultibaseCodec.decodeBase58btc(cfg.privateKeyMultibase);
-  const publicKeyBytes = MultibaseCodec.decodeBase58btc(cfg.publicKeyMultibase);
-
-  return {
-    async listKeyIds() {
-      return [cfg.keyId];
-    },
-    async signWithKeyId(data: Uint8Array, keyId: string) {
-      if (keyId !== cfg.keyId) {
-        throw new Error(`Unknown keyId ${keyId}`);
-      }
-      return CryptoUtils.sign(data, privateKeyBytes, cfg.keyType);
-    },
-    async canSignWithKeyId(keyId: string) {
-      return keyId === cfg.keyId;
-    },
-    async getDid() {
-      return cfg.agentDid;
-    },
-    async getKeyInfo(keyId: string) {
-      if (keyId !== cfg.keyId) return undefined;
-      return {
-        type: cfg.keyType,
-        publicKey: publicKeyBytes,
-      };
-    },
-  };
-}
-
 function createLocalKeyStore(cfg: StoredConfig): KeyStore {
   const privateKeyBytes = MultibaseCodec.decodeBase58btc(cfg.privateKeyMultibase);
   const publicKeyBytes = MultibaseCodec.decodeBase58btc(cfg.publicKeyMultibase);
@@ -259,9 +227,10 @@ async function main() {
     },
   });
   // Note: for demo purposes we only need env.keyManager as signer; DID/key import not required here
-
-  const payer = await createMcpClient(env as any, {
-    baseUrl: process.env.MCP_URL || "http://localhost:8080/mcp",
+  const baseUrl = process.env.MCP_URL || "http://localhost:8080/mcp";
+  console.log(`Using MCP baseUrl: ${baseUrl}`);
+  const payer = await createMcpClient(env, {
+    baseUrl,
     keyId: config.keyId,
     payerDid: config.agentDid,
     defaultAssetId: "0x3::gas_coin::RGas",
@@ -277,6 +246,24 @@ async function main() {
   const { content } = await payer.callTool("nuwa.discovery");
   const discoveryText = content.find((c: any) => c?.type === "text");
   console.log("Discovery:", discoveryText?.text || content);
+
+  console.log("Calling echo…");
+  const echo = await payer.callTool("echo", { text: "Hello, world!" });
+  console.log("Echo:", echo);
+
+  //loop calling echo for testing the payment flow
+  let payments = [];
+  const loopCount = 10;
+  for (let i = 0; i < loopCount; i++) {
+    const { content:_, payment } = await payer.callToolWithPayment("echo", { text: "Hello, world!" });
+    payments.push(payment);
+  }
+  let firstPayment = payments[0];
+  let lastPayment = payments[payments.length - 1];
+  console.log("loop calling echo results", { firstPayment, lastPayment });
+  if (payments.length !== loopCount) {
+    throw new Error(`Payment length is not equal to loop count: ${payments.length} !== ${loopCount}`);
+  }
 }
 
 main().catch(err => {
