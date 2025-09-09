@@ -334,7 +334,7 @@ export class PaymentChannelMcpClient {
           serviceTxRef: svc,
           paymentPayload,
         });
-        const errObj = new PaymentKitError(code, message, details);
+        const errObj = new PaymentKitError(code, message, 402, details);
         throw errObj;
       }
 

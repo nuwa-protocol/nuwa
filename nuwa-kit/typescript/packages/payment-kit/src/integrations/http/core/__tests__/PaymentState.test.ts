@@ -1,5 +1,6 @@
 import { PaymentState } from '../PaymentState';
 import type { SubRAV } from '../../../../core/types';
+import { HttpPaymentCodec } from '../../../../middlewares/http/HttpPaymentCodec';
 
 describe('PaymentState', () => {
   let state: PaymentState;
@@ -199,7 +200,7 @@ describe('PaymentState', () => {
 
       const persisted = state.getPersistedState();
       expect(persisted.channelId).toBe('channel-123');
-      expect(persisted.pendingSubRAV).toEqual(subRav);
+      expect(persisted.pendingSubRAV).toEqual(HttpPaymentCodec.serializeSubRAV(subRav));
       expect(persisted.lastUpdated).toBeDefined();
     });
 
@@ -216,7 +217,7 @@ describe('PaymentState', () => {
 
       const persistedState = {
         channelId: 'channel-456',
-        pendingSubRAV: subRav,
+        pendingSubRAV: HttpPaymentCodec.serializeSubRAV(subRav),
         lastUpdated: new Date().toISOString(),
       };
 
