@@ -12,10 +12,7 @@ import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
-import {
-  extendZodWithNuwaReserved,
-  normalizeToZodObject,
-} from './ToolSchema';
+import { extendZodWithNuwaReserved, normalizeToZodObject } from './ToolSchema';
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;

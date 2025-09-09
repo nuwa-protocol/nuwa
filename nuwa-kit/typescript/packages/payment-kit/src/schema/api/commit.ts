@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { SignedSubRAVSchema } from '../core';
+import { SerializableSignedSubRAVSchema } from '../core';
 
 /**
  * Schema for POST /commit request
  */
 export const CommitRequestSchema = z.object({
   /** Signed SubRAV to be committed */
-  subRav: SignedSubRAVSchema,
+  subRav: SerializableSignedSubRAVSchema,
 });
 
 export type CommitRequest = z.infer<typeof CommitRequestSchema>;

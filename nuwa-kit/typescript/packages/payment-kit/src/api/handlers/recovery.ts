@@ -4,6 +4,7 @@ import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
 import type { RecoveryResponse } from '../../schema';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
+import { HttpPaymentCodec } from 'src/index.browser';
 
 /**
  * Handle recovery endpoint requests
@@ -48,10 +49,10 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
         // sub-channel may not be authorized yet; that's fine
       }
     }
-
+    const serializedPending = pending ? HttpPaymentCodec.serializeSubRAV(pending) : null;
     const response: RecoveryResponse = {
       channel: channel ?? null,
-      pendingSubRav: pending ?? null,
+      pendingSubRav: serializedPending,
       subChannel: subChannel ?? null,
       timestamp: new Date().toISOString(),
     };

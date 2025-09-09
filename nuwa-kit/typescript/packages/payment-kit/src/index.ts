@@ -38,7 +38,7 @@ export {
   SubRAVSigner,
   SubRAVCodec,
   SubRAVUtils,
-  SubRAVSchema,
+  SubRAVBCSSchema,
   CURRENT_SUBRAV_VERSION,
   SUBRAV_VERSION_1,
 } from './core/SubRav';

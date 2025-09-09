@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SignedSubRAVSchema } from '../core';
+import { SerializableSignedSubRAVSchema } from '../core';
 
 /**
  * Schema for GET /subrav request (query parameters)
@@ -15,6 +15,6 @@ export type SubRavRequest = z.infer<typeof SubRavRequestSchema>;
  * Schema for GET /subrav response - returns a SignedSubRAV if found
  * Uses the core SignedSubRAVSchema for consistency
  */
-export const SubRavResponseSchema = SignedSubRAVSchema;
+export const SubRavResponseSchema = SerializableSignedSubRAVSchema;
 
 export type SubRavResponse = z.infer<typeof SubRavResponseSchema>;

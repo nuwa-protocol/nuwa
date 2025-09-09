@@ -1,40 +1,5 @@
 import { z } from 'zod';
-
-// -----------------------------
-// Zod schemas for reserved parameters (for MCP zod-based parameters)
-// -----------------------------
-
-export const SerializableSubRAVSchema = z.object({
-  version: z.string(),
-  chainId: z.string(),
-  channelId: z.string(),
-  channelEpoch: z.string(),
-  vmIdFragment: z.string(),
-  accumulatedAmount: z.string(),
-  nonce: z.string(),
-});
-
-export const SerializableSignedSubRAVSchema = z.object({
-  subRav: SerializableSubRAVSchema,
-  signature: z.string(),
-});
-
-// SerializableResponsePayload (Zod) – mirrors SerializableResponsePayloadSchema
-export const SerializableResponsePayloadSchema = z.object({
-  version: z.number(),
-  clientTxRef: z.string().optional(),
-  serviceTxRef: z.string().optional(),
-  subRav: SerializableSubRAVSchema.optional(),
-  cost: z.string().optional(),
-  costUsd: z.string().optional(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string().optional(),
-    })
-    .optional(),
-});
-
+import { SerializableResponsePayloadSchema } from '../../schema/core';
 
 /**
  * Extend a Zod object schema with Nuwa reserved fields used in MCP calls.

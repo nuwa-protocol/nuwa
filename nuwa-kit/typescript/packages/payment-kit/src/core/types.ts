@@ -3,7 +3,6 @@
  */
 import { z } from 'zod';
 
-
 // Re-export contract interface types for convenience
 export type {
   TxResult,
