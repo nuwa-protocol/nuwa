@@ -419,8 +419,10 @@ describe('HTTP Payment Kit E2E (Real Blockchain + HTTP Server)', () => {
     if (recoveryData.pendingSubRav) {
       const cachedPending = httpClient.getPendingSubRAV();
       expect(cachedPending).toBeTruthy();
-      expect(cachedPending!.nonce).toBe(recoveryData.pendingSubRav.nonce);
-      expect(cachedPending!.accumulatedAmount).toBe(recoveryData.pendingSubRav.accumulatedAmount);
+      expect(cachedPending!.nonce.toString()).toBe(recoveryData.pendingSubRav.nonce.toString());
+      expect(cachedPending!.accumulatedAmount.toString()).toBe(
+        recoveryData.pendingSubRav.accumulatedAmount.toString()
+      );
 
       console.log('✅ Pending SubRAV properly cached from recovery');
     }

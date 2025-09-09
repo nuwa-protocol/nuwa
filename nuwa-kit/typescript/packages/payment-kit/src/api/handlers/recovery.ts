@@ -4,8 +4,10 @@ import type { Handler, ApiContext } from '../../types/api';
 import { ErrorCode } from '../../types/api';
 import type { RecoveryResponse } from '../../schema';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
-import { HttpPaymentCodec } from 'src/index.browser';
+import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 
+const logger = DebugLogger.get('recovery');
 /**
  * Handle recovery endpoint requests
  * Requires DID authentication
@@ -36,6 +38,7 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
     const pending = vmIdFragment
       ? await ctx.pendingSubRAVStore.findLatestBySubChannel(channelId, vmIdFragment)
       : null;
+
 
     // Try to get sub-channel state for this vmIdFragment (authorized -> state exists)
     let subChannel = null as any;

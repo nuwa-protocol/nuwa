@@ -7,6 +7,7 @@ import {
   McpPaymentKitOptions,
   createMcpPaymentKitFromEnv,
 } from './McpPaymentKit';
+import { z } from 'zod';
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { Server } from 'http';
@@ -246,7 +247,9 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     const toolDef = {
       name,
       description: `Built-in payment tool: ${name}`,
-      parameters: undefined,
+      // Ensure FastMCP passes through arguments for built-ins
+      // Use permissive schema to avoid stripping reserved params
+      parameters: z.object({}).passthrough(),
       async execute(params: any, context: any) {
         return await kit.invoke(name, params, context);
       },

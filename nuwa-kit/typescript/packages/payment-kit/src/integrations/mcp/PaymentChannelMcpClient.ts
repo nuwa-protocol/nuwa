@@ -21,7 +21,12 @@ import { serializeJson } from '../../utils/json';
 import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
 import type { ZodTypeAny } from 'zod';
-import { HealthResponseSchema, type HealthResponse } from '../../schema';
+import {
+  HealthResponseSchema,
+  RecoveryResponse,
+  RecoveryResponseSchema,
+  type HealthResponse,
+} from '../../schema';
 import type { ChainConfig } from '../../factory/chainFactory';
 
 export interface McpPayerOptions {
@@ -116,7 +121,25 @@ export class PaymentChannelMcpClient {
   ): Promise<PaymentResult<T>> {
     const { content, payment } = await this.callToolWithPayment(method, params);
     const raw = this.parseFirstJsonText<any>(content);
-    const data = schema ? (schema.parse(raw) as T) : (raw as T);
+    let data = undefined;
+    if (schema) {
+      try {
+        data = schema.parse(raw);
+      } catch (e) {
+        this.logger.warn('Failed to parse response', {
+          cause: e,
+          raw,
+          schema,
+        });
+        throw new PaymentKitError('RESPONSE_PARSE_ERROR', 'Failed to parse response', 500, {
+          cause: e,
+          raw,
+          schema,
+        });
+      }
+    } else {
+      data = raw as T;
+    }
     return { data, payment };
   }
 
@@ -367,6 +390,7 @@ export class PaymentChannelMcpClient {
         clientTxRef,
         hasAuth: typeof __nuwa_auth === 'string' && __nuwa_auth.length > 0,
         hasPayment: !!payment,
+        signedSubRav,
       } as any);
     } catch {}
     // Normalize BigInt and other non-JSON-native types using lossless-json, then parse back
@@ -543,9 +567,13 @@ export class PaymentChannelMcpClient {
     return res.data;
   }
 
-  async recoverFromService(): Promise<any> {
-    const res = await this.channelManager?.recoverFromService();
-    return res as any;
+  async recoverFromService(): Promise<RecoveryResponse> {
+    const res = await this.call<RecoveryResponse>(
+      'nuwa.recovery',
+      undefined,
+      RecoveryResponseSchema
+    );
+    return res.data;
   }
 
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: true }> {

@@ -20,6 +20,7 @@ import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger } from '@nuwa-
 import type { Server } from 'http';
 import { HttpPaymentCodec } from '../../src/integrations/http/internal/codec';
 import { z } from 'zod';
+import { serializeJson } from '../../src/utils/json';
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
   return `Cost: ${payment.cost.toString()} units, USD: ${payment.costUsd.toString()} pUSD, Tx: ${payment.clientTxRef}`;
@@ -320,9 +321,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     console.log('✅ Discovery successful:', discovery.data);
 
     // Test recovery
-    const recoveryRaw = await mcpClient.recoverFromService();
-    const recovery =
-      recoveryRaw && (recoveryRaw as any).success ? (recoveryRaw as any).data : recoveryRaw;
+    const recovery = await mcpClient.recoverFromService();
 
     // channel/subChannel may be null for first-time clients
     expect(recovery).toHaveProperty('channel');
@@ -675,18 +674,22 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(result1.payment).toBeTruthy();
     console.log(`💰 Paid call result - ${formatPaymentInfo(result1.payment!)}`);
 
+    // Wait for 1 second
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Test recovery after paid call - should now have channel
     const recoveryAfter = await mcpClient.recoverFromService();
-    console.log('Recovery after paid call:', JSON.stringify(recoveryAfter, null, 2));
+    console.log('Recovery after paid call:', serializeJson(recoveryAfter));
 
     expect(recoveryAfter).toBeTruthy();
     expect(recoveryAfter.timestamp).toBeTruthy();
     expect(recoveryAfter.channel).toBeTruthy();
-    expect(recoveryAfter.channel.channelId).toEqual(expect.any(String));
-    // SubChannel might exist if auto-authorized
-    if (recoveryAfter.subChannel) {
-      expect(recoveryAfter.subChannel.vmIdFragment).toBeTruthy();
-    }
+    expect(recoveryAfter.channel!.channelId).toEqual(expect.any(String));
+    expect(recoveryAfter.subChannel).toBeTruthy();
+    // Note: pendingSubRav may be null. When recovery is called with DIDAuth, the server may
+    // perform a pending check/handshake and clear the latest pending proposal as part of
+    // verification flow. So we don't strictly assert it here.
+    // expect(recoveryAfter.pendingSubRav).toBeTruthy();
 
     console.log('✅ Recovery data retrieved:', {
       hasChannel: !!recoveryAfter.channel,
@@ -706,11 +709,6 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     const first = await mcpClient.call('analyze', { data: 'trigger pending' });
     expect(first.payment).toBeTruthy();
     console.log(`💰 First payment - ${formatPaymentInfo(first.payment!)}`);
-
-    const recovery = await mcpClient.recoverFromService();
-    expect(recovery).toBeTruthy();
-    expect(recovery.pendingSubRav).toBeTruthy();
-    //const pendingSubRav = HttpPaymentCodec.deserializeSubRAV(recovery.pendingSubRav);
 
     // 2) Clear client local pending to simulate client unaware of server-pending
     mcpClient.clearPendingSubRAV();

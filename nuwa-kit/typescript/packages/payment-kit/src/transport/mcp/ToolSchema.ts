@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SerializableResponsePayloadSchema } from '../../schema/core';
+import { SerializableRequestPayloadSchema } from '../../schema/core';
 
 /**
  * Extend a Zod object schema with Nuwa reserved fields used in MCP calls.
@@ -11,7 +11,7 @@ export function extendZodWithNuwaReserved<T extends z.ZodRawShape>(
 ): z.ZodObject<any> {
   return (schema as any).extend({
     __nuwa_auth: z.string().optional(),
-    __nuwa_payment: SerializableResponsePayloadSchema.optional(),
+    __nuwa_payment: SerializableRequestPayloadSchema.optional(),
   });
 }
 

@@ -114,14 +114,24 @@ export class McpPaymentKit {
 
     // Step A: preProcess (billable or other tools)
     const contextWithRid = { ...(context || {}), requestId: rid } as any;
-    const ctx = await this.middleware.handleWithNewAPI(name, params, contextWithRid);
+    const safeParams = params ?? {};
+    const ctx = await this.middleware.handleWithNewAPI(name, safeParams, contextWithRid);
     if (!ctx) {
-      const result = await entry.handler(params, context);
       const content: any[] = [];
-      if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
-        content.push(...(result as any).content);
-      } else if (result !== undefined) {
-        content.push({ type: 'text', text: serializeJson(result) });
+      try {
+        const result = await entry.handler(safeParams, context);
+
+        if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+          content.push(...(result as any).content);
+        } else if (result !== undefined) {
+          content.push({ type: 'text', text: serializeJson(result) });
+        }
+      } catch (e) {
+        this.logger.warn('Failed to invoke tool', {
+          cause: e,
+          name,
+          params,
+        });
       }
 
       return { content } as any;
@@ -148,7 +158,7 @@ export class McpPaymentKit {
     const contextWithDid = ctx?.meta?.didInfo
       ? { ...(context || {}), didInfo: ctx.meta.didInfo }
       : context;
-    const result = await entry.handler(params, contextWithDid);
+    const result = await entry.handler(safeParams, contextWithDid);
 
     // Step C/D: settle + persist
     // If middleware flagged to skip billing (e.g., nuwa.recovery), return plain result

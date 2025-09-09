@@ -28,6 +28,16 @@ export const SerializableSignedSubRAVSchema = z.object({
   signature: z.string(),
 });
 
+/**
+ * SerializableRequestPayload (Zod) – client -> server request payload
+ */
+export const SerializableRequestPayloadSchema = z.object({
+  version: z.number(),
+  clientTxRef: z.string(),
+  maxAmount: z.string().optional(),
+  signedSubRav: SerializableSignedSubRAVSchema.optional(),
+});
+
 // SerializableResponsePayload (Zod) – mirrors SerializableResponsePayloadSchema
 export const SerializableResponsePayloadSchema = z.object({
   version: z.number(),
