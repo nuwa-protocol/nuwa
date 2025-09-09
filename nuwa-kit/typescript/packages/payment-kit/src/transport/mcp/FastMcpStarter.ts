@@ -15,6 +15,9 @@ import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
 import { extendZodWithNuwaReserved, normalizeToZodObject } from './ToolSchema';
 
+// Server type with explicit stop method used by tests and callers
+export type StoppableServer = Server & { stop: () => Promise<void> };
+
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
   endpoint?: `/${string}`;
@@ -230,7 +233,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     arguments?: any[];
     load: (args: any) => Promise<{ text?: string; blob?: any }> | { text?: string; blob?: any };
   }) => void;
-  start: () => Promise<Server>;
+  start: () => Promise<StoppableServer>;
   getInner: () => { server: FastMCP; kit: McpPaymentKit };
 }> {
   const server = new FastMCP({
@@ -347,7 +350,73 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       tools: registrar.getTools().map(t => t.name),
       total: registrar.getTools().length,
     } as any);
-    return httpServer as any as Server;
+    const srv = httpServer as any as StoppableServer;
+    // Track sockets to force-close on shutdown and avoid hanging closes
+    const sockets = new Set<any>();
+    try {
+      (srv as any).on?.('connection', (socket: any) => {
+        sockets.add(socket);
+        socket.on?.('close', () => sockets.delete(socket));
+      });
+    } catch {}
+    // Wrap stop/close to ensure kit resources are destroyed
+    const originalClose = (srv as any).close?.bind(srv);
+    (srv as any).stop = async () => {
+      try {
+        kit.destroy();
+      } catch {}
+      // Attempt to terminate open sessions
+      try {
+        for (const s of sessions.slice()) {
+          try {
+            (s as any).close?.();
+          } catch {}
+          try {
+            (s as any).terminate?.();
+          } catch {}
+          try {
+            (s as any).dispose?.();
+          } catch {}
+        }
+      } catch {}
+      // Close idle and all connections if supported
+      try {
+        (srv as any).closeIdleConnections?.();
+      } catch {}
+      try {
+        (srv as any).closeAllConnections?.();
+      } catch {}
+      // Destroy any tracked sockets to ensure shutdown
+      try {
+        for (const sock of sockets) {
+          try {
+            sock.destroy?.();
+          } catch {}
+        }
+      } catch {}
+      // Finally, close the server with a timeout fallback
+      await new Promise<void>(resolve => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        try {
+          if (typeof originalClose === 'function') {
+            originalClose(() => finish());
+          } else {
+            (srv as any).close?.();
+            finish();
+          }
+        } catch {
+          finish();
+        }
+        // Fallback timeout to avoid hanging forever
+        setTimeout(finish, 2000);
+      });
+    };
+    return srv;
   };
 
   const addTool = (def: {

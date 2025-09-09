@@ -811,4 +811,21 @@ export class PaymentProcessor {
   private log(...args: any[]): void {
     this.logger.debug(...args);
   }
+
+  /**
+   * Destroy background services and release resources.
+   * - Stops ClaimTriggerService processing loop
+   * - Clears HubBalanceService cache
+   */
+  destroy(): void {
+    try {
+      this.config?.claimTriggerService?.destroy?.();
+    } catch {}
+    try {
+      (this.config.hubBalanceService as unknown as { clear?: () => void })?.clear?.();
+    } catch {}
+    try {
+      this.logger.info('PaymentProcessor destroyed');
+    } catch {}
+  }
 }

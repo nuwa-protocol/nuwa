@@ -39,7 +39,6 @@ export const handleRecovery: Handler<ApiContext, {}, RecoveryResponse> = async (
       ? await ctx.pendingSubRAVStore.findLatestBySubChannel(channelId, vmIdFragment)
       : null;
 
-
     // Try to get sub-channel state for this vmIdFragment (authorized -> state exists)
     let subChannel = null as any;
     if (channel && vmIdFragment) {

@@ -317,6 +317,15 @@ export class McpPaymentKit {
       pendingSubRAVRepo: this.deps.pendingSubRAVRepo,
     };
   }
+
+  /**
+   * Cleanup background resources (timers, caches, etc.) started by the kit
+   */
+  destroy(): void {
+    try {
+      this.deps.processor?.destroy?.();
+    } catch {}
+  }
 }
 
 export async function createMcpPaymentKit(config: McpPaymentKitOptions) {
