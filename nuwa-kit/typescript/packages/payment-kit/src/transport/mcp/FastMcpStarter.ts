@@ -14,6 +14,7 @@ import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
 import { extendZodWithNuwaReserved, normalizeToZodObject } from './ToolSchema';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 // Server type with explicit stop method used by tests and callers
 export type StoppableServer = Server & { stop: () => Promise<void> };
@@ -236,6 +237,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
   start: () => Promise<StoppableServer>;
   getInner: () => { server: FastMCP; kit: McpPaymentKit };
 }> {
+  const logger = DebugLogger.get('FastMcpStarter');
   const server = new FastMCP({
     name: opts.serviceId || 'nuwa-mcp-server',
     version: '1.0.0',
@@ -266,7 +268,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
   const start = async () => {
     const sessions: FastMCPSession[] = [];
     let sessionCounter = 0;
-    const port = opts.port || 8080;
+    const port = opts.port ?? 8080;
     const endpoint = opts.endpoint || '/mcp';
     const wellKnownEnabled =
       opts.wellKnown?.enabled !== false && typeof opts.wellKnown?.discovery === 'function';
@@ -346,7 +348,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     });
 
     registrar.markStarted();
-    console.debug('[FastMcpStarter] registered tools', {
+    logger.debug('registered tools', {
       tools: registrar.getTools().map(t => t.name),
       total: registrar.getTools().length,
     } as any);
