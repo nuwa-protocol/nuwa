@@ -22,6 +22,7 @@ import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
 import type { ZodTypeAny } from 'zod';
 import { HealthResponseSchema, type HealthResponse } from '../../schema';
+import type { ChainConfig } from '../../factory/chainFactory';
 
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
@@ -32,11 +33,7 @@ export interface McpPayerOptions {
   defaultAssetId?: string;
   debug?: boolean;
   /** Chain configuration - required for payment channel operations */
-  chainConfig?: {
-    chain: 'rooch';
-    rpcUrl: string;
-    [key: string]: any;
-  };
+  chainConfig?: ChainConfig;
   /** Optional storage configuration. If not provided, uses in-memory storage */
   storageOptions?: {
     channelRepo?: any; // ChannelRepository interface
@@ -51,7 +48,7 @@ export class PaymentChannelMcpClient {
   private options: McpPayerOptions;
   private logger: DebugLogger;
   private paymentState: PaymentState;
-  private mcpClient: any | undefined;
+  private mcpClient: McpClient | undefined;
   private notificationsSubscribed = false;
   private lastContents: any[] | undefined;
   private scheduler: RequestScheduler = new RequestScheduler();
@@ -76,7 +73,9 @@ export class PaymentChannelMcpClient {
     this.payerClient = PaymentChannelFactory.createClient({
       chainConfig: options.chainConfig || {
         chain: 'rooch' as const,
-        rpcUrl: 'http://localhost:6767',
+        rpcUrl: undefined,
+        network: 'test',
+        debug: false,
       },
       signer: options.signer,
       keyId: options.keyId,
@@ -204,6 +203,17 @@ export class PaymentChannelMcpClient {
   }
 
   /**
+   * List tools exposed by the server.
+   */
+  async listTools(): Promise<Record<string, any>> {
+    const client = await this.ensureClient();
+    if (typeof client.listTools === 'function') {
+      return await client.listTools();
+    }
+    return {};
+  }
+
+  /**
    * Call a tool with payment
    * @param method - The name of the tool to call
    * @param params - The parameters to pass to the tool
@@ -237,7 +247,7 @@ export class PaymentChannelMcpClient {
       let result = await client.callTool({ name: method, arguments: reqParams });
 
       let content: any[] = [];
-      let paymentPayload: any | undefined;
+      let paymentPayload: SerializableResponsePayload | undefined;
       this.lastContents = undefined;
       if (
         result &&
@@ -288,13 +298,19 @@ export class PaymentChannelMcpClient {
       }
 
       // If payment still indicates an error at this point, throw a structured error
-      if (paymentPayload && (paymentPayload as any).error) {
-        const err = (paymentPayload as any).error as { code?: string; message?: string };
-        const svc = (paymentPayload as any).serviceTxRef;
-        const cRef = (paymentPayload as any).clientTxRef ?? clientTxRef;
+      if (paymentPayload && paymentPayload.error) {
+        const err = paymentPayload.error as { code?: string; message?: string };
+        const svc = paymentPayload.serviceTxRef;
+        const cRef = paymentPayload.clientTxRef ?? clientTxRef;
         const code = err?.code || 'PAYMENT_ERROR';
         const message = err?.message || 'Payment negotiation failed';
         const details = { code, message, clientTxRef: cRef, serviceTxRef: svc } as any;
+        this.logger.debug('payment error', {
+          method,
+          clientTxRef: cRef,
+          serviceTxRef: svc,
+          paymentPayload,
+        });
         const errObj = new PaymentKitError(code, message, details);
         throw errObj;
       }
@@ -345,6 +361,14 @@ export class PaymentChannelMcpClient {
     const payment: SerializableRequestPayload = HttpPaymentCodec.toJSONRequest(reqPayload);
     const __nuwa_auth = await this.generateAuthToken(payerDid, method, clientTxRef);
     const params = { ...(userParams || {}), __nuwa_auth, __nuwa_payment: payment };
+    try {
+      this.logger.debug?.('mcp.buildParams', {
+        method,
+        clientTxRef,
+        hasAuth: typeof __nuwa_auth === 'string' && __nuwa_auth.length > 0,
+        hasPayment: !!payment,
+      } as any);
+    } catch {}
     // Normalize BigInt and other non-JSON-native types using lossless-json, then parse back
     return JSON.parse(serializeJson(params));
   }
@@ -370,6 +394,12 @@ export class PaymentChannelMcpClient {
       }
       keyId = ids[0];
     }
+    this.logger.debug('generateAuthToken', {
+      payerDid,
+      method,
+      clientTxRef,
+      keyId,
+    });
     const signedObject = await DIDAuth.v1.createSignature(
       {
         operation: 'mcp_tool_call',
@@ -420,6 +450,11 @@ export class PaymentChannelMcpClient {
       version: '1.0.0',
     });
     await this.mcpClient.connect(transport);
+    const tools = await this.mcpClient.listTools();
+    this.logger.debug('mcp.ensureClient', {
+      baseUrl: this.options.baseUrl,
+      tools,
+    });
     return this.mcpClient;
   }
 

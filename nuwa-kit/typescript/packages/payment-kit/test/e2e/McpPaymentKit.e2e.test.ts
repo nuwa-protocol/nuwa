@@ -19,7 +19,7 @@ import type { AssetInfo, PaymentInfo } from '../../src/core/types';
 import { TestEnv, createSelfDid, CreateSelfDidResult, DebugLogger } from '@nuwa-ai/identity-kit';
 import type { Server } from 'http';
 import { HttpPaymentCodec } from '../../src/integrations/http/internal/codec';
-
+import { z } from 'zod';
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
   return `Cost: ${payment.cost.toString()} units, USD: ${payment.costUsd.toString()} pUSD, Tx: ${payment.clientTxRef}`;
@@ -110,10 +110,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     app.freeTool({
       name: 'hello',
       description: 'Say hello (FREE)',
-      parameters: {
-        type: 'object',
-        properties: { name: { type: 'string', description: 'Name to greet' } },
-      },
+      parameters: { name: z.string().describe('Name to greet').optional() },
       execute: async (params: any) => ({
         message: `Hello, ${params.name || 'World'}!`,
         timestamp: new Date().toISOString(),
@@ -124,7 +121,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     app.freeTool({
       name: 'whoami',
       description: 'Return signer DID from context (FREE)',
-      parameters: { type: 'object', properties: {} },
+      parameters: {},
       execute: async (_params: any, context?: any) => ({
         signerDid: context?.didInfo?.did || null,
         keyId: context?.didInfo?.keyId || null,
@@ -137,10 +134,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       name: 'analyze',
       description: 'Analyze data (paid service)',
       pricePicoUSD: BigInt(1000000000), // 0.001 USD
-      parameters: {
-        type: 'object',
-        properties: { data: { type: 'string', description: 'Data to analyze' } },
-      },
+      parameters: { data: z.string().describe('Data to analyze') },
       execute: async (params: any) => {
         await new Promise(resolve => setTimeout(resolve, 50));
         return {
@@ -156,10 +150,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       name: 'process',
       description: 'Process complex data (expensive)',
       pricePicoUSD: BigInt(10000000000), // 0.01 USD
-      parameters: {
-        type: 'object',
-        properties: { operation: { type: 'string', description: 'Operation to perform' } },
-      },
+      parameters: { operation: z.string().describe('Operation to perform') },
       execute: async (params: any) => {
         await new Promise(resolve => setTimeout(resolve, 100));
         return {
@@ -204,12 +195,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       name: 'slow_process',
       description: 'Simulate a slow business operation (paid)',
       pricePicoUSD: BigInt(500000000), // 0.0005 USD
-      parameters: {
-        type: 'object',
-        properties: {
-          delayMs: { type: 'number', description: 'Artificial delay in milliseconds' },
-        },
-      },
+      parameters: { delayMs: z.number().describe('Artificial delay in milliseconds').optional() },
       execute: async (params: any) => {
         const delayMs = typeof params?.delayMs === 'number' ? params.delayMs : 300;
         await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -262,6 +248,53 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     DebugLogger.setGlobalLevel('error');
     logger.debug('🏁 MCP Payment Kit E2E Tests completed');
+  }, 60000);
+
+  test('MCP client tool list', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔍 Testing MCP client tool list');
+
+    const tools = await mcpClient.listTools();
+    console.log('✅ MCP client tool list:', JSON.stringify(tools, null, 2));
+    expect(tools).toBeTruthy();
+    // Basic structure
+    expect(Array.isArray((tools as any).tools)).toBe(true);
+    const list = (tools as any).tools as any[];
+    expect(list.length).toBeGreaterThan(0);
+
+    // Helper to find tool by name
+    const byName = (n: string) => list.find(t => t?.name === n);
+
+    // Built-ins should exist
+    expect(byName('nuwa.health')).toBeTruthy();
+
+    // Business tools should expose converted JSON Schema with expected properties
+    const hello = byName('hello');
+    expect(hello?.inputSchema?.type).toBe('object');
+    expect(hello?.inputSchema?.properties).toBeTruthy();
+    // name is optional, allow missing required but properties should include it
+    expect(Object.keys(hello?.inputSchema?.properties || {})).toEqual(
+      expect.arrayContaining(['name'])
+    );
+
+    const analyze = byName('analyze');
+    expect(analyze?.inputSchema?.type).toBe('object');
+    expect(Object.keys(analyze?.inputSchema?.properties || {})).toEqual(
+      expect.arrayContaining(['data'])
+    );
+
+    const processTool = byName('process');
+    expect(processTool?.inputSchema?.type).toBe('object');
+    expect(Object.keys(processTool?.inputSchema?.properties || {})).toEqual(
+      expect.arrayContaining(['operation'])
+    );
+
+    const slow = byName('slow_process');
+    expect(slow?.inputSchema?.type).toBe('object');
+    expect(Object.keys(slow?.inputSchema?.properties || {})).toEqual(
+      expect.arrayContaining(['delayMs'])
+    );
   }, 60000);
 
   test('Built-in FREE endpoints', async () => {

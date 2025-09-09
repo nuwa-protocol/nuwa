@@ -1,5 +1,7 @@
 import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
+import { jsonSchema as xsJsonSchema } from 'xsschema';
+import { z } from 'zod';
 
 // -----------------------------
 // Reserved parameter schema
@@ -134,7 +136,8 @@ export function buildParametersSchema(
     // reserved keys are optional; do not push to required
   }
 
-  return out;
+  // Wrap as xsSchema JsonSchema so FastMCP/xsschema code paths can safely access ~standard fields
+  return xsJsonSchema(out) as any;
 }
 
 // -----------------------------
@@ -159,22 +162,8 @@ function mapAjvErrors(errors: ErrorObject[] | null | undefined) {
 }
 
 export function compileStandardSchema(jsonSchema: any) {
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  addFormats(ajv);
-  const validate = ajv.compile(jsonSchema);
-
-  const schema = {
-    ['~standard']: {
-      version: 1 as 1,
-      vendor: 'nuwa',
-      validate: async (input: any) => {
-        const ok = validate(input);
-        if (ok) return { value: input, issues: undefined };
-        return { value: undefined, issues: mapAjvErrors(validate.errors) };
-      },
-    },
-  } as any;
-  return schema;
+  // Also wrap output to satisfy FastMCP expectations
+  return xsJsonSchema(jsonSchema) as any;
 }
 
 // -----------------------------
@@ -189,4 +178,68 @@ export function validateSerializableResponsePayload(payload: any): string[] | nu
   const ok = validateResponse(payload);
   if (ok) return null;
   return (validateResponse.errors || []).map(e => `${e.instancePath} ${e.message}`.trim());
+}
+
+// -----------------------------
+// Zod schemas for reserved parameters (for MCP zod-based parameters)
+// -----------------------------
+
+export const ZodSubRAVSchema = z.object({
+  version: z.string(),
+  chainId: z.string(),
+  channelId: z.string(),
+  channelEpoch: z.string(),
+  vmIdFragment: z.string(),
+  accumulatedAmount: z.string(),
+  nonce: z.string(),
+});
+
+export const ZodSignedSubRAVSchema = z.object({
+  subRav: ZodSubRAVSchema,
+  signature: z.string(),
+});
+
+export const ZodNuwaPaymentSchema = z.object({
+  version: z.number(),
+  clientTxRef: z.string(),
+  maxAmount: z.string().optional(),
+  signedSubRav: ZodSignedSubRAVSchema.optional(),
+});
+
+/**
+ * Extend a Zod object schema with Nuwa reserved fields used in MCP calls.
+ * - __nuwa_auth: DIDAuth header (string), optional
+ * - __nuwa_payment: structured payment payload, optional
+ */
+export function extendZodWithNuwaReserved<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>
+): z.ZodObject<any> {
+  return (schema as any).extend({
+    __nuwa_auth: z.string().optional(),
+    __nuwa_payment: ZodNuwaPaymentSchema.optional(),
+  });
+}
+
+/**
+ * Best-effort normalization: accept either a Zod object schema, or a plain
+ * Zod raw shape (e.g., { name: z.string() }) and convert it to z.object(...).
+ * Returns undefined if input cannot be recognized as zod-based schema.
+ */
+export function normalizeToZodObject(schema: any): z.ZodObject<any> | undefined {
+  try {
+    // Case 1: already a Zod object
+    if (schema && typeof (schema as any).extend === 'function' && (schema as any)._def?.typeName) {
+      return schema as z.ZodObject<any>;
+    }
+    // Case 2: plain object raw shape with zod types as values
+    if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
+      const entries = Object.entries(schema);
+      if (entries.length === 0) return z.object({});
+      const isAllZod = entries.every(([, v]) => !!(v as any)?._def);
+      if (isAllZod) {
+        return z.object(schema as z.ZodRawShape);
+      }
+    }
+  } catch {}
+  return undefined;
 }

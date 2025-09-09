@@ -8,14 +8,10 @@ export async function createMcpClient(
   env: IdentityEnv,
   options: Omit<McpPayerOptions, 'signer' | 'chainConfig'> & { baseUrl: string }
 ) {
-  const chain = getChainConfigFromEnv(env);
-  const chainStrict: { chain: 'rooch'; rpcUrl: string } & Record<string, any> = {
-    ...chain,
-    rpcUrl: chain.rpcUrl || undefined,
-  };
+  const chainConfig = getChainConfigFromEnv(env);
   return new PaymentChannelMcpClient({
     ...options,
-    chainConfig: chainStrict,
+    chainConfig,
     signer: env.keyManager,
   });
 }

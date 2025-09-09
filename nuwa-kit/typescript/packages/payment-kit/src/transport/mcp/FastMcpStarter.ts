@@ -12,7 +12,12 @@ import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
-import { buildParametersSchema, compileStandardSchema } from './ToolSchema';
+import {
+  buildParametersSchema,
+  compileStandardSchema,
+  extendZodWithNuwaReserved,
+  normalizeToZodObject,
+} from './ToolSchema';
 
 export interface FastMcpServerOptions extends McpPaymentKitOptions {
   port?: number;
@@ -77,15 +82,17 @@ export class PaymentMcpToolRegistrar {
     // Register with billing (enables pricing/settlement)
     this.kit.register(name, { pricing: pricePicoUSD }, handler);
     // Register with FastMCP (expose tool) via unified kit.invoke
-    const compiled =
-      schema && typeof schema === 'object' && schema['~standard']
-        ? schema
-        : compileStandardSchema(buildParametersSchema(schema, { mergeReserved: true }));
     const kitRef = this.kit;
+    const paramsSchema = (() => {
+      if (!schema) return undefined;
+      const zodObj = normalizeToZodObject(schema);
+      if (zodObj) return extendZodWithNuwaReserved(zodObj);
+      return undefined;
+    })();
     const toolDef = {
       name,
       description,
-      parameters: compiled,
+      parameters: paramsSchema,
       async execute(params: any, context: any) {
         return await kitRef.invoke(name, params, context);
       },
@@ -244,7 +251,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     const toolDef = {
       name,
       description: `Built-in payment tool: ${name}`,
-      parameters: compileStandardSchema(buildParametersSchema(undefined, { mergeReserved: true })),
+      parameters: undefined,
       async execute(params: any, context: any) {
         return await kit.invoke(name, params, context);
       },
