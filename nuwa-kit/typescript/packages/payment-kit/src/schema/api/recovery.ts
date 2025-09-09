@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SubRAVSchema, ChannelInfoSchema, SubChannelStateSchema } from '../core';
+import { SerializableSubRAVSchema, ChannelInfoSchema, SubChannelStateSchema } from '../core';
 
 /**
  * Schema for GET /recovery response
@@ -9,7 +9,7 @@ export const RecoveryResponseSchema = z.object({
   /** Channel information if channel exists */
   channel: ChannelInfoSchema.nullable(),
   /** Pending SubRAV if any exists for recovery */
-  pendingSubRav: SubRAVSchema.nullable(),
+  pendingSubRav: SerializableSubRAVSchema.nullable(),
   /** Optional sub-channel state for current key fragment (if authorized) */
   subChannel: SubChannelStateSchema.nullable().optional(),
   /** Response timestamp in ISO-8601 format */

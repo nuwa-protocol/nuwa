@@ -683,21 +683,6 @@ export class PaymentChannelHttpClient {
     if (pending && pending.channelId === channelId && pending.vmIdFragment === vmIdFragment) {
       authorizedAccumulated = pending.accumulatedAmount;
       latestSubRavNonce = pending.nonce;
-    } else {
-      // Try to recover from service
-      try {
-        const recovery = await this.channelManager.recoverFromService();
-        if (
-          recovery.pendingSubRav &&
-          recovery.pendingSubRav.channelId === channelId &&
-          recovery.pendingSubRav.vmIdFragment === vmIdFragment
-        ) {
-          authorizedAccumulated = recovery.pendingSubRav.accumulatedAmount;
-          latestSubRavNonce = recovery.pendingSubRav.nonce;
-        }
-      } catch (e) {
-        this.log('[unsettled.recover.error]', e);
-      }
     }
 
     if (authorizedAccumulated === undefined) {
@@ -752,16 +737,8 @@ export class PaymentChannelHttpClient {
    * Try to recover pending SubRAV if needed
    */
   private async tryRecoverPendingIfNeeded(): Promise<void> {
-    if (!this.paymentState.getPendingSubRAV()) {
-      try {
-        const recoveryData = await this.channelManager.recoverFromService();
-        if (recoveryData.pendingSubRav) {
-          this.paymentState.setPendingSubRAV(recoveryData.pendingSubRav);
-        }
-      } catch (error) {
-        this.log('Recovery failed:', error);
-      }
-    }
+    // No-op: auto recovery disabled in favor of 402 auto-retry
+    return;
   }
 
   /**
@@ -885,7 +862,8 @@ export class PaymentChannelHttpClient {
    */
   private async executeRequest(
     context: PaymentRequestContext,
-    init?: RequestInit
+    init?: RequestInit,
+    allowRetry: boolean = true
   ): Promise<Response> {
     try {
       const { headers: _, ...initWithoutHeaders } = init || {};
@@ -896,6 +874,109 @@ export class PaymentChannelHttpClient {
         body: context.body,
         ...initWithoutHeaders,
       });
+
+      // Auto-retry for PAYMENT_REQUIRED (402) with unsignedSubRAV in header
+      const headerName = this.paymentProtocol.getHeaderName();
+      let paymentHeader =
+        response.headers.get(headerName) || response.headers.get(headerName.toLowerCase());
+      if (allowRetry && paymentHeader && typeof paymentHeader === 'string') {
+        try {
+          const payload = this.paymentProtocol.parseResponseHeader(paymentHeader);
+          if (
+            payload?.error?.code === 'PAYMENT_REQUIRED' &&
+            payload.subRav &&
+            context.clientTxRef
+          ) {
+            const signed = await this.payerClient.signSubRAV(payload.subRav);
+            const newHeader = this.paymentProtocol.encodeRequestHeader(
+              signed,
+              context.clientTxRef,
+              this.options.maxAmount
+            );
+            context.headers[headerName] = newHeader;
+            // Refresh DIDAuth Authorization header to avoid nonce replay
+            try {
+              const payerDid = this.options.payerDid || (await this.options.signer.getDid());
+              const authHeader = await DidAuthHelper.generateAuthHeader(
+                payerDid,
+                this.options.signer,
+                context.url,
+                context.method,
+                this.options.keyId
+              );
+              if (authHeader) {
+                context.headers['Authorization'] = authHeader;
+              }
+            } catch {}
+
+            const retried = await this.fetchImpl(context.url, {
+              method: context.method,
+              headers: context.headers,
+              body: context.body,
+              ...initWithoutHeaders,
+            });
+            await this.handleResponse(retried, context);
+
+            // Handle streaming responses for retried request
+            if (
+              isStreamLikeResponse(retried) &&
+              retried.body &&
+              typeof (retried.body as any).getReader === 'function'
+            ) {
+              const onActivity = () => {
+                if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+                  this.requestManager.extendTimeout(
+                    context.clientTxRef,
+                    this.options.timeoutMsStream
+                  );
+                }
+              };
+              const filtered = wrapAndFilterInBandFrames(
+                retried,
+                async p => {
+                  try {
+                    const decoded = this.paymentProtocol.parseResponseHeader(
+                      (p as any).headerValue
+                    );
+                    if (decoded?.subRav && decoded.cost !== undefined) {
+                      await this.handleProtocolSuccess({
+                        type: 'success',
+                        clientTxRef: decoded.clientTxRef,
+                        subRav: decoded.subRav,
+                        cost: decoded.cost as bigint,
+                        costUsd: decoded.costUsd as bigint | undefined,
+                        serviceTxRef: decoded.serviceTxRef,
+                      });
+                    }
+                  } catch (e) {
+                    this.log('[inband.decode.error]', e);
+                  }
+                },
+                (...args: any[]) => this.log(...args),
+                onActivity
+              );
+              if (this.transactionStore && context.clientTxRef) {
+                await this.transactionStore.update(context.clientTxRef, { stream: true });
+              }
+              if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+                this.requestManager.extendTimeout(
+                  context.clientTxRef,
+                  this.options.timeoutMsStream
+                );
+              }
+              return filtered;
+            }
+            return retried;
+          }
+        } catch (error) {
+          this.log('[payment.required.retry.failed]', {
+            url: context.url,
+            method: context.method,
+            clientTxRef: context.clientTxRef,
+            error,
+          });
+        }
+      }
 
       // Handle response
       await this.handleResponse(response, context);

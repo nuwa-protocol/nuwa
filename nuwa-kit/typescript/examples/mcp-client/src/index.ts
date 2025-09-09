@@ -1,14 +1,8 @@
-import { experimental_createMCPClient as createMCPClient } from "ai";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import {
-  DIDAuth,
-  CryptoUtils,
-  MultibaseCodec,
-  KeyType,
-} from "@nuwa-ai/identity-kit";
+import { CryptoUtils, MultibaseCodec, KeyType, IdentityEnvBuilder, IdentityEnv, IdentityKit, KeyStore, MemoryKeyStore } from "@nuwa-ai/identity-kit";
+import { createMcpClient } from "@nuwa-ai/payment-kit/mcp";
 import { randomUUID } from "crypto";
 import fs from "fs/promises";
-import os from "os";
+import os, { networkInterfaces } from "os";
 import path from "path";
 import http from "http";
 import { URL } from "url";
@@ -173,56 +167,44 @@ function waitForCallback(expectedState: string): Promise<CallbackResult> {
  * Simple signer implementation compatible with Identity Kit
  ************************************************************/
 
-import type { SignerInterface } from "@nuwa-ai/identity-kit";
-
-function createLocalSigner(cfg: StoredConfig): SignerInterface {
+function createLocalKeyStore(cfg: StoredConfig): KeyStore {
   const privateKeyBytes = MultibaseCodec.decodeBase58btc(cfg.privateKeyMultibase);
   const publicKeyBytes = MultibaseCodec.decodeBase58btc(cfg.publicKeyMultibase);
+  const fullId = cfg.keyId.includes("#") ? cfg.keyId : `${cfg.agentDid}#${cfg.keyId}`;
 
   return {
-    async listKeyIds() {
-      return [cfg.keyId];
+    async listKeyIds(): Promise<string[]> {
+      return [fullId];
     },
-    async signWithKeyId(data: Uint8Array, keyId: string) {
-      if (keyId !== cfg.keyId) {
+    async load(keyId?: string) {
+      if (!keyId || keyId === fullId) {
+        return {
+          keyId: fullId,
+          keyType: cfg.keyType,
+          publicKeyMultibase: cfg.publicKeyMultibase,
+          privateKeyMultibase: cfg.privateKeyMultibase,
+          meta: { source: "local-config" },
+        } as any;
+      }
+      return null;
+    },
+    async save(_key) {
+      // No-op: keys are persisted in local JSON config already
+      return;
+    },
+    async clear(_keyId?: string) {
+      // No-op: not mutating the local JSON config here
+      return;
+    },
+    async sign(keyId: string, data: Uint8Array): Promise<Uint8Array> {
+      if (keyId !== fullId) {
         throw new Error(`Unknown keyId ${keyId}`);
       }
       return CryptoUtils.sign(data, privateKeyBytes, cfg.keyType);
     },
-    async canSignWithKeyId(keyId: string) {
-      return keyId === cfg.keyId;
-    },
-    async getDid() {
-      return cfg.agentDid;
-    },
-    async getKeyInfo(keyId: string) {
-      if (keyId !== cfg.keyId) return undefined;
-      return {
-        type: cfg.keyType,
-        publicKey: publicKeyBytes,
-      };
-    },
   };
 }
 
-/************************************************************
- * Build Authorization header helper
- ************************************************************/
-
-async function buildAuthHeader(
-  body: unknown,
-  cfg: StoredConfig,
-  signer: SignerInterface
-): Promise<string> {
-  const payload = {
-    operation: "mcp-json-rpc",
-    params: { body },
-  } as const;
-
-  const signedObject = await DIDAuth.v1.createSignature(payload, signer, cfg.keyId);
-
-  return DIDAuth.v1.toAuthorizationHeader(signedObject);
-}
 
 /************************************************************
  * Main
@@ -235,36 +217,53 @@ async function main() {
     config = await connectToCadop(cadopDomain);
   }
 
-  const signer = createLocalSigner(config);
-
-  // Build a static Authorization header for the initial connection. The
-  // StreamableHTTPClientTransport API no longer exposes a per-request
-  // callback, so we embed a pre-computed signature here for demo purposes.
-  const staticAuthHeader = await buildAuthHeader({}, config, signer);
-
-  const transport = new StreamableHTTPClientTransport(
-    new URL("http://localhost:8080/mcp"),
-    {
-      requestInit: {
-        headers: {
-          Authorization: staticAuthHeader,
-        },
-      }
-    } as any
-  );
-
-  const client = await createMCPClient({ transport });
-
-  console.log("Fetching remote tool list…");
-  const tools = await client.tools();
-  console.log("Remote tools:", Object.keys(tools));
-  const echoTool = tools.echo;
-  const echoResult = await echoTool.execute({ text: "Hello from MCP CLI"}, {
-    toolCallId: "123",
-    messages: [],
+  const keyStore = createLocalKeyStore(config);
+  // Build IdentityEnv and preload KeyManager state
+  const env = await IdentityKit.bootstrap({
+    method: "rooch",
+    keyStore: keyStore,
+    vdrOptions: {
+      network: "test",
+    },
   });
-  console.log("Echo result:", echoResult);
-  await client.close();
+  // Note: for demo purposes we only need env.keyManager as signer; DID/key import not required here
+  const baseUrl = process.env.MCP_URL || "http://localhost:8080/mcp";
+  console.log(`Using MCP baseUrl: ${baseUrl}`);
+  const payer = await createMcpClient(env, {
+    baseUrl,
+    keyId: config.keyId,
+    payerDid: config.agentDid,
+    defaultAssetId: "0x3::gas_coin::RGas",
+    maxAmount: BigInt(10_000_000),
+    debug: true,
+  });
+
+  console.log("Calling nuwa.health via PaymentChannelMcpClient…");
+  const health = await payer.healthCheck();
+  console.log("Health:", health);
+
+  console.log("Calling nuwa.discovery…");
+  const { content } = await payer.callTool("nuwa.discovery");
+  const discoveryText = content.find((c: any) => c?.type === "text");
+  console.log("Discovery:", discoveryText?.text || content);
+
+  console.log("Calling echo…");
+  const echo = await payer.callTool("echo", { text: "Hello, world!" });
+  console.log("Echo:", echo);
+
+  //loop calling echo for testing the payment flow
+  let payments = [];
+  const loopCount = 10;
+  for (let i = 0; i < loopCount; i++) {
+    const { content:_, payment } = await payer.callToolWithPayment("echo", { text: "Hello, world!" });
+    payments.push(payment);
+  }
+  let firstPayment = payments[0];
+  let lastPayment = payments[payments.length - 1];
+  console.log("loop calling echo results", { firstPayment, lastPayment });
+  if (payments.length !== loopCount) {
+    throw new Error(`Payment length is not equal to loop count: ${payments.length} !== ${loopCount}`);
+  }
 }
 
 main().catch(err => {

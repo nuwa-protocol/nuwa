@@ -3,19 +3,21 @@
  * For testing and development environments
  */
 
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 import type { SubRAV } from '../../core/types';
 import type { PendingSubRAVRepository } from '../interfaces/PendingSubRAVRepository';
 import type { PendingSubRAVStats } from '../types/pagination';
 
 export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
   private proposals = new Map<string, { subRAV: SubRAV; timestamp: number }>();
-
+  private logger: DebugLogger = DebugLogger.get('pendingSubRavMemory');
   private getKey(channelId: string, vmIdFragment: string, nonce: bigint): string {
     return `${channelId}:${vmIdFragment}:${nonce}`;
   }
 
   async save(subRAV: SubRAV): Promise<void> {
     const key = this.getKey(subRAV.channelId, subRAV.vmIdFragment, subRAV.nonce);
+    this.logger.debug('Saving sub-RAV', { key, subRAV });
     this.proposals.set(key, {
       subRAV: { ...subRAV }, // Deep copy to avoid mutations
       timestamp: Date.now(),
@@ -46,11 +48,12 @@ export class MemoryPendingSubRAVRepository implements PendingSubRAVRepository {
         }
       }
     }
-
+    this.logger.debug('Latest sub-RAV', { channelId, vmIdFragment, latestSubRAV });
     return latestSubRAV ? { ...latestSubRAV } : null; // Return copy to avoid mutations
   }
 
   async remove(channelId: string, vmIdFragment: string, nonce: bigint): Promise<void> {
+    this.logger.debug('Removing sub-RAV', { channelId, vmIdFragment, nonce });
     const key = this.getKey(channelId, vmIdFragment, nonce);
     this.proposals.delete(key);
   }

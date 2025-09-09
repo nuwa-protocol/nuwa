@@ -63,8 +63,27 @@ export class LocalStorageHostChannelMappingStore implements HostChannelMappingSt
 
     try {
       // Parse JSON with lossless-json first
-      const parsedData = parseJson(value);
-      // Then validate and transform with Zod (handles BigInt conversion)
+      const parsedData = parseJson(value) as any;
+
+      // Backward compatibility: pendingSubRAV used to be stored as SubRAV (bigint/number fields)
+      // Convert legacy structure to SerializableSubRAV (string fields) before validation
+      if (parsedData && typeof parsedData === 'object' && parsedData.pendingSubRAV) {
+        const p = parsedData.pendingSubRAV as any;
+        const looksLegacy = typeof p.version === 'number' || typeof p.chainId !== 'string';
+        if (looksLegacy) {
+          parsedData.pendingSubRAV = {
+            version: String(p.version),
+            chainId: String(p.chainId),
+            channelId: String(p.channelId),
+            channelEpoch: String(p.channelEpoch),
+            vmIdFragment: String(p.vmIdFragment),
+            accumulatedAmount: String(p.accumulatedAmount),
+            nonce: String(p.nonce),
+          };
+        }
+      }
+
+      // Then validate and transform with Zod (ensures structure is correct)
       return PersistedHttpClientStateSchema.parse(parsedData);
     } catch (error) {
       return undefined;

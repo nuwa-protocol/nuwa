@@ -1,144 +1,115 @@
-import { FastMCP } from "fastmcp";
 import { z } from "zod";
-import { DIDAuth, VDRRegistry, NIP1SignedObject, initRoochVDR} from "@nuwa-ai/identity-kit";
+import { VDRRegistry, initRoochVDR, KeyManager, MemoryKeyStore, KeyType, IdentityKit } from "@nuwa-ai/identity-kit";
+import { createFastMcpServerFromEnv } from "@nuwa-ai/payment-kit/mcp";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // -----------------------------------------------------------------------------
-// Initialize VDRRegistry with default VDRs (rooch, key)
+// Create Payment-enabled FastMCP server with Nuwa built-ins
 // -----------------------------------------------------------------------------
-const registry = VDRRegistry.getInstance();
-// Ensure rooch VDR is registered (idempotent)
-initRoochVDR("test", undefined, registry);
+async function main() {
+  const serviceKey = process.env.SERVICE_KEY || "";
+  if (!serviceKey) {
+    throw new Error("SERVICE_KEY environment variable is required");
+  }
+  const keyManager = await KeyManager.fromSerializedKey(serviceKey);
+  const serviceDid = await keyManager.getDid();
 
-// -----------------------------------------------------------------------------
-// FastMCP server with DIDAuth (NIP-10) via authenticate option
-// -----------------------------------------------------------------------------
-const server = new FastMCP({
-  name: "nuwa-mcp-demo",
-  version: "0.1.0",
+  const port = Number(process.env.PORT || 8080);
 
-  /**
-   * This function runs once per HTTP request (tool call, list tools, etc.).
-   * Throwing a Response with status 401/403 rejects the call.
-   */
-  authenticate: async (request: any) => {
-    try {
-        const header =
-          typeof request.headers?.get === "function"
-            ? request.headers.get("authorization")
-            : request.headers["authorization"] ?? request.headers["Authorization"];
-        console.log("authenticate header", header);
-        const prefix = "DIDAuthV1 ";
-        if (!header || !header.startsWith(prefix)) {
-        throw new Response(undefined, { status: 401, statusText: "Missing DIDAuthV1 header" });
-        }
-
-        const verify = await DIDAuth.v1.verifyAuthHeader(header, VDRRegistry.getInstance());
-        if (!verify.ok) {
-            const msg = (verify as { error: string }).error;
-            console.error("authenticate error", msg);
-            throw new Response(`Invalid DIDAuth: ${msg}`, { status: 403 });
-        }
-        const signerDid = verify.signedObject.signature.signer_did;
-        console.log("authenticate signerDid", signerDid);
-        return { did: signerDid };
-    } catch (error) {
-        console.error("authenticate error", error);
-        throw new Response(undefined, { status: 401, statusText: "Unauthorized" });
-    }
-  },
-});
-
-// -----------------------------------------------------------------------------
-// Example tool – echo
-// -----------------------------------------------------------------------------
-server.addTool({
-  name: "echo",
-  description: "Echo back the provided text.",
-  parameters: z.object({
-    text: z.string().describe("Text to echo back"),
-  }),
-  async execute({ text }) {
-    return text;
-  },
-});
-
-server.addTool({
-	name: "get_did",
-	description: "Get the DID of the user.",
-	parameters: z.object({}),
-	async execute(
-		args: unknown,
-		context: { session: { did: string } | undefined },
-	) {
-		if (!context.session) {
-			return "No session found";
-		}
-		return context.session.did;
-	},
-});
-
-// -----------------------------------------------------------------------------
-// Example prompt – shout (returns upper-cased text)
-// -----------------------------------------------------------------------------
-
-server.addPrompt({
-  name: "shout",
-  description: "Transform input text to uppercase and surround by >>> <<<.",
-  arguments: [
-    {
-      name: "text",
-      description: "Text to transform",
-      required: true,
+  const env = await IdentityKit.bootstrap({
+    method: "rooch",
+    keyStore: keyManager.getStore(),
+    vdrOptions: {
+      network: "test",
     },
-  ],
-  async load({ text }: { text: string }) {
-    return `>>> ${text.toUpperCase()} <<<`;
-  },
-});
-
-// -----------------------------------------------------------------------------
-// Example resources
-// -----------------------------------------------------------------------------
-
-// Static resource – server info
-server.addResource({
-  uri: "info://version",
-  name: "Server Version Info",
-  mimeType: "text/plain",
-  async load() {
-    return {
-      text: `FastMCP demo server version 0.1.0`,
-    };
-  },
-});
-
-// Resource template – greet user
-server.addResourceTemplate({
-  uriTemplate: "greet://{name}",
-  name: "Greeting message",
-  mimeType: "text/plain",
-  arguments: [
-    {
-      name: "name",
-      description: "Name of the person to greet",
-      required: true,
+  });
+  const server = await createFastMcpServerFromEnv(env, {
+    serviceId: "nuwa-mcp-demo",
+    adminDid: serviceDid,
+    debug: true,
+    port,
+    endpoint: "/mcp",
+    wellKnown: {
+      enabled: true,
+      discovery: async () => ({
+        serviceId: "nuwa-mcp-demo",
+        serviceDid,
+      }),
     },
-  ],
-  async load({ name }: { name: string }) {
-    return {
-      text: `Hello, ${name}! Welcome to FastMCP demo server.`,
-    };
-  },
-});
+  });
 
-// -----------------------------------------------------------------------------
-// Start server
-// -----------------------------------------------------------------------------
-server.start({
-  transportType: "httpStream",
-  httpStream: {
-    port: 8080,
-  },
-});
+  // Register example free tools (no billing) and paid tools (with billing)
+  server.paidTool({
+    name: "echo",
+    description: "Echo back the provided text.",
+    parameters: { text: z.string().describe("Text to echo back") },
+    pricePicoUSD: BigInt(1000000000), // 0.001 USD
+    async execute({ text }) {
+      return text;
+    },
+  });
 
-console.log("✅ MCP server listening on http://localhost:8080/mcp (httpStream)"); 
+  server.freeTool({
+    name: "get_did",
+    description: "Get the DID of the caller (from __nuwa_auth if provided).",
+    parameters: {},
+    async execute(_args: unknown, context: any) {
+      const did = context?.didInfo?.did || "unknown";
+      return { did };
+    },
+  });
+
+  // Free prompt example (no billing)
+  server.addPrompt?.({
+    name: "shout",
+    description: "Transform input text to uppercase and surround by >>> <<<.",
+    arguments: [
+      {
+        name: "text",
+        description: "Text to transform",
+        required: true,
+      },
+    ],
+    async load({ text }: { text: string }) {
+      return `>>> ${text.toUpperCase()} <<<`;
+    },
+  } as any);
+
+  // Free resources examples (no billing)
+  server.addResource?.({
+    uri: "info://version",
+    name: "Server Version Info",
+    mimeType: "text/plain",
+    async load() {
+      return { text: `FastMCP demo server with Nuwa payment` };
+    },
+  } as any);
+
+  server.addResourceTemplate?.({
+    uriTemplate: "greet://{name}",
+    name: "Greeting message",
+    mimeType: "text/plain",
+    arguments: [
+      {
+        name: "name",
+        description: "Name of the person to greet",
+        required: true,
+      },
+    ],
+    async load({ name }: { name: string }) {
+      return { text: `Hello, ${name}! Welcome to FastMCP demo server.` };
+    },
+  } as any);
+
+  await server.start();
+  
+  console.log(`✅ MCP server with Nuwa payment started on http://localhost:${port}/mcp`);
+  console.log(`✅ Service DID: ${serviceDid}`);
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

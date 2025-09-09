@@ -13,57 +13,46 @@ export const createBigIntSchema = () =>
     z.instanceof(LosslessNumber).transform(val => BigInt(val.toString())),
   ]);
 
-/**
- * Core SubRAV schema that matches the SubRAV interface from core/types.ts
- * This is the authoritative schema for SubRAV objects across the entire payment-kit
- */
-export const SubRAVSchema = z.object({
-  /** Protocol version (default: 1) */
-  version: z.number(),
-  /** Blockchain identifier (e.g., 4 for Rooch testnet) */
-  chainId: createBigIntSchema(),
-  /** Deterministic channel identifier (32-byte hex string) */
+export const SerializableSubRAVSchema = z.object({
+  version: z.string(),
+  chainId: z.string(),
   channelId: z.string(),
-  /** Channel epoch to prevent replay attacks across channel resets */
-  channelEpoch: createBigIntSchema(),
-  /** DID verification method fragment (e.g., 'key-1') */
+  channelEpoch: z.string(),
   vmIdFragment: z.string(),
-  /** Total amount ever sent through this sub-channel */
-  accumulatedAmount: createBigIntSchema(),
-  /** Strictly increasing nonce per sub-channel */
-  nonce: createBigIntSchema(),
+  accumulatedAmount: z.string(),
+  nonce: z.string(),
 });
 
-export type SubRAV = z.infer<typeof SubRAVSchema>;
-
-/**
- * SignedSubRAV schema that includes signature fields
- * This matches the SignedSubRAV interface from core/types.ts
- */
-export const SignedSubRAVSchema = z.object({
-  /** SubRAV */
-  subRav: SubRAVSchema,
-  /** Cryptographic signature over the SubRAV */
+export const SerializableSignedSubRAVSchema = z.object({
+  subRav: SerializableSubRAVSchema,
   signature: z.string(),
 });
 
-export type SignedSubRAV = z.infer<typeof SignedSubRAVSchema>;
-
 /**
- * Asset information schema
+ * SerializableRequestPayload (Zod) – client -> server request payload
  */
-export const AssetInfoSchema = z.object({
-  /** Asset identifier (e.g., "0x3::gas_coin::RGas") */
-  id: z.string(),
-  /** Asset symbol (e.g., "RGas") */
-  symbol: z.string(),
-  /** Asset name (e.g., "Rooch Gas") */
-  name: z.string(),
-  /** Number of decimal places */
-  decimals: z.number(),
+export const SerializableRequestPayloadSchema = z.object({
+  version: z.number(),
+  clientTxRef: z.string(),
+  maxAmount: z.string().optional(),
+  signedSubRav: SerializableSignedSubRAVSchema.optional(),
 });
 
-export type AssetInfo = z.infer<typeof AssetInfoSchema>;
+// SerializableResponsePayload (Zod) – mirrors SerializableResponsePayloadSchema
+export const SerializableResponsePayloadSchema = z.object({
+  version: z.number(),
+  clientTxRef: z.string().optional(),
+  serviceTxRef: z.string().optional(),
+  subRav: SerializableSubRAVSchema.optional(),
+  cost: z.string().optional(),
+  costUsd: z.string().optional(),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string().optional(),
+    })
+    .optional(),
+});
 
 /**
  * Channel status enumeration (matches core/types.ts)
@@ -307,7 +296,7 @@ export const PersistedHttpClientStateSchema = z.object({
   /** Channel identifier */
   channelId: z.string().optional(),
   /** Pending SubRAV data */
-  pendingSubRAV: SubRAVSchema.optional(),
+  pendingSubRAV: SerializableSubRAVSchema.optional(),
   /** Last update timestamp (ISO string) */
   lastUpdated: z.string().optional(),
 });

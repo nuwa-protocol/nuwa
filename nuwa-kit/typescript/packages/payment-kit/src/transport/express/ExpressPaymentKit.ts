@@ -399,7 +399,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
           if (billingContext.state?.error) {
             const err = billingContext.state.error as { code: string; message?: string };
             const status = this.mapErrorCodeToHttpStatus(err.code);
-            const headerValue = this.buildProtocolErrorHeader(req, err);
+            // Prefer structured responsePayload (may include pending subRav for auto-retry)
+            const payload = billingContext.state.responsePayload;
+            const headerValue = payload
+              ? HttpPaymentCodec.buildResponseHeader(payload)
+              : this.buildProtocolErrorHeader(req, err);
             this.ensureExposeHeader(res);
             res.setHeader(HttpPaymentCodec.getHeaderName(), headerValue);
 
@@ -444,13 +448,18 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                   if (!headerWritten) {
                     try {
                       this.ensureExposeHeader(res);
-                      if (settled?.state?.headerValue) {
-                        res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
-                      }
+                      const payload = settled?.state?.responsePayload;
+                      const header = payload
+                        ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                        : undefined;
+                      if (header) res.setHeader('X-Payment-Channel-Data', header);
                     } catch {}
                   }
                   try {
-                    const headerValue: string | undefined = settled?.state?.headerValue;
+                    const payload = settled?.state?.responsePayload;
+                    const headerValue: string | undefined = payload
+                      ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                      : undefined;
                     if (headerValue) {
                       const ct = (res.getHeader('Content-Type') as string) || '';
                       const sseObj = { nuwa_payment_header: headerValue };
@@ -503,9 +512,11 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                   // Trailers are not widely supported; rely on polling/in-band. Still expose header if possible.
                   try {
                     this.ensureExposeHeader(res);
-                    if (settled?.state?.headerValue) {
-                      res.setHeader('X-Payment-Channel-Data', settled.state.headerValue);
-                    }
+                    const payload = settled?.state?.responsePayload;
+                    const header = payload
+                      ? HttpPaymentCodec.buildResponseHeader(payload as any)
+                      : undefined;
+                    if (header) res.setHeader('X-Payment-Channel-Data', header);
                   } catch {}
                 }
                 if (settled?.state?.unsignedSubRav) {
@@ -523,6 +534,16 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
 
         next();
       } catch (error) {
+        // Detailed trace logging for 500 errors
+        try {
+          this.logger.error('[billingWrapper.500]', {
+            method: req.method,
+            url: req.originalUrl || req.url,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          } as any);
+        } catch {}
+
         res.status(500).json({
           error: 'Payment processing failed',
           details: error instanceof Error ? error.message : String(error),

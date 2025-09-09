@@ -1,6 +1,7 @@
 /**
  * Core types for NIP-4 Payment Channel protocol
  */
+import { z } from 'zod';
 
 // Re-export contract interface types for convenience
 export type {
@@ -82,7 +83,7 @@ export interface TransactionResult {
 /**
  * Payment header payload - protocol-agnostic structure for payment requests
  */
-export interface PaymentHeaderPayload {
+export interface PaymentRequestPayload {
   /** Signed SubRAV from client (optional in FREE mode) */
   signedSubRav?: SignedSubRAV;
   /** Per-request max amount (token smallest unit) */
@@ -94,7 +95,20 @@ export interface PaymentHeaderPayload {
 }
 
 // Compatibility alias - maintain backward compatibility
-export type HttpRequestPayload = PaymentHeaderPayload;
+export type HttpRequestPayload = PaymentRequestPayload;
+export type PaymentHeaderPayload = PaymentRequestPayload;
+
+/**
+ * JSON-serializable PaymentRequestPayload for embedding into JSON bodies (e.g., MCP)
+ * - bigint fields become strings
+ * - signedSubRav is SerializableSignedSubRAV
+ */
+export interface SerializableRequestPayload {
+  version: number;
+  clientTxRef: string;
+  maxAmount?: string; // optional for FREE paths
+  signedSubRav?: SerializableSignedSubRAV;
+}
 
 /**
  * Payment response header payload (protocol-level)
@@ -126,6 +140,45 @@ export interface PaymentResponsePayload {
 
 // Backward-compatible alias for existing imports
 export type HttpResponsePayload = PaymentResponsePayload;
+
+/**
+ * JSON-serializable SubRAV representation (all bigint -> string)
+ */
+export interface SerializableSubRAV {
+  version: string;
+  chainId: string;
+  channelId: string;
+  channelEpoch: string;
+  vmIdFragment: string;
+  accumulatedAmount: string;
+  nonce: string;
+}
+
+/**
+ * JSON-serializable SignedSubRAV
+ */
+export interface SerializableSignedSubRAV {
+  subRav: SerializableSubRAV;
+  signature: string; // base64url
+}
+
+/**
+ * JSON-serializable PaymentResponsePayload for embedding into JSON bodies (e.g., MCP)
+ * - bigint fields become strings
+ * - subRav is SerializableSubRAV (not encoded header string)
+ */
+export interface SerializableResponsePayload {
+  version: number; // keep number for schema clarity
+  clientTxRef?: string;
+  serviceTxRef?: string;
+  subRav?: SerializableSubRAV;
+  cost?: string;
+  costUsd?: string;
+  error?: {
+    code: string;
+    message?: string;
+  };
+}
 
 /**
  * Payment information for completed requests

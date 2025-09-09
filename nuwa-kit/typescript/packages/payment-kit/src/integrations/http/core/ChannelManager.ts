@@ -78,26 +78,9 @@ export class ChannelManager {
     }
 
     if (!channelId) {
-      // Attempt recovery first
-      try {
-        const recoveryData = await this.recoverFromService();
-        if (recoveryData.channel) {
-          await this.applyRecovery(recoveryData, {
-            authorizeIfMissing: true,
-            requireVmFragment: true,
-          });
-          await this.persistState();
-          channelId = this.options.paymentState.getChannelId();
-        }
-      } catch (e) {
-        this.logger.debug('Recovery attempt failed:', e);
-      }
-
-      // Create new if still missing
-      if (!channelId) {
-        await this.createNewChannel();
-        channelId = this.options.paymentState.getChannelId();
-      }
+      // Create new channel directly; recovery is no longer auto-invoked
+      await this.createNewChannel();
+      channelId = this.options.paymentState.getChannelId();
     }
 
     // 4) Ensure sub-channel exists/authorized for current vmIdFragment
@@ -109,27 +92,19 @@ export class ChannelManager {
           const subInfo = await this.options.payerClient.getSubChannelInfo(channelId, vmIdFragment);
           this.options.paymentState.setSubChannelInfo(subInfo);
         } catch {
-          // Try server-assisted authorization path via recovery
+          // Directly authorize sub-channel without auto recovery
           try {
-            const rec = await this.recoverFromService();
-            await this.applyRecovery(rec, { authorizeIfMissing: true, requireVmFragment: true });
+            await this.options.payerClient.authorizeSubChannel({ channelId, vmIdFragment });
+            await this.waitForSubChannelAuthorization(channelId, vmIdFragment);
+            const subInfo = await this.options.payerClient.getSubChannelInfo(
+              channelId,
+              vmIdFragment
+            );
+            this.options.paymentState.setSubChannelInfo(subInfo);
             await this.persistState();
-          } catch (e) {
-            this.logger.debug('Sub-channel recovery/authorization failed:', e);
-            // Fallback: direct authorize
-            try {
-              await this.options.payerClient.authorizeSubChannel({ channelId, vmIdFragment });
-              await this.waitForSubChannelAuthorization(channelId, vmIdFragment);
-              const subInfo = await this.options.payerClient.getSubChannelInfo(
-                channelId,
-                vmIdFragment
-              );
-              this.options.paymentState.setSubChannelInfo(subInfo);
-              await this.persistState();
-            } catch (e2) {
-              this.logger.debug('Direct sub-channel authorization failed:', e2);
-              throw e2;
-            }
+          } catch (e2) {
+            this.logger.debug('Direct sub-channel authorization failed:', e2);
+            throw e2;
           }
         }
       }
@@ -310,74 +285,6 @@ export class ChannelManager {
       const errorMessage = `Recovery failed: ${error instanceof Error ? error.message : String(error)}`;
       this.logger.debug(errorMessage);
       throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Apply recovery response to client state
-   */
-  private async applyRecovery(
-    recovery: RecoveryResponse,
-    options?: { authorizeIfMissing?: boolean; requireVmFragment?: boolean }
-  ): Promise<void> {
-    // Update channel info
-    if (recovery.channel) {
-      this.options.paymentState.setChannelId(recovery.channel.channelId);
-
-      try {
-        const channelInfo = await this.options.payerClient.getChannelInfo(
-          recovery.channel.channelId
-        );
-        this.options.paymentState.setChannelInfo(channelInfo);
-      } catch (e) {
-        this.logger.debug('GetChannelInfo failed during recovery:', e);
-      }
-    }
-
-    // Accept pending proposal
-    if (recovery.pendingSubRav) {
-      this.options.paymentState.setPendingSubRAV(recovery.pendingSubRav);
-    }
-
-    // Handle sub-channel authorization if needed
-    if (options?.authorizeIfMissing && recovery.channel) {
-      await this.ensureSubChannelAuthorized(recovery, options.requireVmFragment);
-    }
-  }
-
-  private async ensureSubChannelAuthorized(
-    recovery: RecoveryResponse,
-    requireVmFragment?: boolean
-  ): Promise<void> {
-    const channelId = this.options.paymentState.getChannelId();
-    if (!channelId) return;
-
-    let vmIdFragment =
-      recovery.subChannel?.vmIdFragment || this.options.paymentState.getVmIdFragment();
-
-    if (!vmIdFragment && requireVmFragment) {
-      if (this.options.keyId) {
-        const parts = this.options.keyId.split('#');
-        vmIdFragment = parts.length > 1 ? parts[1] : '';
-      }
-      if (!vmIdFragment) {
-        throw new Error(
-          'Recovered channel but sub-channel cannot be authorized: missing vmIdFragment.'
-        );
-      }
-    }
-
-    if (vmIdFragment && !recovery.subChannel) {
-      try {
-        const auth = await this.options.payerClient.authorizeSubChannel({
-          channelId,
-          vmIdFragment,
-        });
-        // Directly use returned subChannelInfo
-        this.options.paymentState.setSubChannelInfo(auth.subChannelInfo);
-      } catch (e) {
-        this.logger.debug('Sub-channel authorization failed during recovery:', e);
-      }
     }
   }
 

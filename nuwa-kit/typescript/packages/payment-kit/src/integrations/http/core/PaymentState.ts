@@ -6,6 +6,7 @@ import type {
 } from '../types';
 import type { SubRAV, ChannelInfo, SubChannelInfo } from '../../../core/types';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
+import { HttpPaymentCodec } from '../../../middlewares/http/HttpPaymentCodec';
 
 /**
  * PaymentState manages all client state in a centralized way.
@@ -153,7 +154,9 @@ export class PaymentState {
   getPersistedState(): PersistedHttpClientState {
     return {
       channelId: this.channelId,
-      pendingSubRAV: this.pendingSubRAV,
+      pendingSubRAV: this.pendingSubRAV
+        ? HttpPaymentCodec.serializeSubRAV(this.pendingSubRAV)
+        : undefined,
       lastUpdated: new Date().toISOString(),
     };
   }
@@ -162,8 +165,11 @@ export class PaymentState {
     if (state.channelId) {
       this.channelId = state.channelId;
     }
-    if (state.pendingSubRAV && this.shouldAcceptSubRAV(state.pendingSubRAV)) {
-      this.pendingSubRAV = state.pendingSubRAV;
+    const pendingSubRAV = state.pendingSubRAV
+      ? HttpPaymentCodec.deserializeSubRAV(state.pendingSubRAV)
+      : undefined;
+    if (pendingSubRAV && this.shouldAcceptSubRAV(pendingSubRAV)) {
+      this.pendingSubRAV = pendingSubRAV;
     }
     this.logger.debug('Persisted state loaded');
   }

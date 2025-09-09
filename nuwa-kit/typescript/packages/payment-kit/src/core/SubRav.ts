@@ -23,7 +23,7 @@ export const CURRENT_SUBRAV_VERSION = SUBRAV_VERSION_1;
  * BCS Schema for SubRAV serialization
  * Must match the Move contract SubRAV struct definition
  */
-export const SubRAVSchema: BcsType<any> = bcs.struct('SubRAV', {
+export const SubRAVBCSSchema: BcsType<any> = bcs.struct('SubRAV', {
   version: bcs.u8(),
   chain_id: bcs.u64(),
   channel_id: bcs.ObjectId,
@@ -55,7 +55,7 @@ export class SubRAVCodec {
         nonce: subRav.nonce.toString(),
       };
 
-      return SubRAVSchema.serialize(bcsSubRAV).toBytes();
+      return SubRAVBCSSchema.serialize(bcsSubRAV).toBytes();
     } catch (error) {
       throw new Error(
         `Failed to encode SubRAV: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -68,7 +68,7 @@ export class SubRAVCodec {
    */
   static decode(bytes: Uint8Array): SubRAV {
     try {
-      const bcsSubRAV = SubRAVSchema.parse(bytes);
+      const bcsSubRAV = SubRAVBCSSchema.parse(bytes);
 
       return {
         version: bcsSubRAV.version,

@@ -46,10 +46,12 @@ async function verifySetup() {
         accumulatedAmount: BigInt('1000000'),
         nonce: BigInt(1),
       },
-      amountDebited: BigInt('1000000'),
+      cost: BigInt('1000000'),
+      costUsd: BigInt('1000000'),
       serviceTxRef: 'test-tx-ref',
       errorCode: 0,
       message: 'Test message',
+      version: 1,
     };
 
     const encoded = HttpPaymentCodec.buildResponseHeader(testPayload);

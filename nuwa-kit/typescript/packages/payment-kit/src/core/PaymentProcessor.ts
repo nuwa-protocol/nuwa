@@ -285,6 +285,32 @@ export class PaymentProcessor {
           ravResult.decision,
           ravResult.error
         );
+        // Do NOT generate new proposal here; just return error
+        // If we have latestPendingSubRav, attach it to payload for client to sign
+        if (pctx.state.latestPendingSubRav) {
+          try {
+            const decoded = {
+              version: 1,
+              clientTxRef: pctx.meta.clientTxRef,
+              serviceTxRef: pctx.state.serviceTxRef,
+              subRav: pctx.state.latestPendingSubRav,
+              error: ravResult.error,
+            };
+            // Store structured payload for later rendering (HTTP header or MCP JSON)
+            pctx.state.responsePayload = decoded;
+          } catch (e) {
+            this.log('⚠️ Failed to attach pending SubRAV to error payload:', e);
+          }
+        } else {
+          // No pending available: still expose an error payload without subRav
+          pctx.state.responsePayload = {
+            version: 1,
+            clientTxRef: pctx.meta.clientTxRef,
+            serviceTxRef: pctx.state.serviceTxRef,
+            error: ravResult.error,
+          };
+        }
+        // Avoid auto-attaching a separate error header here to prevent overwriting payload-based header later
         return this.fail(
           pctx,
           {
@@ -447,7 +473,7 @@ export class PaymentProcessor {
             pctx.state.cost = finalCost;
           }
         } else {
-          // Paid route: always generate SubRAV and header (even if cost=0 per §4.2)
+          // Paid route: always generate SubRAV (even if cost=0 per §4.2)
           // Require a baseline: SignedSubRAV, latestSignedSubRav, or subChannelInfo
           const hasSigned = !!pctx.meta.signedSubRav;
           const hasLatest = !!pctx.state && !!pctx.state.latestSignedSubRav;
@@ -466,7 +492,7 @@ export class PaymentProcessor {
           }
 
           this.log('🔧 Generating SubRAV with finalCost:', finalCost);
-          const { unsignedSubRAV, serviceTxRef, headerValue } = this.generateNextSubRAV({
+          const { unsignedSubRAV, serviceTxRef } = this.generateNextSubRAV({
             signedSubRAV: pctx.meta.signedSubRav,
             latestSignedSubRav: pctx.state?.latestSignedSubRav,
             subChannelInfo: pctx.state?.subChannelInfo!,
@@ -478,12 +504,19 @@ export class PaymentProcessor {
           this.log('🔧 Generated SubRAV:', {
             nonce: unsignedSubRAV.nonce,
             accumulatedAmount: unsignedSubRAV.accumulatedAmount,
-            headerValue: !!headerValue,
           });
           pctx.state.unsignedSubRav = unsignedSubRAV;
           pctx.state.serviceTxRef = serviceTxRef;
           pctx.state.nonce = unsignedSubRAV.nonce;
-          pctx.state.headerValue = headerValue;
+          // Also persist structured payload for protocol-agnostic rendering
+          pctx.state.responsePayload = {
+            subRav: unsignedSubRAV,
+            cost: finalCost,
+            costUsd: usdCost,
+            clientTxRef: pctx.meta.clientTxRef,
+            serviceTxRef,
+            version: 1,
+          };
         }
 
         this.log('✅ Billing settled successfully');
@@ -640,7 +673,6 @@ export class PaymentProcessor {
   }): {
     unsignedSubRAV: SubRAV;
     serviceTxRef: string;
-    headerValue: string;
   } {
     const serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -667,9 +699,8 @@ export class PaymentProcessor {
       version: 1,
     } as any;
 
-    const headerValue = HttpPaymentCodec.buildResponseHeader(responsePayload);
-
-    return { unsignedSubRAV: next, serviceTxRef, headerValue };
+    // Header construction moved to adapters (HTTP/MCP). Core returns payload parts only.
+    return { unsignedSubRAV: next, serviceTxRef };
   }
 
   /**
@@ -748,12 +779,15 @@ export class PaymentProcessor {
       if (!ctx.state.serviceTxRef) {
         ctx.state.serviceTxRef = `srv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       }
-      ctx.state.headerValue = HttpPaymentCodec.buildResponseHeader({
-        error,
-        clientTxRef: ctx.meta.clientTxRef,
-        serviceTxRef: ctx.state.serviceTxRef,
-        version: 1,
-      } as any);
+      // Prefer responsePayload, let adapters render headers at the edge
+      if (!ctx.state.responsePayload) {
+        ctx.state.responsePayload = {
+          error,
+          clientTxRef: ctx.meta.clientTxRef,
+          serviceTxRef: ctx.state.serviceTxRef,
+          version: 1,
+        } as any;
+      }
     } catch (e) {
       this.log('Failed to build error header:', e);
     }
@@ -776,5 +810,22 @@ export class PaymentProcessor {
    */
   private log(...args: any[]): void {
     this.logger.debug(...args);
+  }
+
+  /**
+   * Destroy background services and release resources.
+   * - Stops ClaimTriggerService processing loop
+   * - Clears HubBalanceService cache
+   */
+  destroy(): void {
+    try {
+      this.config?.claimTriggerService?.destroy?.();
+    } catch {}
+    try {
+      (this.config.hubBalanceService as unknown as { clear?: () => void })?.clear?.();
+    } catch {}
+    try {
+      this.logger.info('PaymentProcessor destroyed');
+    } catch {}
   }
 }
