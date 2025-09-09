@@ -1,6 +1,8 @@
 /**
  * Core types for NIP-4 Payment Channel protocol
  */
+import { z } from 'zod';
+
 
 // Re-export contract interface types for convenience
 export type {

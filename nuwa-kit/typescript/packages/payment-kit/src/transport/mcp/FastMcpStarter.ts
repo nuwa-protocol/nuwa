@@ -13,8 +13,6 @@ import type { Server } from 'http';
 import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
 import {
-  buildParametersSchema,
-  compileStandardSchema,
   extendZodWithNuwaReserved,
   normalizeToZodObject,
 } from './ToolSchema';
