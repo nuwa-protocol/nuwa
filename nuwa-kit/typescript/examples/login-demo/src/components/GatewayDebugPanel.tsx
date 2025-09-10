@@ -152,6 +152,7 @@ export function GatewayDebugPanel() {
       const sorted = [...items].sort((a, b) => b.timestamp - a.timestamp);
       setTxItems(sorted);
     } catch (e: any) {
+      console.error('Error sending request:', e);
       setTxError(e.message || String(e));
     } finally {
       setTxLoading(false);
