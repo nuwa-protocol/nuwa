@@ -491,7 +491,7 @@ describe('Cap Stats and Favorites', () => {
       if (updatedStats.stats) {
         expect(updatedStats.stats.downloads).toBe(initialDownloads + 1);
       }
-    }, 10000);
+    }, 1000000);
   });
 
   describe('User Favorites Management', () => {

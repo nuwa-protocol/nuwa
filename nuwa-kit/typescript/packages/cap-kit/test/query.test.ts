@@ -11,6 +11,14 @@ describe("CapKit query cap", () => {
 
   it("should query cap by name", async () => {
 
+    const resut1 = await capKit.queryByName(undefined, {
+      tags: ['AI Model'],
+      page: 0,
+      size: 45,
+      sortBy: 'downloads',
+      sortOrder: 'desc',
+    })
+
     const all = await capKit.queryByName(undefined, {
       sortBy: 'downloads',
       sortOrder: "desc"
@@ -18,9 +26,7 @@ describe("CapKit query cap", () => {
 
     const result = await capKit.queryByName('test')
 
-    const resut1 = await capKit.queryByName(undefined, {
-      tags: ['Coding']
-    })
+
 
     const result2 = await capKit.queryByName(undefined, {
       tags: ['Coding'],

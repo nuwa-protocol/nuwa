@@ -212,12 +212,16 @@ export async function saveCapToSupabase(
 }
 
 /**
- * Queries CAP data from Supabase database with filtering and pagination
- * @param name - Optional name filter (partial match)
- * @param cid - Optional CID filter (partial match)
- * @param tags - Optional array of tags to filter by
+ * Queries CAP data using the query_caps_with_stats SQL function
+ * This provides optimized filtering, sorting, and pagination with proper stats joining
+ * @param id - Optional CAP ID to filter by
+ * @param name - Optional CAP name to filter by (case insensitive, partial match)
+ * @param cid - Optional content ID to filter by
+ * @param tags - Optional array of tags to filter by (OR condition)
  * @param page - Page number starting from 0
  * @param pageSize - Number of items per page (max 50)
+ * @param sortBy - Field to sort by (average_rating, downloads, favorites, rating_count, updated_at)
+ * @param sortOrder - Sort order (asc or desc)
  * @returns Promise with query results including pagination information
  */
 export async function queryFromSupabase(
@@ -245,85 +249,17 @@ export async function queryFromSupabase(
     // Calculate pagination offset
     const offset = page * validatedPageSize;
 
-    // Create base query - we'll handle sorting differently based on the field
-    let query;
-    let isStatsQuery = false;
-    
-    if (sortBy && sortBy !== 'updated_at') {
-      // For cap_stats fields, query from cap_stats table and join with cap_data
-      // This allows us to sort by stats fields at the database level
-      isStatsQuery = true;
-      query = supabase
-        .from(CAP_STATS_TABLE_NAME)
-        .select(`
-          *,
-          cap_data!inner(*)
-        `, { count: 'exact' });
-        
-      // Apply sorting on the stats table
-      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-    } else {
-      // For regular fields, use the standard approach
-      query = supabase
-        .from(CAP_TABLE_NAME)
-        .select(`
-          *,
-          cap_stats(*)
-        `, { count: 'exact' });
-        
-      // Add sorting for timestamp field
-      if (sortBy === 'updated_at') {
-        query = query.order('timestamp', { ascending: sortOrder === 'asc' });
-      }
-    }
-
-    // Add filtering conditions - only add if values are not null/empty
-    if (name && name.trim()) {
-      if (isStatsQuery) {
-        query = query.eq('cap_data.name', name);
-        query = query.eq('cap_data.enable', true);
-      } else {
-        query = query.ilike('name', `%${name}%`);
-        query = query.eq('enable', true);
-      }
-    }
-
-    if (cid && cid.trim()) {
-      if (isStatsQuery) {
-        query = query.eq('cap_data.cid', cid);
-      } else {
-        query = query.eq('cid', cid);
-      }
-    }
-
-    if (id && id.trim()) {
-      if (isStatsQuery) {
-        query = query.eq('cap_data.id', id);
-      } else {
-        query = query.eq('id', id);
-      }
-    }
-    
-    // Add tags filtering using PostgreSQL JSONB operators
-    if (tags && tags.length > 0) {
-      if (isStatsQuery) {
-        const orConditions = tags
-          .map(tag => `cap_data.tags.cs.${JSON.stringify([tag])}`)
-          .join(',');
-        query = query.or(orConditions);
-      } else {
-        const orConditions = tags
-          .map(tag => `tags.cs.${JSON.stringify([tag])}`)
-          .join(',');
-        query = query.or(orConditions);
-      }
-    }
-
-    // Apply pagination
-    query = query.range(offset, offset + validatedPageSize - 1);
-
-    // Execute query
-    const { data, count, error } = await query;
+    // Use the query_caps_with_stats SQL function directly
+    const { data, error } = await supabase.rpc('query_caps_with_stats', {
+      p_tags: tags && tags.length > 0 ? tags : null,
+      p_name: name && name.trim() ? name.trim() : null,
+      p_id: id && id.trim() ? id.trim() : null,
+      p_cid: cid && cid.trim() ? cid.trim() : null,
+      p_sort_by: sortBy || 'downloads',
+      p_sort_order: sortOrder,
+      p_offset: offset,
+      p_limit: validatedPageSize
+    });
 
     if (error) {
       throw error;
@@ -341,63 +277,34 @@ export async function queryFromSupabase(
       };
     }
 
-    // Transform database fields from snake_case to camelCase to match CapMetadata interface
-    let transformedItems = data.map((item: any) => {
-      if (isStatsQuery) {
-        // When querying from cap_stats table, the structure is different
-        const capData = item.cap_data;
-        return {
-          id: capData.id,
-          cid: capData.cid,
-          name: capData.name,
-          displayName: capData.display_name,
-          description: capData.description,
-          tags: capData.tags,
-          submittedAt: capData.submitted_at,
-          homepage: capData.homepage,
-          repository: capData.repository,
-          thumbnail: capData.thumbnail,
-          enable: capData.enable,
-          version: capData.version,
-          stats: {
-            capId: item.cap_id,
-            downloads: item.downloads,
-            ratingCount: item.rating_count,
-            averageRating: item.average_rating,
-            favorites: item.favorites,
-          }
-        };
-      } else {
-        // Standard structure when querying from cap_data table
-        return {
-          id: item.id,
-          cid: item.cid,
-          name: item.name,
-          displayName: item.display_name,
-          description: item.description,
-          tags: item.tags,
-          submittedAt: item.submitted_at,
-          homepage: item.homepage,
-          repository: item.repository,
-          thumbnail: item.thumbnail,
-          enable: item.enable,
-          version: item.version,
-          stats: item.cap_stats || {
-            capId: item.id,
-            downloads: 0,
-            ratingCount: 0,
-            averageRating: 0,
-            favorites: 0,
-          }
-        };
-      }
-    });
-
-
-
-    // Calculate total pages
-    const totalItems = count || data.length;
+    // Get total count from the first record (all records have the same full_count)
+    const totalItems = data.length > 0 ? parseInt(data[0].full_count) : 0;
     const totalPages = Math.ceil(totalItems / validatedPageSize);
+
+    // Transform database fields from snake_case to camelCase to match CapMetadata interface
+    const transformedItems = data.map((item: any) => {
+      return {
+        id: item.id,
+        cid: item.cid,
+        name: item.name,
+        displayName: item.display_name,
+        description: item.description,
+        tags: item.tags,
+        submittedAt: item.submitted_at,
+        homepage: item.homepage,
+        repository: item.repository,
+        thumbnail: item.thumbnail,
+        enable: item.enable,
+        version: item.version,
+        stats: {
+          capId: item.cap_id || item.id,
+          downloads: item.downloads || 0,
+          ratingCount: item.rating_count || 0,
+          averageRating: item.average_rating || 0,
+          favorites: item.favorites || 0,
+        }
+      };
+    });
 
     return {
       success: true,

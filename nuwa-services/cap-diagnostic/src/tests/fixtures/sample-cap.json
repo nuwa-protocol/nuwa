@@ -1,0 +1,24 @@
+{
+  "id": "sample-cap-001",
+  "metadata": {
+    "displayName": "Sample CAP",
+    "description": "A sample CAP for testing purposes",
+    "tags": ["test", "sample"],
+    "submittedAt": 1693749600000,
+    "thumbnail": null
+  },
+  "core": {
+    "prompt": {
+      "value": "You are a helpful assistant. You can help users with various tasks. Your location is {{user_geo}}."
+    },
+    "model": {
+      "id": "openai/gpt-4o-mini"
+    },
+    "mcpServers": {
+      "filesystem": {
+        "url": "http://localhost:3001/mcp",
+        "transport": "httpStream"
+      }
+    }
+  }
+}
