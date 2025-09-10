@@ -1,0 +1,22 @@
+{
+  "llm": {
+    "provider": "openrouter",
+    "baseURL": "https://openrouter.ai/api/v1",
+    "timeout": 30000
+  },
+  "mcp": {
+    "timeout": 30000,
+    "retries": 3
+  },
+  "diagnostic": {
+    "testMessages": [
+      "Hello, can you help me?",
+      "What can you do?",
+      "Test your capabilities",
+      "Can you access external tools?",
+      "What is your current context?"
+    ],
+    "maxSteps": 3,
+    "maxRetries": 2
+  }
+}
