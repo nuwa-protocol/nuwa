@@ -15,6 +15,7 @@ import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createDefaultChannelRepo } from '../http/internal/LocalStore';
+import { createDefaultTransactionStore } from '../http/internal/LocalStore';
 import { RequestScheduler } from '../http/internal/RequestScheduler';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
@@ -28,6 +29,7 @@ import {
   type HealthResponse,
 } from '../../schema';
 import type { ChainConfig } from '../../factory/chainFactory';
+import type { TransactionStore } from '../../storage';
 
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
@@ -46,6 +48,17 @@ export interface McpPayerOptions {
     namespace?: string;
   };
   maxAmount: bigint;
+  /** Transaction logging */
+  transactionStore?: TransactionStore;
+  transactionLog?: {
+    enabled?: boolean;
+    persist?: 'memory' | 'indexeddb' | 'custom';
+    maxRecords?: number;
+    sanitizeRequest?: (
+      headers: Record<string, string>,
+      body?: any
+    ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
+  };
 }
 
 export class PaymentChannelMcpClient {
@@ -59,6 +72,7 @@ export class PaymentChannelMcpClient {
   private scheduler: RequestScheduler = new RequestScheduler();
   private cachedDiscovery: any | undefined;
   private channelManager?: McpChannelManager;
+  private transactionStore: TransactionStore;
 
   constructor(options: McpPayerOptions) {
     this.options = options;
@@ -88,6 +102,8 @@ export class PaymentChannelMcpClient {
         channelRepo,
       },
     });
+    // Initialize transaction store (shared across HTTP/MCP if provided)
+    this.transactionStore = options.transactionStore || createDefaultTransactionStore();
     // Initialize MCP ChannelManager
     this.channelManager = new McpChannelManager({
       baseUrl: options.baseUrl,
@@ -247,6 +263,9 @@ export class PaymentChannelMcpClient {
     params?: any
   ): Promise<{ content: any[]; payment?: PaymentInfo }> {
     const handle = this.scheduler.enqueue(async (_release, signal) => {
+      const startTs = Date.now();
+      let createdLog = false;
+      const txEnabled = this.options.transactionLog?.enabled !== false;
       if (signal.aborted) throw new Error('Request aborted');
       const clientTxRef = crypto.randomUUID();
       await this.ensureDiscovery();
@@ -267,6 +286,16 @@ export class PaymentChannelMcpClient {
       if (signal.aborted) throw new Error('Request aborted');
 
       const reqParams = await this.buildParams(method, params, clientTxRef);
+
+      // Create transaction log entry
+      if (txEnabled) {
+        try {
+          await this.logTransactionCreate(clientTxRef, method, reqParams);
+          createdLog = true;
+        } catch (e) {
+          this.logger.debug('txlog.create.failed', e);
+        }
+      }
       let result = await client.callTool({ name: method, arguments: reqParams });
 
       let content: any[] = [];
@@ -335,10 +364,48 @@ export class PaymentChannelMcpClient {
           paymentPayload,
         });
         const errObj = new PaymentKitError(code, message, 402, details);
+        if (txEnabled && createdLog) {
+          try {
+            const durationMs = Date.now() - startTs;
+            await this.transactionStore.update(cRef, {
+              durationMs,
+              status: 'error',
+              errorCode: code,
+              errorMessage: message,
+            });
+          } catch (e) {
+            this.logger.debug('txlog.update.error', e);
+          }
+        }
         throw errObj;
       }
 
       const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
+      if (txEnabled && createdLog) {
+        try {
+          const durationMs = Date.now() - startTs;
+          if (paymentInfo) {
+            await this.transactionStore.update(paymentInfo.clientTxRef, {
+              durationMs,
+              status: 'paid',
+              payment: {
+                cost: paymentInfo.cost,
+                costUsd: paymentInfo.costUsd,
+                nonce: paymentInfo.nonce,
+                serviceTxRef: paymentInfo.serviceTxRef,
+              },
+              vmIdFragment: paymentInfo.vmIdFragment,
+            });
+          } else {
+            await this.transactionStore.update(clientTxRef, {
+              durationMs,
+              status: 'free',
+            });
+          }
+        } catch (e) {
+          this.logger.debug('txlog.update.error', e);
+        }
+      }
       return { content, payment: paymentInfo } as { content: any[]; payment?: PaymentInfo };
     });
     return await handle.promise;
@@ -520,6 +587,10 @@ export class PaymentChannelMcpClient {
     return this.payerClient;
   }
 
+  getTransactionStore(): TransactionStore {
+    return this.transactionStore;
+  }
+
   private extractStringFromPromptResult(res: any): string {
     if (typeof res === 'string') return res;
     if (res && typeof res === 'object') {
@@ -560,6 +631,56 @@ export class PaymentChannelMcpClient {
       }
     } catch {}
     return res;
+  }
+
+  private async logTransactionCreate(
+    clientTxRef: string,
+    method: string,
+    reqParams?: any
+  ): Promise<void> {
+    if (this.options.transactionLog?.enabled === false) return;
+    const headersSummary: Record<string, string> = {
+      tool: String(method),
+    };
+    try {
+      const hasAuth = !!reqParams?.__nuwa_auth;
+      const hasPayment = !!reqParams?.__nuwa_payment;
+      const hasSignedSubRav = !!reqParams?.__nuwa_payment?.signedSubRav;
+      headersSummary['hasAuth'] = String(hasAuth);
+      headersSummary['hasPayment'] = String(hasPayment);
+      headersSummary['hasSignedSubRav'] = String(hasSignedSubRav);
+    } catch {}
+
+    let requestBodyHash: string | undefined = undefined;
+    try {
+      const sanitize = this.options.transactionLog?.sanitizeRequest;
+      if (sanitize) {
+        const sanitized = sanitize(headersSummary, reqParams);
+        if (sanitized?.headersSummary) {
+          Object.assign(headersSummary, sanitized.headersSummary);
+        }
+        requestBodyHash = sanitized?.requestBodyHash;
+      }
+    } catch {}
+
+    const channelId = this.paymentState.getChannelId();
+    const vmIdFragment = this.paymentState.getVmIdFragment();
+    const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
+
+    await this.transactionStore.create({
+      clientTxRef,
+      timestamp: Date.now(),
+      protocol: 'mcp',
+      urlOrTarget: this.options.baseUrl,
+      operation: `tool:${method}`,
+      headersSummary,
+      requestBodyHash,
+      stream: false,
+      channelId: channelId,
+      vmIdFragment: vmIdFragment,
+      assetId: assetId,
+      status: 'pending',
+    });
   }
 
   async healthCheck(): Promise<HealthResponse> {
