@@ -243,7 +243,7 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * List tools exposed by the server (PUBLIC: internal params are filtered out).
+   * Returns tools exposed by the server with internal parameters filtered out for public consumption.
    */
   async listTools(): Promise<Record<string, any>> {
     const raw = await this.listToolsInternal();
@@ -251,7 +251,7 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * Internal listTools that returns server's raw schemas (may include __nuwa* params).
+   * Internal listTools that returns server's raw schemas (may include SDK-internal parameters like __nuwa_auth and __nuwa_payment).
    */
   private async listToolsInternal(): Promise<any> {
     const client = await this.ensureClient();
