@@ -31,7 +31,7 @@ export function getChainConfigFromEnv(env: IdentityEnv): ChainConfig {
   // Access the options from RoochVDR instance
   // Note: This assumes RoochVDR has an 'options' property with the configuration
   const vdrOptions = (roochVdr as any).options || {};
-  const rpcUrl = vdrOptions.rpcUrl || process.env.ROOCH_NODE_URL || undefined;
+  const rpcUrl = vdrOptions.rpcUrl || undefined;
 
   return {
     chain: 'rooch' as const,
