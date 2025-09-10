@@ -69,6 +69,7 @@ export class PaymentChannelMcpClient {
   private mcpClient: McpClient | undefined;
   private notificationsSubscribed = false;
   private lastContents: any[] | undefined;
+  private lastPaymentPayload: SerializableResponsePayload | undefined;
   private scheduler: RequestScheduler = new RequestScheduler();
   private cachedDiscovery: any | undefined;
   private channelManager?: McpChannelManager;
@@ -242,14 +243,80 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * List tools exposed by the server.
+   * List tools exposed by the server (PUBLIC: internal params are filtered out).
    */
   async listTools(): Promise<Record<string, any>> {
+    const raw = await this.listToolsInternal();
+    return this.sanitizeTools(raw);
+  }
+
+  /**
+   * Internal listTools that returns server's raw schemas (may include __nuwa* params).
+   */
+  private async listToolsInternal(): Promise<any> {
     const client = await this.ensureClient();
     if (typeof client.listTools === 'function') {
       return await client.listTools();
     }
     return {};
+  }
+
+  /** Remove SDK-internal parameters from tool schemas (e.g., __nuwa_auth, __nuwa_payment). */
+  private sanitizeTools(tools: any): any {
+    const sanitizeSchema = (schema: any) => {
+      try {
+        if (!schema || typeof schema !== 'object') return schema;
+        const out: any = { ...schema };
+        const props = (schema as any).properties;
+        if (props && typeof props === 'object') {
+          const filtered: Record<string, any> = {};
+          for (const [k, v] of Object.entries(props)) {
+            if (typeof k === 'string' && k.startsWith('__nuwa')) continue;
+            filtered[k] = v;
+          }
+          out.properties = filtered;
+          if (Array.isArray(out.required)) {
+            out.required = out.required.filter(
+              (k: any) => typeof k !== 'string' || !k.startsWith('__nuwa')
+            );
+          }
+        }
+        return out;
+      } catch {
+        return schema;
+      }
+    };
+
+    const sanitizeTool = (t: any) => {
+      const inputSchemaKey = t?.inputSchema
+        ? 'inputSchema'
+        : t?.parameters
+          ? 'parameters'
+          : t?.input_schema
+            ? 'input_schema'
+            : undefined;
+      if (!inputSchemaKey) return t;
+      const copy = { ...t };
+      copy[inputSchemaKey] = sanitizeSchema(t[inputSchemaKey]);
+      return copy;
+    };
+
+    try {
+      if (tools && Array.isArray((tools as any).tools)) {
+        return { tools: (tools as any).tools.map(sanitizeTool) };
+      }
+      if (Array.isArray(tools)) {
+        return (tools as any).map(sanitizeTool);
+      }
+      if (tools && typeof tools === 'object') {
+        const out: Record<string, any> = {};
+        for (const [name, v] of Object.entries(tools as Record<string, any>)) {
+          out[name] = sanitizeTool({ name, ...(v as any) });
+        }
+        return out;
+      }
+    } catch {}
+    return tools;
   }
 
   /**
@@ -307,9 +374,9 @@ export class PaymentChannelMcpClient {
         (result as any).content &&
         Array.isArray((result as any).content)
       ) {
-        content = (result as any).content as any[];
-        this.lastContents = content;
-        paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
+        const parsed = this.extractPaymentFromContents((result as any).content as any[]);
+        content = parsed.clean;
+        paymentPayload = parsed.payload;
       }
 
       const maybePayment = paymentPayload;
@@ -337,9 +404,9 @@ export class PaymentChannelMcpClient {
             (result as any).content &&
             Array.isArray((result as any).content)
           ) {
-            content = (result as any).content as any[];
-            this.lastContents = content;
-            paymentPayload = HttpPaymentCodec.parseMcpPaymentFromContents(content);
+            const parsed2 = this.extractPaymentFromContents((result as any).content as any[]);
+            content = parsed2.clean;
+            paymentPayload = parsed2.payload;
           }
         } catch {
           this.logger.debug('retry call failed', {
@@ -413,6 +480,10 @@ export class PaymentChannelMcpClient {
 
   getLastContents(): any[] | undefined {
     return this.lastContents;
+  }
+
+  getLastPaymentPayload(): SerializableResponsePayload | undefined {
+    return this.lastPaymentPayload;
   }
 
   getPendingSubRAV(): SubRAV | null {
@@ -581,6 +652,36 @@ export class PaymentChannelMcpClient {
     } catch {
       return undefined;
     }
+  }
+
+  /** Single-pass extractor: separates payment resource and returns clean contents */
+  private extractPaymentFromContents(contents: any[]): {
+    clean: any[];
+    payload?: SerializableResponsePayload;
+  } {
+    if (!Array.isArray(contents)) return { clean: [], payload: undefined };
+    let payload: SerializableResponsePayload | undefined;
+    const clean: any[] = [];
+    for (const c of contents) {
+      const isPayment =
+        c &&
+        c.type === 'resource' &&
+        c.resource &&
+        (c.resource.uri === HttpPaymentCodec.MCP_PAYMENT_URI ||
+          c.resource.mimeType === HttpPaymentCodec.MCP_PAYMENT_MIME);
+      if (isPayment) {
+        try {
+          const text = c?.resource?.text;
+          if (typeof text === 'string') payload = JSON.parse(text) as SerializableResponsePayload;
+        } catch {}
+        continue;
+      }
+      clean.push(c);
+    }
+    // Track last payment payload and last contents (clean) for debugging/tests
+    this.lastPaymentPayload = payload;
+    this.lastContents = clean;
+    return { clean, payload };
   }
 
   getPayerClient(): PaymentChannelPayerClient {
