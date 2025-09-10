@@ -13,8 +13,8 @@
     "@nuwa-ai/identity-kit": "workspace:*",
     "@nuwa-ai/identity-kit-web": "workspace:*",
     "@nuwa-ai/payment-kit": "workspace:*",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "react-router-dom": "^7.2.5"
   },
   "devDependencies": {
