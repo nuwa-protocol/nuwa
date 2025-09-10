@@ -3,6 +3,8 @@ import { useAuth } from '../App';
 
 const STORAGE_KEY = 'nuwa-login-demo:gateway-url';
 const DEFAULT_GATEWAY_URL = 'https://test-llm.nuwa.dev';
+const MCP_STORAGE_KEY = 'nuwa-login-demo:mcp-url';
+const DEFAULT_MCP_URL = 'http://localhost:8080/mcp';
 
 DebugLogger.setGlobalLevel('debug');
 
@@ -19,6 +21,14 @@ export interface GatewayRequestOptions {
   path: string; // e.g. /api/v1/chat/completions
   body?: string; // raw JSON string (will be sent as-is for non-GET)
   headers?: Record<string, string>; // extra headers e.g. { 'X-LLM-Provider': 'litellm' }
+}
+
+export function getMcpUrl(): string {
+  return localStorage.getItem(MCP_STORAGE_KEY) || DEFAULT_MCP_URL;
+}
+
+export function setMcpUrl(url: string): void {
+  localStorage.setItem(MCP_STORAGE_KEY, url);
 }
 
 // This function will be used inside a React component that has access to the auth context

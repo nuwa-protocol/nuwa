@@ -422,13 +422,17 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(analyzeResult.payment!.cost).toBe(BigInt('10000000')); // 1,000,000,000 picoUSD ÷ 100 picoUSD/unit = 10,000,000 RGas base units
     expect(analyzeResult.payment!.nonce).toBeGreaterThan(0n);
 
-    // Assert nuwa:payment resource exists in contents
+    // Contents should NOT include nuwa:payment resource anymore
     const contents1 = mcpClient.getLastContents();
     expect(Array.isArray(contents1)).toBe(true);
     const paymentRes1 = (contents1 || []).find(
       (c: any) => c?.type === 'resource' && c.resource?.uri === 'nuwa:payment'
     );
-    expect(!!paymentRes1).toBe(true);
+    expect(!!paymentRes1).toBe(false);
+
+    // Payment info should be available via dedicated getter
+    const lastPayment = mcpClient.getLastPaymentPayload();
+    expect(lastPayment).toBeDefined();
 
     console.log('✅ Analyze response:', analyzeResult.data);
     console.log(`💰 Analyze payment - ${formatPaymentInfo(analyzeResult.payment!)}`);
@@ -452,13 +456,15 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(processResult.payment!.cost).toBe(BigInt('100000000')); // 10,000,000,000 picoUSD ÷ 100 picoUSD/unit = 100,000,000 RGas base units
     expect(processResult.payment!.nonce).toBeGreaterThan(analyzeResult.payment!.nonce);
 
-    // Assert nuwa:payment resource exists in contents
+    // Contents should NOT include nuwa:payment resource anymore
     const contents2 = mcpClient.getLastContents();
     expect(Array.isArray(contents2)).toBe(true);
     const paymentRes2 = (contents2 || []).find(
       (c: any) => c?.type === 'resource' && c.resource?.uri === 'nuwa:payment'
     );
-    expect(!!paymentRes2).toBe(true);
+    expect(!!paymentRes2).toBe(false);
+    // Payment info should be available via getter
+    expect(mcpClient.getLastPaymentPayload()).toBeDefined();
 
     console.log('✅ Process response:', processResult.data);
     console.log(`💰 Process payment - ${formatPaymentInfo(processResult.payment!)}`);

@@ -875,188 +875,153 @@ export class PaymentChannelHttpClient {
         ...initWithoutHeaders,
       });
 
-      // Auto-retry for PAYMENT_REQUIRED (402) with unsignedSubRAV in header
-      const headerName = this.paymentProtocol.getHeaderName();
-      let paymentHeader =
-        response.headers.get(headerName) || response.headers.get(headerName.toLowerCase());
-      if (allowRetry && paymentHeader && typeof paymentHeader === 'string') {
-        try {
-          const payload = this.paymentProtocol.parseResponseHeader(paymentHeader);
-          if (
-            payload?.error?.code === 'PAYMENT_REQUIRED' &&
-            payload.subRav &&
-            context.clientTxRef
-          ) {
-            const signed = await this.payerClient.signSubRAV(payload.subRav);
-            const newHeader = this.paymentProtocol.encodeRequestHeader(
-              signed,
-              context.clientTxRef,
-              this.options.maxAmount
-            );
-            context.headers[headerName] = newHeader;
-            // Refresh DIDAuth Authorization header to avoid nonce replay
-            try {
-              const payerDid = this.options.payerDid || (await this.options.signer.getDid());
-              const authHeader = await DidAuthHelper.generateAuthHeader(
-                payerDid,
-                this.options.signer,
-                context.url,
-                context.method,
-                this.options.keyId
-              );
-              if (authHeader) {
-                context.headers['Authorization'] = authHeader;
-              }
-            } catch {}
-
-            const retried = await this.fetchImpl(context.url, {
-              method: context.method,
-              headers: context.headers,
-              body: context.body,
-              ...initWithoutHeaders,
-            });
-            await this.handleResponse(retried, context);
-
-            // Handle streaming responses for retried request
-            if (
-              isStreamLikeResponse(retried) &&
-              retried.body &&
-              typeof (retried.body as any).getReader === 'function'
-            ) {
-              const onActivity = () => {
-                if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
-                  this.requestManager.extendTimeout(
-                    context.clientTxRef,
-                    this.options.timeoutMsStream
-                  );
-                }
-              };
-              const filtered = wrapAndFilterInBandFrames(
-                retried,
-                async p => {
-                  try {
-                    const decoded = this.paymentProtocol.parseResponseHeader(
-                      (p as any).headerValue
-                    );
-                    if (decoded?.subRav && decoded.cost !== undefined) {
-                      await this.handleProtocolSuccess({
-                        type: 'success',
-                        clientTxRef: decoded.clientTxRef,
-                        subRav: decoded.subRav,
-                        cost: decoded.cost as bigint,
-                        costUsd: decoded.costUsd as bigint | undefined,
-                        serviceTxRef: decoded.serviceTxRef,
-                      });
-                    }
-                  } catch (e) {
-                    this.log('[inband.decode.error]', e);
-                  }
-                },
-                (...args: any[]) => this.log(...args),
-                onActivity
-              );
-              if (this.transactionStore && context.clientTxRef) {
-                await this.transactionStore.update(context.clientTxRef, { stream: true });
-              }
-              if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
-                this.requestManager.extendTimeout(
-                  context.clientTxRef,
-                  this.options.timeoutMsStream
-                );
-              }
-              return filtered;
-            }
-            return retried;
-          }
-        } catch (error) {
-          this.log('[payment.required.retry.failed]', {
-            url: context.url,
-            method: context.method,
-            clientTxRef: context.clientTxRef,
-            error,
-          });
-        }
-      }
-
-      // Handle response
-      await this.handleResponse(response, context);
-
-      // Handle streaming responses
-      if (
-        isStreamLikeResponse(response) &&
-        response.body &&
-        typeof (response.body as any).getReader === 'function'
-      ) {
-        const onActivity = () => {
-          if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
-            this.requestManager.extendTimeout(context.clientTxRef, this.options.timeoutMsStream);
-          }
-        };
-
-        const filtered = wrapAndFilterInBandFrames(
-          response,
-          async p => {
-            try {
-              const decoded = this.paymentProtocol.parseResponseHeader((p as any).headerValue);
-              this.log('[inband.decode payment response]', decoded);
-              if (decoded?.subRav && decoded.cost !== undefined) {
-                await this.handleProtocolSuccess({
-                  type: 'success',
-                  clientTxRef: decoded.clientTxRef,
-                  subRav: decoded.subRav,
-                  cost: decoded.cost as bigint,
-                  costUsd: decoded.costUsd as bigint | undefined,
-                  serviceTxRef: decoded.serviceTxRef,
-                });
-              } else if ((decoded as any)?.error) {
-                // Streamed protocol-level error
-                await this.handleProtocolError({
-                  type: 'error',
-                  clientTxRef: (decoded as any).clientTxRef,
-                  err: new PaymentKitError(
-                    (decoded as any).error.code,
-                    (decoded as any).error.message || 'Payment error (stream)'
-                  ),
-                });
-              }
-            } catch (e) {
-              this.log('[inband.decode.error]', e);
-            }
-          },
-          (...args: any[]) => this.log(...args),
-          onActivity,
-          ({ sawPayment }) => {
-            try {
-              if (!sawPayment && context.clientTxRef) {
-                // Only resolve THIS request as free, do not affect parallel requests
-                this.requestManager.resolveByRef(context.clientTxRef, undefined);
-              }
-            } catch (e) {
-              this.log('[onFinish.error]', e);
-            }
-          }
-        );
-
-        // Mark as streaming
-        if (this.transactionStore && context.clientTxRef) {
-          await this.transactionStore.update(context.clientTxRef, { stream: true });
-        }
-
-        // Set initial timeout for streaming
-        if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
-          this.requestManager.extendTimeout(context.clientTxRef, this.options.timeoutMsStream);
-        }
-
-        // Don't wrap for scheduler release - let payment promise control it
-        // This allows server time to process reactive claims before next request
-        return filtered;
-      }
-
-      return response;
+      return await this.processResponse(response, context, initWithoutHeaders, allowRetry);
     } catch (error) {
       this.log('Request failed:', error);
       throw error;
     }
+  }
+
+  private async processResponse(
+    response: Response,
+    context: PaymentRequestContext,
+    initWithoutHeaders: Omit<RequestInit, 'headers'>,
+    allowRetry: boolean
+  ): Promise<Response> {
+    // Auto-retry for PAYMENT_REQUIRED (402) with unsignedSubRAV in header
+    const headerName = this.paymentProtocol.getHeaderName();
+    let paymentHeader =
+      response.headers.get(headerName) || response.headers.get(headerName.toLowerCase());
+    if (allowRetry && paymentHeader && typeof paymentHeader === 'string') {
+      try {
+        const payload = this.paymentProtocol.parseResponseHeader(paymentHeader);
+        if (payload?.error?.code === 'PAYMENT_REQUIRED' && payload.subRav && context.clientTxRef) {
+          const signed = await this.payerClient.signSubRAV(payload.subRav);
+          const newHeader = this.paymentProtocol.encodeRequestHeader(
+            signed,
+            context.clientTxRef,
+            this.options.maxAmount
+          );
+          context.headers[headerName] = newHeader;
+          // Refresh DIDAuth Authorization header to avoid nonce replay
+          try {
+            const payerDid = this.options.payerDid || (await this.options.signer.getDid());
+            const authHeader = await DidAuthHelper.generateAuthHeader(
+              payerDid,
+              this.options.signer,
+              context.url,
+              context.method,
+              this.options.keyId
+            );
+            if (authHeader) {
+              context.headers['Authorization'] = authHeader;
+            }
+          } catch {}
+
+          const retried = await this.fetchImpl(context.url, {
+            method: context.method,
+            headers: context.headers,
+            body: context.body,
+            ...initWithoutHeaders,
+          });
+          // Recurse once with allowRetry=false to avoid infinite loops
+          return await this.processResponse(retried, context, initWithoutHeaders, false);
+        }
+      } catch (error) {
+        this.log('[payment.required.retry.failed]', {
+          url: context.url,
+          method: context.method,
+          clientTxRef: context.clientTxRef,
+          error,
+        });
+      }
+    }
+
+    // Handle response
+    await this.handleResponse(response, context);
+
+    // Handle streaming responses
+    return await this.wrapStreamingIfNeeded(response, context);
+  }
+
+  private async wrapStreamingIfNeeded(
+    response: Response,
+    context: PaymentRequestContext
+  ): Promise<Response> {
+    if (
+      isStreamLikeResponse(response) &&
+      response.body &&
+      typeof (response.body as any).getReader === 'function'
+    ) {
+      const onActivity = () => {
+        if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+          this.requestManager.extendTimeout(context.clientTxRef, this.options.timeoutMsStream);
+        }
+      };
+
+      const filtered = wrapAndFilterInBandFrames(
+        response,
+        async p => {
+          try {
+            const decoded = this.paymentProtocol.parseResponseHeader((p as any).headerValue);
+            this.log('[inband.decode payment response]', decoded);
+            if (decoded?.subRav && decoded.cost !== undefined) {
+              await this.handleProtocolSuccess({
+                type: 'success',
+                clientTxRef: decoded.clientTxRef,
+                subRav: decoded.subRav,
+                cost: decoded.cost as bigint,
+                costUsd: decoded.costUsd as bigint | undefined,
+                serviceTxRef: decoded.serviceTxRef,
+              });
+            } else if ((decoded as any)?.error) {
+              // Streamed protocol-level error
+              await this.handleProtocolError({
+                type: 'error',
+                clientTxRef: (decoded as any).clientTxRef,
+                err: new PaymentKitError(
+                  (decoded as any).error.code,
+                  (decoded as any).error.message || 'Payment error (stream)'
+                ),
+              });
+            }
+          } catch (e) {
+            this.log('[inband.decode.error]', e);
+          }
+        },
+        (...args: any[]) => this.log(...args),
+        onActivity,
+        ({ sawPayment }) => {
+          try {
+            if (!sawPayment && context.clientTxRef) {
+              // Only resolve THIS request as free, do not affect parallel requests
+              this.requestManager.resolveByRef(context.clientTxRef, undefined);
+              if (this.options.transactionLog?.enabled !== false && this.transactionStore) {
+                void this.transactionStore.update(context.clientTxRef, { status: 'free' });
+              }
+            }
+          } catch (e) {
+            this.log('[onFinish.error]', e);
+          }
+        }
+      );
+
+      // Mark as streaming
+      if (this.transactionStore && context.clientTxRef) {
+        await this.transactionStore.update(context.clientTxRef, { stream: true });
+      }
+
+      // Set initial timeout for streaming
+      if (context.clientTxRef && typeof this.options.timeoutMsStream === 'number') {
+        this.requestManager.extendTimeout(context.clientTxRef, this.options.timeoutMsStream);
+      }
+
+      // Don't wrap for scheduler release - let payment promise control it
+      // This allows server time to process reactive claims before next request
+      return filtered;
+    }
+
+    return response;
   }
 
   /**
@@ -1099,7 +1064,7 @@ export class PaymentChannelHttpClient {
     }
 
     // No protocol header present
-    await this.handleNoProtocolHeader(response);
+    await this.handleNoProtocolHeader(response, context);
   }
 
   private async handleProtocolError(proto: {
@@ -1227,7 +1192,10 @@ export class PaymentChannelHttpClient {
     this.paymentState.updateHighestNonce(paymentInfo.nonce);
   }
 
-  private async handleNoProtocolHeader(response: Response): Promise<void> {
+  private async handleNoProtocolHeader(
+    response: Response,
+    context?: PaymentRequestContext
+  ): Promise<void> {
     // Streaming responses are handled in wrapper layer
     if (isStreamLikeResponse(response)) {
       return;
@@ -1235,6 +1203,19 @@ export class PaymentChannelHttpClient {
 
     // Non-streaming: treat as free endpoint
     this.requestManager.resolveAllAsFree();
+
+    // Update transaction store for this specific request as free
+    try {
+      if (
+        this.options.transactionLog?.enabled !== false &&
+        this.transactionStore &&
+        context?.clientTxRef
+      ) {
+        await this.transactionStore.update(context.clientTxRef, { status: 'free' });
+      }
+    } catch (e) {
+      this.log('[txlog.free.update.error]', e);
+    }
 
     // Handle specific status codes
     const error = this.paymentProtocol.handleStatusCode(response.status);

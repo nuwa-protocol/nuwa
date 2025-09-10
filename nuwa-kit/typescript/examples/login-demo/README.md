@@ -8,6 +8,7 @@ This is a demo application showcasing third-party login integration with Nuwa Ag
 - Authorize keys with Nuwa Agent DID using deep-links
 - Sign challenges using authorized keys
 - Persistent key storage in browser localStorage
+- Gateway & MCP debug panel with unified transaction history
 
 ## Prerequisites
 

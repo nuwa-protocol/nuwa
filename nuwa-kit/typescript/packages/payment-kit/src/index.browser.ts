@@ -28,6 +28,9 @@ export * from './rooch/RoochPaymentChannelContract';
 // HTTP Payer Client integration
 export * from './integrations/http';
 
+// MCP Client (browser-safe): only client-side MCP pieces
+export * from './integrations/mcp/PaymentChannelMcpClient';
+
 // Storage: browser-safe exports (types, memory, IndexedDB, and factory)
 export type {
   TransactionStore,
