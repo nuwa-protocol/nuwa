@@ -1192,7 +1192,10 @@ export class PaymentChannelHttpClient {
     this.paymentState.updateHighestNonce(paymentInfo.nonce);
   }
 
-  private async handleNoProtocolHeader(response: Response, context?: PaymentRequestContext): Promise<void> {
+  private async handleNoProtocolHeader(
+    response: Response,
+    context?: PaymentRequestContext
+  ): Promise<void> {
     // Streaming responses are handled in wrapper layer
     if (isStreamLikeResponse(response)) {
       return;
@@ -1203,7 +1206,11 @@ export class PaymentChannelHttpClient {
 
     // Update transaction store for this specific request as free
     try {
-      if (this.options.transactionLog?.enabled !== false && this.transactionStore && context?.clientTxRef) {
+      if (
+        this.options.transactionLog?.enabled !== false &&
+        this.transactionStore &&
+        context?.clientTxRef
+      ) {
         await this.transactionStore.update(context.clientTxRef, { status: 'free' });
       }
     } catch (e) {
