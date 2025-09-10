@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { getGatewayUrl, setGatewayUrl } from '../services/GatewayDebug';
+import { getGatewayUrl, setGatewayUrl, getMcpUrl, setMcpUrl } from '../services/GatewayDebug';
 import { useAuth } from '../App';
-import { requestWithPayment, requestWithPaymentRaw, resetPaymentClient, getPaymentClient } from '../services/PaymentClient';
+import { requestWithPayment, requestWithPaymentRaw, resetPaymentClient, getPaymentClient, getMcpClient } from '../services/PaymentClient';
 import { formatUsdAmount } from '@nuwa-ai/payment-kit';
 
 export function GatewayDebugPanel() {
   const { sdk } = useAuth();
+  const [activeTab, setActiveTab] = useState<'http' | 'mcp'>('http');
   const [gatewayUrl, setGatewayUrlState] = useState(getGatewayUrl());
+  const [mcpUrl, setMcpUrlState] = useState(getMcpUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
   const [provider, setProvider] = useState<'openrouter' | 'litellm'>('openrouter');
@@ -23,6 +25,14 @@ export function GatewayDebugPanel() {
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<any | null>(null);
   const [paymentNote, setPaymentNote] = useState<string | null>(null);
+  // MCP specific
+  const [mcpConnected, setMcpConnected] = useState(false);
+  const [mcpTools, setMcpTools] = useState<Array<{ name: string; description?: string; inputSchema?: any }>>([]);
+  const [mcpTool, setMcpTool] = useState('');
+  const [mcpSchema, setMcpSchema] = useState<any | null>(null);
+  const [mcpUseRaw, setMcpUseRaw] = useState(false);
+  const [mcpParams, setMcpParams] = useState<string>('{}');
+  const [mcpFormValues, setMcpFormValues] = useState<Record<string, any>>({});
 
   // Transaction history state
   const [txItems, setTxItems] = useState<any[]>([]);
@@ -34,6 +44,108 @@ export function GatewayDebugPanel() {
     setGatewayUrl(gatewayUrl);
     resetPaymentClient(gatewayUrl); // reset per-host client when base URL changes
   };
+
+  const handleSaveMcp = () => {
+    setMcpUrl(mcpUrl);
+    resetPaymentClient(mcpUrl); // reset per-host MCP client when base URL changes
+    setMcpConnected(false);
+    setMcpTools([]);
+    setMcpTool('');
+    setMcpSchema(null);
+    setMcpFormValues({});
+  };
+  const handleMcpConnect = async () => {
+    if (!sdk) return setError('SDK not initialized');
+    try {
+      setLoading(true);
+      setError(null);
+      const client = await getMcpClient(sdk, mcpUrl, gatewayUrl);
+      const tools = await client.listTools();
+      // Normalize tools into array (supports various SDK/result shapes)
+      let list: Array<{ name: string; description?: string; inputSchema?: any }> = [];
+      const normalize = (t: any) => ({
+        name: t?.name || '',
+        description: t?.description,
+        inputSchema: t?.inputSchema || t?.parameters || t?.input_schema || null,
+      });
+      if (tools && Array.isArray((tools as any).tools)) {
+        list = (tools as any).tools.map(normalize);
+      } else if (Array.isArray(tools)) {
+        list = (tools as any).map(normalize);
+      } else if (tools && typeof tools === 'object') {
+        // Some servers return a map: { [name]: { description, inputSchema } }
+        list = Object.entries(tools as Record<string, any>).map(([name, v]) => normalize({ name, ...v }));
+      }
+      setMcpTools(list);
+      if (list.length > 0) {
+        setMcpTool(list[0].name);
+        setMcpSchema(list[0].inputSchema || null);
+        initFormFromSchema(list[0].inputSchema || null);
+      }
+      setMcpConnected(true);
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  function initFormFromSchema(schema: any | null) {
+    if (!schema || typeof schema !== 'object') {
+      setMcpFormValues({});
+      return;
+    }
+    const props = (schema as any).properties || {};
+    const initial: Record<string, any> = {};
+    for (const key of Object.keys(props)) {
+      const p = props[key] || {};
+      if (p.default !== undefined) initial[key] = p.default;
+      else if (Array.isArray(p.enum) && p.enum.length > 0) initial[key] = p.enum[0];
+      else if (p.type === 'string') initial[key] = '';
+      else if (p.type === 'number' || p.type === 'integer') initial[key] = 0;
+      else if (p.type === 'boolean') initial[key] = false;
+      else initial[key] = '';
+    }
+    setMcpFormValues(initial);
+  }
+
+  function renderFormFromSchema() {
+    if (!mcpSchema || !mcpSchema.properties || typeof mcpSchema.properties !== 'object') return null;
+    const entries = Object.entries<any>(mcpSchema.properties);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {entries.map(([key, prop]) => {
+          const title = prop?.title || key;
+          const type = prop?.type;
+          const enumVals: any[] | undefined = Array.isArray(prop?.enum) ? prop.enum : undefined;
+          const help = prop?.description as string | undefined;
+          const value = mcpFormValues[key];
+          const setVal = (v: any) => setMcpFormValues(prev => ({ ...prev, [key]: v }));
+          return (
+            <div key={key} style={{ textAlign: 'left' }}>
+              <label style={{ display: 'block', fontWeight: 600 }}>{title}</label>
+              {enumVals ? (
+                <select value={value ?? ''} onChange={e => setVal(e.target.value)}>
+                  {enumVals.map(opt => (
+                    <option key={String(opt)} value={opt}>{String(opt)}</option>
+                  ))}
+                </select>
+              ) : type === 'boolean' ? (
+                <input type="checkbox" checked={!!value} onChange={e => setVal(e.target.checked)} />
+              ) : type === 'number' || type === 'integer' ? (
+                <input type="number" value={value ?? 0} onChange={e => setVal(e.target.value === '' ? '' : Number(e.target.value))} />
+              ) : type === 'string' ? (
+                <input type="text" value={value ?? ''} onChange={e => setVal(e.target.value)} />
+              ) : (
+                <textarea value={typeof value === 'string' ? value : JSON.stringify(value ?? '', null, 2)} onChange={e => setVal(e.target.value)} />
+              )}
+              {help && <div style={{ fontSize: 12, color: '#666' }}>{help}</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   // Helper: pretty-print response and parse nested JSON in `body` field if present
   const formatResponse = (response: any): string => {
@@ -141,6 +253,43 @@ export function GatewayDebugPanel() {
     }
   };
 
+  const handleMcpSend = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setResponseText(null);
+      setPayment(null);
+      setPaymentNote(null);
+      if (!sdk) throw new Error('SDK not initialized');
+      let parsedParams: any = undefined;
+      if (mcpUseRaw) {
+        parsedParams = mcpParams && mcpParams.trim().length > 0 ? JSON.parse(mcpParams) : undefined;
+      } else if (mcpSchema && mcpSchema.properties) {
+        // Coerce simple textarea JSON values if user typed JSON in complex fields
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(mcpFormValues)) {
+          const prop = mcpSchema.properties[k];
+          if (typeof v === 'string' && prop && (!prop.type || prop.type === 'object' || prop.type === 'array')) {
+            try { out[k] = JSON.parse(v); } catch { out[k] = v; }
+          } else {
+            out[k] = v;
+          }
+        }
+        parsedParams = out;
+      }
+      const client = await getMcpClient(sdk, mcpUrl, gatewayUrl);
+      const toolName = mcpTool || 'nuwa.health';
+      const { content, payment } = await client.callToolWithPayment(toolName, parsedParams);
+      if (payment) setPayment(payment); else setPaymentNote('No payment info from MCP server.');
+      setResponseText(formatResponse(content));
+      await refreshTransactions();
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   async function refreshTransactions() {
     if (!sdk) return;
     try {
@@ -192,7 +341,14 @@ export function GatewayDebugPanel() {
 
   return (
     <div className="gateway-container">
-      <h2>LLM Gateway Debug</h2>
+      <h2>LLM Gateway & MCP Debug</h2>
+      {/* Tabs */}
+      <div style={{ marginBottom: '12px' }}>
+        <button onClick={() => setActiveTab('http')} disabled={activeTab === 'http'} style={{ marginRight: 8 }}>HTTP</button>
+        <button onClick={() => setActiveTab('mcp')} disabled={activeTab === 'mcp'}>MCP</button>
+      </div>
+
+      {activeTab === 'http' && (
       <div className="gateway-settings" style={{ marginBottom: '1rem' }}>
         <label style={{ marginRight: '8px' }}>Gateway URL:</label>
         <input
@@ -205,7 +361,24 @@ export function GatewayDebugPanel() {
           Save
         </button>
       </div>
+      )}
 
+      {activeTab === 'mcp' && (
+        <div className="gateway-settings" style={{ marginBottom: '1rem' }}>
+          <label style={{ marginRight: '8px' }}>MCP URL:</label>
+          <input
+            type="text"
+            value={mcpUrl}
+            onChange={e => setMcpUrlState(e.target.value)}
+            style={{ width: '60%' }}
+          />
+          <button onClick={handleSaveMcp} style={{ marginLeft: '8px' }}>
+            Save
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'http' && (
       <div className="gateway-request" style={{ marginBottom: '1rem' }}>
         <select value={method} onChange={e => setMethod(e.target.value as any)}>
           <option value="GET">GET</option>
@@ -220,7 +393,9 @@ export function GatewayDebugPanel() {
           style={{ width: '70%', marginLeft: '8px' }}
         />
       </div>
+      )}
 
+      {activeTab === 'http' && (
       <div className="provider-select" style={{ marginBottom: '1rem' }}>
         <label style={{ marginRight: '8px' }}>Provider:</label>
         <select value={provider} onChange={e => setProvider(e.target.value as any)}>
@@ -229,21 +404,24 @@ export function GatewayDebugPanel() {
         </select>
         <small style={{ marginLeft: '8px' }}>(adds X-LLM-Provider header)</small>
       </div>
+      )}
 
-      <div className="stream-toggle" style={{ marginBottom: '1rem' }}>
-        <label>
-          <input
-            type="checkbox"
-            checked={isStream}
-            onChange={e => setIsStream(e.target.checked)}
-            style={{ marginRight: '6px' }}
-          />
-          Stream (SSE)
-        </label>
-        <small style={{ marginLeft: '8px' }}>(adds stream: true in body; reads Response stream)</small>
-      </div>
+      {activeTab === 'http' && (
+        <div className="stream-toggle" style={{ marginBottom: '1rem' }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={isStream}
+              onChange={e => setIsStream(e.target.checked)}
+              style={{ marginRight: '6px' }}
+            />
+            Stream (SSE)
+          </label>
+          <small style={{ marginLeft: '8px' }}>(adds stream: true in body; reads Response stream)</small>
+        </div>
+      )}
 
-      {method !== 'GET' && method !== 'DELETE' && (
+      {activeTab === 'http' && method !== 'GET' && method !== 'DELETE' && (
         <textarea
           style={{ width: '100%', height: '160px' }}
           value={requestBody}
@@ -251,9 +429,52 @@ export function GatewayDebugPanel() {
         />
       )}
 
-      <button onClick={handleSend} disabled={loading} style={{ marginTop: '12px' }}>
-        {loading ? 'Sending...' : 'Send'}
-      </button>
+      {activeTab === 'http' && (
+        <button onClick={handleSend} disabled={loading} style={{ marginTop: '12px' }}>
+          {loading ? 'Sending...' : 'Send'}
+        </button>
+      )}
+
+      {activeTab === 'mcp' && (
+        <div className="mcp-request" style={{ marginBottom: '1rem', textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <button onClick={handleMcpConnect} disabled={loading || mcpConnected}>{mcpConnected ? 'Connected' : 'Connect'}</button>
+            {mcpConnected && <small>Connected</small>}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ marginRight: 8 }}>Tool:</label>
+            <select value={mcpTool} onChange={e => {
+              const name = e.target.value; setMcpTool(name);
+              const t = mcpTools.find(it => it.name === name);
+              const schema = t?.inputSchema || null; setMcpSchema(schema); initFormFromSchema(schema);
+            }} style={{ minWidth: 260 }}>
+              <option value="" disabled>Select a tool</option>
+              {mcpTools.map(t => (
+                <option key={t.name} value={t.name}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          {mcpTool && (
+            <div style={{ marginBottom: 8, color: '#666' }}>
+              {mcpTools.find(t => t.name === mcpTool)?.description || ''}
+            </div>
+          )}
+          <div style={{ marginBottom: 8 }}>
+            <label>
+              <input type="checkbox" checked={mcpUseRaw} onChange={e => setMcpUseRaw(e.target.checked)} style={{ marginRight: 6 }} />
+              Use raw JSON params
+            </label>
+          </div>
+          {mcpUseRaw ? (
+            <textarea style={{ width: '100%', height: '160px' }} value={mcpParams} onChange={e => setMcpParams(e.target.value)} />
+          ) : (
+            <div>{renderFormFromSchema()}</div>
+          )}
+          <button onClick={handleMcpSend} disabled={loading || !mcpTool} style={{ marginTop: '12px' }}>
+            {loading ? 'Calling...' : 'Call Tool'}
+          </button>
+        </div>
+      )}
 
       {error && (
         <pre style={{ color: 'red', marginTop: '1rem', whiteSpace: 'pre-wrap' }}>{error}</pre>
@@ -340,6 +561,7 @@ export function GatewayDebugPanel() {
                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>Time</th>
                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>Method</th>
                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>Path</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Operation</th>
                 <th style={{ textAlign: 'right', padding: '6px 8px' }}>Status</th>
                 <th style={{ textAlign: 'right', padding: '6px 8px' }}>Cost (USD)</th>
                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>State</th>
@@ -357,6 +579,7 @@ export function GatewayDebugPanel() {
                     <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{time}</td>
                     <td style={{ padding: '6px 8px' }}>{rec.method || '-'}</td>
                     <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{path}</td>
+                    <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{rec.operation || '-'}</td>
                     <td style={{ padding: '6px 8px', textAlign: 'right' }}>{rec.statusCode ?? ''}</td>
                     <td style={{ padding: '6px 8px', textAlign: 'right' }}>{paidUsd}</td>
                     <td style={{ padding: '6px 8px' }}>{rec.status}</td>
@@ -365,7 +588,7 @@ export function GatewayDebugPanel() {
               })}
               {txItems.length === 0 && !txLoading && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '8px 10px', color: '#666' }}>No transactions yet.</td>
+                  <td colSpan={7} style={{ padding: '8px 10px', color: '#666' }}>No transactions yet.</td>
                 </tr>
               )}
             </tbody>

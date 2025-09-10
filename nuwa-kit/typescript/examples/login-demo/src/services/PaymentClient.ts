@@ -1,9 +1,11 @@
 import { DebugLogger} from '@nuwa-ai/identity-kit';
 import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
+import { getChainConfigFromEnv, type TransactionStore, PaymentChannelMcpClient } from '@nuwa-ai/payment-kit';
 
 // Cache PaymentChannelHttpClient per host to avoid duplicate instances
 const clientsByHost = new Map<string, PaymentChannelHttpClient>();
+const mcpClientsByHost = new Map<string, PaymentChannelMcpClient>();
 DebugLogger.setGlobalLevel('debug');
 function getHostKey(baseUrl: string): string {
   try {
@@ -27,6 +29,44 @@ export async function getPaymentClient(sdk: IdentityKitWeb, baseUrl: string): Pr
     debug: true,
   });
   clientsByHost.set(key, client);
+  return client;
+}
+
+export async function getMcpClient(
+  sdk: IdentityKitWeb,
+  mcpBaseUrl: string,
+  shareFromBaseUrl?: string
+): Promise<PaymentChannelMcpClient> {
+  const key = getHostKey(mcpBaseUrl);
+  const existing = mcpClientsByHost.get(key);
+  if (existing) return existing;
+  console.log('creating MCP client for', mcpBaseUrl);
+  const env = sdk.getIdentityEnv();
+  let sharedStore: TransactionStore | undefined;
+  if (shareFromBaseUrl) {
+    try {
+      const http = await getPaymentClient(sdk, shareFromBaseUrl);
+      sharedStore = http.getTransactionStore();
+    } catch {}
+  }
+  const chainConfig = getChainConfigFromEnv(env);
+  const signer = env.keyManager;
+  let keyId: string | undefined;
+  try {
+    const ids = await signer.listKeyIds?.();
+    keyId = ids && ids.length > 0 ? ids[0] : undefined;
+  } catch {}
+  const client = new PaymentChannelMcpClient({
+    baseUrl: mcpBaseUrl,
+    signer,
+    keyId,
+    payerDid: await signer.getDid(),
+    chainConfig,
+    maxAmount: BigInt('500000000000'),
+    transactionStore: sharedStore,
+    debug: true,
+  });
+  mcpClientsByHost.set(key, client);
   return client;
 }
 
@@ -79,10 +119,12 @@ export async function requestWithPaymentRaw(
 export function resetPaymentClient(baseUrl?: string): void {
   if (!baseUrl) {
     clientsByHost.clear();
+    mcpClientsByHost.clear();
     return;
   }
   const key = getHostKey(baseUrl);
   clientsByHost.delete(key);
+  mcpClientsByHost.delete(key);
 }
 
 
