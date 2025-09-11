@@ -128,10 +128,9 @@ export class CapKit {
 			}
 			// Transform the raw response data to ResultCap format
 			const transformedItems = queryResult.data.items.map((item: any) => {
-				const thumbnailType = JSON.parse(item.thumbnail);
 				return {
 					...item,
-					thumbnail: thumbnailType,
+					thumbnail: item,
 				};
 			});
 

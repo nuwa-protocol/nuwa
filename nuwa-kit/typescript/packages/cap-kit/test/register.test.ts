@@ -43,7 +43,7 @@ describe("CapKit", () => {
   it("should register a cap", async () => {
     const did = await signer.getDid();
     
-    const result = await capKit.registerCap(buildCap(did, 'test_cap'));
+    const result = await capKit.registerCap(buildCap(did, 'test_cap123'));
     expect(result).toBeDefined();
     
     await new Promise(resolve => setTimeout(resolve, 10000));
