@@ -12,27 +12,22 @@ serviceId: "mcp-proxy-service"
 network: "test"
 rpcUrl: "${ROOCH_RPC_URL}"
 defaultAssetId: "0x3::gas_coin::RGas"
-defaultPricePicoUSD: "1000000000000"
+defaultPricePicoUSD: "1000000000000"  # Default price for all tools (custom and upstream)
 debug: false
 
-# Custom tools registration
-register:
-  tools:
-    - name: "echo.free"
-      description: "Free echo service"
-      pricePicoUSD: "0"
-      parameters:
-        type: "object"
-        properties:
-          text:
-            type: "string"
-    - name: "calc.add"
-      description: "Add two numbers"
-      pricePicoUSD: "0"
-      parameters:
-        type: "object"
-        properties:
-          a:
-            type: "number"
-          b:
-            type: "number"
+# Custom tools registration (optional)
+# register:
+#   tools:
+#     - name: "example.tool"
+#       description: "Example custom tool"
+#       pricePicoUSD: "1000000000000"  # 0.001 USD, if not specified, uses defaultPricePicoUSD
+#       parameters:
+#         type: "object"
+#         properties:
+#           input:
+#             type: "string"
+#     - name: "free.tool"
+#       description: "Free tool example"
+#       pricePicoUSD: "0"  # Free tool
+#       parameters:
+#         type: "object"

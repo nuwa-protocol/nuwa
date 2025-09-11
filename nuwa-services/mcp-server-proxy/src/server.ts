@@ -1,72 +1,13 @@
 /**
  * MCP Server v2 - Start via FastMcpStarter (handles MCP over HTTP/SSE)
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import yaml from 'js-yaml';
-import { fileURLToPath } from 'node:url';
 import { KeyManager } from '@nuwa-ai/identity-kit';
 import { createFastMcpServer } from '@nuwa-ai/payment-kit';
 import { initUpstream } from './upstream.js';
 import type { Upstream } from './types.js';
+import { loadConfig, type MinimalConfig, type MinimalToolConfig } from './config.js';
 import { z } from 'zod';
 
-// Get directory name in ESM
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-// Minimal config for v2 (single service)
-interface MinimalToolConfig {
-  name: string;
-  description: string;
-  pricePicoUSD?: string | number; // kept for forward compatibility; ignored until payment integration
-  parameters?: any;
-}
-
-interface MinimalConfig {
-  port?: number;
-  endpoint?: string; // default "/mcp"
-  register?: {
-    tools?: MinimalToolConfig[];
-  };
-  // Payment options (optional; when provided, payment is enabled)
-  serviceId?: string;
-  serviceKey?: string; // serialized StoredKey string (preferred to env)
-  rpcUrl?: string;
-  network?: 'local' | 'dev' | 'test' | 'main';
-  defaultAssetId?: string;
-  defaultPricePicoUSD?: string | bigint; // Default price for all tools (custom and upstream)
-  adminDid?: string | string[];
-  debug?: boolean;
-  // Upstream MCP server (single), e.g., http://localhost:4000/mcp
-  upstreamUrl?: string;
-}
-
-// Load minimal configuration
-function loadConfig(): MinimalConfig {
-  const configPath = process.env.CONFIG_PATH || path.join(__dirname, '../config.yaml');
-  const configYaml = fs.readFileSync(configPath, 'utf8');
-
-  const configWithEnvVars = configYaml.replace(/\${([^}]+)}/g, (_, varName) => {
-    return process.env[varName] || '';
-  });
-
-  const cfg = yaml.load(configWithEnvVars) as any;
-  const port = Number(process.env.PORT || cfg?.port || cfg?.server?.port || 8088);
-  const endpoint = (cfg?.endpoint || '/mcp') as string;
-  const tools: MinimalToolConfig[] = cfg?.register?.tools || [];
-  const payment: Partial<MinimalConfig> = {
-    serviceId: cfg?.serviceId || process.env.SERVICE_ID,
-    serviceKey: cfg?.serviceKey || process.env.SERVICE_KEY,
-    rpcUrl: cfg?.rpcUrl || process.env.ROOCH_RPC_URL,
-    network: (cfg?.network || process.env.ROOCH_NETWORK || 'test') as any,
-    defaultAssetId: cfg?.defaultAssetId || process.env.DEFAULT_ASSET_ID,
-    defaultPricePicoUSD: cfg?.defaultPricePicoUSD || process.env.DEFAULT_PRICE_PICO_USD,
-    adminDid: cfg?.adminDid,
-    debug: cfg?.debug ?? (process.env.DEBUG === '1' || process.env.DEBUG === 'true'),
-    upstreamUrl: cfg?.upstreamUrl || process.env.UPSTREAM_URL,
-  };
-  return { port, endpoint, register: { tools }, ...payment } as MinimalConfig;
-}
 
 // Local registry removed; FastMcpStarter manages tools
 

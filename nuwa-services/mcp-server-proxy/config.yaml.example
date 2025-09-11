@@ -13,28 +13,30 @@ endpoint: "/mcp"
 # network: "test"  # local | dev | test | main
 # rpcUrl: "${ROOCH_RPC_URL}"
 # defaultAssetId: "0x3::gas_coin::RGas"
-# defaultPricePicoUSD: "1000000000000"  # 0.001 USD
+# defaultPricePicoUSD: "1000000000000"  # 0.001 USD - Default price for all tools (custom and upstream)
 # adminDid: ["did:rooch:0x..."]
 # debug: false
 
 # Custom tools registration (optional)
-register:
-  tools:
-    - name: "echo.free"
-      description: "Echo text back"
-      pricePicoUSD: "0"  # Free tool
-      parameters:
-        type: "object"
-        properties:
-          text:
-            type: "string"
-    - name: "calc.add"
-      description: "Add two numbers"
-      pricePicoUSD: "1000000000"  # 0.001 USD
-      parameters:
-        type: "object"
-        properties:
-          a:
-            type: "number"
-          b:
-            type: "number"
+# register:
+#   tools:
+#     - name: "example.tool"
+#       description: "Example custom tool"
+#       pricePicoUSD: "1000000000000"  # 0.001 USD, if not specified, uses defaultPricePicoUSD
+#       parameters:
+#         type: "object"
+#         properties:
+#           input:
+#             type: "string"
+#     - name: "free.tool"
+#       description: "Free tool example"
+#       pricePicoUSD: "0"  # Free tool
+#       parameters:
+#         type: "object"
+#     - name: "default.price.tool"
+#       description: "Tool using default price (no pricePicoUSD specified)"
+#       parameters:
+#         type: "object"
+#         properties:
+#           data:
+#             type: "string"

@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint --ext .ts src/",
-    "format": "prettier --write 'src/**/*.ts'"
+    "format": "prettier --write 'src/**/*.ts'",
+    "help": "tsx src/server.ts --help"
   },
   "engines": {
     "node": ">=20.0.0"
