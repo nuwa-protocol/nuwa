@@ -13,7 +13,6 @@ export interface CapMetadata {
   displayName: string,
   description: string,
   tags: string[],
-  submittedAt: number,
   homepage: string,
   repository: string,
   thumbnail: string,

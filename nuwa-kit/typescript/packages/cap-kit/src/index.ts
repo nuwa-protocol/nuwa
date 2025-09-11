@@ -447,8 +447,10 @@ export class CapKit {
 				throw new Error("uploadCap tool not available on MCP server");
 			}
 
-			// Convert content to base64
-			const fileData = Buffer.from(content, "utf8").toString("base64");
+			// Convert content to base64 (UTF-8 safe)
+			const encoder = new TextEncoder();
+			const bytes = encoder.encode(content);
+			const fileData = btoa(String.fromCharCode(...bytes));
 			const fileName = `${name}.cap.yaml`;
 
 			// Upload file to IPFS
