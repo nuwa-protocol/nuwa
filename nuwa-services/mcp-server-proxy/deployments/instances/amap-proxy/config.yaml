@@ -1,0 +1,24 @@
+# Amap MCP Proxy Configuration
+
+# Server settings
+port: ${PORT}
+endpoint: "/mcp"
+
+# Amap MCP server
+upstream:
+  type: "httpStream"
+  url: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
+
+# Payment configuration
+serviceId: "amap-mcp-proxy"
+serviceKey: "${SERVICE_KEY}"
+network: "test"
+defaultPricePicoUSD: "100000000"  # 0.0001 USD
+debug: ${DEBUG}
+
+# Tool pricing configuration
+register:
+  tools:
+    # Geocoding - paid
+    - name: "maps_text_search"
+      pricePicoUSD: "1000000000"  # 0.001 USD

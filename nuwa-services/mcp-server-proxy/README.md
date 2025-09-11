@@ -1,4 +1,4 @@
-# MCP Server Proxy (Single Upstream)
+# MCP Server Proxy
 
 MCP Server Proxy is a streamlined MCP service that provides upstream forwarding and payment capabilities. It uses FastMcpStarter to provide a single `/mcp` endpoint with JSON-RPC over HTTP/SSE.
 
@@ -8,9 +8,7 @@ This implementation follows the V2 design (see [PROPOSAL_V2_SINGLE_UPSTREAM_PAYM
 
 - **Single MCP Endpoint**: Provides `/mcp` endpoint with JSON-RPC over streamable HTTP
 - **Upstream Forwarding**: Automatically forwards all upstream tools to clients
-- **Custom Tools**: Optional custom tool registration via configuration
 - **Per-call Payment**: Integrated with Nuwa Payment Kit for tool-level billing
-- **FastMcpStarter Integration**: Uses the standard Nuwa MCP server framework
 - **Pure Proxy**: Clean architecture focused on forwarding and payment, no built-in test tools
 
 ## Quick Start
@@ -38,35 +36,32 @@ port: 8088
 endpoint: "/mcp"
 
 # Optional upstream MCP server
-upstreamUrl: "https://api.example.com/mcp?key=${API_KEY}"
+upstream:
+  type: "httpStream"
+  url: "https://api.example.com/mcp?key=${API_KEY}"
+
+# Alternative: stdio upstream
+# upstream:
+#   type: "stdio"
+#   command: ["npx", "@example/mcp-server"]
+#   env:
+#     API_KEY: "${API_KEY}"
 
 # Optional payment configuration
 serviceId: "my-mcp-service"
 network: "test"
 rpcUrl: "${ROOCH_RPC_URL}"
-defaultPricePicoUSD: "1000000000000"  # 0.001 USD - Default price for all tools
+defaultPricePicoUSD: "100000000"  # 0.0001 USD - Default price for all tools
 
-# Custom tools (optional)
+# Tool pricing configuration (optional)
 register:
   tools:
     - name: "example.tool"
-      description: "Example custom tool"
-      pricePicoUSD: "2000000000000"  # Explicit price, overrides default
-      parameters:
-        type: "object"
-        properties:
-          input:
-            type: "string"
+      pricePicoUSD: "200000000"  # 0.0002 USD - Explicit price, overrides default
     - name: "free.tool"
-      description: "Free tool"
       pricePicoUSD: "0"  # Free tool
-      parameters:
-        type: "object"
     - name: "default.price.tool"
-      description: "Uses default price"
       # No pricePicoUSD specified - uses defaultPricePicoUSD
-      parameters:
-        type: "object"
 ```
 
 Set any required environment variables:
@@ -99,14 +94,11 @@ export ROOCH_RPC_URL=https://test-seed.rooch.network:443
   # Start with custom port and debug
   node dist/index.js --port 3000 --debug
   
-  # Start with upstream URL
-  node dist/index.js --upstream-url https://api.example.com/mcp
+  # Start with custom config file
+  node dist/index.js --config ./custom-config.yaml
   
   # Start with payment configuration
-  node dist/index.js --service-id my-service --network test --default-price-pico-usd 1000000000000
-  
-  # Use custom config file
-  node dist/index.js --config ./my-config.yaml
+  node dist/index.js --service-id my-service --network test --default-price-pico-usd 100000000
   ```
 
 ## Configuration
@@ -125,7 +117,6 @@ Options:
   -p, --port <number>                 Server port (default: 8088)
   -e, --endpoint <string>             MCP endpoint path (default: /mcp)
   -c, --config <path>                 Config file path (default: config.yaml)
-  -u, --upstream-url <url>            Upstream MCP server URL
       --service-id <string>           Payment service ID
   -n, --network <string>              Network (local|dev|test|main)
       --rpc-url <url>                 Rooch RPC URL
@@ -141,17 +132,65 @@ Options:
 PORT=8088
 ENDPOINT=/mcp
 CONFIG_PATH=./config.yaml
-UPSTREAM_URL=https://api.example.com/mcp
 SERVICE_ID=my-service
 SERVICE_KEY=your-service-key
 ROOCH_NETWORK=test
-ROOCH_RPC_URL=https://test-seed.rooch.network:443
-DEFAULT_ASSET_ID=0x3::gas_coin::RGas
-DEFAULT_PRICE_PICO_USD=1000000000000
+DEFAULT_PRICE_PICO_USD=100000000
 DEBUG=true
 ```
 
-### 4. Testing
+### 4. Local Development Examples
+
+#### Using Pre-configured Instances
+
+You can directly use the pre-configured instances for local development:
+
+```bash
+# Run Amap proxy locally
+export AMAP_API_KEY=your_amap_api_key_here
+export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
+export PORT=8088
+
+# Use the pre-configured amap instance
+node dist/index.js --config ./deployments/instances/amap-proxy/config.yaml
+```
+
+```bash
+# Run Context7 proxy locally  
+export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
+export PORT=8089
+
+# Use the pre-configured context7 instance
+node dist/index.js --config ./deployments/instances/context7-proxy/config.yaml
+```
+
+#### Quick Development Scripts
+
+We provide ready-to-use scripts for local development:
+
+```bash
+# Run Amap proxy (requires AMAP_API_KEY and SERVICE_KEY)
+export AMAP_API_KEY=your_amap_api_key_here
+export SERVICE_KEY=your_service_key_here
+./examples/run-amap-local.sh
+
+# Run Context7 proxy (requires SERVICE_KEY)
+export SERVICE_KEY=your_service_key_here
+./examples/run-context7-local.sh
+```
+
+#### Testing the Proxies
+
+##### E2E Testing
+
+Run the comprehensive E2E tests:
+
+```bash
+# Run E2E tests (requires Rooch node and PAYMENT_E2E=1)
+PAYMENT_E2E=1 pnpm test:e2e:local
+```
+
+### 5. Testing
 
 ```bash
 # Run unit tests and basic integration tests
@@ -168,6 +207,33 @@ ROOCH_NODE_URL=https://test-seed.rooch.network:443 pnpm test:e2e
 - A running Rooch node (local or remote)
 - The `PAYMENT_E2E=1` environment variable
 - Sufficient test tokens for payment channel operations
+
+## Deployment
+
+For production deployment, we provide a comprehensive multi-instance deployment system:
+
+### Quick Deployment
+
+```bash
+# List available instances
+./deployments/scripts/manage.sh list
+
+# Create a new instance
+./deployments/scripts/manage.sh create my-proxy httpStream
+
+# Deploy to Railway
+./deployments/scripts/manage.sh deploy my-proxy
+
+# Check status
+./deployments/scripts/manage.sh status my-proxy
+```
+
+### Pre-configured Instances
+
+- **amap-proxy**: Amap Maps MCP proxy
+- **context7-proxy**: Context7 documentation library proxy
+
+See [deployments/QUICKSTART.md](./deployments/QUICKSTART.md) for detailed deployment instructions.
 
 ## Docker
 

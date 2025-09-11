@@ -25,21 +25,22 @@ async function startServer(
   const config = configOverride || loadConfig();
   let signer: any = undefined;
 
-  // Try to create signer from config or generate a test one
+  // Try to create signer from config
   if (config.serviceId) {
-    if (config.serviceKey && config.serviceKey !== "test-key-placeholder") {
-      try {
-        signer = await KeyManager.fromSerializedKey(config.serviceKey);
-      } catch (error) {
-        console.warn("Failed to load service key, generating test key:", error);
-      }
+    if (!config.serviceKey || config.serviceKey === "test-key-placeholder") {
+      console.error("❌ Error: SERVICE_KEY is required when serviceId is configured");
+      console.error("SERVICE_KEY is needed for ServiceDID and payment channel creation");
+      console.error("Please set SERVICE_KEY environment variable or configure serviceKey in config file");
+      process.exit(1);
     }
 
-    // If no valid signer yet, generate a test one for development/testing
-    if (!signer) {
-      console.log("Generating test key for development...");
-      const { keyManager } = await KeyManager.createWithDidKey();
-      signer = keyManager;
+    try {
+      signer = await KeyManager.fromSerializedKey(config.serviceKey);
+      console.log("✅ Successfully loaded service key");
+    } catch (error) {
+      console.error("❌ Error: Failed to load service key:", error);
+      console.error("Please check your SERVICE_KEY format");
+      process.exit(1);
     }
   }
 
