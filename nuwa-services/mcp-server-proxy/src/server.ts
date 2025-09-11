@@ -34,7 +34,7 @@ interface MinimalConfig {
   rpcUrl?: string;
   network?: 'local' | 'dev' | 'test' | 'main';
   defaultAssetId?: string;
-  defaultPricePicoUSD?: string | bigint;
+  defaultPricePicoUSD?: string | bigint; // Default price for all tools (custom and upstream)
   adminDid?: string | string[];
   debug?: boolean;
   // Upstream MCP server (single), e.g., http://localhost:4000/mcp
@@ -117,44 +117,46 @@ async function main() {
     }
     
     const app: any = await createFastMcpServer(serverOptions);
-    // Register minimal tools before start using FastMcp API (no register callback)
-    const list = (config.register?.tools && config.register.tools.length > 0)
-      ? config.register.tools
-      : [
-        { name: 'echo.free', description: 'Echo text', pricePicoUSD: '0', parameters: { type: 'object', properties: { text: { type: 'string' } } } },
-        { name: 'calc.add', description: 'Add two integers', pricePicoUSD: '0', parameters: { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } } } },
-      ];
+    
     // Prepare upstream via shared helper if configured
     let upstream: Upstream | undefined;
     if (config.upstreamUrl) {
       upstream = await initUpstream('default', { type: 'httpStream', url: config.upstreamUrl });
     }
-    // Register built-in tools
-    for (const t of list as any[]) {
-      const isFree = !t.pricePicoUSD || BigInt(t.pricePicoUSD) === 0n;
-      const execute = async (p: any, context?: any) => {
-        console.log(`Executing tool ${t.name} with params:`, p, 'context:', context);
-        if (t.name === 'echo.free') return String(p?.text ?? '');
-        if (t.name === 'calc.add') return { sum: Number(p?.a ?? 0) + Number(p?.b ?? 0) };
-        return { ok: true };
-      };
-      
-      // Use zod schema for better parameter validation
-      let parameters: any = t.parameters;
-      if (t.name === 'echo.free') {
-        parameters = z.object({
-          text: z.string().optional().describe('Text to echo')
-        });
-      } else if (t.name === 'calc.add') {
-        parameters = z.object({
-          a: z.number().describe('First number'),
-          b: z.number().describe('Second number')
-        });
+    
+    // Register custom tools from config if any
+    if (config.register?.tools && config.register.tools.length > 0) {
+      for (const t of config.register.tools) {
+        // Determine tool price: use tool-specific price, or fall back to default, or 0 if no payment config
+        let toolPrice: bigint = 0n;
+        if (t.pricePicoUSD !== undefined) {
+          // Tool has explicit price configuration
+          toolPrice = BigInt(t.pricePicoUSD);
+        } else if (config.defaultPricePicoUSD !== undefined) {
+          // Use default price from config
+          toolPrice = BigInt(config.defaultPricePicoUSD);
+        }
+        // If neither tool price nor default price is set, tool is free (0n)
+        
+        const isFree = toolPrice === 0n;
+        
+        const execute = async (p: any, context?: any) => {
+          console.log(`Executing custom tool ${t.name} with params:`, p, `(price: ${toolPrice} picoUSD)`);
+          // Custom tools should be implemented based on their specific logic
+          // For now, return a placeholder response
+          return { message: `Custom tool ${t.name} executed with params`, params: p };
+        };
+        
+        // Use the parameters from config or a permissive schema
+        const parameters = t.parameters || z.object({}).passthrough();
+        
+        const def = { name: t.name, description: t.description, parameters, execute } as any;
+        if (isFree) {
+          (app as any).freeTool(def);
+        } else {
+          (app as any).paidTool({ ...def, pricePicoUSD: toolPrice });
+        }
       }
-      
-      const def = { name: t.name, description: t.description, parameters, execute } as any;
-      if (isFree) (app as any).freeTool(def);
-      else (app as any).paidTool({ ...def, pricePicoUSD: BigInt(t.pricePicoUSD) });
     }
 
     // If upstream is configured, register a fallback handler for unknown tools
@@ -164,15 +166,22 @@ async function main() {
         const upstreamTools = await upstream.client.listTools();
         if (upstreamTools && upstreamTools.tools) {
           for (const upstreamTool of upstreamTools.tools) {
-            // Skip if we already have a built-in tool with this name
-            const builtInNames = list.map(t => t.name);
-            if (builtInNames.includes(upstreamTool.name)) {
+            // Skip if we already have a custom tool with this name
+            const customToolNames = (config.register?.tools || []).map(t => t.name);
+            if (customToolNames.includes(upstreamTool.name)) {
               continue;
             }
             
-            // Register upstream tool as a free forwarding tool
+            // Determine upstream tool price: use default price if configured
+            let upstreamToolPrice: bigint = 0n;
+            if (config.defaultPricePicoUSD !== undefined) {
+              upstreamToolPrice = BigInt(config.defaultPricePicoUSD);
+            }
+            const isUpstreamToolFree = upstreamToolPrice === 0n;
+            
+            // Register upstream tool as forwarding tool (free or paid based on config)
             const forwardExecute = async (p: any, context?: any) => {
-              console.log(`Forwarding tool ${upstreamTool.name} to upstream with params:`, p, 'context:', context);
+              console.log(`Forwarding tool ${upstreamTool.name} to upstream with params:`, p, `(price: ${upstreamToolPrice} picoUSD)`);
               const res = await upstream!.client.callTool({ name: upstreamTool.name, arguments: p || {} });
               console.log(`Upstream response for ${upstreamTool.name}:`, res);
               if (res && Array.isArray(res.content)) {
@@ -203,12 +212,18 @@ async function main() {
               upstreamParameters = z.object({}).passthrough();
             }
               
-            (app as any).freeTool({
+            const upstreamToolDef = {
               name: upstreamTool.name,
               description: upstreamTool.description || `Forwarded tool: ${upstreamTool.name}`,
               parameters: upstreamParameters,
               execute: forwardExecute
-            });
+            };
+            
+            if (isUpstreamToolFree) {
+              (app as any).freeTool(upstreamToolDef);
+            } else {
+              (app as any).paidTool({ ...upstreamToolDef, pricePicoUSD: upstreamToolPrice });
+            }
           }
         }
       } catch (error) {

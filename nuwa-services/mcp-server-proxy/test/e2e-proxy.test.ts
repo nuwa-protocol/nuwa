@@ -26,26 +26,7 @@ upstreamUrl: "http://127.0.0.1:4000/mcp"
 serviceId: "test-service"
 serviceKey: "test-key-placeholder"
 network: "test"
-register:
-  tools:
-    - name: "echo.free"
-      description: "Echo text back"
-      pricePicoUSD: "0"
-      parameters:
-        type: "object"
-        properties:
-          text:
-            type: "string"
-    - name: "calc.add"
-      description: "Add two numbers"
-      pricePicoUSD: "0"
-      parameters:
-        type: "object"
-        properties:
-          a:
-            type: "number"
-          b:
-            type: "number"
+# No custom tools - only upstream forwarding
 `;
   
   const testConfigPath = path.join(__dirname, '../test-config.yaml');
@@ -109,37 +90,34 @@ describe('Proxy MCP e2e', () => {
     } catch {}
   });
 
-  it('tools/list returns built-in tools', async () => {
+  it('tools/list returns upstream forwarded tools', async () => {
     const tools = await mcpClient.listTools();
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('Available tools:', names);
-    expect(names).toContain('echo.free');
-    expect(names).toContain('calc.add');
-    // Should also contain upstream 'echo' tool
+    
+    // Should contain payment kit built-in tools
+    expect(names).toContain('nuwa.health');
+    expect(names).toContain('nuwa.discovery');
+    
+    // Should contain upstream 'echo' tool
     expect(names).toContain('echo');
   });
 
-  it('tools/call echo.free echoes text (built-in tool)', async () => {
-    const res = await mcpClient.callTool({ name: 'echo.free', arguments: { text: 'hello' } });
-    expect(Array.isArray(res.content)).toBe(true);
-    expect(res.content[0].type).toBe('text');
-    expect(res.content[0].text).toContain('hello');
-  });
-
-  it('tools/call calc.add returns sum (built-in tool)', async () => {
-    const res = await mcpClient.callTool({ name: 'calc.add', arguments: { a: 2, b: 3 } });
-    expect(Array.isArray(res.content)).toBe(true);
-    expect(res.content[0].type).toBe('text');
-    const obj = JSON.parse(res.content[0].text);
-    expect(obj.sum).toBe(5);
-  });
-
   it('can forward calls to upstream MCP server', async () => {
-    // The mock upstream has an 'echo' tool, which should be forwarded if not found in built-in tools
+    // The mock upstream has an 'echo' tool, which should be forwarded
     const res = await mcpClient.callTool({ name: 'echo', arguments: { text: 'upstream test' } });
     expect(Array.isArray(res.content)).toBe(true);
     expect(res.content[0].type).toBe('text');
     expect(res.content[0].text).toBe('upstream test');
+  });
+
+  it('payment kit built-in tools are available', async () => {
+    // Test that payment kit's built-in tools work
+    const res = await mcpClient.callTool({ name: 'nuwa.health', arguments: {} });
+    expect(Array.isArray(res.content)).toBe(true);
+    expect(res.content[0].type).toBe('text');
+    // Health check should return some status information
+    expect(res.content[0].text).toBeDefined();
   });
 });
