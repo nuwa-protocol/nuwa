@@ -33,10 +33,6 @@ async function main() {
     endpoint: "/mcp",
     wellKnown: {
       enabled: true,
-      discovery: async () => ({
-        serviceId: "nuwa-mcp-demo",
-        serviceDid,
-      }),
     },
   });
 
