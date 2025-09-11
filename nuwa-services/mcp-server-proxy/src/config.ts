@@ -6,6 +6,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import type { UpstreamConfig } from "./types.js";
 
 // Get directory name in ESM
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -29,8 +30,8 @@ export interface MinimalConfig {
   defaultPricePicoUSD?: string;
   adminDid?: string[];
   debug?: boolean;
-  // Upstream MCP server (single), e.g., http://localhost:4000/mcp
-  upstreamUrl?: string;
+  // Upstream MCP server configuration
+  upstream?: UpstreamConfig;
   // Custom tools registration
   register?: {
     tools: MinimalToolConfig[];
@@ -42,7 +43,6 @@ interface CliArgs {
   port?: number;
   endpoint?: string;
   config?: string;
-  upstreamUrl?: string;
   serviceId?: string;
   network?: string;
   rpcUrl?: string;
@@ -61,7 +61,6 @@ function parseCliArgs(): CliArgs {
         port: { type: "string", short: "p" },
         endpoint: { type: "string", short: "e" },
         config: { type: "string", short: "c" },
-        "upstream-url": { type: "string", short: "u" },
         "service-id": { type: "string" },
         network: { type: "string", short: "n" },
         "rpc-url": { type: "string" },
@@ -77,7 +76,6 @@ function parseCliArgs(): CliArgs {
       port: values.port ? Number(values.port) : undefined,
       endpoint: values.endpoint,
       config: values.config,
-      upstreamUrl: values["upstream-url"],
       serviceId: values["service-id"],
       network: values.network,
       rpcUrl: values["rpc-url"],
@@ -103,7 +101,6 @@ Options:
   -p, --port <number>                 Server port (default: 8088)
   -e, --endpoint <string>             MCP endpoint path (default: /mcp)
   -c, --config <path>                 Config file path (default: config.yaml)
-  -u, --upstream-url <url>            Upstream MCP server URL
       --service-id <string>           Payment service ID
   -n, --network <string>              Network (local|dev|test|main)
       --rpc-url <url>                 Rooch RPC URL
@@ -119,12 +116,12 @@ Configuration Priority (high to low):
   4. Default values
 
 Environment Variables:
-  PORT, CONFIG_PATH, UPSTREAM_URL, SERVICE_ID, SERVICE_KEY,
+  PORT, CONFIG_PATH, SERVICE_ID, SERVICE_KEY,
   ROOCH_NETWORK, ROOCH_RPC_URL, DEFAULT_ASSET_ID, DEFAULT_PRICE_PICO_USD, DEBUG
 
 Examples:
   node server.js --port 3000 --debug
-  node server.js --config ./my-config.yaml --upstream-url https://api.example.com/mcp
+  node server.js --config ./my-config.yaml
   node server.js --service-id my-service --network test --default-price-pico-usd 1000000000000
 `);
 }
@@ -188,8 +185,7 @@ export function loadConfig(): MinimalConfig {
       cliArgs.endpoint ?? process.env.ENDPOINT ?? fileConfig.endpoint ?? "/mcp",
 
     // Upstream settings
-    upstreamUrl:
-      cliArgs.upstreamUrl ?? process.env.UPSTREAM_URL ?? fileConfig.upstreamUrl,
+    upstream: fileConfig.upstream,
 
     // Payment settings
     serviceId:

@@ -32,6 +32,13 @@ describe('Config Module', () => {
   it('should load default configuration', () => {
     // Clear argv to avoid interference
     process.argv = ['node', 'server.js'];
+    // Clear environment variables that could affect the test
+    delete process.env.DEBUG;
+    delete process.env.PORT;
+    delete process.env.UPSTREAM_URL;
+    delete process.env.CONFIG_PATH;
+    // Use a non-existent config path to ensure defaults are used
+    process.env.CONFIG_PATH = '/non/existent/config.yaml';
     
     const config = loadConfig();
     
@@ -45,13 +52,11 @@ describe('Config Module', () => {
     process.argv = ['node', 'server.js'];
     process.env.PORT = '9000';
     process.env.DEBUG = 'true';
-    process.env.UPSTREAM_URL = 'https://env.example.com/mcp';
     
     const config = loadConfig();
     
     expect(config.port).toBe(9000);
     expect(config.debug).toBe(true);
-    expect(config.upstreamUrl).toBe('https://env.example.com/mcp');
   });
 
   it('should prioritize config file over defaults', () => {
@@ -62,7 +67,9 @@ describe('Config Module', () => {
 port: 7000
 endpoint: "/test-mcp"
 debug: true
-upstreamUrl: "https://file.example.com/mcp"
+upstream:
+  type: "httpStream"
+  url: "https://file.example.com/mcp"
 serviceId: "test-service"
 network: "dev"
 `;
@@ -74,20 +81,22 @@ network: "dev"
     expect(config.port).toBe(7000);
     expect(config.endpoint).toBe('/test-mcp');
     expect(config.debug).toBe(true);
-    expect(config.upstreamUrl).toBe('https://file.example.com/mcp');
+    expect(config.upstream?.type).toBe('httpStream');
+    expect((config.upstream as any)?.url).toBe('https://file.example.com/mcp');
     expect(config.serviceId).toBe('test-service');
     expect(config.network).toBe('dev');
   });
 
   it('should prioritize CLI args over everything else', () => {
-    process.argv = ['node', 'server.js', '--port', '6000', '--debug', '--upstream-url', 'https://cli.example.com/mcp'];
+    process.argv = ['node', 'server.js', '--port', '6000', '--debug'];
     process.env.PORT = '9000';
-    process.env.UPSTREAM_URL = 'https://env.example.com/mcp';
     
     // Create test config file
     const testConfig = `
 port: 7000
-upstreamUrl: "https://file.example.com/mcp"
+upstream:
+  type: "httpStream"
+  url: "https://file.example.com/mcp"
 `;
     fs.writeFileSync(testConfigPath, testConfig);
     process.env.CONFIG_PATH = testConfigPath;
@@ -96,7 +105,8 @@ upstreamUrl: "https://file.example.com/mcp"
     
     expect(config.port).toBe(6000);
     expect(config.debug).toBe(true);
-    expect(config.upstreamUrl).toBe('https://cli.example.com/mcp');
+    expect(config.upstream?.type).toBe('httpStream');
+    expect((config.upstream as any)?.url).toBe('https://file.example.com/mcp');
   });
 
   it('should handle environment variable substitution in config file', () => {
@@ -107,7 +117,9 @@ upstreamUrl: "https://file.example.com/mcp"
     // Create test config file with env vars
     const testConfig = `
 port: 8000
-upstreamUrl: "https://api.example.com/mcp?key=\${TEST_API_KEY}"
+upstream:
+  type: "httpStream"
+  url: "https://api.example.com/mcp?key=\${TEST_API_KEY}"
 rpcUrl: "\${TEST_RPC_URL}"
 serviceId: "test-service"
 `;
@@ -116,7 +128,8 @@ serviceId: "test-service"
     
     const config = loadConfig();
     
-    expect(config.upstreamUrl).toBe('https://api.example.com/mcp?key=secret123');
+    expect(config.upstream?.type).toBe('httpStream');
+    expect((config.upstream as any)?.url).toBe('https://api.example.com/mcp?key=secret123');
     expect(config.rpcUrl).toBe('https://test-rpc.example.com');
   });
 
@@ -150,5 +163,49 @@ register:
     expect(config.register?.tools[0].pricePicoUSD).toBe('1000000000000');
     expect(config.register?.tools[1].name).toBe('free.tool');
     expect(config.register?.tools[1].pricePicoUSD).toBe('0');
+  });
+
+  it('should handle stdio upstream configuration', () => {
+    process.argv = ['node', 'server.js'];
+    
+    fs.writeFileSync(testConfigPath, `port: 8088
+upstream:
+  type: "stdio"
+  command: ["python", "-m", "my_mcp_server"]
+  cwd: "/path/to/server"
+  env:
+    API_KEY: "test-key"`);
+    
+    process.env.CONFIG_PATH = testConfigPath;
+    
+    const config = loadConfig();
+    
+    expect(config.upstream).toBeDefined();
+    expect(config.upstream?.type).toBe('stdio');
+    expect((config.upstream as any)?.command).toEqual(['python', '-m', 'my_mcp_server']);
+    expect((config.upstream as any)?.cwd).toBe('/path/to/server');
+    expect((config.upstream as any)?.env?.API_KEY).toBe('test-key');
+  });
+
+  it('should handle httpStream upstream configuration', () => {
+    process.argv = ['node', 'server.js'];
+    
+    fs.writeFileSync(testConfigPath, `port: 8088
+upstream:
+  type: "httpStream"
+  url: "https://api.example.com/mcp"
+  auth:
+    scheme: "bearer"
+    token: "test-token"`);
+    
+    process.env.CONFIG_PATH = testConfigPath;
+    
+    const config = loadConfig();
+    
+    expect(config.upstream).toBeDefined();
+    expect(config.upstream?.type).toBe('httpStream');
+    expect((config.upstream as any)?.url).toBe('https://api.example.com/mcp');
+    expect((config.upstream as any)?.auth?.scheme).toBe('bearer');
+    expect((config.upstream as any)?.auth?.token).toBe('test-token');
   });
 });

@@ -66,11 +66,8 @@ async function startServer(
 
   // Prepare upstream via shared helper if configured
   let upstream: Upstream | undefined;
-  if (config.upstreamUrl) {
-    upstream = await initUpstream("default", {
-      type: "httpStream",
-      url: config.upstreamUrl,
-    });
+  if (config.upstream) {
+    upstream = await initUpstream("default", config.upstream);
   }
 
   // Register tools from upstream if configured

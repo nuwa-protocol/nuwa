@@ -31,7 +31,10 @@ async function startProxyServer(payee: CreateSelfDidResult): Promise<{ close: ()
   const config: MinimalConfig = {
     port: 5100,
     endpoint: '/mcp',
-    upstreamUrl: 'http://127.0.0.1:4000/mcp',
+    upstream: {
+      type: 'httpStream',
+      url: 'http://127.0.0.1:4000/mcp'
+    },
     serviceId: 'test-service',
     serviceKey: serviceKey, // Use exported key string
     network: 'local',
