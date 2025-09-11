@@ -5,9 +5,8 @@ import { fork, ChildProcess } from 'child_process';
 import waitOn from 'wait-on';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { startServer } from '../src/server.js';
+import type { MinimalConfig } from '../src/config.js';
 
 // Start mock upstream MCP server
 async function startMockUpstream(): Promise<ChildProcess> {
@@ -16,52 +15,28 @@ async function startMockUpstream(): Promise<ChildProcess> {
   return proc;
 }
 
-// Start the actual proxy server by forking the built server
-async function startProxyServer(): Promise<ChildProcess> {
-  // Create a test config file with minimal payment setup
-  const testConfig = `
-port: 5100
-endpoint: "/mcp"
-upstreamUrl: "http://127.0.0.1:4000/mcp"
-serviceId: "test-service"
-serviceKey: "test-key-placeholder"
-network: "test"
-# No custom tools - only upstream forwarding
-`;
-  
-  const testConfigPath = path.join(__dirname, '../test-config.yaml');
-  fs.writeFileSync(testConfigPath, testConfig);
-  
-  // Build the project first if dist doesn't exist
-  const distPath = path.join(__dirname, '../dist/index.js');
-  if (!fs.existsSync(distPath)) {
-    throw new Error('Built server not found. Please run "pnpm build" first.');
-  }
-  
-  // Start the proxy server with test config
-  const proc = fork(distPath, [], {
-    stdio: 'pipe', // Use pipe to capture output for debugging
-    env: {
-      ...process.env,
-      CONFIG_PATH: testConfigPath
+// Start the actual proxy server directly using the exported startServer function
+async function startProxyServer(): Promise<{ close: () => Promise<void> }> {
+  // Create test configuration
+  const config: MinimalConfig = {
+    port: 5100,
+    endpoint: '/mcp',
+    upstreamUrl: 'http://127.0.0.1:4000/mcp',
+    serviceId: 'test-service',
+    serviceKey: 'test-key-placeholder',
+    network: 'test',
+    debug: false,
+    register: {
+      tools: []
     }
-  });
-  
-  // Log server output for debugging
-  proc.stdout?.on('data', (data) => {
-    console.log('[proxy-server]', data.toString());
-  });
-  proc.stderr?.on('data', (data) => {
-    console.error('[proxy-server]', data.toString());
-  });
-  
-  // Wait for server to be ready
-  await waitOn({ resources: ['tcp:5100'], timeout: 15000 });
-  return proc;
+  };
+
+  // Use the exported startServer function
+  return await startServer(config);
 }
 
 describe('Proxy MCP e2e', () => {
-  let proxyProc: ChildProcess | undefined;
+  let proxyServer: { close: () => Promise<void> } | undefined;
   let upstreamProc: ChildProcess | undefined;
   let mcpClient: any;
 
@@ -69,8 +44,8 @@ describe('Proxy MCP e2e', () => {
     // Start mock upstream first
     upstreamProc = await startMockUpstream();
     
-    // Start the actual proxy server
-    proxyProc = await startProxyServer();
+    // Start the actual proxy server directly
+    proxyServer = await startProxyServer();
     
     // Connect MCP client to proxy
     const transport = new StreamableHTTPClientTransport(new URL('http://127.0.0.1:5100/mcp'));
@@ -80,14 +55,8 @@ describe('Proxy MCP e2e', () => {
 
   afterAll(async () => {
     try { await mcpClient?.close?.(); } catch {}
-    try { proxyProc?.kill('SIGTERM'); } catch {}
+    try { await proxyServer?.close?.(); } catch {}
     try { upstreamProc?.kill('SIGTERM'); } catch {}
-    
-    // Clean up test config file
-    try {
-      const testConfigPath = path.join(__dirname, '../test-config.yaml');
-      fs.unlinkSync(testConfigPath);
-    } catch {}
   });
 
   it('tools/list returns upstream forwarded tools', async () => {
