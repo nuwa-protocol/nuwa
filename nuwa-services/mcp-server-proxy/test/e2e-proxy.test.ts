@@ -1,82 +1,68 @@
 import { describe, beforeAll, afterAll, it, expect } from 'vitest';
-import { fork, ChildProcess } from 'child_process';
-import waitOn from 'wait-on';
-import { createServer, initializeUpstreams, registerRoutes } from '../src/server.js';
-import type { ProxyConfig } from '../src/types.js';
-
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { createServer, registerRoutes, ToolRegistry } from '../src/server.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Helper to start embedded MCP server in-process
+async function startServer() {
+  const config = { port: 5100, endpoint: '/mcp', register: { tools: [] } };
+  const { server } = createServer();
 
-// Helper to start proxy server in-process
-async function startProxy(config: ProxyConfig) {
-  const upstreams = await initializeUpstreams(config);
-  const { server } = createServer(config);
-  registerRoutes(server, config, upstreams);
-  await server.listen({ host: config.server.host, port: config.server.port });
-  return { server, upstreams };
+  // Register minimal tools for testing
+  const registry = new ToolRegistry();
+  registry.register({
+    name: 'echo.free',
+    description: 'Echo text',
+    parameters: { type: 'object', properties: { text: { type: 'string' } } },
+    execute: async (p: any) => ({ text: String(p?.text ?? '') }),
+  });
+  registry.register({
+    name: 'calc.add',
+    description: 'Add two numbers',
+    parameters: { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } } },
+    execute: async (p: any) => ({ sum: Number(p?.a ?? 0) + Number(p?.b ?? 0) }),
+  });
+
+  registerRoutes(server, config as any, registry);
+  await server.listen({ host: '127.0.0.1', port: 5100 });
+  return { server };
 }
 
-describe('Proxy e2e', () => {
-  let mockProcess: ChildProcess;
-  let proxy: any;
+describe('Embedded MCP e2e', () => {
+  let svc: any;
   let mcpClient: any;
 
   beforeAll(async () => {
-    // Start mock HTTP MCP server
-    const mockScript = path.resolve(__dirname, 'fixtures/http-mock-mcp.js');
-    mockProcess = fork(mockScript, [], { stdio: 'ignore' });
-    await waitOn({ resources: ['tcp:4000'], timeout: 10000 });
-
-    // Prepare proxy config
-    const config: ProxyConfig = {
-      server: {
-        host: '127.0.0.1',
-        port: 5100,
-        logger: { level: 'silent', prettyPrint: false },
-        cors: { origin: '*', methods: ['GET', 'POST'] },
-      } as any,
-      didAuth: { required: false } as any,
-      defaultUpstream: 'mock-http',
-      routes: [],
-      upstreams: {
-        'mock-http': {
-          type: 'httpStream',
-          url: 'http://localhost:4000/mcp',
-        } as any,
-      },
-    } as any;
-
-    proxy = await startProxy(config);
-    await waitOn({ resources: ['tcp:5100'], timeout: 10000 });
-
-    // Create MCP client pointing to proxy
+    svc = await startServer();
     const transport = new StreamableHTTPClientTransport(new URL('http://127.0.0.1:5100/mcp'));
     mcpClient = new Client({ name: 'e2e-test', version: '0.0.1' }, {});
     await mcpClient.connect(transport);
-  }, 25000);
+  }, 20000);
 
   afterAll(async () => {
     await mcpClient.close();
-    await proxy.server.close();
-    mockProcess.kill();
+    await svc.server.close();
   });
 
-  it('listTools returns echo tool', async () => {
+  it('tools/list returns built-in tools', async () => {
     const res = await mcpClient.listTools();
-    expect(res.tools[0].name).toBe('echo');
+    const names = res.tools.map((t: any) => t.name);
+    expect(names).toContain('echo.free');
+    expect(names).toContain('calc.add');
   });
 
-  it('listPrompts returns hello prompt', async () => {
-    const res = await mcpClient.listPrompts();
-    expect(res.prompts[0].name).toBe('hello');
+  it('tools/call echo.free echoes text', async () => {
+    const res = await mcpClient.callTool({ name: 'echo.free', arguments: { text: 'hello' } });
+    expect(Array.isArray(res.content)).toBe(true);
+    expect(res.content[0].type).toBe('text');
+    expect(res.content[0].text).toContain('hello');
   });
 
-  it('getPrompt returns correct message', async () => {
-    const res = await mcpClient.getPrompt({ name: 'hello' });
-    expect(res.messages[0].content.text).toBe('Hello, world!');
+  it('tools/call calc.add returns sum', async () => {
+    const res = await mcpClient.callTool({ name: 'calc.add', arguments: { a: 2, b: 3 } });
+    expect(Array.isArray(res.content)).toBe(true);
+    expect(res.content[0].type).toBe('text');
+    const obj = JSON.parse(res.content[0].text);
+    expect(obj.sum).toBe(5);
   });
-}); 
+});
