@@ -10,10 +10,8 @@ upstreamUrl: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
 # Payment & chain configuration (optional)
 serviceId: "mcp-proxy-service"
 network: "test"
-rpcUrl: "${ROOCH_RPC_URL}"
-defaultAssetId: "0x3::gas_coin::RGas"
-defaultPricePicoUSD: "1000000000000"  # Default price for all tools (custom and upstream)
-debug: false
+defaultPricePicoUSD: "1000000000"  # Default price for all tools (custom and upstream)
+debug: true
 
 # Custom tools registration (optional)
 # register:

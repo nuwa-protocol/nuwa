@@ -66,7 +66,12 @@ describe('Upstream (httpStream) integration', () => {
     // Start the mock HTTP MCP server
     serverProcess = fork(script, [], { stdio: 'ignore' });
     // Wait for the server to be ready
-    await waitOn({ resources: ['tcp:4000'], timeout: 10000 });
+    await new Promise<void>((resolve, reject) => {
+      waitOn({ resources: ['tcp:4000'], timeout: 10000 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
     upstream = await initUpstream('mock-http', {
       type: 'httpStream',
       url: 'http://localhost:4000/mcp',
