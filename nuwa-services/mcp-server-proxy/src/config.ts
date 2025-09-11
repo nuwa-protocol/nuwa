@@ -1,21 +1,19 @@
 /**
  * Configuration loading and parsing module
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import yaml from 'js-yaml';
-import { parseArgs } from 'node:util';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import yaml from "js-yaml";
+import { parseArgs } from "node:util";
+import { fileURLToPath } from "node:url";
 
 // Get directory name in ESM
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
-// Tool configuration interface
+// Tool configuration interface - only for pricing configuration
 export interface MinimalToolConfig {
   name: string;
-  description: string;
   pricePicoUSD?: string;
-  parameters?: any;
 }
 
 // Main configuration interface
@@ -25,7 +23,7 @@ export interface MinimalConfig {
   // Payment configuration (optional)
   serviceId?: string;
   serviceKey?: string;
-  network?: 'local' | 'dev' | 'test' | 'main';
+  network?: "local" | "dev" | "test" | "main";
   rpcUrl?: string;
   defaultAssetId?: string;
   defaultPricePicoUSD?: string;
@@ -60,17 +58,17 @@ function parseCliArgs(): CliArgs {
     const { values } = parseArgs({
       args: process.argv.slice(2),
       options: {
-        port: { type: 'string', short: 'p' },
-        endpoint: { type: 'string', short: 'e' },
-        config: { type: 'string', short: 'c' },
-        'upstream-url': { type: 'string', short: 'u' },
-        'service-id': { type: 'string' },
-        network: { type: 'string', short: 'n' },
-        'rpc-url': { type: 'string' },
-        'default-asset-id': { type: 'string' },
-        'default-price-pico-usd': { type: 'string' },
-        debug: { type: 'boolean', short: 'd' },
-        help: { type: 'boolean', short: 'h' },
+        port: { type: "string", short: "p" },
+        endpoint: { type: "string", short: "e" },
+        config: { type: "string", short: "c" },
+        "upstream-url": { type: "string", short: "u" },
+        "service-id": { type: "string" },
+        network: { type: "string", short: "n" },
+        "rpc-url": { type: "string" },
+        "default-asset-id": { type: "string" },
+        "default-price-pico-usd": { type: "string" },
+        debug: { type: "boolean", short: "d" },
+        help: { type: "boolean", short: "h" },
       },
       allowPositional: false,
     });
@@ -79,17 +77,17 @@ function parseCliArgs(): CliArgs {
       port: values.port ? Number(values.port) : undefined,
       endpoint: values.endpoint,
       config: values.config,
-      upstreamUrl: values['upstream-url'],
-      serviceId: values['service-id'],
+      upstreamUrl: values["upstream-url"],
+      serviceId: values["service-id"],
       network: values.network,
-      rpcUrl: values['rpc-url'],
-      defaultAssetId: values['default-asset-id'],
-      defaultPricePicoUSD: values['default-price-pico-usd'],
+      rpcUrl: values["rpc-url"],
+      defaultAssetId: values["default-asset-id"],
+      defaultPricePicoUSD: values["default-price-pico-usd"],
       debug: values.debug,
       help: values.help,
     };
   } catch (error) {
-    console.error('Error parsing command line arguments:', error);
+    console.error("Error parsing command line arguments:", error);
     process.exit(1);
   }
 }
@@ -138,10 +136,13 @@ function loadConfigFile(configPath: string): any {
   }
 
   try {
-    const configYaml = fs.readFileSync(configPath, 'utf8');
-    const configWithEnvVars = configYaml.replace(/\${([^}]+)}/g, (_, varName) => {
-      return process.env[varName] || '';
-    });
+    const configYaml = fs.readFileSync(configPath, "utf8");
+    const configWithEnvVars = configYaml.replace(
+      /\${([^}]+)}/g,
+      (_, varName) => {
+        return process.env[varName] || "";
+      },
+    );
     return yaml.load(configWithEnvVars) as any;
   } catch (error) {
     console.error(`Error loading config file ${configPath}:`, error);
@@ -160,11 +161,14 @@ export function loadConfig(): MinimalConfig {
   }
 
   // Determine config file path (CLI > env > default)
-  const configPath = cliArgs.config || process.env.CONFIG_PATH || path.join(__dirname, '../config.yaml');
-  
+  const configPath =
+    cliArgs.config ||
+    process.env.CONFIG_PATH ||
+    path.join(__dirname, "../config.yaml");
+
   // Load config file if it exists
   const fileConfig = loadConfigFile(configPath);
-  
+
   // If config file was explicitly specified but doesn't exist, error
   if (cliArgs.config && !fs.existsSync(configPath)) {
     console.error(`Config file not found: ${configPath}`);
@@ -174,57 +178,56 @@ export function loadConfig(): MinimalConfig {
   // Apply configuration priority: CLI > env > file > defaults
   const config: MinimalConfig = {
     // Server settings
-    port: cliArgs.port ?? 
-          (process.env.PORT ? Number(process.env.PORT) : undefined) ?? 
-          fileConfig.port ?? 
-          8088,
-    
-    endpoint: cliArgs.endpoint ?? 
-              process.env.ENDPOINT ?? 
-              fileConfig.endpoint ?? 
-              '/mcp',
+    port:
+      cliArgs.port ??
+      (process.env.PORT ? Number(process.env.PORT) : undefined) ??
+      fileConfig.port ??
+      8088,
+
+    endpoint:
+      cliArgs.endpoint ?? process.env.ENDPOINT ?? fileConfig.endpoint ?? "/mcp",
 
     // Upstream settings
-    upstreamUrl: cliArgs.upstreamUrl ?? 
-                 process.env.UPSTREAM_URL ?? 
-                 fileConfig.upstreamUrl,
+    upstreamUrl:
+      cliArgs.upstreamUrl ?? process.env.UPSTREAM_URL ?? fileConfig.upstreamUrl,
 
     // Payment settings
-    serviceId: cliArgs.serviceId ?? 
-               process.env.SERVICE_ID ?? 
-               fileConfig.serviceId,
+    serviceId:
+      cliArgs.serviceId ?? process.env.SERVICE_ID ?? fileConfig.serviceId,
 
-    serviceKey: process.env.SERVICE_KEY ?? 
-                fileConfig.serviceKey,
+    serviceKey: process.env.SERVICE_KEY ?? fileConfig.serviceKey,
 
-    network: (cliArgs.network ?? 
-              process.env.ROOCH_NETWORK ?? 
-              fileConfig.network ?? 
-              'test') as any,
+    network: (cliArgs.network ??
+      process.env.ROOCH_NETWORK ??
+      fileConfig.network ??
+      "test") as any,
 
-    rpcUrl: cliArgs.rpcUrl ?? 
-            process.env.ROOCH_RPC_URL ?? 
-            fileConfig.rpcUrl,
+    rpcUrl: cliArgs.rpcUrl ?? process.env.ROOCH_RPC_URL ?? fileConfig.rpcUrl,
 
-    defaultAssetId: cliArgs.defaultAssetId ?? 
-                    process.env.DEFAULT_ASSET_ID ?? 
-                    fileConfig.defaultAssetId,
+    defaultAssetId:
+      cliArgs.defaultAssetId ??
+      process.env.DEFAULT_ASSET_ID ??
+      fileConfig.defaultAssetId,
 
-    defaultPricePicoUSD: cliArgs.defaultPricePicoUSD ?? 
-                         process.env.DEFAULT_PRICE_PICO_USD ?? 
-                         fileConfig.defaultPricePicoUSD,
+    defaultPricePicoUSD:
+      cliArgs.defaultPricePicoUSD ??
+      process.env.DEFAULT_PRICE_PICO_USD ??
+      fileConfig.defaultPricePicoUSD,
 
     adminDid: fileConfig.adminDid,
 
-    debug: cliArgs.debug ?? 
-           (process.env.DEBUG === '1' || process.env.DEBUG === 'true' ? true : undefined) ?? 
-           fileConfig.debug ?? 
-           false,
+    debug:
+      cliArgs.debug ??
+      (process.env.DEBUG === "1" || process.env.DEBUG === "true"
+        ? true
+        : undefined) ??
+      fileConfig.debug ??
+      false,
 
     // Tools from config file only (not suitable for CLI)
     register: {
-      tools: fileConfig.register?.tools || []
-    }
+      tools: fileConfig.register?.tools || [],
+    },
   };
 
   return config;

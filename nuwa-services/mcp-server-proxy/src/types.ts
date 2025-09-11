@@ -1,30 +1,30 @@
 /**
  * MCP Server Proxy - Type Definitions (Single Upstream)
  */
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
 
 export interface HeaderAuthConfig {
-  scheme: 'header';
+  scheme: "header";
   header: string;
   value: string;
 }
 
 export interface BasicAuthConfig {
-  scheme: 'basic';
+  scheme: "basic";
   username: string;
   password: string;
 }
 
 export interface BearerAuthConfig {
-  scheme: 'bearer';
+  scheme: "bearer";
   token: string;
 }
 
 export type AuthConfig = HeaderAuthConfig | BasicAuthConfig | BearerAuthConfig;
 
 export interface HttpStreamUpstreamConfig {
-  type: 'httpStream'|'http';
+  type: "httpStream" | "http";
   /**
    * Base URL of the upstream MCP server.
    * Renamed from `baseURL` to `url` for simplicity.
@@ -34,7 +34,7 @@ export interface HttpStreamUpstreamConfig {
 }
 
 export interface StdioUpstreamConfig {
-  type: 'stdio';
+  type: "stdio";
   command: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -48,4 +48,4 @@ export interface Upstream {
   client: any;
   config: UpstreamConfig;
   capabilities: ServerCapabilities;
-} 
+}

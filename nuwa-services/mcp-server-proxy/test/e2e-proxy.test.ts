@@ -12,7 +12,12 @@ import type { AssetInfo } from '@nuwa-ai/payment-kit';
 // Start mock upstream MCP server
 async function startMockUpstream(): Promise<ChildProcess> {
   const proc = fork('./test/fixtures/http-mock-mcp.js', [], { stdio: 'ignore' });
-  await waitOn({ resources: ['tcp:4000'], timeout: 10000 });
+  await new Promise<void>((resolve, reject) => {
+    waitOn({ resources: ['tcp:4000'], timeout: 10000 }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
   return proc;
 }
 
@@ -31,30 +36,16 @@ async function startProxyServer(payee: CreateSelfDidResult): Promise<{ close: ()
     serviceKey: serviceKey, // Use exported key string
     network: 'local',
     debug: false,
-    defaultPricePicoUSD: '100000000000', // 0.0001 USD - make upstream tools paid for testing
+    defaultPricePicoUSD: '100000000', // 0.0001 USD - make upstream tools paid for testing
     register: {
       tools: [
         {
           name: 'custom.free',
-          description: 'A free custom tool',
-          pricePicoUSD: '0',
-          parameters: {
-            type: 'object',
-            properties: {
-              message: { type: 'string' }
-            }
-          }
+          pricePicoUSD: '0'
         },
         {
           name: 'custom.paid',
-          description: 'A paid custom tool',
-          pricePicoUSD: '200000000000', // 0.0002 USD
-          parameters: {
-            type: 'object',
-            properties: {
-              data: { type: 'string' }
-            }
-          }
+          pricePicoUSD: '200000000' // 0.0002 USD
         }
       ]
     }
@@ -222,7 +213,7 @@ describe('Proxy MCP e2e', () => {
     
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
-    expect(result.payment!.cost).toBe(BigInt('1000000000')); // 100,000,000,000 picoUSD ÷ 100 picoUSD/unit = 1,000,000,000 RGas base units
+    expect(result.payment!.cost).toBe(BigInt('1000000')); // 100,000,000 picoUSD ÷ 100 picoUSD/unit = 1,000,000 RGas base units
     
     console.log('✅ Paid upstream tool response:', result.data);
     console.log('💰 Payment info:', {
@@ -245,6 +236,8 @@ describe('Proxy MCP e2e', () => {
     
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeUndefined(); // Should be free
+    expect(typeof result.data).toBe('string');
+    expect(result.data).toContain('Custom free tool executed with message: test message');
     
     console.log('✅ Custom FREE tool response:', result.data);
     console.log('✅ Payment info:', result.payment || 'None (FREE)');
@@ -252,20 +245,19 @@ describe('Proxy MCP e2e', () => {
     console.log('✅ Custom FREE tools test successful!');
   });
 
-  it.skip('can handle custom paid tools', async () => {
+  it('can handle custom paid tools', async () => {
     if (!shouldRunE2ETests()) return;
 
     console.log('💎 Testing custom paid tools');
-
-    // TODO: Fix UNAUTHORIZED error for custom paid tools
-    // This might be related to DIDAuth handling in custom tool execution
     
     // Call custom paid tool
     const result = await mcpClient.call('custom.paid', { data: 'test data' });
     
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
-    expect(result.payment!.cost).toBe(BigInt('2000000000')); // 200,000,000,000 picoUSD ÷ 100 picoUSD/unit = 2,000,000,000 RGas base units
+    expect(result.payment!.cost).toBe(BigInt('2000000')); // 200,000,000 picoUSD ÷ 100 picoUSD/unit = 2,000,000 RGas base units
+    expect(typeof result.data).toBe('string');
+    expect(result.data).toContain('Custom paid tool executed with data: test data');
     
     console.log('✅ Custom paid tool response:', result.data);
     console.log('💰 Payment info:', {

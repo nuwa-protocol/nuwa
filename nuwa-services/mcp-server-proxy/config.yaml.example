@@ -17,26 +17,13 @@ endpoint: "/mcp"
 # adminDid: ["did:rooch:0x..."]
 # debug: false
 
-# Custom tools registration (optional)
+# Tool pricing configuration (optional)
+# Only configure pricing for upstream tools - tool definitions come from upstream server
 # register:
 #   tools:
-#     - name: "example.tool"
-#       description: "Example custom tool"
+#     - name: "example.tool"  # Must exist in upstream server
 #       pricePicoUSD: "1000000000000"  # 0.001 USD, if not specified, uses defaultPricePicoUSD
-#       parameters:
-#         type: "object"
-#         properties:
-#           input:
-#             type: "string"
-#     - name: "free.tool"
-#       description: "Free tool example"
+#     - name: "free.tool"  # Must exist in upstream server
 #       pricePicoUSD: "0"  # Free tool
-#       parameters:
-#         type: "object"
-#     - name: "default.price.tool"
-#       description: "Tool using default price (no pricePicoUSD specified)"
-#       parameters:
-#         type: "object"
-#         properties:
-#           data:
-#             type: "string"
+#     - name: "default.price.tool"  # Must exist in upstream server
+#       # No pricePicoUSD specified - uses defaultPricePicoUSD
