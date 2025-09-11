@@ -137,29 +137,14 @@ async function startServer(
             return res;
           };
 
-          // Convert upstream tool schema to zod if needed
-          let upstreamParameters: any;
-          if (upstreamTool.inputSchema) {
-            // If it's already a zod schema, use it directly
-            if (
-              typeof upstreamTool.inputSchema === "object" &&
-              "parse" in upstreamTool.inputSchema
-            ) {
-              upstreamParameters = upstreamTool.inputSchema;
-            } else {
-              // Use permissive schema for other tools - let the upstream server handle validation
-              upstreamParameters = z.object({}).passthrough();
-            }
-          } else {
-            upstreamParameters = z.object({}).passthrough();
-          }
-
+          // Use FastMcpStarter's tool registration mechanism which handles schema conversion
           const upstreamToolDef = {
             name: upstreamTool.name,
             description:
               upstreamTool.description ||
               `Forwarded tool: ${upstreamTool.name}`,
-            parameters: upstreamParameters,
+            // Pass the original inputSchema - FastMcpStarter will handle the conversion
+            parameters: upstreamTool.inputSchema,
             execute: forwardExecute,
           };
 
