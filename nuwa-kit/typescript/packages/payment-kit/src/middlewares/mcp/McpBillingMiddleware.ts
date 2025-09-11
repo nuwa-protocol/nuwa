@@ -9,11 +9,12 @@ import type {
   SerializableRequestPayload,
 } from '../../core/types';
 import { HttpPaymentCodec } from '../http/HttpPaymentCodec';
-import { DebugLogger } from '@nuwa-ai/identity-kit';
+import { DebugLogger, type DIDResolver, DIDAuth } from '@nuwa-ai/identity-kit';
 
 export interface McpBillingMiddlewareConfig {
   processor: PaymentProcessor;
   ruleProvider: RuleProvider;
+  didResolver: DIDResolver;
   debug?: boolean;
 }
 
@@ -33,11 +34,13 @@ export interface McpResponseContext<T = any> {
 export class McpBillingMiddleware {
   private readonly processor: PaymentProcessor;
   private readonly ruleProvider: RuleProvider;
+  private readonly didResolver: DIDResolver;
   private readonly logger: DebugLogger;
 
   constructor(cfg: McpBillingMiddlewareConfig) {
     this.processor = cfg.processor;
     this.ruleProvider = cfg.ruleProvider;
+    this.didResolver = cfg.didResolver;
     this.logger = DebugLogger.get('McpBillingMiddleware');
     this.logger.setLevel(cfg.debug ? 'debug' : 'info');
   }
@@ -49,6 +52,11 @@ export class McpBillingMiddleware {
 
     const paymentData = this.extractPaymentData(params);
     const didInfo = await this.extractDidInfo(params?.__nuwa_auth);
+    this.logger.debug('extract paymentData and didInfo from params', {
+      params,
+      paymentData,
+      didInfo,
+    });
     // Enforce auth when rule requires it (note: recovery requires auth)
     if ((rule as any)?.authRequired && !params?.__nuwa_auth) {
       const unauthorizedCtx = this.buildBillingContext(method, paymentData || undefined, rule, {
@@ -133,37 +141,61 @@ export class McpBillingMiddleware {
     };
   }
 
-  private buildStructuredPaymentResult(
-    decoded: PaymentResponsePayload
-  ): SerializableResponsePayload {
-    return HttpPaymentCodec.toJSONResponse(decoded);
+  async extractDidInfo(authHeader?: string): Promise<{ did: string; keyId: string } | undefined> {
+    if (!authHeader) {
+      this.logger.debug('extractDidInfo: no authHeader provided');
+      return undefined;
+    }
+
+    this.logger.debug('extractDidInfo: processing authHeader', {
+      authHeaderLength: authHeader.length,
+      authHeaderPrefix: authHeader.substring(0, 50) + '...',
+    });
+
+    try {
+      // Verify and parse DIDAuthV1 header using the injected didResolver
+      this.logger.debug('extractDidInfo: calling DIDAuth.v1.verifyAuthHeader');
+      const verify = await DIDAuth.v1.verifyAuthHeader(authHeader, this.didResolver);
+
+      this.logger.debug('extractDidInfo: verifyAuthHeader result', {
+        ok: verify.ok,
+        hasSignedObject: !!verify.signedObject,
+        error: !verify.ok ? verify.error : undefined,
+      });
+
+      if (!verify.ok) {
+        this.logger.warn('extractDidInfo: DIDAuth verification failed', { error: verify.error });
+        return undefined;
+      }
+
+      if (!verify.signedObject) {
+        this.logger.warn('extractDidInfo: no signedObject in verification result');
+        return undefined;
+      }
+
+      const sig = verify.signedObject.signature;
+      this.logger.debug('extractDidInfo: signature info', {
+        hasSignature: !!sig,
+        signerDid: sig?.signer_did,
+        keyId: sig?.key_id,
+      });
+
+      if (!sig?.signer_did || !sig?.key_id) {
+        this.logger.warn('extractDidInfo: missing signer_did or key_id in signature', {
+          signerDid: sig?.signer_did,
+          keyId: sig?.key_id,
+        });
+        return undefined;
+      }
+
+      const result = { did: sig.signer_did, keyId: sig.key_id };
+      this.logger.debug('extractDidInfo: successfully extracted didInfo', result);
+      return result;
+    } catch (error) {
+      this.logger.error('extractDidInfo: exception occurred', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
   }
 }
-
-// Import here to avoid circular deps at top
-import { DIDAuth } from '@nuwa-ai/identity-kit';
-
-// Extend class with method implementation
-export interface McpBillingMiddleware {
-  extractDidInfo: (authHeader?: string) => Promise<{ did: string; keyId: string } | undefined>;
-}
-
-McpBillingMiddleware.prototype.extractDidInfo = async function (
-  authHeader?: string
-): Promise<{ did: string; keyId: string } | undefined> {
-  if (!authHeader) return undefined;
-  try {
-    // Verify and parse DIDAuthV1 header
-    const resolver = (this as any).processor?.['config']?.didResolver;
-    if (!resolver) return undefined;
-    const verify = await DIDAuth.v1.verifyAuthHeader(authHeader, resolver);
-    if (!verify.ok || !verify.signedObject) return undefined;
-    const sig = verify.signedObject.signature;
-    if (!sig?.signer_did || !sig?.key_id) return undefined;
-    return { did: sig.signer_did, keyId: sig.key_id };
-  } catch {
-    return undefined;
-  }
-};
-
-// serializeSubRAV helper removed; HttpPaymentCodec handles JSON serialization

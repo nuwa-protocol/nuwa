@@ -75,6 +75,7 @@ export class McpPaymentKit {
     this.middleware = new McpBillingMiddleware({
       processor: deps.processor,
       ruleProvider: this.billableRouter,
+      didResolver: deps.didResolver,
       debug: opts.debug,
     });
     this.handlers = new Map();

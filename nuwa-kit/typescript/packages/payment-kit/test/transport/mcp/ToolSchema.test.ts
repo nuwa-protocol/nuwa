@@ -10,9 +10,9 @@ describe('ToolSchema', () => {
         properties: {
           name: { type: 'string' },
           age: { type: 'number' },
-          active: { type: 'boolean' }
+          active: { type: 'boolean' },
         },
-        required: ['name']
+        required: ['name'],
       };
 
       const zodSchema = jsonSchemaToZodObject(jsonSchema);
@@ -34,9 +34,9 @@ describe('ToolSchema', () => {
         type: 'object',
         properties: {
           required_field: { type: 'string' },
-          optional_field: { type: 'string' }
+          optional_field: { type: 'string' },
         },
-        required: ['required_field']
+        required: ['required_field'],
       };
 
       const zodSchema = jsonSchemaToZodObject(jsonSchema);
@@ -47,9 +47,9 @@ describe('ToolSchema', () => {
       expect(result1.success).toBe(true);
 
       // Should pass with both fields
-      const result2 = zodSchema!.safeParse({ 
-        required_field: 'test', 
-        optional_field: 'optional' 
+      const result2 = zodSchema!.safeParse({
+        required_field: 'test',
+        optional_field: 'optional',
       });
       expect(result2.success).toBe(true);
     });
@@ -62,12 +62,12 @@ describe('ToolSchema', () => {
             type: 'object',
             properties: {
               name: { type: 'string' },
-              email: { type: 'string' }
+              email: { type: 'string' },
             },
-            required: ['name']
-          }
+            required: ['name'],
+          },
         },
-        required: ['user']
+        required: ['user'],
       };
 
       const zodSchema = jsonSchemaToZodObject(jsonSchema);
@@ -76,8 +76,8 @@ describe('ToolSchema', () => {
       const validData = {
         user: {
           name: 'John',
-          email: 'john@example.com'
-        }
+          email: 'john@example.com',
+        },
       };
       const result = zodSchema!.safeParse(validData);
       expect(result.success).toBe(true);
@@ -89,13 +89,13 @@ describe('ToolSchema', () => {
         properties: {
           tags: {
             type: 'array',
-            items: { type: 'string' }
+            items: { type: 'string' },
           },
           numbers: {
             type: 'array',
-            items: { type: 'number' }
-          }
-        }
+            items: { type: 'number' },
+          },
+        },
       };
 
       const zodSchema = jsonSchemaToZodObject(jsonSchema);
@@ -103,7 +103,7 @@ describe('ToolSchema', () => {
 
       const validData = {
         tags: ['tag1', 'tag2'],
-        numbers: [1, 2, 3]
+        numbers: [1, 2, 3],
       };
       const result = zodSchema!.safeParse(validData);
       expect(result.success).toBe(true);
@@ -115,9 +115,9 @@ describe('ToolSchema', () => {
         properties: {
           status: {
             type: 'string',
-            enum: ['active', 'inactive', 'pending']
-          }
-        }
+            enum: ['active', 'inactive', 'pending'],
+          },
+        },
       };
 
       const zodSchema = jsonSchemaToZodObject(jsonSchema);
@@ -144,7 +144,7 @@ describe('ToolSchema', () => {
     it('should handle existing Zod schemas', () => {
       const existingZodSchema = z.object({
         name: z.string(),
-        age: z.number()
+        age: z.number(),
       });
 
       const result = normalizeToZodObject(existingZodSchema);
@@ -154,7 +154,7 @@ describe('ToolSchema', () => {
     it('should handle Zod raw shapes', () => {
       const zodRawShape = {
         name: z.string(),
-        age: z.number().optional()
+        age: z.number().optional(),
       };
 
       const result = normalizeToZodObject(zodRawShape);
@@ -171,9 +171,9 @@ describe('ToolSchema', () => {
         type: 'object',
         properties: {
           text: { type: 'string' },
-          count: { type: 'integer' }
+          count: { type: 'integer' },
         },
-        required: ['text']
+        required: ['text'],
       };
 
       const result = normalizeToZodObject(mcpToolSchema);
@@ -200,14 +200,14 @@ describe('ToolSchema', () => {
         properties: {
           address: {
             type: 'string',
-            description: '待解析的结构化地址信息'
+            description: '待解析的结构化地址信息',
           },
           city: {
             type: 'string',
-            description: '指定查询的城市'
-          }
+            description: '指定查询的城市',
+          },
         },
-        required: ['address']
+        required: ['address'],
       };
 
       const zodSchema = normalizeToZodObject(amapGeoSchema);
@@ -216,7 +216,7 @@ describe('ToolSchema', () => {
       // Test with valid Amap geo request
       const validRequest = {
         address: '北京市朝阳区望京SOHO',
-        city: '北京'
+        city: '北京',
       };
       const result = zodSchema!.safeParse(validRequest);
       expect(result.success).toBe(true);
@@ -240,12 +240,12 @@ describe('ToolSchema', () => {
               avoid_tolls: { type: 'boolean' },
               vehicle_type: {
                 type: 'string',
-                enum: ['car', 'truck', 'motorcycle']
-              }
-            }
-          }
+                enum: ['car', 'truck', 'motorcycle'],
+              },
+            },
+          },
         },
-        required: ['origin', 'destination']
+        required: ['origin', 'destination'],
       };
 
       const zodSchema = normalizeToZodObject(complexSchema);
@@ -256,8 +256,8 @@ describe('ToolSchema', () => {
         destination: '116.507428,39.99923',
         options: {
           avoid_tolls: true,
-          vehicle_type: 'car'
-        }
+          vehicle_type: 'car',
+        },
       };
       const result = zodSchema!.safeParse(validRequest);
       expect(result.success).toBe(true);

@@ -54,7 +54,7 @@ async function startServer(
   if (signer) {
     serverOptions.serviceId = config.serviceId || "nuwa-mcp-server";
     serverOptions.signer = signer;
-    serverOptions.rpcUrl = config.rpcUrl || "http://127.0.0.1:6767"; // Default test RPC
+    serverOptions.rpcUrl = config.rpcUrl
     serverOptions.network = (config.network as any) || "test";
     serverOptions.defaultAssetId =
       config.defaultAssetId || "0x3::gas_coin::RGas";

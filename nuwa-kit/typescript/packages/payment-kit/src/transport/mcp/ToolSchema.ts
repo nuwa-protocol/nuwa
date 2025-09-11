@@ -31,23 +31,23 @@ function jsonSchemaPropertyToZod(property: any): z.ZodTypeAny {
         return z.enum(enumValues as [string, ...string[]]);
       }
       return z.string();
-    
+
     case 'number':
       return z.number();
-    
+
     case 'integer':
       return z.number().int();
-    
+
     case 'boolean':
       return z.boolean();
-    
+
     case 'array':
       if (items) {
         const itemSchema = jsonSchemaPropertyToZod(items);
         return z.array(itemSchema);
       }
       return z.array(z.any());
-    
+
     case 'object':
       if (properties && typeof properties === 'object') {
         const zodShape: z.ZodRawShape = {};
@@ -62,7 +62,7 @@ function jsonSchemaPropertyToZod(property: any): z.ZodTypeAny {
         return z.object(zodShape);
       }
       return z.object({}).passthrough();
-    
+
     default:
       return z.any();
   }
@@ -81,7 +81,7 @@ export function jsonSchemaToZodObject(jsonSchema: any): z.ZodObject<any> | undef
     if (jsonSchema.type === 'object') {
       const { properties = {}, required = [] } = jsonSchema;
       const zodShape: z.ZodRawShape = {};
-      
+
       for (const [key, prop] of Object.entries(properties)) {
         let propSchema = jsonSchemaPropertyToZod(prop);
         // Make optional if not in required array
@@ -90,7 +90,7 @@ export function jsonSchemaToZodObject(jsonSchema: any): z.ZodObject<any> | undef
         }
         zodShape[key] = propSchema;
       }
-      
+
       return z.object(zodShape);
     }
 
@@ -112,7 +112,7 @@ export function normalizeToZodObject(schema: any): z.ZodObject<any> | undefined 
     if (schema && typeof (schema as any).extend === 'function' && (schema as any)._def?.typeName) {
       return schema as z.ZodObject<any>;
     }
-    
+
     // Case 2: plain object raw shape with zod types as values
     if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
       const entries = Object.entries(schema);
