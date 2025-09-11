@@ -7,7 +7,7 @@ const testContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8
 const testMcpUrl = "https://nuwa-test.up.railway.app/mcp";
 const localMcpUrl = "http://localhost:3000/mcp";
 const DEFAULT_FAUCET_URL = 'https://test-faucet.rooch.network';
-const DEFAULT_TARGET = 'local'
+const DEFAULT_TARGET = 'test'
 
 async function claimTestnetGas(
   agentAddress: string,
