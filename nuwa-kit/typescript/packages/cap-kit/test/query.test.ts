@@ -26,8 +26,6 @@ describe("CapKit query cap", () => {
 
     const result = await capKit.queryByName('test')
 
-
-
     const result2 = await capKit.queryByName(undefined, {
       tags: ['Coding'],
       sortBy: 'average_rating',

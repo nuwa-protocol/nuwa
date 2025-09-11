@@ -1,6 +1,10 @@
+import { setupRoochEventListener } from './event-handle.js';
 import { ipfsService } from './services/service.js';
 
-// All tools are now registered in service.ts
+// -----------------------------------------------------------------------------
+// Event Listener Initialization
+// -----------------------------------------------------------------------------
+setupRoochEventListener();
 
 // -----------------------------------------------------------------------------
 // Start Service
