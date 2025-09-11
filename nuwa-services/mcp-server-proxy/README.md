@@ -154,8 +154,20 @@ DEBUG=true
 ### 4. Testing
 
 ```bash
+# Run unit tests and basic integration tests
 pnpm test
+
+# Run E2E tests with payment functionality (requires Rooch node)
+pnpm test:e2e:local
+
+# Run E2E tests with custom node URL
+ROOCH_NODE_URL=https://test-seed.rooch.network:443 pnpm test:e2e
 ```
+
+**Note**: E2E tests require:
+- A running Rooch node (local or remote)
+- The `PAYMENT_E2E=1` environment variable
+- Sufficient test tokens for payment channel operations
 
 ## Docker
 
