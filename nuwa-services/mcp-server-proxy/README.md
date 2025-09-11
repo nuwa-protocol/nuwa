@@ -1,18 +1,16 @@
-# MCP Server Proxy
+# MCP Server Proxy (Single Upstream)
 
-MCP Server Proxy is a proxy server designed to sit in front of various Model Capability Protocol (MCP) services. It provides a unified authentication layer (DIDAuthV1), protocol translation (e.g., stdio to HTTP), and a foundation for usage metering.
+MCP Server Proxy is a streamlined MCP service that combines built-in tools with optional upstream forwarding and payment capabilities. It uses FastMcpStarter to provide a single `/mcp` endpoint with JSON-RPC over HTTP/SSE.
 
-This allows modern Nuwa clients to securely interact with legacy MCP services that might only support API keys or have no authentication at all.
-
-For a detailed design document, see [DESIGN.md](./DESIGN.md).
+This implementation follows the V2 design (see [PROPOSAL_V2_SINGLE_UPSTREAM_PAYMENT.md](./docs/PROPOSAL_V2_SINGLE_UPSTREAM_PAYMENT.md)) which simplifies the architecture to focus on per-call payment and tool execution.
 
 ## Features
 
-- **DIDAuthV1 Authentication**: Secures upstream services with Nuwa's standard DID-based authentication.
-- **Upstream Authentication**: Injects API keys, bearer tokens, or basic auth credentials for upstream services.
-- **Protocol Translation**: Exposes `stdio`-based MCP services over `httpStream`/SSE.
-- **Hostname-based Routing**: Routes requests to different upstream services based on the request hostname (with prefix matching).
-- **Dual Protocol Support**: Understands both modern REST-like MCP calls and legacy JSON-RPC calls.
+- **Single MCP Endpoint**: Provides `/mcp` endpoint with JSON-RPC over streamable HTTP
+- **Built-in Tools**: Includes configurable free and paid tools
+- **Optional Upstream Forwarding**: Can forward tool calls to a single upstream MCP service
+- **Per-call Payment**: Integrated with Nuwa Payment Kit for tool-level billing
+- **FastMcpStarter Integration**: Uses the standard Nuwa MCP server framework
 
 ## Quick Start
 
@@ -34,33 +32,35 @@ cp config.yaml.example config.yaml
 Now, edit `config.yaml` to match your needs. Here is a minimal example:
 
 ```yaml
-# HTTP Server Settings
-server:
-  host: "0.0.0.0"
-  port: 8088
+# Server settings
+port: 8088
+endpoint: "/mcp"
 
-# Default upstream when no route matches
-defaultUpstream: "my-service"
+# Optional upstream MCP server
+upstreamUrl: "https://api.example.com/mcp?key=${API_KEY}"
 
-# Upstream MCP servers
-upstreams:
-  my-service:
-    type: "http"
-    url: "https://api.example.com/mcp?key=${API_KEY}"
+# Optional payment configuration
+serviceId: "my-mcp-service"
+network: "test"
+rpcUrl: "${ROOCH_RPC_URL}"
 
-# Routing rules (prefix-based)
-routes:
-  - hostname: "myservice."
-    upstream: "my-service"
-
-# DIDAuth settings
-didAuth:
-  required: true
+# Custom tools
+register:
+  tools:
+    - name: "echo.free"
+      description: "Echo text back"
+      pricePicoUSD: "0"
+      parameters:
+        type: "object"
+        properties:
+          text:
+            type: "string"
 ```
 
-Set any required environment variables for your upstreams:
+Set any required environment variables:
 ```bash
 export API_KEY=your_secret_key
+export ROOCH_RPC_URL=https://test-seed.rooch.network:443
 ```
 
 ### 3. Running the Server

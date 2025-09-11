@@ -1,45 +1,40 @@
-# MCP Server Proxy - Example Configuration
+# MCP Server Proxy - Example Configuration (Single Upstream)
 
-# HTTP Server Settings
-server:
-  host: "0.0.0.0"
-  port: 8088
-  cors:
-    origin: "*"
-    methods: ["GET", "POST", "OPTIONS"]
-  logger:
-    level: "info"
-    prettyPrint: true
+# Server settings
+port: 8088
+endpoint: "/mcp"
 
-# Default upstream to use when no route matches.
-# This should correspond to one of the keys under the 'upstreams' section.
-defaultUpstream: "context7"
+# Single upstream MCP server (optional - if not provided, only built-in tools will be available)
+# upstreamUrl: "https://api.example.com/mcp?key=${API_KEY}"
 
-# Upstream MCP servers
-upstreams:
-  # An example of a stdio-based upstream.
-  # This runs a command-line tool and communicates with it over stdin/stdout.
-  context7:
-    type: "stdio"
-    command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+# Payment & chain configuration (optional - if not provided, all tools will be free)
+# serviceId: "my-mcp-service"
+# serviceKey: "${SERVICE_KEY}"  # serialized StoredKey string
+# network: "test"  # local | dev | test | main
+# rpcUrl: "${ROOCH_RPC_URL}"
+# defaultAssetId: "0x3::gas_coin::RGas"
+# defaultPricePicoUSD: "1000000000000"  # 0.001 USD
+# adminDid: ["did:rooch:0x..."]
+# debug: false
 
-  # You can add more upstreams here, for example, an HTTP-based one:
-  # amap:
-  #   type: "http"
-  #   url: "https://mcp.amap.com/mcp?key=${AMAP_API_KEY}"
-  #   auth:
-  #     ...
-
-# Routing rules
-routes:
-  # Route requests with hostnames starting with "context7." to the context7 upstream.
-  - hostname: "context7."
-    upstream: "context7"
-
-  # Route requests for "amap." to the amap upstream.
-  # - hostname: "amap."
-  #   upstream: "amap"
-
-# DIDAuth settings
-didAuth:
-  required: true
+# Custom tools registration (optional)
+register:
+  tools:
+    - name: "echo.free"
+      description: "Echo text back"
+      pricePicoUSD: "0"  # Free tool
+      parameters:
+        type: "object"
+        properties:
+          text:
+            type: "string"
+    - name: "calc.add"
+      description: "Add two numbers"
+      pricePicoUSD: "1000000000"  # 0.001 USD
+      parameters:
+        type: "object"
+        properties:
+          a:
+            type: "number"
+          b:
+            type: "number"

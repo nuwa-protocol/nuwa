@@ -1,46 +1,97 @@
 import { describe, beforeAll, afterAll, it, expect } from 'vitest';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { createFastMcpServer } from '@nuwa-ai/payment-kit';
-import { KeyManager } from '@nuwa-ai/identity-kit';
-import { z } from 'zod';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { fork, ChildProcess } from 'child_process';
+import waitOn from 'wait-on';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 
-// Start proxy server in-process using FastMcpStarter (code path)
-async function startServer(): Promise<{ stop: () => Promise<void> }> {
-  const { keyManager } = await KeyManager.createWithDidKey();
-  const app: any = await createFastMcpServer({
-    serviceId: 'test-service',
-    signer: keyManager as any,
-    rpcUrl: 'http://127.0.0.1:6767',
-    network: 'test' as any,
-    port: 5100,
-    endpoint: '/mcp' as any,
-  } as any);
-  // Register tools before start
-  app.freeTool({
-    name: 'echo.free',
-    description: 'Echo text',
-    parameters: z.object({ text: z.string().optional() }),
-    execute: async (p: any) => String(p?.text ?? ''),
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Start mock upstream MCP server
+async function startMockUpstream(): Promise<ChildProcess> {
+  const proc = fork('./test/fixtures/http-mock-mcp.js', [], { stdio: 'ignore' });
+  await waitOn({ resources: ['tcp:4000'], timeout: 10000 });
+  return proc;
+}
+
+// Start the actual proxy server by forking the built server
+async function startProxyServer(): Promise<ChildProcess> {
+  // Create a test config file with minimal payment setup
+  const testConfig = `
+port: 5100
+endpoint: "/mcp"
+upstreamUrl: "http://127.0.0.1:4000/mcp"
+serviceId: "test-service"
+serviceKey: "test-key-placeholder"
+network: "test"
+register:
+  tools:
+    - name: "echo.free"
+      description: "Echo text back"
+      pricePicoUSD: "0"
+      parameters:
+        type: "object"
+        properties:
+          text:
+            type: "string"
+    - name: "calc.add"
+      description: "Add two numbers"
+      pricePicoUSD: "0"
+      parameters:
+        type: "object"
+        properties:
+          a:
+            type: "number"
+          b:
+            type: "number"
+`;
+  
+  const testConfigPath = path.join(__dirname, '../test-config.yaml');
+  fs.writeFileSync(testConfigPath, testConfig);
+  
+  // Build the project first if dist doesn't exist
+  const distPath = path.join(__dirname, '../dist/index.js');
+  if (!fs.existsSync(distPath)) {
+    throw new Error('Built server not found. Please run "pnpm build" first.');
+  }
+  
+  // Start the proxy server with test config
+  const proc = fork(distPath, [], {
+    stdio: 'pipe', // Use pipe to capture output for debugging
+    env: {
+      ...process.env,
+      CONFIG_PATH: testConfigPath
+    }
   });
-  app.freeTool({
-    name: 'calc.add',
-    description: 'Add two numbers',
-    parameters: z.object({ a: z.number(), b: z.number() }),
-    execute: async (p: any) => ({ sum: Number(p?.a ?? 0) + Number(p?.b ?? 0) }),
+  
+  // Log server output for debugging
+  proc.stdout?.on('data', (data) => {
+    console.log('[proxy-server]', data.toString());
   });
-  const server: any = await app.start();
-  return { stop: async () => { try { await server.stop(); } catch {} } };
+  proc.stderr?.on('data', (data) => {
+    console.error('[proxy-server]', data.toString());
+  });
+  
+  // Wait for server to be ready
+  await waitOn({ resources: ['tcp:5100'], timeout: 15000 });
+  return proc;
 }
 
 describe('Proxy MCP e2e', () => {
-  let svc: { stop: () => Promise<void> } | undefined;
+  let proxyProc: ChildProcess | undefined;
+  let upstreamProc: ChildProcess | undefined;
   let mcpClient: any;
 
   beforeAll(async () => {
-    svc = await startServer();
+    // Start mock upstream first
+    upstreamProc = await startMockUpstream();
+    
+    // Start the actual proxy server
+    proxyProc = await startProxyServer();
+    
+    // Connect MCP client to proxy
     const transport = new StreamableHTTPClientTransport(new URL('http://127.0.0.1:5100/mcp'));
     mcpClient = new Client({ name: 'e2e-test', version: '0.0.1' }, {});
     await mcpClient.connect(transport);
@@ -48,29 +99,47 @@ describe('Proxy MCP e2e', () => {
 
   afterAll(async () => {
     try { await mcpClient?.close?.(); } catch {}
-    try { await svc?.stop?.(); } catch {}
+    try { proxyProc?.kill('SIGTERM'); } catch {}
+    try { upstreamProc?.kill('SIGTERM'); } catch {}
+    
+    // Clean up test config file
+    try {
+      const testConfigPath = path.join(__dirname, '../test-config.yaml');
+      fs.unlinkSync(testConfigPath);
+    } catch {}
   });
 
   it('tools/list returns built-in tools', async () => {
     const tools = await mcpClient.listTools();
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
+    console.log('Available tools:', names);
     expect(names).toContain('echo.free');
     expect(names).toContain('calc.add');
+    // Should also contain upstream 'echo' tool
+    expect(names).toContain('echo');
   });
 
-  it('tools/call echo.free echoes text', async () => {
+  it('tools/call echo.free echoes text (built-in tool)', async () => {
     const res = await mcpClient.callTool({ name: 'echo.free', arguments: { text: 'hello' } });
     expect(Array.isArray(res.content)).toBe(true);
     expect(res.content[0].type).toBe('text');
     expect(res.content[0].text).toContain('hello');
   });
 
-  it('tools/call calc.add returns sum', async () => {
+  it('tools/call calc.add returns sum (built-in tool)', async () => {
     const res = await mcpClient.callTool({ name: 'calc.add', arguments: { a: 2, b: 3 } });
     expect(Array.isArray(res.content)).toBe(true);
     expect(res.content[0].type).toBe('text');
     const obj = JSON.parse(res.content[0].text);
     expect(obj.sum).toBe(5);
+  });
+
+  it('can forward calls to upstream MCP server', async () => {
+    // The mock upstream has an 'echo' tool, which should be forwarded if not found in built-in tools
+    const res = await mcpClient.callTool({ name: 'echo', arguments: { text: 'upstream test' } });
+    expect(Array.isArray(res.content)).toBe(true);
+    expect(res.content[0].type).toBe('text');
+    expect(res.content[0].text).toBe('upstream test');
   });
 });

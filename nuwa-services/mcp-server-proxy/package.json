@@ -17,16 +17,10 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@fastify/cors": "^9.0.0",
     "@modelcontextprotocol/sdk": "^1.13.3",
     "@nuwa-ai/identity-kit": "^0.5.1",
-    "fastify": "^4.26.0",
-    "fastify-plugin": "^4.5.1",
-    "fastify-sse-v2": "^3.1.2",
-    "fastmcp": "^3.5.0",
+    "@nuwa-ai/payment-kit": "link:../../nuwa-kit/typescript/packages/payment-kit",
     "js-yaml": "^4.1.0",
-    "pino": "^8.19.0",
-    "pino-pretty": "^10.3.1",
     "undici": "^6.6.0",
     "zod": "^3.22.4"
   },
