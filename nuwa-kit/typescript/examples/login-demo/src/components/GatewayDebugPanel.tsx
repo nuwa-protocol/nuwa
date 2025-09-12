@@ -60,7 +60,9 @@ export function GatewayDebugPanel() {
       setLoading(true);
       setError(null);
       const client = await getMcpClient(sdk, mcpUrl, gatewayUrl);
-      const tools = await client.listTools();
+      const tools = await client.listTools({
+        includeBuiltinTools: true,
+      });
       // Normalize tools into array (supports various SDK/result shapes)
       let list: Array<{ name: string; description?: string; inputSchema?: any }> = [];
       const normalize = (t: any) => ({

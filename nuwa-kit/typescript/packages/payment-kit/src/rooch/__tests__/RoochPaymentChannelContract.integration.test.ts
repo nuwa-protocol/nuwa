@@ -579,11 +579,13 @@ describe('RoochPaymentChannelContract Integration Test', () => {
 
     it('should test getHubClient from PaymentChannelClient', async () => {
       if (!shouldRunIntegrationTests()) return;
-
+      const payerKeyIds = await payer.keyManager.listKeyIds();
+      const payerKeyId = payerKeyIds[0];
       // Create PaymentChannelPayerClient
       const payerClient = new PaymentChannelPayerClient({
         contract,
         signer: payer.signer,
+        keyId: payerKeyId,
         storageOptions: {
           channelRepo: new MemoryChannelRepository(),
         },

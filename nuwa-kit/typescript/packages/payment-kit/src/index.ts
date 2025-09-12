@@ -67,11 +67,15 @@ export {
 // HTTP Payer Client integration
 export * from './integrations/http';
 
+// MCP Payer Client integration
+export * from './integrations/mcp';
+
 // Express Payment Kit integration (legacy path - deprecated)
 export * from './integrations/express';
 
 // New transport layer (recommended)
 export * from './transport/express';
+export * from './transport/mcp';
 
 // Framework-agnostic API handlers and types
 export * from './api';

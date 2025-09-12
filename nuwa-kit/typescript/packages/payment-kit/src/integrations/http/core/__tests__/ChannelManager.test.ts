@@ -1,3 +1,5 @@
+// @ts-nocheck
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { ChannelManager } from '../ChannelManager';
 import { PaymentState } from '../PaymentState';
 import { PaymentChannelPayerClient } from '../../../../client/PaymentChannelPayerClient';
@@ -6,7 +8,12 @@ import type { HostChannelMappingStore } from '../../types';
 
 // Mock dependencies
 jest.mock('../../../../client/PaymentChannelPayerClient');
-jest.mock('../../internal/DidAuthHelper');
+const mockGenerateAuthHeader = jest.fn();
+jest.mock('../../internal/DidAuthHelper', () => ({
+  DidAuthHelper: {
+    generateAuthHeader: mockGenerateAuthHeader,
+  },
+}));
 
 describe('ChannelManager', () => {
   let channelManager: ChannelManager;
@@ -40,7 +47,7 @@ describe('ChannelManager', () => {
     mockSigner = {
       getDid: jest.fn().mockResolvedValue('did:example:user'),
       sign: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    };
+    } as any;
 
     channelManager = new ChannelManager({
       host: 'api.example.com',
@@ -84,7 +91,7 @@ describe('ChannelManager', () => {
         status: 200,
         headers: new Headers(),
         json: jest.fn().mockResolvedValue(discoveryResponse),
-      });
+      } as any);
 
       const result = await channelManager.discoverService();
 
@@ -105,7 +112,7 @@ describe('ChannelManager', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-      });
+      } as any);
 
       await expect(channelManager.discoverService()).rejects.toThrow('Service discovery failed');
     });
@@ -114,7 +121,7 @@ describe('ChannelManager', () => {
   describe('recoverFromService', () => {
     it('should recover channel state from service', async () => {
       // Mock DID auth header
-      (DidAuthHelper.generateAuthHeader as jest.Mock).mockResolvedValue('Bearer token');
+      mockGenerateAuthHeader.mockResolvedValue('Bearer token');
 
       const recoveryData = {
         channelId: 'channel-123',
@@ -134,7 +141,7 @@ describe('ChannelManager', () => {
         status: 200,
         headers: new Headers(),
         json: jest.fn().mockResolvedValue(recoveryData),
-      });
+      } as any);
 
       // Set keyId and vmIdFragment in payment state
       paymentState.setKeyInfo('did:example:user#key-1', 'key-1');
@@ -147,18 +154,18 @@ describe('ChannelManager', () => {
           channelId: 'channel-123',
           nonce: BigInt(1),
         }),
-      });
+      } as any);
     });
 
     it('should handle recovery when no data exists', async () => {
-      (DidAuthHelper.generateAuthHeader as jest.Mock).mockResolvedValue('Bearer token');
+      mockGenerateAuthHeader.mockResolvedValue('Bearer token');
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         headers: new Headers(),
         json: jest.fn().mockResolvedValue({}),
-      });
+      } as any);
 
       const result = await channelManager.recoverFromService();
 
@@ -186,14 +193,14 @@ describe('ChannelManager', () => {
         signature: new Uint8Array([1, 2, 3]),
       };
 
-      (DidAuthHelper.generateAuthHeader as jest.Mock).mockResolvedValue('Bearer token');
+      mockGenerateAuthHeader.mockResolvedValue('Bearer token');
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         headers: new Headers(),
         text: jest.fn().mockResolvedValue('OK'),
-      });
+      } as any);
 
       await channelManager.commitSubRAV(signedSubRav);
 
@@ -234,7 +241,7 @@ describe('ChannelManager', () => {
         status: 200,
         headers: new Headers(),
         json: jest.fn().mockResolvedValue(discoveryResponse),
-      });
+      } as any);
 
       // Set up state retrieval - no existing channel
       mockMappingStore.getState.mockResolvedValue(undefined);
@@ -260,7 +267,7 @@ describe('ChannelManager', () => {
           lastConfirmedNonce: BigInt(0),
           lastUpdated: Date.now(),
         },
-      });
+      } as any);
 
       // Ensure channel is ready
       await channelManager.ensureChannelReady();
@@ -269,7 +276,7 @@ describe('ChannelManager', () => {
       expect(mockPayerClient.openChannelWithSubChannel).toHaveBeenCalledWith({
         payeeDid: 'did:example:payee',
         assetId: '0x3::gas_coin::RGas',
-      });
+      } as any);
     });
 
     it('should use existing channel from state', async () => {
@@ -287,7 +294,7 @@ describe('ChannelManager', () => {
         assetId: '0x3::gas_coin::RGas',
         epoch: BigInt(1),
         status: 'active',
-      });
+      } as any);
 
       await channelManager.ensureChannelReady();
 

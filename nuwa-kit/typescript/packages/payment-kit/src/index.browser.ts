@@ -29,7 +29,7 @@ export * from './rooch/RoochPaymentChannelContract';
 export * from './integrations/http';
 
 // MCP Client (browser-safe): only client-side MCP pieces
-export * from './integrations/mcp/PaymentChannelMcpClient';
+export * from './integrations/mcp';
 
 // Storage: browser-safe exports (types, memory, IndexedDB, and factory)
 export type {

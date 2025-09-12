@@ -14,8 +14,14 @@ import { PaymentState } from '../http/core/PaymentState';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createDefaultChannelRepo } from '../http/internal/LocalStore';
-import { createDefaultTransactionStore } from '../http/internal/LocalStore';
+import {
+  createDefaultChannelRepo,
+  createDefaultTransactionStore,
+  createDefaultMappingStore,
+  createNamespacedMappingStore,
+  extractHost,
+} from '../http/internal/LocalStore';
+import type { HostChannelMappingStore } from '../http/types';
 import { RequestScheduler } from '../http/internal/RequestScheduler';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
@@ -34,13 +40,10 @@ import type { TransactionStore } from '../../storage';
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
   signer: SignerInterface;
-  keyId?: string;
-  payerDid?: string;
-  payeeDid?: string;
-  defaultAssetId?: string;
+  keyId: string;
   debug?: boolean;
   /** Chain configuration - required for payment channel operations */
-  chainConfig?: ChainConfig;
+  chainConfig: ChainConfig;
   /** Optional storage configuration. If not provided, uses in-memory storage */
   storageOptions?: {
     channelRepo?: any; // ChannelRepository interface
@@ -59,6 +62,13 @@ export interface McpPayerOptions {
       body?: any
     ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
   };
+  /** Optional mapping store for state persistence. If not provided, uses default store */
+  mappingStore?: HostChannelMappingStore;
+}
+
+export interface ListToolsOptions {
+  /** Whether to include nuwa built-in tools (default: false) */
+  includeBuiltinTools?: boolean;
 }
 
 export class PaymentChannelMcpClient {
@@ -71,15 +81,25 @@ export class PaymentChannelMcpClient {
   private lastContents: any[] | undefined;
   private lastPaymentPayload: SerializableResponsePayload | undefined;
   private scheduler: RequestScheduler = new RequestScheduler();
-  private cachedDiscovery: any | undefined;
-  private channelManager?: McpChannelManager;
+  private channelManager: McpChannelManager;
   private transactionStore: TransactionStore;
+  private host: string;
+  private mappingStore: HostChannelMappingStore;
 
   constructor(options: McpPayerOptions) {
     this.options = options;
     this.logger = DebugLogger.get('PaymentChannelMcpClient');
     this.logger.setLevel(options.debug ? 'debug' : 'info');
     this.paymentState = new PaymentState();
+
+    // Extract host for state persistence
+    this.host = extractHost(options.baseUrl);
+
+    // Setup mapping store for state persistence
+    const baseMapping = options.mappingStore || createDefaultMappingStore();
+    this.mappingStore = createNamespacedMappingStore(baseMapping, {
+      getPayerDid: async () => await options.signer.getDid(),
+    });
 
     // Setup storage - use provided storage or default in-memory
     let channelRepo;
@@ -91,12 +111,7 @@ export class PaymentChannelMcpClient {
     }
 
     this.payerClient = PaymentChannelFactory.createClient({
-      chainConfig: options.chainConfig || {
-        chain: 'rooch' as const,
-        rpcUrl: undefined,
-        network: 'test',
-        debug: false,
-      },
+      chainConfig: options.chainConfig,
       signer: options.signer,
       keyId: options.keyId,
       storageOptions: {
@@ -112,9 +127,6 @@ export class PaymentChannelMcpClient {
       paymentState: this.paymentState,
       signer: options.signer,
       keyId: options.keyId,
-      payerDid: options.payerDid,
-      payeeDid: options.payeeDid,
-      defaultAssetId: options.defaultAssetId,
       fetchImpl: (globalThis as any).fetch?.bind(globalThis),
       mcpCall: async (name: string, params?: any) => {
         const client = await this.ensureClient();
@@ -123,6 +135,9 @@ export class PaymentChannelMcpClient {
       },
       autoRecover: false,
     });
+
+    // Load persisted state asynchronously (don't block constructor)
+    void this.loadPersistedState();
   }
 
   /**
@@ -244,10 +259,14 @@ export class PaymentChannelMcpClient {
 
   /**
    * Returns tools exposed by the server with internal parameters filtered out for public consumption.
+   * @param options - Options for filtering tools, or boolean for backward compatibility
    */
-  async listTools(): Promise<Record<string, any>> {
+  async listTools(options?: ListToolsOptions): Promise<Record<string, any>> {
     const raw = await this.listToolsInternal();
-    return this.sanitizeTools(raw);
+    const sanitized = this.sanitizeTools(raw);
+
+    const { includeBuiltinTools = false } = options || {};
+    return includeBuiltinTools ? sanitized : this.filterBuiltinTools(sanitized);
   }
 
   /**
@@ -319,6 +338,40 @@ export class PaymentChannelMcpClient {
     return tools;
   }
 
+  /** Filter out nuwa built-in tools that are not useful for AI consumption */
+  private filterBuiltinTools(tools: any): any {
+    const isBuiltinTool = (toolName: string): boolean => {
+      return typeof toolName === 'string' && toolName.startsWith('nuwa.');
+    };
+
+    try {
+      if (tools && Array.isArray((tools as any).tools)) {
+        // Handle { tools: [...] } format
+        const filtered = (tools as any).tools.filter((tool: any) => {
+          return !(tool && typeof tool === 'object' && tool.name && isBuiltinTool(tool.name));
+        });
+        return { tools: filtered };
+      }
+      if (Array.isArray(tools)) {
+        // Handle [...] format
+        return (tools as any).filter((tool: any) => {
+          return !(tool && typeof tool === 'object' && tool.name && isBuiltinTool(tool.name));
+        });
+      }
+      if (tools && typeof tools === 'object') {
+        // Handle { toolName: toolDef, ... } format
+        const filtered: Record<string, any> = {};
+        for (const [name, toolDef] of Object.entries(tools as Record<string, any>)) {
+          if (!isBuiltinTool(name)) {
+            filtered[name] = toolDef;
+          }
+        }
+        return filtered;
+      }
+    } catch {}
+    return tools;
+  }
+
   /**
    * Call a tool with payment
    * @param method - The name of the tool to call
@@ -335,9 +388,8 @@ export class PaymentChannelMcpClient {
       const txEnabled = this.options.transactionLog?.enabled !== false;
       if (signal.aborted) throw new Error('Request aborted');
       const clientTxRef = crypto.randomUUID();
-      await this.ensureDiscovery();
-      if (signal.aborted) throw new Error('Request aborted');
       const client = await this.ensureClient();
+      if (signal.aborted) throw new Error('Request aborted');
       await this.ensureNotificationSubscription();
       // Skip ensureChannelReady for info/free tools to avoid recursive recovery loops
       const infoTools = new Set([
@@ -492,6 +544,8 @@ export class PaymentChannelMcpClient {
 
   clearPendingSubRAV(): void {
     this.paymentState.clearPendingSubRAV();
+    // Persist state when SubRAV is cleared
+    void this.persistClientState();
   }
 
   private parseFirstJsonText<T>(content: any[]): T | undefined {
@@ -511,7 +565,7 @@ export class PaymentChannelMcpClient {
   // Schema should be provided by call sites for strong typing, no internal mapping
 
   private async buildParams(method: string, userParams: any, clientTxRef: string) {
-    const payerDid = this.options.payerDid || (await this.options.signer.getDid());
+    const payerDid = await this.options.signer.getDid();
     const signedSubRav = await this.buildSignedSubRavIfNeeded();
     const reqPayload: PaymentRequestPayload = {
       version: 1,
@@ -539,6 +593,8 @@ export class PaymentChannelMcpClient {
     const pending = this.paymentState.getPendingSubRAV();
     if (!pending) return undefined;
     this.paymentState.clearPendingSubRAV();
+    // Persist state when SubRAV is cleared for signing
+    void this.persistClientState();
     return this.payerClient.signSubRAV(pending);
   }
 
@@ -548,14 +604,7 @@ export class PaymentChannelMcpClient {
     clientTxRef: string
   ): Promise<string> {
     // Ensure we have a concrete keyId
-    let keyId = this.options.keyId;
-    if (!keyId) {
-      const ids = await this.options.signer.listKeyIds();
-      if (!ids || ids.length === 0) {
-        throw new Error('No keyId available for DIDAuth signing');
-      }
-      keyId = ids[0];
-    }
+    const keyId = this.options.keyId;
     this.logger.debug('generateAuthToken', {
       payerDid,
       method,
@@ -575,28 +624,10 @@ export class PaymentChannelMcpClient {
 
   private async ensureChannelReady(): Promise<void> {
     try {
-      await this.channelManager?.ensureChannelReady();
+      await this.channelManager.ensureChannelReady();
     } catch (e) {
       this.logger.debug('ensureChannelReady failed:', e);
       throw e instanceof Error ? e : new Error(String(e));
-    }
-  }
-
-  private async ensureDiscovery(): Promise<any | undefined> {
-    if (this.cachedDiscovery) return this.cachedDiscovery;
-    try {
-      const base = new URL(String(this.options.baseUrl));
-      const origin = `${base.protocol}//${base.host}`;
-      const url = `${origin}/.well-known/nuwa-payment/info`;
-      const fetchImpl: any = (globalThis as any).fetch?.bind(globalThis);
-      if (!fetchImpl) return undefined;
-      const res = await fetchImpl(url, { method: 'GET', headers: { Accept: 'application/json' } });
-      if (!res.ok) return undefined;
-      const json = await res.json();
-      this.cachedDiscovery = json;
-      return json;
-    } catch {
-      return undefined;
     }
   }
 
@@ -635,8 +666,12 @@ export class PaymentChannelMcpClient {
       const decoded = HttpPaymentCodec.fromJSONResponse(payload);
       if (decoded.subRav) {
         this.paymentState.setPendingSubRAV(decoded.subRav);
+        // Persist state when SubRAV is updated
+        void this.persistClientState();
       }
       if (decoded.error || decoded.cost === undefined || !decoded.subRav) return undefined;
+      const channelInfo = this.paymentState.getChannelInfo();
+      const assetId = channelInfo?.assetId ?? 'unknown';
       return {
         clientTxRef: decoded.clientTxRef ?? clientTxRef,
         serviceTxRef: decoded.serviceTxRef,
@@ -645,8 +680,7 @@ export class PaymentChannelMcpClient {
         nonce: decoded.subRav.nonce,
         channelId: decoded.subRav.channelId,
         vmIdFragment: decoded.subRav.vmIdFragment,
-        //TODO get assetId from channelInfo
-        assetId: this.options.defaultAssetId ?? '0x3::gas_coin::RGas',
+        assetId: assetId,
         timestamp: new Date().toISOString(),
       };
     } catch {
@@ -766,7 +800,7 @@ export class PaymentChannelMcpClient {
 
     const channelId = this.paymentState.getChannelId();
     const vmIdFragment = this.paymentState.getVmIdFragment();
-    const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
+    const assetId = this.channelManager.getDefaultAssetId() || 'unknown';
 
     await this.transactionStore.create({
       clientTxRef,
@@ -799,7 +833,143 @@ export class PaymentChannelMcpClient {
   }
 
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: true }> {
-    await this.channelManager?.commitSubRAV(signedSubRAV);
+    await this.channelManager.commitSubRAV(signedSubRAV);
     return { success: true };
+  }
+
+  /**
+   * Get tools in AI SDK compatible format
+   * This method provides compatibility with AI SDK's streamText function
+   * @param options - Options for filtering tools, or boolean for backward compatibility
+   * @returns A record of tool definitions compatible with AI SDK
+   */
+  async tools(options?: ListToolsOptions): Promise<Record<string, any>> {
+    const rawTools = await this.listTools(options);
+    const aiSdkTools: Record<string, any> = {};
+
+    // Convert MCP tool format to AI SDK tool format
+    if (rawTools && typeof rawTools === 'object') {
+      if (Array.isArray(rawTools.tools)) {
+        // Handle { tools: [...] } format
+        for (const tool of rawTools.tools) {
+          if (tool && typeof tool === 'object' && tool.name) {
+            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      } else if (Array.isArray(rawTools)) {
+        // Handle [...] format
+        for (const tool of rawTools) {
+          if (tool && typeof tool === 'object' && tool.name) {
+            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      } else {
+        // Handle { toolName: toolDef, ... } format
+        for (const [name, toolDef] of Object.entries(rawTools)) {
+          if (toolDef && typeof toolDef === 'object') {
+            const tool = { name, ...(toolDef as any) };
+            aiSdkTools[name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      }
+    }
+
+    return aiSdkTools;
+  }
+
+  /**
+   * Convert MCP tool definition to AI SDK compatible format
+   */
+  private convertToolToAiSdkFormat(tool: any): any {
+    // Extract schema from various possible locations
+    // Note: tool should already be sanitized by listTools() -> sanitizeTools()
+    const schema = tool.inputSchema || tool.parameters || tool.input_schema || {};
+
+    return {
+      type: 'function',
+      name: tool.name,
+      description: tool.description || `Tool: ${tool.name}`,
+      parameters: schema,
+      // Preserve original MCP tool metadata for debugging
+      _mcpTool: tool,
+      // Add execute method that uses callToolWithPayment
+      execute: async (args: any) => {
+        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args);
+        // We don't return the payment here, because the AI do not need to know about it
+        return { content };
+      },
+    };
+  }
+
+  /**
+   * Close the MCP client connection and clean up resources
+   */
+  async close(): Promise<void> {
+    try {
+      // Persist final state before closing
+      await this.persistClientState();
+
+      // Close the underlying MCP client connection
+      if (this.mcpClient) {
+        await this.mcpClient.close();
+        this.mcpClient = undefined;
+      }
+
+      // Note: RequestScheduler doesn't have a cancelAll method
+      // Individual requests will be cancelled when the MCP client closes
+
+      // Clear cached data
+      this.lastContents = undefined;
+      this.lastPaymentPayload = undefined;
+
+      // Reset notification subscription state
+      this.notificationsSubscribed = false;
+
+      this.logger.debug('PaymentChannelMcpClient closed successfully');
+    } catch (error) {
+      this.logger.warn('Error during close:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load persisted state from storage
+   */
+  private async loadPersistedState(): Promise<void> {
+    try {
+      const state = await this.mappingStore.getState(this.host);
+      if (state) {
+        this.paymentState.loadPersistedState(state);
+        this.logger.debug('Loaded persisted state for host:', this.host);
+      }
+    } catch (error) {
+      this.logger.debug('Failed to load persisted state:', error);
+    }
+  }
+
+  /**
+   * Persist current client state to storage
+   */
+  private async persistClientState(): Promise<void> {
+    try {
+      const state = this.paymentState.getPersistedState();
+      await this.mappingStore.setState(this.host, state);
+      this.logger.debug('Persisted client state for host:', this.host);
+    } catch (error) {
+      this.logger.debug('Failed to persist client state:', error);
+    }
+  }
+
+  /**
+   * Clear persisted state (useful for logout/cleanup)
+   */
+  async clearPersistedState(): Promise<void> {
+    try {
+      await this.mappingStore.deleteState(this.host);
+      this.paymentState.reset();
+      this.logger.debug('Cleared persisted state for host:', this.host);
+    } catch (error) {
+      this.logger.debug('Failed to clear persisted state:', error);
+    }
   }
 }

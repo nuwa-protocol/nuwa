@@ -12,8 +12,6 @@ export interface McpChannelManagerOptions {
   signer: any;
   keyId?: string;
   payerDid?: string;
-  payeeDid?: string;
-  defaultAssetId?: string;
   fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   /** Minimal MCP caller used for service-side operations */
   mcpCall: (name: string, params?: any) => Promise<any>;
@@ -31,7 +29,8 @@ export class McpChannelManager {
   private cachedDiscovery?: DiscoveryResponse;
   private discoveredBasePath?: string;
   private ensureReadyPromise?: Promise<void>;
-  private recoveringPromise?: Promise<RecoveryResponse>;
+  private payeeDid?: string;
+  private defaultAssetId?: string;
 
   constructor(options: McpChannelManagerOptions) {
     this.options = options;
@@ -86,21 +85,26 @@ export class McpChannelManager {
   }
 
   private async createNewChannel(): Promise<void> {
-    const defaultAssetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
-    let payeeDid = this.options.payeeDid;
-    if (!payeeDid) {
-      const service = await this.discoverService().catch(() => undefined);
-      payeeDid = service?.serviceDid;
+    if (!this.payeeDid) {
+      const service = await this.discoverService();
+      this.payeeDid = service.serviceDid;
     }
-    if (!payeeDid) {
+    if (!this.defaultAssetId) {
+      const service = await this.discoverService();
+      this.defaultAssetId = service.defaultAssetId;
+    }
+    this.logger.debug('createNewChannel: opening new channel', {
+      payeeDid: this.payeeDid,
+      defaultAssetId: this.defaultAssetId,
+    } as any);
+    if (!this.payeeDid || !this.defaultAssetId) {
       this.logger.debug('createNewChannel: missing payeeDid, cannot create channel');
-      throw new Error('payeeDid missing for channel creation');
+      throw new Error('payeeDid or defaultAssetId missing for channel creation');
     }
-    this.logger.debug('createNewChannel: opening new channel', { payeeDid, defaultAssetId } as any);
     try {
       const opened = await this.options.payerClient.openChannelWithSubChannel({
-        payeeDid,
-        assetId: defaultAssetId,
+        payeeDid: this.payeeDid,
+        assetId: this.defaultAssetId,
       });
       this.options.paymentState.setChannelId(opened.channelId);
       if (opened.channelInfo) this.options.paymentState.setChannelInfo(opened.channelInfo);
@@ -271,5 +275,9 @@ export class McpChannelManager {
       keyId
     );
     return DIDAuth.v1.toAuthorizationHeader(signedObject);
+  }
+
+  getDefaultAssetId(): string | undefined {
+    return this.defaultAssetId;
   }
 }

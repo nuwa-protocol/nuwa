@@ -43,7 +43,7 @@ export type ChainConfig = RoochChainConfig;
 export interface PaymentChannelFactoryOptions {
   chainConfig: ChainConfig;
   signer: SignerInterface;
-  keyId?: string;
+  keyId: string;
   storageOptions: PaymentChannelPayerClientOptions['storageOptions'];
 }
 
