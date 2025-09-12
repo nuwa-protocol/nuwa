@@ -212,8 +212,6 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       signer: payer.signer,
       keyId: `${payer.did}#${payer.vmIdFragment}`, // Use full DID key ID
       payerDid: payer.did,
-      payeeDid: payee.did,
-      defaultAssetId: testAsset.assetId,
       chainConfig: {
         chain: 'rooch' as const,
         rpcUrl: env.rpcUrl,

@@ -140,14 +140,5 @@ export async function createHttpClient(
 
   const client = new PaymentChannelHttpClient(httpPayerOptions);
 
-  // Automatically perform service discovery
-  try {
-    const serviceInfo = await client.discoverService();
-    // Optional debug handled by client's logger
-  } catch (error) {
-    // Client will retry when needed
-    // Continue anyway - the client will attempt discovery again when needed
-  }
-
   return client;
 }

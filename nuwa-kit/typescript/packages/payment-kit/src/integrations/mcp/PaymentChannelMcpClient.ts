@@ -36,8 +36,6 @@ export interface McpPayerOptions {
   signer: SignerInterface;
   keyId?: string;
   payerDid?: string;
-  payeeDid?: string;
-  defaultAssetId?: string;
   debug?: boolean;
   /** Chain configuration - required for payment channel operations */
   chainConfig?: ChainConfig;
@@ -71,8 +69,7 @@ export class PaymentChannelMcpClient {
   private lastContents: any[] | undefined;
   private lastPaymentPayload: SerializableResponsePayload | undefined;
   private scheduler: RequestScheduler = new RequestScheduler();
-  private cachedDiscovery: any | undefined;
-  private channelManager?: McpChannelManager;
+  private channelManager: McpChannelManager;
   private transactionStore: TransactionStore;
 
   constructor(options: McpPayerOptions) {
@@ -112,9 +109,6 @@ export class PaymentChannelMcpClient {
       paymentState: this.paymentState,
       signer: options.signer,
       keyId: options.keyId,
-      payerDid: options.payerDid,
-      payeeDid: options.payeeDid,
-      defaultAssetId: options.defaultAssetId,
       fetchImpl: (globalThis as any).fetch?.bind(globalThis),
       mcpCall: async (name: string, params?: any) => {
         const client = await this.ensureClient();
@@ -335,9 +329,8 @@ export class PaymentChannelMcpClient {
       const txEnabled = this.options.transactionLog?.enabled !== false;
       if (signal.aborted) throw new Error('Request aborted');
       const clientTxRef = crypto.randomUUID();
-      await this.ensureDiscovery();
-      if (signal.aborted) throw new Error('Request aborted');
       const client = await this.ensureClient();
+      if (signal.aborted) throw new Error('Request aborted');
       await this.ensureNotificationSubscription();
       // Skip ensureChannelReady for info/free tools to avoid recursive recovery loops
       const infoTools = new Set([
@@ -575,28 +568,10 @@ export class PaymentChannelMcpClient {
 
   private async ensureChannelReady(): Promise<void> {
     try {
-      await this.channelManager?.ensureChannelReady();
+      await this.channelManager.ensureChannelReady();
     } catch (e) {
       this.logger.debug('ensureChannelReady failed:', e);
       throw e instanceof Error ? e : new Error(String(e));
-    }
-  }
-
-  private async ensureDiscovery(): Promise<any | undefined> {
-    if (this.cachedDiscovery) return this.cachedDiscovery;
-    try {
-      const base = new URL(String(this.options.baseUrl));
-      const origin = `${base.protocol}//${base.host}`;
-      const url = `${origin}/.well-known/nuwa-payment/info`;
-      const fetchImpl: any = (globalThis as any).fetch?.bind(globalThis);
-      if (!fetchImpl) return undefined;
-      const res = await fetchImpl(url, { method: 'GET', headers: { Accept: 'application/json' } });
-      if (!res.ok) return undefined;
-      const json = await res.json();
-      this.cachedDiscovery = json;
-      return json;
-    } catch {
-      return undefined;
     }
   }
 
@@ -637,6 +612,8 @@ export class PaymentChannelMcpClient {
         this.paymentState.setPendingSubRAV(decoded.subRav);
       }
       if (decoded.error || decoded.cost === undefined || !decoded.subRav) return undefined;
+      const channelInfo = this.paymentState.getChannelInfo();
+      const assetId = channelInfo?.assetId ?? 'unknown';
       return {
         clientTxRef: decoded.clientTxRef ?? clientTxRef,
         serviceTxRef: decoded.serviceTxRef,
@@ -645,8 +622,7 @@ export class PaymentChannelMcpClient {
         nonce: decoded.subRav.nonce,
         channelId: decoded.subRav.channelId,
         vmIdFragment: decoded.subRav.vmIdFragment,
-        //TODO get assetId from channelInfo
-        assetId: this.options.defaultAssetId ?? '0x3::gas_coin::RGas',
+        assetId: assetId,
         timestamp: new Date().toISOString(),
       };
     } catch {
@@ -766,7 +742,7 @@ export class PaymentChannelMcpClient {
 
     const channelId = this.paymentState.getChannelId();
     const vmIdFragment = this.paymentState.getVmIdFragment();
-    const assetId = this.options.defaultAssetId || '0x3::gas_coin::RGas';
+    const assetId = this.channelManager.getDefaultAssetId() || 'unknown';
 
     await this.transactionStore.create({
       clientTxRef,
@@ -799,7 +775,97 @@ export class PaymentChannelMcpClient {
   }
 
   async commitSubRAV(signedSubRAV: SignedSubRAV): Promise<{ success: true }> {
-    await this.channelManager?.commitSubRAV(signedSubRAV);
+    await this.channelManager.commitSubRAV(signedSubRAV);
     return { success: true };
+  }
+
+  /**
+   * Get tools in AI SDK compatible format
+   * This method provides compatibility with AI SDK's streamText function
+   * @returns A record of tool definitions compatible with AI SDK
+   */
+  async tools(): Promise<Record<string, any>> {
+    const rawTools = await this.listTools();
+    const aiSdkTools: Record<string, any> = {};
+
+    // Convert MCP tool format to AI SDK tool format
+    if (rawTools && typeof rawTools === 'object') {
+      if (Array.isArray(rawTools.tools)) {
+        // Handle { tools: [...] } format
+        for (const tool of rawTools.tools) {
+          if (tool && typeof tool === 'object' && tool.name) {
+            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      } else if (Array.isArray(rawTools)) {
+        // Handle [...] format
+        for (const tool of rawTools) {
+          if (tool && typeof tool === 'object' && tool.name) {
+            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      } else {
+        // Handle { toolName: toolDef, ... } format
+        for (const [name, toolDef] of Object.entries(rawTools)) {
+          if (toolDef && typeof toolDef === 'object') {
+            const tool = { name, ...(toolDef as any) };
+            aiSdkTools[name] = this.convertToolToAiSdkFormat(tool);
+          }
+        }
+      }
+    }
+
+    return aiSdkTools;
+  }
+
+  /**
+   * Convert MCP tool definition to AI SDK compatible format
+   */
+  private convertToolToAiSdkFormat(tool: any): any {
+    // Extract schema from various possible locations
+    // Note: tool should already be sanitized by listTools() -> sanitizeTools()
+    const schema = tool.inputSchema || tool.parameters || tool.input_schema || {};
+
+    return {
+      type: 'function',
+      name: tool.name,
+      description: tool.description || `Tool: ${tool.name}`,
+      parameters: schema,
+      // Preserve original MCP tool metadata for debugging
+      _mcpTool: tool,
+      // Add execute method that uses callToolWithPayment
+      execute: async (args: any) => {
+        const { content, payment } = await this.callToolWithPayment(tool.name, args);
+        return { content, payment };
+      },
+    };
+  }
+
+  /**
+   * Close the MCP client connection and clean up resources
+   */
+  async close(): Promise<void> {
+    try {
+      // Close the underlying MCP client connection
+      if (this.mcpClient) {
+        await this.mcpClient.close();
+        this.mcpClient = undefined;
+      }
+
+      // Note: RequestScheduler doesn't have a cancelAll method
+      // Individual requests will be cancelled when the MCP client closes
+
+      // Clear cached data
+      this.lastContents = undefined;
+      this.lastPaymentPayload = undefined;
+
+      // Reset notification subscription state
+      this.notificationsSubscribed = false;
+
+      this.logger.debug('PaymentChannelMcpClient closed successfully');
+    } catch (error) {
+      this.logger.warn('Error during close:', error);
+      throw error;
+    }
   }
 }
