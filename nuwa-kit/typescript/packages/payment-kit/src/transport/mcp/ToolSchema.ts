@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SerializableRequestPayloadSchema } from '../../schema/core';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 /**
  * Extend a Zod object schema with Nuwa reserved fields used in MCP calls.
@@ -96,7 +97,7 @@ export function jsonSchemaToZodObject(jsonSchema: any): z.ZodObject<any> | undef
 
     return undefined;
   } catch (error) {
-    console.warn('Failed to convert JSON Schema to Zod:', error);
+    DebugLogger.warn('Failed to convert JSON Schema to Zod:', error);
     return undefined;
   }
 }

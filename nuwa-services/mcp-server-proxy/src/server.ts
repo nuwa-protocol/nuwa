@@ -28,9 +28,15 @@ async function startServer(
   // Try to create signer from config
   if (config.serviceId) {
     if (!config.serviceKey || config.serviceKey === "test-key-placeholder") {
-      console.error("❌ Error: SERVICE_KEY is required when serviceId is configured");
-      console.error("SERVICE_KEY is needed for ServiceDID and payment channel creation");
-      console.error("Please set SERVICE_KEY environment variable or configure serviceKey in config file");
+      console.error(
+        "❌ Error: SERVICE_KEY is required when serviceId is configured",
+      );
+      console.error(
+        "SERVICE_KEY is needed for ServiceDID and payment channel creation",
+      );
+      console.error(
+        "Please set SERVICE_KEY environment variable or configure serviceKey in config file",
+      );
       process.exit(1);
     }
 
@@ -54,7 +60,7 @@ async function startServer(
   if (signer) {
     serverOptions.serviceId = config.serviceId || "nuwa-mcp-server";
     serverOptions.signer = signer;
-    serverOptions.rpcUrl = config.rpcUrl
+    serverOptions.rpcUrl = config.rpcUrl;
     serverOptions.network = (config.network as any) || "test";
     serverOptions.defaultAssetId =
       config.defaultAssetId || "0x3::gas_coin::RGas";
