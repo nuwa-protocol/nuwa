@@ -263,12 +263,13 @@ describe('Chain-Agnostic Payment Channel Architecture', () => {
 describe('Chain Integration Examples', () => {
   it('should demonstrate multi-chain support concept', async () => {
     // This test shows how the same client code can work with different chains
-
+    const keyId = 'test-key-1';
     // Mock Rooch implementation
     const roochContract = new MockPaymentChannelContract();
     const roochClient = new PaymentChannelPayerClient({
       contract: roochContract,
       signer: mockSigner,
+      keyId,
       storageOptions: {
         channelRepo: new MemoryChannelRepository(),
       },
@@ -279,6 +280,7 @@ describe('Chain Integration Examples', () => {
     const evmClient = new PaymentChannelPayerClient({
       contract: evmContract,
       signer: mockSigner,
+      keyId,
       storageOptions: {
         channelRepo: new MemoryChannelRepository(),
       },
