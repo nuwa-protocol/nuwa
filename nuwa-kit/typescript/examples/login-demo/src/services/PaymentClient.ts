@@ -1,7 +1,7 @@
 import { DebugLogger} from '@nuwa-ai/identity-kit';
 import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
-import { getChainConfigFromEnv, type TransactionStore, PaymentChannelMcpClient } from '@nuwa-ai/payment-kit';
+import { type TransactionStore, PaymentChannelMcpClient, createMcpClient } from '@nuwa-ai/payment-kit';
 
 // Cache PaymentChannelHttpClient per host to avoid duplicate instances
 const clientsByHost = new Map<string, PaymentChannelHttpClient>();
@@ -49,19 +49,9 @@ export async function getMcpClient(
       sharedStore = http.getTransactionStore();
     } catch {}
   }
-  const chainConfig = getChainConfigFromEnv(env);
-  const signer = env.keyManager;
-  let keyId: string | undefined;
-  try {
-    const ids = await signer.listKeyIds?.();
-    keyId = ids && ids.length > 0 ? ids[0] : undefined;
-  } catch {}
-  const client = new PaymentChannelMcpClient({
+  const client = await createMcpClient({
     baseUrl: mcpBaseUrl,
-    signer,
-    keyId,
-    payerDid: await signer.getDid(),
-    chainConfig,
+    env,
     maxAmount: BigInt('500000000000'),
     transactionStore: sharedStore,
     debug: true,
