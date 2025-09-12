@@ -1,5 +1,5 @@
 import { CryptoUtils, MultibaseCodec, KeyType, IdentityEnvBuilder, IdentityEnv, IdentityKit, KeyStore, MemoryKeyStore } from "@nuwa-ai/identity-kit";
-import { createMcpClient } from "@nuwa-ai/payment-kit/mcp";
+import { createMcpClient } from "@nuwa-ai/payment-kit";
 import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import os, { networkInterfaces } from "os";
@@ -229,11 +229,9 @@ async function main() {
   // Note: for demo purposes we only need env.keyManager as signer; DID/key import not required here
   const baseUrl = process.env.MCP_URL || "http://localhost:8080/mcp";
   console.log(`Using MCP baseUrl: ${baseUrl}`);
-  const payer = await createMcpClient(env, {
+  const payer = await createMcpClient({
     baseUrl,
-    keyId: config.keyId,
-    payerDid: config.agentDid,
-    defaultAssetId: "0x3::gas_coin::RGas",
+    env,
     maxAmount: BigInt(10_000_000),
     debug: true,
   });
