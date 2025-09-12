@@ -58,6 +58,11 @@ export interface McpPayerOptions {
   };
 }
 
+export interface ListToolsOptions {
+  /** Whether to include nuwa built-in tools (default: false) */
+  includeBuiltinTools?: boolean;
+}
+
 export class PaymentChannelMcpClient {
   private payerClient: PaymentChannelPayerClient;
   private options: McpPayerOptions;
@@ -232,10 +237,14 @@ export class PaymentChannelMcpClient {
 
   /**
    * Returns tools exposed by the server with internal parameters filtered out for public consumption.
+   * @param options - Options for filtering tools, or boolean for backward compatibility
    */
-  async listTools(): Promise<Record<string, any>> {
+  async listTools(options?: ListToolsOptions): Promise<Record<string, any>> {
     const raw = await this.listToolsInternal();
-    return this.sanitizeTools(raw);
+    const sanitized = this.sanitizeTools(raw);
+
+    const { includeBuiltinTools = false } = options || {};
+    return includeBuiltinTools ? sanitized : this.filterBuiltinTools(sanitized);
   }
 
   /**
@@ -302,6 +311,40 @@ export class PaymentChannelMcpClient {
           out[name] = sanitizeTool({ name, ...(v as any) });
         }
         return out;
+      }
+    } catch {}
+    return tools;
+  }
+
+  /** Filter out nuwa built-in tools that are not useful for AI consumption */
+  private filterBuiltinTools(tools: any): any {
+    const isBuiltinTool = (toolName: string): boolean => {
+      return typeof toolName === 'string' && toolName.startsWith('nuwa.');
+    };
+
+    try {
+      if (tools && Array.isArray((tools as any).tools)) {
+        // Handle { tools: [...] } format
+        const filtered = (tools as any).tools.filter((tool: any) => {
+          return !(tool && typeof tool === 'object' && tool.name && isBuiltinTool(tool.name));
+        });
+        return { tools: filtered };
+      }
+      if (Array.isArray(tools)) {
+        // Handle [...] format
+        return (tools as any).filter((tool: any) => {
+          return !(tool && typeof tool === 'object' && tool.name && isBuiltinTool(tool.name));
+        });
+      }
+      if (tools && typeof tools === 'object') {
+        // Handle { toolName: toolDef, ... } format
+        const filtered: Record<string, any> = {};
+        for (const [name, toolDef] of Object.entries(tools as Record<string, any>)) {
+          if (!isBuiltinTool(name)) {
+            filtered[name] = toolDef;
+          }
+        }
+        return filtered;
       }
     } catch {}
     return tools;
@@ -769,10 +812,11 @@ export class PaymentChannelMcpClient {
   /**
    * Get tools in AI SDK compatible format
    * This method provides compatibility with AI SDK's streamText function
+   * @param options - Options for filtering tools, or boolean for backward compatibility
    * @returns A record of tool definitions compatible with AI SDK
    */
-  async tools(): Promise<Record<string, any>> {
-    const rawTools = await this.listTools();
+  async tools(options?: ListToolsOptions): Promise<Record<string, any>> {
+    const rawTools = await this.listTools(options);
     const aiSdkTools: Record<string, any> = {};
 
     // Convert MCP tool format to AI SDK tool format

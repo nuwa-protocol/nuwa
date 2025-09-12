@@ -249,7 +249,9 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     console.log('🔍 Testing MCP client tool list');
 
-    const tools = await mcpClient.listTools();
+    const tools = await mcpClient.listTools({
+      includeBuiltinTools: true,
+    });
     console.log('✅ MCP client tool list:', JSON.stringify(tools, null, 2));
     expect(tools).toBeTruthy();
     // Basic structure
