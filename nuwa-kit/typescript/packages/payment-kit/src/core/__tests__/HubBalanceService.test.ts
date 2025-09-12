@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { HubBalanceService } from '../HubBalanceService';
 import type { IPaymentChannelContract } from '../../contracts/IPaymentChannelContract';
 import { Errors } from '../../errors/codes';

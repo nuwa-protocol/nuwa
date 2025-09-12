@@ -28,7 +28,7 @@
       "statements": 0
     }
   },
-  "setupFiles": ["<rootDir>/__tests__/setup.ts"],
+  "setupFiles": ["<rootDir>/__tests__/setup.cjs"],
   "reporters": [
     ["default", {
       "summaryThreshold": 1,

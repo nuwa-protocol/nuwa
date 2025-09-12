@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { RequestManager } from '../RequestManager';
 import { PaymentState } from '../PaymentState';
 import type { PaymentInfo } from '../../../../core/types';
