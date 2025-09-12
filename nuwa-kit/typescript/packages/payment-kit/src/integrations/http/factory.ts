@@ -109,12 +109,18 @@ export async function createHttpClient(
   options: CreateHttpClientOptions
 ): Promise<PaymentChannelHttpClient> {
   const chainConfig = getChainConfigFromEnv(options.env);
-
+  let keyId;
+  const keyIds = await options.env.keyManager.listKeyIds?.();
+  if (keyIds && keyIds.length > 0) {
+    keyId = keyIds[0];
+  } else {
+    throw new Error('No keyId available');
+  }
   const httpPayerOptions: HttpPayerOptions = {
     baseUrl: options.baseUrl,
     chainConfig,
     signer: options.env.keyManager,
-    // keyId will be set dynamically below if not provided
+    keyId,
     maxAmount: options.maxAmount || BigInt('500000000000'), // Default: 50 cents USD
     debug: options.debug ?? chainConfig.debug,
     onError: options.onError,
@@ -124,19 +130,6 @@ export async function createHttpClient(
     timeoutMs: options.timeoutMs,
     timeoutMsStream: options.timeoutMsStream,
   };
-
-  // If caller did not explicitly provide a keyId, pick the first available from the KeyManager
-  try {
-    if (!httpPayerOptions.keyId) {
-      const keyIds = await options.env.keyManager.listKeyIds?.();
-      if (keyIds && keyIds.length > 0) {
-        httpPayerOptions.keyId = keyIds[0];
-      }
-    }
-  } catch {
-    // If we cannot resolve a keyId automatically, continue without it – the downstream
-    // code will throw a clear error so that the caller can address the issue.
-  }
 
   const client = new PaymentChannelHttpClient(httpPayerOptions);
 

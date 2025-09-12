@@ -34,11 +34,10 @@ import type { TransactionStore } from '../../storage';
 export interface McpPayerOptions {
   baseUrl: string; // MCP server endpoint (e.g., http://localhost:8080/mcp)
   signer: SignerInterface;
-  keyId?: string;
-  payerDid?: string;
+  keyId: string;
   debug?: boolean;
   /** Chain configuration - required for payment channel operations */
-  chainConfig?: ChainConfig;
+  chainConfig: ChainConfig;
   /** Optional storage configuration. If not provided, uses in-memory storage */
   storageOptions?: {
     channelRepo?: any; // ChannelRepository interface
@@ -88,12 +87,7 @@ export class PaymentChannelMcpClient {
     }
 
     this.payerClient = PaymentChannelFactory.createClient({
-      chainConfig: options.chainConfig || {
-        chain: 'rooch' as const,
-        rpcUrl: undefined,
-        network: 'test',
-        debug: false,
-      },
+      chainConfig: options.chainConfig,
       signer: options.signer,
       keyId: options.keyId,
       storageOptions: {
@@ -504,7 +498,7 @@ export class PaymentChannelMcpClient {
   // Schema should be provided by call sites for strong typing, no internal mapping
 
   private async buildParams(method: string, userParams: any, clientTxRef: string) {
-    const payerDid = this.options.payerDid || (await this.options.signer.getDid());
+    const payerDid = await this.options.signer.getDid();
     const signedSubRav = await this.buildSignedSubRavIfNeeded();
     const reqPayload: PaymentRequestPayload = {
       version: 1,
@@ -541,14 +535,7 @@ export class PaymentChannelMcpClient {
     clientTxRef: string
   ): Promise<string> {
     // Ensure we have a concrete keyId
-    let keyId = this.options.keyId;
-    if (!keyId) {
-      const ids = await this.options.signer.listKeyIds();
-      if (!ids || ids.length === 0) {
-        throw new Error('No keyId available for DIDAuth signing');
-      }
-      keyId = ids[0];
-    }
+    const keyId = this.options.keyId;
     this.logger.debug('generateAuthToken', {
       payerDid,
       method,
@@ -835,8 +822,9 @@ export class PaymentChannelMcpClient {
       _mcpTool: tool,
       // Add execute method that uses callToolWithPayment
       execute: async (args: any) => {
-        const { content, payment } = await this.callToolWithPayment(tool.name, args);
-        return { content, payment };
+        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args);
+        // We don't return the payment here, because the AI do not need to know about it
+        return { content };
       },
     };
   }

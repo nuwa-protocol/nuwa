@@ -24,7 +24,7 @@ export interface HttpPayerOptions {
   signer: SignerInterface;
 
   /** Key ID for signing operations (optional, will use first available if not specified) */
-  keyId?: string;
+  keyId: string;
 
   /** Optional specific channelId. If empty, will auto-create or find active channel for current host */
   channelId?: string;

@@ -21,6 +21,7 @@ import type { Server } from 'http';
 import { HttpPaymentCodec } from '../../src/integrations/http/internal/codec';
 import { z } from 'zod';
 import { serializeJson } from '../../src/utils/json';
+import { createMcpClient } from '../../src/integrations/mcp/factory';
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
   return `Cost: ${payment.cost.toString()} units, USD: ${payment.costUsd.toString()} pUSD, Tx: ${payment.clientTxRef}`;
@@ -207,15 +208,9 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     mcpServer = await app.start();
 
     // Create MCP client
-    mcpClient = new PaymentChannelMcpClient({
+    mcpClient = await createMcpClient({
       baseUrl: serverUrl,
-      signer: payer.signer,
-      keyId: `${payer.did}#${payer.vmIdFragment}`, // Use full DID key ID
-      payerDid: payer.did,
-      chainConfig: {
-        chain: 'rooch' as const,
-        rpcUrl: env.rpcUrl,
-      },
+      env: payer.identityEnv,
       debug: true,
       maxAmount: BigInt(1000000000), // 10 RGas
     });

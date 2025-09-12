@@ -39,7 +39,7 @@ export interface PayerStorageOptions {
 export interface PaymentChannelPayerClientOptions {
   contract: IPaymentChannelContract;
   signer: SignerInterface;
-  keyId?: string;
+  keyId: string;
   storageOptions: PayerStorageOptions;
 }
 
@@ -80,7 +80,7 @@ export interface AuthorizeSubChannelResult extends TxResult {
 export class PaymentChannelPayerClient {
   private contract: IPaymentChannelContract;
   private signer: SignerInterface;
-  private keyId?: string;
+  private keyId: string;
   private channelRepo: ChannelRepository;
   private chainIdCache?: bigint;
   private activeChannelId?: string;
@@ -144,7 +144,7 @@ export class PaymentChannelPayerClient {
     params: PayerOpenChannelWithSubChannelParams
   ): Promise<OpenChannelResultWithSubChannelInfo> {
     const payerDid = await this.signer.getDid();
-    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
+    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId);
 
     const openParams: ContractOpenChannelWithSubChannelParams = {
       payerDid,
@@ -201,7 +201,7 @@ export class PaymentChannelPayerClient {
     vmIdFragment?: string;
   }): Promise<AuthorizeSubChannelResult> {
     const payerDid = await this.signer.getDid();
-    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId || '');
+    const useFragment = params.vmIdFragment || this.extractFragment(this.keyId);
 
     const result = await this.contract.authorizeSubChannel({
       channelId: params.channelId,
@@ -254,21 +254,15 @@ export class PaymentChannelPayerClient {
    */
   async signSubRAV(subRAV: SubRAV): Promise<SignedSubRAV> {
     await this.validateSubRAV(subRAV);
-    // Determine which key to use for signing
-    const payerDid = await this.signer.getDid();
-    const expectedKeyId = `${payerDid}#${subRAV.vmIdFragment}`;
-
-    // Use the keyId that matches the SubRAV's vmIdFragment
-    const useKeyId = this.keyId || expectedKeyId;
 
     // Verify that our keyId matches the SubRAV
-    const ourFragment = this.extractFragment(useKeyId);
+    const ourFragment = this.extractFragment(this.keyId);
     if (ourFragment !== subRAV.vmIdFragment) {
       throw new Error(`Key fragment mismatch: our ${ourFragment}, SubRAV ${subRAV.vmIdFragment}`);
     }
 
     // Sign the SubRAV
-    const signedSubRAV = SubRAVSigner.sign(subRAV, this.signer, useKeyId);
+    const signedSubRAV = SubRAVSigner.sign(subRAV, this.signer, this.keyId);
 
     return signedSubRAV;
   }
