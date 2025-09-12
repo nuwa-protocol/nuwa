@@ -3,6 +3,7 @@ import type { McpPayerOptions } from './PaymentChannelMcpClient';
 import { PaymentChannelMcpClient } from './PaymentChannelMcpClient';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { TransactionStore } from '../../storage';
+import type { HostChannelMappingStore } from '../http/types';
 
 /**
  * Simple options for creating PaymentChannelMcpClient with IdentityEnv (recommended)
@@ -40,6 +41,9 @@ export interface CreateMcpClientOptions {
       body?: any
     ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
   };
+
+  /** Optional mapping store for state persistence. If not provided, uses default store */
+  mappingStore?: HostChannelMappingStore;
 }
 
 /**
@@ -90,6 +94,9 @@ export interface CreateMcpPayerClientOptions {
       body?: any
     ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
   };
+
+  /** Optional mapping store for state persistence */
+  mappingStore?: HostChannelMappingStore;
 }
 
 /**
@@ -141,6 +148,7 @@ export async function createMcpClient(
     storageOptions: options.storageOptions,
     transactionStore: options.transactionStore,
     transactionLog: options.transactionLog,
+    mappingStore: options.mappingStore,
   };
 
   const client = new PaymentChannelMcpClient(mcpPayerOptions);

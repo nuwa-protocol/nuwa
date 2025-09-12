@@ -14,8 +14,14 @@ import { PaymentState } from '../http/core/PaymentState';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createDefaultChannelRepo } from '../http/internal/LocalStore';
-import { createDefaultTransactionStore } from '../http/internal/LocalStore';
+import {
+  createDefaultChannelRepo,
+  createDefaultTransactionStore,
+  createDefaultMappingStore,
+  createNamespacedMappingStore,
+  extractHost,
+} from '../http/internal/LocalStore';
+import type { HostChannelMappingStore } from '../http/types';
 import { RequestScheduler } from '../http/internal/RequestScheduler';
 import { deriveChannelId } from '../../rooch/ChannelUtils';
 import { serializeJson } from '../../utils/json';
@@ -56,6 +62,8 @@ export interface McpPayerOptions {
       body?: any
     ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
   };
+  /** Optional mapping store for state persistence. If not provided, uses default store */
+  mappingStore?: HostChannelMappingStore;
 }
 
 export interface ListToolsOptions {
@@ -75,12 +83,23 @@ export class PaymentChannelMcpClient {
   private scheduler: RequestScheduler = new RequestScheduler();
   private channelManager: McpChannelManager;
   private transactionStore: TransactionStore;
+  private host: string;
+  private mappingStore: HostChannelMappingStore;
 
   constructor(options: McpPayerOptions) {
     this.options = options;
     this.logger = DebugLogger.get('PaymentChannelMcpClient');
     this.logger.setLevel(options.debug ? 'debug' : 'info');
     this.paymentState = new PaymentState();
+
+    // Extract host for state persistence
+    this.host = extractHost(options.baseUrl);
+
+    // Setup mapping store for state persistence
+    const baseMapping = options.mappingStore || createDefaultMappingStore();
+    this.mappingStore = createNamespacedMappingStore(baseMapping, {
+      getPayerDid: async () => await options.signer.getDid(),
+    });
 
     // Setup storage - use provided storage or default in-memory
     let channelRepo;
@@ -116,6 +135,9 @@ export class PaymentChannelMcpClient {
       },
       autoRecover: false,
     });
+
+    // Load persisted state asynchronously (don't block constructor)
+    void this.loadPersistedState();
   }
 
   /**
@@ -522,6 +544,8 @@ export class PaymentChannelMcpClient {
 
   clearPendingSubRAV(): void {
     this.paymentState.clearPendingSubRAV();
+    // Persist state when SubRAV is cleared
+    void this.persistClientState();
   }
 
   private parseFirstJsonText<T>(content: any[]): T | undefined {
@@ -569,6 +593,8 @@ export class PaymentChannelMcpClient {
     const pending = this.paymentState.getPendingSubRAV();
     if (!pending) return undefined;
     this.paymentState.clearPendingSubRAV();
+    // Persist state when SubRAV is cleared for signing
+    void this.persistClientState();
     return this.payerClient.signSubRAV(pending);
   }
 
@@ -640,6 +666,8 @@ export class PaymentChannelMcpClient {
       const decoded = HttpPaymentCodec.fromJSONResponse(payload);
       if (decoded.subRav) {
         this.paymentState.setPendingSubRAV(decoded.subRav);
+        // Persist state when SubRAV is updated
+        void this.persistClientState();
       }
       if (decoded.error || decoded.cost === undefined || !decoded.subRav) return undefined;
       const channelInfo = this.paymentState.getChannelInfo();
@@ -878,6 +906,9 @@ export class PaymentChannelMcpClient {
    */
   async close(): Promise<void> {
     try {
+      // Persist final state before closing
+      await this.persistClientState();
+
       // Close the underlying MCP client connection
       if (this.mcpClient) {
         await this.mcpClient.close();
@@ -898,6 +929,47 @@ export class PaymentChannelMcpClient {
     } catch (error) {
       this.logger.warn('Error during close:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Load persisted state from storage
+   */
+  private async loadPersistedState(): Promise<void> {
+    try {
+      const state = await this.mappingStore.getState(this.host);
+      if (state) {
+        this.paymentState.loadPersistedState(state);
+        this.logger.debug('Loaded persisted state for host:', this.host);
+      }
+    } catch (error) {
+      this.logger.debug('Failed to load persisted state:', error);
+    }
+  }
+
+  /**
+   * Persist current client state to storage
+   */
+  private async persistClientState(): Promise<void> {
+    try {
+      const state = this.paymentState.getPersistedState();
+      await this.mappingStore.setState(this.host, state);
+      this.logger.debug('Persisted client state for host:', this.host);
+    } catch (error) {
+      this.logger.debug('Failed to persist client state:', error);
+    }
+  }
+
+  /**
+   * Clear persisted state (useful for logout/cleanup)
+   */
+  async clearPersistedState(): Promise<void> {
+    try {
+      await this.mappingStore.deleteState(this.host);
+      this.paymentState.reset();
+      this.logger.debug('Cleared persisted state for host:', this.host);
+    } catch (error) {
+      this.logger.debug('Failed to clear persisted state:', error);
     }
   }
 }
