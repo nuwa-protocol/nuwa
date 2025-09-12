@@ -26,7 +26,6 @@ export interface FastMcpServerOptions extends McpPaymentKitOptions {
   wellKnown?: {
     enabled?: boolean;
     path?: `/${string}`; // default: '/.well-known/nuwa-payment/info'
-    discovery: () => Promise<any> | any; // should conform to ServiceDiscoverySchema
   };
 }
 
@@ -270,8 +269,8 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     let sessionCounter = 0;
     const port = opts.port ?? 8080;
     const endpoint = opts.endpoint || '/mcp';
-    const wellKnownEnabled =
-      opts.wellKnown?.enabled !== false && typeof opts.wellKnown?.discovery === 'function';
+    // Well-known is enabled by default for payment-enabled MCP servers
+    const wellKnownEnabled = opts.wellKnown?.enabled !== false;
     const wellKnownPath = (opts.wellKnown?.path ||
       '/.well-known/nuwa-payment/info') as `/${string}`;
 
@@ -329,7 +328,17 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
           // Well-known discovery endpoint (no auth)
           if (wellKnownEnabled && req.method === 'GET' && url.pathname === wellKnownPath) {
             try {
-              const body = await Promise.resolve(opts.wellKnown!.discovery());
+              // Auto-generate service discovery info from kit conforming to ServiceDiscoverySchema
+              const serviceDid = await kit.getServiceDid();
+              const body = {
+                version: 1,
+                serviceId: opts.serviceId || 'nuwa-mcp-server',
+                serviceDid,
+                network: opts.network || 'test',
+                defaultAssetId: opts.defaultAssetId || '0x3::gas_coin::RGas',
+                defaultPricePicoUSD: opts.defaultPricePicoUSD?.toString(),
+                basePath: endpoint,
+              };
               res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
             } catch (e: any) {
               res

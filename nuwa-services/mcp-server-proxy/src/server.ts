@@ -1,454 +1,216 @@
 /**
- * MCP Server Proxy - Main Server
+ * MCP Server v2 - Start via FastMcpStarter (handles MCP over HTTP/SSE)
  */
-import fastify, { FastifyInstance } from 'fastify';
-import cors from '@fastify/cors';
-import fs from 'node:fs';
-import path from 'node:path';
-import yaml from 'js-yaml';
-import { fileURLToPath } from 'node:url';
-import { performance } from 'node:perf_hooks';
+import { KeyManager } from "@nuwa-ai/identity-kit";
+import { createFastMcpServer } from "@nuwa-ai/payment-kit";
+import { initUpstream } from "./upstream.js";
+import type { Upstream } from "./types.js";
+import {
+  loadConfig,
+  type MinimalConfig,
+  type MinimalToolConfig,
+} from "./config.js";
+import { z } from "zod";
 
-// Import modules
-import { didAuthMiddleware } from './auth.js';
-import { determineUpstream, setUpstreamInContext } from './router.js';
-import { initUpstream, forwardToolList, forwardToolCall, forwardPromptList, forwardPromptGet, forwardResourceList, forwardResourceTemplateList, forwardResourceRead } from './upstream.js';
-import { ProxyConfig, UpstreamRegistry } from './types.js';
+// Local registry removed; FastMcpStarter manages tools
 
-// Get directory name in ESM
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+// No Fastify server; FastMcpStarter provides HTTP server
 
-// Load configuration
-function loadConfig(): ProxyConfig {
-  const configPath = process.env.CONFIG_PATH || path.join(__dirname, '../config.yaml');
-  const configYaml = fs.readFileSync(configPath, 'utf8');
-  
-  // Replace environment variables in the config
-  const configWithEnvVars = configYaml.replace(/\${([^}]+)}/g, (_, varName) => {
-    return process.env[varName] || '';
-  });
-  
-  return yaml.load(configWithEnvVars) as ProxyConfig;
-}
+// (FastMcpStarter handles HTTP/SSE/MCP parsing)
 
-// Initialize upstreams
-async function initializeUpstreams(config: ProxyConfig): Promise<UpstreamRegistry> {
-  const upstreams: UpstreamRegistry = {};
-  
-  for (const [name, upstreamConfig] of Object.entries(config.upstreams)) {
+// Exported function to start the server (for testing and direct use)
+async function startServer(
+  configOverride?: Partial<MinimalConfig>,
+): Promise<{ close: () => Promise<void> }> {
+  const config = configOverride || loadConfig();
+  let signer: any = undefined;
+
+  // Try to create signer from config
+  if (config.serviceId) {
+    if (!config.serviceKey || config.serviceKey === "test-key-placeholder") {
+      console.error(
+        "❌ Error: SERVICE_KEY is required when serviceId is configured",
+      );
+      console.error(
+        "SERVICE_KEY is needed for ServiceDID and payment channel creation",
+      );
+      console.error(
+        "Please set SERVICE_KEY environment variable or configure serviceKey in config file",
+      );
+      process.exit(1);
+    }
+
     try {
-      const upstream = await initUpstream(name, upstreamConfig);
-      upstreams[name] = upstream;
+      signer = await KeyManager.fromSerializedKey(config.serviceKey);
+      console.log("✅ Successfully loaded service key");
     } catch (error) {
-      console.error(`Failed to initialize upstream ${name}:`, error);
+      console.error("❌ Error: Failed to load service key:", error);
+      console.error("Please check your SERVICE_KEY format");
+      process.exit(1);
     }
   }
-  
-  return upstreams;
-}
 
-// Create the Fastify server
-function createServer(config: ProxyConfig): { 
-  server: FastifyInstance; 
-} {
-  const { level, prettyPrint, ...restLogger } = config.server.logger as any;
-  const loggerOpts: any = { level, ...restLogger };
+  // Create server options, only include payment-related options if signer is available
+  const serverOptions: any = {
+    port: Number(config.port || process.env.PORT || 8088),
+    endpoint: (config.endpoint || "/mcp") as any,
+  };
 
-  if (prettyPrint) {
-    loggerOpts.transport = {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    };
+  // Only add payment options if we have a signer
+  if (signer) {
+    serverOptions.serviceId = config.serviceId || "nuwa-mcp-server";
+    serverOptions.signer = signer;
+    serverOptions.rpcUrl = config.rpcUrl;
+    serverOptions.network = (config.network as any) || "test";
+    serverOptions.defaultAssetId =
+      config.defaultAssetId || "0x3::gas_coin::RGas";
+    serverOptions.defaultPricePicoUSD = config.defaultPricePicoUSD as any;
+    serverOptions.adminDid = config.adminDid as any;
+    serverOptions.debug = config.debug;
   }
 
-  const server = fastify({
-    logger: loggerOpts,
-  });
-  
-  // Register CORS
-  server.register(cors, config.server.cors);
-  
-  return { server } as any;
-}
+  const app: any = await createFastMcpServer(serverOptions);
 
-// Register routes
-function registerRoutes(
-  server: FastifyInstance,
-  config: ProxyConfig,
-  upstreams: UpstreamRegistry,
-): void {
-  // Middleware to initialize request context
-  server.addHook('onRequest', (request, reply, done) => {
-    request.ctx = {
-      startTime: performance.now(),
-      upstream: config.defaultUpstream,
-      timings: {},
-    };
-    done();
-  });
-  
-  // DIDAuth middleware
-  if (config.didAuth.required) {
-    server.addHook('onRequest', didAuthMiddleware);
+  // Prepare upstream via shared helper if configured
+  let upstream: Upstream | undefined;
+  if (config.upstream) {
+    upstream = await initUpstream("default", config.upstream);
   }
-  
-  // Router middleware
-  server.addHook('preHandler', (request, reply, done) => {
-    const tRouteStart = performance.now();
-    const upstream = determineUpstream(request, config.routes, config.defaultUpstream);
-    setUpstreamInContext(request, upstream);
-    if (request.ctx && request.ctx.timings) {
-      request.ctx.timings.route = Number((performance.now() - tRouteStart).toFixed(3));
-    }
-    done();
-  });
-  
-  // Health check route
-  server.get('/health', async (request, reply) => {
-    return { status: 'ok', upstreams: Object.keys(upstreams) };
-  });
-  
-  // MCP tool.list route
-  server.get('/mcp/tools', async (request, reply) => {
-    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
-    const upstream = upstreams[upstreamName];
-    
-    if (!upstream) {
-      return reply.status(404).send({
-        error: `Upstream "${upstreamName}" not found`,
-      });
-    }
-    
+
+  // Register tools from upstream if configured
+  if (upstream) {
     try {
-      await forwardToolList(request, reply, upstream);
+      const upstreamTools = await upstream.client.listTools();
+      if (upstreamTools && upstreamTools.tools) {
+        // Create a map of configured tool prices for quick lookup
+        const configuredToolPrices = new Map<string, string>();
+        if (config.register?.tools) {
+          for (const configTool of config.register.tools) {
+            configuredToolPrices.set(
+              configTool.name,
+              configTool.pricePicoUSD || "",
+            );
+          }
+        }
+
+        // Validate that all configured tools exist in upstream
+        if (config.register?.tools) {
+          const upstreamToolNames = new Set(
+            upstreamTools.tools.map((t: any) => t.name),
+          );
+          for (const configTool of config.register.tools) {
+            if (!upstreamToolNames.has(configTool.name)) {
+              throw new Error(
+                `Configured tool '${configTool.name}' not found in upstream server. Available tools: ${Array.from(upstreamToolNames).join(", ")}`,
+              );
+            }
+          }
+        }
+
+        // Register all upstream tools with appropriate pricing
+        for (const upstreamTool of upstreamTools.tools) {
+          // Determine tool price: use configured price, or fall back to default, or 0 if no payment config
+          let toolPrice: bigint = 0n;
+          const configuredPrice = configuredToolPrices.get(upstreamTool.name);
+
+          if (configuredPrice !== undefined) {
+            // Tool has explicit price configuration
+            toolPrice = BigInt(configuredPrice);
+          } else if (config.defaultPricePicoUSD !== undefined) {
+            // Use default price from config
+            toolPrice = BigInt(config.defaultPricePicoUSD);
+          }
+          // If neither tool price nor default price is set, tool is free (0n)
+
+          const isFree = toolPrice === 0n;
+
+          // Register upstream tool as forwarding tool
+          const forwardExecute = async (p: any, context?: any) => {
+            console.log(
+              `Forwarding tool ${upstreamTool.name} to upstream with params:`,
+              p,
+              `(price: ${toolPrice} picoUSD)`,
+            );
+            const res = await upstream!.client.callTool({
+              name: upstreamTool.name,
+              arguments: p || {},
+            });
+            console.log(`Upstream response for ${upstreamTool.name}:`, res);
+            if (res && Array.isArray(res.content)) {
+              // Return the content array directly so FastMcpStarter can handle it properly
+              return { content: res.content };
+            }
+            return res;
+          };
+
+          // Use FastMcpStarter's tool registration mechanism which handles schema conversion
+          const upstreamToolDef = {
+            name: upstreamTool.name,
+            description:
+              upstreamTool.description ||
+              `Forwarded tool: ${upstreamTool.name}`,
+            // Pass the original inputSchema - FastMcpStarter will handle the conversion
+            parameters: upstreamTool.inputSchema,
+            execute: forwardExecute,
+          };
+
+          if (isFree) {
+            (app as any).freeTool(upstreamToolDef);
+          } else {
+            (app as any).paidTool({
+              ...upstreamToolDef,
+              pricePicoUSD: toolPrice,
+            });
+          }
+        }
+      }
     } catch (error) {
-      console.error('Error handling tool.list:', error);
-      return reply.status(500).send({
-        error: 'Failed to forward request to upstream',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      console.error("Failed to register upstream tools:", error);
+      throw error; // Re-throw to prevent server from starting with invalid configuration
     }
-  });
-  
-  // MCP tool.call route
-  server.post('/mcp/tool.call', async (request, reply) => {
-    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
-    const upstream = upstreams[upstreamName];
-    
-    if (!upstream) {
-      return reply.status(404).send({
-        error: `Upstream "${upstreamName}" not found`,
-      });
-    }
-    
-    try {
-      await forwardToolCall(request, reply, upstream);
-    } catch (error) {
-      console.error('Error handling tool.call:', error);
-      return reply.status(500).send({
-        error: 'Failed to forward request to upstream',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-  
-  // MCP prompt.load route
-  server.post('/mcp/prompt.load', async (request, reply) => {
-    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
-    const upstream = upstreams[upstreamName];
-    
-    if (!upstream) {
-      return reply.status(404).send({
-        error: `Upstream "${upstreamName}" not found`,
-      });
-    }
-    
-    try {
-      await forwardPromptList(request, reply, upstream);
-    } catch (error) {
-      console.error('Error handling prompt.load:', error);
-      return reply.status(500).send({
-        error: 'Failed to forward request to upstream',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
+  } else if (config.register?.tools && config.register.tools.length > 0) {
+    // If tools are configured but no upstream is provided, this is an error
+    throw new Error(
+      "Tools are configured but no upstream server is provided. Tools can only be configured for upstream servers.",
+    );
+  }
 
-  /***************************************************************************
-   * JSON-RPC root endpoint compatibility (`/mcp`)
-   * Allows clients that follow the original MCP JSON-RPC convention
-   * to use methods like "tools/list" and "tools/call" via POST /mcp.
-   * For GET /mcp with Accept: text/event-stream, we return a keep-alive
-   * SSE connection so that clients can establish a long poll even if the
-   * upstream (especially stdio) does not push events.
-   ***************************************************************************/
+  const server = await app.start();
+  console.log(`MCP Server started on endpoint ${config.endpoint || "/mcp"}`);
 
-  const sseHandler = async (request: any, reply: any) => {
-    // Start minimal SSE stream
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-
-    // Initial comment to establish stream
-    reply.raw.write(':' + Array(2049).join(' ') + "\n"); // 2KB padding for some browsers
-    reply.raw.write(': keep-alive\n\n');
-
-    const timer = setInterval(() => {
+  return {
+    close: async () => {
       try {
-        reply.raw.write(': keep-alive\n\n');
-      } catch {
-        clearInterval(timer);
+        await server.stop();
+        if (upstream) {
+          await upstream.client.close();
+        }
+      } catch (e) {
+        console.error("Error during server shutdown:", e);
       }
-    }, 30_000);
-
-    request.raw.on('close', () => clearInterval(timer));
+    },
   };
-  server.get('/mcp', sseHandler);
-  server.get('/mcp/', sseHandler);
-
-  const rpcHandler = async (request: any, reply: any) => {
-    let payload: any;
-    try {
-      payload = request.body;
-      if (typeof payload === 'string') payload = JSON.parse(payload);
-    } catch {
-      return reply.code(400).send({
-        jsonrpc: '2.0',
-        error: { code: -32700, message: 'Parse error' },
-        id: null,
-      });
-    }
-
-    // Record JSON-RPC method to ctx
-    if (request.ctx) {
-      request.ctx.rpcMethod = payload?.method ?? null;
-    }
-
-    const { method, params, id } = payload || {};
-    const upstreamName = request.ctx?.upstream || config.defaultUpstream;
-    const upstream = upstreams[upstreamName];
-    const caps = upstream?.capabilities || {};
-
-    // Silently acknowledge 'notifications/initialized' notification
-    if ((id === undefined || id === null) && method === 'notifications/initialized') {
-      reply.code(204).send();
-      return;
-    }
-
-    // Helper to check if a method is supported by the upstream's capabilities
-    function isSupported(method: string) {
-      if (method.startsWith('tools/')) {
-        if (caps.tools === undefined) return true;
-        return Boolean(caps.tools);
-      }
-      if (method.startsWith('prompts/')) {
-        if (caps.prompts === undefined) return true;
-        return Boolean(caps.prompts);
-      }
-      if (method.startsWith('resources/')) {
-        if (caps.resources === undefined) return true;
-        return Boolean(caps.resources);
-      }
-      if (method.startsWith('resourceTemplates/')) {
-        if (caps.resourceTemplates === undefined) return true;
-        return Boolean(caps.resourceTemplates);
-      }
-      return true;
-    }
-
-    const jsonRpcError = (code: number, message: string) => reply.code(404).send({
-      jsonrpc: '2.0',
-      error: { code, message },
-      id: id ?? null,
-    });
-
-    switch (method) {
-      case 'tools/list': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        try {
-          await forwardToolList(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'tools/list failed');
-        }
-        return;
-      }
-      case 'tools/call': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        if (!params?.name) return jsonRpcError(-32602, 'Missing params.name');
-        // Forge req.body for forwardToolCall
-        (request as any).body = { name: params.name, arguments: params.arguments || {} };
-        try {
-          await forwardToolCall(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'tools/call failed');
-        }
-        return;
-      }
-      case 'prompts/list': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        try {
-          await forwardPromptList(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'prompts/list failed');
-        }
-        return;
-      }
-      case 'prompts/get': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        (request as any).body = { name: params?.name, arguments: params?.arguments || {} };
-        try {
-          await forwardPromptGet(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'prompts/get failed');
-        }
-        return;
-      }
-      case 'resources/list': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        try {
-          await forwardResourceList(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'resources/list failed');
-        }
-        return;
-      }
-      case 'resources/read': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        (request as any).body = { params };
-        try {
-          await forwardResourceRead(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'resources/read failed');
-        }
-        return;
-      }
-      case 'resourceTemplates/list': {
-        if (!isSupported(method)) return jsonRpcError(-32601, 'Method not supported');
-        try {
-          await forwardResourceTemplateList(request, reply, upstream, id);
-        } catch (error) {
-          return jsonRpcError(-32000, 'resourceTemplates/list failed');
-        }
-        return;
-      }
-      case 'initialize': {
-        return reply.send({
-          jsonrpc: '2.0',
-          result: {
-            protocolVersion: '2024-11-05',
-            serverInfo: { name: 'nuwa-mcp-proxy', version: '0.1.0' },
-            capabilities: caps,
-          },
-          id,
-        });
-      }
-      default:
-        console.log('Method not found:', method);
-        return jsonRpcError(-32601, 'Method not found: ' + method);
-    }
-  };
-  server.post('/mcp', rpcHandler);
-  server.post('/mcp/', rpcHandler);
-
-  // --- logging ---
-  server.addHook('onResponse', (request, reply, done) => {
-    // Safely handle cases where request.ctx might be undefined
-    if (!request.ctx) {
-      request.log.warn({
-        reqId: request.id,
-        method: request.method,
-        url: request.url,
-        status: reply.statusCode,
-      }, 'request.summary.no_ctx');
-      done();
-      return;
-    }
-    
-    const total = Number((performance.now() - request.ctx.startTime).toFixed(3));
-    const summary = {
-      reqId: request.id,
-      did: request.ctx.callerDid ?? null,
-      method: request.method,
-      url: request.url,
-      status: reply.statusCode,
-      upstream: request.ctx.upstream,
-      rpcMethod: request.ctx.rpcMethod ?? null,
-      timings: { ...request.ctx.timings, total },
-    };
-    request.log.info(summary, 'request.summary');
-    done();
-  });
-
-  server.addHook('onError', (request, reply, error, done) => {
-    request.log.error({
-      reqId: request.id,
-      did: request.ctx?.callerDid ?? null,
-      stage: 'error',
-      upstream: request.ctx?.upstream,
-      rpcMethod: request.ctx?.rpcMethod ?? null,
-      err: error,
-    }, 'request.error');
-    done();
-  });
 }
 
-// Main function
+// Main function for direct execution
 async function main() {
   try {
-    // Load configuration
-    const config = loadConfig();
-    
-    // Initialize upstreams
-    const upstreams = await initializeUpstreams(config);
-    
-    // Create server
-    const { server } = createServer(config);
-    
-    // Register routes
-    registerRoutes(server, config, upstreams);
-    
-    // Graceful shutdown: close upstream clients when server stops
-    server.addHook('onClose', (instance, done) => {
-      instance.log.info('Closing upstream connections...');
-      Promise.all(
-        Object.values(upstreams).map(async (up) => {
-          try {
-            if (up.client && typeof up.client.close === 'function') {
-              await up.client.close();
-            }
-          } catch (err) {
-            instance.log.error({ err }, `Failed to close upstream ${(up.config as any)?.name || ''}`);
-          }
-        }),
-      ).then(() => done()).catch(done);
-    });
+    const serverInstance = await startServer();
 
-    // Handle process signals for graceful shutdown
     const shutdown = async () => {
       try {
-        await server.close();
+        await serverInstance.close();
       } catch (e) {
-        console.error('Error during server.close():', e);
+        console.error("Error during shutdown:", e);
         process.exit(1);
       }
       process.exit(0);
     };
-    process.once('SIGINT', shutdown);
-    process.once('SIGTERM', shutdown);
 
-    let port = process.env.PORT || config.server.port || 8088;
-    // Start server
-    await server.listen({
-      host: config.server.host,
-      port: Number(port),
-    });
-    
-    console.log(`MCP Server Proxy started on ${config.server.host}:${port}`);
-    console.log(`Available upstreams: ${Object.keys(upstreams).join(', ')}`);
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }
@@ -457,4 +219,4 @@ async function main() {
 main().catch(console.error);
 
 // For testing/importing
-export { loadConfig, initializeUpstreams, createServer, registerRoutes }; 
+export { loadConfig, startServer };

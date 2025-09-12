@@ -1,0 +1,28 @@
+# Context7 MCP Proxy Configuration
+
+# Server settings
+port: ${PORT}
+endpoint: "/mcp"
+
+# Context7 MCP server (running via stdio)
+upstream:
+  type: "stdio"
+  command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+
+# Payment configuration  
+serviceId: "context7-mcp-proxy"
+serviceKey: "${SERVICE_KEY}"
+network: "test"
+defaultPricePicoUSD: "100000000"  # 0.0001 USD - default price
+debug: ${DEBUG}
+
+# Context7 tool pricing configuration
+register:
+  tools:
+    # Library resolution - free
+    - name: "mcp_context7_resolve-library-id"
+      pricePicoUSD: "0"
+    
+    # Documentation retrieval
+    - name: "mcp_context7_get-library-docs"
+      pricePicoUSD: "100000000"  

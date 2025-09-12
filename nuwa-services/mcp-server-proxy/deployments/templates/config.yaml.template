@@ -1,0 +1,45 @@
+# MCP Server Proxy Configuration Template
+# Instance: {{INSTANCE_NAME}}
+
+# Server settings
+port: ${PORT}
+endpoint: "/mcp"
+
+# Upstream MCP server configuration
+upstream:
+  type: "{{UPSTREAM_TYPE}}"
+  {{#if_httpStream}}
+  url: "{{UPSTREAM_URL}}"
+  {{#if_auth}}
+  auth:
+    scheme: "{{AUTH_SCHEME}}"
+    token: "${{{AUTH_TOKEN_ENV}}}"
+  {{/if_auth}}
+  {{/if_httpStream}}
+  {{#if_stdio}}
+  command: {{UPSTREAM_COMMAND}}
+  cwd: "{{UPSTREAM_CWD}}"
+  {{#if_env}}
+  env:
+    {{#each UPSTREAM_ENV}}
+    {{@key}}: "${{{this}}}"
+    {{/each}}
+  {{/if_env}}
+  {{/if_stdio}}
+
+# Payment & chain configuration
+serviceId: "{{SERVICE_ID}}"
+serviceKey: "${SERVICE_KEY}"
+network: "{{NETWORK}}"
+defaultPricePicoUSD: "{{DEFAULT_PRICE_PICO_USD}}"
+debug: ${DEBUG}
+
+# Tool pricing configuration
+{{#if TOOLS}}
+register:
+  tools:
+    {{#each TOOLS}}
+    - name: "{{name}}"
+      pricePicoUSD: "{{pricePicoUSD}}"
+    {{/each}}
+{{/if}}

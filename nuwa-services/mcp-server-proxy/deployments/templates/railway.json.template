@@ -1,0 +1,29 @@
+{
+  "name": "{{INSTANCE_NAME}}",
+  "description": "MCP Server Proxy - {{INSTANCE_DESCRIPTION}}",
+  "source": {
+    "type": "github",
+    "repo": "rooch-network/nuwa",
+    "branch": "main"
+  },
+  "build": {
+    "buildCommand": "cd nuwa-services/mcp-server-proxy && pnpm install && pnpm run build",
+    "startCommand": "cd nuwa-services/mcp-server-proxy && pnpm start"
+  },
+  "environment": {
+    "NODE_ENV": "production",
+    "CONFIG_PATH": "./deployments/instances/{{INSTANCE_NAME}}/config.yaml",
+    "SERVICE_KEY": "${{SERVICE_KEY}}",
+    "ROOCH_RPC_URL": "${{ROOCH_RPC_URL}}",
+    "DEBUG": "${{DEBUG}}"
+  },
+  "healthcheck": {
+    "path": "/health",
+    "interval": 30,
+    "timeout": 10
+  },
+  "resources": {
+    "memory": "512MB",
+    "cpu": "0.5"
+  }
+}

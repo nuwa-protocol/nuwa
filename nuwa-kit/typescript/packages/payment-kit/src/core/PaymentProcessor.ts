@@ -145,6 +145,7 @@ export class PaymentProcessor {
         vmIdFragment = ctx.meta.signedSubRav.subRav.vmIdFragment;
       } else {
         const didAuth = await this.tryDIDAuthFallback(ctx);
+        this.log('DIDAuth fallback result:', didAuth);
         if (didAuth) {
           channelId = didAuth.channelId;
           vmIdFragment = didAuth.vmIdFragment;

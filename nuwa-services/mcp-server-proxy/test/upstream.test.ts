@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import { initUpstream, forwardToolList, forwardPromptList, forwardPromptGet, forwardResourceList, forwardResourceTemplateList, forwardResourceRead } from '../src/upstream.js';
+import { initUpstream } from '../src/upstream.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork } from 'child_process';
@@ -40,58 +40,18 @@ describe('Upstream (stdio) integration', () => {
     ).toBe(true);
   });
 
-  // Mock FastifyReply
-  class MockReply {
-    statusCode = 200;
-    payload: any = undefined;
-    status(code: number) { this.statusCode = code; return this; }
-    send(payload: any) { this.payload = payload; return this; }
-  }
-
-  it('forwardToolList returns echo tool', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    await forwardToolList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.tools[0].name).toBe('echo');
+  it('upstream client can list tools', async () => {
+    const tools = await upstream.client.listTools();
+    expect(tools.tools).toBeDefined();
+    expect(Array.isArray(tools.tools)).toBe(true);
+    expect(tools.tools[0].name).toBe('echo');
   });
 
-  it('forwardPromptList returns hello prompt', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    await forwardPromptList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.prompts[0].name).toBe('hello');
-  });
-
-  it('forwardPromptGet returns prompt message', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    const req = { ...mockReq, body: { name: 'hello' } };
-    await forwardPromptGet(req as any, reply as any, upstream);
-    expect(reply.payload.messages[0].content.text).toBe('Hello, world!');
-  });
-
-  it('forwardResourceList returns test.txt resource', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    await forwardResourceList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.resources[0].name).toBe('test.txt');
-    
-  });
-
-  it('forwardResourceTemplateList returns template1', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    await forwardResourceTemplateList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.resourceTemplates[0].name).toBe('template1');
-  });
-
-  it('forwardResourceRead returns file content', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock', startTime: Date.now(), timings: {} } };
-    const req = { ...mockReq, body: { params: { uri: 'file:///test.txt' } } };
-    await forwardResourceRead(req as any, reply as any, upstream);
-    console.log('reply.payload', reply.payload);
-    expect(reply.payload.contents[0].text).toBe('file content');
+  it('upstream client can call tools', async () => {
+    const result = await upstream.client.callTool({ name: 'echo', arguments: { text: 'hello' } });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBe('hello');
   });
 });
 
@@ -106,7 +66,12 @@ describe('Upstream (httpStream) integration', () => {
     // Start the mock HTTP MCP server
     serverProcess = fork(script, [], { stdio: 'ignore' });
     // Wait for the server to be ready
-    await waitOn({ resources: ['tcp:4000'], timeout: 10000 });
+    await new Promise<void>((resolve, reject) => {
+      waitOn({ resources: ['tcp:4000'], timeout: 10000 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
     upstream = await initUpstream('mock-http', {
       type: 'httpStream',
       url: 'http://localhost:4000/mcp',
@@ -120,7 +85,6 @@ describe('Upstream (httpStream) integration', () => {
 
   it('upstream exposes capabilities', async () => {
     expect(upstream.capabilities).toBeDefined();
-    console.log('upstream.capabilities', upstream.capabilities);
     expect(typeof upstream.capabilities).toBe('object');
     expect(
       'tools' in upstream.capabilities ||
@@ -129,55 +93,17 @@ describe('Upstream (httpStream) integration', () => {
     ).toBe(true);
   });
 
-  // Mock FastifyReply
-  class MockReply {
-    statusCode = 200;
-    payload: any = undefined;
-    status(code: number) { this.statusCode = code; return this; }
-    send(payload: any) { this.payload = payload; return this; }
-  }
-
-  it('forwardToolList returns echo tool', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    await forwardToolList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.tools[0].name).toBe('echo');
+  it('upstream client can list tools', async () => {
+    const tools = await upstream.client.listTools();
+    expect(tools.tools).toBeDefined();
+    expect(Array.isArray(tools.tools)).toBe(true);
+    expect(tools.tools[0].name).toBe('echo');
   });
 
-  it('forwardPromptList returns hello prompt', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    await forwardPromptList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.prompts[0].name).toBe('hello');
-  });
-
-  it('forwardPromptGet returns prompt message', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    const req = { ...mockReq, body: { name: 'hello' } };
-    await forwardPromptGet(req as any, reply as any, upstream);
-    expect(reply.payload.messages[0].content.text).toBe('Hello, world!');
-  });
-
-  it('forwardResourceList returns test.txt resource', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    await forwardResourceList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.resources[0].name).toBe('test.txt');
-  });
-
-  it('forwardResourceTemplateList returns template1', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    await forwardResourceTemplateList(mockReq as any, reply as any, upstream);
-    expect(reply.payload.resourceTemplates[0].name).toBe('template1');
-  });
-
-  it('forwardResourceRead returns file content', async () => {
-    const reply = new MockReply();
-    const mockReq = { body: {}, headers: {}, query: {}, params: {}, raw: {}, id: 'test', ctx: { upstream: 'mock-http', startTime: Date.now(), timings: {} } };
-    const req = { ...mockReq, body: { params: { uri: 'file:///test.txt' } } };
-    await forwardResourceRead(req as any, reply as any, upstream);
-    expect(reply.payload.contents[0].text).toBe('file content');
+  it('upstream client can call tools', async () => {
+    const result = await upstream.client.callTool({ name: 'echo', arguments: { text: 'hello' } });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBe('hello');
   });
 }); 

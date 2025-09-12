@@ -16,6 +16,20 @@ server.tool(
   async ({ text }) => ({ content: [{ type: 'text', text }] })
 );
 
+server.tool(
+  'custom.free',
+  'A free custom tool',
+  { message: z.string() },
+  async ({ message }) => ({ content: [{ type: 'text', text: `Custom free tool executed with message: ${message}` }] })
+);
+
+server.tool(
+  'custom.paid',
+  'A paid custom tool',
+  { data: z.string() },
+  async ({ data }) => ({ content: [{ type: 'text', text: `Custom paid tool executed with data: ${data}` }] })
+);
+
 server.prompt('hello', async () => ({
   messages: [
     { role: 'user', content: { type: 'text', text: 'Hello, world!' } }

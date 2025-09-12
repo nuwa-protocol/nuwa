@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
 const server = new McpServer({
-  name: 'mock',
+  name: 'stdio-mock',
   version: '0.1.0',
 });
 
@@ -15,42 +15,38 @@ server.tool(
   async ({ text }) => ({ content: [{ type: 'text', text }] })
 );
 
-// Register a prompt with a callback returning the expected message
+server.tool(
+  'stdio.free',
+  'A free stdio tool',
+  { message: z.string() },
+  async ({ message }) => ({ content: [{ type: 'text', text: `Stdio free tool executed with message: ${message}` }] })
+);
+
+server.tool(
+  'stdio.paid',
+  'A paid stdio tool',
+  { data: z.string() },
+  async ({ data }) => ({ content: [{ type: 'text', text: `Stdio paid tool executed with data: ${data}` }] })
+);
+
 server.prompt('hello', async () => ({
   messages: [
-    { role: 'user', content: { type: 'text', text: 'Hello, world!' } }
+    { role: 'user', content: { type: 'text', text: 'Hello from stdio!' } }
   ]
 }));
 
-// Register a static resource
 server.resource(
-  'test.txt',
-  'file:///test.txt',
+  'stdio-test.txt',
+  'file:///stdio-test.txt',
   async (uri) => ({
-    contents: [{ type: 'text', text: 'file content', uri: 'file:///test.txt' }]
+    contents: [{ type: 'text', text: 'stdio file content', uri: 'file:///stdio-test.txt' }]
   })
 );
 
-// Register a resource template using ResourceTemplate
-const template = new ResourceTemplate('file:///{name}.txt', {
-  list: async () => ({
-    resources: [
-      { name: 'template1', uri: 'file:///template1.txt', mimeType: 'text/plain' }
-    ]
-  })
-});
+const transport = new StdioServerTransport();
 
-server.resource(
-  'template1',
-  template,
-  async (uri, variables) => ({
-    contents: [{ type: 'text', text: `file content for ${variables.name}`, uri: uri.toString() }]
-  })
-);
-
-async function main() {
-  const transport = new StdioServerTransport();
+// Connect the server to the transport
+(async () => {
   await server.connect(transport);
-}
-
-main().catch(e => { console.error(e); process.exit(1); }); 
+  console.error('[stdio-mock-mcp] MCP stdio server connected and ready');
+})();
