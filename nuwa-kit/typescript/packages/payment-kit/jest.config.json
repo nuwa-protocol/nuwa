@@ -1,11 +1,12 @@
 {
-  "preset": "ts-jest",
+  "preset": "ts-jest/presets/default-esm",
   "testEnvironment": "node",
   "extensionsToTreatAsEsm": [".ts"],
   "roots": ["<rootDir>/src", "<rootDir>/__tests__", "<rootDir>/test"],
   "transform": {
     "^.+\\.tsx?$": ["ts-jest", {
-      "tsconfig": "tsconfig.json"
+      "tsconfig": "tsconfig.json",
+      "useESM": true
     }]
   },
   "testMatch": ["**/__tests__/**/*.ts", "**/test/**/*.test.ts", "**/?(*.)+(spec|test).ts"],
@@ -27,7 +28,7 @@
       "statements": 0
     }
   },
-  "setupFiles": ["<rootDir>/__tests__/setup.js"],
+  "setupFiles": ["<rootDir>/__tests__/setup.ts"],
   "reporters": [
     ["default", {
       "summaryThreshold": 1,
@@ -42,5 +43,8 @@
   },
   "testPathIgnorePatterns": [
     "<rootDir>/test/e2e/"
+  ],
+  "transformIgnorePatterns": [
+    "node_modules/(?!(fastmcp|@modelcontextprotocol|mcp-proxy)/)"
   ]
 } 
