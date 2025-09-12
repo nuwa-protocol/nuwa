@@ -8,6 +8,7 @@ import type { MinimalConfig } from '../src/config.js';
 import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit';
 import { TestEnv, createSelfDid, type CreateSelfDidResult } from '@nuwa-ai/identity-kit';
 import type { AssetInfo } from '@nuwa-ai/payment-kit';
+import { createMcpClient } from '@nuwa-ai/payment-kit';
 
 // Start mock upstream MCP server
 async function startMockUpstream(): Promise<ChildProcess> {
@@ -116,18 +117,9 @@ describe('Proxy MCP e2e', () => {
     proxyServer = await startProxyServer(payee);
     
     // Create MCP client with payment capabilities
-    mcpClient = new PaymentChannelMcpClient({
+    mcpClient = await createMcpClient({
       baseUrl: 'http://127.0.0.1:5100/mcp',
-      signer: payer.signer,
-      keyId: `${payer.did}#${payer.vmIdFragment}`,
-      payerDid: payer.did,
-      payeeDid: payee.did, // Add payeeDid
-      defaultAssetId: testAsset.assetId,
-      chainConfig: {
-        chain: 'rooch' as const,
-        rpcUrl: env.rpcUrl,
-        network: 'local',
-      },
+      env: payer.identityEnv,
       debug: true,
       maxAmount: BigInt(100000000000), // 100 RGas - increase to handle higher costs
     });
@@ -153,7 +145,9 @@ describe('Proxy MCP e2e', () => {
 
     console.log('🔍 Testing proxy tool list');
 
-    const tools = await mcpClient.listTools();
+    const tools = await mcpClient.listTools({
+      includeBuiltinTools: true,
+    });
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('Available tools:', names);
@@ -278,7 +272,9 @@ describe('Proxy MCP e2e', () => {
 
     console.log('📋 Testing comprehensive tool list');
 
-    const tools = await mcpClient.listTools();
+    const tools = await mcpClient.listTools({
+      includeBuiltinTools: true,
+    });
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('All available tools:', names);
@@ -384,20 +380,11 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
     proxyServer = await startStdioProxyServer(payee);
     
     // Create MCP client with payment capabilities
-    mcpClient = new PaymentChannelMcpClient({
+    mcpClient = await createMcpClient({
       baseUrl: 'http://127.0.0.1:5200/mcp',
-      signer: payer.signer,
-      keyId: `${payer.did}#${payer.vmIdFragment}`,
-      payerDid: payer.did,
-      payeeDid: payee.did,
-      defaultAssetId: testAsset.assetId,
-      chainConfig: {
-        chain: 'rooch' as const,
-        rpcUrl: env.rpcUrl,
-        network: 'local',
-      },
+      env: payer.identityEnv,
       debug: true,
-      maxAmount: BigInt(100000000000), // 100 RGas
+      maxAmount: BigInt(100000000000), // 100 RGas - increase to handle higher costs
     });
 
     // Fund the payer's hub
@@ -420,7 +407,9 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
 
     console.log('🔍 Testing stdio proxy tool list');
 
-    const tools = await mcpClient.listTools();
+    const tools = await mcpClient.listTools({
+      includeBuiltinTools: true,
+    });
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('Available stdio tools:', names);
