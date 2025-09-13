@@ -49,20 +49,6 @@ export interface NuwaClientMethods {
 		label: string,
 		message: string | Record<string, any>,
 	): Promise<void>;
-
-	/**
-	 * Save state data to the parent Nuwa client
-	 * @param state State data to save
-	 * @returns Promise resolving when state is saved
-	 */
-	saveState<T = any>(state: T): Promise<void>;
-
-	/**
-	 * Retrieve state data from the parent Nuwa client
-	 * @returns Promise resolving with the saved state
-	 */
-	getState<T = any>(): Promise<T | null>;
-
 }
 
 // Penpal-specific parent methods interface
@@ -74,8 +60,6 @@ type PenpalParentMethods = {
 		label: string,
 		message: string | Record<string, any>,
 	): Reply<void>;
-	saveState(state: any): Reply<void>;
-	getState(): Reply<any>;
 };
 
 export interface NuwaClientOptions {
@@ -217,42 +201,6 @@ export class NuwaClient implements NuwaClientMethods {
 			this.handleMethodError("addSelection", error);
 		}
 	}
-
-	/**
-	 * Save state data to the parent Nuwa client
-	 */
-	async saveState<T = any>(state: T): Promise<void> {
-		await this.ensureConnected();
-
-		this.log("Saving state", { stateType: typeof state });
-		try {
-			await this.parentMethods!.saveState(
-				state,
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-		} catch (error: any) {
-			this.handleMethodError("saveState", error);
-		}
-	}
-
-	/**
-	 * Retrieve state data from the parent Nuwa client
-	 */
-	async getState<T = any>(): Promise<T | null> {
-		await this.ensureConnected();
-
-		this.log("Getting state");
-		try {
-			const state = await this.parentMethods!.getState(
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-			return state as T | null;
-		} catch (error: any) {
-			this.handleMethodError("getState", error);
-			return null; // This will never be reached due to handleMethodError throwing
-		}
-	}
-
 
 	// === Connection Management ===
 
