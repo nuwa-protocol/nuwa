@@ -102,7 +102,7 @@ export class RequestManager {
       }
     }, newTimeoutMs);
 
-    this.logger.debug('[payment.timeout.extend]', 'clientTxRef=', clientTxRef, 'ms=', newTimeoutMs);
+    //this.logger.debug('[payment.timeout.extend]', 'clientTxRef=', clientTxRef, 'ms=', newTimeoutMs);
   }
 
   /**
