@@ -1,6 +1,7 @@
 import {
 	CallOptions,
 	connect,
+	debug,
 	type RemoteProxy,
 	type Reply,
 	WindowMessenger,
@@ -11,6 +12,21 @@ export const NUWA_CLIENT_TIMEOUT = 1000;
 
 // Default timeout for method calls
 export const NUWA_METHOD_TIMEOUT = 2000;
+
+// Per-method default timeouts (can be overridden via options)
+export const NUWA_SEND_PROMPT_TIMEOUT = NUWA_METHOD_TIMEOUT;
+export const NUWA_SET_HEIGHT_TIMEOUT = NUWA_METHOD_TIMEOUT;
+export const NUWA_ADD_SELECTION_TIMEOUT = NUWA_METHOD_TIMEOUT;
+export const NUWA_SAVE_STATE_TIMEOUT = NUWA_METHOD_TIMEOUT;
+export const NUWA_GET_STATE_TIMEOUT = 3000;
+
+// Retry defaults
+export const NUWA_METHOD_RETRIES = 0;
+export const NUWA_SEND_PROMPT_RETRIES = NUWA_METHOD_RETRIES;
+export const NUWA_SET_HEIGHT_RETRIES = NUWA_METHOD_RETRIES;
+export const NUWA_ADD_SELECTION_RETRIES = NUWA_METHOD_RETRIES;
+export const NUWA_SAVE_STATE_RETRIES = NUWA_METHOD_RETRIES;
+export const NUWA_GET_STATE_RETRIES = 3;
 
 // Re-export Penpal error codes for client use
 export { ErrorCode } from "penpal";
@@ -62,7 +78,6 @@ export interface NuwaClientMethods {
 	 * @returns Promise resolving with the saved state
 	 */
 	getState<T = any>(): Promise<T | null>;
-
 }
 
 // Penpal-specific parent methods interface
@@ -82,7 +97,14 @@ export interface NuwaClientOptions {
 	allowedOrigins?: string[];
 	timeout?: number;
 	debug?: boolean;
+	// Global fallback timeout for all method calls
 	methodTimeout?: number;
+	// Optional per-method timeouts override the global value
+	methodTimeouts?: Partial<Record<keyof NuwaClientMethods, number>>;
+	// Global fallback retries for all method calls
+	methodRetries?: number;
+	// Optional per-method retries override the global value
+	methodRetriesMap?: Partial<Record<keyof NuwaClientMethods, number>>;
 }
 
 /**
@@ -93,19 +115,17 @@ export class NuwaClient implements NuwaClientMethods {
 	private parentMethods: RemoteProxy<PenpalParentMethods> | null = null;
 	private connectionStatus: boolean = false;
 	private connectionPromise: Promise<void> | null = null;
+	// Store the underlying Penpal connection to allow proper cleanup
+	private penpalConnection: any | null = null;
 	private options: NuwaClientOptions;
-	private methodTimeout: number;
 
 	constructor(options: NuwaClientOptions = {}) {
 		this.options = {
 			allowedOrigins: ["*"],
+			debug: true,
 			timeout: NUWA_CLIENT_TIMEOUT,
-			debug: false,
-			methodTimeout: NUWA_METHOD_TIMEOUT,
 			...options,
 		};
-
-		this.methodTimeout = this.options.methodTimeout || NUWA_METHOD_TIMEOUT;
 
 		this.log("NuwaClient initialized", this.options);
 	}
@@ -114,12 +134,19 @@ export class NuwaClient implements NuwaClientMethods {
 	 * Connect to parent window via Penpal
 	 */
 	async connect(): Promise<void> {
-		if (this.connectionPromise) {
-			return this.connectionPromise;
+		// If already connected, nothing to do
+		if (this.parentMethods && this.connectionStatus) return;
+
+		// Reuse in-flight connection attempt; reset on failure so we can retry
+		if (!this.connectionPromise) {
+			this.connectionPromise = this.establishConnection().catch((err) => {
+				this.connectionPromise = null; // allow subsequent retries
+				throw err;
+			});
 		}
 
-		this.connectionPromise = this.establishConnection();
-		return this.connectionPromise;
+		// Ensure callers only proceed after successful handshake
+		await this.connectionPromise;
 	}
 
 	private async establishConnection(): Promise<void> {
@@ -138,13 +165,13 @@ export class NuwaClient implements NuwaClientMethods {
 				allowedOrigins: this.options.allowedOrigins || ["*"],
 			});
 
-			const conn = connect<PenpalParentMethods>({
+			// Create and keep the connection so we can destroy it on disconnect
+			this.penpalConnection = connect<PenpalParentMethods>({
 				messenger,
-				timeout: this.options.timeout || NUWA_CLIENT_TIMEOUT,
-				// log: debug("Child"),
+				log: this.options.debug ? debug("Nuwa Child") : undefined,
 			});
 
-			this.parentMethods = await conn.promise;
+			this.parentMethods = await this.penpalConnection.promise;
 			this.connectionStatus = true;
 
 			this.log("Connected to parent successfully");
@@ -166,14 +193,12 @@ export class NuwaClient implements NuwaClientMethods {
 		this.log("Sending prompt", {
 			prompt: prompt.substring(0, 100) + "...",
 		});
-		try {
-			await this.parentMethods!.sendPrompt(
+		await this.callWithRetry("sendPrompt", async () =>
+			this.parentMethods!.sendPrompt(
 				prompt,
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-		} catch (error: any) {
-			this.handleMethodError("sendPrompt", error);
-		}
+				new CallOptions({ timeout: this.getTimeout("sendPrompt") }),
+			),
+		);
 	}
 
 	/**
@@ -183,14 +208,12 @@ export class NuwaClient implements NuwaClientMethods {
 		await this.ensureConnected();
 
 		this.log("Setting height", { height });
-		try {
-			await this.parentMethods!.setHeight(
+		await this.callWithRetry("setHeight", async () =>
+			this.parentMethods!.setHeight(
 				height,
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-		} catch (error: any) {
-			this.handleMethodError("setHeight", error);
-		}
+				new CallOptions({ timeout: this.getTimeout("setHeight") }),
+			),
+		);
 	}
 
 	/**
@@ -207,15 +230,13 @@ export class NuwaClient implements NuwaClientMethods {
 			typeof message === "string" ? message : JSON.stringify(message);
 
 		this.log("Sending selection", { name: label });
-		try {
-			await this.parentMethods!.addSelection(
+		await this.callWithRetry("addSelection", async () =>
+			this.parentMethods!.addSelection(
 				label,
 				normalizedMessage,
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-		} catch (error: any) {
-			this.handleMethodError("addSelection", error);
-		}
+				new CallOptions({ timeout: this.getTimeout("addSelection") }),
+			),
+		);
 	}
 
 	/**
@@ -225,14 +246,12 @@ export class NuwaClient implements NuwaClientMethods {
 		await this.ensureConnected();
 
 		this.log("Saving state", { stateType: typeof state });
-		try {
-			await this.parentMethods!.saveState(
+		await this.callWithRetry("saveState", async () =>
+			this.parentMethods!.saveState(
 				state,
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-		} catch (error: any) {
-			this.handleMethodError("saveState", error);
-		}
+				new CallOptions({ timeout: this.getTimeout("saveState") }),
+			),
+		);
 	}
 
 	/**
@@ -242,17 +261,12 @@ export class NuwaClient implements NuwaClientMethods {
 		await this.ensureConnected();
 
 		this.log("Getting state");
-		try {
-			const state = await this.parentMethods!.getState(
-				new CallOptions({ timeout: this.methodTimeout }),
-			);
-			return state as T | null;
-		} catch (error: any) {
-			this.handleMethodError("getState", error);
-			return null; // This will never be reached due to handleMethodError throwing
-		}
+		return await this.callWithRetry("getState", async () =>
+			this.parentMethods!.getState(
+				new CallOptions({ timeout: this.getTimeout("getState") }),
+			).then((s) => s as T | null),
+		);
 	}
-
 
 	// === Connection Management ===
 
@@ -277,6 +291,15 @@ export class NuwaClient implements NuwaClientMethods {
 		this.parentMethods = null;
 		this.connectionPromise = null;
 		this.connectionStatus = false;
+
+		// Destroy the underlying Penpal connection if present
+		try {
+			this.penpalConnection?.destroy?.();
+		} catch {
+			// no-op
+		} finally {
+			this.penpalConnection = null;
+		}
 
 		this.log("Disconnected from parent");
 	}
@@ -311,7 +334,75 @@ export class NuwaClient implements NuwaClientMethods {
 
 	private log(message: string, data?: any): void {
 		if (this.options.debug) {
-			console.debug(`[NuwaClient] ${message}`, data);
+			console.debug(`[NuwaClient SDK] ${message}`, data);
 		}
+	}
+
+	// Resolve timeout for a given method using per-method overrides,
+	// then global methodTimeout, then the built-in default.
+	private getTimeout(method: keyof NuwaClientMethods): number {
+		const perMethod = this.options.methodTimeouts?.[method];
+		if (typeof perMethod === "number") return perMethod;
+		if (typeof this.options.methodTimeout === "number")
+			return this.options.methodTimeout;
+		// Use per-method defaults if defined
+		switch (method) {
+			case "sendPrompt":
+				return NUWA_SEND_PROMPT_TIMEOUT;
+			case "setHeight":
+				return NUWA_SET_HEIGHT_TIMEOUT;
+			case "addSelection":
+				return NUWA_ADD_SELECTION_TIMEOUT;
+			case "saveState":
+				return NUWA_SAVE_STATE_TIMEOUT;
+			case "getState":
+				return NUWA_GET_STATE_TIMEOUT;
+			default:
+				return NUWA_METHOD_TIMEOUT;
+		}
+	}
+
+	// Resolve retry count for a given method using per-method overrides,
+	// then global methodRetries, then the built-in default.
+	private getRetries(method: keyof NuwaClientMethods): number {
+		const perMethod = this.options.methodRetriesMap?.[method];
+		if (typeof perMethod === "number") return perMethod;
+		if (typeof this.options.methodRetries === "number")
+			return this.options.methodRetries;
+		switch (method) {
+			case "sendPrompt":
+				return NUWA_SEND_PROMPT_RETRIES;
+			case "setHeight":
+				return NUWA_SET_HEIGHT_RETRIES;
+			case "addSelection":
+				return NUWA_ADD_SELECTION_RETRIES;
+			case "saveState":
+				return NUWA_SAVE_STATE_RETRIES;
+			case "getState":
+				return NUWA_GET_STATE_RETRIES;
+			default:
+				return NUWA_METHOD_RETRIES;
+		}
+	}
+
+	// Generic retry wrapper used by all outbound calls
+	private async callWithRetry<T>(
+		method: keyof NuwaClientMethods,
+		fn: () => Promise<T>,
+	): Promise<T> {
+		const retries = this.getRetries(method);
+		let attempt = 0;
+		let lastError: any;
+		while (attempt <= retries) {
+			try {
+				return await fn();
+			} catch (err) {
+				lastError = err;
+				attempt += 1;
+				if (attempt > retries) break;
+			}
+		}
+		// If we get here, all attempts failed; throw structured error
+		this.handleMethodError(method as string, lastError);
 	}
 }

@@ -34,9 +34,9 @@ Connect to the Nuwa Client to call its functions from your Cap UI.
 import { useNuwaClient } from '@nuwa-ai/ui-kit';
 
 function MyCapUI() {
-  const { containerRef, nuwaClient, isConnected } = useNuwaClient({
+  const { containerRef, nuwaClient } = useNuwaClient({
     autoAdjustHeight: true, // Automatically adjust iframe height
-    onConnected: () => console.log('Connected to parent!'),
+    onConnected: () => console.log('Connected to Nuwa!'),
     onError: (error) => console.error('Connection error:', error)
   });
 
@@ -51,7 +51,6 @@ function MyCapUI() {
   return (
     <div ref={containerRef} className="p-4">
       <h1>My Cap UI</h1>
-      <p>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</p>
       
       <button onClick={handleSendPrompt} disabled={!isConnected}>
         Send Prompt to AI
