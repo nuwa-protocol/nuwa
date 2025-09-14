@@ -151,6 +151,11 @@ export function wrapAndFilterInBandFrames(
 
   const headers = new Headers(response.headers);
   headers.delete('content-length');
+  // Normalize content-type to guide downstream parsers
+  try {
+    if (isSSE) headers.set('content-type', 'text/event-stream; charset=utf-8');
+    else if (isNDJSON) headers.set('content-type', 'application/x-ndjson');
+  } catch {}
   const filteredResponse = new Response(filtered as any, {
     status: response.status,
     statusText: response.statusText,
@@ -190,8 +195,10 @@ class SseInbandParser implements InBandParser {
       try {
         const o = JSON.parse(m[1]);
         const header = o?.nuwa_payment_header || o?.__nuwa_payment_header__;
-        this.log('[extractPaymentHeaderFromEventLines]', header);
-        if (typeof header === 'string') return header;
+        if (typeof header === 'string') {
+          this.log('[extractPaymentHeaderFromEventLines]', header);
+          return header;
+        }
       } catch {}
     }
     return null;
@@ -204,14 +211,27 @@ class SseInbandParser implements InBandParser {
     if (!headerValue) {
       for (const out of this.pendingEvent) {
         const bytes = this.encoder.encode(out + '\n');
-        if (!this.shouldEmit || this.shouldEmit(controller)) controller.enqueue(bytes);
+        // Never drop data lines; rely on controller backpressure
+        controller.enqueue(bytes);
       }
+      // Ensure SSE event separation with a single blank line delimiter
+      const last = this.pendingEvent[this.pendingEvent.length - 1];
+      if (last !== '') {
+        const sep = this.encoder.encode('\n');
+        // Never drop the protocol boundary due to backpressure
+        controller.enqueue(sep);
+        this.log('[sse.event.emit.sep]', true);
+      }
+
       this.pendingEvent = [];
       return;
     }
     try {
       this.onTick?.();
-    } catch {}
+    } catch (e) {
+      this.log('[sse.event.onTick.error]', e);
+    }
+
     await safeHandlePayment({ headerValue }, this.onPayment, this.log);
     this.onAfterPayment(controller);
     this.pendingEvent = [];
@@ -227,7 +247,9 @@ class SseInbandParser implements InBandParser {
     for (const line of lines) {
       try {
         this.onTick?.();
-      } catch {}
+      } catch (e) {
+        this.log('[sse.event.onTick.error]', e);
+      }
       this.pendingEvent.push(line);
       if (line === '') {
         try {
@@ -279,15 +301,17 @@ class NdjsonInbandParser implements InBandParser {
   ): Promise<void> {
     const t = line.trim();
     if (!t) return;
+    try {
+      this.log('[ndjson.emit.line]', t.slice(0, 128));
+    } catch {}
     const headerValue = this.extractPaymentHeaderFromLine(t);
     if (!headerValue) {
       const bytes = this.encoder.encode(line + '\n');
-      if (!this.shouldEmit || this.shouldEmit(controller)) controller.enqueue(bytes);
+      // Never drop data lines; rely on controller backpressure
+      controller.enqueue(bytes);
       return;
     }
-    try {
-      this.onTick?.();
-    } catch {}
+    this.onTick?.();
     await safeHandlePayment({ headerValue }, this.onPayment, this.log);
     this.onAfterPayment(controller);
   }

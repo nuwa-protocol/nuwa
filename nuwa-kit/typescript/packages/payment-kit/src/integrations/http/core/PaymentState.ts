@@ -110,7 +110,11 @@ export class PaymentState {
       (this.highestObservedNonce && subRav.nonce <= this.highestObservedNonce) ||
       (currentNonce && subRav.nonce <= currentNonce)
     ) {
-      this.logger.debug('Rejecting SubRAV: nonce not progressive');
+      this.logger.debug('Rejecting SubRAV: nonce not progressive', {
+        highestObservedNonce: this.highestObservedNonce,
+        currentNonce: currentNonce,
+        subRavNonce: subRav.nonce,
+      });
       return false;
     }
 
