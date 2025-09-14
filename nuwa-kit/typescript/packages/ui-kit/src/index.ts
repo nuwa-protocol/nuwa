@@ -21,7 +21,6 @@ export type {
 } from "./nuwa-client/nuwa-client.js";
 export {
 	NUWA_CLIENT_TIMEOUT,
-	NUWA_METHOD_TIMEOUT,
 	NuwaClient,
 } from "./nuwa-client/nuwa-client.js";
 // === React Hook for Nuwa Client ===

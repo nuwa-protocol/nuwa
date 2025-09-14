@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { NuwaClient, type NuwaClientOptions } from "./nuwa-client";
 
 export interface useNuwaClientProps extends NuwaClientOptions {
@@ -9,7 +9,6 @@ export interface useNuwaClientProps extends NuwaClientOptions {
 
 export interface useNuwaClientReturn {
 	nuwaClient: NuwaClient;
-	isConnected: boolean;
 
 	// Auto height management
 	containerRef: React.RefObject<HTMLDivElement>;
@@ -31,11 +30,15 @@ export function useNuwaClient(
 	} = props;
 
 	const containerRef = useRef<HTMLDivElement>(null);
-	const [isConnected, setIsConnected] = useState(false);
 
-	const nuwaClient = new NuwaClient({
-		...nuwaClientOptions,
-	});
+	// Keep a stable NuwaClient instance across renders
+	const nuwaClientRef = useRef<NuwaClient | null>(null);
+	if (!nuwaClientRef.current) {
+		nuwaClientRef.current = new NuwaClient({
+			...nuwaClientOptions,
+		});
+	}
+	const nuwaClient = nuwaClientRef.current;
 
 	// Update height function for auto-adjust functionality
 	const updateHeight = () => {
@@ -54,13 +57,11 @@ export function useNuwaClient(
 		const connect = async () => {
 			try {
 				await nuwaClient.connect();
-				setIsConnected(true);
 				onConnected?.();
 
 				// Trigger initial height update after connection
 				setTimeout(updateHeight, 0);
 			} catch (err) {
-				setIsConnected(false);
 				const error =
 					err instanceof Error ? err : new Error("Connection failed");
 				onError?.(error);
@@ -71,7 +72,6 @@ export function useNuwaClient(
 
 		// Cleanup on unmount
 		return () => {
-			setIsConnected(false);
 			nuwaClient.disconnect();
 		};
 	}, []); // Only run once on mount
@@ -105,8 +105,7 @@ export function useNuwaClient(
 	}, [autoAdjustHeight]);
 
 	return {
-		nuwaClient,
-		isConnected,
+		nuwaClient: nuwaClient as NuwaClient,
 
 		// Auto height management
 		containerRef: containerRef as React.RefObject<HTMLDivElement>,
