@@ -220,15 +220,18 @@ class SseInbandParser implements InBandParser {
         const sep = this.encoder.encode('\n');
         // Never drop the protocol boundary due to backpressure
         controller.enqueue(sep);
-        try {
-          this.log('[sse.event.emit.sep]', true);
-        } catch {}
+        this.log('[sse.event.emit.sep]', true);
       }
 
       this.pendingEvent = [];
       return;
     }
-    this.onTick?.();
+    try {
+      this.onTick?.();
+    } catch (e) {
+      this.log('[sse.event.onTick.error]', e);
+    }
+
     await safeHandlePayment({ headerValue }, this.onPayment, this.log);
     this.onAfterPayment(controller);
     this.pendingEvent = [];
@@ -244,7 +247,9 @@ class SseInbandParser implements InBandParser {
     for (const line of lines) {
       try {
         this.onTick?.();
-      } catch {}
+      } catch (e) {
+        this.log('[sse.event.onTick.error]', e);
+      }
       this.pendingEvent.push(line);
       if (line === '') {
         try {
