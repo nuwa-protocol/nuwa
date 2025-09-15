@@ -1,14 +1,22 @@
 #!/bin/bash
 
 # Deploy MCP Proxy instance to Railway
-# Usage: ./deploy.sh <instance-name>
+# Usage: ./deploy.sh <instance-name> [existing-project-id]
+# 
+# If existing-project-id is provided, the service will be added to that project
+# Otherwise, a new project will be created
 
 set -e
 
 INSTANCE_NAME="$1"
+EXISTING_PROJECT_ID="$2"
 
 if [ -z "$INSTANCE_NAME" ]; then
-    echo "Usage: $0 <instance-name>"
+    echo "Usage: $0 <instance-name> [existing-project-id]"
+    echo ""
+    echo "Arguments:"
+    echo "  instance-name        Name of the instance to deploy"
+    echo "  existing-project-id  Optional: ID of existing Railway project to add service to"
     echo ""
     echo "Available instances:"
     ls -1 "$(dirname "$(dirname "${BASH_SOURCE[0]}")")/instances" 2>/dev/null || echo "  (none)"
@@ -65,31 +73,52 @@ echo "✅ Configuration file: $CONFIG_FILE"
 # Create or connect Railway project
 echo "🔗 Connecting Railway project..."
 
-# Try to connect to existing project
-if [ -f "$INSTANCE_DIR/.railway-project-id" ]; then
-    PROJECT_ID=$(cat "$INSTANCE_DIR/.railway-project-id")
-    echo "📋 Using existing project ID: $PROJECT_ID"
-    railway link "$PROJECT_ID" || {
+# Check if existing project ID is provided as argument
+if [ -n "$EXISTING_PROJECT_ID" ]; then
+    echo "📋 Using provided project ID: $EXISTING_PROJECT_ID"
+    PROJECT_ID="$EXISTING_PROJECT_ID"
+    echo "$PROJECT_ID" > "$INSTANCE_DIR/.railway-project-id"
+    railway link --project "$PROJECT_ID" || {
         echo "❌ Cannot connect to project $PROJECT_ID"
-        echo "May need to recreate project"
-        rm -f "$INSTANCE_DIR/.railway-project-id"
+        echo "Please verify the project ID is correct and you have access to it"
+        exit 1
     }
+    echo "✅ Connected to existing project: $PROJECT_ID"
+else
+    # Try to connect to existing project from saved file
+    if [ -f "$INSTANCE_DIR/.railway-project-id" ]; then
+        PROJECT_ID=$(cat "$INSTANCE_DIR/.railway-project-id")
+        echo "📋 Using saved project ID: $PROJECT_ID"
+        railway link --project "$PROJECT_ID" || {
+            echo "❌ Cannot connect to project $PROJECT_ID"
+            echo "May need to recreate project"
+            rm -f "$INSTANCE_DIR/.railway-project-id"
+        }
+    fi
+
+    # If no project ID, create new project
+    if [ ! -f "$INSTANCE_DIR/.railway-project-id" ]; then
+        echo "🆕 Creating new Railway project..."
+        railway init --name "$INSTANCE_NAME"
+        
+        # Get project ID from status
+        PROJECT_ID=$(railway status --json | jq -r '.id')
+        if [ -n "$PROJECT_ID" ]; then
+            echo "$PROJECT_ID" > "$INSTANCE_DIR/.railway-project-id"
+            echo "✅ Project created successfully: $PROJECT_ID"
+        else
+            echo "❌ Failed to get project ID after creation"
+            exit 1
+        fi
+    fi
 fi
 
-# If no project ID, create new project
-if [ ! -f "$INSTANCE_DIR/.railway-project-id" ]; then
-    echo "🆕 Creating new Railway project..."
-    railway create "$INSTANCE_NAME" --json > /tmp/railway-create.json
-    PROJECT_ID=$(cat /tmp/railway-create.json | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
-    echo "$PROJECT_ID" > "$INSTANCE_DIR/.railway-project-id"
-    echo "✅ Project created successfully: $PROJECT_ID"
-fi
+# Add service if not exists
+echo "🔧 Setting up service..."
+railway add --service "$INSTANCE_NAME" --variables "CONFIG_PATH=./deployments/instances/$INSTANCE_NAME/config.yaml" || echo "Service may already exist"
 
 # Set environment variables
 echo "🔧 Configuring environment variables..."
-
-# Set configuration file path
-railway variables set CONFIG_PATH="./deployments/instances/$INSTANCE_NAME/config.yaml"
 
 # Read environment variable examples from env.example
 if [ -f "$INSTANCE_DIR/env.example" ]; then
@@ -97,7 +126,7 @@ if [ -f "$INSTANCE_DIR/env.example" ]; then
     echo ""
     cat "$INSTANCE_DIR/env.example" | grep -E "^[A-Z_]+=.*_here" | while read line; do
         VAR_NAME=$(echo "$line" | cut -d'=' -f1)
-        echo "  railway variables set $VAR_NAME=<your_value>"
+        echo "  railway variables --set \"$VAR_NAME=<your_value>\""
     done
     echo ""
     echo "⚠️  Please manually set the above environment variables before continuing"
@@ -113,7 +142,7 @@ railway up --detach
 echo "🌐 Getting deployment information..."
 sleep 5  # Wait for deployment to start
 
-DEPLOY_URL=$(railway status --json | grep -o '"url":"[^"]*"' | cut -d'"' -f4 || echo "")
+DEPLOY_URL=$(railway status --json | jq -r '.services.edges[0].node.url // empty' || echo "")
 
 if [ -n "$DEPLOY_URL" ]; then
     echo "✅ Deployment successful!"
