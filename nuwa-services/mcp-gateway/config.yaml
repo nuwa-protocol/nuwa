@@ -1,0 +1,52 @@
+# MCP Gateway Configuration
+
+# Gateway server settings
+port: ${PORT}
+baseDomain: "mcpproxy.xyz"
+
+# Default target for root domain (optional)
+# defaultTarget: "https://nuwa.ai"
+
+# CORS configuration
+cors:
+  origin: "*"
+  credentials: false
+
+# Health check configuration
+healthCheck:
+  interval: 30  # seconds
+  timeout: 10   # seconds
+
+# Debug mode
+debug: ${DEBUG}
+
+# MCP Instance configurations
+instances:
+  - name: "amap-proxy"
+    subdomain: "amap"
+    targetUrl: "https://amap-proxy.railway.app"
+    healthPath: "/health"
+    enabled: true
+    description: "Amap Maps MCP Proxy - 高德地图服务"
+
+  - name: "context7-proxy"
+    subdomain: "context7"
+    targetUrl: "https://context7-proxy.railway.app"
+    healthPath: "/health"
+    enabled: true
+    description: "Context7 Documentation Library Proxy - 文档库服务"
+
+  - name: "github-proxy"
+    subdomain: "github"
+    targetUrl: "https://github-proxy.railway.app"
+    healthPath: "/health"
+    enabled: false  # Disabled until deployed
+    description: "GitHub MCP Proxy - GitHub API 服务"
+
+  # Example of a custom instance
+  # - name: "custom-proxy"
+  #   subdomain: "custom"
+  #   targetUrl: "https://custom-proxy.railway.app"
+  #   healthPath: "/health"
+  #   enabled: true
+  #   description: "Custom MCP Service"
