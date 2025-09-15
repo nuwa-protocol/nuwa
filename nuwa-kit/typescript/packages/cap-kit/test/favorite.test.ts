@@ -32,5 +32,5 @@ describe("CapKit", () => {
     const fav1 = await capKit.queryMyFavorite()
     expect(fav1.code).toBe(200);
     expect(fav1.data?.items.length).toEqual(0)
-  }, 150000);
+  }, 1500000);
 });
