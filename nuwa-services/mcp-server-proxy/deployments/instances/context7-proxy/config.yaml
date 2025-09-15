@@ -20,9 +20,9 @@ debug: ${DEBUG}
 register:
   tools:
     # Library resolution - free
-    - name: "mcp_context7_resolve-library-id"
+    - name: "resolve-library-id"
       pricePicoUSD: "0"
     
     # Documentation retrieval
-    - name: "mcp_context7_get-library-docs"
+    - name: "get-library-docs"
       pricePicoUSD: "100000000"  

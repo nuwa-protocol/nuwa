@@ -83,8 +83,6 @@ upstream:
 serviceId: "$INSTANCE_NAME"
 serviceKey: "\${SERVICE_KEY}"
 network: "test"
-rpcUrl: "\${ROOCH_RPC_URL}"
-defaultAssetId: "0x3::gas_coin::RGas"
 defaultPricePicoUSD: "1000000000"  # 0.001 USD
 debug: \${DEBUG}
 
