@@ -57,7 +57,9 @@ export function useNuwaClient(
 		const connect = async () => {
 			try {
 				await nuwaClient.connect();
-				onConnected?.();
+				setTimeout(() => {
+					onConnected?.();
+				}, 0);
 
 				// Trigger initial height update after connection
 				setTimeout(updateHeight, 0);

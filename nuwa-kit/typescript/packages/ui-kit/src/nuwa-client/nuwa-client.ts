@@ -8,7 +8,7 @@ import {
 } from "penpal";
 
 // Default timeout for Penpal connections
-export const NUWA_CLIENT_TIMEOUT = 1000;
+export const NUWA_CLIENT_TIMEOUT = 2000;
 
 // Default timeout for method calls
 export const NUWA_METHOD_TIMEOUT = 2000;
