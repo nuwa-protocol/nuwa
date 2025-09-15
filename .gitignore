@@ -69,3 +69,9 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Railway deployment files
+.railway-project-id
+.deployment-info
+**/.railway-project-id
+**/.deployment-info
