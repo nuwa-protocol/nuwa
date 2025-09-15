@@ -21,7 +21,9 @@ export default function NotePage() {
 
 
   // connect to Nuwa Client on mount and obtain nuwa client methods
-  const { nuwaClient, isConnected: isNuwaConnected } = useNuwaClient({
+  //TODO FIXME
+  const isNuwaConnected = true;
+  const { nuwaClient } = useNuwaClient({
     onError: (error) => {
       console.error("Nuwa client error:", error);
     },

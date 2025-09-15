@@ -13,10 +13,10 @@ export default function NuwaClientDemoPage() {
 
     // Connection state is now provided by the hook
     const [error, setError] = useState<string | null>(null);
-
+    //TODO FIXME
+    const isNuwaConnected = true;
     const {
         nuwaClient,
-        isConnected: isNuwaConnected,
         containerRef,
     } = useNuwaClient({
         autoAdjustHeight: true,
