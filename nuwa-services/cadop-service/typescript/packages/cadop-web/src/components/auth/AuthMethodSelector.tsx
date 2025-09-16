@@ -1,0 +1,148 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { WebAuthnLogin } from './WebAuthnLogin';
+import { WalletLogin } from './WalletLogin';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { AuthMethod } from '../../lib/storage/types';
+
+interface AuthMethodSelectorProps {
+  onSuccess?: (userDid: string, isNew: boolean) => void;
+  onError?: (error: string) => void;
+}
+
+export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorProps) {
+  const [supportedMethods, setSupportedMethods] = useState<AuthMethod[]>([]);
+  const [activeTab, setActiveTab] = useState<AuthMethod>('passkey');
+  const { getSupportedAuthMethods } = useAuth();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    async function loadSupportedMethods() {
+      try {
+        const methods = await getSupportedAuthMethods();
+        setSupportedMethods(methods);
+
+        // Set default tab to first supported method
+        if (methods.length > 0) {
+          setActiveTab(methods[0]);
+        }
+      } catch (error) {
+        console.error('Failed to load supported auth methods:', error);
+        // Fallback to Passkey only
+        setSupportedMethods(['passkey']);
+        setActiveTab('passkey');
+      }
+    }
+
+    loadSupportedMethods();
+  }, [getSupportedAuthMethods]);
+
+  const getMethodLabel = (method: AuthMethod): string => {
+    switch (method) {
+      case 'passkey':
+        return 'Passkey';
+      case 'wallet':
+        return 'Wallet';
+      default:
+        return method;
+    }
+  };
+
+  const getMethodIcon = (method: AuthMethod) => {
+    switch (method) {
+      case 'passkey':
+        return (
+          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+      case 'wallet':
+        return (
+          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 114 0 2 2 0 01-4 0zm6 0a2 2 0 114 0 2 2 0 01-4 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (supportedMethods.length === 0) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-gray-500">Loading authentication methods...</p>
+      </div>
+    );
+  }
+
+  // If only one method is supported, show it directly without tabs
+  if (supportedMethods.length === 1) {
+    const method = supportedMethods[0];
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900 flex items-center justify-center">
+            {getMethodIcon(method)}
+            Sign in with {getMethodLabel(method)}
+          </h3>
+        </div>
+
+        {method === 'passkey' && <WebAuthnLogin onSuccess={onSuccess} onError={onError} />}
+        {method === 'wallet' && <WalletLogin onSuccess={onSuccess} onError={onError} />}
+      </div>
+    );
+  }
+
+  // Multiple methods available, show tabs
+  return (
+    <Tabs
+      value={activeTab}
+      onValueChange={value => setActiveTab(value as AuthMethod)}
+      className="w-full"
+    >
+      <TabsList className="grid w-full grid-cols-2">
+        {supportedMethods.map(method => (
+          <TabsTrigger key={method} value={method} className="flex items-center">
+            {getMethodIcon(method)}
+            {getMethodLabel(method)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      {supportedMethods.includes('passkey') && (
+        <TabsContent value="passkey" className="mt-6">
+          <div className="space-y-4">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">Sign in with Passkey</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Use your device's built-in authentication
+              </p>
+            </div>
+            <WebAuthnLogin onSuccess={onSuccess} onError={onError} />
+          </div>
+        </TabsContent>
+      )}
+
+      {supportedMethods.includes('wallet') && (
+        <TabsContent value="wallet" className="mt-6">
+          <div className="space-y-4">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900">Sign in with Wallet</h3>
+              <p className="text-sm text-gray-600 mt-1">Connect your Bitcoin wallet to sign in</p>
+            </div>
+            <WalletLogin onSuccess={onSuccess} onError={onError} />
+          </div>
+        </TabsContent>
+      )}
+    </Tabs>
+  );
+}

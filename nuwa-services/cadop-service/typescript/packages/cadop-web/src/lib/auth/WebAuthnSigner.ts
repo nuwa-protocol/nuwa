@@ -1,4 +1,4 @@
-import { Base64, isValid } from 'js-base64';
+import { Base64 } from 'js-base64';
 import type { DIDDocument, SignerInterface, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { MultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from '@nuwa-ai/identity-kit';
 import {
@@ -17,8 +17,7 @@ import {
   PublicKeyInitData,
   fromB64,
 } from '@roochnetwork/rooch-sdk';
-import { CryptoUtils, defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
-import { hexToBytes } from '@noble/curves/abstract/utils';
+import { defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
 import { PublicKeyUtils } from '../crypto/PublicKeyUtils';
 
@@ -357,6 +356,34 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.did;
   }
 
+  // SignerInterface methods
+  getDID(): string {
+    return this.did;
+  }
+
+  async getPublicKey(): Promise<Uint8Array> {
+    if (!this.passkeyAuthMethod?.publicKeyMultibase) {
+      throw new Error('Public key not found');
+    }
+    return MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase);
+  }
+
+  getAlgorithm(): string {
+    return this.passkeyAuthMethod.type || 'unknown';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      if (!window.PublicKeyCredential) {
+        return false;
+      }
+      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    } catch (error) {
+      console.error('Failed to check WebAuthn availability:', error);
+      return false;
+    }
+  }
+
   async getKeyInfo(keyId: string): Promise<
     | {
         type: KeyType;
@@ -512,7 +539,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.passkeyAuthMethod.type === KEY_TYPE.SECP256K1 ? 'Secp256k1' : 'ED25519';
   }
 
-  getPublicKey(): PublicKey<Address> {
+  getRoochPublicKey(): PublicKey<Address> {
     let publicKey = MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase!);
     if (this.passkeyAuthMethod.type === KEY_TYPE.SECP256K1) {
       return new Secp256k1PublicKey(publicKey);

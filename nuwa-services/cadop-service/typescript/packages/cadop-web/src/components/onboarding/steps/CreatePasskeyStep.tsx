@@ -55,10 +55,7 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
 
   if (loading) {
     return (
-      <FixedCardLoading
-        title={t('passkey.creating')}
-        message={t('passkey.creatingMessage')}
-      />
+      <FixedCardLoading title={t('passkey.creating')} message={t('passkey.creatingMessage')} />
     );
   }
 
@@ -85,12 +82,7 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
               {errorInfo.actionLabel || t('passkey.retry')}
             </FixedCardActionButton>
             {errorInfo.actionType !== 'retry' && (
-              <Button 
-                variant="outline" 
-                size="lg" 
-                onClick={handleCreate}
-                className="w-full"
-              >
+              <Button variant="outline" size="lg" onClick={handleCreate} className="w-full">
                 {t('passkey.retry')}
               </Button>
             )}
@@ -106,9 +98,7 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
                 <summary className="cursor-pointer text-sm opacity-75">
                   {t('common.technicalDetails', '技术详情')}
                 </summary>
-                <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto">
-                  {error}
-                </pre>
+                <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto">{error}</pre>
               </details>
             )}
           </AlertDescription>
@@ -129,9 +119,7 @@ export const CreatePasskeyStep: React.FC<Props> = ({ onComplete }) => {
       }
     >
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md text-center">
-        <p className="text-blue-800 font-semibold text-md">
-          {t('passkey.noteMessage')}
-        </p>
+        <p className="text-blue-800 font-semibold text-md">{t('passkey.noteMessage')}</p>
       </div>
     </FixedCardLayout>
   );

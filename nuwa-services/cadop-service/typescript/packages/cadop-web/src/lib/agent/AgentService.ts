@@ -1,92 +1,62 @@
-import { apiClient } from '../api/client';
-import { PasskeyService } from '../passkey/PasskeyService';
-import { custodianClient } from '../api/client';
-import type { AgentDIDCreationStatus, ChallengeResponse } from '@cadop/shared';
-import { UserStore, AuthStore } from '../storage';
-import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
+import { unifiedAgentService } from './UnifiedAgentService';
+import { PasskeyAgentService } from './PasskeyAgentService';
+import { WalletAgentService } from './WalletAgentService';
+import { AuthStore } from '../storage';
+import type { AgentDIDCreationStatus } from '@cadop/shared';
 
-function decodeJWT(jwt: string): any | null {
-  const parts = jwt.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
-  } catch {
-    return null;
-  }
-}
+// Initialize the unified agent service with available implementations
+const passkeyAgentService = new PasskeyAgentService();
+const walletAgentService = new WalletAgentService();
+unifiedAgentService.registerAgentService('passkey', passkeyAgentService);
+unifiedAgentService.registerAgentService('wallet', walletAgentService);
 
-function isTokenValid(token: string | null): boolean {
-  if (!token) return false;
-  const payload = decodeJWT(token);
-  if (!payload || typeof payload.exp !== 'number') return false;
-  const now = Math.floor(Date.now() / 1000);
-  return payload.exp - now > 30; // 30-second leeway
-}
-
+/**
+ * Legacy AgentService for backward compatibility
+ *
+ * @deprecated Use UnifiedAgentService directly for new code
+ */
 export class AgentService {
-  private passkeyService = new PasskeyService();
-
+  /**
+   * Get cached Agent DIDs for current user
+   */
   public getCachedAgentDIDs(userDid: string): string[] {
-    return UserStore.listAgents(userDid);
+    return unifiedAgentService.getCachedAgentDIDs(userDid);
   }
 
+  /**
+   * Get ID token for current user (Passkey only)
+   *
+   * @deprecated This method is specific to Passkey authentication
+   */
   public async getIdToken(interactive = false): Promise<string> {
-    // We no longer cache idToken as per design doc
-    // Always request a fresh token
-
-    // ensure we have userDid
     const userDid = AuthStore.getCurrentUserDid();
     if (!userDid) {
       throw new Error('User did not exist');
     }
 
-    // step 1: get challenge
-    const challengeResp = await apiClient.get<ChallengeResponse>('/api/idp/challenge');
-    if (!challengeResp.data)
-      throw new Error(String(challengeResp.error || 'Failed to get challenge'));
-    const { challenge, nonce } = challengeResp.data;
-    const rpId = window.location.hostname;
-    const origin = window.location.origin;
-    try {
-      // step 2: call PasskeyService.authenticateWithChallenge to authenticate
-      const { assertionJSON, userDid: authenticatedDid } =
-        await this.passkeyService.authenticateWithChallenge({
-          challenge,
-          rpId,
-          mediation: interactive ? 'required' : 'silent',
-        });
-
-      // step 3: send assertion to server to verify
-      const verifyResp = await apiClient.post<{ idToken: string }>(
-        '/api/idp/verify-assertion',
-        { assertion: assertionJSON, userDid: authenticatedDid, nonce, rpId, origin },
-        { skipAuth: true }
-      );
-
-      if (!verifyResp.data)
-        throw new Error(String(verifyResp.error || 'Failed to verify assertion'));
-      return verifyResp.data.idToken;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
-      console.error('Passkey authentication failed error:', errorMessage);
-      throw error;
+    // This only works for Passkey users
+    const agentService = unifiedAgentService.getAgentService(userDid);
+    if (agentService.authMethod !== 'passkey') {
+      throw new Error('getIdToken is only supported for Passkey users');
     }
+
+    // Cast to PasskeyAgentService to access getIdToken method
+    const passkeyService = agentService as PasskeyAgentService;
+    return await passkeyService.getIdToken(userDid, interactive);
   }
 
+  /**
+   * Create agent for current user
+   */
   public async createAgent(interactive = false): Promise<AgentDIDCreationStatus> {
-    const idToken = await this.getIdToken(interactive);
     const userDid = AuthStore.getCurrentUserDid();
     if (!userDid) {
       throw new Error('User did not exist');
     }
 
-    const resp = await custodianClient.mint({ idToken, userDid });
-    if (!resp.data) throw new Error(String(resp.error || 'Mint failed'));
-
-    if (resp.data.agentDid) {
-      UserStore.addAgent(userDid, resp.data.agentDid);
-    }
-    return resp.data;
+    return await unifiedAgentService.createAgent(userDid, interactive);
   }
 }
+
+// Export the unified service for new code
+export { unifiedAgentService };

@@ -1,36 +1,16 @@
 import { StorageAdapter, defaultAdapter } from './StorageAdapter';
+import { NuwaStateV2, UserEntryV2, NuwaStateV1 } from './types';
+import { StorageMigration } from './StorageMigration';
+
+// Export the current types as the default
+export type UserEntry = UserEntryV2;
+export type NuwaState = NuwaStateV2;
 
 /**
- * User entry, stores user-related information
- */
-export interface UserEntry {
-  /** WebAuthn credentialId list */
-  credentials: string[];
-  /** User's Agent DID list */
-  agents: string[];
-  /** Creation timestamp (Unix timestamp, seconds) */
-  createdAt: number;
-  /** Last update timestamp (Unix timestamp, seconds) */
-  updatedAt: number;
-}
-
-/**
- * Nuwa local storage state structure
- */
-export interface NuwaState {
-  /** Data structure version number */
-  version: number;
-  /** Current logged-in user's DID, null if not logged in */
-  currentUserDid: string | null;
-  /** User information mapping table, key is userDid */
-  users: Record<string, UserEntry>;
-}
-
-/**
- * Default empty state
+ * Default empty state (v2)
  */
 const DEFAULT_STATE: NuwaState = {
-  version: 1,
+  version: 2,
   currentUserDid: null,
   users: {},
 };
@@ -62,12 +42,32 @@ export class NuwaStore {
     }
 
     try {
-      const state = JSON.parse(raw) as NuwaState;
+      const parsedState = JSON.parse(raw);
+
+      // Handle version migration
+      if (StorageMigration.needsMigration(parsedState.version || 1)) {
+        console.log(
+          `[NuwaStore] Migrating storage from v${parsedState.version || 1} to v${StorageMigration.getTargetVersion()}`
+        );
+
+        // Migrate from v1 to v2
+        if (parsedState.version === 1 || !parsedState.version) {
+          const v1State = parsedState as NuwaStateV1;
+          const migratedState = StorageMigration.migrateV1ToV2(v1State);
+
+          // Save the migrated state
+          this.saveState(migratedState);
+          return migratedState;
+        }
+      }
+
+      const state = parsedState as NuwaState;
+
       // Ensure version compatibility
       if (state.version !== DEFAULT_STATE.version) {
         console.warn(`[NuwaStore] Version mismatch: ${state.version} vs ${DEFAULT_STATE.version}`);
-        // Version migration logic can be added here in the future
       }
+
       return state;
     } catch (error) {
       console.error('[NuwaStore] Failed to parse storage data:', error);
