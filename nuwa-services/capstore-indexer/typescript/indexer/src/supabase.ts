@@ -292,6 +292,7 @@ export async function queryFromSupabase(
         homepage: item.homepage,
         repository: item.repository,
         thumbnail: item.thumbnail,
+        timestamp: item.timestamp,
         enable: item.enable,
         version: item.version,
         stats: {
@@ -565,31 +566,34 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
         const totalPages = Math.ceil(totalItems / validatedPageSize);
 
         const transformedItems = data.map((item: any) => {
+          const cap = item.cap_data
+          const stats = cap.cap_stats
           return {
-            id: item.id,
-            cid: item.cid,
-            name: item.name,
-            displayName: item.display_name,
-            description: item.description,
-            tags: item.tags,
-            homepage: item.homepage,
-            repository: item.repository,
-            thumbnail: item.thumbnail,
-            enable: item.enable,
-            version: item.version,
+            id: cap.id,
+            cid: cap.cid,
+            name: cap.name,
+            displayName: cap.display_name,
+            description: cap.description,
+            tags: cap.tags,
+            homepage: cap.homepage,
+            repository: cap.repository,
+            thumbnail: cap.thumbnail,
+            enable: cap.enable,
+            timestamp: cap.timestamp,
+            version: cap.version,
             stats: {
-              capId: item.cap_id || item.id,
-              downloads: item.downloads || 0,
-              ratingCount: item.rating_count || 0,
-              averageRating: item.average_rating || 0,
-              favorites: item.favorites || 0,
+              capId: stats.cap_id || cap.id,
+              downloads: stats.downloads || 0,
+              ratingCount: stats.rating_count || 0,
+              averageRating: stats.average_rating || 0,
+              favorites: stats.favorites || 0,
+              userRating: stats.user_rating || null,
             }
           };
         })
-        console.log(transformedItems)
         return {
             success: true,
-            items,
+            items: transformedItems,
             totalItems,
             page,
             pageSize: validatedPageSize,

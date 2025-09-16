@@ -184,28 +184,13 @@ export class CapKit {
 				);
 			}
 
-			const transformedItems = queryResult.data.items.map((item: any) => {
-				return {
-					...item,
-					displayName: item.display_name,
-					stats: {
-						downloads: item.cap_stats.downloads,
-						capId: item.cap_stats.cap_id,
-						ratingCount: item.cap_stats.rating_count,
-						averageRating: item.cap_stats.average_rating,
-						userRating: item.cap_stats.user_rating,
-						favorites: item.cap_stats.favorites,
-					}
-				} as ResultCap;
-			});
-
 			return {
 				code: queryResult.code,
 				data: {
 					totalItems: queryResult.data.totalItems,
 					page: queryResult.data.page,
 					pageSize: queryResult.data.pageSize,
-					items: transformedItems,
+					items: queryResult.data.items,
 				},
 			} as Result<Page<ResultCap>>;
 		} finally {

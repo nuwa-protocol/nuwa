@@ -14,6 +14,7 @@ export interface CapMetadata {
   description: string,
   tags: string[],
   homepage: string,
+  timestamp: string,
   repository: string,
   thumbnail: string,
   enable: boolean,
