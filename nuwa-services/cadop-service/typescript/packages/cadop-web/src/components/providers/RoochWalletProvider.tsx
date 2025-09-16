@@ -1,0 +1,63 @@
+import React from 'react';
+import { RoochProvider, WalletProvider } from '@roochnetwork/rooch-sdk-kit';
+import { getRoochNodeUrl } from '@roochnetwork/rooch-sdk';
+import { createNetworkConfig } from '@roochnetwork/rooch-sdk-kit';
+import { WalletStoreConnector } from '../../lib/auth/providers/WalletStoreConnector';
+
+// Create network configuration
+const { networkConfig } = createNetworkConfig({
+  mainnet: {
+    url: getRoochNodeUrl('mainnet'),
+    variables: {},
+  },
+  testnet: {
+    url: getRoochNodeUrl('testnet'),
+    variables: {},
+  },
+  devnet: {
+    url: getRoochNodeUrl('devnet'),
+    variables: {},
+  },
+  localnet: {
+    url: getRoochNodeUrl('localnet'),
+    variables: {},
+  },
+});
+
+interface RoochWalletProviderProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Rooch Wallet Provider Wrapper
+ *
+ * Wraps the application with necessary Rooch SDK Kit providers
+ * Note: Assumes QueryClientProvider is already provided by parent
+ */
+export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
+  const defaultNetwork = import.meta.env.VITE_ROOCH_NETWORK || 'devnet';
+  const isDev = import.meta.env.DEV;
+
+  return (
+    <RoochProvider
+      networks={networkConfig}
+      defaultNetwork={defaultNetwork}
+      sessionConf={{
+        appName: 'CADOP',
+        appUrl: window.location.origin,
+        scopes: ['*::*::*'], // Allow all scopes for now
+        maxInactiveInterval: 1200, // 20 minutes
+      }}
+    >
+      <WalletProvider
+        enableLocal={isDev} // Enable local wallet for development
+        preferredWallets={['UniSat', 'OKX']} // Preferred Bitcoin wallets
+        chain="bitcoin"
+        autoConnect={false} // Don't auto-connect, let user choose
+      >
+        <WalletStoreConnector />
+        {children}
+      </WalletProvider>
+    </RoochProvider>
+  );
+}

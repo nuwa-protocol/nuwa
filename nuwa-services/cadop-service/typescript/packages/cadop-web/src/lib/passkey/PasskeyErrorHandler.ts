@@ -83,10 +83,10 @@ export class PasskeyErrorHandler {
    */
   private isUserCancelledError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
-    
+
     const message = error.message.toLowerCase();
     const name = error.name.toLowerCase();
-    
+
     return (
       name === 'notallowederror' ||
       name === 'aborterror' ||
@@ -106,10 +106,10 @@ export class PasskeyErrorHandler {
    */
   private isTimeoutError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
-    
+
     const message = error.message.toLowerCase();
     const name = error.name.toLowerCase();
-    
+
     return (
       name === 'timeouterror' ||
       message.includes('timeout') ||
@@ -123,17 +123,18 @@ export class PasskeyErrorHandler {
    */
   private isNotAllowedError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
-    
+
     const message = error.message.toLowerCase();
     const name = error.name.toLowerCase();
-    
+
     // This specific case mentioned in the issue - Chrome double-dialog cancellation
-    const isChromeDoubleDialogError = message.includes('the operation either timed out or was not allowed') &&
+    const isChromeDoubleDialogError =
+      message.includes('the operation either timed out or was not allowed') &&
       message.includes('privacy-considerations-client');
-    
+
     // Generic NotAllowedError that's not user cancellation
     const isGenericNotAllowed = name === 'notallowederror' && !this.isUserCancelledError(error);
-    
+
     return (
       isChromeDoubleDialogError ||
       isGenericNotAllowed ||
@@ -149,10 +150,10 @@ export class PasskeyErrorHandler {
    */
   private isUnsupportedError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
-    
+
     const message = error.message.toLowerCase();
     const name = error.name.toLowerCase();
-    
+
     return (
       name === 'notsupportederror' ||
       message.includes('not supported') ||
@@ -167,9 +168,9 @@ export class PasskeyErrorHandler {
    */
   private isAlreadyExistsError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
-    
+
     const message = error.message.toLowerCase();
-    
+
     return (
       message.includes('already been registered') ||
       message.includes('credential already exists') ||
@@ -184,7 +185,7 @@ export class PasskeyErrorHandler {
  */
 export function usePasskeyErrorHandler() {
   const { t } = useTranslation();
-  
+
   return new PasskeyErrorHandler(t);
 }
 

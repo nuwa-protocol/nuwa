@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './lib/auth/AuthContext';
 import { VDRProvider } from './lib/identity/VDRProvider';
+import { RoochWalletProvider } from './components/providers/RoochWalletProvider';
 
 import App from './app';
 import i18n from './i18n';
@@ -26,11 +27,13 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <BrowserRouter>
-          <VDRProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </VDRProvider>
+          <RoochWalletProvider>
+            <VDRProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </VDRProvider>
+          </RoochWalletProvider>
         </BrowserRouter>
       </I18nextProvider>
     </QueryClientProvider>

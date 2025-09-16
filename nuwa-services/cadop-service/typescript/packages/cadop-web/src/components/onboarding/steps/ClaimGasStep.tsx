@@ -1,9 +1,9 @@
-import { Coins } from "lucide-react";
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FixedCardActionButton, FixedCardLayout, FixedCardLoading } from "@/components/ui";
-import { useHubDeposit } from "@/hooks/useHubDeposit";
-import { claimTestnetGas } from "@/lib/rooch/faucet";
+import { Coins } from 'lucide-react';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FixedCardActionButton, FixedCardLayout, FixedCardLoading } from '@/components/ui';
+import { useHubDeposit } from '@/hooks/useHubDeposit';
+import { claimTestnetGas } from '@/lib/rooch/faucet';
 
 interface Props {
   agentDid: string;
@@ -26,18 +26,16 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
     try {
       setLoading(true);
       setDepositError(null);
-      console.log("Performing deposit");
+      console.log('Performing deposit');
       const result = await depositPercentOfClaimed(claimedAmount, 50);
       if (result && !result.confirmed) {
-        console.warn(
-          "Deposit sent but not confirmed within timeout period",
-        );
+        console.warn('Deposit sent but not confirmed within timeout period');
       }
-      console.log("Deposit process completed");
+      console.log('Deposit process completed');
       setLoading(false);
       onComplete();
     } catch (error) {
-      console.error("Deposit failed:", error);
+      console.error('Deposit failed:', error);
       setDepositError(error instanceof Error ? error.message : String(error));
       setLoading(false);
     }
@@ -45,11 +43,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
 
   // Handle deposit when conditions are met
   useEffect(() => {
-    if (
-      shouldDeposit &&
-      depositPercentOfClaimed &&
-      !depositTriggeredRef.current
-    ) {
+    if (shouldDeposit && depositPercentOfClaimed && !depositTriggeredRef.current) {
       depositTriggeredRef.current = true;
       performDeposit();
     }
@@ -57,14 +51,14 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
 
   const claimGas = useCallback(async () => {
     if (claimCompleted) {
-      console.log("Claim already completed, skipping");
+      console.log('Claim already completed, skipping');
       return;
     }
 
     setLoading(true);
     setClaimError(null);
     try {
-      const address = agentDid.split(":")[2];
+      const address = agentDid.split(':')[2];
       const claimed = await claimTestnetGas(address);
       setClaimCompleted(true);
 
@@ -73,9 +67,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
       setShouldDeposit(true);
     } catch (claimError) {
       // Only set error for claiming failures, not deposit failures
-      setClaimError(
-        claimError instanceof Error ? claimError.message : String(claimError),
-      );
+      setClaimError(claimError instanceof Error ? claimError.message : String(claimError));
     }
   }, [agentDid, claimCompleted]);
 
@@ -86,12 +78,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
   }, [claimError, claimGas]);
 
   if (loading && !claimError && !depositError) {
-    return (
-      <FixedCardLoading
-        title="Claiming Gas"
-        message="Claiming gas for your agent..."
-      />
-    );
+    return <FixedCardLoading title="Claiming Gas" message="Claiming gas for your agent..." />;
   }
 
   // Error state
@@ -111,8 +98,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
             </FixedCardActionButton>
           </div>
         }
-      >
-      </FixedCardLayout>
+      ></FixedCardLayout>
     );
   }
   if (claimError) {
@@ -131,8 +117,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
             </FixedCardActionButton>
           </div>
         }
-      >
-      </FixedCardLayout>
+      ></FixedCardLayout>
     );
   }
 

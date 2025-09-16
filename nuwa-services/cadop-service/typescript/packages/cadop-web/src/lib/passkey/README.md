@@ -18,7 +18,7 @@ import { usePasskeyErrorHandler } from '@/lib/passkey/PasskeyErrorHandler';
 
 function MyComponent() {
   const errorHandler = usePasskeyErrorHandler();
-  
+
   try {
     // Your passkey operation
   } catch (error) {
@@ -53,9 +53,11 @@ function handleError(error: unknown) {
 ## Chrome Double-Dialog Issue
 
 The specific error mentioned in the GitHub issue:
+
 > "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client"
 
 This error occurs when:
+
 1. User cancels the first passkey dialog
 2. Chrome shows a second passkey selection dialog
 3. User cancels again
@@ -68,11 +70,13 @@ Our solution provides a clear explanation and suggests refreshing the page to re
 ### Separation of Concerns
 
 1. **PasskeyService**: Pure business logic layer
+
    - Handles WebAuthn API calls
    - Re-throws original errors without modification
    - No internationalization or UI concerns
 
 2. **PasskeyErrorHandler**: Error processing layer
+
    - Converts technical errors to user-friendly messages
    - Handles internationalization
    - Provides contextual actions
