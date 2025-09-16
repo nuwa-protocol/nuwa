@@ -19,6 +19,13 @@ export class UnifiedAgentService implements IUnifiedAgentService {
   }
 
   /**
+   * Get agent service by auth method (without requiring userDid)
+   */
+  getAgentServiceByMethod(authMethod: AuthMethod): IAgentService | undefined {
+    return this.agentServices.get(authMethod);
+  }
+
+  /**
    * Get cached Agent DIDs for a user
    */
   getCachedAgentDIDs(userDid: string): string[] {

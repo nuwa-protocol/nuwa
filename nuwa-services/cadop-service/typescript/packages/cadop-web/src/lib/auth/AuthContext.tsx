@@ -10,6 +10,7 @@ import {
 } from './providers';
 import { PasskeyAuthProvider } from './providers/PasskeyAuthProvider';
 import { WalletAuthProvider } from './providers/WalletAuthProvider';
+import { WalletStoreConnector } from './providers/WalletStoreConnector';
 
 const defaultAuthContext: AuthContextType = {
   isAuthenticated: false,
@@ -69,6 +70,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
 
   const [currentAuthProvider, setCurrentAuthProvider] = useState<IAuthProvider | null>(null);
+
+  // Initialize auth providers immediately when component mounts
+  React.useEffect(() => {
+    initializeAuthProviders();
+  }, []);
 
   const signInWithDid = useCallback((userDid: string) => {
     try {
@@ -184,9 +190,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     async function bootstrapAuth() {
       try {
-        // Initialize auth providers
-        initializeAuthProviders();
-
         // Step 1: Check if we have a current user DID
         const currentUserDid = AuthStore.getCurrentUserDid();
 
@@ -199,7 +202,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
               // Try to restore the session
               let sessionRestored = false;
-              if (provider instanceof PasskeyAuthProvider) {
+              if (provider.restoreSession) {
                 sessionRestored = await provider.restoreSession();
               }
 
@@ -285,5 +288,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     trySilentAuth,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <WalletStoreConnector />
+      {children}
+    </AuthContext.Provider>
+  );
 }

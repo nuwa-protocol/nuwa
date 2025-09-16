@@ -28,6 +28,7 @@ import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
 import { useHubDeposit } from '@/hooks/useHubDeposit';
+import { hasControllerAccess, isUserController } from '@/lib/utils/didCompatibility';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
@@ -170,10 +171,8 @@ export function AgentDetailPage() {
         setDidDocument(doc);
 
         if (isAuthenticated && userDid) {
-          const hasControllerAccess = doc.verificationMethod?.some(
-            (method: VerificationMethod) => method.controller === userDid
-          );
-          setIsController(!!hasControllerAccess);
+          const hasAccess = hasControllerAccess(userDid, doc.verificationMethod);
+          setIsController(hasAccess);
         } else {
           setIsController(false);
         }
@@ -382,12 +381,12 @@ export function AgentDetailPage() {
                           <Key className="mr-2 h-4 w-4" />
                           <span className="font-mono font-bold">{fragment}</span>
                           <span className="ml-2">{method.type}</span>
-                          {method.controller === userDid && (
+                          {isController && (
                             <Tag variant="info" className="ml-2">
                               {t('agent.controller')}
                             </Tag>
                           )}
-                          {isController && method.controller !== userDid && (
+                          {isController && (
                             <Button
                               variant="ghost"
                               size="icon"

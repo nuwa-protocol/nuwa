@@ -1,5 +1,12 @@
-import { SignerInterface } from '../providers/types';
-// Note: Wallet types will be defined when implementing actual wallet integration
+import type {
+  SignerInterface,
+  KeyType,
+  DIDDocument,
+  VerificationMethod,
+} from '@nuwa-ai/identity-kit';
+import { MultibaseCodec } from '@nuwa-ai/identity-kit';
+import { isUserController } from '../../utils/didCompatibility';
+import type { Wallet } from '@roochnetwork/rooch-sdk-kit';
 import {
   Signer,
   Transaction,
@@ -16,82 +23,238 @@ import {
  *
  * Implements SignerInterface for Rooch wallet integration
  */
-// Temporary wallet account interface until SDK types are available
-interface WalletAccount {
-  address: string;
-  publicKey?: string;
+/**
+ * Options for creating a RoochWalletSigner for Agent DID operations
+ */
+interface WalletSignerOptions {
+  didDocument?: DIDDocument;
 }
 
 export class RoochWalletSigner extends Signer implements SignerInterface {
   private userDid: string;
-  private walletAccount: WalletAccount | null = null;
   private walletAddress: string;
+  private wallet: Wallet | null = null;
+  private didDocument?: DIDDocument;
+  private walletAuthMethod?: VerificationMethod;
+  private didAddress?: RoochAddress;
 
-  constructor(userDid: string, walletAddress: string) {
+  constructor(userDid: string, walletAddress: string, options?: WalletSignerOptions) {
     super();
     this.userDid = userDid;
     this.walletAddress = walletAddress;
+
+    // If DID document is provided, this signer can handle Agent DID operations
+    if (options?.didDocument) {
+      this.didDocument = options.didDocument;
+      this.walletAuthMethod = this.findWalletAuthMethod() || undefined;
+
+      // Extract Rooch address from Agent DID
+      const didParts = options.didDocument.id.split(':');
+      this.didAddress = new RoochAddress(didParts[2]);
+    }
   }
 
   /**
-   * Initialize the signer with current wallet connection
+   * Find wallet authentication method in Agent DID document
+   * Similar to WebAuthnSigner.findPasskeyAuthMethod but for wallet users
    */
-  async initialize(): Promise<void> {
-    // This will be called after wallet connection is established
-    // The wallet account will be available through the wallet store
+  private findWalletAuthMethod(): VerificationMethod | null {
+    if (!this.didDocument?.controller || !this.didDocument?.verificationMethod) {
+      return null;
+    }
+
+    const controller = this.didDocument.controller[0];
+
+    // Check if controller is a wallet DID (did:bitcoin: or did:rooch:)
+    if (!controller.startsWith('did:bitcoin:') && !controller.startsWith('did:rooch:')) {
+      return null;
+    }
+
+    // Find verification method that matches this wallet
+    const verificationMethods = this.didDocument.verificationMethod || [];
+    for (const authMethod of verificationMethods) {
+      if (authMethod.publicKeyMultibase && isUserController(controller, authMethod.controller)) {
+        try {
+          // For wallet users, we need to verify the public key matches our wallet
+          // This will be validated when wallet is connected via setWallet()
+          return authMethod;
+        } catch (error) {
+          console.warn(`Failed to parse wallet authentication method: ${authMethod.id}`, error);
+          continue;
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
-   * Set wallet account (called after wallet connection)
+   * Set wallet instance (called after wallet connection)
    */
-  setWalletAccount(account: WalletAccount): void {
-    this.walletAccount = account;
+  setWallet(wallet: Wallet): void {
+    this.wallet = wallet;
+
+    // Validate address consistency
+    this.validateAddressConsistency();
   }
 
-  // SignerInterface methods
-  getDID(): string {
+  /**
+   * Validate that the wallet address matches the expected address
+   */
+  private validateAddressConsistency(): void {
+    if (!this.wallet) return;
+
+    try {
+      const walletBitcoinAddress = this.wallet.getBitcoinAddress();
+      const expectedAddress = this.walletAddress;
+
+      // Compare addresses (handle different formats if needed)
+      if (walletBitcoinAddress.toStr() !== expectedAddress) {
+        console.warn(
+          '[RoochWalletSigner] Address mismatch:',
+          'expected:',
+          expectedAddress,
+          'wallet:',
+          walletBitcoinAddress.toStr()
+        );
+        // For now, just warn. In production, you might want to throw an error
+      } else {
+        console.log('[RoochWalletSigner] Address validation passed:', expectedAddress);
+      }
+    } catch (error) {
+      console.warn('[RoochWalletSigner] Failed to validate address consistency:', error);
+    }
+  }
+
+  /**
+   * Get current wallet instance
+   */
+  getWallet(): Wallet | null {
+    return this.wallet;
+  }
+
+  // IdentityKit SignerInterface methods
+  async listKeyIds(): Promise<string[]> {
+    // If we have a wallet auth method (Agent DID mode), return its key ID
+    if (this.walletAuthMethod) {
+      return [this.walletAuthMethod.id];
+    }
+    // Otherwise, return the user DID (User DID mode)
+    return [this.userDid];
+  }
+
+  async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
+    // Support both User DID and Agent DID key IDs
+    if (this.walletAuthMethod && keyId === this.walletAuthMethod.id) {
+      // Agent DID signing
+      return this.sign(data);
+    } else if (keyId === this.userDid) {
+      // User DID signing
+      return this.sign(data);
+    } else {
+      throw new Error(`[RoochWalletSigner] Unknown key ID: ${keyId}`);
+    }
+  }
+
+  async canSignWithKeyId(keyId: string): Promise<boolean> {
+    const supportedKeyIds = await this.listKeyIds();
+    return supportedKeyIds.includes(keyId) && this.isConnected();
+  }
+
+  async getDid(): Promise<string> {
     return this.userDid;
   }
 
-  async getPublicKey(): Promise<Uint8Array> {
-    if (!this.walletAccount) {
+  async getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined> {
+    if (!this.isConnected()) {
+      return undefined;
+    }
+
+    // Support both User DID and Agent DID key IDs
+    const supportedKeyIds = await this.listKeyIds();
+    if (!supportedKeyIds.includes(keyId)) {
+      return undefined;
+    }
+
+    try {
+      let publicKey: Uint8Array;
+
+      // If this is an Agent DID key and we have the auth method, use its public key
+      if (
+        this.walletAuthMethod &&
+        keyId === this.walletAuthMethod.id &&
+        this.walletAuthMethod.publicKeyMultibase
+      ) {
+        publicKey = MultibaseCodec.decodeBase58btc(this.walletAuthMethod.publicKeyMultibase);
+      } else {
+        // Otherwise, get public key from wallet
+        publicKey = await this.getPublicKeyBytes();
+      }
+
+      return {
+        type: 'EcdsaSecp256k1VerificationKey2019' as KeyType,
+        publicKey,
+      };
+    } catch (error) {
+      console.error('[RoochWalletSigner] Failed to get key info:', error);
+      return undefined;
+    }
+  }
+
+  // Helper methods for wallet functionality
+  private async getPublicKeyBytes(): Promise<Uint8Array> {
+    if (!this.wallet) {
       throw new Error('[RoochWalletSigner] Wallet not connected');
     }
 
-    // Get public key from wallet account
-    // This will depend on the actual wallet implementation
-    // For now, we'll throw an error as this needs wallet-specific implementation
-    throw new Error('[RoochWalletSigner] getPublicKey not yet implemented');
+    try {
+      // Get public key from wallet - this returns PublicKey<Address>
+      const publicKey = this.wallet.getPublicKey();
+
+      // Convert to Uint8Array - need to extract the raw bytes
+      return publicKey.toBytes();
+    } catch (error) {
+      console.error('[RoochWalletSigner] Failed to get public key bytes:', error);
+      throw new Error('[RoochWalletSigner] Failed to get public key from wallet');
+    }
   }
 
-  async sign(_data: Uint8Array): Promise<Uint8Array> {
-    if (!this.walletAccount) {
+  // Rooch Signer methods (abstract implementations)
+  async sign(data: Uint8Array): Promise<Uint8Array> {
+    if (!this.wallet) {
       throw new Error('[RoochWalletSigner] Wallet not connected');
     }
 
-    // Sign data using wallet
-    // This will be implemented based on the wallet's signing API
-    throw new Error('[RoochWalletSigner] sign not yet implemented');
+    try {
+      // Use wallet's sign method - it should handle the signing process
+      return await this.wallet.sign(data);
+    } catch (error) {
+      console.error('[RoochWalletSigner] Failed to sign data:', error);
+      throw new Error('[RoochWalletSigner] Failed to sign data with wallet');
+    }
   }
 
-  getAlgorithm(): string {
-    // Bitcoin wallets typically use ECDSA with secp256k1
-    return 'secp256k1';
-  }
-
-  async isAvailable(): Promise<boolean> {
-    // Check if wallet is connected and available
-    return this.walletAccount !== null;
-  }
-
-  // Rooch Signer methods
-  async signTransaction(_tx: Transaction): Promise<Authenticator> {
-    if (!this.walletAccount) {
+  getPublicKey(): PublicKey<Address> {
+    if (!this.wallet) {
       throw new Error('[RoochWalletSigner] Wallet not connected');
     }
 
-    // This will be implemented based on the wallet's transaction signing API
-    throw new Error('[RoochWalletSigner] signTransaction not yet implemented');
+    // Delegate to wallet's getPublicKey method
+    return this.wallet.getPublicKey();
+  }
+
+  async signTransaction(tx: Transaction): Promise<Authenticator> {
+    if (!this.wallet) {
+      throw new Error('[RoochWalletSigner] Wallet not connected');
+    }
+
+    try {
+      // Delegate to wallet's signTransaction method
+      return await this.wallet.signTransaction(tx);
+    } catch (error) {
+      console.error('[RoochWalletSigner] Failed to sign transaction:', error);
+      throw new Error('[RoochWalletSigner] Failed to sign transaction with wallet');
+    }
   }
 
   getKeyScheme(): SignatureScheme {
@@ -100,31 +263,32 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
   }
 
   getRoochPublicKey(): PublicKey<Address> {
-    if (!this.walletAccount) {
-      throw new Error('[RoochWalletSigner] Wallet not connected');
-    }
-
-    // This will be implemented based on the wallet's public key format
-    throw new Error('[RoochWalletSigner] getRoochPublicKey not yet implemented');
+    // Same as getPublicKey for wallet signers
+    return this.getPublicKey();
   }
 
   getBitcoinAddress(): BitcoinAddress {
-    if (!this.walletAccount) {
+    if (!this.wallet) {
       throw new Error('[RoochWalletSigner] Wallet not connected');
     }
 
-    // Return the Bitcoin address from wallet account
-    return new BitcoinAddress(this.walletAddress);
+    // Delegate to wallet's getBitcoinAddress method
+    return this.wallet.getBitcoinAddress();
   }
 
   getRoochAddress(): RoochAddress {
-    if (!this.walletAccount) {
+    // If we're in Agent DID mode, return the Agent's address
+    if (this.didAddress) {
+      return this.didAddress;
+    }
+
+    // Otherwise, return the wallet's Rooch address (User DID mode)
+    if (!this.wallet) {
       throw new Error('[RoochWalletSigner] Wallet not connected');
     }
 
-    // Convert Bitcoin address to Rooch address
-    // This will depend on the address conversion logic
-    throw new Error('[RoochWalletSigner] getRoochAddress not yet implemented');
+    // Delegate to wallet's getRoochAddress method
+    return this.wallet.getRoochAddress();
   }
 
   /**
@@ -138,6 +302,13 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
    * Check if wallet is connected
    */
   isConnected(): boolean {
-    return this.walletAccount !== null;
+    return this.wallet !== null;
+  }
+
+  /**
+   * Check if signer is available (alias for isConnected for compatibility)
+   */
+  async isAvailable(): Promise<boolean> {
+    return this.isConnected();
   }
 }
