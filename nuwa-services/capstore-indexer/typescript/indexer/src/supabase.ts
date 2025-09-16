@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import {PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL} from './constant.js';
 import {IndexerEventIDView} from "@roochnetwork/rooch-sdk";
-import {CapMetadata, CapStats} from './type.js';
+import {CapMetadata, CapStats, RatingDistribution} from './type.js';
 
 config();
 
@@ -564,6 +564,29 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
         const totalItems = count || items.length;
         const totalPages = Math.ceil(totalItems / validatedPageSize);
 
+        const transformedItems = data.map((item: any) => {
+          return {
+            id: item.id,
+            cid: item.cid,
+            name: item.name,
+            displayName: item.display_name,
+            description: item.description,
+            tags: item.tags,
+            homepage: item.homepage,
+            repository: item.repository,
+            thumbnail: item.thumbnail,
+            enable: item.enable,
+            version: item.version,
+            stats: {
+              capId: item.cap_id || item.id,
+              downloads: item.downloads || 0,
+              ratingCount: item.rating_count || 0,
+              averageRating: item.average_rating || 0,
+              favorites: item.favorites || 0,
+            }
+          };
+        })
+        console.log(transformedItems)
         return {
             success: true,
             items,
@@ -681,6 +704,34 @@ export async function updateCapEnable(capId: string, enable: boolean): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update cap enable'
+    };
+  }
+}
+
+export async function getCapRatingDistribution(capId: string): Promise<{
+  success: boolean;
+  distribution?: RatingDistribution[];
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_cap_rating_distribution_complete', {
+      p_cap_id: capId
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const distribution: RatingDistribution[] = data?.map((item: any) => ({
+      rating: item.rating,
+      count: Number(item.count)
+    })) ?? [];
+
+    return { success: true, distribution };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get rating distribution'
     };
   }
 }

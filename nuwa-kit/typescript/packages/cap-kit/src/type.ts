@@ -130,6 +130,12 @@ export const ResultCapMetadataSchema = z.object({
 	stats: CapStatsSchema,
 });
 
+export const RatingDistribution = z.object({
+  rating: z.number(),
+  count: z.number(),
+})
+
 // Inferred TypeScript types from Zod schemas
 export type ResultCap = z.infer<typeof ResultCapMetadataSchema>;
 export type CapStats = z.infer<typeof CapStatsSchema>;
+export type RatingDistribution = z.infer<typeof RatingDistribution>;

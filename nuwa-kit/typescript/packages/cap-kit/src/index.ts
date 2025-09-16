@@ -2,7 +2,7 @@ import { DidAccountSigner, type SignerInterface } from "@nuwa-ai/identity-kit";
 import { Args, RoochClient, Transaction } from "@roochnetwork/rooch-sdk";
 import * as yaml from "js-yaml";
 import { buildClient } from "./client";
-import type { Cap, CapStats, Page, Result, ResultCap } from "./type";
+import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from "./type";
 
 export * from "./type";
 
@@ -130,7 +130,6 @@ export class CapKit {
 			const transformedItems = queryResult.data.items.map((item: any) => {
 				return {
 					...item,
-					// thumbnail: item,
 				};
 			});
 
@@ -288,6 +287,50 @@ export class CapKit {
 				code: 200,
 				data: true,
 			} as Result<boolean>;
+		} finally {
+			await client.close();
+		}
+	}
+
+	async queryCapRatingDistribution(capId: string): Promise<Result<RatingDistribution[]>> {
+		const client = await buildClient(this.mcpUrl, this.signer);
+
+		try {
+			const tools = await client.tools();
+			const queryCapRatingDistribution = tools.queryCapRatingDistribution;
+
+			if (!queryCapRatingDistribution) {
+				throw new Error("queryCapRatingDistribution tool not available on MCP server");
+			}
+
+			const result = await queryCapRatingDistribution.execute(
+				{
+					capId: capId,
+				},
+				{
+					toolCallId: "queryCapRatingDistribution",
+					messages: [],
+				},
+			);
+
+			if (result.isError) {
+				throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+			}
+
+			const content = (result.content as any)?.[0]?.text;
+			if (content) {
+				try {
+					const resut = JSON.parse(content);
+					return {
+						code: 200,
+						data: resut.data.distribution,
+					} as Result<RatingDistribution[]>;
+				} catch (parseError) {
+					throw new Error("Failed to parse rating distribution response");
+				}
+			}
+
+			throw new Error("No data received");
 		} finally {
 			await client.close();
 		}

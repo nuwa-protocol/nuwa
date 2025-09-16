@@ -12,6 +12,7 @@ import { queryCapStatsTool } from "./query-cap-stas.js";
 import { queryMyFavoriteCapTool } from "./query-my-favorite-cap.js";
 import { rateCapTool } from "./rate-cap.js";
 import { updateEnableCapTool } from "./update-enable-cap.js";
+import { queryCapRatingDistributionTool } from "./query-cap-rating-distribution.js";
 
 // Load environment variables
 config();
@@ -89,3 +90,4 @@ ipfsService.addTool(queryCapStatsTool);
 ipfsService.addTool(queryMyFavoriteCapTool);
 ipfsService.addTool(rateCapTool);
 ipfsService.addTool(updateEnableCapTool);
+ipfsService.addTool(queryCapRatingDistributionTool);

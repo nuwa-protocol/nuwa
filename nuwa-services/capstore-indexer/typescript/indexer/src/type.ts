@@ -21,6 +21,11 @@ export interface CapMetadata {
   stats: CapStats
 }
 
+export interface RatingDistribution {
+  rating: number;
+  count: number;
+}
+
 export interface CapStats {
   capId: string;
   downloads: number;
@@ -28,4 +33,5 @@ export interface CapStats {
   averageRating: number;
   favorites: number;
   userRating?: number | null;
+  ratingDistribution?: RatingDistribution[];
 }
