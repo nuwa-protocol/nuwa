@@ -20,13 +20,9 @@ export type {
 	Selection,
 } from "./nuwa-client/nuwa-client.js";
 export {
-  NUWA_CLIENT_TIMEOUT,
-  NuwaClient,
+	NUWA_CLIENT_TIMEOUT,
+	NuwaClient,
 } from "./nuwa-client/nuwa-client.js";
-export type {
-  StreamAIRequest,
-  StreamChunk,
-  StreamController,
-} from "./nuwa-client/streaming-types.js";
+export type { HandleStreamAIRequest } from "./nuwa-client/streaming-types.js";
 // === React Hook for Nuwa Client ===
 export { useNuwaClient } from "./nuwa-client/use-nuwa-client.js";

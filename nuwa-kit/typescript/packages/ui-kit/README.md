@@ -44,21 +44,15 @@ function MyCapUI() {
     await nuwaClient.sendPrompt('Generate something amazing');
   };
 
-  const handleAddSelection = async () => {
-    await nuwaClient.addSelection('My Selection', 'This is a selection message');
-  };
 
   return (
     <div ref={containerRef} className="p-4">
       <h1>My Cap UI</h1>
       
-      <button onClick={handleSendPrompt} disabled={!isConnected}>
+      <button onClick={handleSendPrompt}>
         Send Prompt to AI
       </button>
       
-      <button onClick={handleAddSelection} disabled={!isConnected}>
-        Add Selection to Chat
-      </button>
     </div>
   );
 }
@@ -83,6 +77,24 @@ await client.addSelection('Weather Data', 'Current temperature is 72°F');
 // Save and retrieve state
 await client.saveState({ userPreferences: { theme: 'dark' } });
 const state = await client.getState();
+
+// Stream AI responses (capId is optional)
+const controller = await client.streamAI({
+  prompt: 'Stream a poem line by line',
+  onChunk: (chunk) => {
+    if (chunk.type === 'content') console.log('chunk:', chunk.content);
+  },
+  onComplete: () => console.log('stream complete'),
+  onError: (err) => console.error('stream error:', err),
+});
+
+// Abort when you are done (optional)
+// controller.abort();
+
+// Inspect controller state anytime
+console.log('status:', controller.getStatus()); // 'running' | 'completed' | 'error' | 'aborted'
+console.log('error:', controller.getError());   // Error | null
+console.log('result:', controller.getResult()); // string or array of chunks
 ```
 
 ### Auto Height Adjustment
@@ -92,7 +104,7 @@ The SDK provides automatic height adjustment to ensure your iframe content is fu
 ```jsx
 function WeatherApp() {
   const [weatherData, setWeatherData] = useState(null);
-  const { containerRef, isConnected } = useNuwaClient({ 
+  const { containerRef } = useNuwaClient({ 
     autoAdjustHeight: true,
     onConnected: () => console.log('Connected to parent!')
   });
@@ -104,7 +116,6 @@ function WeatherApp() {
   return (
     <div ref={containerRef}>
       <div className="p-4">
-        <p>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</p>
         {weatherData ? (
           <WeatherDisplay data={weatherData} />
         ) : (
@@ -219,7 +230,7 @@ import { z } from 'zod';
 
 function MyCapWithMCP() {
   const [content, setContent] = useState('Initial content');
-  const { containerRef, nuwaClient, isConnected } = useNuwaClient({ 
+  const { containerRef, nuwaClient } = useNuwaClient({ 
     autoAdjustHeight: true,
     onConnected: () => console.log('Connected to parent!')
   });
@@ -280,7 +291,6 @@ function MyCapWithMCP() {
   return (
     <div ref={containerRef} className="p-4">
       <h1>My Cap UI with MCP</h1>
-      <p>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</p>
       
       <div className="content-display">
         <h2>Current Content:</h2>
@@ -337,7 +347,6 @@ For a full working example, see our **Cap UI example** in the repository:
 
 **Returns:**
 - `nuwaClient: NuwaClient` - The NuwaClient instance
-- `isConnected: boolean` - Reactive connection status
 - `containerRef: RefObject<HTMLDivElement>` - Ref to attach to your root container
 
 ### `NuwaClient` Class
@@ -352,11 +361,50 @@ For a full working example, see our **Cap UI example** in the repository:
 - `addSelection(label: string, message: string | Record<string, any>): Promise<void>` - Add selection to parent
 - `saveState<T>(state: T): Promise<void>` - Save state data to parent
 - `getState<T>(): Promise<T | null>` - Retrieve state data from parent
+- `streamAI<T>(request: StreamAIRequest<T>): Promise<StreamController>` - Start a server-side stream and receive events. Provide `onChunk`, `onComplete`, and `onError` in the request object.
 - `reconnect(): Promise<void>` - Reconnect to parent if connection is lost
 - `disconnect(): void` - Disconnect from parent
 - `getStats()` - Get connection statistics
 
-> **Note**: The `isConnected` property has been removed from the `NuwaClient` class. Use the `isConnected` state from the `useNuwaClient` hook instead for reactive connection status.
+> Note: The hook does not expose a reactive `isConnected` boolean. If you need connection state, track it via `onConnected`/`onError` callbacks in your component state.
+
+### Streaming API
+
+```ts
+// Basic (capId optional)
+const ctrl1 = await nuwaClient.streamAI({
+  prompt: 'Stream summary',
+  onChunk: (chunk) => {
+    if (chunk.type === 'content') console.log(chunk.content);
+  },
+});
+// Later:
+ctrl1.getStatus();
+ctrl1.getResult();
+
+// Full callbacks
+const ctrl2 = await nuwaClient.streamAI({
+  prompt: 'Stream structured output',
+  onChunk: (chunk) => {
+    if (chunk.type === 'content') console.log('content:', chunk.content);
+  },
+  onComplete: () => console.log('done'),
+  onError: (err) => console.error('error:', err),
+});
+
+// If your environment requires targeting a specific Cap, provide capId:
+const ctrl3 = await nuwaClient.streamAI({
+  prompt: 'Stream with specific cap',
+  capId: 'my-cap',
+  onChunk: (chunk) => {/* ... */},
+});
+// Retrieve final result
+if (ctrl3.getStatus() === 'completed') {
+  const result = ctrl3.getResult();
+}
+```
+
+Note: Callback functions in `StreamAIRequest` are handled locally by the SDK and are not sent to the parent window, as functions cannot be cloned across `postMessage`.
 
 ## Best Practice - Always Use Container Ref
 
