@@ -11,7 +11,7 @@ export class StreamingManager {
 	private streamCallbacks = new Map<
 		string,
 		{
-			onChunk?: (chunk: StreamChunk<any>) => void;
+			onChunk?: (chunk: StreamChunk) => void;
 			onError?: (error: Error) => void;
 		}
 	>();
@@ -20,7 +20,10 @@ export class StreamingManager {
 	// completion/error/abort/timeout without relying on consumer callbacks.
 	private streamExecs = new Map<
 		string,
-		{ resolve: (v: { result: any; error: Error | null }) => void; settled: boolean }
+		{
+			resolve: (v: { result: any; error: Error | null }) => void;
+			settled: boolean;
+		}
 	>();
 	private streamStates = new Map<
 		string,
@@ -47,17 +50,13 @@ export class StreamingManager {
 	) {}
 
 	// Expose for NuwaClient to wire into Penpal child methods
-	pushStreamChunk = (streamId: string, chunk: StreamChunk<any>) => {
+	pushStreamChunk = (streamId: string, chunk: StreamChunk) => {
 		const cbs = this.streamCallbacks.get(streamId);
 		const st = this.streamStates.get(streamId);
 		// Accumulate results for controller/handle access
 		if (st && chunk?.type === "content") {
-			const c = (chunk as StreamChunk<any>).content;
-			if (typeof c === "string") {
-				st.resultText = (st.resultText ?? "") + c;
-			} else if (c !== undefined) {
-				st.resultArray = [...(st.resultArray ?? []), c];
-			}
+			const c = (chunk as StreamChunk).content;
+			st.resultText = (st.resultText ?? "") + c;
 		}
 		if (cbs?.onChunk) {
 			try {
@@ -110,7 +109,7 @@ export class StreamingManager {
 	};
 
 	// Factory API: create and then execute
-	createHandle<T = any>(request: StreamAIRequest<T>): StreamHandle<T> {
+	createHandle(request: StreamAIRequest): StreamHandle {
 		const streamId = this.generateStreamId();
 		this.streamStates.set(streamId, { status: "idle", error: null });
 
@@ -118,7 +117,7 @@ export class StreamingManager {
 
 		const getAggregatedResult = () => this.getAggregatedResult(streamId);
 
-		const handle: StreamHandle<T> = {
+		const handle: StreamHandle = {
 			get id() {
 				return streamId;
 			},
@@ -153,7 +152,7 @@ export class StreamingManager {
 				thisRef.cleanupStream(streamId);
 			},
 			execute: async (options?: {
-				onChunk?: (chunk: StreamChunk<any>) => void;
+				onChunk?: (chunk: StreamChunk) => void;
 				onError?: (error: Error) => void;
 			}) => {
 				if (executed) {
@@ -178,7 +177,7 @@ export class StreamingManager {
 				);
 
 				thisRef.streamCallbacks.set(streamId, {
-					onChunk: (chunk: StreamChunk<any>) => {
+					onChunk: (chunk: StreamChunk) => {
 						try {
 							options?.onChunk?.(chunk);
 						} catch (err) {

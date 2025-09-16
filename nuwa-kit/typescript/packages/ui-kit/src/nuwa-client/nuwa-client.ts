@@ -89,7 +89,7 @@ export interface NuwaClientMethods {
 	 * @param request The stream request
 	 * @returns A stream handle
 	 */
-	createAIStream<T = any>(request: StreamAIRequest<T>): StreamHandle<T>;
+	createAIStream(request: StreamAIRequest): StreamHandle;
 }
 
 // Penpal-specific parent methods interface
@@ -335,7 +335,7 @@ export class NuwaClient implements NuwaClientMethods {
 	 * to start it and await completion. Inspect `status`, `error`, and `result`
 	 * at any time, and call `abort()` to cancel.
 	 */
-	createAIStream<T = any>(request: StreamAIRequest<T>): StreamHandle<T> {
+	createAIStream(request: StreamAIRequest): StreamHandle {
 		return this.streaming.createHandle(request);
 	}
 
