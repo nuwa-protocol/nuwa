@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import {PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL} from './constant.js';
 import {IndexerEventIDView} from "@roochnetwork/rooch-sdk";
-import {CapMetadata, CapStats} from './type.js';
+import {CapMetadata, CapStats, RatingDistribution} from './type.js';
 
 config();
 
@@ -292,6 +292,7 @@ export async function queryFromSupabase(
         homepage: item.homepage,
         repository: item.repository,
         thumbnail: item.thumbnail,
+        timestamp: item.timestamp,
         enable: item.enable,
         version: item.version,
         stats: {
@@ -564,9 +565,35 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
         const totalItems = count || items.length;
         const totalPages = Math.ceil(totalItems / validatedPageSize);
 
+        const transformedItems = data.map((item: any) => {
+          const cap = item.cap_data
+          const stats = cap.cap_stats
+          return {
+            id: cap.id,
+            cid: cap.cid,
+            name: cap.name,
+            displayName: cap.display_name,
+            description: cap.description,
+            tags: cap.tags,
+            homepage: cap.homepage,
+            repository: cap.repository,
+            thumbnail: cap.thumbnail,
+            enable: cap.enable,
+            timestamp: cap.timestamp,
+            version: cap.version,
+            stats: {
+              capId: stats.cap_id || cap.id,
+              downloads: stats.downloads || 0,
+              ratingCount: stats.rating_count || 0,
+              averageRating: stats.average_rating || 0,
+              favorites: stats.favorites || 0,
+              userRating: stats.user_rating || null,
+            }
+          };
+        })
         return {
             success: true,
-            items,
+            items: transformedItems,
             totalItems,
             page,
             pageSize: validatedPageSize,
@@ -681,6 +708,34 @@ export async function updateCapEnable(capId: string, enable: boolean): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update cap enable'
+    };
+  }
+}
+
+export async function getCapRatingDistribution(capId: string): Promise<{
+  success: boolean;
+  distribution?: RatingDistribution[];
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_cap_rating_distribution_complete', {
+      p_cap_id: capId
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const distribution: RatingDistribution[] = data?.map((item: any) => ({
+      rating: item.rating,
+      count: Number(item.count)
+    })) ?? [];
+
+    return { success: true, distribution };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get rating distribution'
     };
   }
 }

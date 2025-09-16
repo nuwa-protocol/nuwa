@@ -14,11 +14,17 @@ export interface CapMetadata {
   description: string,
   tags: string[],
   homepage: string,
+  timestamp: string,
   repository: string,
   thumbnail: string,
   enable: boolean,
   version?: number,
   stats: CapStats
+}
+
+export interface RatingDistribution {
+  rating: number;
+  count: number;
 }
 
 export interface CapStats {
@@ -28,4 +34,5 @@ export interface CapStats {
   averageRating: number;
   favorites: number;
   userRating?: number | null;
+  ratingDistribution?: RatingDistribution[];
 }
