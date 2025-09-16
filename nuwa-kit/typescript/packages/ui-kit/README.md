@@ -79,22 +79,27 @@ await client.saveState({ userPreferences: { theme: 'dark' } });
 const state = await client.getState();
 
 // Stream AI responses (capId is optional)
-const controller = await client.streamAI({
-  prompt: 'Stream a poem line by line',
+const stream = client.StreamAI({
+  prompt: 'Stream a poem line by line'
+});
+
+// Start and await until completion; observe live chunks via callbacks
+const { result, error } = await stream.execute({
   onChunk: (chunk) => {
     if (chunk.type === 'content') console.log('chunk:', chunk.content);
   },
-  onComplete: () => console.log('stream complete'),
-  onError: (err) => console.error('stream error:', err),
+  onError: (err) => console.error('stream error:', err)
 });
+console.log('final result:', result);
+if (error) console.warn('ended with error:', error);
 
 // Abort when you are done (optional)
-// controller.abort();
+// stream.abort();
 
-// Inspect controller state anytime
-console.log('status:', controller.getStatus()); // 'running' | 'completed' | 'error' | 'aborted'
-console.log('error:', controller.getError());   // Error | null
-console.log('result:', controller.getResult()); // string or array of chunks
+// Inspect live state anytime
+console.log('status:', stream.status); // 'idle' | 'running' | 'completed' | 'error' | 'aborted'
+console.log('error:', stream.error);   // Error | null
+console.log('result:', stream.result); // string or array of chunks
 ```
 
 ### Auto Height Adjustment
@@ -361,7 +366,7 @@ For a full working example, see our **Cap UI example** in the repository:
 - `addSelection(label: string, message: string | Record<string, any>): Promise<void>` - Add selection to parent
 - `saveState<T>(state: T): Promise<void>` - Save state data to parent
 - `getState<T>(): Promise<T | null>` - Retrieve state data from parent
-- `streamAI<T>(request: StreamAIRequest<T>): Promise<StreamController>` - Start a server-side stream and receive events. Provide `onChunk`, `onComplete`, and `onError` in the request object.
+- `StreamAI<T>(request: StreamAIRequest<T>): StreamHandle<T>` - Factory for starting a server-side stream. Call `await execute({ onChunk?, onError? })` to run until completion; the promise resolves to `{ result, error }`. Inspect live `status`, `error`, `result` and use `abort()` to cancel.
 - `reconnect(): Promise<void>` - Reconnect to parent if connection is lost
 - `disconnect(): void` - Disconnect from parent
 - `getStats()` - Get connection statistics
@@ -372,39 +377,31 @@ For a full working example, see our **Cap UI example** in the repository:
 
 ```ts
 // Basic (capId optional)
-const ctrl1 = await nuwaClient.streamAI({
-  prompt: 'Stream summary',
+const s1 = nuwaClient.StreamAI({ prompt: 'Stream summary' });
+const { result: res1, error: err1 } = await s1.execute({
   onChunk: (chunk) => {
     if (chunk.type === 'content') console.log(chunk.content);
-  },
+  }
 });
-// Later:
-ctrl1.getStatus();
-ctrl1.getResult();
+console.log('status:', s1.status);
+console.log('result:', res1);
+if (err1) console.warn('error:', err1);
 
-// Full callbacks
-const ctrl2 = await nuwaClient.streamAI({
-  prompt: 'Stream structured output',
+// With explicit error callback
+const s2 = nuwaClient.StreamAI({ prompt: 'Stream structured output' });
+const { result: res2, error: err2 } = await s2.execute({
   onChunk: (chunk) => {
     if (chunk.type === 'content') console.log('content:', chunk.content);
   },
-  onComplete: () => console.log('done'),
-  onError: (err) => console.error('error:', err),
+  onError: (err) => console.error('stream error (live):', err)
 });
 
 // If your environment requires targeting a specific Cap, provide capId:
-const ctrl3 = await nuwaClient.streamAI({
-  prompt: 'Stream with specific cap',
-  capId: 'my-cap',
-  onChunk: (chunk) => {/* ... */},
-});
-// Retrieve final result
-if (ctrl3.getStatus() === 'completed') {
-  const result = ctrl3.getResult();
-}
+const s3 = nuwaClient.StreamAI({ prompt: 'Stream with specific cap', capId: 'my-cap' });
+const { result: res3, error: err3 } = await s3.execute();
 ```
 
-Note: Callback functions in `StreamAIRequest` are handled locally by the SDK and are not sent to the parent window, as functions cannot be cloned across `postMessage`.
+Note: Callbacks passed to `execute()` are handled locally by the SDK and are not sent to the parent window, as functions cannot be cloned across `postMessage`.
 
 ## Best Practice - Always Use Container Ref
 

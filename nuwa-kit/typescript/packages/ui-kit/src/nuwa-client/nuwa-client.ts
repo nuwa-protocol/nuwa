@@ -6,13 +6,8 @@ import {
 	type Reply,
 	WindowMessenger,
 } from "penpal";
-import type {
-	HandleStreamAIRequest,
-	StreamAIRequest,
-	StreamChunk,
-	StreamController,
-	StreamStatus,
-} from "./streaming-types.js";
+import { StreamingManager } from "./streaming-core.js";
+import type { StreamAIRequest, StreamHandle } from "./streaming-types.js";
 
 // Default timeout for Penpal connections
 export const NUWA_CLIENT_TIMEOUT = 2000;
@@ -90,12 +85,11 @@ export interface NuwaClientMethods {
 	getState<T = any>(): Promise<T | null>;
 
 	/**
-	 * Start an AI stream and receive chunks from the parent.
-	 * If `schema` is provided in request, the stream will be treated as structured.
+	 * Create a stream handle
 	 * @param request The stream request
-	 * @returns A controller object for managing the stream
+	 * @returns A stream handle
 	 */
-	streamAI<T = any>(request: StreamAIRequest<T>): Promise<StreamController>;
+	createAIStream<T = any>(request: StreamAIRequest<T>): StreamHandle<T>;
 }
 
 // Penpal-specific parent methods interface
@@ -111,10 +105,7 @@ type PenpalParentMethods = {
 	saveState(state: any): Reply<void>;
 	getState(): Reply<any>;
 	// Streaming: parent-side handlers invoked by child
-	handleStreamRequest(
-		request: HandleStreamAIRequest,
-		streamId: string,
-	): Reply<void>;
+	handleStreamRequest(request: StreamAIRequest, streamId: string): Reply<void>;
 	abortStream(streamId: string): Reply<void>;
 };
 
@@ -148,29 +139,8 @@ export class NuwaClient implements NuwaClientMethods {
 	// Store the underlying Penpal connection to allow proper cleanup
 	private penpalConnection: any | null = null;
 	private options: NuwaClientOptions;
-	// Streaming state: per-stream lifecycle handlers are kept locally in the
-	// iframe. They are never sent over postMessage.
-	private streamCallbacks = new Map<
-		string,
-		{
-			onChunk?: (chunk: StreamChunk<any>) => void;
-			onComplete?: () => void;
-			onError?: (error: Error) => void;
-		}
-	>();
-	// Map of streamId -> timeout handle for overall stream timeout.
-	private streamTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-	// Track per-stream status and accumulated results so controller methods can
-	// retrieve them even after streaming completes.
-	private streamStates = new Map<
-		string,
-		{
-			status: StreamStatus;
-			error: Error | null;
-			resultText?: string; // used when content chunks are strings
-			resultArray?: any[]; // used for non-string content chunks
-		}
-	>();
+	// Streaming: delegate to StreamingManager
+	private streaming: StreamingManager;
 
 	constructor(options: NuwaClientOptions = {}) {
 		this.options = {
@@ -179,6 +149,36 @@ export class NuwaClient implements NuwaClientMethods {
 			timeout: NUWA_CLIENT_TIMEOUT,
 			...options,
 		};
+
+		// Initialize streaming manager with NuwaClient-provided deps
+		this.streaming = new StreamingManager({
+			ensureConnected: this.ensureConnected.bind(this),
+			log: this.log.bind(this),
+			normalizeError: this.normalizeError.bind(this),
+			getStreamTimeoutMs: () => this.getTimeout("streamAI"),
+			startParentStream: async (
+				wireRequest: StreamAIRequest,
+				streamId: string,
+			) => {
+				await this.callWithRetry("streamAI", async () =>
+					this.parentMethods!.handleStreamRequest(
+						wireRequest,
+						streamId,
+						new CallOptions({ timeout: this.getTimeout("streamAI") }),
+					),
+				);
+			},
+			abortParentStream: (streamId: string) => {
+				try {
+					this.parentMethods?.abortStream(
+						streamId,
+						new CallOptions({ timeout: this.getTimeout("streamAI") }),
+					);
+				} catch {
+					// ignore
+				}
+			},
+		});
 
 		this.log("NuwaClient initialized", this.options);
 	}
@@ -220,64 +220,10 @@ export class NuwaClient implements NuwaClientMethods {
 
 			// Expose child methods the parent can call (for streaming)
 			const childMethods = {
-				// Parent pushes a chunk for a given streamId
-				pushStreamChunk: (streamId: string, chunk: StreamChunk<any>) => {
-					const cbs = this.streamCallbacks.get(streamId);
-					const st = this.streamStates.get(streamId);
-					// Accumulate results for controller access
-					if (st && chunk?.type === "content") {
-						const c = (chunk as StreamChunk<any>).content;
-						if (typeof c === "string") {
-							st.resultText = (st.resultText ?? "") + c;
-						} else if (c !== undefined) {
-							st.resultArray = [...(st.resultArray ?? []), c];
-						}
-					}
-					if (cbs?.onChunk) {
-						try {
-							cbs.onChunk(chunk);
-						} catch (err) {
-							this.log("onChunk handler threw", err);
-						}
-						// Reset per-chunk timeout if configured
-						this.resetStreamTimeout(streamId);
-					} else if (!cbs) {
-						this.log(`No stream callback found for ${streamId}`);
-					}
-				},
-				// Parent indicates the stream is complete
-				completeStream: (streamId: string) => {
-					const cbs = this.streamCallbacks.get(streamId);
-					const st = this.streamStates.get(streamId);
-					if (st) st.status = "completed";
-					try {
-						cbs?.onComplete?.();
-					} catch (err) {
-						this.log("onComplete handler threw", err);
-					}
-					this.cleanupStream(streamId);
-				},
-				// Parent indicates the stream errored
-				errorStream: (streamId: string, error: any) => {
-					const cbs = this.streamCallbacks.get(streamId);
-					const normalized = this.normalizeError(error);
-					const st = this.streamStates.get(streamId);
-					if (st) {
-						st.status = "error";
-						st.error = normalized;
-					}
-					try {
-						if (cbs?.onError) {
-							cbs.onError(normalized);
-						} else if (cbs?.onChunk) {
-							// Fallback: surface error as a chunk if consumer didn't supply onError
-							cbs.onChunk({ type: "error", error: normalized });
-						}
-					} catch (err) {
-						this.log("onError/onChunk handler threw", err);
-					}
-					this.cleanupStream(streamId);
-				},
+				// Delegates to streaming manager
+				pushStreamChunk: this.streaming.pushStreamChunk,
+				completeStream: this.streaming.completeStream,
+				errorStream: this.streaming.errorStream,
 			};
 
 			// Create and keep the connection so we can destroy it on disconnect
@@ -385,82 +331,12 @@ export class NuwaClient implements NuwaClientMethods {
 	}
 
 	/**
-	 * Start an AI stream via parent.
-	 *
-	 * The request may include optional callbacks (onChunk, onComplete, onError).
-	 * These callbacks are handled locally and are NOT sent to the parent, since
-	 * functions cannot be cloned via postMessage.
+	 * Factory-style streaming API. Create a stream handle, then call `execute()`
+	 * to start it and await completion. Inspect `status`, `error`, and `result`
+	 * at any time, and call `abort()` to cancel.
 	 */
-	async streamAI<T = any>(
-		request: StreamAIRequest<T>,
-	): Promise<StreamController<T>> {
-		await this.ensureConnected();
-
-		const streamId = this.generateStreamId();
-		// Extract callbacks from request (if present) and register them.
-		const { onChunk, onComplete, onError, ...wireRequest } =
-			(request as any) || {};
-		this.streamCallbacks.set(streamId, {
-			onChunk: onChunk as (c: StreamChunk<any>) => void | undefined,
-			onComplete,
-			onError,
-		});
-		// Initialize state tracking for this stream
-		this.streamStates.set(streamId, {
-			status: "running",
-			error: null,
-		});
-		// Set overall stream timeout (auto abort)
-		this.resetStreamTimeout(streamId);
-
-		// Log a sanitized copy of the request (avoid logging functions)
-		this.log("Starting stream", {
-			streamId,
-			request: {
-				...(wireRequest as any),
-				prompt: (wireRequest.prompt || "").slice(0, 60) + "...",
-			},
-		});
-
-		// Kick off the stream on the parent
-		await this.callWithRetry("streamAI", async () =>
-			this.parentMethods!.handleStreamRequest(
-				wireRequest as Omit<
-					StreamAIRequest<any>,
-					"onChunk" | "onComplete" | "onError"
-				>,
-				streamId,
-				new CallOptions({ timeout: this.getTimeout("streamAI") }),
-			),
-		);
-
-		const controller: StreamController<T> = {
-			abort: () => {
-				// Inform parent and cleanup
-				try {
-					this.parentMethods?.abortStream(
-						streamId,
-						new CallOptions({ timeout: this.getTimeout("streamAI") }),
-					);
-				} catch {
-					// ignore
-				}
-				const st = this.streamStates.get(streamId);
-				if (st) st.status = "aborted";
-				this.cleanupStream(streamId);
-			},
-			getStreamId: () => streamId,
-			getStatus: () => this.streamStates.get(streamId)?.status ?? "aborted",
-			getResult: () => {
-				const st = this.streamStates.get(streamId);
-				if (!st) return "" as any; // default fallback
-				if (st.resultText !== undefined) return st.resultText as any;
-				return (st.resultArray ?? []) as any;
-			},
-			getError: () => this.streamStates.get(streamId)?.error ?? null,
-		};
-
-		return controller;
+	createAIStream<T = any>(request: StreamAIRequest<T>): StreamHandle<T> {
+		return this.streaming.createHandle(request);
 	}
 
 	// === Connection Management ===
@@ -546,8 +422,8 @@ export class NuwaClient implements NuwaClientMethods {
 
 	// Resolve timeout for a given method using per-method overrides,
 	// then global methodTimeout, then the built-in default.
-	private getTimeout(method: keyof NuwaClientMethods): number {
-		const perMethod = this.options.methodTimeouts?.[method];
+	private getTimeout(method: string): number {
+		const perMethod = (this.options.methodTimeouts as any)?.[method];
 		if (typeof perMethod === "number") return perMethod;
 		if (typeof this.options.methodTimeout === "number")
 			return this.options.methodTimeout;
@@ -572,8 +448,8 @@ export class NuwaClient implements NuwaClientMethods {
 
 	// Resolve retry count for a given method using per-method overrides,
 	// then global methodRetries, then the built-in default.
-	private getRetries(method: keyof NuwaClientMethods): number {
-		const perMethod = this.options.methodRetriesMap?.[method];
+	private getRetries(method: string): number {
+		const perMethod = (this.options.methodRetriesMap as any)?.[method];
 		if (typeof perMethod === "number") return perMethod;
 		if (typeof this.options.methodRetries === "number")
 			return this.options.methodRetries;
@@ -597,7 +473,7 @@ export class NuwaClient implements NuwaClientMethods {
 
 	// Generic retry wrapper used by all outbound calls
 	private async callWithRetry<T>(
-		method: keyof NuwaClientMethods,
+		method: string,
 		fn: () => Promise<T>,
 	): Promise<T> {
 		const retries = this.getRetries(method);
@@ -613,68 +489,8 @@ export class NuwaClient implements NuwaClientMethods {
 			}
 		}
 		// If we get here, all attempts failed; throw structured error
-		this.handleMethodError(method as string, lastError);
+		this.handleMethodError(method, lastError);
 	}
 
-	private generateStreamId(): string {
-		try {
-			// @ts-ignore - crypto may not exist in all environments but browsers have it
-			if (typeof crypto !== "undefined" && crypto.randomUUID) {
-				// @ts-ignore
-				return crypto.randomUUID();
-			}
-		} catch {
-			// ignore
-		}
-		return `stream_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-	}
-
-	/**
-	 * Reset or arm the overall stream timeout. If no chunks arrive within
-	 * the configured window, the stream is aborted on the parent, an error
-	 * is surfaced to the consumer, and all local state is cleaned up.
-	 */
-	private resetStreamTimeout(streamId: string) {
-		const timeoutMs = this.getTimeout("streamAI");
-		// Clear existing
-		const existing = this.streamTimeouts.get(streamId);
-		if (existing) clearTimeout(existing);
-		if (timeoutMs <= 0) return;
-		const t = setTimeout(() => {
-			this.log("Stream timeout; aborting", { streamId });
-			try {
-				this.parentMethods?.abortStream(
-					streamId,
-					new CallOptions({ timeout: this.getTimeout("streamAI") }),
-				);
-			} catch {
-				// ignore
-			}
-			const cbs = this.streamCallbacks.get(streamId);
-			const st = this.streamStates.get(streamId);
-			if (st) {
-				st.status = "error";
-				st.error = new Error("Stream timed out");
-			}
-			if (cbs?.onError) {
-				cbs.onError(new Error("Stream timed out"));
-			} else if (cbs?.onChunk) {
-				// Fallback: surface timeout as an error chunk if no onError
-				cbs.onChunk({ type: "error", error: new Error("Stream timed out") });
-			}
-			this.cleanupStream(streamId);
-		}, timeoutMs);
-		this.streamTimeouts.set(streamId, t);
-	}
-
-	/**
-	 * Remove all local state (callbacks, timers) associated with a stream.
-	 * Safe to call multiple times.
-	 */
-	private cleanupStream(streamId: string) {
-		const t = this.streamTimeouts.get(streamId);
-		if (t) clearTimeout(t);
-		this.streamTimeouts.delete(streamId);
-		this.streamCallbacks.delete(streamId);
-	}
+	// Streaming helpers moved to StreamingManager
 }
