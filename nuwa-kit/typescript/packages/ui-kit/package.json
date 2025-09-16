@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/ui-kit",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Nuwa UI Kit for TypeScript/React",
   "type": "module",
   "main": "./dist/index.cjs",
