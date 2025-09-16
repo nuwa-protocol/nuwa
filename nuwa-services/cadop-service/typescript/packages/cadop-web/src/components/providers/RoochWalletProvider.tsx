@@ -2,7 +2,6 @@ import React from 'react';
 import { RoochProvider, WalletProvider } from '@roochnetwork/rooch-sdk-kit';
 import { getRoochNodeUrl } from '@roochnetwork/rooch-sdk';
 import { createNetworkConfig } from '@roochnetwork/rooch-sdk-kit';
-import { WalletStoreConnector } from '../../lib/auth/providers/WalletStoreConnector';
 
 // Create network configuration
 const { networkConfig } = createNetworkConfig({
@@ -55,7 +54,6 @@ export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
         chain="bitcoin"
         autoConnect={false} // Don't auto-connect, let user choose
       >
-        <WalletStoreConnector />
         {children}
       </WalletProvider>
     </RoochProvider>

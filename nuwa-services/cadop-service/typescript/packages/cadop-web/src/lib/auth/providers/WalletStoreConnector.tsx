@@ -6,6 +6,8 @@ import {
 } from '@roochnetwork/rooch-sdk-kit';
 import { WalletAuthProvider } from './WalletAuthProvider';
 import { authProviderRegistry } from './AuthProviderRegistry';
+import { unifiedAgentService } from '../../agent/UnifiedAgentService';
+import { WalletAgentService } from '../../agent/WalletAgentService';
 
 /**
  * Component that connects the WalletAuthProvider to the wallet store
@@ -31,11 +33,18 @@ export function WalletStoreConnector() {
       .then(provider => {
         if (provider instanceof WalletAuthProvider) {
           provider.setWalletStoreAccess(walletStoreAccess);
+          console.log('[WalletStoreConnector] Successfully injected wallet store access');
         }
       })
       .catch(error => {
         console.warn('[WalletStoreConnector] Failed to get wallet provider:', error);
       });
+
+    // Also inject wallet instance into WalletAgentService
+    const walletAgentService = unifiedAgentService.getAgentServiceByMethod('wallet');
+    if (walletAgentService instanceof WalletAgentService && currentWallet?.wallet) {
+      walletAgentService.setCurrentWallet(currentWallet.wallet);
+    }
   }, [currentWallet, currentAddress, connectionStatus]);
 
   // This component doesn't render anything

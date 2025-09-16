@@ -1,8 +1,10 @@
 import { IAgentService } from './types';
 import { AuthMethod } from '../storage/types';
-import { UserStore, AuthStore } from '../storage';
+import { UserStore } from '../storage';
 import type { AgentDIDCreationStatus } from '@cadop/shared';
-import { IdentityKit } from '@nuwa-ai/identity-kit';
+import { IdentityKit, VDRRegistry, createVDR, MultibaseCodec } from '@nuwa-ai/identity-kit';
+import type { VerificationRelationship } from '@nuwa-ai/identity-kit';
+import type { Wallet } from '@roochnetwork/rooch-sdk-kit';
 import { RoochWalletSigner } from '../auth/signers/RoochWalletSigner';
 
 /**
@@ -12,6 +14,22 @@ import { RoochWalletSigner } from '../auth/signers/RoochWalletSigner';
  */
 export class WalletAgentService implements IAgentService {
   readonly authMethod: AuthMethod = 'wallet';
+  private currentWallet: Wallet | null = null;
+
+  /**
+   * Set current wallet instance (called by WalletStoreConnector)
+   */
+  setCurrentWallet(wallet: Wallet): void {
+    this.currentWallet = wallet;
+    console.log('[WalletAgentService] Current wallet set:', wallet.getName());
+  }
+
+  /**
+   * Get current wallet instance
+   */
+  getCurrentWallet(): Wallet | null {
+    return this.currentWallet;
+  }
 
   /**
    * Get cached Agent DIDs for a user
@@ -23,7 +41,7 @@ export class WalletAgentService implements IAgentService {
   /**
    * Create a new Agent DID using IdentityKit directly
    */
-  async createAgent(userDid: string, interactive = false): Promise<AgentDIDCreationStatus> {
+  async createAgent(userDid: string, _interactive = false): Promise<AgentDIDCreationStatus> {
     // Validate that this is a wallet user
     if (!this.canCreateAgent(userDid)) {
       throw new Error(`[WalletAgentService] Cannot create agent for non-wallet user: ${userDid}`);
@@ -36,11 +54,17 @@ export class WalletAgentService implements IAgentService {
         throw new Error(`[WalletAgentService] Invalid wallet DID format: ${userDid}`);
       }
 
-      // Create wallet signer
-      const signer = new RoochWalletSigner(userDid, walletAddress);
+      // Check if we have current wallet instance
+      if (!this.currentWallet) {
+        throw new Error('[WalletAgentService] No wallet connected. Please connect wallet first.');
+      }
 
-      // TODO: Ensure wallet is connected
-      // This will depend on the wallet connection state management
+      // Create wallet signer and inject wallet instance
+      const signer = new RoochWalletSigner(userDid, walletAddress);
+      signer.setWallet(this.currentWallet);
+
+      // Validate wallet connection
+      await this.validateWalletConnection(signer);
 
       // Create Agent DID using IdentityKit
       const agentDid = await this.createAgentWithIdentityKit(signer);
@@ -48,10 +72,13 @@ export class WalletAgentService implements IAgentService {
       // Cache the created agent DID
       UserStore.addAgent(userDid, agentDid);
 
+      const now = new Date();
       return {
+        userDid,
         agentDid,
         status: 'completed',
-        // Add other required fields based on AgentDIDCreationStatus interface
+        createdAt: now,
+        updatedAt: now,
       } as AgentDIDCreationStatus;
     } catch (error) {
       console.error('[WalletAgentService] Agent creation failed:', error);
@@ -72,14 +99,38 @@ export class WalletAgentService implements IAgentService {
    */
   private async createAgentWithIdentityKit(signer: RoochWalletSigner): Promise<string> {
     try {
-      // Get public key from signer
-      const publicKey = await signer.getPublicKey();
+      // Ensure VDR is initialized
+      await this.ensureVDRInitialized();
+
+      // Get public key from signer via IdentityKit interface
+      const keyIds = await signer.listKeyIds();
+      if (keyIds.length === 0) {
+        throw new Error('[WalletAgentService] No keys available from signer');
+      }
+
+      const keyInfo = await signer.getKeyInfo(keyIds[0]);
+      if (!keyInfo) {
+        throw new Error('[WalletAgentService] Failed to get key info from signer');
+      }
+      const publicKey = keyInfo.publicKey;
+
+      // Encode public key as multibase
+      const publicKeyMultibase = await MultibaseCodec.encodeBase58btc(publicKey);
 
       // Create Agent DID creation request
       const creationRequest = {
-        publicKey,
-        // Add other required parameters for Agent creation
+        publicKeyMultibase,
+        keyType: 'EcdsaSecp256k1VerificationKey2019', // Bitcoin/Secp256k1 key type
+        initialRelationships: [
+          'authentication',
+          'assertionMethod',
+          'capabilityInvocation',
+          'capabilityDelegation',
+        ] as VerificationRelationship[],
+        customScopes: ['0x3::*::*'], // Allow all scopes for Agent
       };
+
+      console.log('[WalletAgentService] Creating Agent DID with request:', creationRequest);
 
       // Create new Agent DID (smart contract account on Rooch chain)
       const identityKit = await IdentityKit.createNewDID(
@@ -87,18 +138,45 @@ export class WalletAgentService implements IAgentService {
         creationRequest,
         signer,
         {
+          // Pass signer in options for RoochVDR
+          signer: signer,
           // Optional parameters for Agent creation
+          network: import.meta.env.VITE_ROOCH_NETWORK || 'devnet',
         }
       );
 
       // Get the created Agent DID
       const agentDid = identityKit.getDIDDocument().id;
 
-      console.log('[WalletAgentService] Agent DID created:', agentDid);
+      console.log('[WalletAgentService] Agent DID created successfully:', agentDid);
       return agentDid;
     } catch (error) {
       console.error('[WalletAgentService] IdentityKit Agent creation failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Ensure Rooch VDR is initialized
+   */
+  private async ensureVDRInitialized(): Promise<void> {
+    const registry = VDRRegistry.getInstance();
+
+    // Check if Rooch VDR is already registered
+    if (!registry.getVDR('rooch')) {
+      const roochRpcUrl =
+        import.meta.env.VITE_ROOCH_RPC_URL || 'https://dev-seed.rooch.network:443';
+
+      console.log('[WalletAgentService] Initializing Rooch VDR with RPC:', roochRpcUrl);
+
+      // Create and register Rooch VDR
+      const roochVDR = createVDR('rooch', {
+        rpcUrl: roochRpcUrl,
+        debug: import.meta.env.DEV,
+      });
+
+      registry.registerVDR(roochVDR);
+      console.log('[WalletAgentService] Rooch VDR initialized successfully');
     }
   }
 

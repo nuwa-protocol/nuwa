@@ -361,12 +361,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.did;
   }
 
-  async getPublicKey(): Promise<Uint8Array> {
-    if (!this.passkeyAuthMethod?.publicKeyMultibase) {
-      throw new Error('Public key not found');
-    }
-    return MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase);
-  }
+  // Note: getPublicKeyBytes removed - use getKeyInfo() from IdentityKit SignerInterface instead
 
   getAlgorithm(): string {
     return this.passkeyAuthMethod.type || 'unknown';

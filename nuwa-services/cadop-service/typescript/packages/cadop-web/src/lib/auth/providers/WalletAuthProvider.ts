@@ -121,6 +121,54 @@ export class WalletAuthProvider implements AuthProvider {
   }
 
   /**
+   * Try to restore previous session
+   */
+  async restoreSession(): Promise<boolean> {
+    try {
+      if (!this.walletStoreAccess) {
+        console.log('[WalletAuthProvider] Wallet store access not available for session restore');
+        return false;
+      }
+
+      // Check if wallet is still connected
+      const connectionStatus = this.walletStoreAccess.getConnectionStatus();
+      const currentAddress = this.walletStoreAccess.getCurrentAddress();
+
+      if (connectionStatus !== 'connected' || !currentAddress) {
+        console.log('[WalletAuthProvider] Wallet not connected, cannot restore session');
+        return false;
+      }
+
+      // Get current user DID from storage
+      const currentUserDid = AuthStore.getCurrentUserDid();
+      if (!currentUserDid) {
+        console.log('[WalletAuthProvider] No current user DID in storage');
+        return false;
+      }
+
+      // Verify the wallet address matches the stored user DID
+      const bitcoinAddress = currentAddress.toStr();
+      const expectedUserDid = this.createUserDidFromBitcoinAddress(bitcoinAddress);
+
+      if (expectedUserDid !== currentUserDid) {
+        console.log('[WalletAuthProvider] Wallet address mismatch, clearing session');
+        return false;
+      }
+
+      // Update current state
+      this.currentUserDid = currentUserDid;
+
+      console.log('[WalletAuthProvider] Session restored successfully:', {
+        userDid: currentUserDid,
+      });
+      return true;
+    } catch (error) {
+      console.error('[WalletAuthProvider] Session restore failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Perform logout
    */
   async logout(): Promise<void> {

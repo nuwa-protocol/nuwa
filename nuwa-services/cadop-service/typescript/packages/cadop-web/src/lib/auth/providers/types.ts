@@ -24,25 +24,8 @@ export interface AuthResult {
   authIdentifier: string;
 }
 
-/**
- * Signer interface for unified signing operations
- */
-export interface SignerInterface {
-  /** Get the DID this signer is associated with */
-  getDID(): string;
-
-  /** Get the public key */
-  getPublicKey(): Promise<Uint8Array>;
-
-  /** Sign data */
-  sign(data: Uint8Array): Promise<Uint8Array>;
-
-  /** Get algorithm identifier */
-  getAlgorithm(): string;
-
-  /** Check if signer is available/connected */
-  isAvailable(): Promise<boolean>;
-}
+// Note: We use IdentityKit's SignerInterface instead of defining our own
+// import type { SignerInterface } from '@nuwa-ai/identity-kit';
 
 /**
  * Authentication provider interface
