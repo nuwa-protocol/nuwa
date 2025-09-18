@@ -16,7 +16,46 @@ import {
   BitcoinAddress,
   RoochAddress,
   SignatureScheme,
+  Bytes,
+  bcs,
+  toHEX,
+  bytes,
 } from '@roochnetwork/rooch-sdk';
+
+/**
+ * Built-in auth validators (copied from WebAuthnSigner for consistency)
+ */
+export enum BuiltinAuthValidator {
+  SESSION = 0x00,
+  BITCOIN = 0x01,
+  BITCOIN_MULTISIG = 0x02,
+  WEBAUTHN = 0x03,
+}
+
+/**
+ * Bitcoin Authenticator for Agent DID transactions
+ */
+export class BitcoinAuthenticator {
+  readonly authValidatorId: number;
+  readonly payload: Bytes;
+
+  private constructor(authValidatorId: number, payload: Bytes) {
+    this.authValidatorId = authValidatorId;
+    this.payload = payload;
+  }
+
+  encode(): Bytes {
+    return bcs.Authenticator.serialize({
+      authValidatorId: this.authValidatorId,
+      payload: this.payload,
+    }).toBytes();
+  }
+
+  static async bitcoin(signature: Uint8Array): Promise<BitcoinAuthenticator> {
+    const authenticator = new BitcoinAuthenticator(BuiltinAuthValidator.BITCOIN, signature);
+    return authenticator;
+  }
+}
 
 /**
  * Rooch Wallet Signer
@@ -249,8 +288,29 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
     }
 
     try {
-      // Delegate to wallet's signTransaction method
-      return await this.wallet.signTransaction(tx);
+      // If we're in Agent DID mode, use Bitcoin authenticator
+      if (this.didAddress) {
+        tx.setSender(this.didAddress);
+        console.log('[RoochWalletSigner] Set transaction sender to Agent DID address:', this.didAddress.toStr());
+
+        // Get transaction hash for signing
+        const txHash = tx.hashData();
+        const txHashHex = toHEX(txHash);
+        const txHashHexBytes = bytes('utf8', txHashHex);
+        // Create Session authenticator for Agent DID
+        const sessionAuth = await Authenticator.session(txHashHexBytes, this.wallet);
+       
+        // Set authenticator to transaction
+        tx.setAuth(sessionAuth);
+        
+        console.log('[RoochWalletSigner] Agent DID transaction signed with Bitcoin authenticator');
+        return sessionAuth;
+      } else {
+        // User DID mode - delegate to wallet's default signTransaction method
+        const authenticator = await this.wallet.signTransaction(tx);
+        console.log('[RoochWalletSigner] User DID transaction signed successfully');
+        return authenticator;
+      }
     } catch (error) {
       console.error('[RoochWalletSigner] Failed to sign transaction:', error);
       throw new Error('[RoochWalletSigner] Failed to sign transaction with wallet');

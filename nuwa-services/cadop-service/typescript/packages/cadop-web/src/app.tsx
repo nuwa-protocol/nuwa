@@ -10,8 +10,12 @@ import { AddKeyPage } from './pages/add-key';
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard';
 import { OnboardingPage } from './pages/onboarding';
 import { Toaster } from './components/ui/toaster';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
+
+const GLOBAL_DEBUG = import.meta.env.DEV;
 
 const App: React.FC = () => {
+  DebugLogger.setGlobalLevel(GLOBAL_DEBUG ? 'debug' : 'info');
   return (
     <>
       <Routes>
