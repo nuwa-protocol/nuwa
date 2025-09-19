@@ -85,7 +85,9 @@ export class DidAccountSigner extends Signer implements SignerInterface {
   }
 
   async signTransaction(input: Transaction): Promise<Authenticator> {
-    return Authenticator.rooch(input.hashData(), this);
+    const txHash = input.hashData();
+    const vmFragment = this.getVmFragment();
+    return Authenticator.did(txHash, this, vmFragment);
   }
 
   getKeyScheme(): SignatureScheme {
@@ -136,5 +138,13 @@ export class DidAccountSigner extends Signer implements SignerInterface {
       type: this.keyType,
       publicKey: this.publicKey,
     };
+  }
+
+  private getVmFragment(): string {
+    const parts = this.keyId.split('#');
+    if (parts.length !== 2) {
+      throw new Error(`Invalid keyId format: ${this.keyId}. Expected format: "did:rooch:0x123#fragment"`);
+    }
+    return parts[1];
   }
 }

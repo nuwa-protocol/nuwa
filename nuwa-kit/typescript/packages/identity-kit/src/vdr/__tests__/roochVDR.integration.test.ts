@@ -14,6 +14,7 @@ import {
 import { KeyMultibaseCodec } from '../../multibase/key';
 import { MultibaseCodec } from '../../multibase';
 import { KeyManager } from '../../keys/KeyManager';
+import { DidAccountSigner } from '../../signers/didAccountSigner';
 
 // Test configuration
 const DEFAULT_NODE_URL = process.env.ROOCH_NODE_URL || 'http://localhost:6767';
@@ -190,14 +191,19 @@ describe('RoochVDR Integration Tests', () => {
           publicKeyMultibase: publicKeyMultibase,
         };
 
+        // Create a proper signer that uses the DID account's authentication method
+        // Note: In the new DID authentication system, we need to use the original controller keypair
+        // but wrap it properly as a DidAccountSigner for the actual DID account
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair); // Use 'account-key' to match the DID document
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addVerificationMethod(
           actualDID,
           verificationMethod,
           ['authentication', 'assertionMethod'],
-          { signer: signer }
+          { signer: didAccountSigner }
         );
 
         console.log(`📝 Add verification method result: ${success}`);
@@ -219,10 +225,12 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🗑️ Attempting to remove verification method from DID: ${actualDID}`);
 
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair);
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.removeVerificationMethod(actualDID, `${actualDID}#key-2`, {
-          signer: signer,
+          signer: didAccountSigner,
         });
 
         console.log(`📝 Remove verification method result: ${success}`);
@@ -247,7 +255,9 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🗝️ Using signer with address: ${testAddress}`);
 
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair);
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addService(
           actualDID,
@@ -256,7 +266,7 @@ describe('RoochVDR Integration Tests', () => {
             type: 'LinkedDomains',
             serviceEndpoint: 'https://example.com',
           },
-          { signer: signer }
+          { signer: didAccountSigner }
         );
 
         console.log(`📝 Add service result: ${success}`);
@@ -276,7 +286,9 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🔧 Adding service with properties to DID: ${actualDID}`);
 
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair);
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addServiceWithProperties(
           actualDID,
@@ -289,7 +301,7 @@ describe('RoochVDR Integration Tests', () => {
               version: '1.0',
             },
           },
-          { signer: signer }
+          { signer: didAccountSigner }
         );
 
         console.log(`📝 Add service with properties result: ${success}`);
@@ -311,10 +323,12 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🗑️ Attempting to remove service from DID: ${actualDID}`);
 
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair);
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.removeService(actualDID, `${actualDID}#service-1`, {
-          signer: signer,
+          signer: didAccountSigner,
         });
 
         console.log(`📝 Remove service result: ${success}`);
@@ -342,7 +356,9 @@ describe('RoochVDR Integration Tests', () => {
         console.log(`🔧 Attempting to add CADOP service to actual DID: ${actualDID}`);
 
         let signer = KeyManager.createEmpty(actualDID);
-        await signer.importRoochKeyPair('key-2', keypair);
+        await signer.importRoochKeyPair('account-key', keypair);
+        
+        const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const serviceAddResult = await roochVDR.addServiceWithProperties(
           actualDID,
@@ -355,7 +371,7 @@ describe('RoochVDR Integration Tests', () => {
               maxDailyMints: '1000',
             },
           },
-          { signer: signer }
+          { signer: didAccountSigner }
         );
 
         console.log(`📝 CADOP service addition result: ${serviceAddResult}`);
@@ -371,7 +387,7 @@ describe('RoochVDR Integration Tests', () => {
           custodianServiceVMType: 'Ed25519VerificationKey2020',
         };
 
-        const result = await roochVDR.createViaCADOP(cadopRequest, { signer: signer });
+        const result = await roochVDR.createViaCADOP(cadopRequest, { signer: didAccountSigner });
 
         console.log(`📝 CADOP DID creation result: ${result.success}`);
         expect(result.success).toBe(true);

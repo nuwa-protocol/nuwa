@@ -75,7 +75,7 @@
   "dependencies": {
     "@noble/curves": "^1.9.1",
     "@noble/hashes": "^1.8.0",
-    "@roochnetwork/rooch-sdk": "^0.3.6",
+    "@roochnetwork/rooch-sdk": "link:../../../../deps/rooch/sdk/typescript/rooch-sdk",
     "multiformats": "^9.9.0"
   },
   "tsup": {
