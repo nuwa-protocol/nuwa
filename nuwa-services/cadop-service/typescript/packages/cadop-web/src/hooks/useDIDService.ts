@@ -22,10 +22,18 @@ export function useDIDService(targetDid: string | null | undefined): UseDIDServi
     // Wait until auth bootstrap finishes to avoid initializing with undefined credentialId
     if (authLoading) return;
 
-    const creds = userDid ? UserStore.listCredentials(userDid) : [];
-    const credentialId = creds.length > 0 ? creds[0] : undefined;
+    // Get credential ID only for Passkey users (wallet users don't need it)
+    let credentialId: string | undefined;
+    if (userDid) {
+      const authMethod = UserStore.getAuthMethod(userDid);
+      if (authMethod === 'passkey') {
+        const creds = UserStore.listCredentials(userDid);
+        credentialId = creds.length > 0 ? creds[0] : undefined;
+      }
+    }
 
     setIsLoading(true);
+    setError(null); // Clear previous errors
     DIDService.initialize(targetDid, credentialId)
       .then(setDidService)
       .catch(err => setError(err instanceof Error ? err.message : String(err)))

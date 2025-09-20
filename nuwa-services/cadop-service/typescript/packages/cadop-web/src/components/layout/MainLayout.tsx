@@ -10,7 +10,11 @@ interface MainLayoutProps {
   hasHeader?: boolean;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ children, hasSidebar = true, hasHeader = true }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({
+  children,
+  hasSidebar = true,
+  hasHeader = true,
+}) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(hasSidebar);
 
   const toggleSidebar = () => {
