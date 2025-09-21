@@ -1,5 +1,5 @@
-import { createVDR, IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
-import { ROOCH_RPC_URL } from '../../config/env';
+import { IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
+import { ensureVDRInitialized } from '../identity/VDRManager';
 import type {
   OperationalKeyInfo,
   VerificationRelationship,
@@ -18,12 +18,8 @@ export class DIDService {
 
   static async initialize(did: string, credentialId?: string): Promise<DIDService> {
     try {
-      // Ensure VDR is registered
-      const roochVDR = createVDR('rooch', {
-        rpcUrl: ROOCH_RPC_URL,
-        debug: true,
-      });
-      VDRRegistry.getInstance().registerVDR(roochVDR);
+      // Ensure VDRs are initialized using centralized VDRManager
+      await ensureVDRInitialized();
 
       // Resolve DID document to check if it exists
       const didDocument = await VDRRegistry.getInstance().resolveDID(did);

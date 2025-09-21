@@ -70,6 +70,7 @@ interface WalletSignerOptions {
 }
 
 export class RoochWalletSigner extends Signer implements SignerInterface {
+  readonly autoPrefix: true;
   private userDid: string;
   private walletAddress: string;
   private wallet: Wallet | null = null;
@@ -79,6 +80,7 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
 
   constructor(userDid: string, walletAddress: string, options?: WalletSignerOptions) {
     super();
+    this.autoPrefix = true;
     this.userDid = userDid;
     this.walletAddress = walletAddress;
 
@@ -291,14 +293,18 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
       // If we're in Agent DID mode, use Bitcoin authenticator
       if (this.didAddress) {
         tx.setSender(this.didAddress);
+        const vmFragment = this.walletAuthMethod?.id.split('#')[1];
+        if (!vmFragment) {
+          throw new Error('[RoochWalletSigner] VM fragment not found');
+        }
         console.log('[RoochWalletSigner] Set transaction sender to Agent DID address:', this.didAddress.toStr());
-
+        console.log('[RoochWalletSigner] VM fragment:', vmFragment);
         // Get transaction hash for signing
         const txHash = tx.hashData();
         const txHashHex = toHEX(txHash);
         const txHashHexBytes = bytes('utf8', txHashHex);
         // Create Session authenticator for Agent DID
-        const sessionAuth = await Authenticator.session(txHashHexBytes, this.wallet);
+        const sessionAuth = await Authenticator.didBitcoinMessage(txHash, this, vmFragment);
        
         // Set authenticator to transaction
         tx.setAuth(sessionAuth);
@@ -371,4 +377,5 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
   async isAvailable(): Promise<boolean> {
     return this.isConnected();
   }
+
 }

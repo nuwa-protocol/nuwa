@@ -16,6 +16,8 @@ import {
   bcs,
   PublicKeyInitData,
   fromB64,
+  WebAuthnSigner as RoochWebAuthnSigner,
+  WebAuthnAssertionData,
 } from '@roochnetwork/rooch-sdk';
 import { defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
@@ -165,6 +167,7 @@ export class EcdsaR1PublicKey extends PublicKey<Address> {
 }
 
 interface WebAuthnSignature {
+  response: AuthenticatorAssertionResponse;
   signature: Uint8Array;
   rawSignature: Uint8Array;
   authenticatorData: Uint8Array;
@@ -178,7 +181,7 @@ interface WebAuthnSignerOptions {
   credentialId?: string;
 }
 
-export class WebAuthnSigner extends Signer implements SignerInterface {
+export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterface {
   private did: string;
   private rpId: string;
   private rpName: string;
@@ -244,6 +247,11 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
   async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
     const { signature, authenticatorData: _ } = await this.signWithWebAuthn(data, keyId);
     return signature;
+  }
+
+  async signAssertion(data: Uint8Array): Promise<AuthenticatorAssertionResponse> {
+    const { response, signature, authenticatorData, clientDataJSON } = await this.signWithWebAuthn(data, this.passkeyAuthMethod?.id);
+    return response;
   }
 
   async signWithWebAuthn(data: Uint8Array, keyId: string): Promise<WebAuthnSignature> {
@@ -323,6 +331,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       });
 
       return {
+        response,
         signature,
         rawSignature,
         authenticatorData,
@@ -509,22 +518,11 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
   }
 
   async signTransaction(tx: Transaction): Promise<Authenticator> {
-    // 使用交易哈希作为 WebAuthn challenge
     const txHash = tx.hashData();
 
-    // 进行 WebAuthn 签名
-    const sig = await this.signWithWebAuthn(txHash, this.passkeyAuthMethod.id);
+    const vmFragment = this.passkeyAuthMethod.id.split('#')[1];
+    const webauthnAuth = await Authenticator.didWebAuthn(txHash, this, vmFragment);
 
-    // 构造 payload
-    const payloadBytes = await this.buildAuthenticatorPayload(sig);
-
-    // 构造 Authenticator 对象
-    const webauthnAuth = (await WebAuthnAuthenticator.webauthn(
-      payloadBytes,
-      this
-    )) as unknown as Authenticator;
-
-    // 设置到交易中（便于调用方）
     tx.setAuth(webauthnAuth);
     tx.setSender(this.didAddress);
     return webauthnAuth;
@@ -534,7 +532,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return this.passkeyAuthMethod.type === KEY_TYPE.SECP256K1 ? 'Secp256k1' : 'ED25519';
   }
 
-  getRoochPublicKey(): PublicKey<Address> {
+  getPublicKey(): PublicKey<Address> {
     let publicKey = MultibaseCodec.decodeBase58btc(this.passkeyAuthMethod.publicKeyMultibase!);
     if (this.passkeyAuthMethod.type === KEY_TYPE.SECP256K1) {
       return new Secp256k1PublicKey(publicKey);

@@ -2,7 +2,7 @@ import { IAgentService } from './types';
 import { AuthMethod } from '../storage/types';
 import { UserStore } from '../storage';
 import type { AgentDIDCreationStatus } from '@cadop/shared';
-import { IdentityKit, VDRRegistry, createVDR, MultibaseCodec } from '@nuwa-ai/identity-kit';
+import { IdentityKit, MultibaseCodec } from '@nuwa-ai/identity-kit';
 import type { VerificationRelationship } from '@nuwa-ai/identity-kit';
 import type { Wallet } from '@roochnetwork/rooch-sdk-kit';
 import { RoochWalletSigner } from '../auth/signers/RoochWalletSigner';
@@ -157,27 +157,11 @@ export class WalletAgentService implements IAgentService {
   }
 
   /**
-   * Ensure Rooch VDR is initialized
+   * Ensure VDR is initialized for identity operations using centralized VDRManager
    */
   private async ensureVDRInitialized(): Promise<void> {
-    const registry = VDRRegistry.getInstance();
-
-    // Check if Rooch VDR is already registered
-    if (!registry.getVDR('rooch')) {
-      const roochRpcUrl =
-        import.meta.env.VITE_ROOCH_RPC_URL || 'https://dev-seed.rooch.network:443';
-
-      console.log('[WalletAgentService] Initializing Rooch VDR with RPC:', roochRpcUrl);
-
-      // Create and register Rooch VDR
-      const roochVDR = createVDR('rooch', {
-        rpcUrl: roochRpcUrl,
-        debug: import.meta.env.DEV,
-      });
-
-      registry.registerVDR(roochVDR);
-      console.log('[WalletAgentService] Rooch VDR initialized successfully');
-    }
+    const { ensureVDRInitialized } = await import('../identity/VDRManager');
+    await ensureVDRInitialized();
   }
 
   /**

@@ -3,11 +3,10 @@ import { AuthMethod } from '../../storage/types';
 import { UserStore } from '../../storage';
 import { WebAuthnSigner } from '../WebAuthnSigner';
 import { RoochWalletSigner } from './RoochWalletSigner';
-import { VDRRegistry, createVDR } from '@nuwa-ai/identity-kit';
+import { VDRRegistry } from '@nuwa-ai/identity-kit';
 import { unifiedAgentService } from '../../agent/UnifiedAgentService';
 import { WalletAgentService } from '../../agent/WalletAgentService';
-
-const ROOCH_RPC_URL = import.meta.env.VITE_ROOCH_RPC_URL || 'https://dev-seed.rooch.network:443';
+import { ensureVDRInitialized } from '../../identity/VDRManager';
 
 /**
  * Signer creation options
@@ -259,16 +258,10 @@ export class SignerFactory {
   }
 
   /**
-   * Ensure Rooch VDR is registered
+   * Ensure VDRs are initialized using the centralized VDRManager
    */
   private async ensureVDRRegistered(): Promise<void> {
-    if (!VDRRegistry.getInstance().getVDR('rooch')) {
-      const roochVDR = createVDR('rooch', {
-        rpcUrl: ROOCH_RPC_URL,
-        debug: true,
-      });
-      VDRRegistry.getInstance().registerVDR(roochVDR);
-    }
+    await ensureVDRInitialized();
   }
 
   /**

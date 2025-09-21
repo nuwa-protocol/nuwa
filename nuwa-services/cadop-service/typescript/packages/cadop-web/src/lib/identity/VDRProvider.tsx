@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { VDRRegistry, createVDR } from '@nuwa-ai/identity-kit';
-import { ROOCH_RPC_URL } from '@/config/env';
+import { VDRRegistry } from '@nuwa-ai/identity-kit';
+import { VDRManager } from './VDRManager';
 
 interface VDRContextValue {
   /** Global VDRRegistry singleton */
@@ -14,8 +14,7 @@ interface VDRContextValue {
 const VDRContext = createContext<VDRContextValue | undefined>(undefined);
 
 /**
- * Hook that lazily registers the default Rooch VDR exactly once and returns
- * the (already singleton) `VDRRegistry` instance for consumers.
+ * Hook that uses the centralized VDRManager to initialize VDRs
  */
 function useInitialiseVDR(): VDRContextValue {
   const [initialised, setInitialised] = useState(false);
@@ -24,23 +23,23 @@ function useInitialiseVDR(): VDRContextValue {
   const registry = useMemo(() => VDRRegistry.getInstance(), []);
 
   useEffect(() => {
-    if (initialised) return;
-    try {
-      // If Rooch VDR not yet registered, do it now.
-      const hasRooch = Boolean((registry as any).getVDR?.('rooch'));
-      if (!hasRooch) {
-        const roochVDR = createVDR('rooch', {
-          rpcUrl: ROOCH_RPC_URL,
-          debug: import.meta.env.DEV,
-        });
-        registry.registerVDR(roochVDR);
+    async function init() {
+      if (initialised) return;
+      
+      try {
+        console.log('[VDRProvider] Initialising VDRs using VDRManager...');
+        const vdrManager = VDRManager.getInstance();
+        await vdrManager.initialize();
+        setInitialised(true);
+        console.log('[VDRProvider] VDRs initialised successfully');
+      } catch (err) {
+        console.error('[VDRProvider] Failed to initialise VDRs:', err);
+        setError(err instanceof Error ? err.message : String(err));
       }
-      setInitialised(true);
-    } catch (err) {
-      console.error('[VDRProvider] failed to initialise VDRRegistry', err);
-      setError(err instanceof Error ? err.message : String(err));
     }
-  }, [initialised, registry]);
+    
+    init();
+  }, [initialised]);
 
   return { registry, initialised, error };
 }
