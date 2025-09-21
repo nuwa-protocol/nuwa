@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/ui-kit",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Nuwa UI Kit for TypeScript/React",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -29,7 +29,7 @@
     "react": ">=16.8.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "penpal": "^7.0.4"
   },
   "devDependencies": {

@@ -42,6 +42,9 @@ export interface Selection {
 	message: string | Record<string, any>;
 }
 
+// Theme enumeration for consistent theme values across parent/child
+export type NuwaThemeValue = "light" | "dark";
+
 /**
  * Interface for Nuwa client methods that can be called by child iframes
  */
@@ -109,6 +112,18 @@ type PenpalParentMethods = {
 	abortStream(streamId: string): Reply<void>;
 };
 
+// Child-exposed methods that the parent can call via Penpal
+// We keep this local to the child; the parent should not send functions across
+// postMessage. All parameters must be structured-cloneable.
+type PenpalChildMethods = {
+	// Streaming callbacks
+	pushStreamChunk: (streamId: string, chunk: any) => void;
+	completeStream: (streamId: string) => void;
+	errorStream: (streamId: string, error: any) => void;
+	// Theme updates pushed from parent to child
+	updateTheme: (theme: NuwaThemeValue) => void;
+};
+
 export interface NuwaClientOptions {
 	allowedOrigins?: string[];
 	timeout?: number;
@@ -142,10 +157,14 @@ export class NuwaClient implements NuwaClientMethods {
 	// Streaming: delegate to StreamingManager
 	private streaming: StreamingManager;
 
+	// Theme state propagated by parent -> child
+	public theme: NuwaThemeValue = "light";
+	private themeListeners = new Set<(theme: NuwaThemeValue) => void>();
+
 	constructor(options: NuwaClientOptions = {}) {
 		this.options = {
 			allowedOrigins: ["*"],
-			debug: true,
+			debug: false,
 			timeout: NUWA_CLIENT_TIMEOUT,
 			...options,
 		};
@@ -218,12 +237,17 @@ export class NuwaClient implements NuwaClientMethods {
 				allowedOrigins: this.options.allowedOrigins || ["*"],
 			});
 
-			// Expose child methods the parent can call (for streaming)
-			const childMethods = {
+			// Expose child methods the parent can call
+			const childMethods: PenpalChildMethods = {
 				// Delegates to streaming manager
 				pushStreamChunk: this.streaming.pushStreamChunk,
 				completeStream: this.streaming.completeStream,
 				errorStream: this.streaming.errorStream,
+				// Allow parent to push theme updates into the child
+				updateTheme: (theme: NuwaThemeValue) => {
+					this.log("Theme updated from parent", theme);
+					this.setThemeFromParent(theme);
+				},
 			};
 
 			// Create and keep the connection so we can destroy it on disconnect
@@ -407,6 +431,28 @@ export class NuwaClient implements NuwaClientMethods {
 		if (this.options.debug) {
 			console.debug(`[NuwaClient SDK] ${message}`, data);
 		}
+	}
+
+	// === Theme helpers ===
+	private setThemeFromParent(theme: any): void {
+		if (theme !== "light" && theme !== "dark") {
+			this.log("Ignoring invalid theme value from parent", theme);
+			return;
+		}
+		this.theme = theme;
+		for (const cb of this.themeListeners) {
+			try {
+				cb(theme);
+			} catch {
+				// ignore listener errors
+			}
+		}
+	}
+
+	/** Subscribe to theme changes pushed from the parent. Returns an unsubscribe. */
+	onThemeChange(listener: (theme: NuwaThemeValue) => void): () => void {
+		this.themeListeners.add(listener);
+		return () => this.themeListeners.delete(listener);
 	}
 
 	private normalizeError(error: any): Error {

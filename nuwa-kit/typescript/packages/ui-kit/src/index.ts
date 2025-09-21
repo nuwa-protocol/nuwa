@@ -23,10 +23,16 @@ export {
 	NUWA_CLIENT_TIMEOUT,
 	NuwaClient,
 } from "./nuwa-client/nuwa-client.js";
+// === React Hook for Nuwa Client ===
+export {
+	NuwaProvider,
+	useNuwa,
+} from "./nuwa-client/nuwa-context.js";
 export type {
 	StreamAIRequest,
 	StreamChunk,
 	StreamHandle,
 } from "./nuwa-client/streaming-types.js";
-// === React Hook for Nuwa Client ===
-export { useNuwaClient } from "./nuwa-client/use-nuwa-client.js";
+// === React Hook for MCP server lifecycle ===
+export { useNuwaMCP } from "./mcp-server/use-nuwa-mcp.js";
+export type { UseNuwaMCPOptions } from "./mcp-server/use-nuwa-mcp.js";
