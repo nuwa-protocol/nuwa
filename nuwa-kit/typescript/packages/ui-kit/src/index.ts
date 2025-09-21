@@ -33,3 +33,6 @@ export type {
 	StreamChunk,
 	StreamHandle,
 } from "./nuwa-client/streaming-types.js";
+// === React Hook for MCP server lifecycle ===
+export { useNuwaMCP } from "./mcp-server/use-nuwa-mcp.js";
+export type { UseNuwaMCPOptions } from "./mcp-server/use-nuwa-mcp.js";
