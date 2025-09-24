@@ -10,6 +10,10 @@ export const CapIDNameSchema = z
 	.min(6, "Name must be at least 6 characters")
 	.max(20, "Name must be at most 20 characters");
 
+export const CapArtifactSchema = z.object({
+	srcUrl: z.string().url('Must be a valid URL'),
+});
+
 export const CapIDSchema = z
 	.object({
 		authorDID: CapAuthorDIDSchema,
@@ -39,6 +43,9 @@ export const CapModelSchema = z.object({
 		"Transcription Model",
 		"Speech Model",
 	]),
+	contextLength: z
+	.number()
+	.refine((num) => num > 0, 'Context length must be greater than 0'),
 });
 
 export const CapPromptSuggestionSchema = z
@@ -80,6 +87,7 @@ export const CapSchema = CapIDSchema.and(
 	z.object({
 		core: CapCoreSchema,
 		metadata: CapMetadataSchema,
+		artifact: CapArtifactSchema.optional(),
 	}),
 );
 
