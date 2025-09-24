@@ -28,6 +28,40 @@ import { serializeJson } from '../../utils/json';
 import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
 import type { ZodTypeAny } from 'zod';
+import type { Tool, ToolCallOptions, ToolSet } from 'ai';
+
+/**
+ * CallToolResult type compatible with AI SDK's MCP implementation
+ * This matches the exact structure used by AI SDK's createMCPClient
+ * Based on: https://github.com/vercel/ai/blob/main/packages/ai/core/tool/mcp/types.ts
+ */
+type CallToolResult = {
+  content: Array<{
+    type: 'text';
+    text: string;
+  } | {
+    type: 'image';
+    data: string; // base64 encoded
+    mimeType: string;
+  } | {
+    type: 'resource';
+    resource: {
+      uri: string;
+      name?: string;
+      description?: string;
+      mimeType?: string;
+    } & ({
+      text: string;
+    } | {
+      blob: string; // base64 encoded
+    });
+  }>;
+  isError?: boolean;
+  _meta?: Record<string, unknown>;
+} | {
+  toolResult: unknown;
+  _meta?: Record<string, unknown>;
+};
 import {
   HealthResponseSchema,
   RecoveryResponse,
@@ -141,17 +175,59 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * Call a tool with payment, this is a convenience method that returns the first text as data for convenience API
+   * Call a tool with payment processing and optional result validation
    * @param method - The method to call
    * @param params - The parameters to pass to the tool
+   * @param schema - Schema for validation
    * @returns The result of the tool call
    */
   async call<T = any>(
     method: string,
     params?: any,
     schema?: ZodTypeAny
+  ): Promise<PaymentResult<T>>;
+
+  /**
+   * Call a tool with payment processing, custom clientTxRef, and optional result validation
+   * @param method - The method to call
+   * @param params - The parameters to pass to the tool
+   * @param options - Call options including clientTxRef and schema
+   * @returns The result of the tool call
+   */
+  async call<T = any>(
+    method: string,
+    params: any,
+    options: { clientTxRef: string; schema?: ZodTypeAny }
+  ): Promise<PaymentResult<T>>;
+
+  async call<T = any>(
+    method: string,
+    params?: any,
+    schemaOrOptions?: ZodTypeAny | { clientTxRef: string; schema?: ZodTypeAny }
   ): Promise<PaymentResult<T>> {
-    const { content, payment } = await this.callToolWithPayment(method, params);
+    let schema: ZodTypeAny | undefined;
+    let clientTxRef: string | undefined;
+    
+    // Type-safe parameter parsing with proper type guards
+    if (
+      schemaOrOptions &&
+      typeof schemaOrOptions === 'object' &&
+      // Ensure it's not a Zod schema (Zod schemas have a 'safeParse' function)
+      !(
+        typeof (schemaOrOptions as any).safeParse === 'function' ||
+        typeof (schemaOrOptions as any).parse === 'function'
+      ) &&
+      'clientTxRef' in schemaOrOptions
+    ) {
+      // Options object pattern: call(method, params, { clientTxRef: 'xxx', schema: ... })
+      clientTxRef = schemaOrOptions.clientTxRef;
+      schema = schemaOrOptions.schema;
+    } else {
+      // Simple schema pattern: call(method, params, schema)
+      schema = schemaOrOptions as ZodTypeAny | undefined;
+    }
+
+    const { content, payment } = await this.callToolWithPayment(method, params, clientTxRef);
     const raw = this.parseFirstJsonText<any>(content);
     let data = undefined;
     if (schema) {
@@ -176,13 +252,39 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * Call a tool returns the content of the tool call
+   * Call a tool and return the content of the tool call
    * @param name - The name of the tool to call
    * @param args - The parameters to pass to the tool
    * @returns The content of the tool call
    */
-  async callTool(name: string, args?: any): Promise<{ content: any[] }> {
-    const { content } = await this.callToolWithPayment(name, args);
+  async callTool(name: string, args?: any): Promise<{ content: any[] }>;
+
+  /**
+   * Call a tool with custom clientTxRef and return the content of the tool call
+   * @param name - The name of the tool to call
+   * @param args - The parameters to pass to the tool
+   * @param options - Call options including clientTxRef
+   * @returns The content of the tool call
+   */
+  async callTool(name: string, args: any, options: { clientTxRef: string }): Promise<{ content: any[] }>;
+
+  async callTool(
+    name: string, 
+    args?: any, 
+    optionsOrClientTxRef?: { clientTxRef: string } | string
+  ): Promise<{ content: any[] }> {
+    let clientTxRef: string | undefined;
+    
+    // Type-safe parameter parsing
+    if (typeof optionsOrClientTxRef === 'string') {
+      // Backward compatibility: support callTool(name, args, clientTxRef) usage pattern
+      clientTxRef = optionsOrClientTxRef;
+    } else if (optionsOrClientTxRef && typeof optionsOrClientTxRef === 'object' && 'clientTxRef' in optionsOrClientTxRef) {
+      // New pattern: callTool(name, args, { clientTxRef: 'xxx' })
+      clientTxRef = optionsOrClientTxRef.clientTxRef;
+    }
+    
+    const { content } = await this.callToolWithPayment(name, args, clientTxRef);
     return { content };
   }
 
@@ -376,18 +478,20 @@ export class PaymentChannelMcpClient {
    * Call a tool with payment
    * @param method - The name of the tool to call
    * @param params - The parameters to pass to the tool
+   * @param clientTxRef - Optional custom client transaction reference. If not provided, a UUID will be generated
    * @returns The content of the tool call and the payment info
    */
   async callToolWithPayment(
     method: string,
-    params?: any
+    params?: any,
+    clientTxRef?: string
   ): Promise<{ content: any[]; payment?: PaymentInfo }> {
     const handle = this.scheduler.enqueue(async (_release, signal) => {
       const startTs = Date.now();
       let createdLog = false;
       const txEnabled = this.options.transactionLog?.enabled !== false;
       if (signal.aborted) throw new Error('Request aborted');
-      const clientTxRef = crypto.randomUUID();
+      const txRef = clientTxRef || crypto.randomUUID();
       const client = await this.ensureClient();
       if (signal.aborted) throw new Error('Request aborted');
       await this.ensureNotificationSubscription();
@@ -404,12 +508,12 @@ export class PaymentChannelMcpClient {
       }
       if (signal.aborted) throw new Error('Request aborted');
 
-      const reqParams = await this.buildParams(method, params, clientTxRef);
+      const reqParams = await this.buildParams(method, params, txRef);
 
       // Create transaction log entry
       if (txEnabled) {
         try {
-          await this.logTransactionCreate(clientTxRef, method, reqParams);
+          await this.logTransactionCreate(txRef, method, reqParams);
           createdLog = true;
         } catch (e) {
           this.logger.debug('txlog.create.failed', e);
@@ -437,14 +541,14 @@ export class PaymentChannelMcpClient {
         try {
           this.logger.debug('retry call', {
             method,
-            clientTxRef,
+            clientTxRef: txRef,
           });
           const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
           const signed = await this.payerClient.signSubRAV(subRav);
-          const retryParams = await this.buildParams(method, params, clientTxRef);
+          const retryParams = await this.buildParams(method, params, txRef);
           const newReqPayload: PaymentRequestPayload = {
             version: 1,
-            clientTxRef,
+            clientTxRef: txRef,
             maxAmount: this.options.maxAmount,
             signedSubRav: signed,
           };
@@ -463,7 +567,7 @@ export class PaymentChannelMcpClient {
         } catch {
           this.logger.debug('retry call failed', {
             method,
-            clientTxRef,
+            clientTxRef: txRef,
           });
         }
       }
@@ -472,7 +576,7 @@ export class PaymentChannelMcpClient {
       if (paymentPayload && paymentPayload.error) {
         const err = paymentPayload.error as { code?: string; message?: string };
         const svc = paymentPayload.serviceTxRef;
-        const cRef = paymentPayload.clientTxRef ?? clientTxRef;
+        const cRef = paymentPayload.clientTxRef ?? txRef;
         const code = err?.code || 'PAYMENT_ERROR';
         const message = err?.message || 'Payment negotiation failed';
         const details = { code, message, clientTxRef: cRef, serviceTxRef: svc } as any;
@@ -499,7 +603,7 @@ export class PaymentChannelMcpClient {
         throw errObj;
       }
 
-      const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
+      const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, txRef);
       if (txEnabled && createdLog) {
         try {
           const durationMs = Date.now() - startTs;
@@ -516,7 +620,7 @@ export class PaymentChannelMcpClient {
               vmIdFragment: paymentInfo.vmIdFragment,
             });
           } else {
-            await this.transactionStore.update(clientTxRef, {
+            await this.transactionStore.update(txRef, {
               durationMs,
               status: 'free',
             });
@@ -843,9 +947,9 @@ export class PaymentChannelMcpClient {
    * @param options - Options for filtering tools, or boolean for backward compatibility
    * @returns A record of tool definitions compatible with AI SDK
    */
-  async tools(options?: ListToolsOptions): Promise<Record<string, any>> {
+  async tools(options?: ListToolsOptions): Promise<ToolSet> {
     const rawTools = await this.listTools(options);
-    const aiSdkTools: Record<string, any> = {};
+    const aiSdkTools: ToolSet = {};
 
     // Convert MCP tool format to AI SDK tool format
     if (rawTools && typeof rawTools === 'object') {
@@ -879,26 +983,32 @@ export class PaymentChannelMcpClient {
 
   /**
    * Convert MCP tool definition to AI SDK compatible format
+   * @param tool - MCP tool definition
+   * @returns AI SDK compatible tool with proper typing
    */
-  private convertToolToAiSdkFormat(tool: any): any {
+  private convertToolToAiSdkFormat(tool: {
+    name: string;
+    description?: string;
+    inputSchema?: any;
+    parameters?: any;
+    input_schema?: any;
+  }): Tool<Record<string, any>, CallToolResult> {
     // Extract schema from various possible locations
     // Note: tool should already be sanitized by listTools() -> sanitizeTools()
     const schema = tool.inputSchema || tool.parameters || tool.input_schema || {};
 
     return {
-      type: 'function',
-      name: tool.name,
       description: tool.description || `Tool: ${tool.name}`,
-      parameters: schema,
-      // Preserve original MCP tool metadata for debugging
-      _mcpTool: tool,
+      inputSchema: schema,
       // Add execute method that uses callToolWithPayment
-      execute: async (args: any) => {
-        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args);
+      execute: async (args: any, options?: ToolCallOptions) => {
+        // Use AI SDK's toolCallId as clientTxRef
+        const clientTxRef = options?.toolCallId;
+        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args, clientTxRef);
         // We don't return the payment here, because the AI do not need to know about it
         return { content };
       },
-    };
+    } as Tool<Record<string, any>, CallToolResult>;
   }
 
   /**
