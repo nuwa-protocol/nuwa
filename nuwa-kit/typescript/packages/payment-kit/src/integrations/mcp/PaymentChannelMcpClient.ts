@@ -28,6 +28,40 @@ import { serializeJson } from '../../utils/json';
 import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
 import type { ZodTypeAny } from 'zod';
+import type { Tool, ToolCallOptions, ToolSet } from 'ai';
+
+/**
+ * CallToolResult type compatible with AI SDK's MCP implementation
+ * This matches the exact structure used by AI SDK's createMCPClient
+ * Based on: https://github.com/vercel/ai/blob/main/packages/ai/core/tool/mcp/types.ts
+ */
+type CallToolResult = {
+  content: Array<{
+    type: 'text';
+    text: string;
+  } | {
+    type: 'image';
+    data: string; // base64 encoded
+    mimeType: string;
+  } | {
+    type: 'resource';
+    resource: {
+      uri: string;
+      name?: string;
+      description?: string;
+      mimeType?: string;
+    } & ({
+      text: string;
+    } | {
+      blob: string; // base64 encoded
+    });
+  }>;
+  isError?: boolean;
+  _meta?: Record<string, unknown>;
+} | {
+  toolResult: unknown;
+  _meta?: Record<string, unknown>;
+};
 import {
   HealthResponseSchema,
   RecoveryResponse,
@@ -863,9 +897,9 @@ export class PaymentChannelMcpClient {
    * @param options - Options for filtering tools, or boolean for backward compatibility
    * @returns A record of tool definitions compatible with AI SDK
    */
-  async tools(options?: ListToolsOptions): Promise<Record<string, any>> {
+  async tools(options?: ListToolsOptions): Promise<ToolSet> {
     const rawTools = await this.listTools(options);
-    const aiSdkTools: Record<string, any> = {};
+    const aiSdkTools: ToolSet = {};
 
     // Convert MCP tool format to AI SDK tool format
     if (rawTools && typeof rawTools === 'object') {
@@ -899,28 +933,32 @@ export class PaymentChannelMcpClient {
 
   /**
    * Convert MCP tool definition to AI SDK compatible format
+   * @param tool - MCP tool definition
+   * @returns AI SDK compatible tool with proper typing
    */
-  private convertToolToAiSdkFormat(tool: any): any {
+  private convertToolToAiSdkFormat(tool: {
+    name: string;
+    description?: string;
+    inputSchema?: any;
+    parameters?: any;
+    input_schema?: any;
+  }): Tool<Record<string, any>, CallToolResult> {
     // Extract schema from various possible locations
     // Note: tool should already be sanitized by listTools() -> sanitizeTools()
     const schema = tool.inputSchema || tool.parameters || tool.input_schema || {};
 
     return {
-      type: 'function',
-      name: tool.name,
       description: tool.description || `Tool: ${tool.name}`,
-      parameters: schema,
-      // Preserve original MCP tool metadata for debugging
-      _mcpTool: tool,
+      inputSchema: schema,
       // Add execute method that uses callToolWithPayment
-      execute: async (args: any, options?: { toolCallId?: string; messages?: any[]; abortSignal?: AbortSignal }) => {
-        // Use AI SDK's toolCallId as clientTxRef if available
+      execute: async (args: any, options?: ToolCallOptions) => {
+        // Use AI SDK's toolCallId as clientTxRef
         const clientTxRef = options?.toolCallId;
         const { content, payment: _ } = await this.callToolWithPayment(tool.name, args, clientTxRef);
         // We don't return the payment here, because the AI do not need to know about it
         return { content };
       },
-    };
+    } as Tool<Record<string, any>, CallToolResult>;
   }
 
   /**
