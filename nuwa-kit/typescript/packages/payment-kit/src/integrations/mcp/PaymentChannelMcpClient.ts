@@ -144,14 +144,31 @@ export class PaymentChannelMcpClient {
    * Call a tool with payment, this is a convenience method that returns the first text as data for convenience API
    * @param method - The method to call
    * @param params - The parameters to pass to the tool
+   * @param schemaOrClientTxRef - Schema for validation or custom clientTxRef
+   * @param clientTxRefOrSchema - Custom clientTxRef or schema (when first param is clientTxRef)
    * @returns The result of the tool call
    */
   async call<T = any>(
     method: string,
     params?: any,
-    schema?: ZodTypeAny
+    schemaOrClientTxRef?: ZodTypeAny | string,
+    clientTxRefOrSchema?: string | ZodTypeAny
   ): Promise<PaymentResult<T>> {
-    const { content, payment } = await this.callToolWithPayment(method, params);
+    // Support two calling patterns:
+    // 1. call(method, params, schema) - original way
+    // 2. call(method, params, clientTxRef, schema) - new way with custom clientTxRef
+    let schema: ZodTypeAny | undefined;
+    let clientTxRef: string | undefined;
+    
+    if (typeof schemaOrClientTxRef === 'string') {
+      clientTxRef = schemaOrClientTxRef;
+      schema = clientTxRefOrSchema as ZodTypeAny;
+    } else {
+      schema = schemaOrClientTxRef;
+      clientTxRef = typeof clientTxRefOrSchema === 'string' ? clientTxRefOrSchema : undefined;
+    }
+
+    const { content, payment } = await this.callToolWithPayment(method, params, clientTxRef);
     const raw = this.parseFirstJsonText<any>(content);
     let data = undefined;
     if (schema) {
@@ -179,10 +196,11 @@ export class PaymentChannelMcpClient {
    * Call a tool returns the content of the tool call
    * @param name - The name of the tool to call
    * @param args - The parameters to pass to the tool
+   * @param clientTxRef - Optional custom client transaction reference
    * @returns The content of the tool call
    */
-  async callTool(name: string, args?: any): Promise<{ content: any[] }> {
-    const { content } = await this.callToolWithPayment(name, args);
+  async callTool(name: string, args?: any, clientTxRef?: string): Promise<{ content: any[] }> {
+    const { content } = await this.callToolWithPayment(name, args, clientTxRef);
     return { content };
   }
 
@@ -376,18 +394,20 @@ export class PaymentChannelMcpClient {
    * Call a tool with payment
    * @param method - The name of the tool to call
    * @param params - The parameters to pass to the tool
+   * @param clientTxRef - Optional custom client transaction reference. If not provided, a UUID will be generated
    * @returns The content of the tool call and the payment info
    */
   async callToolWithPayment(
     method: string,
-    params?: any
+    params?: any,
+    clientTxRef?: string
   ): Promise<{ content: any[]; payment?: PaymentInfo }> {
     const handle = this.scheduler.enqueue(async (_release, signal) => {
       const startTs = Date.now();
       let createdLog = false;
       const txEnabled = this.options.transactionLog?.enabled !== false;
       if (signal.aborted) throw new Error('Request aborted');
-      const clientTxRef = crypto.randomUUID();
+      const txRef = clientTxRef || crypto.randomUUID();
       const client = await this.ensureClient();
       if (signal.aborted) throw new Error('Request aborted');
       await this.ensureNotificationSubscription();
@@ -404,12 +424,12 @@ export class PaymentChannelMcpClient {
       }
       if (signal.aborted) throw new Error('Request aborted');
 
-      const reqParams = await this.buildParams(method, params, clientTxRef);
+      const reqParams = await this.buildParams(method, params, txRef);
 
       // Create transaction log entry
       if (txEnabled) {
         try {
-          await this.logTransactionCreate(clientTxRef, method, reqParams);
+          await this.logTransactionCreate(txRef, method, reqParams);
           createdLog = true;
         } catch (e) {
           this.logger.debug('txlog.create.failed', e);
@@ -437,14 +457,14 @@ export class PaymentChannelMcpClient {
         try {
           this.logger.debug('retry call', {
             method,
-            clientTxRef,
+            clientTxRef: txRef,
           });
           const subRav = HttpPaymentCodec.deserializeSubRAV(maybePayment.subRav);
           const signed = await this.payerClient.signSubRAV(subRav);
-          const retryParams = await this.buildParams(method, params, clientTxRef);
+          const retryParams = await this.buildParams(method, params, txRef);
           const newReqPayload: PaymentRequestPayload = {
             version: 1,
-            clientTxRef,
+            clientTxRef: txRef,
             maxAmount: this.options.maxAmount,
             signedSubRav: signed,
           };
@@ -463,7 +483,7 @@ export class PaymentChannelMcpClient {
         } catch {
           this.logger.debug('retry call failed', {
             method,
-            clientTxRef,
+            clientTxRef: txRef,
           });
         }
       }
@@ -472,7 +492,7 @@ export class PaymentChannelMcpClient {
       if (paymentPayload && paymentPayload.error) {
         const err = paymentPayload.error as { code?: string; message?: string };
         const svc = paymentPayload.serviceTxRef;
-        const cRef = paymentPayload.clientTxRef ?? clientTxRef;
+        const cRef = paymentPayload.clientTxRef ?? txRef;
         const code = err?.code || 'PAYMENT_ERROR';
         const message = err?.message || 'Payment negotiation failed';
         const details = { code, message, clientTxRef: cRef, serviceTxRef: svc } as any;
@@ -499,7 +519,7 @@ export class PaymentChannelMcpClient {
         throw errObj;
       }
 
-      const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, clientTxRef);
+      const paymentInfo = await this.toPaymentInfoFromPayload(paymentPayload, txRef);
       if (txEnabled && createdLog) {
         try {
           const durationMs = Date.now() - startTs;
@@ -516,7 +536,7 @@ export class PaymentChannelMcpClient {
               vmIdFragment: paymentInfo.vmIdFragment,
             });
           } else {
-            await this.transactionStore.update(clientTxRef, {
+            await this.transactionStore.update(txRef, {
               durationMs,
               status: 'free',
             });
@@ -893,8 +913,10 @@ export class PaymentChannelMcpClient {
       // Preserve original MCP tool metadata for debugging
       _mcpTool: tool,
       // Add execute method that uses callToolWithPayment
-      execute: async (args: any) => {
-        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args);
+      execute: async (args: any, options?: { toolCallId?: string; messages?: any[]; abortSignal?: AbortSignal }) => {
+        // Use AI SDK's toolCallId as clientTxRef if available
+        const clientTxRef = options?.toolCallId;
+        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args, clientTxRef);
         // We don't return the payment here, because the AI do not need to know about it
         return { content };
       },
