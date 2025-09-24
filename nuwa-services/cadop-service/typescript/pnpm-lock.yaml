@@ -64,11 +64,11 @@ importers:
         specifier: ^1.9.1
         version: 1.9.2
       '@nuwa-ai/identity-kit':
-        specifier: ^0.5.1
-        version: 0.5.1(typescript@5.8.3)
+        specifier: link:../../../../../nuwa-kit/typescript/packages/identity-kit
+        version: link:../../../../../nuwa-kit/typescript/packages/identity-kit
       '@roochnetwork/rooch-sdk':
-        specifier: ^0.3.6
-        version: 0.3.6(typescript@5.8.3)
+        specifier: link:../../../../../deps/rooch/sdk/typescript/rooch-sdk
+        version: link:../../../../../deps/rooch/sdk/typescript/rooch-sdk
       '@simplewebauthn/server':
         specifier: ^12.0.0
         version: 12.0.0
@@ -237,8 +237,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.2
       '@nuwa-ai/identity-kit':
-        specifier: ^0.5.1
-        version: 0.5.1(typescript@4.9.5)
+        specifier: link:../../../../../nuwa-kit/typescript/packages/identity-kit
+        version: link:../../../../../nuwa-kit/typescript/packages/identity-kit
       '@nuwa-ai/payment-kit':
         specifier: ^0.5.0
         version: 0.5.0(express@4.21.2)(typescript@4.9.5)
@@ -279,8 +279,8 @@ importers:
         specifier: ^1.2.7
         version: 1.2.7(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@roochnetwork/rooch-sdk':
-        specifier: ^0.3.6
-        version: 0.3.6(typescript@4.9.5)
+        specifier: link:../../../../../deps/rooch/sdk/typescript/rooch-sdk
+        version: link:../../../../../deps/rooch/sdk/typescript/rooch-sdk
       '@roochnetwork/rooch-sdk-kit':
         specifier: ^0.3.6
         version: 0.3.6(@tanstack/react-query@5.80.10(react@18.3.1))(@types/react-dom@18.3.7(@types/react@18.3.23))(@types/react@18.3.23)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@4.9.5)
@@ -6160,16 +6160,6 @@ snapshots:
       fastq: 1.19.1
 
   '@nuwa-ai/identity-kit@0.5.0(typescript@4.9.5)':
-    dependencies:
-      '@noble/curves': 1.9.2
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.3.6(typescript@4.9.5)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
-  '@nuwa-ai/identity-kit@0.5.1(typescript@4.9.5)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0
