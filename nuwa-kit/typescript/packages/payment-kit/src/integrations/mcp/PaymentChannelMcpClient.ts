@@ -175,31 +175,47 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * Call a tool with payment, this is a convenience method that returns the first text as data for convenience API
+   * Call a tool with payment processing and optional result validation
    * @param method - The method to call
    * @param params - The parameters to pass to the tool
-   * @param schemaOrClientTxRef - Schema for validation or custom clientTxRef
-   * @param clientTxRefOrSchema - Custom clientTxRef or schema (when first param is clientTxRef)
+   * @param schema - Schema for validation
    * @returns The result of the tool call
    */
   async call<T = any>(
     method: string,
     params?: any,
-    schemaOrClientTxRef?: ZodTypeAny | string,
-    clientTxRefOrSchema?: string | ZodTypeAny
+    schema?: ZodTypeAny
+  ): Promise<PaymentResult<T>>;
+
+  /**
+   * Call a tool with payment processing, custom clientTxRef, and optional result validation
+   * @param method - The method to call
+   * @param params - The parameters to pass to the tool
+   * @param options - Call options including clientTxRef and schema
+   * @returns The result of the tool call
+   */
+  async call<T = any>(
+    method: string,
+    params: any,
+    options: { clientTxRef: string; schema?: ZodTypeAny }
+  ): Promise<PaymentResult<T>>;
+
+  async call<T = any>(
+    method: string,
+    params?: any,
+    schemaOrOptions?: ZodTypeAny | { clientTxRef: string; schema?: ZodTypeAny }
   ): Promise<PaymentResult<T>> {
-    // Support two calling patterns:
-    // 1. call(method, params, schema) - original way
-    // 2. call(method, params, clientTxRef, schema) - new way with custom clientTxRef
     let schema: ZodTypeAny | undefined;
     let clientTxRef: string | undefined;
     
-    if (typeof schemaOrClientTxRef === 'string') {
-      clientTxRef = schemaOrClientTxRef;
-      schema = clientTxRefOrSchema as ZodTypeAny;
+    // Type-safe parameter parsing with proper type guards
+    if (schemaOrOptions && typeof schemaOrOptions === 'object' && 'clientTxRef' in schemaOrOptions) {
+      // Options object pattern: call(method, params, { clientTxRef: 'xxx', schema: ... })
+      clientTxRef = schemaOrOptions.clientTxRef;
+      schema = schemaOrOptions.schema;
     } else {
-      schema = schemaOrClientTxRef;
-      clientTxRef = typeof clientTxRefOrSchema === 'string' ? clientTxRefOrSchema : undefined;
+      // Simple schema pattern: call(method, params, schema)
+      schema = schemaOrOptions as ZodTypeAny | undefined;
     }
 
     const { content, payment } = await this.callToolWithPayment(method, params, clientTxRef);
@@ -227,13 +243,38 @@ export class PaymentChannelMcpClient {
   }
 
   /**
-   * Call a tool returns the content of the tool call
+   * Call a tool and return the content of the tool call
    * @param name - The name of the tool to call
    * @param args - The parameters to pass to the tool
-   * @param clientTxRef - Optional custom client transaction reference
    * @returns The content of the tool call
    */
-  async callTool(name: string, args?: any, clientTxRef?: string): Promise<{ content: any[] }> {
+  async callTool(name: string, args?: any): Promise<{ content: any[] }>;
+
+  /**
+   * Call a tool with custom clientTxRef and return the content of the tool call
+   * @param name - The name of the tool to call
+   * @param args - The parameters to pass to the tool
+   * @param options - Call options including clientTxRef
+   * @returns The content of the tool call
+   */
+  async callTool(name: string, args: any, options: { clientTxRef: string }): Promise<{ content: any[] }>;
+
+  async callTool(
+    name: string, 
+    args?: any, 
+    optionsOrClientTxRef?: { clientTxRef: string } | string
+  ): Promise<{ content: any[] }> {
+    let clientTxRef: string | undefined;
+    
+    // Type-safe parameter parsing
+    if (typeof optionsOrClientTxRef === 'string') {
+      // Legacy support: callTool(name, args, clientTxRef)
+      clientTxRef = optionsOrClientTxRef;
+    } else if (optionsOrClientTxRef && typeof optionsOrClientTxRef === 'object' && 'clientTxRef' in optionsOrClientTxRef) {
+      // New pattern: callTool(name, args, { clientTxRef: 'xxx' })
+      clientTxRef = optionsOrClientTxRef.clientTxRef;
+    }
+    
     const { content } = await this.callToolWithPayment(name, args, clientTxRef);
     return { content };
   }
