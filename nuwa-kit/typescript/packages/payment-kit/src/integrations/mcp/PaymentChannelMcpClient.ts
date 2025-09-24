@@ -209,7 +209,16 @@ export class PaymentChannelMcpClient {
     let clientTxRef: string | undefined;
     
     // Type-safe parameter parsing with proper type guards
-    if (schemaOrOptions && typeof schemaOrOptions === 'object' && 'clientTxRef' in schemaOrOptions) {
+    if (
+      schemaOrOptions &&
+      typeof schemaOrOptions === 'object' &&
+      // Ensure it's not a Zod schema (Zod schemas have a 'safeParse' function)
+      !(
+        typeof (schemaOrOptions as any).safeParse === 'function' ||
+        typeof (schemaOrOptions as any).parse === 'function'
+      ) &&
+      'clientTxRef' in schemaOrOptions
+    ) {
       // Options object pattern: call(method, params, { clientTxRef: 'xxx', schema: ... })
       clientTxRef = schemaOrOptions.clientTxRef;
       schema = schemaOrOptions.schema;
@@ -268,7 +277,7 @@ export class PaymentChannelMcpClient {
     
     // Type-safe parameter parsing
     if (typeof optionsOrClientTxRef === 'string') {
-      // Legacy support: callTool(name, args, clientTxRef)
+      // Backward compatibility: support callTool(name, args, clientTxRef) usage pattern
       clientTxRef = optionsOrClientTxRef;
     } else if (optionsOrClientTxRef && typeof optionsOrClientTxRef === 'object' && 'clientTxRef' in optionsOrClientTxRef) {
       // New pattern: callTool(name, args, { clientTxRef: 'xxx' })
