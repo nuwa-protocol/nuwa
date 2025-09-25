@@ -61,6 +61,34 @@ export interface CADOPCreationRequest {
 }
 
 /**
+ * CADOP controller-based creation request
+ */
+export interface CADOPControllerCreationRequest {
+  controllerDid: string;
+  controllerPublicKeyMultibase?: string;
+  controllerVMType?: string;
+  custodianServicePublicKey: string;
+  custodianServiceVMType: string;
+
+  // Custom session key scopes (for Rooch VDR)
+  customScopes?: string[];
+}
+
+/**
+ * Authentication provider types for CADOP
+ */
+export type AuthProvider = 'webauthn' | 'bitcoin' | 'ethereum';
+
+/**
+ * Provider constants for CADOP authentication
+ */
+export const AUTH_PROVIDERS = {
+  WEBAUTHN: 'webauthn' as const,
+  BITCOIN: 'bitcoin' as const,
+  ETHEREUM: 'ethereum' as const,
+} as const;
+
+/**
  * Interface for Verifiable Data Registry (VDR) implementations
  * A VDR is responsible for storing and retrieving DID Documents
  */
@@ -102,6 +130,15 @@ export interface VDRInterface {
    * @returns DID creation result
    */
   createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult>;
+
+  /**
+   * Create a DID via CADOP with controller
+   *
+   * @param request CADOP controller creation request
+   * @param options Creation options
+   * @returns DID creation result
+   */
+  createViaCADOPWithController(request: CADOPControllerCreationRequest, options?: any): Promise<DIDCreationResult>;
 
   /**
    * Add a new verification method to a DID document

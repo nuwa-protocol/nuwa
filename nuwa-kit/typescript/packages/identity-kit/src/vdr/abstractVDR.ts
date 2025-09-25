@@ -4,7 +4,7 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, VDRInterface } from './types';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest, VDRInterface } from './types';
 import { parseDid } from '../utils/did';
 import { DebugLogger } from '../utils/DebugLogger';
 
@@ -147,6 +147,13 @@ export abstract class AbstractVDR implements VDRInterface {
    */
   async createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult> {
     throw new Error(`createViaCADOP not implemented for ${this.method} VDR`);
+  }
+
+  /**
+   * Default CADOP with controller implementation - throws not implemented error
+   */
+  async createViaCADOPWithController(request: CADOPControllerCreationRequest, options?: any): Promise<DIDCreationResult> {
+    throw new Error(`createViaCADOPWithController not implemented for ${this.method} VDR`);
   }
 
   /**

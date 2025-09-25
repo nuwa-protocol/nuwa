@@ -1,6 +1,6 @@
 import { DIDDocument, DIDResolver } from '../types';
 import { DIDDocumentCache } from '../cache';
-import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
+import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
 
 import { InMemoryLRUDIDDocumentCache } from '../cache/InMemoryLRUDIDDocumentCache';
 
@@ -96,6 +96,22 @@ export class VDRRegistry implements DIDResolver {
       throw new Error(`No VDR available for method: ${method}`);
     }
     const result = await vdr.createViaCADOP(creationRequest, options);
+    if (result.success && result.didDocument) {
+      this.cache.set(result.didDocument.id, result.didDocument);
+    }
+    return result;
+  }
+
+  async createDIDViaCADOPWithController(
+    method: string,
+    creationRequest: CADOPControllerCreationRequest,
+    options?: Record<string, any>
+  ): Promise<DIDCreationResult> {
+    const vdr = this.vdrs.get(method);
+    if (!vdr) {
+      throw new Error(`No VDR available for method: ${method}`);
+    }
+    const result = await vdr.createViaCADOPWithController(creationRequest, options);
     if (result.success && result.didDocument) {
       this.cache.set(result.didDocument.id, result.didDocument);
     }

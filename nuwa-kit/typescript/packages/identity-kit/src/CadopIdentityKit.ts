@@ -1,6 +1,6 @@
 import { ServiceEndpoint, DIDDocument, ServiceInfo, VerificationRelationship } from './types/did';
 import { SignerInterface } from './signers/types';
-import { CADOPCreationRequest, DIDCreationResult } from './vdr/types';
+import { CADOPCreationRequest, CADOPControllerCreationRequest, DIDCreationResult, AUTH_PROVIDERS, AuthProvider } from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 import { IdentityKit } from './IdentityKit';
 import { DebugLogger } from './utils/DebugLogger';
@@ -136,6 +136,81 @@ export class CadopIdentityKit {
   }
 
   /**
+   * Create a new DID via CADOP protocol with controller
+   * Supports did:key (backward compatible), did:bitcoin, and other controller types
+   */
+  async createDIDWithController(
+    method: string,
+    controllerDid: string,
+    options?: {
+      controllerPublicKeyMultibase?: string;
+      controllerVMType?: string;
+      customScopes?: string[];
+    } & Record<string, any>
+  ): Promise<DIDCreationResult> {
+    const logger = DebugLogger.get('CadopIdentityKit');
+    logger.debug('createDIDWithController called', { method, controllerDid, options });
+
+    const custodianInfo = this.extractCustodianInfo();
+
+    const authenticationMethods =
+      this.nuwaKit.findVerificationMethodsByRelationship('authentication');
+    if (authenticationMethods.length === 0) {
+      throw new Error('No authentication method found in service document');
+    }
+    const authenticationMethod = authenticationMethods[0];
+
+    // Extract custodian service configuration
+    const { custodianPublicKey, custodianServiceVMType } =
+      custodianInfo.custodianPublicKey && custodianInfo.custodianServiceVMType
+        ? {
+            custodianPublicKey: custodianInfo.custodianPublicKey,
+            custodianServiceVMType: custodianInfo.custodianServiceVMType,
+          }
+        : {
+            custodianPublicKey: authenticationMethod.publicKeyMultibase,
+            custodianServiceVMType: authenticationMethod.type,
+          };
+
+    if (!custodianPublicKey || !custodianServiceVMType) {
+      throw new Error('Custodian service configuration not found in service document');
+    }
+
+    // Check if this is a did:key and we should use backward compatible path
+    if (controllerDid.startsWith('did:key:') && !options?.controllerPublicKeyMultibase) {
+      logger.debug('Using backward compatible did:key path');
+      // For did:key without explicit public key, use the legacy CADOP method
+      const creationRequest: CADOPCreationRequest = {
+        userDidKey: controllerDid,
+        custodianServicePublicKey: custodianPublicKey,
+        custodianServiceVMType: custodianServiceVMType,
+        customScopes: options?.customScopes,
+      };
+
+      return VDRRegistry.getInstance().createDIDViaCADOP(method, creationRequest, {
+        signer: this.nuwaKit.getSigner(),
+        ...options,
+      });
+    }
+
+    // Use the new controller-based path
+    logger.debug('Using controller-based CADOP path');
+    const creationRequest: CADOPControllerCreationRequest = {
+      controllerDid,
+      controllerPublicKeyMultibase: options?.controllerPublicKeyMultibase,
+      controllerVMType: options?.controllerVMType,
+      custodianServicePublicKey: custodianPublicKey,
+      custodianServiceVMType: custodianServiceVMType,
+      customScopes: options?.customScopes,
+    };
+
+    return VDRRegistry.getInstance().createDIDViaCADOPWithController(method, creationRequest, {
+      signer: this.nuwaKit.getSigner(),
+      ...options,
+    });
+  }
+
+  /**
    * Add a new CADOP service to the service DID document
    */
   async addService(service: ServiceInfo): Promise<string> {
@@ -242,3 +317,6 @@ export class CadopIdentityKit {
     return true;
   }
 }
+
+// Export additional types and constants for external use
+export { AUTH_PROVIDERS, type AuthProvider, type CADOPControllerCreationRequest } from './vdr/types';

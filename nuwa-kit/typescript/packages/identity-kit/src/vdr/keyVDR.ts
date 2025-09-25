@@ -4,7 +4,7 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import { MultibaseCodec, DidKeyCodec } from '../multibase';
 import { DebugLogger } from '../utils/DebugLogger';
@@ -319,6 +319,34 @@ export class KeyVDR extends AbstractVDR {
       };
     } catch (error) {
       logger.error(`Error creating DID document via CADOP:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  async createViaCADOPWithController(request: CADOPControllerCreationRequest, _options?: any): Promise<DIDCreationResult> {
+    // For KeyVDR, we only support did:key controllers
+    if (!request.controllerDid.startsWith('did:key:')) {
+      return {
+        success: false,
+        error: 'KeyVDR only supports did:key controllers. Use RoochVDR for other controller types.',
+      };
+    }
+
+    try {
+      // For did:key controllers, delegate to the regular CADOP method
+      const cadopRequest: CADOPCreationRequest = {
+        userDidKey: request.controllerDid,
+        custodianServicePublicKey: request.custodianServicePublicKey,
+        custodianServiceVMType: request.custodianServiceVMType,
+        customScopes: request.customScopes,
+      };
+
+      return this.createViaCADOP(cadopRequest, _options);
+    } catch (error) {
+      logger.error(`Error creating DID document via CADOP with controller:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
