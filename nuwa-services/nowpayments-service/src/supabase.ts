@@ -13,6 +13,22 @@ export interface PaymentRecord {
 	ipn_payload?: any;
 	created_at?: string;
 	updated_at?: string;
+	// NowPayments 创建订单返回的完整信息
+	pay_address?: string;
+	price_amount?: number;
+	price_currency?: string;
+	pay_amount?: number;
+	order_description?: string;
+	ipn_callback_url?: string;
+	purchase_id?: string;
+	amount_received?: number | null;
+	payin_extra_id?: string | null;
+	smart_contract?: string;
+	network?: string;
+	network_precision?: number;
+	time_limit?: number | null;
+	burning_percent?: number | null;
+	expiration_estimate_date?: string;
 }
 
 export class SupabaseService {

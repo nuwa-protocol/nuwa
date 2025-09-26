@@ -94,6 +94,21 @@ app.post(
         pay_currency: existing?.pay_currency ?? pay_currency,
         payer_did: existing?.payer_did,
         ipn_payload: payload,
+        pay_address: payload.pay_address ?? existing?.pay_address,
+        price_amount: payload.price_amount ?? existing?.price_amount,
+        price_currency: payload.price_currency ?? existing?.price_currency,
+        pay_amount: payload.pay_amount ?? existing?.pay_amount,
+        order_description: payload.order_description ?? existing?.order_description,
+        ipn_callback_url: payload.ipn_callback_url ?? existing?.ipn_callback_url,
+        purchase_id: payload.purchase_id ?? existing?.purchase_id,
+        amount_received: payload.amount_received ?? existing?.amount_received,
+        payin_extra_id: payload.payin_extra_id ?? existing?.payin_extra_id,
+        smart_contract: payload.smart_contract ?? existing?.smart_contract,
+        network: payload.network ?? existing?.network,
+        network_precision: payload.network_precision ?? existing?.network_precision,
+        time_limit: payload.time_limit ?? existing?.time_limit,
+        burning_percent: payload.burning_percent ?? existing?.burning_percent,
+        expiration_estimate_date: payload.expiration_estimate_date ?? existing?.expiration_estimate_date,
       });
 
       // 处理支付成功的情况
@@ -174,7 +189,8 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       ipn_callback_url,
       case:cases ?? "success"
     });
-
+      console.log(payment)
+      console.log(payment.network)
     await supabase.upsertPayment({
       nowpayments_payment_id: payment.payment_id?.toString?.() || payment.id?.toString?.() || '',
       order_id,
@@ -184,6 +200,22 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       pay_currency,
       payer_did,
       ipn_payload: null,
+      // 存储 NowPayments 返回的完整信息
+      pay_address: payment.pay_address,
+      price_amount: payment.price_amount,
+      price_currency: payment.price_currency,
+      pay_amount: payment.pay_amount,
+      order_description: payment.order_description,
+      ipn_callback_url: payment.ipn_callback_url,
+      purchase_id: payment.purchase_id,
+      amount_received: payment.amount_received,
+      payin_extra_id: payment.payin_extra_id,
+      smart_contract: payment.smart_contract,
+      network: payment.network,
+      network_precision: payment.network_precision,
+      time_limit: payment.time_limit,
+      burning_percent: payment.burning_percent,
+      expiration_estimate_date: payment.expiration_estimate_date,
     });
 
     res.status(201).json(payment);
