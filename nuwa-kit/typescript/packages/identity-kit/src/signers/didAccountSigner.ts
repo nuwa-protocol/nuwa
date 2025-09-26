@@ -52,9 +52,17 @@ export class DidAccountSigner extends Signer implements SignerInterface {
    * @param keyId Optional specific keyId to use
    * @returns A new DidAccountSigner instance
    */
+  /**
+   * Check if an object is a DidAccountSigner instance
+   * Safe to use instanceof within the same module
+   */
+  static isDidAccountSigner(obj: any): obj is DidAccountSigner {
+    return obj instanceof DidAccountSigner;
+  }
+
   static async create(signer: SignerInterface, keyId?: string): Promise<DidAccountSigner> {
     // If already a DidAccountSigner, return as is
-    if (signer instanceof DidAccountSigner) {
+    if (DidAccountSigner.isDidAccountSigner(signer)) {
       return signer;
     }
 
@@ -147,4 +155,12 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     }
     return parts[1];
   }
+}
+
+/**
+ * Exported function for checking DidAccountSigner instances
+ * Uses safe instanceof checking within the same module
+ */
+export function isDidAccountSigner(obj: any): obj is DidAccountSigner {
+  return DidAccountSigner.isDidAccountSigner(obj);
 }

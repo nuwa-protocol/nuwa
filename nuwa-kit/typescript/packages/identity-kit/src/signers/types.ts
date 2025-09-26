@@ -1,6 +1,7 @@
 // Signer interfaces and types
 
 import { KeyType } from '../types/crypto';
+import { Signer } from '@roochnetwork/rooch-sdk';
 
 /**
  * Interface for external signers that can be used for master key operations
@@ -41,4 +42,25 @@ export interface SignerInterface {
    * @returns Key information or undefined if not found
    */
   getKeyInfo(keyId: string): Promise<{ type: KeyType; publicKey: Uint8Array } | undefined>;
+}
+
+/**
+ * Type guard utilities for SignerInterface and Signer
+ * These are more reliable than instanceof when dealing with cross-module dependencies
+ */
+
+/**
+ * Check if an object implements SignerInterface (but not Signer)
+ * This is more reliable than instanceof when dealing with cross-module dependencies
+ */
+export function isSignerInterface(obj: any): obj is SignerInterface {
+  return obj &&
+    typeof obj === 'object' &&
+    typeof obj.listKeyIds === 'function' &&
+    typeof obj.signWithKeyId === 'function' &&
+    typeof obj.canSignWithKeyId === 'function' &&
+    typeof obj.getDid === 'function' &&
+    typeof obj.getKeyInfo === 'function' &&
+    // Check that it's NOT a Signer (which has different methods)
+    typeof obj.sign !== 'function';
 }

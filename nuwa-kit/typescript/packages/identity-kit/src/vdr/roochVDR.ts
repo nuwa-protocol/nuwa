@@ -23,7 +23,7 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { SignerInterface, DidAccountSigner } from '../signers';
+import { SignerInterface, DidAccountSigner, isSignerInterface } from '../signers';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
 import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
@@ -182,10 +182,12 @@ export class RoochVDR extends AbstractVDR {
   }
 
   private async convertSigner(signer: SignerInterface | Signer, keyId?: string): Promise<Signer> {
-    if (signer instanceof Signer) {
-      return signer;
+    // If it implements SignerInterface, convert it to DidAccountSigner
+    if (isSignerInterface(signer)) {
+      return DidAccountSigner.create(signer, keyId);
     }
-    return DidAccountSigner.create(signer, keyId);
+    // Fallback: assume it's Signer
+    return signer;
   }
 
   /**
