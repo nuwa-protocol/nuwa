@@ -206,7 +206,7 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
 
 app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
   try {
-    const paymentId = req.params.payment_id;
+    const paymentId = req.params.id;
     const payment = await supabase.getByPaymentId(paymentId);
     res.json(payment);
   } catch (err: any) {
