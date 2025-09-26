@@ -37,7 +37,6 @@ export class NowPaymentsClient {
 
 	// 创建支付
 	async createPayment(body: CreatePaymentRequest): Promise<any> {
-        body.case = "success";
 		const resp = await this.http.post('/payment', body);
         console.log(resp.data)
 		return resp.data;

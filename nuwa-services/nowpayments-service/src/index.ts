@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { NowPaymentsClient } from './nowpayments.js';
 import { SupabaseService } from './supabase.js';
 import { transferFromHubToUser } from './transfer.js';
+import { z } from "zod";
 
 dotenv.config();
 
@@ -129,9 +130,30 @@ app.use(express.json());
 // 健康检查
 app.get('/auth', (_req, res) => res.json({ ok: true }));
 
+
+export const createPaymentRequestSchema = z.object({
+  price_amount: z.number().positive(),
+  price_currency: z.string().min(1),
+  order_id: z.string().optional(),
+  order_description: z.string().optional(),
+  pay_currency: z.string().optional(),
+  ipn_callback_url: z.string().url().optional(),
+  payer_did: z.string(),
+  cases: z.string().optional(),
+});
+
+
 // 创建支付
 app.post('/api/payment', async (req: Request, res: Response) => {
   try {
+    const parsed = createPaymentRequestSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Invalid request body",
+        details: parsed.error.format(),
+      });
+    }
     const {
       price_amount,
       price_currency,
@@ -140,7 +162,8 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       pay_currency,
       ipn_callback_url,
       payer_did,
-    } = req.body as any;
+      cases
+    } = parsed.data;
 
     const payment = await client.createPayment({
       price_amount,
@@ -149,6 +172,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       order_description,
       pay_currency,
       ipn_callback_url,
+      case:cases ?? "success"
     });
 
     await supabase.upsertPayment({
@@ -173,6 +197,17 @@ app.post('/api/payment', async (req: Request, res: Response) => {
 app.get('/api/payments/:id', async (req: Request, res: Response) => {
   try {
     const payment = await client.getPayment(req.params.id);
+    res.json(payment);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'get payment failed' });
+  }
+});
+
+
+app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
+  try {
+    const paymentId = req.params.payment_id;
+    const payment = await supabase.getByPaymentId(paymentId);
     res.json(payment);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'get payment failed' });

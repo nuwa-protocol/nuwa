@@ -29,6 +29,9 @@ importers:
       express:
         specifier: ^4.19.2
         version: 4.21.2
+      zod:
+        specifier: ^4.1.11
+        version: 4.1.11
     devDependencies:
       '@types/cors':
         specifier: ^2.8.19
@@ -800,6 +803,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.1.11:
+    resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
+
 snapshots:
 
   '@esbuild/aix-ppc64@0.25.9':
@@ -1555,3 +1561,5 @@ snapshots:
   xtend@4.0.2: {}
 
   zod@3.25.76: {}
+
+  zod@4.1.11: {}
