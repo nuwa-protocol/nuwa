@@ -236,15 +236,35 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
 });
 
 
-app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
+app.get('/api/payments/:id', async (req: Request, res: Response) => {
   try {
-    const paymentId = req.params.id;
-    const payment = await supabase.getByPaymentId(paymentId);
+    const payment = await client.getPayment(req.params.id);
     res.json(payment);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'get payment failed' });
   }
 });
+
+
+app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
+  try {
+    const paymentId = req.params.id;
+
+    const [dbRecord, npRecord] = await Promise.all([
+      supabase.getByPaymentId(paymentId),
+      client.getPayment(paymentId),
+    ]);
+
+    res.json({
+      db: dbRecord,
+      nowpayments: npRecord,
+    });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "get payment failed" });
+  }
+});
+
 
 // 用户订单列表
 app.get('/api/users/:did/orders', async (req: Request, res: Response) => {
