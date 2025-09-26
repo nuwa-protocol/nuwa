@@ -15,11 +15,12 @@ export function useHubDeposit(agentDid?: string | null) {
       assetId: string = DEFAULT_ASSET_ID
     ): Promise<{ txHash: string } | null> => {
       if (!hubClient) throw new Error('PaymentHub client is not ready');
+      if (!agentDid) throw new Error('Agent DID is required');
       if (amount <= 0n) return null;
       setDepositing(true);
       setError(null);
       try {
-        const res = await hubClient.deposit(assetId, amount);
+        const res = await hubClient.deposit(assetId, amount, agentDid);
         return res;
       } catch (e: any) {
         setError(e?.message || String(e));
@@ -28,7 +29,7 @@ export function useHubDeposit(agentDid?: string | null) {
         setDepositing(false);
       }
     },
-    [hubClient]
+    [hubClient, agentDid]
   );
 
   const depositPercentOfClaimed = useCallback(

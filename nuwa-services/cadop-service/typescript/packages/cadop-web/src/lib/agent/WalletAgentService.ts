@@ -2,19 +2,24 @@ import { IAgentService } from './types';
 import { AuthMethod } from '../storage/types';
 import { UserStore } from '../storage';
 import type { AgentDIDCreationStatus } from '@cadop/shared';
-import { IdentityKit, MultibaseCodec } from '@nuwa-ai/identity-kit';
-import type { VerificationRelationship } from '@nuwa-ai/identity-kit';
 import type { Wallet } from '@roochnetwork/rooch-sdk-kit';
 import { RoochWalletSigner } from '../auth/signers/RoochWalletSigner';
+import { BitcoinIdTokenService } from '../auth/BitcoinIdTokenService';
+import { custodianClient } from '../api/client';
 
 /**
  * Wallet Agent Service
  *
- * Handles Agent DID creation for wallet users via direct IdentityKit integration
+ * Handles Agent DID creation for wallet users via cadop-api
  */
 export class WalletAgentService implements IAgentService {
   readonly authMethod: AuthMethod = 'wallet';
   private currentWallet: Wallet | null = null;
+  private bitcoinIdTokenService: BitcoinIdTokenService;
+
+  constructor() {
+    this.bitcoinIdTokenService = new BitcoinIdTokenService();
+  }
 
   /**
    * Set current wallet instance (called by WalletStoreConnector)
@@ -39,7 +44,7 @@ export class WalletAgentService implements IAgentService {
   }
 
   /**
-   * Create a new Agent DID using IdentityKit directly
+   * Create a new Agent DID via cadop-api
    */
   async createAgent(userDid: string, _interactive = false): Promise<AgentDIDCreationStatus> {
     // Validate that this is a wallet user
@@ -48,6 +53,11 @@ export class WalletAgentService implements IAgentService {
     }
 
     try {
+      console.log(
+        '[WalletAgentService] Creating Agent DID via cadop-api for wallet user:',
+        userDid
+      );
+
       // Get wallet address from User DID
       const walletAddress = UserStore.extractAddressFromDID(userDid);
       if (!walletAddress) {
@@ -66,20 +76,22 @@ export class WalletAgentService implements IAgentService {
       // Validate wallet connection
       await this.validateWalletConnection(signer);
 
-      // Create Agent DID using IdentityKit
-      const agentDid = await this.createAgentWithIdentityKit(signer);
+      // Generate ID token using Bitcoin wallet signature
+      const idToken = await this.bitcoinIdTokenService.generateIdToken(signer);
+
+      // Create agent via cadop-api
+      const response = await custodianClient.mint({ idToken, userDid });
+      if (!response.data) {
+        throw new Error(String(response.error || 'Agent creation failed'));
+      }
 
       // Cache the created agent DID
-      UserStore.addAgent(userDid, agentDid);
+      if (response.data.agentDid) {
+        UserStore.addAgent(userDid, response.data.agentDid);
+        console.log('[WalletAgentService] Agent DID created and cached:', response.data.agentDid);
+      }
 
-      const now = new Date();
-      return {
-        userDid,
-        agentDid,
-        status: 'completed',
-        createdAt: now,
-        updatedAt: now,
-      } as AgentDIDCreationStatus;
+      return response.data;
     } catch (error) {
       console.error('[WalletAgentService] Agent creation failed:', error);
       throw error;
@@ -92,76 +104,6 @@ export class WalletAgentService implements IAgentService {
   canCreateAgent(userDid: string): boolean {
     const authMethod = UserStore.getAuthMethod(userDid);
     return authMethod === 'wallet';
-  }
-
-  /**
-   * Create Agent DID using IdentityKit
-   */
-  private async createAgentWithIdentityKit(signer: RoochWalletSigner): Promise<string> {
-    try {
-      // Ensure VDR is initialized
-      await this.ensureVDRInitialized();
-
-      // Get public key from signer via IdentityKit interface
-      const keyIds = await signer.listKeyIds();
-      if (keyIds.length === 0) {
-        throw new Error('[WalletAgentService] No keys available from signer');
-      }
-
-      const keyInfo = await signer.getKeyInfo(keyIds[0]);
-      if (!keyInfo) {
-        throw new Error('[WalletAgentService] Failed to get key info from signer');
-      }
-      const publicKey = keyInfo.publicKey;
-
-      // Encode public key as multibase
-      const publicKeyMultibase = await MultibaseCodec.encodeBase58btc(publicKey);
-
-      // Create Agent DID creation request
-      const creationRequest = {
-        publicKeyMultibase,
-        keyType: 'EcdsaSecp256k1VerificationKey2019', // Bitcoin/Secp256k1 key type
-        initialRelationships: [
-          'authentication',
-          'assertionMethod',
-          'capabilityInvocation',
-          'capabilityDelegation',
-        ] as VerificationRelationship[],
-        customScopes: ['0x3::*::*'], // Allow all scopes for Agent
-      };
-
-      console.log('[WalletAgentService] Creating Agent DID with request:', creationRequest);
-
-      // Create new Agent DID (smart contract account on Rooch chain)
-      const identityKit = await IdentityKit.createNewDID(
-        'rooch', // DID method
-        creationRequest,
-        signer,
-        {
-          // Pass signer in options for RoochVDR
-          signer: signer,
-          // Optional parameters for Agent creation
-          network: import.meta.env.VITE_ROOCH_NETWORK || 'devnet',
-        }
-      );
-
-      // Get the created Agent DID
-      const agentDid = identityKit.getDIDDocument().id;
-
-      console.log('[WalletAgentService] Agent DID created successfully:', agentDid);
-      return agentDid;
-    } catch (error) {
-      console.error('[WalletAgentService] IdentityKit Agent creation failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Ensure VDR is initialized for identity operations using centralized VDRManager
-   */
-  private async ensureVDRInitialized(): Promise<void> {
-    const { ensureVDRInitialized } = await import('../identity/VDRManager');
-    await ensureVDRInitialized();
   }
 
   /**

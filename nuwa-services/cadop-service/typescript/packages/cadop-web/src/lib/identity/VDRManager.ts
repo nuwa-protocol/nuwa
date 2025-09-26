@@ -3,7 +3,7 @@ import { ROOCH_RPC_URL } from '@/config/env';
 
 /**
  * Centralized VDR Manager
- * 
+ *
  * This service provides a single point of control for VDR initialization
  * and ensures that VDRs are only created once and reused across the application.
  */
@@ -54,7 +54,7 @@ export class VDRManager {
       // Initialize Rooch VDR if not already registered
       if (!registry.getVDR('rooch')) {
         console.log('[VDRManager] Initializing Rooch VDR with RPC:', ROOCH_RPC_URL);
-        
+
         const roochVDR = createVDR('rooch', {
           rpcUrl: ROOCH_RPC_URL,
           debug: import.meta.env.DEV,
@@ -103,7 +103,7 @@ export class VDRManager {
    */
   async ensureRoochVDR(): Promise<void> {
     await this.initialize();
-    
+
     const registry = VDRRegistry.getInstance();
     if (!registry.getVDR('rooch')) {
       throw new Error('Rooch VDR is not available after initialization');

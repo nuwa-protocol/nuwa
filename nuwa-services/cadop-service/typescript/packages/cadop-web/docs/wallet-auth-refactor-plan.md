@@ -287,13 +287,11 @@ class AgentServiceFactory {
 ## 5. 测试策略
 
 1. **单元测试**
-
    - 所有新的 Provider 和 Service 类
    - 存储迁移逻辑
    - 签名器工厂
 
 2. **集成测试**
-
    - 完整的登录流程（Passkey）
    - Agent 创建流程
    - 数据迁移场景

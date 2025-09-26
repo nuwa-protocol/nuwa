@@ -56,6 +56,7 @@ Content-Type: application/json
 ```
 
 校验要点：
+
 - `challenge/nonce` 匹配且未过期。
 - 根据 `publicKeyHex` 推导 `address` 并与入参一致，校验 `network` 一致性。
 - 验签模式可配置（默认开发友好，生产建议更严格）：
@@ -69,9 +70,11 @@ Content-Type: application/json
 ### 3.3 JWT 载荷
 
 标准声明：
+
 - `iss`=`cadopDid`，`aud`=`cadopDid`，`sub`=`controllerDid`（控制者 DID），`exp/iat/jti/nonce`。
 
 扩展声明：
+
 - `provider`: `webauthn` | `bitcoin` | ...
 - `controllerPublicKeyMultibase`: base58btc(publicKeyBytes)
 - `controllerVMType`: 建议使用 `EcdsaSecp256k1VerificationKey2019`（或通过 `algorithmToKeyType('secp256k1')` 映射）
@@ -92,6 +95,7 @@ POST /api/custodian/mint
 ```
 
 处理：
+
 - 解析 `idToken`：
   - 若 `provider==='bitcoin'` 或 `sub` 以 `did:bitcoin:` 开头：
     - 读取 `sub` 作为 `controllerDid`；从 JWT 取 `controllerPublicKeyMultibase` 与 `controllerVMType`；
@@ -118,10 +122,12 @@ createDIDWithController(
 ```
 
 行为：
+
 - `did:key`：如未提供 `controllerPublicKeyMultibase/controllerVMType`，从 did:key 自动提取，保持旧路径兼容。
 - `did:bitcoin`：使用“控制者模式”走 Rooch VDR 的 `createDIDViaCADOPWithControllerAndScopes(...)`，映射到合约新入口。
 
 类型：
+
 - 新增 `CADOPControllerCreationRequest`，与现有 `CADOPCreationRequest` 并存。
 - 暴露 Provider 常量，便于前后端一致化。
 
@@ -146,6 +152,7 @@ createDIDViaCADOPWithControllerAndScopes(
 ```
 
 链上映射：
+
 - `rooch_framework::did::create_did_object_via_cadop_with_controller_and_scopes_entry`
 - did:key 控制者：链上自动从 identifier 解析公钥与类型。
 - did:bitcoin 控制者：必须提供 `userVmPkMultibase`（公钥）与 `userVmType='EcdsaSecp256k1VerificationKey2019'`，链上会校验地址与类型。
@@ -155,11 +162,13 @@ createDIDViaCADOPWithControllerAndScopes(
 ## 7. 配置与安全
 
 环境变量（新增）：
+
 - `BTC_NETWORK=mainnet|testnet|regtest`
 - `BTC_VERIFY_MODE=simple|core-msg|bip322`
 - 可选：`ALLOWED_ORIGINS`（域白名单，配合 CORS 与 `origin` 绑定）
 
 安全建议：
+
 - 将域名与时间戳/随机值纳入 `messageToSign`，配合 `challenge/nonce` 做重放防护。
 - JWT 包含 `nonce`，可选引入 Redis/TTL 做“一次性”校验。
 - 生产建议使用 `core-msg` 或 `bip322` 验证模式。
@@ -169,12 +178,14 @@ createDIDViaCADOPWithControllerAndScopes(
 ## 8. 渐进式落地
 
 阶段 A（最小可用）：
+
 - IdP：新增 `/challenge?provider=bitcoin` 与 `/verify-bitcoin`，默认 `simple` 验证模式；签发扩展 JWT。
 - IdentityKit：实现 `createDIDWithController`，Rooch VDR 对接合约新入口。
 - CustodianService：按 provider 分流（did:key 走旧路径、did:bitcoin 走控制者路径）。
 - 文档与 `@cadop/shared` 类型更新；现有 Passkey 路由不变。
 
 阶段 B（增强）：
+
 - 增加 `core-msg`/`bip322` 支持，更严格重放防护与多域白名单。
 - 前端（cadop-web/agent）对接钱包：获取压缩公钥、签名、地址。
 - 完善单测/集成测试：
@@ -212,5 +223,3 @@ createDIDViaCADOPWithControllerAndScopes(
 
 - 现有 Passkey 路由、请求体与 Custodian 调用完全保留。
 - 新增能力对旧客户端透明；使用 Bitcoin 的客户端按新增路由/参数接入即可。
-
-

@@ -25,7 +25,7 @@ function useInitialiseVDR(): VDRContextValue {
   useEffect(() => {
     async function init() {
       if (initialised) return;
-      
+
       try {
         console.log('[VDRProvider] Initialising VDRs using VDRManager...');
         const vdrManager = VDRManager.getInstance();
@@ -37,7 +37,7 @@ function useInitialiseVDR(): VDRContextValue {
         setError(err instanceof Error ? err.message : String(err));
       }
     }
-    
+
     init();
   }, [initialised]);
 

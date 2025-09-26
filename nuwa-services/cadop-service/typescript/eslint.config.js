@@ -7,7 +7,7 @@ import prettierConfig from 'eslint-config-prettier';
 export default [
   // Base configuration for all files
   js.configs.recommended,
-  
+
   // TypeScript configuration
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -59,10 +59,10 @@ export default [
       'no-console': 'warn',
     },
   },
-  
+
   // Prettier configuration (must be last)
   prettierConfig,
-  
+
   // Ignore patterns
   {
     ignores: [

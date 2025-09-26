@@ -203,6 +203,11 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
   }
 
   async getDid(): Promise<string> {
+    // If this signer was created for an Agent DID (has didDocument), return the Agent DID
+    if (this.didDocument?.id) {
+      return this.didDocument.id;
+    }
+    // Otherwise, return the user DID
     return this.userDid;
   }
 
@@ -252,7 +257,6 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
       // Get public key from wallet - this returns PublicKey<Address>
       const publicKey = this.wallet.getPublicKey();
 
-      // Convert to Uint8Array - need to extract the raw bytes
       return publicKey.toBytes();
     } catch (error) {
       console.error('[RoochWalletSigner] Failed to get public key bytes:', error);
@@ -297,7 +301,10 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
         if (!vmFragment) {
           throw new Error('[RoochWalletSigner] VM fragment not found');
         }
-        console.log('[RoochWalletSigner] Set transaction sender to Agent DID address:', this.didAddress.toStr());
+        console.log(
+          '[RoochWalletSigner] Set transaction sender to Agent DID address:',
+          this.didAddress.toStr()
+        );
         console.log('[RoochWalletSigner] VM fragment:', vmFragment);
         // Get transaction hash for signing
         const txHash = tx.hashData();
@@ -305,10 +312,10 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
         const txHashHexBytes = bytes('utf8', txHashHex);
         // Create Session authenticator for Agent DID
         const sessionAuth = await Authenticator.didBitcoinMessage(txHash, this, vmFragment);
-       
+
         // Set authenticator to transaction
         tx.setAuth(sessionAuth);
-        
+
         console.log('[RoochWalletSigner] Agent DID transaction signed with Bitcoin authenticator');
         return sessionAuth;
       } else {
@@ -377,5 +384,4 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
   async isAvailable(): Promise<boolean> {
     return this.isConnected();
   }
-
 }

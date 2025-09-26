@@ -56,6 +56,7 @@ export const config = {
     windowMs: parseInt(env.RATE_LIMIT_WINDOW_MS, 10),
     maxRequests: parseInt(env.RATE_LIMIT_MAX_REQUESTS, 10),
   },
+  // Bitcoin configuration removed - using standard Bitcoin message signing
   logging: {
     level: env.LOG_LEVEL,
     format: env.LOG_FORMAT,

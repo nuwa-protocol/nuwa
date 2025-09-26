@@ -14,6 +14,7 @@ import {
 import { SignerInterface } from './types';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
 import { parseDid } from '../utils/did';
+import { EcdsaR1PublicKey } from '../crypto/EcdsaR1PublicKey';
 
 /**
  * A Rooch Signer implementation that wraps a SignerInterface.
@@ -108,7 +109,7 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     } else if (this.keyType === KeyType.ED25519) {
       return new Ed25519PublicKey(this.publicKey);
     } else if (this.keyType === KeyType.ECDSAR1) {
-      throw new Error('ECDSAR1 is not supported for DID account');
+      return new EcdsaR1PublicKey(this.publicKey);
     } else {
       throw new Error(`Unsupported key type: ${this.keyType}`);
     }

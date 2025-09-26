@@ -119,6 +119,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   if (step === 'agent' && userDid) {
     return <CreateAgentStep userDid={userDid} onComplete={handleAgentCreated} />;
   }
+
   if (step === 'gas' && agentDid) {
     return <ClaimGasStep agentDid={agentDid} onComplete={handleGasClaimed} />;
   }

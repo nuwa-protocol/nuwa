@@ -70,13 +70,11 @@ Our solution provides a clear explanation and suggests refreshing the page to re
 ### Separation of Concerns
 
 1. **PasskeyService**: Pure business logic layer
-
    - Handles WebAuthn API calls
    - Re-throws original errors without modification
    - No internationalization or UI concerns
 
 2. **PasskeyErrorHandler**: Error processing layer
-
    - Converts technical errors to user-friendly messages
    - Handles internationalization
    - Provides contextual actions

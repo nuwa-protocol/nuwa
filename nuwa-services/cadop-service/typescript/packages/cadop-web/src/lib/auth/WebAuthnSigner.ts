@@ -250,7 +250,10 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
   }
 
   async signAssertion(data: Uint8Array): Promise<AuthenticatorAssertionResponse> {
-    const { response, signature, authenticatorData, clientDataJSON } = await this.signWithWebAuthn(data, this.passkeyAuthMethod?.id);
+    const { response, signature, authenticatorData, clientDataJSON } = await this.signWithWebAuthn(
+      data,
+      this.passkeyAuthMethod?.id
+    );
     return response;
   }
 

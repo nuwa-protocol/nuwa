@@ -64,6 +64,7 @@ function AgentItem({ did, isSelected, onSelect }: AgentItemProps) {
       setUsdLoading(true);
       try {
         const res = await hubClient.getBalanceWithUsd({
+          ownerDid: did,
           assetId: DEFAULT_ASSET_ID,
         });
         const usd = formatBigIntWithDecimals(res.balancePicoUSD, 12, 2);

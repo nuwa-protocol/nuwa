@@ -6,7 +6,7 @@ import prettierConfig from 'eslint-config-prettier';
 
 export default [
   js.configs.recommended,
-  
+
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
@@ -49,9 +49,9 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
     },
   },
-  
+
   prettierConfig,
-  
+
   {
     ignores: ['dist', 'node_modules', '**/*.js'],
   },

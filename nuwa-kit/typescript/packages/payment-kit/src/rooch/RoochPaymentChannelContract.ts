@@ -57,7 +57,7 @@ import {
   DynamicField,
   CoinStoreFieldData,
 } from './ChannelUtils';
-import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
+import { DebugLogger, SignerInterface, DidAccountSigner, parseDid, isSignerInterface } from '@nuwa-ai/identity-kit';
 import {
   badRequest,
   notFound,
@@ -877,11 +877,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   }
 
   // Helper methods
-  private async convertSigner(signer: SignerInterface): Promise<Signer> {
-    if (signer instanceof Signer) {
-      return signer;
+  private async convertSigner(signer: SignerInterface | Signer): Promise<Signer> {
+    // If it implements SignerInterface, convert it to DidAccountSigner
+    if (isSignerInterface(signer)) {
+      return DidAccountSigner.create(signer);
     }
-    return DidAccountSigner.create(signer);
+    // Fallback: assume it's Signer
+    return signer;
   }
 
   private createTransaction(): Transaction {

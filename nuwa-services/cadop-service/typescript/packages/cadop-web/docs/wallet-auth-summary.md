@@ -51,13 +51,11 @@
 必须先完成的基础重构工作：
 
 1. **存储层重构**
-
    - 实现 v1 到 v2 的数据迁移
    - 扩展 UserStore API
    - 添加版本迁移机制
 
 2. **认证抽象**
-
    - 创建 AuthProvider 接口
    - 封装 PasskeyService
    - 重构 AuthContext
@@ -97,17 +95,14 @@
 ## 🔑 关键技术决策
 
 1. **使用 IdentityKit 创建 Agent**
-
    - 钱包方式直接调用 `IdentityKit.createNewDID`
    - 无需通过 cadop-api 服务
 
 2. **Rooch 钱包即 Bitcoin 钱包**
-
    - 使用 Bitcoin 地址作为账户
    - 支持 UniSat 等钱包
 
 3. **Agent 权限一致性**
-
    - 两种方式创建的 Agent 权限无差异
    - 都是标准的智能合约账户
 
@@ -135,12 +130,10 @@
 ## ✅ 下一步行动
 
 1. **确认设计方案**
-
    - 审查架构设计
    - 确认实施优先级
 
 2. **开始 Phase 0 重构**
-
    - 创建功能分支
    - 实施存储层重构
    - 创建认证抽象

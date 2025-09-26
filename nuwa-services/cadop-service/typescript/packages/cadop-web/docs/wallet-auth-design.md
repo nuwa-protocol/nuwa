@@ -470,22 +470,18 @@ export class UnifiedAgentService {
 基于讨论，以下是关键决策：
 
 1. **Agent 创建方式**
-
    - 使用 `IdentityKit.createNewDID` 方法创建 Agent DID
    - 钱包用户直接调用该方法，无需通过 cadop-api
 
 2. **多链支持**
-
    - 当前 Rooch 钱包即是 Bitcoin 钱包
    - Ethereum 支持留待未来考虑
 
 3. **Agent 权限**
-
    - 钱包创建的 Agent 与 Passkey 创建的 Agent 在权限上无差异
    - 两种方式创建的都是标准的智能合约账户
 
 4. **独立性设计**
-
    - Agent DID 创建后是独立账户
    - 与创建者（controller）解耦，具有完全的自主权
 

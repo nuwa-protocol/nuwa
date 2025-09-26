@@ -9,7 +9,7 @@ import globals from 'globals';
 
 export default [
   js.configs.recommended,
-  
+
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
@@ -58,9 +58,9 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
-  
+
   prettierConfig,
-  
+
   {
     ignores: ['dist', 'node_modules', 'vite.config.ts'],
   },
