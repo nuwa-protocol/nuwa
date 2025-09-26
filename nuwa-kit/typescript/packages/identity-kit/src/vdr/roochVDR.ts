@@ -502,7 +502,6 @@ export class RoochVDR extends AbstractVDR {
         this.debugLog(`Resolved DID document by ${did} is null`);
         return null;
       }
-      this.debugLog(`Resolved DID document Move Object:`, JSON.stringify(didDocObject, null, 2));
       return convertMoveDIDDocumentToInterface(didDocObject);
     } catch (error) {
       this.errorLog(`Error resolving DID from Rooch network:`, error);
