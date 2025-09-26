@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@cadop/shared": "workspace:*",
-    "@roochnetwork/rooch-sdk": "link:../../../../../deps/rooch/sdk/typescript/rooch-sdk",
+    "@roochnetwork/rooch-sdk": "^0.4.0",
     "@simplewebauthn/server": "^12.0.0",
     "@simplewebauthn/types": "^12.0.0",
     "@noble/curves": "^1.9.1",
