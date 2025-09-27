@@ -44,7 +44,7 @@ export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
       sessionConf={{
         appName: 'CADOP',
         appUrl: window.location.origin,
-        scopes: ['*::*::*'], // Allow all scopes for now
+        scopes: ['0x3::*::*'], // Allow all scopes for now
         maxInactiveInterval: 1200, // 20 minutes
       }}
     >
@@ -52,7 +52,7 @@ export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
         enableLocal={isDev} // Enable local wallet for development
         preferredWallets={['UniSat', 'OKX']} // Preferred Bitcoin wallets
         chain="bitcoin"
-        autoConnect={false} // Don't auto-connect, let user choose
+        autoConnect={true} // Enable auto-connect to restore wallet connection on page refresh
       >
         {children}
       </WalletProvider>

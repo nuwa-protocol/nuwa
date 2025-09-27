@@ -37,7 +37,17 @@ export class WalletAuthProvider implements AuthProvider {
    * Set wallet store access (called by components that have access to the store)
    */
   setWalletStoreAccess(walletStoreAccess: WalletStoreAccess): void {
+    console.log('[WalletAuthProvider] Setting wallet store access');
     this.walletStoreAccess = walletStoreAccess;
+  }
+
+  /**
+   * Check if wallet store access is available
+   */
+  isWalletStoreReady(): boolean {
+    const ready = !!this.walletStoreAccess;
+    console.log('[WalletAuthProvider] isWalletStoreReady:', ready);
+    return ready;
   }
 
   /**
@@ -125,18 +135,58 @@ export class WalletAuthProvider implements AuthProvider {
    */
   async restoreSession(): Promise<boolean> {
     try {
+      console.log('[WalletAuthProvider] Attempting to restore session...');
+      
       if (!this.walletStoreAccess) {
         console.log('[WalletAuthProvider] Wallet store access not available for session restore');
         return false;
       }
 
       // Check if wallet is still connected
-      const connectionStatus = this.walletStoreAccess.getConnectionStatus();
-      const currentAddress = this.walletStoreAccess.getCurrentAddress();
+      let connectionStatus = this.walletStoreAccess.getConnectionStatus();
+      let currentAddress = this.walletStoreAccess.getCurrentAddress();
+
+      console.log('[WalletAuthProvider] Wallet state:', {
+        connectionStatus,
+        hasAddress: !!currentAddress,
+        address: currentAddress?.toStr(),
+      });
 
       if (connectionStatus !== 'connected' || !currentAddress) {
-        console.log('[WalletAuthProvider] Wallet not connected, cannot restore session');
-        return false;
+        console.log('[WalletAuthProvider] Wallet not connected, attempting to reconnect...');
+        
+        // Try to reconnect the wallet
+        try {
+          const currentWallet = this.walletStoreAccess.getCurrentWallet();
+          if (currentWallet && typeof currentWallet.connect === 'function') {
+            console.log('[WalletAuthProvider] Attempting wallet reconnection...');
+            await currentWallet.connect();
+            
+            // Check again after reconnection attempt
+            const newConnectionStatus = this.walletStoreAccess.getConnectionStatus();
+            const newCurrentAddress = this.walletStoreAccess.getCurrentAddress();
+            
+            console.log('[WalletAuthProvider] After reconnection attempt:', {
+              connectionStatus: newConnectionStatus,
+              hasAddress: !!newCurrentAddress,
+            });
+            
+            if (newConnectionStatus !== 'connected' || !newCurrentAddress) {
+              console.log('[WalletAuthProvider] Reconnection failed, cannot restore session');
+              return false;
+            }
+            
+            // Update for the rest of the function
+            connectionStatus = newConnectionStatus;
+            currentAddress = newCurrentAddress;
+          } else {
+            console.log('[WalletAuthProvider] No wallet available for reconnection');
+            return false;
+          }
+        } catch (error) {
+          console.log('[WalletAuthProvider] Wallet reconnection failed:', error);
+          return false;
+        }
       }
 
       // Get current user DID from storage
@@ -149,6 +199,13 @@ export class WalletAuthProvider implements AuthProvider {
       // Verify the wallet address matches the stored user DID
       const bitcoinAddress = currentAddress.toStr();
       const expectedUserDid = this.createUserDidFromBitcoinAddress(bitcoinAddress);
+
+      console.log('[WalletAuthProvider] Address verification:', {
+        currentUserDid,
+        expectedUserDid,
+        bitcoinAddress,
+        matches: expectedUserDid === currentUserDid,
+      });
 
       if (expectedUserDid !== currentUserDid) {
         console.log('[WalletAuthProvider] Wallet address mismatch, clearing session');
