@@ -299,15 +299,12 @@ export class PaymentProcessor {
             };
             // Store structured payload for later rendering (HTTP header or MCP JSON)
             pctx.state.responsePayload = decoded;
-            this.log(
-              '✅ Attached pending SubRAV to PAYMENT_REQUIRED response:',
-              {
-                channelId: pctx.state.latestPendingSubRav.channelId,
-                nonce: pctx.state.latestPendingSubRav.nonce.toString(),
-                accumulatedAmount: pctx.state.latestPendingSubRav.accumulatedAmount.toString(),
-                clientTxRef: pctx.meta.clientTxRef,
-              }
-            );
+            this.log('✅ Attached pending SubRAV to PAYMENT_REQUIRED response:', {
+              channelId: pctx.state.latestPendingSubRav.channelId,
+              nonce: pctx.state.latestPendingSubRav.nonce.toString(),
+              accumulatedAmount: pctx.state.latestPendingSubRav.accumulatedAmount.toString(),
+              clientTxRef: pctx.meta.clientTxRef,
+            });
           } catch (e) {
             this.logger.error('⚠️ Failed to attach pending SubRAV to error payload:', e);
             // Ensure we still set a responsePayload even if there's an error
@@ -326,17 +323,14 @@ export class PaymentProcessor {
             serviceTxRef: pctx.state.serviceTxRef,
             error: ravResult.error,
           };
-          // this should not happen, because if the pending SubRAV is not available, 
+          // this should not happen, because if the pending SubRAV is not available,
           // the rav verifier result should not be REQUIRE_SIGNATURE_402 or CONFLICT
-          this.logger.error(
-            '⚠️ No pending SubRAV available for PAYMENT_REQUIRED response:',
-            {
-              channelId: pctx.meta.channelId,
-              vmIdFragment: pctx.meta.vmIdFragment,
-              clientTxRef: pctx.meta.clientTxRef,
-              decision: ravResult.decision,
-            }
-          );
+          this.logger.error('⚠️ No pending SubRAV available for PAYMENT_REQUIRED response:', {
+            channelId: pctx.meta.channelId,
+            vmIdFragment: pctx.meta.vmIdFragment,
+            clientTxRef: pctx.meta.clientTxRef,
+            decision: ravResult.decision,
+          });
         }
         // Avoid auto-attaching a separate error header here to prevent overwriting payload-based header later
         return this.fail(

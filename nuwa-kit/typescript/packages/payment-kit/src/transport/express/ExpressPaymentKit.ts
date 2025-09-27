@@ -404,7 +404,7 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
             const headerValue = payload
               ? HttpPaymentCodec.buildResponseHeader(payload)
               : this.buildProtocolErrorHeader(req, err);
-            
+
             // Enhanced logging for PAYMENT_REQUIRED responses
             if (err.code === 'PAYMENT_REQUIRED') {
               const debugInfo = {
@@ -417,16 +417,21 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
                 usingFallbackHeader: !payload,
               };
               this.logger.debug('[ExpressPaymentKit] PAYMENT_REQUIRED response debug:', debugInfo);
-              
+
               // Critical warning if we're using fallback header for PAYMENT_REQUIRED
               if (!payload) {
-                this.logger.warn('[ExpressPaymentKit] CRITICAL: PAYMENT_REQUIRED without responsePayload - client cannot auto-retry!', {
-                  errorMessage: err.message,
-                  billingContextState: billingContext.state ? Object.keys(billingContext.state) : 'no state',
-                });
+                this.logger.warn(
+                  '[ExpressPaymentKit] CRITICAL: PAYMENT_REQUIRED without responsePayload - client cannot auto-retry!',
+                  {
+                    errorMessage: err.message,
+                    billingContextState: billingContext.state
+                      ? Object.keys(billingContext.state)
+                      : 'no state',
+                  }
+                );
               }
             }
-            
+
             this.ensureExposeHeader(res);
             res.setHeader(HttpPaymentCodec.getHeaderName(), headerValue);
 
