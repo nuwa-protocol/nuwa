@@ -90,27 +90,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuthProviders();
   }, []);
 
-  // Listen for wallet auth success events
-  React.useEffect(() => {
-    const handleWalletAuthSuccess = () => {
-      console.log('[AuthContext] Wallet auth success event received, updating state...');
-      const currentUserDid = AuthStore.getCurrentUserDid();
-      const authMethod = UserStore.getAuthMethod(currentUserDid);
-      
-      if (currentUserDid && authMethod === 'wallet') {
-        setState({
-          isAuthenticated: true,
-          isLoading: false,
-          userDid: currentUserDid,
-          authMethod,
-          error: null,
-        });
-      }
-    };
-
-    window.addEventListener('wallet-auth-success', handleWalletAuthSuccess);
-    return () => window.removeEventListener('wallet-auth-success', handleWalletAuthSuccess);
-  }, []);
+  // Note: Removed wallet auth success event listener - now using structured return values
 
   const signInWithDid = useCallback((userDid: string) => {
     try {

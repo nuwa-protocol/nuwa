@@ -45,20 +45,38 @@ export function WalletStoreConnector() {
       getConnectionStatus: () => connectionStatus,
     };
 
-    // Get the wallet provider and inject the store access
-    authProviderRegistry
-      .get('wallet')
-      .then(provider => {
-        if (provider instanceof WalletAuthProvider) {
-          provider.setWalletStoreAccess(walletStoreAccess);
-          console.log('[WalletStoreConnector] Successfully injected wallet store access');
-        } else {
-          console.warn('[WalletStoreConnector] Provider is not WalletAuthProvider:', provider);
-        }
-      })
-      .catch(error => {
-        console.warn('[WalletStoreConnector] Failed to get wallet provider:', error);
-      });
+    // Get the wallet provider and inject the store access (with retry for robustness)
+    const injectWalletStoreAccess = () => {
+      authProviderRegistry
+        .get('wallet')
+        .then(provider => {
+          if (provider instanceof WalletAuthProvider) {
+            provider.setWalletStoreAccess(walletStoreAccess);
+            console.log('[WalletStoreConnector] Successfully injected wallet store access');
+          } else {
+            console.warn('[WalletStoreConnector] Provider is not WalletAuthProvider:', provider);
+          }
+        })
+        .catch(error => {
+          console.warn('[WalletStoreConnector] Failed to get wallet provider, retrying...:', error);
+          // Single retry after a short delay to handle timing issues
+          setTimeout(() => {
+            authProviderRegistry
+              .get('wallet')
+              .then(provider => {
+                if (provider instanceof WalletAuthProvider) {
+                  provider.setWalletStoreAccess(walletStoreAccess);
+                  console.log('[WalletStoreConnector] Successfully injected wallet store access (retry)');
+                }
+              })
+              .catch(retryError => {
+                console.error('[WalletStoreConnector] Failed to get wallet provider after retry:', retryError);
+              });
+          }, 100);
+        });
+    };
+
+    injectWalletStoreAccess();
 
     // Also inject wallet instance into WalletAgentService
     const walletAgentService = unifiedAgentService.getAgentServiceByMethod('wallet');
