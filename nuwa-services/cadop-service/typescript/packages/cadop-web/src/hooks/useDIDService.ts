@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DIDService } from '@/lib/did/DIDService';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { UserStore } from '@/lib/storage';
+import { AuthMethod } from '@/lib/storage/types';
 
 export interface UseDIDServiceResult {
   didService: DIDService | null;
