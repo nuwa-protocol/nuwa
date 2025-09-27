@@ -9,6 +9,7 @@ interface WalletStoreAccess {
   getCurrentWallet: () => any;
   getCurrentAddress: () => ThirdPartyAddress | undefined;
   getConnectionStatus: () => 'disconnected' | 'connecting' | 'connected';
+  forceDisconnect: () => void;
 }
 
 /**
@@ -230,8 +231,28 @@ export class WalletAuthProvider implements AuthProvider {
    */
   async logout(): Promise<void> {
     try {
-      // Disconnect wallet if connected
-      // This will depend on the wallet SDK implementation
+      // Disconnect wallet if connected to prevent auto-reconnect
+      if (this.walletStoreAccess) {
+        const connectionStatus = this.walletStoreAccess.getConnectionStatus();
+
+        if (connectionStatus === 'connected') {
+          console.log('[WalletAuthProvider] Disconnecting wallet on logout...');
+
+          // First try to force disconnect through the store
+          this.walletStoreAccess.forceDisconnect();
+
+          // Also clear rooch-sdk-kit wallet storage to prevent auto-reconnect
+          // This is similar to what the DropdownMenu component does
+          const prefix = 'rooch-sdk-kit';
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith(prefix)) {
+              localStorage.removeItem(key);
+            }
+          });
+
+          console.log('[WalletAuthProvider] Wallet disconnected and storage cleared successfully');
+        }
+      }
 
       this.currentUserDid = null;
 

@@ -115,7 +115,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = useCallback(async () => {
     try {
-      // Logout from current auth provider
+      // Logout from current auth provider (this will handle wallet disconnect if needed)
       if (currentAuthProvider) {
         await currentAuthProvider.logout();
       }

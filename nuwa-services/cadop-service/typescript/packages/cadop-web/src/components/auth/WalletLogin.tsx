@@ -163,10 +163,6 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
           </>
         )}
       </button>
-
-      <p className="text-xs text-gray-500 text-center">
-        Connect your Bitcoin wallet to sign in with Rooch
-      </p>
     </div>
   );
 }

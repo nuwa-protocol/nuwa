@@ -21,6 +21,16 @@ export function WalletStoreConnector() {
   const connectionStatus = useConnectionStatus();
   const { signOut, authMethod, isAuthenticated } = useAuth();
 
+  // Create a force disconnect function that triggers a page reload
+  // This is the most reliable way to reset wallet state after clearing localStorage
+  const forceDisconnect = () => {
+    console.log('[WalletStoreConnector] Force disconnecting wallet...');
+    // Use a small delay to ensure localStorage is cleared first
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
   // Track if we've seen a connected state to distinguish between initial load and actual disconnection
   const [hasBeenConnected, setHasBeenConnected] = useState(false);
 
@@ -43,6 +53,7 @@ export function WalletStoreConnector() {
       getCurrentWallet: () => currentWallet,
       getCurrentAddress: () => currentAddress,
       getConnectionStatus: () => connectionStatus,
+      forceDisconnect,
     };
 
     // Get the wallet provider and inject the store access (with retry for robustness)
@@ -88,7 +99,7 @@ export function WalletStoreConnector() {
     if (walletAgentService instanceof WalletAgentService && currentWallet?.wallet) {
       walletAgentService.setCurrentWallet(currentWallet.wallet);
     }
-  }, [currentWallet, currentAddress, connectionStatus]);
+  }, [currentWallet, currentAddress, connectionStatus, forceDisconnect]);
 
   // Track when wallet becomes connected
   useEffect(() => {
