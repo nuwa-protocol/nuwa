@@ -27,11 +27,11 @@ function useInitialiseVDR(): VDRContextValue {
       if (initialised) return;
 
       try {
-        console.log('[VDRProvider] Initialising VDRs using VDRManager...');
+        console.info('[VDRProvider] Initialising VDRs using VDRManager...');
         const vdrManager = VDRManager.getInstance();
         await vdrManager.initialize();
         setInitialised(true);
-        console.log('[VDRProvider] VDRs initialised successfully');
+        console.info('[VDRProvider] VDRs initialised successfully');
       } catch (err) {
         console.error('[VDRProvider] Failed to initialise VDRs:', err);
         setError(err instanceof Error ? err.message : String(err));

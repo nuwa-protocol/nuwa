@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { WebAuthnLogin } from './WebAuthnLogin';
 import { WalletLogin } from './WalletLogin';
+import { WalletErrorBoundary } from './WalletErrorBoundary';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { AuthMethod } from '../../lib/storage/types';
 
@@ -15,20 +15,32 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
   const [supportedMethods, setSupportedMethods] = useState<AuthMethod[]>([]);
   const [activeTab, setActiveTab] = useState<AuthMethod>(AuthMethod.PASSKEY);
   const { getSupportedAuthMethods } = useAuth();
-  const { t } = useTranslation();
 
   useEffect(() => {
+    let isMounted = true;
     async function loadSupportedMethods() {
       try {
         const methods = await getSupportedAuthMethods();
+
+        if (!isMounted) return; // Component was unmounted
+
         setSupportedMethods(methods);
 
         // Set default tab to first supported method
         if (methods.length > 0) {
           setActiveTab(methods[0]);
+        } else {
+          console.warn(
+            '[AuthMethodSelector] No supported auth methods found, falling back to Passkey'
+          );
+          setSupportedMethods([AuthMethod.PASSKEY]);
+          setActiveTab(AuthMethod.PASSKEY);
         }
       } catch (error) {
-        console.error('Failed to load supported auth methods:', error);
+        console.error('[AuthMethodSelector] Failed to load supported auth methods:', error);
+
+        if (!isMounted) return; // Component was unmounted
+
         // Fallback to Passkey only
         setSupportedMethods([AuthMethod.PASSKEY]);
         setActiveTab(AuthMethod.PASSKEY);
@@ -36,6 +48,10 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
     }
 
     loadSupportedMethods();
+
+    return () => {
+      isMounted = false;
+    };
   }, [getSupportedAuthMethods]);
 
   const getMethodLabel = (method: AuthMethod): string => {
@@ -97,7 +113,11 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
         </div>
 
         {method === AuthMethod.PASSKEY && <WebAuthnLogin onSuccess={onSuccess} onError={onError} />}
-        {method === AuthMethod.WALLET && <WalletLogin onSuccess={onSuccess} onError={onError} />}
+        {method === AuthMethod.WALLET && (
+          <WalletErrorBoundary onError={onError}>
+            <WalletLogin onSuccess={onSuccess} onError={onError} />
+          </WalletErrorBoundary>
+        )}
       </div>
     );
   }
@@ -124,7 +144,7 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-900">Sign in with Passkey</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Use your device's built-in authentication
+                Use your device&apos;s built-in authentication
               </p>
             </div>
             <WebAuthnLogin onSuccess={onSuccess} onError={onError} />
@@ -139,7 +159,9 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
               <h3 className="text-lg font-medium text-gray-900">Sign in with Wallet</h3>
               <p className="text-sm text-gray-600 mt-1">Connect your Bitcoin wallet to sign in</p>
             </div>
-            <WalletLogin onSuccess={onSuccess} onError={onError} />
+            <WalletErrorBoundary onError={onError}>
+              <WalletLogin onSuccess={onSuccess} onError={onError} />
+            </WalletErrorBoundary>
           </div>
         </TabsContent>
       )}

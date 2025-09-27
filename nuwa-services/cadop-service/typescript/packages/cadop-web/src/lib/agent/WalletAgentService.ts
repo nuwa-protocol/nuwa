@@ -26,7 +26,7 @@ export class WalletAgentService implements IAgentService {
    */
   setCurrentWallet(wallet: Wallet): void {
     this.currentWallet = wallet;
-    console.log('[WalletAgentService] Current wallet set:', wallet.getName());
+    console.debug('[WalletAgentService] Current wallet set:', wallet.getName());
   }
 
   /**
@@ -53,7 +53,7 @@ export class WalletAgentService implements IAgentService {
     }
 
     try {
-      console.log(
+      console.info(
         '[WalletAgentService] Creating Agent DID via cadop-api for wallet user:',
         userDid
       );
@@ -88,7 +88,7 @@ export class WalletAgentService implements IAgentService {
       // Cache the created agent DID
       if (response.data.agentDid) {
         UserStore.addAgent(userDid, response.data.agentDid);
-        console.log('[WalletAgentService] Agent DID created and cached:', response.data.agentDid);
+        console.info('[WalletAgentService] Agent DID created and cached:', response.data.agentDid);
       }
 
       return response.data;

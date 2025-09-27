@@ -53,7 +53,7 @@ export class VDRManager {
 
       // Initialize Rooch VDR if not already registered
       if (!registry.getVDR('rooch')) {
-        console.log('[VDRManager] Initializing Rooch VDR with RPC:', ROOCH_RPC_URL);
+        console.info('[VDRManager] Initializing Rooch VDR with RPC:', ROOCH_RPC_URL);
 
         const roochVDR = createVDR('rooch', {
           rpcUrl: ROOCH_RPC_URL,
@@ -61,9 +61,9 @@ export class VDRManager {
         });
 
         registry.registerVDR(roochVDR);
-        console.log('[VDRManager] Rooch VDR initialized successfully');
+        console.info('[VDRManager] Rooch VDR initialized successfully');
       } else {
-        console.log('[VDRManager] Rooch VDR already registered');
+        console.debug('[VDRManager] Rooch VDR already registered');
       }
 
       // Add other VDRs here as needed in the future
@@ -74,7 +74,7 @@ export class VDRManager {
       // }
 
       this.initialized = true;
-      console.log('[VDRManager] All VDRs initialized successfully');
+      console.info('[VDRManager] All VDRs initialized successfully');
     } catch (error) {
       console.error('[VDRManager] Failed to initialize VDRs:', error);
       // Reset state so initialization can be retried

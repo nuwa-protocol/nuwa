@@ -15,9 +15,10 @@ interface WalletLoginProps {
 
 export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [hookError, setHookError] = useState<string | null>(null);
   const { loginWithProvider } = useAuth();
 
-  // Rooch SDK Kit hooks
+  // Rooch SDK Kit hooks - these might fail if wallet environment is not properly set up
   const currentWallet = useCurrentWallet();
   const currentAddress = useCurrentAddress();
   const wallets = useWallets();
@@ -25,8 +26,13 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
 
   // Handle wallet connection state changes
   useEffect(() => {
-    if (currentWallet?.isConnected && currentAddress) {
-      handleWalletConnected();
+    try {
+      if (currentWallet?.isConnected && currentAddress) {
+        handleWalletConnected();
+      }
+    } catch (error) {
+      console.error('[WalletLogin] Error in wallet connection effect:', error);
+      setHookError(error instanceof Error ? error.message : 'Wallet connection error');
     }
   }, [currentWallet?.isConnected, currentAddress]);
 
@@ -55,37 +61,69 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
   };
 
   const handleConnectWallet = async () => {
-    if (currentWallet?.isConnected) {
-      // Already connected, proceed with authentication
-      await handleWalletConnected();
-      return;
-    }
-
     try {
+      // Check for hook errors first
+      if (hookError) {
+        onError?.(hookError);
+        return;
+      }
+
+      // Check if wallets array is available
+      if (!wallets || wallets.length === 0) {
+        const errorMessage =
+          'No wallet providers available. Please ensure you have Bitcoin wallet extensions installed (UniSat, OKX, or OneKey).';
+        onError?.(errorMessage);
+        return;
+      }
+
+      if (currentWallet?.isConnected) {
+        // Already connected, proceed with authentication
+        await handleWalletConnected();
+        return;
+      }
+
       setIsLoading(true);
 
-      // Get available wallets - check installation status
-      console.log(
-        '[WalletLogin] All wallets:',
-        wallets.map(w => ({ name: w.getName() }))
-      );
+      // Filter out problematic wallets first
+      const safeWallets = wallets.filter(wallet => {
+        const walletName = wallet.getName();
+        // Filter out LocalWallet which has getBitcoinAddressWith issues
+        if (walletName === 'Local Wallet' || walletName === 'LocalWallet') {
+          console.warn(`[WalletLogin] Filtering out problematic wallet: ${walletName}`);
+          return false;
+        }
+        return true;
+      });
 
-      // Check which wallets are installed
-      const walletInstallationChecks = await Promise.all(
-        wallets.map(async wallet => ({
-          wallet,
-          isInstalled: await wallet.checkInstalled(),
-        }))
-      );
+      // Get available wallets - check installation status with error handling
+      let walletInstallationChecks;
+      try {
+        walletInstallationChecks = await Promise.all(
+          safeWallets.map(async wallet => {
+            try {
+              return {
+                wallet,
+                isInstalled: await wallet.checkInstalled(),
+              };
+            } catch (error) {
+              console.warn(`[WalletLogin] Error checking wallet ${wallet.getName()}:`, error);
+              return {
+                wallet,
+                isInstalled: false,
+              };
+            }
+          })
+        );
+      } catch (error) {
+        console.error('[WalletLogin] Error checking wallet installations:', error);
+        onError?.('Failed to check wallet installations. Please refresh and try again.');
+        setIsLoading(false);
+        return;
+      }
 
       const availableWallets = walletInstallationChecks
         .filter(({ isInstalled }) => isInstalled)
         .map(({ wallet }) => wallet);
-
-      console.log(
-        '[WalletLogin] Available wallets:',
-        availableWallets.map(w => w.getName())
-      );
 
       if (availableWallets.length === 0) {
         // In development, show more helpful error message
@@ -99,8 +137,9 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
 
         const errorMessage = isDev
           ? `No Bitcoin wallets found. Available wallets: ${walletStatusList}. For development, you can install UniSat or OKX wallet, or we can add a mock wallet.`
-          : 'No Bitcoin wallets found. Please install UniSat or OKX wallet.';
+          : 'No Bitcoin wallets found. Please install UniSat or OKX wallet to continue.';
         onError?.(errorMessage);
+        setIsLoading(false);
         return;
       }
 
@@ -108,12 +147,30 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
       // In a real implementation, you might want to show a wallet selection dialog
       const walletToConnect = availableWallets[0];
 
-      await connectWallet({ wallet: walletToConnect });
+      try {
+        await connectWallet({ wallet: walletToConnect });
+        // The useEffect will handle the rest when connection is established
+      } catch (connectError) {
+        console.error('[WalletLogin] Wallet connection failed:', connectError);
 
-      // The useEffect will handle the rest when connection is established
+        // Handle specific LocalWallet getBitcoinAddressWith error
+        const errorMessage =
+          connectError instanceof Error ? connectError.message : 'Failed to connect wallet';
+        if (
+          errorMessage.includes('getBitcoinAddressWith') ||
+          errorMessage.includes('this.keypair')
+        ) {
+          const friendlyMessage = `Wallet connection failed due to a compatibility issue. Please try installing a Bitcoin wallet extension like UniSat or OKX Wallet.`;
+          onError?.(friendlyMessage);
+        } else {
+          onError?.(errorMessage);
+        }
+        setIsLoading(false);
+      }
     } catch (error) {
-      console.error('Wallet connection failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Wallet connection failed';
+      console.error('[WalletLogin] Unexpected error in handleConnectWallet:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unexpected wallet connection error';
       onError?.(errorMessage);
       setIsLoading(false);
     }

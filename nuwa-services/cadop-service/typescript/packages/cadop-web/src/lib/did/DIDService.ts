@@ -27,7 +27,7 @@ export class DIDService {
         throw new Error('Failed to resolve DID document');
       }
 
-      console.log('[DIDService] Initializing with DID:', did, 'credentialId:', credentialId);
+      console.debug('[DIDService] Initializing with DID:', did, 'credentialId:', credentialId);
 
       // Use SignerFactory to create appropriate signer based on Agent DID
       const signerFactory = SignerFactory.getInstance();

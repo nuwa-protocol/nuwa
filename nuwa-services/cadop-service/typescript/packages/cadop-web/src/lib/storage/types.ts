@@ -3,7 +3,7 @@
  */
 export enum AuthMethod {
   PASSKEY = 'passkey',
-  WALLET = 'wallet'
+  WALLET = 'wallet',
 }
 
 /**

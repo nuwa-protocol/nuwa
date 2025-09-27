@@ -110,7 +110,7 @@ export function WalletStoreConnector() {
       connectionStatus === 'disconnected' &&
       hasBeenConnected
     ) {
-      console.log(
+      console.info(
         '[WalletStoreConnector] Wallet disconnected after being connected, signing out user'
       );
       signOut();

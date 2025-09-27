@@ -39,13 +39,13 @@ export function useWalletAuth(): UseWalletAuthResult {
   // Monitor wallet state changes and attempt restore when conditions are met
   useEffect(() => {
     if (shouldAttemptRestore && connectionStatus === 'connected' && currentAddress) {
-      console.log('[useWalletAuth] Wallet connected, attempting session restore...');
+      console.info('[useWalletAuth] Wallet connected, attempting session restore...');
       setShouldAttemptRestore(false);
 
       // Delay the restore attempt slightly to ensure all state is synced
       setTimeout(async () => {
         const result = await restoreSession();
-        console.log('[useWalletAuth] Auto-restore result:', result);
+        console.debug('[useWalletAuth] Auto-restore result:', result);
         // Note: No longer dispatching events - AuthContext handles state via structured returns
       }, 100);
     }
@@ -71,12 +71,12 @@ export function useWalletAuth(): UseWalletAuthResult {
     isWaiting: boolean;
   }> => {
     if (!canRestore()) {
-      console.log('[useWalletAuth] No wallet session to restore');
+      console.debug('[useWalletAuth] No wallet session to restore');
       return { success: false, isWaiting: false };
     }
 
-    console.log('[useWalletAuth] Attempting to restore wallet session...');
-    console.log('[useWalletAuth] Current wallet state:', {
+    console.info('[useWalletAuth] Attempting to restore wallet session...');
+    console.debug('[useWalletAuth] Current wallet state:', {
       hasWallet: !!currentWallet,
       hasAddress: !!currentAddress,
       connectionStatus,
@@ -86,12 +86,12 @@ export function useWalletAuth(): UseWalletAuthResult {
 
     // If auto-connect is still in progress, set flag to attempt restore later
     if (autoConnectStatus === 'idle') {
-      console.log(
+      console.debug(
         '[useWalletAuth] Auto-connect still in progress, will retry when wallet connects'
       );
       setError(null);
       setShouldAttemptRestore(true);
-      console.log('[useWalletAuth] Returning isWaiting=true');
+      console.debug('[useWalletAuth] Returning isWaiting=true');
       // Return isWaiting=true to indicate we're waiting for auto-connect
       return { success: false, isWaiting: true };
     }
@@ -101,8 +101,8 @@ export function useWalletAuth(): UseWalletAuthResult {
     try {
       // Check if wallet is connected
       if (connectionStatus !== 'connected' || !currentAddress) {
-        console.log('[useWalletAuth] Wallet not connected, cannot restore session automatically');
-        console.log('[useWalletAuth] Current wallet state:', {
+        console.debug('[useWalletAuth] Wallet not connected, cannot restore session automatically');
+        console.debug('[useWalletAuth] Current wallet state:', {
           connectionStatus,
           hasAddress: !!currentAddress,
           hasWallet: !!currentWallet,
@@ -126,7 +126,7 @@ export function useWalletAuth(): UseWalletAuthResult {
       const bitcoinAddress = currentAddress.toStr();
       const expectedUserDid = createUserDidFromBitcoinAddress(bitcoinAddress);
 
-      console.log('[useWalletAuth] Address verification:', {
+      console.debug('[useWalletAuth] Address verification:', {
         currentUserDid,
         expectedUserDid,
         bitcoinAddress,
@@ -134,14 +134,14 @@ export function useWalletAuth(): UseWalletAuthResult {
       });
 
       if (expectedUserDid !== currentUserDid) {
-        console.log('[useWalletAuth] Wallet address mismatch, cannot restore session');
+        console.debug('[useWalletAuth] Wallet address mismatch, cannot restore session');
         setError('Wallet address does not match stored session');
         return false;
       }
 
       // Wallet verified, session can be restored
-      console.log('[useWalletAuth] Wallet verified, session can be restored');
-      console.log('[useWalletAuth] Wallet session restored successfully');
+      console.debug('[useWalletAuth] Wallet verified, session can be restored');
+      console.info('[useWalletAuth] Wallet session restored successfully');
       return { success: true, isWaiting: false };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

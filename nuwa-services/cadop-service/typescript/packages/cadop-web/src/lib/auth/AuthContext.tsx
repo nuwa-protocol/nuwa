@@ -45,16 +45,36 @@ interface AuthProviderProps {
 
 // Initialize auth providers
 let providersInitialized = false;
-const initializeAuthProviders = () => {
+let initializationPromise: Promise<void> | null = null;
+
+const initializeAuthProviders = async (): Promise<void> => {
   if (providersInitialized) {
     return;
   }
-  // Register Passkey provider
-  authProviderRegistry.register(AuthMethod.PASSKEY, async () => new PasskeyAuthProvider());
-  // Register Wallet provider
-  authProviderRegistry.register(AuthMethod.WALLET, async () => new WalletAuthProvider());
 
-  providersInitialized = true;
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  initializationPromise = (async () => {
+    try {
+      console.info('[AuthContext] Initializing auth providers...');
+
+      // Register Passkey provider
+      authProviderRegistry.register(AuthMethod.PASSKEY, async () => new PasskeyAuthProvider());
+
+      // Register Wallet provider
+      authProviderRegistry.register(AuthMethod.WALLET, async () => new WalletAuthProvider());
+
+      providersInitialized = true;
+      console.info('[AuthContext] Auth providers initialized successfully');
+    } catch (error) {
+      console.error('[AuthContext] Failed to initialize auth providers:', error);
+      throw error;
+    }
+  })();
+
+  return initializationPromise;
 };
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -83,7 +103,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Initialize auth providers immediately when component mounts
   React.useEffect(() => {
-    initializeAuthProviders();
+    initializeAuthProviders().catch(error => {
+      console.error('[AuthContext] Failed to initialize auth providers:', error);
+      setState(prev => ({
+        ...prev,
+        error: 'Failed to initialize authentication providers',
+        isLoading: false,
+      }));
+    });
   }, []);
 
   // Note: Removed wallet auth success event listener - now using structured return values
@@ -174,7 +201,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const getSupportedAuthMethods = useCallback(async (): Promise<AuthMethod[]> => {
-    return await authProviderRegistry.getSupportedMethods();
+    try {
+      // Ensure providers are initialized before checking support
+      await initializeAuthProviders();
+
+      const methods = await authProviderRegistry.getSupportedMethods();
+      console.info('[AuthContext] Supported auth methods:', methods);
+
+      return methods;
+    } catch (error) {
+      console.error('[AuthContext] Failed to get supported auth methods:', error);
+      // Fallback to Passkey only
+      return [AuthMethod.PASSKEY];
+    }
   }, []);
 
   const getCurrentAuthProvider = useCallback((): IAuthProvider | null => {

@@ -66,7 +66,7 @@ export function useHubDeposit(agentDid?: string | null) {
         try {
           current = await hubClient.getBalance({ assetId });
           if (current >= expected) {
-            console.log('balance updated', {
+            console.debug('balance updated', {
               attempt: i + 1,
               current: current.toString(),
               expected: expected.toString(),
@@ -77,7 +77,7 @@ export function useHubDeposit(agentDid?: string | null) {
         } catch (_) {
           // ignore and keep waiting
         }
-        console.log('waiting for balance update', {
+        console.debug('waiting for balance update', {
           attempt: i + 1,
           expected: expected.toString(),
           current: current?.toString(),
@@ -88,7 +88,7 @@ export function useHubDeposit(agentDid?: string | null) {
       if (!confirmed) {
         console.warn('Deposit transaction sent but balance confirmation timed out');
       } else {
-        console.log('deposit completed and confirmed');
+        console.info('deposit completed and confirmed');
       }
 
       return { txHash: res.txHash, confirmed };

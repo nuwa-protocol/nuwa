@@ -242,7 +242,7 @@ export class SignerFactory {
         const currentWallet = walletAgentService.getCurrentWallet();
         if (currentWallet) {
           signer.setWallet(currentWallet);
-          console.log('[SignerFactory] Injected wallet into RoochWalletSigner for Agent DID');
+          console.debug('[SignerFactory] Injected wallet into RoochWalletSigner for Agent DID');
         } else {
           console.warn('[SignerFactory] No current wallet available in WalletAgentService');
         }

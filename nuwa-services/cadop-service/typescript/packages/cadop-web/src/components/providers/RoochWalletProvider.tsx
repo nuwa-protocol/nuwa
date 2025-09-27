@@ -35,7 +35,6 @@ interface RoochWalletProviderProps {
  */
 export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
   const defaultNetwork = import.meta.env.VITE_ROOCH_NETWORK || 'devnet';
-  const isDev = import.meta.env.DEV;
 
   return (
     <RoochProvider
@@ -49,7 +48,7 @@ export function RoochWalletProvider({ children }: RoochWalletProviderProps) {
       }}
     >
       <WalletProvider
-        enableLocal={isDev} // Enable local wallet for development
+        enableLocal={false} // Disable local wallet due to getBitcoinAddressWith error
         preferredWallets={['UniSat', 'OKX']} // Preferred Bitcoin wallets
         chain="bitcoin"
         autoConnect={true} // Enable auto-connect to restore wallet connection on page refresh

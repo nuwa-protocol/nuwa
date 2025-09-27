@@ -26,12 +26,12 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
     try {
       setLoading(true);
       setDepositError(null);
-      console.log('Performing deposit');
+      console.info('Performing deposit');
       const result = await depositPercentOfClaimed(claimedAmount, 50);
       if (result && !result.confirmed) {
         console.warn('Deposit sent but not confirmed within timeout period');
       }
-      console.log('Deposit process completed');
+      console.info('Deposit process completed');
       setLoading(false);
       onComplete();
     } catch (error) {
@@ -43,7 +43,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
 
   // Handle deposit when conditions are met
   useEffect(() => {
-    if (shouldDeposit && depositPercentOfClaimed && !depositTriggeredRef.current) {
+    if (shouldDeposit && !depositTriggeredRef.current) {
       depositTriggeredRef.current = true;
       performDeposit();
     }
@@ -51,7 +51,7 @@ export const ClaimGasStep: React.FC<Props> = ({ agentDid, onComplete }) => {
 
   const claimGas = useCallback(async () => {
     if (claimCompleted) {
-      console.log('Claim already completed, skipping');
+      console.debug('Claim already completed, skipping');
       return;
     }
 

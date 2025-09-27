@@ -53,7 +53,9 @@ export class DefaultAuthProviderRegistry implements AuthProviderRegistry {
     for (const method of this.providers.keys()) {
       try {
         const provider = await this.get(method);
-        if (await provider.isSupported()) {
+        const isSupported = await provider.isSupported();
+
+        if (isSupported) {
           supportedMethods.push(method);
         }
       } catch (error) {

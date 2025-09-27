@@ -1,4 +1,4 @@
-import { NuwaStateV1, NuwaStateV2, UserEntryV1, UserEntryV2 } from './types';
+import { AuthMethod, NuwaStateV1, NuwaStateV2, UserEntryV1, UserEntryV2 } from './types';
 
 /**
  * Storage Migration Utilities
@@ -12,7 +12,7 @@ export class StorageMigration {
    * @returns Migrated v2 state
    */
   static migrateV1ToV2(v1State: NuwaStateV1): NuwaStateV2 {
-    console.log('[StorageMigration] Migrating from v1 to v2...');
+    console.info('[StorageMigration] Migrating from v1 to v2...');
 
     const v2State: NuwaStateV2 = {
       version: 2,
@@ -33,7 +33,7 @@ export class StorageMigration {
       v2State.users[userDid] = v2UserEntry;
     }
 
-    console.log(
+    console.info(
       `[StorageMigration] Migrated ${Object.keys(v2State.users).length} users from v1 to v2`
     );
     return v2State;

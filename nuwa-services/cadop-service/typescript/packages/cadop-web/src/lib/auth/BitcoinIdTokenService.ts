@@ -67,22 +67,22 @@ export class BitcoinIdTokenService {
       const bitcoinAddress = signer.getBitcoinAddress();
       const walletAddress = bitcoinAddress.toStr();
       const roochAddress = bitcoinAddress.genRoochAddress();
-      console.log('walletAddress', walletAddress);
-      console.log('roochAddress', roochAddress.toStr());
+      console.debug('walletAddress', walletAddress);
+      console.debug('roochAddress', roochAddress.toStr());
 
       const publicKey = await signer.getPublicKey();
       if (!publicKey) {
         throw new Error('Failed to get key info from wallet signer');
       }
       // const derivedAddress = publicKey.toAddress().toStr();
-      // console.log('derivedAddress', derivedAddress);
+      // console.debug('derivedAddress', derivedAddress);
 
       const publicKeyHex = toHEX(publicKey.toBytes());
-      console.log('publicKeyHex', publicKeyHex);
+      console.debug('publicKeyHex', publicKeyHex);
       const publicKey2 = new Secp256k1PublicKey(publicKey.toBytes().slice(1));
       const derivedAddress2 = publicKey2.toAddress();
-      console.log('derivedAddress2', derivedAddress2.bitcoinAddress.toStr());
-      console.log('derivedAddress2 rooch address', derivedAddress2.roochAddress.toStr());
+      console.debug('derivedAddress2', derivedAddress2.bitcoinAddress.toStr());
+      console.debug('derivedAddress2 rooch address', derivedAddress2.roochAddress.toStr());
       // 3. Sign the message using Bitcoin message format
       // Create Bitcoin message format directly (not using BitcoinSignMessage which is for transactions)
       // Standard Bitcoin message format: "\x18Bitcoin Signed Message:\n" + varint(message.length) + message
@@ -101,7 +101,7 @@ export class BitcoinIdTokenService {
         throw new Error('Local signature verification failed');
       }
 
-      console.log('✅ Local signature verification passed');
+      console.debug('✅ Local signature verification passed');
       const signature = toHEX(signatureBytes);
 
       // 4. Verify signature with cadop-api and get ID token

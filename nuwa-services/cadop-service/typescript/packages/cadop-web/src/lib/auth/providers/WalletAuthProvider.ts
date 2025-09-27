@@ -50,33 +50,46 @@ export class WalletAuthProvider implements AuthProvider {
 
   /**
    * Check if wallet authentication is supported
+   * Always return true to show the wallet tab, wallet availability will be checked during connection
    */
   async isSupported(): Promise<boolean> {
-    // Check if we're in a browser environment
+    // Always show wallet tab in browser environment
+    // Actual wallet availability will be checked when user tries to connect
     if (typeof window === 'undefined') {
+      console.debug('[WalletAuthProvider] Not in browser environment');
       return false;
     }
 
-    // Check for supported wallet extensions using the same logic as rooch-sdk-kit
-    // UniSat wallet
-    if (typeof (window as any).unisat !== 'undefined') {
-      return true;
-    }
+    console.debug('[WalletAuthProvider] Wallet authentication tab is always available');
+    return true;
+  }
 
-    // OKX wallet
-    if (typeof (window as any).okxwallet?.bitcoin !== 'undefined') {
-      return true;
-    }
+  /**
+   * Check if any supported wallet extensions are installed
+   * This is called during the actual connection attempt
+   */
+  private checkWalletAvailability(): {
+    hasWallet: boolean;
+    availableWallets: string[];
+    allWallets: string[];
+  } {
+    const walletChecks = {
+      UniSat: typeof (window as any).unisat !== 'undefined',
+      OKX: typeof (window as any).okxwallet?.bitcoin !== 'undefined',
+      OneKey: typeof (window as any).$onekey?.btc !== 'undefined',
+    };
 
-    // OneKey wallet
-    if (typeof (window as any).$onekey?.btc !== 'undefined') {
-      return true;
-    }
+    const availableWallets = Object.entries(walletChecks)
+      .filter(([, isAvailable]) => isAvailable)
+      .map(([name]) => name);
 
-    // For development, return true even if no wallet is detected
-    // This allows testing the wallet UI without having wallets installed
-    const isDev = import.meta.env.DEV;
-    return isDev;
+    const allWallets = Object.keys(walletChecks);
+
+    return {
+      hasWallet: availableWallets.length > 0,
+      availableWallets,
+      allWallets,
+    };
   }
 
   /**
@@ -84,6 +97,20 @@ export class WalletAuthProvider implements AuthProvider {
    */
   async login(_options?: LoginOptions): Promise<AuthResult> {
     try {
+      // First check if any wallets are available
+      const walletAvailability = this.checkWalletAvailability();
+
+      if (!walletAvailability.hasWallet) {
+        const isDev = import.meta.env.DEV;
+        const errorMessage = isDev
+          ? `No Bitcoin wallets detected. Please install one of the supported wallets: ${walletAvailability.allWallets.join(', ')}. For development, you can install UniSat or OKX wallet.`
+          : `No Bitcoin wallets found. Please install one of the supported wallets: ${walletAvailability.allWallets.join(', ')}.`;
+
+        throw new Error(errorMessage);
+      }
+
+      console.info('[WalletAuthProvider] Available wallets:', walletAvailability.availableWallets);
+
       if (!this.walletStoreAccess) {
         throw new Error(
           '[WalletAuthProvider] Wallet store access not available. Make sure WalletProvider is properly initialized.'

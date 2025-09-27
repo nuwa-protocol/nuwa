@@ -274,7 +274,7 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
       }
 
       const response = assertion.response as AuthenticatorAssertionResponse;
-      console.log('signWithWebAuthn', { data, keyId, response });
+      console.debug('signWithWebAuthn', { data, keyId, response });
 
       let signature = new Uint8Array(response.signature);
       const authenticatorData = new Uint8Array(response.authenticatorData);
@@ -316,7 +316,7 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
       let isValidByWebCrypto = await verifyByWebCrypto(publicKeyBytes, derCanonical, dataToVerify);
       let isValidByP256 = await verifyByP256(publicKeyBytes, rawSignature, dataToVerify);
 
-      console.log('Signature verification:', {
+      console.debug('Signature verification:', {
         isValidByWebCrypto,
         isValidByP256,
         clientDataJSON,
@@ -450,34 +450,34 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
       sig.clientDataJSON
     );
     let clientData = JSON.parse(new TextDecoder().decode(sig.clientDataJSON));
-    console.log('client_data:', clientData);
+    console.debug('client_data:', clientData);
     // Log detailed data for Move test case
-    console.log('=== WebAuthn Test Data for Move Test Case ===');
-    console.log(
+    console.debug('=== WebAuthn Test Data for Move Test Case ===');
+    console.debug(
       'authenticator_data_hex:',
       Array.from(sig.authenticatorData)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'client_data_json_hex:',
       Array.from(sig.clientDataJSON)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'signature_der_hex:',
       Array.from(sig.signature)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'signature_raw_hex:',
       Array.from(sig.rawSignature)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'public_key_compressed_hex:',
       Array.from(this.getPublicKey().toBytes())
         .map(b => b.toString(16).padStart(2, '0'))
@@ -487,7 +487,7 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
     // Compute client data hash
     const clientDataHashBuffer = await crypto.subtle.digest('SHA-256', sig.clientDataJSON);
     const clientDataHash = new Uint8Array(clientDataHashBuffer);
-    console.log(
+    console.debug(
       'client_data_hash_hex:',
       Array.from(clientDataHash)
         .map(b => b.toString(16).padStart(2, '0'))
@@ -500,7 +500,7 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
     );
     verificationMessage.set(sig.authenticatorData, 0);
     verificationMessage.set(clientDataHash, sig.authenticatorData.length);
-    console.log(
+    console.debug(
       'verification_message_hex:',
       Array.from(verificationMessage)
         .map(b => b.toString(16).padStart(2, '0'))
@@ -509,13 +509,13 @@ export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterfa
 
     // Log BCS payload
     const payloadBytes = payload.encode();
-    console.log(
+    console.debug(
       'bcs_payload_hex:',
       Array.from(payloadBytes)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log('=== End WebAuthn Test Data ===');
+    console.debug('=== End WebAuthn Test Data ===');
 
     return payloadBytes;
   }
@@ -635,7 +635,7 @@ async function verifyByWebCrypto(
   const x = toB64Url(uncompressed.slice(1, 33));
   const y = toB64Url(uncompressed.slice(33, 65));
 
-  console.log('WebCrypto JWK params:', { x, y });
+  console.debug('WebCrypto JWK params:', { x, y });
 
   const jwk: JsonWebKey = {
     kty: 'EC',

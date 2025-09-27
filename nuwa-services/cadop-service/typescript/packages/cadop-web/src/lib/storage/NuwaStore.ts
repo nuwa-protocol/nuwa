@@ -46,7 +46,7 @@ export class NuwaStore {
 
       // Handle version migration
       if (StorageMigration.needsMigration(parsedState.version || 1)) {
-        console.log(
+        console.info(
           `[NuwaStore] Migrating storage from v${parsedState.version || 1} to v${StorageMigration.getTargetVersion()}`
         );
 

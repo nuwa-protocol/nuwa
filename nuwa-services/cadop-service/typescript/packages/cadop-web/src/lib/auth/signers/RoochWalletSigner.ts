@@ -160,7 +160,7 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
         );
         // For now, just warn. In production, you might want to throw an error
       } else {
-        console.log('[RoochWalletSigner] Address validation passed:', expectedAddress);
+        console.debug('[RoochWalletSigner] Address validation passed:', expectedAddress);
       }
     } catch (error) {
       console.warn('[RoochWalletSigner] Failed to validate address consistency:', error);
@@ -301,11 +301,11 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
         if (!vmFragment) {
           throw new Error('[RoochWalletSigner] VM fragment not found');
         }
-        console.log(
+        console.debug(
           '[RoochWalletSigner] Set transaction sender to Agent DID address:',
           this.didAddress.toStr()
         );
-        console.log('[RoochWalletSigner] VM fragment:', vmFragment);
+        console.debug('[RoochWalletSigner] VM fragment:', vmFragment);
         // Get transaction hash for signing
         const txHash = tx.hashData();
         const txHashHex = toHEX(txHash);
@@ -316,12 +316,14 @@ export class RoochWalletSigner extends Signer implements SignerInterface {
         // Set authenticator to transaction
         tx.setAuth(sessionAuth);
 
-        console.log('[RoochWalletSigner] Agent DID transaction signed with Bitcoin authenticator');
+        console.debug(
+          '[RoochWalletSigner] Agent DID transaction signed with Bitcoin authenticator'
+        );
         return sessionAuth;
       } else {
         // User DID mode - delegate to wallet's default signTransaction method
         const authenticator = await this.wallet.signTransaction(tx);
-        console.log('[RoochWalletSigner] User DID transaction signed successfully');
+        console.debug('[RoochWalletSigner] User DID transaction signed successfully');
         return authenticator;
       }
     } catch (error) {
