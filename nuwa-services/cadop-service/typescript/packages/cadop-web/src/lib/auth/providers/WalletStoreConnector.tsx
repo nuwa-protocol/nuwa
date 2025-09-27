@@ -9,6 +9,7 @@ import { authProviderRegistry } from './AuthProviderRegistry';
 import { unifiedAgentService } from '../../agent/UnifiedAgentService';
 import { WalletAgentService } from '../../agent/WalletAgentService';
 import { useAuth } from '../AuthContext';
+import { AuthMethod } from '../../storage/types';
 
 /**
  * Component that connects the WalletAuthProvider to the wallet store
@@ -48,7 +49,7 @@ export function WalletStoreConnector() {
     const injectWalletStoreAccess = async (maxRetries = 10, delay = 50) => {
       // First check if wallet provider is registered to avoid unnecessary errors
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        if (!authProviderRegistry.isRegistered('wallet')) {
+        if (!authProviderRegistry.isRegistered(AuthMethod.WALLET)) {
           // Provider not registered yet, wait and try again
           if (attempt === maxRetries) {
             return;
@@ -58,7 +59,7 @@ export function WalletStoreConnector() {
         }
 
         try {
-          const provider = await authProviderRegistry.get('wallet');
+          const provider = await authProviderRegistry.get(AuthMethod.WALLET);
           if (provider instanceof WalletAuthProvider) {
             provider.setWalletStoreAccess(walletStoreAccess);
             return; // Success, exit the retry loop
@@ -84,7 +85,7 @@ export function WalletStoreConnector() {
     injectWalletStoreAccess();
 
     // Also inject wallet instance into WalletAgentService
-    const walletAgentService = unifiedAgentService.getAgentServiceByMethod('wallet');
+    const walletAgentService = unifiedAgentService.getAgentServiceByMethod(AuthMethod.WALLET);
     if (walletAgentService instanceof WalletAgentService && currentWallet?.wallet) {
       walletAgentService.setCurrentWallet(currentWallet.wallet);
     }
@@ -105,7 +106,7 @@ export function WalletStoreConnector() {
     // 3. We have previously seen a connected state (to avoid signing out during initial load)
     if (
       isAuthenticated &&
-      authMethod === 'wallet' &&
+      authMethod === AuthMethod.WALLET &&
       connectionStatus === 'disconnected' &&
       hasBeenConnected
     ) {

@@ -9,7 +9,7 @@ import { AuthStore, UserStore } from '../../storage';
  * Implements AuthProvider interface for WebAuthn/Passkey authentication
  */
 export class PasskeyAuthProvider implements AuthProvider {
-  readonly type: AuthMethod = 'passkey';
+  readonly type: AuthMethod = AuthMethod.PASSKEY;
 
   private passkeyService: PasskeyService;
   private currentUserDid: string | null = null;
@@ -65,7 +65,7 @@ export class PasskeyAuthProvider implements AuthProvider {
       return {
         userDid,
         isNewUser,
-        authMethod: 'passkey',
+        authMethod: AuthMethod.PASSKEY,
         authIdentifier,
       };
     } catch (error) {
@@ -115,7 +115,7 @@ export class PasskeyAuthProvider implements AuthProvider {
     try {
       // Verify the user still exists in storage
       const user = UserStore.getUser(currentUserDid);
-      if (!user || user.authMethod !== 'passkey') {
+      if (!user || user.authMethod !== AuthMethod.PASSKEY) {
         // User doesn't exist or is not a Passkey user
         AuthStore.clearCurrentUser();
         return false;

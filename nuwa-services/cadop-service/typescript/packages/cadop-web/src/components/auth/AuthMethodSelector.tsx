@@ -13,7 +13,7 @@ interface AuthMethodSelectorProps {
 
 export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorProps) {
   const [supportedMethods, setSupportedMethods] = useState<AuthMethod[]>([]);
-  const [activeTab, setActiveTab] = useState<AuthMethod>('passkey');
+  const [activeTab, setActiveTab] = useState<AuthMethod>(AuthMethod.PASSKEY);
   const { getSupportedAuthMethods } = useAuth();
   const { t } = useTranslation();
 
@@ -30,8 +30,8 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
       } catch (error) {
         console.error('Failed to load supported auth methods:', error);
         // Fallback to Passkey only
-        setSupportedMethods(['passkey']);
-        setActiveTab('passkey');
+        setSupportedMethods([AuthMethod.PASSKEY]);
+        setActiveTab(AuthMethod.PASSKEY);
       }
     }
 
@@ -40,9 +40,9 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
 
   const getMethodLabel = (method: AuthMethod): string => {
     switch (method) {
-      case 'passkey':
+      case AuthMethod.PASSKEY:
         return 'Passkey';
-      case 'wallet':
+      case AuthMethod.WALLET:
         return 'Wallet';
       default:
         return method;
@@ -51,7 +51,7 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
 
   const getMethodIcon = (method: AuthMethod) => {
     switch (method) {
-      case 'passkey':
+      case AuthMethod.PASSKEY:
         return (
           <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path
@@ -61,7 +61,7 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
             />
           </svg>
         );
-      case 'wallet':
+      case AuthMethod.WALLET:
         return (
           <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path
@@ -96,8 +96,8 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
           </h3>
         </div>
 
-        {method === 'passkey' && <WebAuthnLogin onSuccess={onSuccess} onError={onError} />}
-        {method === 'wallet' && <WalletLogin onSuccess={onSuccess} onError={onError} />}
+        {method === AuthMethod.PASSKEY && <WebAuthnLogin onSuccess={onSuccess} onError={onError} />}
+        {method === AuthMethod.WALLET && <WalletLogin onSuccess={onSuccess} onError={onError} />}
       </div>
     );
   }
@@ -118,8 +118,8 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
         ))}
       </TabsList>
 
-      {supportedMethods.includes('passkey') && (
-        <TabsContent value="passkey" className="mt-6">
+      {supportedMethods.includes(AuthMethod.PASSKEY) && (
+        <TabsContent value={AuthMethod.PASSKEY} className="mt-6">
           <div className="space-y-4">
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-900">Sign in with Passkey</h3>
@@ -132,8 +132,8 @@ export function AuthMethodSelector({ onSuccess, onError }: AuthMethodSelectorPro
         </TabsContent>
       )}
 
-      {supportedMethods.includes('wallet') && (
-        <TabsContent value="wallet" className="mt-6">
+      {supportedMethods.includes(AuthMethod.WALLET) && (
+        <TabsContent value={AuthMethod.WALLET} className="mt-6">
           <div className="space-y-4">
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-900">Sign in with Wallet</h3>

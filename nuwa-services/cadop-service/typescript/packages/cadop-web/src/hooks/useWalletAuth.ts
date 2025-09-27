@@ -7,6 +7,7 @@ import {
   useAutoConnectWallet,
 } from '@roochnetwork/rooch-sdk-kit';
 import { AuthStore, UserStore } from '../lib/storage';
+import { AuthMethod } from '../lib/storage/types';
 
 export interface UseWalletAuthResult {
   canRestore: boolean;
@@ -56,7 +57,7 @@ export function useWalletAuth(): UseWalletAuthResult {
     if (!currentUserDid) return false;
 
     const authMethod = UserStore.getAuthMethod(currentUserDid);
-    return authMethod === 'wallet';
+    return authMethod === AuthMethod.WALLET;
   }, []);
 
   // Create User DID from Bitcoin address

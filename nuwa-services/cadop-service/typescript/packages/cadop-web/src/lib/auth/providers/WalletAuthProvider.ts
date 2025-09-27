@@ -18,7 +18,7 @@ interface WalletStoreAccess {
  * Implements AuthProvider interface for Rooch wallet authentication
  */
 export class WalletAuthProvider implements AuthProvider {
-  readonly type: AuthMethod = 'wallet';
+  readonly type: AuthMethod = AuthMethod.WALLET;
 
   private currentUserDid: string | null = null;
   private walletStoreAccess: WalletStoreAccess | null = null;
@@ -28,7 +28,7 @@ export class WalletAuthProvider implements AuthProvider {
     this.walletStoreAccess = walletStoreAccess || null;
 
     // Check if current user is a wallet user
-    if (this.currentUserDid && UserStore.getAuthMethod(this.currentUserDid) === 'wallet') {
+    if (this.currentUserDid && UserStore.getAuthMethod(this.currentUserDid) === AuthMethod.WALLET) {
       // Try to restore wallet connection
       this.tryRestoreWalletConnection();
     }
@@ -117,7 +117,7 @@ export class WalletAuthProvider implements AuthProvider {
 
       return {
         userDid,
-        authMethod: 'wallet',
+        authMethod: AuthMethod.WALLET,
         authIdentifier: bitcoinAddress,
         isNewUser,
       };

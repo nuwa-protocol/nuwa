@@ -50,9 +50,9 @@ const initializeAuthProviders = () => {
     return;
   }
   // Register Passkey provider
-  authProviderRegistry.register('passkey', async () => new PasskeyAuthProvider());
+  authProviderRegistry.register(AuthMethod.PASSKEY, async () => new PasskeyAuthProvider());
   // Register Wallet provider
-  authProviderRegistry.register('wallet', async () => new WalletAuthProvider());
+  authProviderRegistry.register(AuthMethod.WALLET, async () => new WalletAuthProvider());
 
   providersInitialized = true;
 };
@@ -212,7 +212,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               let sessionRestored = false;
 
               // Use the new wallet auth hook for wallet authentication
-              if (authMethod === 'wallet') {
+              if (authMethod === AuthMethod.WALLET) {
                 const walletAuthResult = await walletAuth.restoreSession();
 
                 if (walletAuthResult.success) {

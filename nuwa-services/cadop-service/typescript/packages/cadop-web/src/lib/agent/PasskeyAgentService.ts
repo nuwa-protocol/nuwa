@@ -12,7 +12,7 @@ import { UserStore, AuthStore } from '../storage';
  * Handles Agent DID creation for Passkey users via CADOP API
  */
 export class PasskeyAgentService implements IAgentService {
-  readonly authMethod: AuthMethod = 'passkey';
+  readonly authMethod: AuthMethod = AuthMethod.PASSKEY;
 
   private passkeyService = new PasskeyService();
 
@@ -59,7 +59,7 @@ export class PasskeyAgentService implements IAgentService {
    */
   canCreateAgent(userDid: string): boolean {
     const authMethod = UserStore.getAuthMethod(userDid);
-    return authMethod === 'passkey';
+    return authMethod === AuthMethod.PASSKEY;
   }
 
   /**

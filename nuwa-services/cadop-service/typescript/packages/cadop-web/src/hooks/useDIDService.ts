@@ -26,7 +26,7 @@ export function useDIDService(targetDid: string | null | undefined): UseDIDServi
     let credentialId: string | undefined;
     if (userDid) {
       const authMethod = UserStore.getAuthMethod(userDid);
-      if (authMethod === 'passkey') {
+      if (authMethod === AuthMethod.PASSKEY) {
         const creds = UserStore.listCredentials(userDid);
         credentialId = creds.length > 0 ? creds[0] : undefined;
       }

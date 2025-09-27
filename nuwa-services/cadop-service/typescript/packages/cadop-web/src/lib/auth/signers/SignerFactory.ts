@@ -45,9 +45,9 @@ export class SignerFactory {
     const { userDid, authMethod } = options;
 
     switch (authMethod) {
-      case 'passkey':
+      case AuthMethod.PASSKEY:
         return await this.createWebAuthnSigner(userDid, options);
-      case 'wallet':
+      case AuthMethod.WALLET:
         return await this.createWalletSigner(userDid, options);
       default:
         throw new Error(`[SignerFactory] Unsupported authentication method: ${authMethod}`);
@@ -100,18 +100,18 @@ export class SignerFactory {
       // Determine auth method from controller DID
       let authMethod: AuthMethod;
       if (controllerDid.startsWith('did:key:')) {
-        authMethod = 'passkey';
+        authMethod = AuthMethod.PASSKEY;
       } else if (
         controllerDid.startsWith('did:bitcoin:') ||
         controllerDid.startsWith('did:rooch:')
       ) {
-        authMethod = 'wallet';
+        authMethod = AuthMethod.WALLET;
       } else {
         throw new Error(`Unsupported controller DID format: ${controllerDid}`);
       }
 
       // Create appropriate signer with Agent DID document
-      if (authMethod === 'passkey') {
+      if (authMethod === AuthMethod.PASSKEY) {
         return this.createWebAuthnSignerForAgent(controllerDid, didDocument, additionalOptions);
       } else {
         // Extract wallet address from controller DID
@@ -237,7 +237,7 @@ export class SignerFactory {
       });
 
       // Get current wallet instance from WalletAgentService
-      const walletAgentService = unifiedAgentService.getAgentServiceByMethod('wallet');
+      const walletAgentService = unifiedAgentService.getAgentServiceByMethod(AuthMethod.WALLET);
       if (walletAgentService instanceof WalletAgentService) {
         const currentWallet = walletAgentService.getCurrentWallet();
         if (currentWallet) {
@@ -282,10 +282,10 @@ export class SignerFactory {
 
       // Additional checks based on auth method
       switch (authMethod) {
-        case 'passkey':
+        case AuthMethod.PASSKEY:
           // Check if user has credentials
           return user.credentials.length > 0;
-        case 'wallet':
+        case AuthMethod.WALLET:
           // Wallet users should have valid DID format
           return userDid.startsWith('did:rooch:');
         default:
@@ -301,6 +301,6 @@ export class SignerFactory {
    * Get supported authentication methods
    */
   getSupportedAuthMethods(): AuthMethod[] {
-    return ['passkey', 'wallet'];
+    return [AuthMethod.PASSKEY, AuthMethod.WALLET];
   }
 }

@@ -2,13 +2,14 @@ import { unifiedAgentService } from './UnifiedAgentService';
 import { PasskeyAgentService } from './PasskeyAgentService';
 import { WalletAgentService } from './WalletAgentService';
 import { AuthStore } from '../storage';
+import { AuthMethod } from '../storage/types';
 import type { AgentDIDCreationStatus } from '@cadop/shared';
 
 // Initialize the unified agent service with available implementations
 const passkeyAgentService = new PasskeyAgentService();
 const walletAgentService = new WalletAgentService();
-unifiedAgentService.registerAgentService('passkey', passkeyAgentService);
-unifiedAgentService.registerAgentService('wallet', walletAgentService);
+unifiedAgentService.registerAgentService(AuthMethod.PASSKEY, passkeyAgentService);
+unifiedAgentService.registerAgentService(AuthMethod.WALLET, walletAgentService);
 
 /**
  * Legacy AgentService for backward compatibility
@@ -36,7 +37,7 @@ export class AgentService {
 
     // This only works for Passkey users
     const agentService = unifiedAgentService.getAgentService(userDid);
-    if (agentService.authMethod !== 'passkey') {
+    if (agentService.authMethod !== AuthMethod.PASSKEY) {
       throw new Error('getIdToken is only supported for Passkey users');
     }
 

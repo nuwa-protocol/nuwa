@@ -13,7 +13,7 @@ import { custodianClient } from '../api/client';
  * Handles Agent DID creation for wallet users via cadop-api
  */
 export class WalletAgentService implements IAgentService {
-  readonly authMethod: AuthMethod = 'wallet';
+  readonly authMethod: AuthMethod = AuthMethod.WALLET;
   private currentWallet: Wallet | null = null;
   private bitcoinIdTokenService: BitcoinIdTokenService;
 
@@ -103,7 +103,7 @@ export class WalletAgentService implements IAgentService {
    */
   canCreateAgent(userDid: string): boolean {
     const authMethod = UserStore.getAuthMethod(userDid);
-    return authMethod === 'wallet';
+    return authMethod === AuthMethod.WALLET;
   }
 
   /**

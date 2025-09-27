@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { AuthMethod } from '../../lib/storage/types';
 import {
   useCurrentWallet,
   useCurrentAddress,
@@ -39,7 +40,7 @@ export function WalletLogin({ onSuccess, onError }: WalletLoginProps) {
       setIsLoading(true);
 
       // Use the new loginWithProvider method
-      const result = await loginWithProvider('wallet');
+      const result = await loginWithProvider(AuthMethod.WALLET);
 
       onSuccess?.(result.userDid, result.isNewUser);
     } catch (error) {

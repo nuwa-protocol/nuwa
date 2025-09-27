@@ -23,7 +23,7 @@ export class UserStore {
         agents: [],
         createdAt: now,
         updatedAt: now,
-        authMethod: 'passkey',
+        authMethod: AuthMethod.PASSKEY,
         authIdentifier: credentialId, // Use the first credential as identifier
       };
     }
@@ -31,7 +31,7 @@ export class UserStore {
     const user = state.users[userDid];
 
     // Ensure this is a Passkey user
-    if (user.authMethod !== 'passkey') {
+    if (user.authMethod !== AuthMethod.PASSKEY) {
       throw new Error(`[UserStore] Cannot add credential to non-Passkey user: ${userDid}`);
     }
 
@@ -188,7 +188,7 @@ export class UserStore {
       agents: [],
       createdAt: now,
       updatedAt: now,
-      authMethod: 'wallet',
+      authMethod: AuthMethod.WALLET,
       authIdentifier: address,
     };
 
@@ -202,9 +202,9 @@ export class UserStore {
    */
   static getAuthMethod(userDid: string): AuthMethod | null {
     // Infer from DID format
-    if (userDid.startsWith('did:key:')) return 'passkey';
-    if (userDid.startsWith('did:rooch:')) return 'wallet';
-    if (userDid.startsWith('did:bitcoin:')) return 'wallet';
+    if (userDid.startsWith('did:key:')) return AuthMethod.PASSKEY;
+    if (userDid.startsWith('did:rooch:')) return AuthMethod.WALLET;
+    if (userDid.startsWith('did:bitcoin:')) return AuthMethod.WALLET;
     return null;
   }
 

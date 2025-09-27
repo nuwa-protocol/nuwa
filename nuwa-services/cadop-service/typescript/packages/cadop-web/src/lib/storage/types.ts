@@ -1,7 +1,10 @@
 /**
  * Authentication method types
  */
-export type AuthMethod = 'passkey' | 'wallet';
+export enum AuthMethod {
+  PASSKEY = 'passkey',
+  WALLET = 'wallet'
+}
 
 /**
  * User entry for v2 storage structure

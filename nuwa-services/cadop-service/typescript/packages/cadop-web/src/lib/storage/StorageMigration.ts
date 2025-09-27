@@ -24,7 +24,7 @@ export class StorageMigration {
     for (const [userDid, userEntry] of Object.entries(v1State.users)) {
       const v2UserEntry: UserEntryV2 = {
         ...userEntry,
-        authMethod: 'passkey',
+        authMethod: AuthMethod.PASSKEY,
         // Use the first credential as the auth identifier
         // In v1, all users are Passkey users and should have at least one credential
         authIdentifier: userEntry.credentials[0] || '',
