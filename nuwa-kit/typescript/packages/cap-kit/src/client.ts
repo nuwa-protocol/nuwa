@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp";
 import { DIDAuth, type SignerInterface } from "@nuwa-ai/identity-kit";
-import { experimental_createMCPClient as createMCPClient } from "ai";
+
 
 export const buildClient = async (
 	mcpUrl: string,
@@ -26,5 +26,5 @@ export const buildClient = async (
 		},
 	} as any);
 
-	return await createMCPClient({ transport });
+	return transport;
 };
