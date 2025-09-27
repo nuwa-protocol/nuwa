@@ -57,7 +57,13 @@ import {
   DynamicField,
   CoinStoreFieldData,
 } from './ChannelUtils';
-import { DebugLogger, SignerInterface, DidAccountSigner, parseDid } from '@nuwa-ai/identity-kit';
+import {
+  DebugLogger,
+  SignerInterface,
+  DidAccountSigner,
+  parseDid,
+  isSignerInterface,
+} from '@nuwa-ai/identity-kit';
 import {
   badRequest,
   notFound,
@@ -639,13 +645,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
         // Parse BCS bytes using DynamicFieldCoinStoreSchema
         try {
-          this.logger.debug(
-            'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
-            fieldValue
-          );
+          // this.logger.debug(
+          //   'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
+          //   fieldValue
+          // );
           const parsed = parseDynamicFieldCoinStore(fieldValue);
 
-          this.logger.debug('Parsed DynamicField:', parsed);
+          //this.logger.debug('Parsed DynamicField:', parsed);
 
           // Extract balance from the parsed CoinStoreField and ensure it's bigint
           return safeBalanceToBigint(parsed.value.balance.value);
@@ -711,13 +717,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
             // Parse BCS bytes using DynamicFieldCoinStoreSchema
             try {
-              this.logger.debug(
-                'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
-                fieldValue
-              );
+              // this.logger.debug(
+              //   'Parsing DynamicField<String, CoinStoreField> from BCS hex:',
+              //   fieldValue
+              // );
               const parsed = parseDynamicFieldCoinStore(fieldValue);
 
-              this.logger.debug('Parsed DynamicField:', parsed);
+              //this.logger.debug('Parsed DynamicField:', parsed);
 
               // Extract coin type and balance from the parsed data
               const coinType = parsed.name;
@@ -790,10 +796,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
           // Parse BCS bytes using DynamicFieldU64Schema
           try {
-            this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
+            //this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
             const parsed = parseDynamicFieldU64(fieldValue);
 
-            this.logger.debug('Parsed DynamicField:', parsed);
+            //this.logger.debug('Parsed DynamicField:', parsed);
 
             // Extract coin type and count from the parsed data
             const coinType = parsed.name;
@@ -857,10 +863,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
         if (typeof hubValue === 'string' && hubValue.startsWith('0x')) {
           // Parse BCS bytes using PaymentHubSchema
-          this.logger.debug('Parsing PaymentHub from BCS hex:', hubValue);
+          //this.logger.debug('Parsing PaymentHub from BCS hex:', hubValue);
           const parsed = parsePaymentHubData(hubValue);
 
-          this.logger.debug('Parsed PaymentHub:', parsed);
+          //this.logger.debug('Parsed PaymentHub:', parsed);
 
           return parsed;
         } else {
@@ -877,11 +883,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   }
 
   // Helper methods
-  private async convertSigner(signer: SignerInterface): Promise<Signer> {
-    if (signer instanceof Signer) {
-      return signer;
+  private async convertSigner(signer: SignerInterface | Signer): Promise<Signer> {
+    // If it implements SignerInterface, convert it to DidAccountSigner
+    if (isSignerInterface(signer)) {
+      return DidAccountSigner.create(signer);
     }
-    return DidAccountSigner.create(signer);
+    // Fallback: assume it's Signer
+    return signer;
   }
 
   private createTransaction(): Transaction {

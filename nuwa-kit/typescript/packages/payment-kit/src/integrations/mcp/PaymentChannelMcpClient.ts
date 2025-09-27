@@ -35,33 +35,42 @@ import type { Tool, ToolCallOptions, ToolSet } from 'ai';
  * This matches the exact structure used by AI SDK's createMCPClient
  * Based on: https://github.com/vercel/ai/blob/main/packages/ai/core/tool/mcp/types.ts
  */
-type CallToolResult = {
-  content: Array<{
-    type: 'text';
-    text: string;
-  } | {
-    type: 'image';
-    data: string; // base64 encoded
-    mimeType: string;
-  } | {
-    type: 'resource';
-    resource: {
-      uri: string;
-      name?: string;
-      description?: string;
-      mimeType?: string;
-    } & ({
-      text: string;
-    } | {
-      blob: string; // base64 encoded
-    });
-  }>;
-  isError?: boolean;
-  _meta?: Record<string, unknown>;
-} | {
-  toolResult: unknown;
-  _meta?: Record<string, unknown>;
-};
+type CallToolResult =
+  | {
+      content: Array<
+        | {
+            type: 'text';
+            text: string;
+          }
+        | {
+            type: 'image';
+            data: string; // base64 encoded
+            mimeType: string;
+          }
+        | {
+            type: 'resource';
+            resource: {
+              uri: string;
+              name?: string;
+              description?: string;
+              mimeType?: string;
+            } & (
+              | {
+                  text: string;
+                }
+              | {
+                  blob: string; // base64 encoded
+                }
+            );
+          }
+      >;
+      isError?: boolean;
+      _meta?: Record<string, unknown>;
+    }
+  | {
+      toolResult: unknown;
+      _meta?: Record<string, unknown>;
+    };
 import {
   HealthResponseSchema,
   RecoveryResponse,
@@ -181,11 +190,7 @@ export class PaymentChannelMcpClient {
    * @param schema - Schema for validation
    * @returns The result of the tool call
    */
-  async call<T = any>(
-    method: string,
-    params?: any,
-    schema?: ZodTypeAny
-  ): Promise<PaymentResult<T>>;
+  async call<T = any>(method: string, params?: any, schema?: ZodTypeAny): Promise<PaymentResult<T>>;
 
   /**
    * Call a tool with payment processing, custom clientTxRef, and optional result validation
@@ -207,7 +212,7 @@ export class PaymentChannelMcpClient {
   ): Promise<PaymentResult<T>> {
     let schema: ZodTypeAny | undefined;
     let clientTxRef: string | undefined;
-    
+
     // Type-safe parameter parsing with proper type guards
     if (
       schemaOrOptions &&
@@ -266,24 +271,32 @@ export class PaymentChannelMcpClient {
    * @param options - Call options including clientTxRef
    * @returns The content of the tool call
    */
-  async callTool(name: string, args: any, options: { clientTxRef: string }): Promise<{ content: any[] }>;
+  async callTool(
+    name: string,
+    args: any,
+    options: { clientTxRef: string }
+  ): Promise<{ content: any[] }>;
 
   async callTool(
-    name: string, 
-    args?: any, 
+    name: string,
+    args?: any,
     optionsOrClientTxRef?: { clientTxRef: string } | string
   ): Promise<{ content: any[] }> {
     let clientTxRef: string | undefined;
-    
+
     // Type-safe parameter parsing
     if (typeof optionsOrClientTxRef === 'string') {
       // Backward compatibility: support callTool(name, args, clientTxRef) usage pattern
       clientTxRef = optionsOrClientTxRef;
-    } else if (optionsOrClientTxRef && typeof optionsOrClientTxRef === 'object' && 'clientTxRef' in optionsOrClientTxRef) {
+    } else if (
+      optionsOrClientTxRef &&
+      typeof optionsOrClientTxRef === 'object' &&
+      'clientTxRef' in optionsOrClientTxRef
+    ) {
       // New pattern: callTool(name, args, { clientTxRef: 'xxx' })
       clientTxRef = optionsOrClientTxRef.clientTxRef;
     }
-    
+
     const { content } = await this.callToolWithPayment(name, args, clientTxRef);
     return { content };
   }
@@ -1004,7 +1017,11 @@ export class PaymentChannelMcpClient {
       execute: async (args: any, options?: ToolCallOptions) => {
         // Use AI SDK's toolCallId as clientTxRef
         const clientTxRef = options?.toolCallId;
-        const { content, payment: _ } = await this.callToolWithPayment(tool.name, args, clientTxRef);
+        const { content, payment: _ } = await this.callToolWithPayment(
+          tool.name,
+          args,
+          clientTxRef
+        );
         // We don't return the payment here, because the AI do not need to know about it
         return { content };
       },

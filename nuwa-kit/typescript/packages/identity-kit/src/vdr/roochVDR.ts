@@ -23,9 +23,9 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { SignerInterface, DidAccountSigner } from '../signers';
+import { SignerInterface, DidAccountSigner, isSignerInterface } from '../signers';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from './types';
+import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
@@ -182,10 +182,12 @@ export class RoochVDR extends AbstractVDR {
   }
 
   private async convertSigner(signer: SignerInterface | Signer, keyId?: string): Promise<Signer> {
-    if (signer instanceof Signer) {
-      return signer;
+    // If it implements SignerInterface, convert it to DidAccountSigner
+    if (isSignerInterface(signer)) {
+      return DidAccountSigner.create(signer, keyId);
     }
-    return DidAccountSigner.create(signer, keyId);
+    // Fallback: assume it's Signer
+    return signer;
   }
 
   /**
@@ -373,6 +375,104 @@ export class RoochVDR extends AbstractVDR {
   }
 
   /**
+   * Create DID via CADOP with controller (supports did:key, did:bitcoin, etc.)
+   */
+  async createViaCADOPWithController(
+    request: CADOPControllerCreationRequest,
+    options?: RoochVDROperationOptions
+  ): Promise<DIDCreationResult> {
+    try {
+      const signer = options?.signer;
+      if (!signer) {
+        throw new Error('No custodian signer provided for CADOP controller operation');
+      }
+
+      this.debugLog('Creating DID via CADOP with controller request:', request);
+      const didAccountSigner = await this.convertSigner(signer, options?.keyId);
+
+      // Always combine base scopes with custom scopes
+      const finalScopes = combineScopes(request.customScopes || []);
+
+      // Validate all scopes
+      const scopeValidation = validateScopes(finalScopes);
+      if (!scopeValidation.valid) {
+        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+      }
+
+      // Use the new controller-based contract entry point
+      const transaction = this.createTransaction();
+      transaction.callFunction({
+        target: `${this.didContractAddress}::create_did_object_via_cadop_with_controller_and_scopes_entry`,
+        args: [
+          Args.string(request.controllerDid),
+          Args.string(request.controllerPublicKeyMultibase || ''),
+          Args.string(request.controllerVMType || ''),
+          Args.string(request.custodianServicePublicKey),
+          Args.string(request.custodianServiceVMType),
+          Args.vec('string', finalScopes),
+        ],
+        maxGas: options?.advanced?.maxGas || 100000000,
+      });
+
+      this.debugLog('Creating DID via CADOP with controller and scopes:', finalScopes);
+      this.debugLog('Controller DID:', request.controllerDid);
+      this.debugLog('Controller public key multibase:', request.controllerPublicKeyMultibase);
+      this.debugLog('Controller VM type:', request.controllerVMType);
+
+      this.debugLog('Creating DID via CADOP with controller Transaction:', transaction);
+
+      // Execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        transaction,
+        signer: didAccountSigner,
+        option: { withOutput: true },
+      });
+
+      this.debugLog('Creating DID via CADOP with controller Transaction Result:', result);
+
+      const success = result.execution_info.status.type === 'executed';
+
+      if (!success) {
+        return {
+          success: false,
+          error:
+            'CADOP controller transaction execution failed, execution_info: ' +
+            JSON.stringify(result.execution_info),
+        };
+      }
+
+      // Parse the created DID
+      const didCreatedEvent = result.output?.events?.find(
+        (event: any) => event.event_type === '0x3::did::DIDCreatedEvent'
+      );
+      if (!didCreatedEvent) {
+        throw new Error('DIDCreatedEvent not found');
+      }
+      let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent);
+      let didDocument = await this.resolve(actualDID);
+      if (!didDocument) {
+        throw new Error('DID document not found with DID: ' + actualDID);
+      }
+      return {
+        success: true,
+        didDocument: didDocument,
+        transactionHash: (result as any).transaction_hash,
+        debug: {
+          requestedDID: request.controllerDid,
+          actualDID: actualDID,
+          events: result.output?.events,
+        },
+      };
+    } catch (error) {
+      this.errorLog('Error creating DID via CADOP with controller:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Resolve DID Document from Rooch blockchain
    *
    * @param did The DID to resolve (e.g., "did:rooch:0x123...")
@@ -404,7 +504,6 @@ export class RoochVDR extends AbstractVDR {
         this.debugLog(`Resolved DID document by ${did} is null`);
         return null;
       }
-      this.debugLog(`Resolved DID document Move Object:`, JSON.stringify(didDocObject, null, 2));
       return convertMoveDIDDocumentToInterface(didDocObject);
     } catch (error) {
       this.errorLog(`Error resolving DID from Rooch network:`, error);

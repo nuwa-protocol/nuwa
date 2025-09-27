@@ -14,6 +14,7 @@ import {
 import { SignerInterface } from './types';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
 import { parseDid } from '../utils/did';
+import { EcdsaR1PublicKey } from '../crypto/EcdsaR1PublicKey';
 
 /**
  * A Rooch Signer implementation that wraps a SignerInterface.
@@ -52,9 +53,17 @@ export class DidAccountSigner extends Signer implements SignerInterface {
    * @param keyId Optional specific keyId to use
    * @returns A new DidAccountSigner instance
    */
+  /**
+   * Check if an object is a DidAccountSigner instance
+   * Safe to use instanceof within the same module
+   */
+  static isDidAccountSigner(obj: any): obj is DidAccountSigner {
+    return obj instanceof DidAccountSigner;
+  }
+
   static async create(signer: SignerInterface, keyId?: string): Promise<DidAccountSigner> {
     // If already a DidAccountSigner, return as is
-    if (signer instanceof DidAccountSigner) {
+    if (DidAccountSigner.isDidAccountSigner(signer)) {
       return signer;
     }
 
@@ -85,7 +94,9 @@ export class DidAccountSigner extends Signer implements SignerInterface {
   }
 
   async signTransaction(input: Transaction): Promise<Authenticator> {
-    return Authenticator.rooch(input.hashData(), this);
+    const txHash = input.hashData();
+    const vmFragment = this.getVmFragment();
+    return Authenticator.did(txHash, this, vmFragment);
   }
 
   getKeyScheme(): SignatureScheme {
@@ -98,7 +109,7 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     } else if (this.keyType === KeyType.ED25519) {
       return new Ed25519PublicKey(this.publicKey);
     } else if (this.keyType === KeyType.ECDSAR1) {
-      throw new Error('ECDSAR1 is not supported for DID account');
+      return new EcdsaR1PublicKey(this.publicKey);
     } else {
       throw new Error(`Unsupported key type: ${this.keyType}`);
     }
@@ -137,4 +148,20 @@ export class DidAccountSigner extends Signer implements SignerInterface {
       publicKey: this.publicKey,
     };
   }
+
+  private getVmFragment(): string {
+    const parts = this.keyId.split('#');
+    if (parts.length !== 2) {
+      throw new Error(`Invalid keyId format: ${this.keyId}. Expected format: "did:rooch:0x123#fragment"`);
+    }
+    return parts[1];
+  }
+}
+
+/**
+ * Exported function for checking DidAccountSigner instances
+ * Uses safe instanceof checking within the same module
+ */
+export function isDidAccountSigner(obj: any): obj is DidAccountSigner {
+  return DidAccountSigner.isDidAccountSigner(obj);
 }

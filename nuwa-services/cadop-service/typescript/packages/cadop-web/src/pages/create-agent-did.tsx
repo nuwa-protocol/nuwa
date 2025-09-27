@@ -1,9 +1,9 @@
-import React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { MainLayout } from "@/components/layout/MainLayout";
-import { ClaimGasStep } from "@/components/onboarding/steps/ClaimGasStep";
-import { CreateAgentStep } from "@/components/onboarding/steps/CreateAgentStep";
-import { useAuth } from "@/lib/auth/AuthContext";
+import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { ClaimGasStep } from '@/components/onboarding/steps/ClaimGasStep';
+import { CreateAgentStep } from '@/components/onboarding/steps/CreateAgentStep';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 export function CreateAgentDIDPage() {
   const { userDid } = useAuth();
@@ -14,7 +14,7 @@ export function CreateAgentDIDPage() {
   const hasPayload = !!searchParams.get('payload');
 
   if (!userDid) {
-    navigate("/auth/login");
+    navigate('/auth/login');
     return null;
   }
 
@@ -28,7 +28,7 @@ export function CreateAgentDIDPage() {
       // Return to add-key page with the payload
       navigate(`/add-key?payload=${encodeURIComponent(payloadParam)}`);
     } else {
-      navigate("/dashboard");
+      navigate('/dashboard');
     }
   };
 

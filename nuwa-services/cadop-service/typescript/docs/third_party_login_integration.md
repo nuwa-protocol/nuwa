@@ -203,7 +203,6 @@ await kit.addVerificationMethod(
 #### 5.3.1 前置条件 & 用户输入
 
 1. **是否需要用户输入 `userDid`？**
-
    - **首次** 使用直签模式时，App 需要知道：`agentDid`、`userDid`、`credentialId`（Passkey ID）。通常这些信息可在之前的 Deep-Link 流程中由 CADOP Web 通过回调或 `postMessage` 返回一次，App 持久化即可；因此无须用户手工输入。
    - 若 App 从未记录过这些信息，可让用户扫描 **Agent DID QR**（内含 `agentDid` + `userDid`) 或再走一次 Deep-Link 注册流程获取。
 

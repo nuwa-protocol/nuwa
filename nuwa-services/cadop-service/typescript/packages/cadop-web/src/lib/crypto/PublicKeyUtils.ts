@@ -30,7 +30,7 @@ export class PublicKeyUtils {
   ): Uint8Array {
     const spkiBytes = spkiInput instanceof Uint8Array ? spkiInput : new Uint8Array(spkiInput);
 
-    console.log('[PublicKeyUtils] SPKI extraction started:', {
+    console.debug('[PublicKeyUtils] SPKI extraction started:', {
       algorithm,
       spkiLength: spkiBytes.length,
       spkiHex: Array.from(spkiBytes)
@@ -46,7 +46,7 @@ export class PublicKeyUtils {
       const spki = AsnParser.parse(spkiBytes, SubjectPublicKeyInfo);
       const publicKeyBytes = new Uint8Array(spki.subjectPublicKey);
 
-      console.log('[PublicKeyUtils] ASN.1 parsing successful:', {
+      console.debug('[PublicKeyUtils] ASN.1 parsing successful:', {
         publicKeyBytesLength: publicKeyBytes.length,
         publicKeyHex: Array.from(publicKeyBytes)
           .map(b => b.toString(16).padStart(2, '0'))
@@ -59,7 +59,7 @@ export class PublicKeyUtils {
       if (algorithm === -8) {
         // Ed25519
         const result = publicKeyBytes.slice(-32);
-        console.log('[PublicKeyUtils] Ed25519 key extracted:', {
+        console.debug('[PublicKeyUtils] Ed25519 key extracted:', {
           resultLength: result.length,
           resultHex: Array.from(result)
             .map(b => b.toString(16).padStart(2, '0'))
@@ -70,7 +70,7 @@ export class PublicKeyUtils {
         // ES256 (P-256)
         // Find uncompressed point marker (0x04) and compress
         const uncompressedIndex = publicKeyBytes.findIndex(byte => byte === 0x04);
-        console.log('[PublicKeyUtils] P-256 uncompressed point search:', {
+        console.debug('[PublicKeyUtils] P-256 uncompressed point search:', {
           uncompressedIndex,
           found: uncompressedIndex !== -1,
           availableLength: publicKeyBytes.length - uncompressedIndex,
@@ -81,7 +81,7 @@ export class PublicKeyUtils {
         }
 
         const uncompressedPoint = publicKeyBytes.slice(uncompressedIndex, uncompressedIndex + 65);
-        console.log('[PublicKeyUtils] P-256 uncompressed point extracted:', {
+        console.debug('[PublicKeyUtils] P-256 uncompressed point extracted:', {
           pointLength: uncompressedPoint.length,
           firstByte: uncompressedPoint[0].toString(16).padStart(2, '0'),
           pointHex: Array.from(uncompressedPoint)
@@ -90,7 +90,7 @@ export class PublicKeyUtils {
         });
 
         const compressed = this.compressP256PublicKey(uncompressedPoint);
-        console.log('[PublicKeyUtils] P-256 compression completed:', {
+        console.debug('[PublicKeyUtils] P-256 compression completed:', {
           compressedLength: compressed.length,
           compressionFlag: compressed[0].toString(16).padStart(2, '0'),
           compressedHex: Array.from(compressed)
@@ -106,7 +106,7 @@ export class PublicKeyUtils {
       // Fallback to legacy parsing if ASN.1 parsing fails
       console.warn('[PublicKeyUtils] ASN.1 parsing failed, falling back to legacy method:', error);
       const result = this.extractRawPublicKeyLegacy(spkiBytes, algorithm);
-      console.log('[PublicKeyUtils] Legacy extraction result:', {
+      console.debug('[PublicKeyUtils] Legacy extraction result:', {
         resultLength: result.length,
         resultHex: Array.from(result)
           .map(b => b.toString(16).padStart(2, '0'))
@@ -120,7 +120,7 @@ export class PublicKeyUtils {
    * Compress P-256 public key using @noble/curves
    */
   static compressP256PublicKey(uncompressedPoint: Uint8Array): Uint8Array {
-    console.log('[PublicKeyUtils] P-256 compression started:', {
+    console.debug('[PublicKeyUtils] P-256 compression started:', {
       inputLength: uncompressedPoint.length,
       firstByte: uncompressedPoint[0]?.toString(16).padStart(2, '0'),
       isValidFormat: uncompressedPoint.length === 65 && uncompressedPoint[0] === 0x04,
@@ -135,7 +135,7 @@ export class PublicKeyUtils {
       const point = p256.ProjectivePoint.fromHex(uncompressedPoint);
       const compressed = point.toRawBytes(true); // compressed format
 
-      console.log('[PublicKeyUtils] P-256 compression successful:', {
+      console.debug('[PublicKeyUtils] P-256 compression successful:', {
         compressedLength: compressed.length,
         compressionFlag: compressed[0].toString(16).padStart(2, '0'),
         compressedHex: Array.from(compressed)
@@ -154,7 +154,7 @@ export class PublicKeyUtils {
    * Decompress P-256 public key using @noble/curves
    */
   static decompressP256PublicKey(compressedPoint: Uint8Array): Uint8Array {
-    console.log('[PublicKeyUtils] P-256 decompression started:', {
+    console.debug('[PublicKeyUtils] P-256 decompression started:', {
       inputLength: compressedPoint.length,
       compressionFlag: compressedPoint[0]?.toString(16).padStart(2, '0'),
       isValidLength: compressedPoint.length === 33,
@@ -169,7 +169,7 @@ export class PublicKeyUtils {
       const point = p256.ProjectivePoint.fromHex(compressedPoint);
       const decompressed = point.toRawBytes(false); // uncompressed format
 
-      console.log('[PublicKeyUtils] P-256 decompression successful:', {
+      console.debug('[PublicKeyUtils] P-256 decompression successful:', {
         decompressedLength: decompressed.length,
         firstByte: decompressed[0].toString(16).padStart(2, '0'),
         isValidUncompressed: decompressed.length === 65 && decompressed[0] === 0x04,
@@ -198,7 +198,7 @@ export class PublicKeyUtils {
     publicKey: Uint8Array,
     keyType: KeyType
   ): Promise<boolean> {
-    console.log('[PublicKeyUtils] Signature verification started:', {
+    console.debug('[PublicKeyUtils] Signature verification started:', {
       keyType,
       dataLength: data.length,
       signatureLength: signature.length,
@@ -209,10 +209,10 @@ export class PublicKeyUtils {
       let result: boolean;
 
       if (keyType === KEY_TYPE.ED25519) {
-        console.log('[PublicKeyUtils] Using Ed25519 verification');
+        console.debug('[PublicKeyUtils] Using Ed25519 verification');
         result = this.verifyEd25519(data, signature, publicKey);
       } else if (keyType === KEY_TYPE.ECDSAR1) {
-        console.log('[PublicKeyUtils] Using ECDSA-R1 verification');
+        console.debug('[PublicKeyUtils] Using ECDSA-R1 verification');
         result = await this.verifyEcdsaR1(data, signature, publicKey);
       } else if (keyType === KEY_TYPE.SECP256K1) {
         // TODO: Add secp256k1 support when needed
@@ -221,7 +221,7 @@ export class PublicKeyUtils {
         throw new Error(`Unsupported key type: ${keyType}`);
       }
 
-      console.log('[PublicKeyUtils] Signature verification result:', {
+      console.debug('[PublicKeyUtils] Signature verification result:', {
         keyType,
         result,
         success: result === true,
@@ -270,7 +270,7 @@ export class PublicKeyUtils {
     signature: Uint8Array,
     publicKey: Uint8Array
   ): Promise<boolean> {
-    console.log('[PublicKeyUtils] ECDSA-R1 verification started:', {
+    console.debug('[PublicKeyUtils] ECDSA-R1 verification started:', {
       dataLength: data.length,
       signatureLength: signature.length,
       publicKeyLength: publicKey.length,
@@ -292,7 +292,7 @@ export class PublicKeyUtils {
       // Decompress the public key for WebCrypto
       const decompressedKey = this.decompressP256PublicKey(publicKey);
 
-      console.log('[PublicKeyUtils] Public key decompressed for WebCrypto:', {
+      console.debug('[PublicKeyUtils] Public key decompressed for WebCrypto:', {
         originalLength: publicKey.length,
         decompressedLength: decompressedKey.length,
         isValidUncompressed: decompressedKey.length === 65 && decompressedKey[0] === 0x04,
@@ -310,12 +310,12 @@ export class PublicKeyUtils {
         ['verify']
       );
 
-      console.log('[PublicKeyUtils] WebCrypto key imported successfully');
+      console.debug('[PublicKeyUtils] WebCrypto key imported successfully');
 
       // WebCrypto expects DER format, convert if needed
       const derSignature = SignatureUtils.normalizeSignature(signature, KEY_TYPE.ECDSAR1, 'der');
 
-      console.log('[PublicKeyUtils] Signature normalized to DER:', {
+      console.debug('[PublicKeyUtils] Signature normalized to DER:', {
         originalLength: signature.length,
         derLength: derSignature.length,
         isDER: derSignature.length > 64 && derSignature[0] === 0x30,
@@ -337,7 +337,7 @@ export class PublicKeyUtils {
         data // WebCrypto will hash this internally
       );
 
-      console.log('[PublicKeyUtils] ECDSA-R1 verification completed:', {
+      console.debug('[PublicKeyUtils] ECDSA-R1 verification completed:', {
         result,
         algorithm: 'ECDSA',
         curve: 'P-256',

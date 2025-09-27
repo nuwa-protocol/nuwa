@@ -36,7 +36,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
         limit: '10',
       });
       const balances = resp.data || [];
-      console.log('balances', balances);
+      console.debug('balances', balances);
       const gas = balances.find(b => b.coin_type === '0x3::gas_coin::RGas');
       const amount = gas ? parseFloat(gas.balance) : 0;
       if (amount < MIN_GAS) {
@@ -119,6 +119,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   if (step === 'agent' && userDid) {
     return <CreateAgentStep userDid={userDid} onComplete={handleAgentCreated} />;
   }
+
   if (step === 'gas' && agentDid) {
     return <ClaimGasStep agentDid={agentDid} onComplete={handleGasClaimed} />;
   }

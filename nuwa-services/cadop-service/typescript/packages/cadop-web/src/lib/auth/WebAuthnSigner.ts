@@ -1,4 +1,4 @@
-import { Base64, isValid } from 'js-base64';
+import { Base64 } from 'js-base64';
 import type { DIDDocument, SignerInterface, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { MultibaseCodec, DidKeyCodec, KeyType, KEY_TYPE, toKeyType } from '@nuwa-ai/identity-kit';
 import {
@@ -16,9 +16,10 @@ import {
   bcs,
   PublicKeyInitData,
   fromB64,
+  WebAuthnSigner as RoochWebAuthnSigner,
+  WebAuthnAssertionData,
 } from '@roochnetwork/rooch-sdk';
-import { CryptoUtils, defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
-import { hexToBytes } from '@noble/curves/abstract/utils';
+import { defaultCryptoProviderFactory } from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
 import { PublicKeyUtils } from '../crypto/PublicKeyUtils';
 
@@ -166,6 +167,7 @@ export class EcdsaR1PublicKey extends PublicKey<Address> {
 }
 
 interface WebAuthnSignature {
+  response: AuthenticatorAssertionResponse;
   signature: Uint8Array;
   rawSignature: Uint8Array;
   authenticatorData: Uint8Array;
@@ -179,7 +181,7 @@ interface WebAuthnSignerOptions {
   credentialId?: string;
 }
 
-export class WebAuthnSigner extends Signer implements SignerInterface {
+export class WebAuthnSigner extends RoochWebAuthnSigner implements SignerInterface {
   private did: string;
   private rpId: string;
   private rpName: string;
@@ -247,6 +249,14 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     return signature;
   }
 
+  async signAssertion(data: Uint8Array): Promise<AuthenticatorAssertionResponse> {
+    const { response, signature, authenticatorData, clientDataJSON } = await this.signWithWebAuthn(
+      data,
+      this.passkeyAuthMethod?.id
+    );
+    return response;
+  }
+
   async signWithWebAuthn(data: Uint8Array, keyId: string): Promise<WebAuthnSignature> {
     if (keyId !== this.passkeyAuthMethod?.id) {
       throw new Error('Only passkey authentication method is supported');
@@ -264,7 +274,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       }
 
       const response = assertion.response as AuthenticatorAssertionResponse;
-      console.log('signWithWebAuthn', { data, keyId, response });
+      console.debug('signWithWebAuthn', { data, keyId, response });
 
       let signature = new Uint8Array(response.signature);
       const authenticatorData = new Uint8Array(response.authenticatorData);
@@ -306,7 +316,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       let isValidByWebCrypto = await verifyByWebCrypto(publicKeyBytes, derCanonical, dataToVerify);
       let isValidByP256 = await verifyByP256(publicKeyBytes, rawSignature, dataToVerify);
 
-      console.log('Signature verification:', {
+      console.debug('Signature verification:', {
         isValidByWebCrypto,
         isValidByP256,
         clientDataJSON,
@@ -324,6 +334,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       });
 
       return {
+        response,
         signature,
         rawSignature,
         authenticatorData,
@@ -355,6 +366,29 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
 
   async getDid(): Promise<string> {
     return this.did;
+  }
+
+  // SignerInterface methods
+  getDID(): string {
+    return this.did;
+  }
+
+  // Note: getPublicKeyBytes removed - use getKeyInfo() from IdentityKit SignerInterface instead
+
+  getAlgorithm(): string {
+    return this.passkeyAuthMethod.type || 'unknown';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      if (!window.PublicKeyCredential) {
+        return false;
+      }
+      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    } catch (error) {
+      console.error('Failed to check WebAuthn availability:', error);
+      return false;
+    }
   }
 
   async getKeyInfo(keyId: string): Promise<
@@ -416,34 +450,34 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
       sig.clientDataJSON
     );
     let clientData = JSON.parse(new TextDecoder().decode(sig.clientDataJSON));
-    console.log('client_data:', clientData);
+    console.debug('client_data:', clientData);
     // Log detailed data for Move test case
-    console.log('=== WebAuthn Test Data for Move Test Case ===');
-    console.log(
+    console.debug('=== WebAuthn Test Data for Move Test Case ===');
+    console.debug(
       'authenticator_data_hex:',
       Array.from(sig.authenticatorData)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'client_data_json_hex:',
       Array.from(sig.clientDataJSON)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'signature_der_hex:',
       Array.from(sig.signature)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'signature_raw_hex:',
       Array.from(sig.rawSignature)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log(
+    console.debug(
       'public_key_compressed_hex:',
       Array.from(this.getPublicKey().toBytes())
         .map(b => b.toString(16).padStart(2, '0'))
@@ -453,7 +487,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     // Compute client data hash
     const clientDataHashBuffer = await crypto.subtle.digest('SHA-256', sig.clientDataJSON);
     const clientDataHash = new Uint8Array(clientDataHashBuffer);
-    console.log(
+    console.debug(
       'client_data_hash_hex:',
       Array.from(clientDataHash)
         .map(b => b.toString(16).padStart(2, '0'))
@@ -466,7 +500,7 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
     );
     verificationMessage.set(sig.authenticatorData, 0);
     verificationMessage.set(clientDataHash, sig.authenticatorData.length);
-    console.log(
+    console.debug(
       'verification_message_hex:',
       Array.from(verificationMessage)
         .map(b => b.toString(16).padStart(2, '0'))
@@ -475,34 +509,23 @@ export class WebAuthnSigner extends Signer implements SignerInterface {
 
     // Log BCS payload
     const payloadBytes = payload.encode();
-    console.log(
+    console.debug(
       'bcs_payload_hex:',
       Array.from(payloadBytes)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
     );
-    console.log('=== End WebAuthn Test Data ===');
+    console.debug('=== End WebAuthn Test Data ===');
 
     return payloadBytes;
   }
 
   async signTransaction(tx: Transaction): Promise<Authenticator> {
-    // 使用交易哈希作为 WebAuthn challenge
     const txHash = tx.hashData();
 
-    // 进行 WebAuthn 签名
-    const sig = await this.signWithWebAuthn(txHash, this.passkeyAuthMethod.id);
+    const vmFragment = this.passkeyAuthMethod.id.split('#')[1];
+    const webauthnAuth = await Authenticator.didWebAuthn(txHash, this, vmFragment);
 
-    // 构造 payload
-    const payloadBytes = await this.buildAuthenticatorPayload(sig);
-
-    // 构造 Authenticator 对象
-    const webauthnAuth = (await WebAuthnAuthenticator.webauthn(
-      payloadBytes,
-      this
-    )) as unknown as Authenticator;
-
-    // 设置到交易中（便于调用方）
     tx.setAuth(webauthnAuth);
     tx.setSender(this.didAddress);
     return webauthnAuth;
@@ -612,7 +635,7 @@ async function verifyByWebCrypto(
   const x = toB64Url(uncompressed.slice(1, 33));
   const y = toB64Url(uncompressed.slice(33, 65));
 
-  console.log('WebCrypto JWK params:', { x, y });
+  console.debug('WebCrypto JWK params:', { x, y });
 
   const jwk: JsonWebKey = {
     kty: 'EC',

@@ -15,7 +15,7 @@ class APIClient {
 
   private constructor() {
     this.baseUrl = API_URL;
-    console.log('APIClient initialized with baseUrl:', this.baseUrl);
+    console.debug('APIClient initialized with baseUrl:', this.baseUrl);
   }
 
   public static getInstance(): APIClient {

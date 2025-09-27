@@ -128,7 +128,7 @@ export class PasskeyService {
     };
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Registration options:', {
+      console.debug('[PasskeyService] Registration options:', {
         challenge: options.challenge,
         rpId: options.rp.id,
         rpName: options.rp.name,
@@ -148,18 +148,12 @@ export class PasskeyService {
       },
     } as unknown as PublicKeyCredentialCreationOptions;
 
-    let cred: PublicKeyCredential;
-    try {
-      cred = (await navigator.credentials.create({
-        publicKey: publicKeyOptions,
-      })) as PublicKeyCredential;
-    } catch (error) {
-      // Re-throw the original error to be handled by UI layer with proper internationalization
-      throw error;
-    }
+    let cred: PublicKeyCredential = (await navigator.credentials.create({
+      publicKey: publicKeyOptions,
+    })) as PublicKeyCredential;
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Credential created:', {
+      console.debug('[PasskeyService] Credential created:', {
         credentialId: cred.id,
         credentialIdLength: cred.id.length,
         credentialType: cred.type,
@@ -172,7 +166,7 @@ export class PasskeyService {
     const alg = attRes.getPublicKeyAlgorithm();
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Attestation response details:', {
+      console.debug('[PasskeyService] Attestation response details:', {
         hasPublicKey: !!publicKey,
         publicKeyLength: publicKey?.byteLength,
         algorithm: alg,
@@ -186,7 +180,7 @@ export class PasskeyService {
     // Log SPKI format public key details
     const spkiBytes = new Uint8Array(publicKey);
     if (this.developmentMode) {
-      console.log('[PasskeyService] SPKI public key details:', {
+      console.debug('[PasskeyService] SPKI public key details:', {
         algorithm: alg,
         spkiLength: spkiBytes.length,
         spkiHex: Array.from(spkiBytes)
@@ -204,7 +198,7 @@ export class PasskeyService {
     const rawPubKey = extractRawPublicKey(publicKey, alg);
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Raw public key extracted:', {
+      console.debug('[PasskeyService] Raw public key extracted:', {
         rawLength: rawPubKey.length,
         rawHex: Array.from(rawPubKey)
           .map(b => b.toString(16).padStart(2, '0'))
@@ -219,7 +213,7 @@ export class PasskeyService {
 
     const keyType = algo2key(alg);
     if (this.developmentMode) {
-      console.log('[PasskeyService] Key type resolution:', {
+      console.debug('[PasskeyService] Key type resolution:', {
         algorithm: alg,
         resolvedKeyType: keyType,
         isEd25519: keyType === KEY_TYPE.ED25519,
@@ -234,7 +228,7 @@ export class PasskeyService {
     const userDid = DidKeyCodec.generateDidKey(rawPubKey, keyType);
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] DID generation:', {
+      console.debug('[PasskeyService] DID generation:', {
         userDid,
         didLength: userDid.length,
         didPrefix: userDid.substring(0, 20) + '...',
@@ -250,7 +244,7 @@ export class PasskeyService {
           (byte, index) => byte === parsedPublicKey[index]
         );
 
-        console.log('[PasskeyService] DID roundtrip verification:', {
+        console.debug('[PasskeyService] DID roundtrip verification:', {
           originalKeyType: keyType,
           parsedKeyType: parsedKeyType,
           keyTypeMatches: keyType === parsedKeyType,
@@ -274,7 +268,7 @@ export class PasskeyService {
     AuthStore.setCurrentUserDid(userDid);
 
     if (this.developmentMode) {
-      console.log('[PasskeyService] Registration completed:', {
+      console.info('[PasskeyService] Registration completed:', {
         userDid,
         credentialId: cred.id,
         credentialIdTruncated: cred.id.substring(0, 20) + '...',
@@ -309,7 +303,7 @@ export class PasskeyService {
         allowCredentialIds.push(...UserStore.listCredentials(did));
       }
     }
-    console.log('allowCredentialIds', allowCredentialIds);
+    console.debug('allowCredentialIds', allowCredentialIds);
     const publicKeyRequest: PublicKeyCredentialRequestOptions = {
       ...requestOptions,
       challenge: base64URLToArrayBuffer(requestOptions.challenge),
@@ -374,7 +368,7 @@ export class PasskeyService {
       }
 
       if (this.developmentMode) {
-        console.log('[PasskeyService] authenticateWithChallenge options:', {
+        console.debug('[PasskeyService] authenticateWithChallenge options:', {
           challenge: options.challenge?.substring(0, 20) + '...',
           rpId: options.rpId,
           allowCredentials: allowCredentialIds,
@@ -436,7 +430,7 @@ export class PasskeyService {
       };
 
       if (this.developmentMode) {
-        console.log('[PasskeyService] authenticateWithChallenge result:', {
+        console.debug('[PasskeyService] authenticateWithChallenge result:', {
           credId: assertionJSON.id.substring(0, 20) + '...',
           userDid: userDid,
         });

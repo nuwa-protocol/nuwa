@@ -42,7 +42,7 @@ export function AddAuthMethodPage() {
         values.relationships as VerificationRelationship[]
       );
 
-      console.log('Added verification method:', keyId);
+      console.info('Added verification method:', keyId);
       navigate(`/agent/${did}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.error');

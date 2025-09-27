@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/identity-kit",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "SDK for NIP-1 Agent Single DID Multi-Key Model and NIP-3 CADOP (Custodian-Assisted DID Onboarding Protocol)",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -75,7 +75,7 @@
   "dependencies": {
     "@noble/curves": "^1.9.1",
     "@noble/hashes": "^1.8.0",
-    "@roochnetwork/rooch-sdk": "^0.3.6",
+    "@roochnetwork/rooch-sdk": "^0.4.0",
     "multiformats": "^9.9.0"
   },
   "tsup": {

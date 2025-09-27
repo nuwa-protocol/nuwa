@@ -1,4 +1,8 @@
-import { CreateAgentDIDRequest, AgentDIDCreationStatus } from '@cadop/shared';
+import {
+  CreateAgentDIDRequest,
+  AgentDIDCreationStatus,
+  ExtendedIDTokenPayload,
+} from '@cadop/shared';
 import { VDRRegistry, DIDDocument, CadopIdentityKit } from '@nuwa-ai/identity-kit';
 import { logger } from '../utils/logger.js';
 import crypto from 'crypto';
@@ -32,10 +36,10 @@ export class CustodianService {
    */
   async createAgentDIDViaCADOP(request: CreateAgentDIDRequest): Promise<AgentDIDCreationStatus> {
     try {
-      // 1. Simplified ID Token validation: just decode & check audience
-      let tokenPayload: any;
+      // 1. Decode and validate ID Token
+      let tokenPayload: ExtendedIDTokenPayload;
       try {
-        tokenPayload = jwt.decode(request.idToken) as any;
+        tokenPayload = jwt.decode(request.idToken) as ExtendedIDTokenPayload;
       } catch {
         throw new Error('Invalid idToken');
       }
@@ -47,6 +51,12 @@ export class CustodianService {
       if (!tokenPayload.sub) {
         throw new Error('Token missing subject');
       }
+
+      logger.info('Processing CADOP request', {
+        provider: tokenPayload.provider || 'webauthn',
+        controllerDid: tokenPayload.sub,
+        hasControllerPublicKey: !!tokenPayload.controllerPublicKeyMultibase,
+      });
 
       // 2. Check daily mint quota
       await this.checkAndUpdateDailyMintQuota(tokenPayload.sub);
@@ -61,12 +71,60 @@ export class CustodianService {
       };
       this.didCreationRecords.set(recordId, status);
 
-      // 4. Create DID Document
-      const result = await this.cadopKit.createDID('rooch', request.userDid);
+      // 4. Route to appropriate DID creation method based on provider
+      let result;
+      const provider = tokenPayload.provider || 'webauthn';
+
+      if (provider === 'bitcoin' || tokenPayload.sub.startsWith('did:bitcoin:')) {
+        // Use controller-based CADOP creation for Bitcoin
+        if (!tokenPayload.controllerPublicKeyMultibase || !tokenPayload.controllerVMType) {
+          throw new Error(
+            'Bitcoin provider requires controllerPublicKeyMultibase and controllerVMType'
+          );
+        }
+
+        logger.info('Using controller-based CADOP creation for Bitcoin', {
+          controllerDid: tokenPayload.sub,
+          controllerVMType: tokenPayload.controllerVMType,
+        });
+
+        result = await this.cadopKit.createDIDWithController('rooch', tokenPayload.sub, {
+          controllerPublicKeyMultibase: tokenPayload.controllerPublicKeyMultibase,
+          controllerVMType: tokenPayload.controllerVMType,
+          customScopes: undefined, // Could be configurable
+        });
+      } else if (
+        tokenPayload.sub.startsWith('did:key:') &&
+        !tokenPayload.controllerPublicKeyMultibase
+      ) {
+        // Backward compatible path for did:key without explicit public key
+        logger.info('Using legacy CADOP creation for did:key', {
+          userDid: request.userDid,
+        });
+
+        result = await this.cadopKit.createDID('rooch', request.userDid);
+      } else {
+        // Use controller-based CADOP creation for other cases
+        logger.info('Using controller-based CADOP creation', {
+          controllerDid: tokenPayload.sub,
+          controllerVMType: tokenPayload.controllerVMType,
+        });
+
+        result = await this.cadopKit.createDIDWithController('rooch', tokenPayload.sub, {
+          controllerPublicKeyMultibase: tokenPayload.controllerPublicKeyMultibase,
+          controllerVMType: tokenPayload.controllerVMType,
+          customScopes: undefined, // Could be configurable
+        });
+      }
 
       if (!result.success) {
         status.status = 'failed';
         status.error = result.error;
+        logger.error('DID creation failed', {
+          error: result.error,
+          provider,
+          controllerDid: tokenPayload.sub,
+        });
       } else {
         status.status = 'completed';
         status.userDid = tokenPayload.sub;
@@ -77,6 +135,12 @@ export class CustodianService {
         const userDids = this.userDids.get(tokenPayload.sub) || [];
         userDids.push(result.didDocument!.id);
         this.userDids.set(tokenPayload.sub, userDids);
+
+        logger.info('Agent DID created successfully', {
+          provider,
+          controllerDid: tokenPayload.sub,
+          agentDid: result.didDocument?.id,
+        });
       }
 
       status.updatedAt = new Date();

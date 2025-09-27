@@ -1,11 +1,11 @@
-import { createVDR, IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
-import { ROOCH_RPC_URL } from '../../config/env';
+import { IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
+import { ensureVDRInitialized } from '../identity/VDRManager';
 import type {
   OperationalKeyInfo,
   VerificationRelationship,
   SignerInterface,
 } from '@nuwa-ai/identity-kit';
-import { WebAuthnSigner } from '../auth/WebAuthnSigner';
+import { SignerFactory } from '../auth/signers/SignerFactory';
 
 export class DIDService {
   private identityKit: IdentityKit;
@@ -18,18 +18,20 @@ export class DIDService {
 
   static async initialize(did: string, credentialId?: string): Promise<DIDService> {
     try {
-      const roochVDR = createVDR('rooch', {
-        rpcUrl: ROOCH_RPC_URL,
-        debug: true,
-      });
-      VDRRegistry.getInstance().registerVDR(roochVDR);
+      // Ensure VDRs are initialized using centralized VDRManager
+      await ensureVDRInitialized();
+
+      // Resolve DID document to check if it exists
       const didDocument = await VDRRegistry.getInstance().resolveDID(did);
       if (!didDocument) {
         throw new Error('Failed to resolve DID document');
       }
-      console.log('initialize with credentialId', credentialId);
-      const signer = new WebAuthnSigner(did, {
-        didDocument: didDocument,
+
+      console.debug('[DIDService] Initializing with DID:', did, 'credentialId:', credentialId);
+
+      // Use SignerFactory to create appropriate signer based on Agent DID
+      const signerFactory = SignerFactory.getInstance();
+      const signer = await signerFactory.createSignerFromAgentDID(did, {
         rpId: window.location.hostname,
         rpName: 'CADOP',
         credentialId: credentialId || undefined,
@@ -38,7 +40,7 @@ export class DIDService {
       const identityKit = await IdentityKit.fromDIDDocument(didDocument, signer);
       return new DIDService(identityKit, signer);
     } catch (error) {
-      console.error('Failed to initialize DID service:', error);
+      console.error('[DIDService] Failed to initialize:', error);
       throw error;
     }
   }

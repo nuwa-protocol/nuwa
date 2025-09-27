@@ -1,14 +1,37 @@
 import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import {
   verifyAuthenticationResponse,
   VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { PublicKeyCredentialJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
-import { DidKeyCodec, algorithmToKeyType, KEY_TYPE } from '@nuwa-ai/identity-kit';
+import {
+  DidKeyCodec,
+  algorithmToKeyType,
+  KEY_TYPE,
+  DebugLogger,
+  MultibaseCodec,
+} from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
-import { ChallengeResponse, VerifyResponse } from '@cadop/shared';
+import {
+  Secp256k1PublicKey,
+  BitcoinAddress,
+  varintByteNum,
+  bytes,
+  concatBytes,
+  sha256,
+} from '@roochnetwork/rooch-sdk';
+import {
+  ChallengeResponse,
+  VerifyResponse,
+  AuthProvider,
+  BitcoinVerifyRequest,
+  BitcoinChallengeResponse,
+  BitcoinVerifyResponse,
+  ExtendedIDTokenPayload,
+} from '@cadop/shared';
+import { config } from '../config/environment.js';
 
 /** In-memory challenge map for dev; clear periodically */
 const challengeMap = new Map<string, { nonce: string; ts: number }>();
@@ -23,13 +46,16 @@ export interface IdpServiceConfig {
 
 export class IdpService {
   private config: IdpServiceConfig;
+  private logger = DebugLogger.get('IdpService');
 
   constructor(config: IdpServiceConfig) {
     this.config = config;
   }
 
-  /** Generate WebAuthn challenge */
-  generateChallenge(): ChallengeResponse {
+  /** Generate challenge for specified provider */
+  generateChallenge(
+    provider: AuthProvider = 'webauthn'
+  ): ChallengeResponse | BitcoinChallengeResponse {
     // Generate random challenge
     const challengeBytes = randomBytes(32);
     const challenge = Buffer.from(challengeBytes).toString('base64url');
@@ -43,10 +69,50 @@ export class IdpService {
     // Clean up expired challenges
     this.cleanupChallenges();
 
+    if (provider === 'bitcoin') {
+      // For Bitcoin, include messageToSign
+      const messageToSign = this.generateBitcoinMessage(challenge);
+      return {
+        challenge,
+        nonce,
+        messageToSign,
+      };
+    }
+
+    // For WebAuthn (default)
     return {
       challenge,
       nonce,
     };
+  }
+
+  /** Generate Bitcoin message to sign using standard format */
+  private generateBitcoinMessage(challenge: string): string {
+    // Create a user-friendly message that explains what they're signing
+    return `Sign this message to authenticate with CADOP:
+
+This signature proves you control this Bitcoin address.
+No funds will be moved or transactions created.
+
+Authentication Challenge: ${challenge}
+
+By signing, you authorize CADOP to verify your identity.`;
+  }
+
+  /** Create Bitcoin message format for verification (matching what wallet signs) */
+  private createBitcoinAuthMessage(message: string): Uint8Array {
+    // Wallet automatically adds Bitcoin message prefix when signing
+    // For verification, we need to reconstruct the complete format that wallet used
+    // Standard Bitcoin message format: "\x18Bitcoin Signed Message:\n" + varint(message.length) + message
+    const prefix = '\x18Bitcoin Signed Message:\n';
+    const messageBytes = bytes('utf8', message);
+
+    // Create varint for message length
+    const messageLength = messageBytes.length;
+    let varint_bytes = varintByteNum(messageLength);
+
+    // Combine prefix + varint + message (same format wallet used for signing)
+    return concatBytes(bytes('utf8', prefix), varint_bytes, messageBytes);
   }
 
   /** Clean up expired challenges */
@@ -73,6 +139,30 @@ export class IdpService {
   }
 
   /**
+   * Issue extended ID token with provider-specific claims
+   */
+  private issueExtendedIdToken(
+    controllerDid: string,
+    nonce: string,
+    provider: AuthProvider,
+    controllerPublicKeyMultibase?: string,
+    controllerVMType?: string,
+    origin?: string
+  ): BitcoinVerifyResponse {
+    const idToken = IdpService.buildExtendedIdToken(
+      controllerDid,
+      nonce,
+      this.config.cadopDid,
+      this.config.signingKey,
+      provider,
+      controllerPublicKeyMultibase,
+      controllerVMType,
+      origin
+    );
+    return { idToken };
+  }
+
+  /**
    * Helper: build a valid ID-Token (JWT) outside of IdpService instance, mainly for testing.
    */
   public static buildIdToken(
@@ -91,6 +181,38 @@ export class IdpService {
       iat: now,
       jti: randomUUID(),
       nonce,
+    };
+
+    return jwt.sign(payload, signingKey);
+  }
+
+  /**
+   * Helper: build an extended ID-Token (JWT) with provider-specific claims
+   */
+  public static buildExtendedIdToken(
+    controllerDid: string,
+    nonce: string,
+    cadopDid: string,
+    signingKey: string,
+    provider: AuthProvider,
+    controllerPublicKeyMultibase?: string,
+    controllerVMType?: string,
+    origin?: string,
+    expiresInSec: number = 3600
+  ): string {
+    const now = Math.floor(Date.now() / 1000);
+    const payload: ExtendedIDTokenPayload = {
+      iss: cadopDid,
+      sub: controllerDid,
+      aud: cadopDid,
+      exp: now + expiresInSec,
+      iat: now,
+      jti: randomUUID(),
+      nonce,
+      provider,
+      controllerPublicKeyMultibase,
+      controllerVMType,
+      origin,
     };
 
     return jwt.sign(payload, signingKey);
@@ -150,7 +272,7 @@ export class IdpService {
         const x = uncompressed.slice(1, 33); // skip 0x04 prefix
         const y = uncompressed.slice(33, 65);
 
-        console.log('P-256 key decompression:', {
+        this.logger.debug('P-256 key decompression:', {
           compressedLength: rawPubKey.length,
           uncompressedLength: uncompressed.length,
           xLength: x.length,
@@ -196,13 +318,144 @@ export class IdpService {
           Buffer.from(y),
         ]);
       } catch (error) {
-        console.error('P-256 key decompression error:', error);
+        this.logger.error('P-256 key decompression error:', error);
         throw new Error(
           `P-256 key decompression failed: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     } else {
       throw new Error(`Unsupported key type: ${keyType}`);
+    }
+  }
+
+  /**
+   * Verify Bitcoin signature
+   */
+  async verifyBitcoinSignature(request: BitcoinVerifyRequest): Promise<BitcoinVerifyResponse> {
+    const { address, publicKeyHex, signature, challenge, nonce, origin } = request;
+
+    if (!address || !publicKeyHex || !signature || !challenge || !nonce) {
+      throw new Error('All fields are required for Bitcoin verification');
+    }
+
+    try {
+      // Verify challenge exists and matches nonce
+      const challengeData = challengeMap.get(challenge);
+      if (!challengeData) {
+        throw new Error('Invalid or expired challenge');
+      }
+
+      if (challengeData.nonce !== nonce) {
+        throw new Error('Nonce mismatch');
+      }
+
+      // Verify public key matches address
+      // Note: Bitcoin address is derived from Schnorr public key (32 bytes)
+      // but signature verification uses compressed public key (33 bytes)
+      const publicKeyBytes = Buffer.from(publicKeyHex, 'hex');
+
+      // // For address verification, we need to convert compressed key to Schnorr key
+      // // if the provided key is 33 bytes (compressed ECDSA key)
+      let addressPublicKeyBytes: Uint8Array;
+      if (publicKeyBytes.length === 33) {
+        // Convert compressed ECDSA key (33 bytes) to Schnorr key (32 bytes)
+        // Remove the prefix byte (0x02 or 0x03)
+        addressPublicKeyBytes = publicKeyBytes.slice(1);
+      } else if (publicKeyBytes.length === 32) {
+        // Already Schnorr key format
+        addressPublicKeyBytes = publicKeyBytes;
+      } else {
+        throw new Error('Invalid public key length');
+      }
+      const publicKey = new Secp256k1PublicKey(addressPublicKeyBytes);
+      const derivedAddress = publicKey.toAddress().roochAddress;
+      // const derivedAddress = BitcoinAddress.fromPublicKey(publicKeyBytes);
+
+      // // Convert the provided address to Rooch's internal format for comparison
+      // // The wallet provides standard Bitcoin address format, but Rooch uses internal format
+      const providedAddress = new BitcoinAddress(address).genRoochAddress();
+
+      if (derivedAddress.toStr() !== providedAddress.toStr()) {
+        this.logger.warn(
+          'Public key does not match Bitcoin address derived: ' +
+            derivedAddress.toStr() +
+            ' provided: ' +
+            providedAddress.toStr()
+        );
+        this.logger.debug('Derived address bytes: ' + derivedAddress.toBytes().toString());
+        this.logger.debug('Provided address bytes: ' + providedAddress.toBytes().toString());
+        throw new Error(
+          'Public key does not match Bitcoin address derived: ' +
+            derivedAddress.toStr() +
+            ' provided: ' +
+            providedAddress.toStr()
+        );
+      }
+
+      // Generate message to verify using standard Bitcoin message format
+      const messageContent = this.generateBitcoinMessage(challenge);
+
+      // Create Bitcoin message format for verification (wallet adds prefix automatically when signing)
+      // For verification, we need the complete format that wallet used
+      const bitcoinMessageBytes = this.createBitcoinAuthMessage(messageContent);
+
+      // Verify signature using standard Bitcoin message verification
+      const isValidSignature = await this.verifyBitcoinMessageSignature(
+        bitcoinMessageBytes,
+        signature,
+        publicKeyBytes
+      );
+
+      if (!isValidSignature) {
+        throw new Error('Invalid Bitcoin signature');
+      }
+
+      // Remove used challenge
+      challengeMap.delete(challenge);
+
+      // Create controller DID
+      const controllerDid = `did:bitcoin:${address}`;
+
+      // Convert public key to multibase format
+      const controllerPublicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
+
+      // Issue extended ID token
+      return this.issueExtendedIdToken(
+        controllerDid,
+        nonce,
+        'bitcoin',
+        controllerPublicKeyMultibase,
+        'EcdsaSecp256k1VerificationKey2019',
+        origin
+      );
+    } catch (error) {
+      this.logger.error('Bitcoin verification error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify Bitcoin message signature using standard Bitcoin message format
+   * This verifies authentication messages, not transaction signatures
+   * Wallet signs SHA256 hash of the full Bitcoin message format
+   */
+  private async verifyBitcoinMessageSignature(
+    messageBytes: Uint8Array,
+    signature: string,
+    publicKeyBytes: Uint8Array
+  ): Promise<boolean> {
+    try {
+      // Use Rooch SDK's Secp256k1PublicKey.verify method for ECDSA signatures
+      const signatureBytes = Buffer.from(signature, 'hex');
+      const publicKey = new Secp256k1PublicKey(publicKeyBytes);
+
+      // Wallet signs SHA256 hash of the full Bitcoin message format
+      // (not double SHA256, just single SHA256)
+      const hashedMessage = sha256(messageBytes);
+      return await publicKey.verify(hashedMessage, signatureBytes);
+    } catch (error) {
+      this.logger.error('Bitcoin signature verification error:', error);
+      return false;
     }
   }
 
@@ -245,7 +498,7 @@ export class IdpService {
 
       try {
         // Log for debugging
-        console.log('Public key details:', {
+        this.logger.debug('Public key details:', {
           keyType,
           publicKeyLength: publicKey.length,
           publicKeyHex: Buffer.from(publicKey).toString('hex').substring(0, 32) + '...',
@@ -255,12 +508,12 @@ export class IdpService {
         let cosePublicKey: Uint8Array;
         try {
           cosePublicKey = this.rawPubKeyToCOSE(publicKey, keyType);
-          console.log('COSE public key created:', {
+          this.logger.debug('COSE public key created:', {
             coseKeyLength: cosePublicKey.length,
             coseKeyHex: Buffer.from(cosePublicKey).toString('hex').substring(0, 32) + '...',
           });
         } catch (coseError) {
-          console.error('COSE key creation error:', coseError);
+          this.logger.error('COSE key creation error:', coseError);
           throw new Error(
             `Failed to create COSE key: ${coseError instanceof Error ? coseError.message : String(coseError)}`
           );
@@ -290,7 +543,7 @@ export class IdpService {
         // Issue ID token
         return this.issueIdToken(userDid, nonce);
       } catch (error) {
-        console.error(
+        this.logger.error(
           'Verification error details:',
           error instanceof Error
             ? { name: error.name, message: error.message, stack: error.stack }
@@ -301,7 +554,7 @@ export class IdpService {
         );
       }
     } catch (error) {
-      console.error(
+      this.logger.error(
         'Assertion processing error:',
         error instanceof Error
           ? { name: error.name, message: error.message, stack: error.stack }
