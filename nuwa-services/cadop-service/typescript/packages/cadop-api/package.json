@@ -9,6 +9,7 @@
     "build": "tsc -b --force",
     "postbuild": "cp package.json dist/",
     "start": "node --experimental-specifier-resolution=node dist/index.js",
+    "start:prod": "NODE_ENV=production node --experimental-specifier-resolution=node dist/index.js",
     "predev": "pnpm --filter @cadop/shared build",
     "dev": "tsx watch src/index.ts",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
