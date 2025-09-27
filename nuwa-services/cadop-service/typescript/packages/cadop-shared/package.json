@@ -28,7 +28,7 @@
     "@roochnetwork/rooch-sdk": "^0.4.0",
     "@simplewebauthn/server": "^12.0.0",
     "@simplewebauthn/types": "^12.0.0",
-    "@nuwa-ai/identity-kit": "link:../../../../../nuwa-kit/typescript/packages/identity-kit",
+    "@nuwa-ai/identity-kit": "^0.6.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
