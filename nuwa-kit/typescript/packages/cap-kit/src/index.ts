@@ -3,6 +3,7 @@ import { Args, RoochClient, Transaction } from "@roochnetwork/rooch-sdk";
 import * as yaml from "js-yaml";
 import { buildClient } from "./client";
 import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from "./type";
+import { experimental_createMCPClient as createMCPClient } from "ai";
 
 export * from "./type";
 
@@ -11,6 +12,8 @@ export class CapKit {
 	protected contractAddress: string;
 	protected mcpUrl: string;
 	protected signer: SignerInterface;
+	protected mcpClient?: any;
+	protected mcpTools?: any;
 
 	constructor(option: {
 		mcpUrl: string;
@@ -24,15 +27,27 @@ export class CapKit {
 		this.signer = option.signer;
 	}
 
+	async getTools() {
+		if (!this.mcpClient) {
+			const transport = await buildClient(this.mcpUrl, this.signer)
+			this.mcpClient = await createMCPClient({ transport });
+		}
+		if (!this.mcpTools) {
+			this.mcpTools = await this.mcpClient.tools();
+		}
+		return this.mcpTools
+	}
+	async mcpClose() {
+		this.mcpClient?.close();
+	}
+
 	async queryByID(id: {
 		id?: string;
 		cid?: string;
 	}): Promise<Result<ResultCap>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
-
 		try {
 			// Get tools from MCP server
-			const tools = await client.tools();
+			const tools = await this.getTools();
 			const queryCapByID = tools.queryCapByID;
 
 			if (!queryCapByID) {
@@ -58,8 +73,8 @@ export class CapKit {
 			}
 
 			return queryResult;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -78,11 +93,9 @@ export class CapKit {
 			sortOrder?: "asc" | "desc";
 		},
 	): Promise<Result<Page<ResultCap>>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
-
 		try {
 			// Get tools from MCP server
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const queryCapByName = tools.queryCapByName;
 
 			if (!queryCapByName) {
@@ -142,8 +155,8 @@ export class CapKit {
 					items: transformedItems,
 				},
 			} as Result<Page<ResultCap>>;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -151,10 +164,10 @@ export class CapKit {
 		page?: number,
 		size?: number,
 	): Promise<Result<Page<ResultCap>>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
+		
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const queryMyFavoriteCaps = tools.queryMyFavoriteCap;
 
 			if (!queryMyFavoriteCaps) {
@@ -193,16 +206,15 @@ export class CapKit {
 					items: queryResult.data.items,
 				},
 			} as Result<Page<ResultCap>>;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
 	async queryCapStats(capId: string): Promise<Result<CapStats>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const queryCapStats = tools.queryCapStats;
 
 			if (!queryCapStats) {
@@ -232,8 +244,8 @@ export class CapKit {
 			}
 
 			return queryResult as Result<CapStats>;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -243,10 +255,10 @@ export class CapKit {
 			throw new Error("Rating must be an integer between 1 and 5");
 		}
 
-		const client = await buildClient(this.mcpUrl, this.signer);
+		
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const rateCap = tools.rateCap;
 
 			if (!rateCap) {
@@ -272,16 +284,16 @@ export class CapKit {
 				code: 200,
 				data: true,
 			} as Result<boolean>;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
 	async queryCapRatingDistribution(capId: string): Promise<Result<RatingDistribution[]>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
+		
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const queryCapRatingDistribution = tools.queryCapRatingDistribution;
 
 			if (!queryCapRatingDistribution) {
@@ -316,8 +328,8 @@ export class CapKit {
 			}
 
 			throw new Error("No data received");
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -325,10 +337,9 @@ export class CapKit {
 		capId: string,
 		action: "add" | "remove" | "isFavorite",
 	): Promise<Result<boolean>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const favoriteCap = tools.favoriteCap;
 
 			if (!favoriteCap) {
@@ -362,8 +373,8 @@ export class CapKit {
 					data: true,
 				} as Result<boolean>;
 			}
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -371,10 +382,10 @@ export class CapKit {
 		capId: string,
 		action: "enable" | "disable",
 	): Promise<Result<boolean>> {
-		const client = await buildClient(this.mcpUrl, this.signer);
+		
 
 		try {
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const updateEnableCap = tools.updateEnableCap;
 
 			if (!updateEnableCap) {
@@ -400,8 +411,8 @@ export class CapKit {
 				code: 200,
 				data: true,
 			} as Result<boolean>;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -416,11 +427,11 @@ export class CapKit {
 	}
 
 	async downloadByCID(cid: string, format?: "base64" | "utf8"): Promise<Cap> {
-		const client = await buildClient(this.mcpUrl, this.signer);
+		
 
 		try {
 			// Get tools from MCP server
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const downloadCap = tools.downloadCap;
 
 			if (!downloadCap) {
@@ -452,8 +463,8 @@ export class CapKit {
 			}
 
 			return yaml.load(downloadResult.data.fileData) as Cap;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 
@@ -490,7 +501,7 @@ export class CapKit {
 
 		try {
 			// Get tools from MCP server
-			const tools = await client.tools();
+			const tools = await this.getTools()
 			const uploadCap = tools.uploadCap;
 
 			if (!uploadCap) {
@@ -529,8 +540,8 @@ export class CapKit {
 			}
 
 			return uploadData.ipfsCid;
-		} finally {
-			await client.close();
+		} catch (e) {
+			throw e
 		}
 	}
 

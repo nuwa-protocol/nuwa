@@ -63,6 +63,7 @@ export const CapCoreSchema = z.object({
 	prompt: CapPromptSchema,
 	model: CapModelSchema,
 	mcpServers: z.record(z.string(), CapMcpServerSchema),
+	artifact: CapArtifactSchema.optional(),
 });
 
 export const CapThumbnailSchema = z
@@ -87,7 +88,6 @@ export const CapSchema = CapIDSchema.and(
 	z.object({
 		core: CapCoreSchema,
 		metadata: CapMetadataSchema,
-		artifact: CapArtifactSchema.optional(),
 	}),
 );
 
@@ -147,3 +147,4 @@ export const RatingDistribution = z.object({
 export type ResultCap = z.infer<typeof ResultCapMetadataSchema>;
 export type CapStats = z.infer<typeof CapStatsSchema>;
 export type RatingDistribution = z.infer<typeof RatingDistribution>;
+export type Artifact = z.infer<typeof CapArtifactSchema>;
