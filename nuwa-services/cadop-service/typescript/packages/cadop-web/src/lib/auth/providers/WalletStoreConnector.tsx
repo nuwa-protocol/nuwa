@@ -24,7 +24,6 @@ export function WalletStoreConnector() {
   // Create a force disconnect function that triggers a page reload
   // This is the most reliable way to reset wallet state after clearing localStorage
   const forceDisconnect = () => {
-    console.log('[WalletStoreConnector] Force disconnecting wallet...');
     // Use a small delay to ensure localStorage is cleared first
     setTimeout(() => {
       window.location.reload();
@@ -34,20 +33,9 @@ export function WalletStoreConnector() {
   // Track if we've seen a connected state to distinguish between initial load and actual disconnection
   const [hasBeenConnected, setHasBeenConnected] = useState(false);
 
-  console.log('[WalletStoreConnector] Wallet state:', {
-    hasWallet: !!currentWallet,
-    hasAddress: !!currentAddress,
-    connectionStatus,
-    walletName: currentWallet?.getName?.(),
-  });
+  // Monitor wallet state for debugging if needed
 
   useEffect(() => {
-    console.log('[WalletStoreConnector] useEffect triggered with wallet state:', {
-      hasWallet: !!currentWallet,
-      hasAddress: !!currentAddress,
-      connectionStatus,
-    });
-
     // Create wallet store access object
     const walletStoreAccess = {
       getCurrentWallet: () => currentWallet,
@@ -63,7 +51,6 @@ export function WalletStoreConnector() {
         if (!authProviderRegistry.isRegistered('wallet')) {
           // Provider not registered yet, wait and try again
           if (attempt === maxRetries) {
-            console.warn('[WalletStoreConnector] Wallet provider not registered after waiting');
             return;
           }
           await new Promise(resolve => setTimeout(resolve, delay * attempt));
@@ -74,7 +61,6 @@ export function WalletStoreConnector() {
           const provider = await authProviderRegistry.get('wallet');
           if (provider instanceof WalletAuthProvider) {
             provider.setWalletStoreAccess(walletStoreAccess);
-            console.log('[WalletStoreConnector] Successfully injected wallet store access');
             return; // Success, exit the retry loop
           } else {
             console.warn('[WalletStoreConnector] Provider is not WalletAuthProvider:', provider);

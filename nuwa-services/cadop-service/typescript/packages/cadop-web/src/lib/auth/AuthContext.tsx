@@ -47,18 +47,14 @@ interface AuthProviderProps {
 let providersInitialized = false;
 const initializeAuthProviders = () => {
   if (providersInitialized) {
-    console.log('[AuthContext] Auth providers already initialized, skipping...');
     return;
   }
-
-  console.log('[AuthContext] Initializing auth providers...');
   // Register Passkey provider
   authProviderRegistry.register('passkey', async () => new PasskeyAuthProvider());
   // Register Wallet provider
   authProviderRegistry.register('wallet', async () => new WalletAuthProvider());
 
   providersInitialized = true;
-  console.log('[AuthContext] Auth providers initialized');
 };
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -189,7 +185,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       // NOTE: Silent auth is disabled because mediation: 'silent' often still shows prompts
       // Users should explicitly choose their authentication method
-      console.debug('[AuthContext] Silent auth skipped - users must explicitly choose auth method');
       return false;
 
       // TODO: In the future, we could implement true silent auth by:
@@ -197,7 +192,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // 2. Validating stored credentials without WebAuthn calls
       // 3. Only for wallet users, checking if wallet is still connected
     } catch (error) {
-      console.debug('[AuthContext] Silent auth failed:', error);
       return false;
     }
   }, []);
@@ -206,21 +200,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     async function bootstrapAuth() {
       try {
-        console.log('[AuthContext] Starting bootstrap authentication...');
-
         // Step 1: Check if we have a current user DID
         const currentUserDid = AuthStore.getCurrentUserDid();
-        console.log('[AuthContext] Current user DID from storage:', currentUserDid);
 
         if (currentUserDid) {
           // User is already authenticated, restore session
           const authMethod = UserStore.getAuthMethod(currentUserDid);
-          console.log(
-            '[AuthContext] Auth method for user:',
-            authMethod,
-            'type:',
-            typeof authMethod
-          );
 
           if (authMethod) {
             try {
@@ -228,19 +213,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
               // Use the new wallet auth hook for wallet authentication
               if (authMethod === 'wallet') {
-                console.log('[AuthContext] Wallet auth detected, using wallet auth hook...');
                 const walletAuthResult = await walletAuth.restoreSession();
-
-                console.log('[AuthContext] Wallet auth result:', walletAuthResult);
 
                 if (walletAuthResult.success) {
                   // Session restored successfully
                   sessionRestored = true;
                 } else if (walletAuthResult.isWaiting) {
                   // Waiting for wallet auto-connect: keep user authenticated while waiting
-                  console.log(
-                    '[AuthContext] Wallet auth in progress, keeping authenticated state...'
-                  );
                   setState({
                     isAuthenticated: true, // Keep user authenticated
                     isLoading: false,
@@ -256,7 +235,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
               } else {
                 // For non-wallet auth methods, use the traditional approach
                 const provider = await authProviderRegistry.get(authMethod);
-                console.log('[AuthContext] Got provider for auth method:', authMethod);
 
                 if (provider.restoreSession) {
                   sessionRestored = await provider.restoreSession();
@@ -267,8 +245,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
               }
 
-              console.log('[AuthContext] Session restore result:', sessionRestored);
-
               if (sessionRestored) {
                 setState({
                   isAuthenticated: true,
@@ -277,10 +253,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                   authMethod,
                   error: null,
                 });
-                console.log('[AuthContext] Session restored successfully');
               } else {
                 // Session restore failed, clear auth state
-                console.log('[AuthContext] Session restore failed, clearing auth state');
                 AuthStore.clearCurrentUser();
                 setState({
                   isAuthenticated: false,
@@ -303,7 +277,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           } else {
             // Unknown auth method, clear state
-            console.log('[AuthContext] Unknown auth method, clearing state');
+            console.warn('[AuthContext] Unknown auth method, clearing state');
             AuthStore.clearCurrentUser();
             setState({
               isAuthenticated: false,
@@ -315,7 +289,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } else {
           // No current user, try silent authentication
-          console.log('[AuthContext] No current user, trying silent auth');
           const silentAuthSuccess = await trySilentAuth();
 
           if (!silentAuthSuccess) {
