@@ -6,7 +6,13 @@ import {
   VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { PublicKeyCredentialJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
-import { DidKeyCodec, algorithmToKeyType, KEY_TYPE, DebugLogger } from '@nuwa-ai/identity-kit';
+import {
+  DidKeyCodec,
+  algorithmToKeyType,
+  KEY_TYPE,
+  DebugLogger,
+  MultibaseCodec,
+} from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
 import {
   Secp256k1PublicKey,
@@ -82,8 +88,15 @@ export class IdpService {
 
   /** Generate Bitcoin message to sign using standard format */
   private generateBitcoinMessage(challenge: string): string {
-    // Use CADOP-specific message instead of "Rooch Transaction:"
-    return `CADOP Authentication:\n${challenge}`;
+    // Create a user-friendly message that explains what they're signing
+    return `Sign this message to authenticate with CADOP:
+
+This signature proves you control this Bitcoin address.
+No funds will be moved or transactions created.
+
+Authentication Challenge: ${challenge}
+
+By signing, you authorize CADOP to verify your identity.`;
   }
 
   /** Create Bitcoin message format for verification (matching what wallet signs) */
@@ -404,7 +417,6 @@ export class IdpService {
       const controllerDid = `did:bitcoin:${address}`;
 
       // Convert public key to multibase format
-      const { MultibaseCodec } = await import('@nuwa-ai/identity-kit');
       const controllerPublicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
 
       // Issue extended ID token
