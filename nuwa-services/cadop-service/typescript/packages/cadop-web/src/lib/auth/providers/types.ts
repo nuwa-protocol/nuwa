@@ -104,6 +104,9 @@ export interface AuthProviderRegistry {
   /** Get authentication provider */
   get(method: AuthMethod): Promise<AuthProvider>;
 
+  /** Check if a provider is registered for the given method */
+  isRegistered(method: AuthMethod): boolean;
+
   /** Get all supported authentication methods */
   getSupportedMethods(): Promise<AuthMethod[]>;
 }

@@ -56,40 +56,43 @@ export function WalletStoreConnector() {
       forceDisconnect,
     };
 
-    // Get the wallet provider and inject the store access (with retry for robustness)
-    const injectWalletStoreAccess = () => {
-      authProviderRegistry
-        .get('wallet')
-        .then(provider => {
+    // Get the wallet provider and inject the store access (with improved retry mechanism)
+    const injectWalletStoreAccess = async (maxRetries = 10, delay = 50) => {
+      // First check if wallet provider is registered to avoid unnecessary errors
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        if (!authProviderRegistry.isRegistered('wallet')) {
+          // Provider not registered yet, wait and try again
+          if (attempt === maxRetries) {
+            console.warn('[WalletStoreConnector] Wallet provider not registered after waiting');
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, delay * attempt));
+          continue;
+        }
+
+        try {
+          const provider = await authProviderRegistry.get('wallet');
           if (provider instanceof WalletAuthProvider) {
             provider.setWalletStoreAccess(walletStoreAccess);
             console.log('[WalletStoreConnector] Successfully injected wallet store access');
+            return; // Success, exit the retry loop
           } else {
             console.warn('[WalletStoreConnector] Provider is not WalletAuthProvider:', provider);
+            return; // Wrong type, no point in retrying
           }
-        })
-        .catch(error => {
-          console.warn('[WalletStoreConnector] Failed to get wallet provider, retrying...:', error);
-          // Single retry after a short delay to handle timing issues
-          setTimeout(() => {
-            authProviderRegistry
-              .get('wallet')
-              .then(provider => {
-                if (provider instanceof WalletAuthProvider) {
-                  provider.setWalletStoreAccess(walletStoreAccess);
-                  console.log(
-                    '[WalletStoreConnector] Successfully injected wallet store access (retry)'
-                  );
-                }
-              })
-              .catch(retryError => {
-                console.error(
-                  '[WalletStoreConnector] Failed to get wallet provider after retry:',
-                  retryError
-                );
-              });
-          }, 100);
-        });
+        } catch (error) {
+          if (attempt === maxRetries) {
+            // Only log error on final attempt to reduce noise
+            console.error(
+              '[WalletStoreConnector] Failed to get wallet provider after all retries:',
+              error
+            );
+          } else {
+            // Wait before next attempt, with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay * attempt));
+          }
+        }
+      }
     };
 
     injectWalletStoreAccess();

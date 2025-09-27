@@ -38,6 +38,13 @@ export class DefaultAuthProviderRegistry implements AuthProviderRegistry {
   }
 
   /**
+   * Check if a provider is registered for the given method
+   */
+  isRegistered(method: AuthMethod): boolean {
+    return this.providers.has(method);
+  }
+
+  /**
    * Get all supported authentication methods
    */
   async getSupportedMethods(): Promise<AuthMethod[]> {
