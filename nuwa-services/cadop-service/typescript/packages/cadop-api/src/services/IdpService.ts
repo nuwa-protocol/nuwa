@@ -6,7 +6,7 @@ import {
   VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { PublicKeyCredentialJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
-import { DidKeyCodec, algorithmToKeyType, KEY_TYPE } from '@nuwa-ai/identity-kit';
+import { DidKeyCodec, algorithmToKeyType, KEY_TYPE, DebugLogger } from '@nuwa-ai/identity-kit';
 import { p256 } from '@noble/curves/p256';
 import {
   Secp256k1PublicKey,
@@ -40,6 +40,7 @@ export interface IdpServiceConfig {
 
 export class IdpService {
   private config: IdpServiceConfig;
+  private logger = DebugLogger.get('IdpService');
 
   constructor(config: IdpServiceConfig) {
     this.config = config;
@@ -258,7 +259,7 @@ export class IdpService {
         const x = uncompressed.slice(1, 33); // skip 0x04 prefix
         const y = uncompressed.slice(33, 65);
 
-        console.log('P-256 key decompression:', {
+        this.logger.debug('P-256 key decompression:', {
           compressedLength: rawPubKey.length,
           uncompressedLength: uncompressed.length,
           xLength: x.length,
@@ -304,7 +305,7 @@ export class IdpService {
           Buffer.from(y),
         ]);
       } catch (error) {
-        console.error('P-256 key decompression error:', error);
+        this.logger.error('P-256 key decompression error:', error);
         throw new Error(
           `P-256 key decompression failed: ${error instanceof Error ? error.message : String(error)}`
         );
@@ -362,14 +363,14 @@ export class IdpService {
       const providedAddress = new BitcoinAddress(address).genRoochAddress();
 
       if (derivedAddress.toStr() !== providedAddress.toStr()) {
-        console.log(
+        this.logger.warn(
           'Public key does not match Bitcoin address derived: ' +
             derivedAddress.toStr() +
             ' provided: ' +
             providedAddress.toStr()
         );
-        console.log('Derived address bytes: ' + derivedAddress.toBytes().toString());
-        console.log('Provided address bytes: ' + providedAddress.toBytes().toString());
+        this.logger.debug('Derived address bytes: ' + derivedAddress.toBytes().toString());
+        this.logger.debug('Provided address bytes: ' + providedAddress.toBytes().toString());
         throw new Error(
           'Public key does not match Bitcoin address derived: ' +
             derivedAddress.toStr() +
@@ -416,7 +417,7 @@ export class IdpService {
         origin
       );
     } catch (error) {
-      console.error('Bitcoin verification error:', error);
+      this.logger.error('Bitcoin verification error:', error);
       throw error;
     }
   }
@@ -441,7 +442,7 @@ export class IdpService {
       const hashedMessage = sha256(messageBytes);
       return await publicKey.verify(hashedMessage, signatureBytes);
     } catch (error) {
-      console.error('Bitcoin signature verification error:', error);
+      this.logger.error('Bitcoin signature verification error:', error);
       return false;
     }
   }
@@ -485,7 +486,7 @@ export class IdpService {
 
       try {
         // Log for debugging
-        console.log('Public key details:', {
+        this.logger.debug('Public key details:', {
           keyType,
           publicKeyLength: publicKey.length,
           publicKeyHex: Buffer.from(publicKey).toString('hex').substring(0, 32) + '...',
@@ -495,12 +496,12 @@ export class IdpService {
         let cosePublicKey: Uint8Array;
         try {
           cosePublicKey = this.rawPubKeyToCOSE(publicKey, keyType);
-          console.log('COSE public key created:', {
+          this.logger.debug('COSE public key created:', {
             coseKeyLength: cosePublicKey.length,
             coseKeyHex: Buffer.from(cosePublicKey).toString('hex').substring(0, 32) + '...',
           });
         } catch (coseError) {
-          console.error('COSE key creation error:', coseError);
+          this.logger.error('COSE key creation error:', coseError);
           throw new Error(
             `Failed to create COSE key: ${coseError instanceof Error ? coseError.message : String(coseError)}`
           );
@@ -530,7 +531,7 @@ export class IdpService {
         // Issue ID token
         return this.issueIdToken(userDid, nonce);
       } catch (error) {
-        console.error(
+        this.logger.error(
           'Verification error details:',
           error instanceof Error
             ? { name: error.name, message: error.message, stack: error.stack }
@@ -541,7 +542,7 @@ export class IdpService {
         );
       }
     } catch (error) {
-      console.error(
+      this.logger.error(
         'Assertion processing error:',
         error instanceof Error
           ? { name: error.name, message: error.message, stack: error.stack }
