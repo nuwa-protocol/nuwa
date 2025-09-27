@@ -27,7 +27,7 @@ export interface UseWalletAuthResult {
 export function useWalletAuth(): UseWalletAuthResult {
   const [error, setError] = useState<string | null>(null);
   const [shouldAttemptRestore, setShouldAttemptRestore] = useState(false);
-  
+
   // Rooch SDK Kit hooks
   const currentWallet = useCurrentWallet();
   const currentAddress = useCurrentAddress();
@@ -40,7 +40,7 @@ export function useWalletAuth(): UseWalletAuthResult {
     if (shouldAttemptRestore && connectionStatus === 'connected' && currentAddress) {
       console.log('[useWalletAuth] Wallet connected, attempting session restore...');
       setShouldAttemptRestore(false);
-      
+
       // Delay the restore attempt slightly to ensure all state is synced
       setTimeout(async () => {
         const result = await restoreSession();
@@ -54,7 +54,7 @@ export function useWalletAuth(): UseWalletAuthResult {
   const canRestore = useCallback((): boolean => {
     const currentUserDid = AuthStore.getCurrentUserDid();
     if (!currentUserDid) return false;
-    
+
     const authMethod = UserStore.getAuthMethod(currentUserDid);
     return authMethod === 'wallet';
   }, []);
@@ -65,7 +65,10 @@ export function useWalletAuth(): UseWalletAuthResult {
   }, []);
 
   // Restore wallet session
-  const restoreSession = useCallback(async (): Promise<{ success: boolean; isWaiting: boolean }> => {
+  const restoreSession = useCallback(async (): Promise<{
+    success: boolean;
+    isWaiting: boolean;
+  }> => {
     if (!canRestore()) {
       console.log('[useWalletAuth] No wallet session to restore');
       return { success: false, isWaiting: false };
@@ -82,7 +85,9 @@ export function useWalletAuth(): UseWalletAuthResult {
 
     // If auto-connect is still in progress, set flag to attempt restore later
     if (autoConnectStatus === 'idle') {
-      console.log('[useWalletAuth] Auto-connect still in progress, will retry when wallet connects');
+      console.log(
+        '[useWalletAuth] Auto-connect still in progress, will retry when wallet connects'
+      );
       setError(null);
       setShouldAttemptRestore(true);
       console.log('[useWalletAuth] Returning isWaiting=true');
@@ -93,7 +98,6 @@ export function useWalletAuth(): UseWalletAuthResult {
     setError(null);
 
     try {
-
       // Check if wallet is connected
       if (connectionStatus !== 'connected' || !currentAddress) {
         console.log('[useWalletAuth] Wallet not connected, cannot restore session automatically');
@@ -103,13 +107,13 @@ export function useWalletAuth(): UseWalletAuthResult {
           hasWallet: !!currentWallet,
           walletName: currentWallet?.getName?.(),
         });
-        
+
         // If auto-connect was attempted but wallet is still not connected, fail
         if (autoConnectStatus === 'attempted') {
           setError('Wallet not connected. Please reconnect your wallet.');
           return { success: false, isWaiting: false };
         }
-        
+
         // Otherwise, set flag to attempt restore when wallet connects
         setShouldAttemptRestore(true);
         // Return isWaiting=true to indicate we're waiting for wallet to connect
@@ -138,7 +142,6 @@ export function useWalletAuth(): UseWalletAuthResult {
       console.log('[useWalletAuth] Wallet verified, session can be restored');
       console.log('[useWalletAuth] Wallet session restored successfully');
       return { success: true, isWaiting: false };
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[useWalletAuth] Session restore failed:', error);

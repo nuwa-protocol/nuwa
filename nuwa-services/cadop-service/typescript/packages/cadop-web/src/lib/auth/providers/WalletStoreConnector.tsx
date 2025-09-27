@@ -20,7 +20,7 @@ export function WalletStoreConnector() {
   const currentAddress = useCurrentAddress();
   const connectionStatus = useConnectionStatus();
   const { signOut, authMethod, isAuthenticated } = useAuth();
-  
+
   // Track if we've seen a connected state to distinguish between initial load and actual disconnection
   const [hasBeenConnected, setHasBeenConnected] = useState(false);
 
@@ -66,11 +66,16 @@ export function WalletStoreConnector() {
               .then(provider => {
                 if (provider instanceof WalletAuthProvider) {
                   provider.setWalletStoreAccess(walletStoreAccess);
-                  console.log('[WalletStoreConnector] Successfully injected wallet store access (retry)');
+                  console.log(
+                    '[WalletStoreConnector] Successfully injected wallet store access (retry)'
+                  );
                 }
               })
               .catch(retryError => {
-                console.error('[WalletStoreConnector] Failed to get wallet provider after retry:', retryError);
+                console.error(
+                  '[WalletStoreConnector] Failed to get wallet provider after retry:',
+                  retryError
+                );
               });
           }, 100);
         });
@@ -98,8 +103,15 @@ export function WalletStoreConnector() {
     // 1. User is authenticated with wallet
     // 2. Wallet is currently disconnected
     // 3. We have previously seen a connected state (to avoid signing out during initial load)
-    if (isAuthenticated && authMethod === 'wallet' && connectionStatus === 'disconnected' && hasBeenConnected) {
-      console.log('[WalletStoreConnector] Wallet disconnected after being connected, signing out user');
+    if (
+      isAuthenticated &&
+      authMethod === 'wallet' &&
+      connectionStatus === 'disconnected' &&
+      hasBeenConnected
+    ) {
+      console.log(
+        '[WalletStoreConnector] Wallet disconnected after being connected, signing out user'
+      );
       signOut();
     }
   }, [connectionStatus, isAuthenticated, authMethod, signOut, hasBeenConnected]);

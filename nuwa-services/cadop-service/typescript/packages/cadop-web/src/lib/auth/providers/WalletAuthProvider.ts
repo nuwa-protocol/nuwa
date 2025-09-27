@@ -136,7 +136,7 @@ export class WalletAuthProvider implements AuthProvider {
   async restoreSession(): Promise<boolean> {
     try {
       console.log('[WalletAuthProvider] Attempting to restore session...');
-      
+
       if (!this.walletStoreAccess) {
         console.log('[WalletAuthProvider] Wallet store access not available for session restore');
         return false;
@@ -154,28 +154,28 @@ export class WalletAuthProvider implements AuthProvider {
 
       if (connectionStatus !== 'connected' || !currentAddress) {
         console.log('[WalletAuthProvider] Wallet not connected, attempting to reconnect...');
-        
+
         // Try to reconnect the wallet
         try {
           const currentWallet = this.walletStoreAccess.getCurrentWallet();
           if (currentWallet && typeof currentWallet.connect === 'function') {
             console.log('[WalletAuthProvider] Attempting wallet reconnection...');
             await currentWallet.connect();
-            
+
             // Check again after reconnection attempt
             const newConnectionStatus = this.walletStoreAccess.getConnectionStatus();
             const newCurrentAddress = this.walletStoreAccess.getCurrentAddress();
-            
+
             console.log('[WalletAuthProvider] After reconnection attempt:', {
               connectionStatus: newConnectionStatus,
               hasAddress: !!newCurrentAddress,
             });
-            
+
             if (newConnectionStatus !== 'connected' || !newCurrentAddress) {
               console.log('[WalletAuthProvider] Reconnection failed, cannot restore session');
               return false;
             }
-            
+
             // Update for the rest of the function
             connectionStatus = newConnectionStatus;
             currentAddress = newCurrentAddress;

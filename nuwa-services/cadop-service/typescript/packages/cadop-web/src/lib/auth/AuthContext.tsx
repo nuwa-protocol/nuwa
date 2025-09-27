@@ -50,13 +50,13 @@ const initializeAuthProviders = () => {
     console.log('[AuthContext] Auth providers already initialized, skipping...');
     return;
   }
-  
+
   console.log('[AuthContext] Initializing auth providers...');
   // Register Passkey provider
   authProviderRegistry.register('passkey', async () => new PasskeyAuthProvider());
   // Register Wallet provider
   authProviderRegistry.register('wallet', async () => new WalletAuthProvider());
-  
+
   providersInitialized = true;
   console.log('[AuthContext] Auth providers initialized');
 };
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
 
   const [currentAuthProvider, setCurrentAuthProvider] = useState<IAuthProvider | null>(null);
-  
+
   // Use the new wallet auth hook
   const walletAuth = useWalletAuth();
 
@@ -207,7 +207,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async function bootstrapAuth() {
       try {
         console.log('[AuthContext] Starting bootstrap authentication...');
-        
+
         // Step 1: Check if we have a current user DID
         const currentUserDid = AuthStore.getCurrentUserDid();
         console.log('[AuthContext] Current user DID from storage:', currentUserDid);
@@ -215,8 +215,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (currentUserDid) {
           // User is already authenticated, restore session
           const authMethod = UserStore.getAuthMethod(currentUserDid);
-          console.log('[AuthContext] Auth method for user:', authMethod, 'type:', typeof authMethod);
-          
+          console.log(
+            '[AuthContext] Auth method for user:',
+            authMethod,
+            'type:',
+            typeof authMethod
+          );
+
           if (authMethod) {
             try {
               let sessionRestored = false;
@@ -225,15 +230,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
               if (authMethod === 'wallet') {
                 console.log('[AuthContext] Wallet auth detected, using wallet auth hook...');
                 const walletAuthResult = await walletAuth.restoreSession();
-                
+
                 console.log('[AuthContext] Wallet auth result:', walletAuthResult);
-                
+
                 if (walletAuthResult.success) {
                   // Session restored successfully
                   sessionRestored = true;
                 } else if (walletAuthResult.isWaiting) {
                   // Waiting for wallet auto-connect: keep user authenticated while waiting
-                  console.log('[AuthContext] Wallet auth in progress, keeping authenticated state...');
+                  console.log(
+                    '[AuthContext] Wallet auth in progress, keeping authenticated state...'
+                  );
                   setState({
                     isAuthenticated: true, // Keep user authenticated
                     isLoading: false,
@@ -254,7 +261,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 if (provider.restoreSession) {
                   sessionRestored = await provider.restoreSession();
                 }
-                
+
                 if (sessionRestored) {
                   setCurrentAuthProvider(provider);
                 }
