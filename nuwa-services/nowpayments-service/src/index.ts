@@ -223,8 +223,6 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       pay_currency,
       ipn_callback_url,
       case:cases ?? "success",
-      is_fee_paid_by_user: true,
-      is_fixed_rate: true
     });
       console.log(payment)
       console.log(payment.network)
