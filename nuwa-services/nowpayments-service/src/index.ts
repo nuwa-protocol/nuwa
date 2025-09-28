@@ -169,7 +169,7 @@ app.post(
       res.json({ ok: true });
     } catch (err: any) {
       console.error('Webhook processing error:', err);
-      res.status(500).json({ error: err.message || 'webhook processing error' });
+      res.status(500).json({ error: err.data || 'webhook processing error' });
     }
   }
 );
@@ -258,7 +258,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
     res.status(201).json(payment);
   } catch (err: any) {
       console.log(err)
-    res.status(500).json({ error: err.message || 'create payment failed' });
+    res.status(500).json({ error: err.data || 'create payment failed' });
   }
 });
 
@@ -268,7 +268,7 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
     const payment = await client.getPayment(req.params.id);
     res.json(payment);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'get payment failed' });
+    res.status(500).json({ error: err.data || 'get payment failed' });
   }
 });
 
@@ -278,7 +278,7 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
     const payment = await client.getPayment(req.params.id);
     res.json(payment);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'get payment failed' });
+    res.status(500).json({ error: err.data || 'get payment failed' });
   }
 });
 
@@ -298,7 +298,7 @@ app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: err.message || "get payment failed" });
+    res.status(500).json({ error: err.data || "get payment failed" });
   }
 });
 
@@ -320,7 +320,7 @@ app.get('/api/users/:did/orders', async (req: Request, res: Response) => {
     });
     res.json({ items: records, limit, offset, count: records.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'list orders failed' });
+    res.status(500).json({ error: err.data || 'list orders failed' });
   }
 });
 
@@ -330,7 +330,7 @@ app.get('/api/full-currencies', async (req: Request, res: Response) => {
     const result = await client.getCurrencies();
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'get currencies failed' });
+    res.status(500).json({ error: err.data || 'get currencies failed' });
   }
 });
 
@@ -340,7 +340,7 @@ app.get('/api/fiat-currencies', async (_req: Request, res: Response) => {
     const result = await client.getFiatCurrencies();
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'get fiat currencies failed' });
+    res.status(500).json({ error: err.data || 'get fiat currencies failed' });
   }
 });
 
@@ -355,7 +355,7 @@ app.get('/api/min-amount', async (req: Request, res: Response) => {
     res.json(result);
   } catch (err: any) {
       console.log(err, req)
-    res.status(500).json({ error: err.message || 'get min-amount failed' });
+    res.status(500).json({ error: err.data || 'get min-amount failed' });
   }
 });
 
@@ -375,7 +375,7 @@ app.get('/api/estimate', async (req: Request, res: Response) => {
       console.log(result)
   } catch (err: any) {
       console.log(err)
-    res.status(500).json({ error: err.message || 'get estimate failed' });
+    res.status(500).json({ error: err.data || 'get estimate failed' });
   }
 });
 
