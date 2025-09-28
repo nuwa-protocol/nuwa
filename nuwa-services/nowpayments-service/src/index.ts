@@ -138,7 +138,7 @@ app.post(
         console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
         
           try {
-            const amountReceived = payload.actually_paid || 0;
+            const amountReceived = payload.actually_paid_at_fiat || 0;
             const originalAmount = existing.amount_fiat;
           
           console.log(`Handling expired partially paid order ${paymentId} for user ${existing.payer_did}`);
