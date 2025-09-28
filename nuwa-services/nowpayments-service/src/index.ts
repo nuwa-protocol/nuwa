@@ -131,6 +131,41 @@ app.post(
         }
       }
 
+      const isExpired = status.toLowerCase() === 'expired';
+      const isPartiallyPaid = existing?.status?.toLowerCase() === 'partially_paid';
+      
+      if (isExpired && isPartiallyPaid && existing && existing.payer_did && !existing.transfer_tx) {
+        console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
+        
+          try {
+            const amountReceived = payload.actually_paid || 0;
+            const originalAmount = existing.amount_fiat;
+          
+          console.log(`Handling expired partially paid order ${paymentId} for user ${existing.payer_did}`);
+          console.log(`Order details: original_amount=${originalAmount}, received_amount=${amountReceived}, currency=${existing.currency_fiat}`);
+          
+          if (amountReceived > 0) {
+            const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
+            const amountRgas = BigInt(Math.round(amountReceived)) * rgasPerUsd;
+            
+            console.log(`Transferring ${amountRgas.toString()} RGAS for received amount ${amountReceived} USD`);
+            
+            const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
+            if (tx) {
+              await supabase.markTransferred(paymentId, tx);
+              console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${amountReceived} USD -> ${amountRgas.toString()} RGAS`);
+            } else {
+              console.error(`Partial transfer failed for payment ${paymentId}`);
+            }
+          } else {
+            console.log(`No amount received for payment ${paymentId}, skipping transfer`);
+          }
+          
+        } catch (expiredError) {
+          console.error(`Error handling expired partially paid order ${paymentId}:`, expiredError);
+        }
+      }
+
       res.json({ ok: true });
     } catch (err: any) {
       console.error('Webhook processing error:', err);
