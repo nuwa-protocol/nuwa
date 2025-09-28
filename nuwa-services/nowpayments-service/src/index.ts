@@ -271,7 +271,7 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
 });
 
 // 获取/更新支付估算
-app.get('/api/payments/:id/estimate', async (req: Request, res: Response) => {
+app.get('/api/payments/:id/update-merchant-estimate', async (req: Request, res: Response) => {
   try {
     const paymentId = req.params.id;
     const estimate = await client.getPaymentEstimate(paymentId);
