@@ -345,11 +345,11 @@ app.get('/api/fiat-currencies', async (_req: Request, res: Response) => {
 // 获取最低支付金额
 app.get('/api/min-amount', async (req: Request, res: Response) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, fiat_equivalent, is_fixed_rate, is_fee_paid_by_user } = req.query;
     if (!from || !to) {
       return res.status(400).json({ error: 'missing currency_from or currency_to' });
     }
-    const result = await client.getMinimumAmount(from as string, to as string);
+    const result = await client.getMinimumAmount(from as string, to as string, fiat_equivalent as string, is_fixed_rate as string, is_fee_paid_by_user as string);
     res.json(result);
   } catch (err: any) {
       console.log(err, req)

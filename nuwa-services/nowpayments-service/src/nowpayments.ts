@@ -61,9 +61,9 @@ export class NowPaymentsClient {
 	}
 
 	// 获取最小支付金额
-	async getMinimumAmount(currencyFrom: string, currencyTo: string): Promise<any> {
+	async getMinimumAmount(currencyFrom: string, currencyTo: string, fiat_equivalent: string, is_fixed_rate: string, is_fee_paid_by_user: string): Promise<any> {
 		const resp = await this.http.get('/min-amount', {
-			params: { currency_from: currencyFrom, currency_to: currencyTo },
+			params: { currency_from: currencyFrom, currency_to: currencyTo, fiat_equivalent: fiat_equivalent, is_fixed_rate: is_fixed_rate, is_fee_paid_by_user: is_fee_paid_by_user },
 		});
 		return resp.data;
 	}
