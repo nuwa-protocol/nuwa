@@ -137,6 +137,7 @@ export const ResultCapMetadataSchema = z.object({
 	version: z.string(),
 	displayName: z.string(),
 	description: z.string(),
+	introduction: z.string(),
 	timestamp: z.string(),
 	tags: z.array(z.string()),
 	homepage: z.string().optional(),

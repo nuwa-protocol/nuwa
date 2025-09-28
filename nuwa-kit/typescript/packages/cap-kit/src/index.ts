@@ -140,11 +140,11 @@ export class CapKit {
 				);
 			}
 			// Transform the raw response data to ResultCap format
-			const transformedItems = queryResult.data.items.map((item: any) => {
-				return {
-					...item,
-				};
-			});
+			// const transformedItems = queryResult.data.items.map((item: any) => {
+			// 	return {
+			// 		...item,
+			// 	};
+			// });
 
 			return {
 				code: queryResult.code,
@@ -152,7 +152,7 @@ export class CapKit {
 					totalItems: queryResult.data.totalItems,
 					page: queryResult.data.page,
 					pageSize: queryResult.data.pageSize,
-					items: transformedItems,
+					items: queryResult.data.items,
 				},
 			} as Result<Page<ResultCap>>;
 		} catch (e) {
