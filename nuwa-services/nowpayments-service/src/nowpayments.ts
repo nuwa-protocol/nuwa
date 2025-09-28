@@ -76,6 +76,12 @@ export class NowPaymentsClient {
 		return resp.data;
 	}
 
+	// 获取/更新支付估算
+	async getPaymentEstimate(paymentId: string): Promise<any> {
+		const resp = await this.http.get(`/payment/${encodeURIComponent(paymentId)}/update-merchant-estimate`);
+		return resp.data;
+	}
+
 	// 验证 webhook
 	verifyWebhook(rawBody: Buffer, signature: string): boolean {
 		if (!this.ipnSecret) return false;

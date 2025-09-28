@@ -270,16 +270,17 @@ app.get('/api/payments/:id', async (req: Request, res: Response) => {
   }
 });
 
-
-app.get('/api/payments/:id', async (req: Request, res: Response) => {
+// 获取/更新支付估算
+app.get('/api/payments/:id/estimate', async (req: Request, res: Response) => {
   try {
-    const payment = await client.getPayment(req.params.id);
-    res.json(payment);
+    const paymentId = req.params.id;
+    const estimate = await client.getPaymentEstimate(paymentId);
+    res.json(estimate);
   } catch (err: any) {
-    res.status(500).json({ error: err.response?.data || 'get payment failed' });
+    console.error('Get payment estimate error:', err);
+    res.status(500).json({ error: err.response?.data || 'get payment estimate failed' });
   }
 });
-
 
 app.get('/api/payments-info/:id', async (req: Request, res: Response) => {
   try {
