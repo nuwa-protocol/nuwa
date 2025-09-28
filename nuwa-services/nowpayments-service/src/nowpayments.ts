@@ -9,6 +9,8 @@ export interface CreatePaymentRequest {
 	pay_currency?: string; // e.g. 'btc', 'eth'
 	ipn_callback_url?: string;
     case?: string;
+    is_fixed_rate?: boolean;
+    is_fee_paid_by_user?: boolean;
 }
 
 export interface NowPaymentsClientOptions {
