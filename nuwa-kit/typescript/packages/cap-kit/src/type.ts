@@ -53,7 +53,7 @@ export const CapIDSchema = z
 
 export const CapPromptSuggestionSchema = z
 	.string()
-	.max(50, "Each suggestion must be at most 50 characters");
+	.max(100, "Each suggestion must be at most 50 characters");
 
 export const CapPromptSchema = z.object({
 	value: z.string(),

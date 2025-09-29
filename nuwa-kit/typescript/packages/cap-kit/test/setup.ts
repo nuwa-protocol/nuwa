@@ -27,7 +27,7 @@ async function claimTestnetGas(
   return data.gas || 5_000_000_000; // default fallback
 }
 
-export const setupEnv = async (target: 'test' | 'local' = DEFAULT_TARGET, auth: boolean = true) => {
+export const setupEnv  = async (target: 'test' | 'local' = DEFAULT_TARGET, auth: boolean = true) => {
   const roochUrl = process.env.ROOCH_NODE_URL || target === 'test' ? 'https://test-seed.rooch.network' : 'http://localhost:6767';
   const mcpUrl = process.env.MCP_URL || target === 'test' ? testMcpUrl : localMcpUrl;
   const contractAddress = process.env.CONTRACT_ADDRESS || target === 'test' ? testContractAddress : localContractAddress;

@@ -147,7 +147,7 @@ describe("CapKit query cap", () => {
       console.log('❌ all and checkAll have data differences');
     }
 
-    // expect(checkAll.size).toEqual(all.length);
+    expect(checkAll.size).toEqual(all.length);
 
   }, 150000);
 });
