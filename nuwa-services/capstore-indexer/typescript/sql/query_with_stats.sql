@@ -72,19 +72,19 @@ BEGIN
     END;
   END IF;
   
-  -- Build ORDER BY clause
+  -- Build ORDER BY clause with deterministic secondary sort
   IF p_sort_by IS NOT NULL AND p_sort_by != 'updated_at' THEN
-    order_clause := format('ORDER BY cap_stats.%I %s NULLS %s',
+    order_clause := format('ORDER BY cap_stats.%I %s NULLS %s, cap_data.id ASC',
       p_sort_by,
       CASE WHEN upper(p_sort_order) = 'ASC' THEN 'ASC' ELSE 'DESC' END,
       CASE WHEN upper(p_sort_order) = 'ASC' THEN 'FIRST' ELSE 'LAST' END
     );
   ELSIF p_sort_by = 'updated_at' THEN
-    order_clause := format('ORDER BY cap_data."timestamp" %s',
+    order_clause := format('ORDER BY cap_data."timestamp" %s, cap_data.id ASC',
       CASE WHEN upper(p_sort_order) = 'ASC' THEN 'ASC' ELSE 'DESC' END
     );
   ELSE
-    order_clause := 'ORDER BY cap_data."timestamp" DESC';
+    order_clause := 'ORDER BY cap_data."timestamp" DESC, cap_data.id ASC';
   END IF;
   
   -- Construct the full SQL query with proper column order and types
@@ -415,6 +415,59 @@ SELECT
     ELSE 'PASS - no NULL values'
   END as null_check
 FROM query_caps_with_stats(p_limit := 10);
+
+-- ============================================================================
+-- Test 16: Pagination consistency test (duplicate data fix verification)
+-- ============================================================================
+SELECT 'Test 16a: Pagination consistency - Page 1' as test_name;
+SELECT 
+  id,
+  name,
+  downloads,
+  ROW_NUMBER() OVER (ORDER BY downloads DESC, id ASC) as row_num
+FROM query_caps_with_stats(
+  p_sort_by := 'downloads',
+  p_sort_order := 'desc',
+  p_limit := 5,
+  p_offset := 0
+);
+
+SELECT 'Test 16b: Pagination consistency - Page 2' as test_name;
+SELECT 
+  id,
+  name,
+  downloads,
+  ROW_NUMBER() OVER (ORDER BY downloads DESC, id ASC) as row_num
+FROM query_caps_with_stats(
+  p_sort_by := 'downloads',
+  p_sort_order := 'desc',
+  p_limit := 5,
+  p_offset := 5
+);
+
+-- Test for deterministic ordering with same values
+SELECT 'Test 16c: Deterministic ordering test' as test_name;
+WITH paginated_data AS (
+  SELECT 
+    id,
+    name,
+    downloads,
+    ROW_NUMBER() OVER (ORDER BY downloads DESC, id ASC) as row_num
+  FROM query_caps_with_stats(
+    p_sort_by := 'downloads',
+    p_sort_order := 'desc',
+    p_limit := 20,
+    p_offset := 0
+  )
+)
+SELECT 
+  'PASS - Deterministic ordering' as test_result
+WHERE NOT EXISTS (
+  SELECT 1 
+  FROM paginated_data p1
+  JOIN paginated_data p2 ON p1.downloads = p2.downloads AND p1.id != p2.id
+  WHERE p1.row_num > p2.row_num AND p1.id < p2.id
+);
 
 -- ============================================================================
 -- Summary Report

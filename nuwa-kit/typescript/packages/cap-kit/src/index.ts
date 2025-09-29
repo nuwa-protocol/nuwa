@@ -37,6 +37,7 @@ export class CapKit {
 		}
 		return this.mcpTools
 	}
+
 	async mcpClose() {
 		this.mcpClient?.close();
 	}
@@ -497,7 +498,6 @@ export class CapKit {
 		content: string,
 		signer: SignerInterface,
 	): Promise<string> {
-		const client = await buildClient(this.mcpUrl, signer);
 
 		try {
 			// Get tools from MCP server
