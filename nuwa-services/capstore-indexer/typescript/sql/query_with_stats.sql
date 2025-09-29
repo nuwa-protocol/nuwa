@@ -20,6 +20,7 @@ RETURNS TABLE (
   homepage TEXT,
   repository TEXT,
   thumbnail TEXT,
+  introduction TEXT,
   enable BOOLEAN,
   "timestamp" TIMESTAMPTZ,  -- Use quotes for reserved keyword
   version INTEGER,
@@ -99,6 +100,7 @@ BEGIN
       cap_data.homepage,
       cap_data.repository,
       cap_data.thumbnail,
+      cap_data.introduction,
       cap_data.enable,
       cap_data."timestamp",
       cap_data.version,

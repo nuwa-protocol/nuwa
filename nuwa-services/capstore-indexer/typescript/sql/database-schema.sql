@@ -11,6 +11,7 @@ CREATE TABLE cap_data (
   display_name TEXT NOT NULL,
   tags JSONB DEFAULT '[]'::jsonb,
   description TEXT NOT NULL,
+  introduction TEXT NULL,
   submitted_at BIGINT NULL,
   homepage TEXT NULL,
   repository TEXT NULL,

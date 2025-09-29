@@ -10,6 +10,10 @@ export const CapIDNameSchema = z
 	.min(6, "Name must be at least 6 characters")
 	.max(20, "Name must be at most 20 characters");
 
+export const CapArtifactSchema = z.object({
+	srcUrl: z.string().url('Must be a valid URL'),
+});
+
 export const CapIDSchema = z
 	.object({
 		authorDID: CapAuthorDIDSchema,
@@ -20,26 +24,32 @@ export const CapIDSchema = z
 		id: `${data.authorDID}:${data.idName}`,
 	}));
 
-export const CapModelSchema = z.object({
-	customGatewayUrl: z.string().url("Must be a valid URL").optional(),
-	modelId: z
-		.string()
-		.max(50, "Model ID must be at most 50 characters")
-		.refine((id) => id.length > 0, "Model ID is required"),
-	parameters: z.record(z.string(), z.any()).optional(),
-	supportedInputs: z
-		.array(z.enum(["text", "image", "file", "audio"]))
-		.min(1)
-		.refine((inputs) => inputs.includes("text"), "text input is required"),
-	modelType: z.enum([
-		"Language Model",
-		"Responses Model",
-		"Embedding Model",
-		"Image Model",
-		"Transcription Model",
-		"Speech Model",
-	]),
-});
+	export const CapModelSchema = z.object({
+		customGatewayUrl: z.string().url('Must be a valid URL').optional(),
+		providerId: z.enum([
+			'openai_chat_completion',
+			'openai_responses',
+			'anthropic',
+			'google',
+			'openrouter',
+			'xai',
+			'groq',
+			'togetherai',
+			'azure',
+			'deepseek',
+			'mistral',
+		]),
+		modelId: z
+			.string()
+			.max(50, 'Model ID must be at most 50 characters')
+			.refine((id) => id.length > 0, 'Model ID is required'),
+		parameters: z.record(z.string(), z.any()).optional(),
+		supportedInputs: z
+			.array(z.enum(['text', 'image', 'file', 'audio']))
+			.min(1)
+			.refine((inputs) => inputs.includes('text'), 'text input is required'),
+		contextLength: z.number().min(1000, 'Please enter a valid context length'),
+	});
 
 export const CapPromptSuggestionSchema = z
 	.string()
@@ -56,25 +66,30 @@ export const CapCoreSchema = z.object({
 	prompt: CapPromptSchema,
 	model: CapModelSchema,
 	mcpServers: z.record(z.string(), CapMcpServerSchema),
+	artifact: CapArtifactSchema.optional(),
 });
 
 export const CapThumbnailSchema = z
 	.string().optional();
 
-export const CapMetadataSchema = z.object({
-	displayName: z
-		.string()
-		.min(1, "Display name is required")
-		.max(50, "Display name too long"),
-	description: z
-		.string()
-		.min(20, "Description must be at least 10 characters")
-		.max(500, "Description too long"),
-	tags: z.array(z.string()).min(1, "At least one tag is required"),
-	homepage: z.string().url("Must be a valid URL").optional(),
-	repository: z.string().url("Must be a valid URL").optional(),
-	thumbnail: CapThumbnailSchema,
-});
+	export const CapMetadataSchema = z.object({
+		displayName: z
+			.string()
+			.min(1, 'Display name is required')
+			.max(50, 'Display name too long'),
+		description: z
+			.string()
+			.min(10, 'Description must be at least 10 characters')
+			.max(150, 'Description too long'),
+		introduction: z
+			.string()
+			.min(10, 'Introduction must be at least 10 characters')
+			.max(5000, 'Introduction too long'),
+		tags: z.array(z.string()).min(1, 'At least one tag is required'),
+		homepage: z.string().url('Must be a valid URL').optional(),
+		repository: z.string().url('Must be a valid URL').optional(),
+		thumbnail: CapThumbnailSchema,
+	});
 
 export const CapSchema = CapIDSchema.and(
 	z.object({
@@ -122,6 +137,7 @@ export const ResultCapMetadataSchema = z.object({
 	version: z.string(),
 	displayName: z.string(),
 	description: z.string(),
+	introduction: z.string(),
 	timestamp: z.string(),
 	tags: z.array(z.string()),
 	homepage: z.string().optional(),
@@ -139,3 +155,4 @@ export const RatingDistribution = z.object({
 export type ResultCap = z.infer<typeof ResultCapMetadataSchema>;
 export type CapStats = z.infer<typeof CapStatsSchema>;
 export type RatingDistribution = z.infer<typeof RatingDistribution>;
+export type Artifact = z.infer<typeof CapArtifactSchema>;

@@ -17,6 +17,7 @@ export interface CapMetadata {
   timestamp: string,
   repository: string,
   thumbnail: string,
+  introduction: string,
   enable: boolean,
   version?: number,
   stats: CapStats

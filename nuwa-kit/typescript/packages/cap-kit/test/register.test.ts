@@ -24,14 +24,17 @@ describe("CapKit", () => {
           value: 'nuwa test cap'
         },
         model: {
+          providerId: "anthropic",
           modelId: 'openai/gpt-4o-mini',
           supportedInputs: ['text', 'image', 'file'],
-          modelType: 'Language Model'
+          modelType: 'Language Model',
+          contextLength: 100,
         }
       },
       metadata: {
         "displayName": "nuwa_test",
         "description": "nuwa test cap nuwa test cap nuwa test cap",
+        "introduction": "nuwa test",
         "tags": [
           "Coding"
         ],
