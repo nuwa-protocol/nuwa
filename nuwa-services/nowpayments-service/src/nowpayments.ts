@@ -78,7 +78,7 @@ export class NowPaymentsClient {
 
 	// 获取/更新支付估算
 	async getPaymentEstimate(paymentId: string): Promise<any> {
-		const resp = await this.http.get(`/payment/${encodeURIComponent(paymentId)}/update-merchant-estimate`);
+		const resp = await this.http.post(`/payment/${encodeURIComponent(paymentId)}/update-merchant-estimate`);
 		return resp.data;
 	}
 

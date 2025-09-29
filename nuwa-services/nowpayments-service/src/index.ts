@@ -331,7 +331,7 @@ app.get('/api/payment/:id/update-merchant-estimate', async (req: Request, res: R
     const estimate = await client.getPaymentEstimate(paymentId);
     res.json(estimate);
   } catch (err: any) {
-    console.error('Get payment estimate error:', err);
+    console.error('Post payment estimate error:', err);
     res.status(500).json({ error: err.response?.data || 'get payment estimate failed' });
   }
 });
