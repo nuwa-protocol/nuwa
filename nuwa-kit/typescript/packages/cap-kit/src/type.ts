@@ -70,7 +70,7 @@ export const CapCoreSchema = z.object({
 });
 
 export const CapThumbnailSchema = z
-	.string().optional();
+	.string().url('Must be a valid URL').optional();
 
 	export const CapMetadataSchema = z.object({
 		displayName: z
