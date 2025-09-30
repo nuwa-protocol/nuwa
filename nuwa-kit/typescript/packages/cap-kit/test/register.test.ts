@@ -12,7 +12,7 @@ describe("CapKit", () => {
     signer = s;
   }, 60000)
 
-  const buildCap = (did:string, name: string)=> {
+  const buildCap = (did:string, name: string, disName?: string)=> {
     return {
       id: `${did}:test_cap`,
       idName: name,
@@ -32,7 +32,7 @@ describe("CapKit", () => {
         }
       },
       metadata: {
-        "displayName": "nuwa_test",
+        displayName: disName ?? "nuwa_test",
         "description": "nuwa test cap nuwa test cap nuwa test cap",
         "introduction": "nuwa test",
         "tags": [
@@ -53,7 +53,7 @@ describe("CapKit", () => {
     const download1 = await capKit.downloadByCID(result || '');
     expect(download1).toBeDefined();
 
-    const result2 = await capKit.registerCap(buildCap(did, 'test_cap1'));
+    const result2 = await capKit.registerCap(buildCap(did, 'test_cap123', 'update_test'));
     expect(result2).toBeDefined();
 
     await new Promise(resolve => setTimeout(resolve, 10000));

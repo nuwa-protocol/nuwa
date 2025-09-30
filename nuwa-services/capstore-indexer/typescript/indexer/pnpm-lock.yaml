@@ -12,8 +12,8 @@ importers:
         specifier: ^0.5.1
         version: 0.5.1(typescript@5.4.5)
       '@roochnetwork/rooch-sdk':
-        specifier: 0.3.6
-        version: 0.3.6(typescript@5.4.5)
+        specifier: 0.4.0
+        version: 0.4.0(typescript@5.4.5)
       '@supabase/supabase-js':
         specifier: ^2.50.5
         version: 2.50.5
@@ -625,6 +625,10 @@ packages:
 
   '@roochnetwork/rooch-sdk@0.3.6':
     resolution: {integrity: sha512-dbej3xzpb2WK9CJh90cT51hTSCee/GHRFIHbWhlCGse1zaiJh4KDuP+jpJJH5PYrrOQsCZNHU1WJ0hQTH8UNIA==}
+    engines: {node: '>=18.0.0'}
+
+  '@roochnetwork/rooch-sdk@0.4.0':
+    resolution: {integrity: sha512-8YEqhLL7c1/wDpxkbWzFhoL6Aj1pe62Yqdb/KsFnYqoJgj47MTHaf0J0vDl6bVVPJAWPDzCVVQyMz2WyfK2OlQ==}
     engines: {node: '>=18.0.0'}
 
   '@scure/base@1.1.9':
@@ -2390,6 +2394,27 @@ snapshots:
     optional: true
 
   '@roochnetwork/rooch-sdk@0.3.6(typescript@5.4.5)':
+    dependencies:
+      '@mysten/bcs': 1.0.4
+      '@noble/curves': 1.6.0
+      '@noble/hashes': 1.5.0
+      '@scure/base': 1.1.9
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      '@suchipi/femver': 1.0.0
+      bech32: 2.0.0
+      bs58check: 4.0.0
+      buffer: 6.0.3
+      debug: 4.4.1
+      eventsource: 3.0.6
+      rxjs: 7.8.2
+      tweetnacl: 1.0.3
+      valibot: 0.41.0(typescript@5.4.5)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@roochnetwork/rooch-sdk@0.4.0(typescript@5.4.5)':
     dependencies:
       '@mysten/bcs': 1.0.4
       '@noble/curves': 1.6.0
