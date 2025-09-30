@@ -31,29 +31,64 @@ Connect to the Nuwa Client to call its functions from your Cap UI.
 ### React Hook (Recommended)
 
 ```jsx
-import { useNuwaClient } from '@nuwa-ai/ui-kit';
+import React, { useEffect, useState } from 'react';
+import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
 
 function MyCapUI() {
-  const { containerRef, nuwaClient } = useNuwaClient({
-    autoAdjustHeight: true, // Automatically adjust iframe height
-    onConnected: () => console.log('Connected to Nuwa!'),
-    onError: (error) => console.error('Connection error:', error)
-  });
+  const { nuwa, connected, theme } = useNuwa();
+  const [input, setInput] = useState('');
 
-  const handleSendPrompt = async () => {
-    await nuwaClient.sendPrompt('Generate something amazing');
+  // Load previously saved state (if any)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const prev = await nuwa.getState<string | null>();
+      if (mounted && typeof prev === 'string') setInput(prev);
+    })();
+    return () => { mounted = false; };
+  }, [nuwa]);
+
+  // Save state 
+  const handleInputChange = async (e) => {
+    const value = e.target.value;
+    setInput(value);
+    await nuwa.saveState(value);
   };
 
+  const handleSendPrompt = async () => {
+    await nuwa.sendPrompt('The user wants to do this');
+  };
+
+  const handleAIGeneration = async () => {
+    const stream = nuwa.createAIStream({ prompt: 'Generate something amazing' });
+    await stream.execute({
+      onChunk: (chunk) => {
+        if (chunk.type === 'content') setInput((prev) => prev + chunk.content);
+      },
+    });
+  };
 
   return (
-    <div ref={containerRef} className="p-4">
+    <div className="p-4">
       <h1>My Cap UI</h1>
+      <p>Connected: {String(connected)}</p>
+      <input value={input} onChange={handleInputChange} />
       
-      <button onClick={handleSendPrompt}>
-        Send Prompt to AI
-      </button>
-      
+      <button onClick={handleSendPrompt}>Send Prompt to AI</button>
+      <button onClick={handleAIGeneration}>Let AI Generate</button>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <NuwaProvider
+      autoHeight
+      onConnected={() => console.log('Connected to Nuwa!')}
+      onError={(err) => console.error('Connection error:', err)}
+    >
+      <MyCapUI />
+    </NuwaProvider>
   );
 }
 ```
@@ -65,7 +100,7 @@ import { NuwaClient } from '@nuwa-ai/ui-kit';
 
 const client = new NuwaClient();
 
-// The client auto-connects by default
+// Connect before invoking methods
 await client.connect();
 
 // Send a prompt to the AI
@@ -79,7 +114,7 @@ await client.saveState({ userPreferences: { theme: 'dark' } });
 const state = await client.getState();
 
 // Stream AI responses (capId is optional)
-const stream = client.StreamAI({
+const stream = client.createAIStream({
   prompt: 'Stream a poem line by line'
 });
 
@@ -104,30 +139,18 @@ console.log('result:', stream.result); // string or array of chunks
 
 ### Auto Height Adjustment
 
-The SDK provides automatic height adjustment to ensure your iframe content is fully visible:
+The SDK provides automatic height adjustment to ensure your iframe content is fully visible. Wrap your app with `NuwaProvider` and set `autoHeight`:
 
 ```jsx
-function WeatherApp() {
-  const [weatherData, setWeatherData] = useState(null);
-  const { containerRef } = useNuwaClient({ 
-    autoAdjustHeight: true,
-    onConnected: () => console.log('Connected to parent!')
-  });
+import React from 'react';
+import { NuwaProvider } from '@nuwa-ai/ui-kit';
+import App from './App';
 
-  useEffect(() => {
-    fetchWeatherData().then(setWeatherData);
-  }, []);
-
+export default function Root() {
   return (
-    <div ref={containerRef}>
-      <div className="p-4">
-        {weatherData ? (
-          <WeatherDisplay data={weatherData} />
-        ) : (
-          <div>Loading weather...</div>
-        )}
-      </div>
-    </div>
+    <NuwaProvider autoHeight>
+      <App />
+    </NuwaProvider>
   );
 }
 ```
@@ -183,7 +206,7 @@ server.connect(transport);
 
 ### Returning UI Resources from MCP Tools
 
-You can return UI resources from your MCP tools to tell the client to render specific UI components:
+You can return UI resources from your MCP tools to tell the client to render specific UI components for a tool execution:
 
 ```javascript
 import { createUIToolResult } from '@nuwa-ai/ui-kit';
@@ -230,15 +253,12 @@ interface UIResource {
 ```jsx
 import { useEffect, useState } from 'react';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { PostMessageMCPTransport, useNuwaClient } from '@nuwa-ai/ui-kit';
+import { PostMessageMCPTransport, NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
 import { z } from 'zod';
 
 function MyCapWithMCP() {
   const [content, setContent] = useState('Initial content');
-  const { containerRef, nuwaClient } = useNuwaClient({ 
-    autoAdjustHeight: true,
-    onConnected: () => console.log('Connected to parent!')
-  });
+  const { nuwa } = useNuwa();
 
   useEffect(() => {
     // Set up MCP server
@@ -294,7 +314,7 @@ function MyCapWithMCP() {
   }, [content]);
 
   return (
-    <div ref={containerRef} className="p-4">
+    <div className="p-4">
       <h1>My Cap UI with MCP</h1>
       
       <div className="content-display">
@@ -331,53 +351,56 @@ const transport = new PostMessageMCPTransport({
 
 ## 🚀 Complete Example
 
-For a full working example, see our **Cap UI example** in the repository:
+For a full working example, see **Nuwa Caps**:
 
-**📁 [`examples/cap-ui/`](./../../examples/cap-ui/)**
+**📁 [`nuwa-caps`](https://github.com/nuwa-protocol/nuwa-caps)**
 
 
 ## API Reference
 
-### `useNuwaClient(options)`
+### `NuwaProvider(props)` and `useNuwa()`
 
-**Options:**
-- `autoAdjustHeight?: boolean` - Enable automatic height adjustment (default: `false`)
-- `allowedOrigins?: string[]` - Allowed origins for iframe communication (default: `["*"]`)
-- `timeout?: number` - Connection timeout in milliseconds (default: `1000`)
-- `autoConnect?: boolean` - Auto-connect on instantiation (default: `true`)
-- `debug?: boolean` - Enable debug logging (default: `false`)
-- `methodTimeout?: number` - Timeout for method calls in milliseconds (default: `2000`)
-- `onConnected?: () => void` - Callback when connection is established
-- `onError?: (error: Error) => void` - Callback when connection fails
+Use `NuwaProvider` to set up the connection and wrap your UI; call `useNuwa()` inside to access the client and state.
 
-**Returns:**
-- `nuwaClient: NuwaClient` - The NuwaClient instance
-- `containerRef: RefObject<HTMLDivElement>` - Ref to attach to your root container
+`NuwaProvider` props:
+- `autoHeight?: boolean` - Auto-adjust parent iframe height (default `true`)
+- `allowedOrigins?: string[]` - Allowed origins (default `["*"]`)
+- `timeout?: number` - Connection timeout in ms (default `2000`)
+- `debug?: boolean` - Enable debug logging
+- `methodTimeout?, methodTimeouts?, methodRetries?, methodRetriesMap?` - Per-call behavior
+- `streamTimeout?, streamRetries?, streamBufferSize?` - Streaming config
+- `onConnected?(), onError?(error)` - Lifecycle callbacks
+- `className?, style?` - Provider container props (dark class toggles automatically with theme)
+
+`useNuwa()` returns:
+- `nuwa: NuwaClient` - The client instance
+- `theme: 'light' | 'dark'` - Current theme pushed from parent
+- `connected: boolean` - Connection state
 
 ### `NuwaClient` Class
 
 **Constructor Options:**
-- Same as `useNuwaClient` options above
+- Same as `NuwaProvider` client options (`allowedOrigins`, `timeout`, `debug`, `methodTimeout(s)`, retry maps, stream settings)
 
 **Methods:**
 - `connect(): Promise<void>` - Establish connection with parent
 - `sendPrompt(prompt: string): Promise<void>` - Send a prompt to parent
 - `setHeight(height: string | number): Promise<void>` - Set iframe height
 - `addSelection(label: string, message: string | Record<string, any>): Promise<void>` - Add selection to parent
-- `saveState<T>(state: T): Promise<void>` - Save state data to parent
+- `saveState<T>(state: T): Promise<void>` - Save state data to parent 
 - `getState<T>(): Promise<T | null>` - Retrieve state data from parent
-- `StreamAI<T>(request: StreamAIRequest<T>): StreamHandle<T>` - Factory for starting a server-side stream. Call `await execute({ onChunk?, onError? })` to run until completion; the promise resolves to `{ result, error }`. Inspect live `status`, `error`, `result` and use `abort()` to cancel.
+- `createAIStream<T>(request: StreamAIRequest<T>): StreamHandle<T>` - Factory for starting a server-side stream. Call `await execute({ onChunk?, onError? })` to run until completion; the promise resolves to `{ result, error }`. Inspect live `status`, `error`, `result` and use `abort()` to cancel.
 - `reconnect(): Promise<void>` - Reconnect to parent if connection is lost
 - `disconnect(): void` - Disconnect from parent
 - `getStats()` - Get connection statistics
 
-> Note: The hook does not expose a reactive `isConnected` boolean. If you need connection state, track it via `onConnected`/`onError` callbacks in your component state.
+> Note: `useNuwa()` exposes `connected`. You can also rely on `onConnected`/`onError` callbacks in the provider for lifecycle events.
 
 ### Streaming API
 
 ```ts
-// Basic (capId optional)
-const s1 = nuwaClient.StreamAI({ prompt: 'Stream summary' });
+// Basic
+const s1 = nuwa.createAIStream({ prompt: 'Stream summary' });
 const { result: res1, error: err1 } = await s1.execute({
   onChunk: (chunk) => {
     if (chunk.type === 'content') console.log(chunk.content);
@@ -388,34 +411,16 @@ console.log('result:', res1);
 if (err1) console.warn('error:', err1);
 
 // With explicit error callback
-const s2 = nuwaClient.StreamAI({ prompt: 'Stream structured output' });
+const s2 = nuwa.createAIStream({ prompt: 'Stream structured output' });
 const { result: res2, error: err2 } = await s2.execute({
   onChunk: (chunk) => {
     if (chunk.type === 'content') console.log('content:', chunk.content);
   },
   onError: (err) => console.error('stream error (live):', err)
 });
-
-// If your environment requires targeting a specific Cap, provide capId:
-const s3 = nuwaClient.StreamAI({ prompt: 'Stream with specific cap', capId: 'my-cap' });
-const { result: res3, error: err3 } = await s3.execute();
 ```
 
 Note: Callbacks passed to `execute()` are handled locally by the SDK and are not sent to the parent window, as functions cannot be cloned across `postMessage`.
-
-## Best Practice - Always Use Container Ref
-
-When using `autoAdjustHeight`, always attach the `containerRef` to your root container:
-
-```jsx
-// ✅ Correct
-const { containerRef } = useNuwaClient({ autoAdjustHeight: true });
-return <div ref={containerRef}>Content</div>;
-
-// ❌ Wrong - height detection won't work
-const { containerRef } = useNuwaClient({ autoAdjustHeight: true });
-return <div>Content</div>; // Missing ref
-```
 
 ## Requirements
 
