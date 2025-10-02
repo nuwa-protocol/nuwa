@@ -121,7 +121,7 @@ app.post(
         try {
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
           if (tx) {
-            await supabase.markTransferred(paymentId, tx, existing.amount_fiat);
+            await supabase.markTransferred(paymentId, tx, amountRgas);
             console.log(`Transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${existing.amount_fiat} USD`);
           } else {
             console.error(`Transfer failed for payment ${paymentId}`);
@@ -137,34 +137,36 @@ app.post(
         console.log(`Payment ${paymentId} is partially paid, processing transfer`);
         
         try {
-          const amountReceived = payload.actually_paid_at_fiat || payload.amount_received || 0;
-          const originalAmount = existing.amount_fiat;
-          const alreadyTransferred = existing.transferred_amount || 0;
+          const amountReceivedUsd: number = Number(payload.actually_paid_at_fiat || payload.amount_received || 0);
+          const originalAmountUsd: number = Number(existing.amount_fiat || 0);
+          // 数据库存储的已转账数量改为 RGAS（可能是 string），读取后转为 bigint 参与计算
+          const alreadyTransferredRgas: bigint = BigInt(existing.transferred_amount ?? 0);
           
           console.log(`Handling partially paid order ${paymentId} for user ${existing.payer_did}`);
-          console.log(`Order details: original_amount=${originalAmount}, received_amount=${amountReceived}, already_transferred=${alreadyTransferred}, currency=${existing.currency_fiat}`);
+          console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
-          if (amountReceived > 0) {
+          if (amountReceivedUsd > 0) {
             // 计算需要转账的金额（已收到的金额减去已经转账的金额）
-            const amountToTransfer = amountReceived - alreadyTransferred;
+            const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
+            const receivedRgas: bigint = BigInt(Math.round(amountReceivedUsd)) * rgasPerUsd;
+            const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
-            if (amountToTransfer > 0) {
-              const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-              const amountRgas = BigInt(Math.round(amountToTransfer)) * rgasPerUsd;
+            if (amountToTransferRgas > 0n) {
+              const amountRgas = amountToTransferRgas;
               
-              console.log(`Transferring ${amountRgas.toString()} RGAS for amount ${amountToTransfer} USD (received: ${amountReceived}, already transferred: ${alreadyTransferred})`);
+              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${amountReceivedUsd} USD (already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
               
               const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
               if (tx) {
-                // 更新已转账金额
-                const newTransferredAmount = alreadyTransferred + amountToTransfer;
-                await supabase.updateTransferredAmount(paymentId, newTransferredAmount, tx);
-                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${amountToTransfer} USD -> ${amountRgas.toString()} RGAS, total transferred: ${newTransferredAmount}`);
+                // 更新已转账 RGAS 数量
+                const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
+                await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
+                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}`);
               } else {
                 console.error(`Partial transfer failed for payment ${paymentId}`);
               }
             } else {
-              console.log(`No additional amount to transfer for payment ${paymentId} (already transferred: ${alreadyTransferred}, received: ${amountReceived})`);
+              console.log(`No additional RGAS to transfer for payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${amountReceivedUsd})`);
             }
           } else {
             console.log(`No amount received for payment ${paymentId}, skipping transfer`);
@@ -182,34 +184,35 @@ app.post(
         console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
         
         try {
-          const amountReceived = payload.actually_paid_at_fiat || 0;
-          const originalAmount = existing.amount_fiat;
-          const alreadyTransferred = existing.transferred_amount || 0;
+          const amountReceivedUsd: number = Number(payload.actually_paid_at_fiat || 0);
+          const originalAmountUsd: number = Number(existing.amount_fiat || 0);
+          const alreadyTransferredRgas: bigint = BigInt(existing.transferred_amount ?? 0);
         
           console.log(`Handling expired partially paid order ${paymentId} for user ${existing.payer_did}`);
-          console.log(`Order details: original_amount=${originalAmount}, received_amount=${amountReceived}, already_transferred=${alreadyTransferred}, currency=${existing.currency_fiat}`);
+          console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
-          if (amountReceived > 0) {
+          if (amountReceivedUsd > 0) {
             // 计算需要转账的金额（已收到的金额减去已经转账的金额）
-            const amountToTransfer = amountReceived - alreadyTransferred;
+            const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
+            const receivedRgas: bigint = BigInt(Math.round(amountReceivedUsd)) * rgasPerUsd;
+            const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
-            if (amountToTransfer > 0) {
-              const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-              const amountRgas = BigInt(Math.round(amountToTransfer)) * rgasPerUsd;
+            if (amountToTransferRgas > 0n) {
+              const amountRgas = amountToTransferRgas;
               
-              console.log(`Transferring ${amountRgas.toString()} RGAS for amount ${amountToTransfer} USD (received: ${amountReceived}, already transferred: ${alreadyTransferred})`);
+              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${amountReceivedUsd} USD (already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
               
               const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
               if (tx) {
-                // 更新已转账金额
-                const newTransferredAmount = alreadyTransferred + amountToTransfer;
-                await supabase.updateTransferredAmount(paymentId, newTransferredAmount, tx);
-                console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${amountToTransfer} USD -> ${amountRgas.toString()} RGAS, total transferred: ${newTransferredAmount}`);
+                // 更新已转账 RGAS 数量
+                const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
+                await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
+                console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}`);
               } else {
                 console.error(`Expired partial transfer failed for payment ${paymentId}`);
               }
             } else {
-              console.log(`No additional amount to transfer for expired payment ${paymentId} (already transferred: ${alreadyTransferred}, received: ${amountReceived})`);
+              console.log(`No additional RGAS to transfer for expired payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${amountReceivedUsd})`);
             }
           } else {
             console.log(`No amount received for payment ${paymentId}, skipping transfer`);

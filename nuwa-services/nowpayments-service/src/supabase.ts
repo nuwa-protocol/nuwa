@@ -29,7 +29,7 @@ export interface PaymentRecord {
 	time_limit?: number | null;
 	burning_percent?: number | null;
 	expiration_estimate_date?: string;
-	transferred_amount?: number;
+		transferred_amount?: number | string;
 	transferred_tx_hash?: string;
 }
 
@@ -54,10 +54,10 @@ export class SupabaseService {
 		return data as any;
 	}
 
-	async markTransferred(paymentId: string, txHash: string, amount?: number): Promise<void> {
+	async markTransferred(paymentId: string, txHash: string, amount?: number | bigint | string): Promise<void> {
 		const updateData: any = { transfer_tx: txHash };
 		if (amount !== undefined) {
-			updateData.transferred_amount = amount;
+			updateData.transferred_amount = typeof amount === 'bigint' ? amount.toString() : amount;
 			updateData.transferred_tx_hash = txHash;
 		}
 		
@@ -68,11 +68,12 @@ export class SupabaseService {
 		if (error) throw error;
 	}
 
-	async updateTransferredAmount(paymentId: string, amount: number, txHash: string): Promise<void> {
+	async updateTransferredAmount(paymentId: string, amount: number | bigint | string, txHash: string): Promise<void> {
+		const normalizedAmount = typeof amount === 'bigint' ? amount.toString() : amount;
 		const { error } = await this.client
 			.from(this.table)
 			.update({ 
-				transferred_amount: amount,
+				transferred_amount: normalizedAmount,
 				transferred_tx_hash: txHash
 			})
 			.eq('nowpayments_payment_id', paymentId);
