@@ -29,7 +29,7 @@ export interface PaymentRecord {
 	time_limit?: number | null;
 	burning_percent?: number | null;
 	expiration_estimate_date?: string;
-		transferred_amount?: number | string;
+    transferred_amount?: number | string;
 	transferred_tx_hash?: string;
 }
 

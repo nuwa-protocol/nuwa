@@ -116,7 +116,7 @@ app.post(
       if (isSuccess && existing && !existing.transfer_tx && existing.payer_did) {
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-        const amountRgas = BigInt(Math.round(existing.amount_fiat)) * rgasPerUsd;
+        const amountRgas = BigInt(existing.amount_fiat) * rgasPerUsd;
         
         try {
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
@@ -148,7 +148,7 @@ app.post(
           if (amountReceivedUsd > 0) {
             // 计算需要转账的金额（已收到的金额减去已经转账的金额）
             const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(Math.round(amountReceivedUsd)) * rgasPerUsd;
+            const receivedRgas: bigint = BigInt(amountReceivedUsd) * rgasPerUsd;
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
