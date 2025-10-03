@@ -1,0 +1,212 @@
+---
+title: "Cap Kit"
+description: "About Nuwa Cap Kit"
+---
+## What It Is
+
+`@nuwa-ai/cap-kit` helps you register, discover, and manage Caps (Agent Capability Packages). It integrates DID auth, IPFS storage, Rooch contracts, and MCP.
+
+## Examples
+
+Register a Cap
+
+```ts
+import { CapKit } from '@nuwa-ai/cap-kit';
+import { TestEnv, createSelfDid } from '@nuwa-ai/identity-kit/testHelpers';
+
+const env = await TestEnv.bootstrap({ rpcUrl: 'https://test-seed.rooch.network', network: 'test' });
+const { signer, did } = await createSelfDid(env);
+
+const capKit = new CapKit({ roochUrl: 'https://test-seed.rooch.network', mcpUrl: 'https://<your-mcp-server>', contractAddress: '<contract>', signer });
+
+await capKit.registerCap({
+  authorDID: did,
+  idName: 'my_awesome_cap',
+  core: {
+    prompt: { value: 'You are...' },
+    model: { providerId: 'openrouter', modelId: 'openai/gpt-4o-mini', supportedInputs: ['text'], contextLength: 128000 },
+    mcpServers: { tools: 'https://<your-mcp-server>' },
+  },
+  metadata: { displayName: 'Awesome Cap', description: '...', introduction: '...', tags: ['demo'] },
+});
+```
+
+Query & Stats
+
+```ts
+const result = await capKit.queryByName('translator', { page: 1, size: 20, sortBy: 'downloads' });
+const byId = await capKit.queryByID({ id: 'did:rooch:0x..:translator' });
+const cap = await capKit.downloadByCID('bafybei...');
+const stats = await capKit.queryCapStats(cap.id);
+await capKit.favorite(cap.id, 'add');
+```
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/cap-kit @nuwa-ai/identity-kit
+```
+
+## CapKit (Constructor)
+
+Create a CapKit client.
+
+**Inputs**
+
+<ResponseField name="options" type="object" required>
+  <Expandable title="options">
+    <ResponseField name="mcpUrl" type="string" required>MCP host that provides cap-store tools</ResponseField>
+    <ResponseField name="roochUrl" type="string" required>Rooch RPC endpoint</ResponseField>
+    <ResponseField name="contractAddress" type="string" required>Cap registry contract address</ResponseField>
+    <ResponseField name="signer" type="SignerInterface" required>DID signer used to sign on-chain txs</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="capKit" type="CapKit">Configured CapKit instance</ResponseField>
+
+## Methods
+
+### getTools
+Fetch and cache MCP tool registry.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="tools" type="record">Server-exposed tools keyed by name</ResponseField>
+
+### mcpClose
+Close the underlying MCP client.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="void">No return value</ResponseField>
+
+### queryByID
+Query Cap metadata by id or cid.
+
+**Inputs**
+
+<ResponseField name="id" type="string?">Cap id (e.g., did:...:name)</ResponseField>
+<ResponseField name="cid" type="string?">IPFS CID</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<ResultCap>">Result wrapper with code, data?, error?</ResponseField>
+
+### queryByName
+Search Caps by name/tags with pagination/sort.
+
+**Inputs**
+
+<ResponseField name="name" type="string?">Optional partial name</ResponseField>
+<ResponseField name="tags" type="string[]?">Filter by tags</ResponseField>
+<ResponseField name="page" type="number?">Page index</ResponseField>
+<ResponseField name="size" type="number?">Page size</ResponseField>
+<ResponseField name="sortBy" type='"average_rating"|"downloads"|"favorites"|"rating_count"|"updated_at"?'>Sort field</ResponseField>
+<ResponseField name="sortOrder" type='"asc"|"desc"?'>Sort order</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<Page<ResultCap>>">Paged results</ResponseField>
+
+### queryMyFavorite
+List favorite Caps of the current DID.
+
+**Inputs**
+
+<ResponseField name="page" type="number?">Page index</ResponseField>
+<ResponseField name="size" type="number?">Page size</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<Page<ResultCap>>">Paged favorites</ResponseField>
+
+### favorite
+Add/remove/check favorite for a Cap.
+
+**Inputs**
+
+<ResponseField name="capId" type="string" required>Cap identifier</ResponseField>
+<ResponseField name="action" type='"add"|"remove"|"isFavorite"' required>Operation to perform</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<boolean>">True on success</ResponseField>
+
+### queryCapStats
+Fetch downloads/ratings/favorites.
+
+**Inputs**
+
+<ResponseField name="capId" type="string" required>Cap identifier</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<CapStats>">Stats including downloads, averages, favorites</ResponseField>
+
+### rateCap
+Rate a Cap (1..5).
+
+**Inputs**
+
+<ResponseField name="capId" type="string" required>Cap identifier</ResponseField>
+<ResponseField name="rating" type="number" required>Integer 1..5</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<boolean>">True on success</ResponseField>
+
+### queryCapRatingDistribution
+Get rating histogram for a Cap.
+
+**Inputs**
+
+<ResponseField name="capId" type="string" required>Cap identifier</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<RatingDistribution[]>">Distribution list</ResponseField>
+
+### updateEnableCap
+Enable/disable a Cap.
+
+**Inputs**
+
+<ResponseField name="capId" type="string" required>Cap identifier</ResponseField>
+<ResponseField name="action" type='"enable"|"disable"' required>Toggle action</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Result<boolean>">True on success</ResponseField>
+
+### downloadByID / downloadByCID
+Download Cap YAML via id/cid and parse into Cap.
+
+**Inputs**
+
+<ResponseField name="id | cid" type="string" required>Cap id or IPFS CID</ResponseField>
+<ResponseField name="format" type='"base64"|"utf8"?'>Optional format</ResponseField>
+
+**Returns**
+
+<ResponseField name="cap" type="Cap">Parsed Cap object</ResponseField>
+
+### registerCap
+Upload Cap YAML to IPFS and register on-chain.
+
+**Inputs**
+
+<ResponseField name="cap" type="Cap" required>Cap content to register</ResponseField>
+
+**Returns**
+
+<ResponseField name="cid" type="string">IPFS CID</ResponseField>

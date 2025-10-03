@@ -1,0 +1,39 @@
+---
+title: "Nuwa Kit"
+description: "About Nuwa Kit"
+---
+## Overview
+
+Nuwa Kit is the developer toolkit for building on the Nuwa protocol. It includes TypeScript SDKs for identity (DID), payments (channels), capability packaging (Caps), and UI integration.
+
+Packages (TypeScript):
+
+- `@nuwa-ai/identity-kit`: DID creation, resolution, and DIDAuth v1
+- `@nuwa-ai/payment-kit`: unidirectional payment channels (HTTP + MCP), strategies, streaming
+- `@nuwa-ai/cap-kit`: register, discover, and manage Caps
+- `@nuwa-ai/ui-kit`: iframe UI integration and MCP postMessage transport
+
+Python SDKs are planned.
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/identity-kit @nuwa-ai/payment-kit @nuwa-ai/cap-kit @nuwa-ai/ui-kit
+```
+
+## Pick A Kit
+
+<CardGroup cols={2}>
+  <Card title="Identity Kit" icon="id-card" href="/sdk/identity-kit">
+    DID creation, keys, and DIDAuth v1
+  </Card>
+  <Card title="Payment Kit" icon="credit-card" href="/sdk/payment-kit">
+    Channels, pricing, streaming, HTTP & MCP
+  </Card>
+  <Card title="Cap Kit" icon="box" href="/sdk/cap-kit">
+    Register and query capabilities
+  </Card>
+  <Card title="UI Kit" icon="window-restore" href="/sdk/ui-kit">
+    Build artifact UIs and MCP transports
+  </Card>
+</CardGroup>

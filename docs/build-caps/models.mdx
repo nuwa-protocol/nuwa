@@ -1,0 +1,41 @@
+---
+title: "Models"
+description: "About Models in Nuwa"
+---
+## Choosing a Model
+
+The Nuwa Client resolves and runs your Cap's model via the Nuwa LLM Gateway by default. You select a provider and a model ID in the Cap:
+
+```ts
+core: {
+  model: {
+    providerId: 'openrouter' | 'anthropic' | 'google' | 'groq' | 'togetherai' | 'azure' | 'deepseek' | 'mistral' | 'openai_chat_completion' | 'openai_responses',
+    modelId: 'openai/gpt-4o-mini',
+    parameters: { temperature: 0.3 },
+    supportedInputs: ['text', 'image'], // must include 'text'
+    contextLength: 128000,
+    // Optional: override default LLM Gateway
+    // customGatewayUrl: 'https://your-gateway.example.com/api/v1'
+  }
+}
+```
+
+### Providers
+
+- OpenRouter compatible (default via Nuwa LLM Gateway)
+- Anthropic, Google, Azure, Together, Groq, Mistral, DeepSeek
+- OpenAI (Chat Completions, Responses)
+
+The Nuwa Client attaches DID authentication and payment metadata to every request; your gateway can enforce both without extra code in the Cap.
+
+## Streaming & Usage
+
+The LLM Gateway supports both non-streaming and streaming (SSE/NDJSON) responses. When streaming, payment frames are injected in-band and filtered out for your application automatically.
+
+## Custom Gateway
+
+Set `customGatewayUrl` if your Cap must talk to a specialized backend. The client will use that base URL with the same auth and payment behavior.
+
+<Note>
+  If your gateway is not OpenRouter-compatible, implement the usage fields your Cap expects and verify your content type and payment headers match the Nuwa Payment Kit.
+</Note>

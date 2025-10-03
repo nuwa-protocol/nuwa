@@ -1,91 +1,109 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Nuwa AI Documentation",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#FF21FE",
+    "light": "#FF5DEC",
+    "dark": "#FF15FB"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
             "group": "Getting started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "getting-started/index",
+              "getting-started/quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core-concepts/capabilities",
+              "core-concepts/payment",
+              "core-concepts/identity"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Development",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "build-caps/index",
+              "build-caps/models",
+              "build-caps/mcp",
+              "build-caps/prompt",
+              "build-caps/artifact"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "SDK",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "sdk/index",
+              "sdk/cap-kit",
+              "sdk/payment-kit",
+              "sdk/identity-kit",
+              "sdk/ui-kit"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Examples",
+        "pages": [
+          "examples/nuwa-note-editor"
+        ]
+      },
+      {
+        "tab": "Example Docs",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Example Docs",
             "pages": [
-              "api-reference/introduction"
+              "example-docs/index",
+              "example-docs/quickstart",
+              "example-docs/development"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Essentials",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "example-docs/essentials/code",
+              "example-docs/essentials/images",
+              "example-docs/essentials/markdown",
+              "example-docs/essentials/navigation",
+              "example-docs/essentials/reusable-snippets",
+              "example-docs/essentials/settings"
+            ]
+          },
+          {
+            "group": "AI Tools",
+            "pages": [
+              "example-docs/ai-tools/cursor",
+              "example-docs/ai-tools/claude-code",
+              "example-docs/ai-tools/windsurf"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "example-docs/api-reference/introduction",
+              "example-docs/api-reference/endpoint/create",
+              "example-docs/api-reference/endpoint/delete",
+              "example-docs/api-reference/endpoint/get",
+              "example-docs/api-reference/endpoint/webhook"
             ]
           }
         ]
       }
     ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    "global": {}
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png"
   },
   "navbar": {
     "links": [
@@ -102,15 +120,15 @@
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {

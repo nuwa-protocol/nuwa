@@ -1,0 +1,372 @@
+---
+title: "Identity Kit"
+description: "About Nuwa Identity Kit"
+---
+## Overview
+
+`@nuwa-ai/identity-kit` provides DID creation, resolution, key management, and DIDAuth v1 signing/verification. It supports multiple DID methods (e.g., `did:rooch`, `did:key`) and follows NIP-1 (single DID, multi-key) and NIP-2 (DIDAuth v1).
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/identity-kit @roochnetwork/rooch-sdk
+```
+
+## Quick Start
+
+```ts
+import { IdentityKit, DIDAuth, KeyType } from '@nuwa-ai/identity-kit';
+
+const env = await IdentityKit.bootstrap({ method: 'rooch', vdrOptions: { rpcUrl: 'https://test-seed.rooch.network' } });
+const kit = await env.loadDid('did:rooch:0xYourDid');
+await kit.addVerificationMethod({ keyType: KeyType.ECDSA_SECP256K1 }, ['authentication']);
+const sig = await DIDAuth.v1.createSignature({ operation: 'call', params: { ts: Date.now() } }, env.keyManager, kit.getDIDDocument().verificationMethod![0].id);
+const authz = DIDAuth.v1.toAuthorizationHeader(sig);
+```
+
+## IdentityKit (Static)
+
+### bootstrap
+Prepare VDR(s) and a KeyManager without creating a DID.
+
+**Inputs**
+
+Bootstrap options
+
+<ResponseField name="options" type="object">
+  <Expandable title="options">
+    <ResponseField name="method" type="string" default="rooch">DID method to register with VDR</ResponseField>
+    <ResponseField name="vdrOptions" type="object">VDR-specific options (e.g., rpcUrl, network)</ResponseField>
+    <ResponseField name="keyStore" type="KeyStore?">Custom key store implementation</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="env" type="IdentityEnv">Environment with VDRRegistry and KeyManager</ResponseField>
+
+### fromExistingDID
+Resolve a DID and bind an IdentityKit instance to it.
+
+**Inputs**
+
+<ResponseField name="did" type="string" required>DID to resolve (e.g., did:rooch:0x...)</ResponseField>
+<ResponseField name="signer" type="SignerInterface" required>Used for publishing changes and signing</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to the DID</ResponseField>
+
+### fromDIDDocument
+Create an instance using a known DID Document.
+
+**Inputs**
+
+<ResponseField name="didDocument" type="DIDDocument" required>Pre-resolved DID Document</ResponseField>
+<ResponseField name="signer" type="SignerInterface" required>Signer for publishing</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to the doc</ResponseField>
+
+### createNewDID
+Create and publish a new DID via registered VDR.
+
+**Inputs**
+
+<ResponseField name="method" type="string" required>DID method (e.g., rooch)</ResponseField>
+<ResponseField name="creationRequest" type="DIDCreationRequest" required>VDR-specific creation payload</ResponseField>
+<ResponseField name="signer" type="SignerInterface" required>Signer for publishing</ResponseField>
+<ResponseField name="options" type="object?">Optional VDR params</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to new DID</ResponseField>
+
+## IdentityEnv
+
+### loadDid
+Load an existing DID using the environment.
+
+**Inputs**
+
+<ResponseField name="did" type="string" required>DID to load</ResponseField>
+<ResponseField name="signer" type="SignerInterface?">Defaults to env.keyManager</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to DID</ResponseField>
+
+### fromDocument
+Bind a known DID Document.
+
+**Inputs**
+
+<ResponseField name="doc" type="DIDDocument" required>Known DID Document</ResponseField>
+<ResponseField name="signer" type="SignerInterface?">Defaults to env.keyManager</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to doc</ResponseField>
+
+### createDid
+Create a DID via the underlying VDR.
+
+**Inputs**
+
+<ResponseField name="method" type="string" required>DID method name</ResponseField>
+<ResponseField name="request" type="DIDCreationRequest" required>Creation payload</ResponseField>
+<ResponseField name="signer" type="SignerInterface?">Override signer</ResponseField>
+<ResponseField name="options" type="object?">VDR-specific options</ResponseField>
+
+**Returns**
+
+<ResponseField name="kit" type="IdentityKit">Instance bound to new DID</ResponseField>
+
+## IdentityKit (Instance)
+
+### addVerificationMethod
+Add a verification method to the DID Document and publish.
+
+**Inputs**
+Key material and metadata
+
+
+<ResponseField name="keyInfo" type="OperationalKeyInfo" required>
+  <Expandable title="keyInfo">
+    <ResponseField name="idFragment" type="string?">Defaults to `key-&lt;timestamp&gt;`</ResponseField>
+    <ResponseField name="type" type="string" required>e.g., EcdsaSecp256k1VerificationKey2019</ResponseField>
+    <ResponseField name="controller" type="string?">Defaults to DID</ResponseField>
+    <ResponseField name="publicKeyMaterial" type="Uint8Array | JsonWebKey" required>Public key</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="relationships" type="string[]" required>
+  One or more of authentication/assertionMethod/keyAgreement/capabilityInvocation/capabilityDelegation
+</ResponseField>
+
+Optional signing controls
+
+<ResponseField name="options" type="object?">
+  <Expandable title="options">
+    <ResponseField name="keyId" type="string?">Signing key with capabilityDelegation</ResponseField>
+    <ResponseField name="scopes" type="string[]?">Optional scopes</ResponseField>
+  </Expandable>
+</ResponseField>
+
+
+
+
+**Returns**
+
+<ResponseField name="keyId" type="string">New verification method id</ResponseField>
+
+### removeVerificationMethod
+Remove a verification method and update relationships.
+
+**Inputs**
+
+<ResponseField name="keyId" type="string" required>Verification method id to remove</ResponseField>
+<ResponseField name="signerKeyId" type="string?">Signing key (capabilityDelegation)</ResponseField>
+
+**Returns**
+
+<ResponseField name="success" type="boolean">True if removal published</ResponseField>
+
+### updateVerificationMethodRelationships
+Add/remove relationships for an existing key.
+
+**Inputs**
+
+<ResponseField name="keyId" type="string" required>Verification method id</ResponseField>
+<ResponseField name="add" type="string[]" required>Relationships to add</ResponseField>
+<ResponseField name="remove" type="string[]" required>Relationships to remove</ResponseField>
+<ResponseField name="signer" type="SignerInterface?">Override signer</ResponseField>
+
+**Returns**
+
+<ResponseField name="success" type="boolean">True if update published</ResponseField>
+
+### addService
+Publish a new service entry to the DID Document.
+
+**Inputs**
+Service definition
+
+<ResponseField name="serviceInfo" type="object" required>
+  <Expandable title="serviceInfo">
+    <ResponseField name="idFragment" type="string" required></ResponseField>
+    <ResponseField name="type" type="string" required></ResponseField>
+    <ResponseField name="serviceEndpoint" type="string | object" required></ResponseField>
+    <ResponseField name="additionalProperties" type="object?">Arbitrary fields</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="keyId" type="string?">Signing key (capabilityInvocation)</ResponseField>
+
+**Returns**
+
+<ResponseField name="serviceId" type="string">Fully qualified service id</ResponseField>
+
+### removeService
+Delete a service by id and publish.
+
+**Inputs**
+
+<ResponseField name="serviceId" type="string" required>Service id to remove</ResponseField>
+<ResponseField name="keyId" type="string?">Signing key (capabilityInvocation)</ResponseField>
+
+**Returns**
+
+<ResponseField name="success" type="boolean">True if removal published</ResponseField>
+
+### getDIDDocument
+Return the current DID Document.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="didDocument" type="DIDDocument">Latest resolved DID Document</ResponseField>
+
+### findServiceByType
+Find a service by its type.
+
+**Inputs**
+
+<ResponseField name="serviceType" type="string" required>Service type string</ResponseField>
+
+**Returns**
+
+<ResponseField name="service" type="ServiceEndpoint | undefined">Matching service (if any)</ResponseField>
+
+### findVerificationMethodsByRelationship
+List verification methods for a given relationship.
+
+**Inputs**
+
+<ResponseField name="relationship" type="string" required>Relationship key</ResponseField>
+
+**Returns**
+
+<ResponseField name="methods" type="VerificationMethod[]">Matching verification methods</ResponseField>
+
+### canSignWithKey
+Check if the signer has the private key for keyId.
+
+**Inputs**
+
+<ResponseField name="keyId" type="string" required>Verification method id</ResponseField>
+
+**Returns**
+
+<ResponseField name="canSign" type="boolean">True if signer can sign</ResponseField>
+
+### getAvailableKeyIds
+List available key ids by relationship present in both DID doc and signer.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="byRelationship" type="record">Map of relationships to key ids</ResponseField>
+
+## DIDAuth.v1
+
+### createSignature
+Create a signed object suitable for DIDAuth v1.
+
+**Inputs**
+
+Operation payload
+
+<ResponseField name="payload" type="object" required>
+  <Expandable title="payload">
+    <ResponseField name="operation" type="string" required></ResponseField>
+    <ResponseField name="params" type="any" required></ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="signer" type="SignerInterface" required>Signing interface</ResponseField>
+<ResponseField name="keyId" type="string" required>Verification method id</ResponseField>
+
+Optional signing controls
+
+<ResponseField name="options" type="object?">
+  <ResponseField name="didDocument" type="DIDDocument?"></ResponseField>
+  <ResponseField name="nonce" type="string?"></ResponseField>
+  <ResponseField name="timestamp" type="number?"></ResponseField>
+  <ResponseField name="domainSeparator" type="string?" default="DIDAuthV1:"></ResponseField>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="signed" type="NIP1SignedObject">Signed object</ResponseField>
+
+### toAuthorizationHeader
+Serialize a signed object into an Authorization header value.
+
+**Inputs**
+
+<ResponseField name="signed" type="NIP1SignedObject" required>Signed object</ResponseField>
+
+**Returns**
+
+<ResponseField name="header" type="string">DIDAuthV1 &lt;base64url(payload)&gt;</ResponseField>
+
+### verifyAuthHeader
+Verify a DIDAuth header string.
+
+**Inputs**
+
+<ResponseField name="header" type="string" required>Authorization header value</ResponseField>
+<ResponseField name="resolver" type="DIDResolver" required>DID resolver</ResponseField>
+
+Verification options
+
+<ResponseField name="options" type="object?">
+  <ResponseField name="maxClockSkew" type="number?" default="300">Seconds</ResponseField>
+  <ResponseField name="nonceStore" type="NonceStore?">Replay protection</ResponseField>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="object">Detailed verification result (ok, error?, errorCode?, signedObject?)</ResponseField>
+
+### verifySignatureDetailed
+Verify a signed object using a resolver or a DID Document.
+
+**Inputs**
+
+<ResponseField name="signed" type="NIP1SignedObject" required>Signed object</ResponseField>
+<ResponseField name="resolverOrDoc" type="DIDResolver | DIDDocument" required>Source for public key</ResponseField>
+
+Verification options
+
+<ResponseField name="options" type="object?">
+  <ResponseField name="maxClockSkew" type="number?" default="300"></ResponseField>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="object">Detailed verification result (ok, error?, errorCode?, signedObject?)</ResponseField>
+
+### verifySignature
+Backward compatible boolean verification.
+
+**Inputs**
+
+<ResponseField name="signed" type="NIP1SignedObject" required>Signed object</ResponseField>
+<ResponseField name="resolverOrDoc" type="DIDResolver | DIDDocument" required>Source for public key</ResponseField>
+
+Verification options
+
+<ResponseField name="options" type="object?">
+  <ResponseField name="maxClockSkew" type="number?" default="300"></ResponseField>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="ok" type="boolean">True if signature is valid</ResponseField>

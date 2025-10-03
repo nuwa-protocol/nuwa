@@ -1,0 +1,53 @@
+---
+title: "Decentralized Identity"
+description: "About Decentralized Identity in Nuwa"
+---
+## Overview
+
+Identity in Nuwa is DID-first. Each user or service has a single DID with multiple device keys. Authentication uses DIDAuth v1 (NIP-2), and onboarding can be self-sovereign or assisted (CADOP).
+
+Key ideas:
+
+- Single DID, multi-key (NIP-1): add/remove device keys without changing identity
+- DID methods: `did:rooch` for on-chain DIDs, `did:key` for local ephemeral identities
+- DIDAuth v1: request signing and verification with replay protection and scoped permissions
+- CADOP (NIP-3): Custodian-Assisted DID Onboarding using passkeys or other verifiable credentials
+
+## Basic Usage With Identity Kit
+
+```ts
+import { IdentityKit, DIDAuth, KeyType } from '@nuwa-ai/identity-kit';
+
+// Bootstrap environment (register VDRs, create KeyManager & KeyStore)
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network' },
+});
+
+// Load or create a DID (shortened)
+const kit = await env.loadDid('did:rooch:0xYourDid');
+
+// Sign a DIDAuth v1 payload
+const sig = await DIDAuth.v1.createSignature(
+  { operation: 'example', params: { message: 'hello' } },
+  env.keyManager,
+  kit.getDIDDocument().verificationMethod![0].id
+);
+
+// Convert to Authorization header value
+const header = DIDAuth.v1.toAuthorizationHeader(sig);
+// -> pass `header` as `Authorization: DIDAuthV1 <...>` when calling services
+```
+
+## Onboarding (CADOP)
+
+Nuwa provides a custodian service for assisted onboarding: mint a `did:rooch` agent identity backed by a user-controlled passkey. The custodian can also relay on-chain transactions to cover gas for first-time users.
+
+- Web: Passkey-based sign-in, create Agent DID, add devices
+- APIs: query agent DIDs, add/remove keys, relay transactions
+
+You can start with passkeys and progressively decentralize key custody per device.
+
+<Tip>
+  Identity Kit ships with test helpers to create real on-chain DIDs in CI for integration tests.
+</Tip>
