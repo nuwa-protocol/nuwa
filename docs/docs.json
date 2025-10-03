@@ -1,0 +1,140 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Nuwa AI Documentation",
+  "colors": {
+    "primary": "#FF21FE",
+    "light": "#FF5DEC",
+    "dark": "#FF15FB"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "getting-started/index",
+              "getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/capabilities",
+              "core-concepts/payment",
+              "core-concepts/identity"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "build-caps/index",
+              "build-caps/models",
+              "build-caps/mcp",
+              "build-caps/prompt",
+              "build-caps/artifact"
+            ]
+          },
+          {
+            "group": "SDK",
+            "pages": [
+              "sdk/index",
+              "sdk/cap-kit",
+              "sdk/payment-kit",
+              "sdk/identity-kit",
+              "sdk/ui-kit"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "pages": [
+          "examples/nuwa-note-editor"
+        ]
+      },
+      {
+        "tab": "Example Docs",
+        "groups": [
+          {
+            "group": "Example Docs",
+            "pages": [
+              "example-docs/index",
+              "example-docs/quickstart",
+              "example-docs/development"
+            ]
+          },
+          {
+            "group": "Essentials",
+            "pages": [
+              "example-docs/essentials/code",
+              "example-docs/essentials/images",
+              "example-docs/essentials/markdown",
+              "example-docs/essentials/navigation",
+              "example-docs/essentials/reusable-snippets",
+              "example-docs/essentials/settings"
+            ]
+          },
+          {
+            "group": "AI Tools",
+            "pages": [
+              "example-docs/ai-tools/cursor",
+              "example-docs/ai-tools/claude-code",
+              "example-docs/ai-tools/windsurf"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "example-docs/api-reference/introduction",
+              "example-docs/api-reference/endpoint/create",
+              "example-docs/api-reference/endpoint/delete",
+              "example-docs/api-reference/endpoint/get",
+              "example-docs/api-reference/endpoint/webhook"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {}
+  },
+  "logo": {
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:hi@mintlify.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://dashboard.mintlify.com"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/mintlify",
+      "github": "https://github.com/mintlify",
+      "linkedin": "https://linkedin.com/company/mintlify"
+    }
+  }
+}

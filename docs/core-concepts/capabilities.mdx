@@ -1,0 +1,67 @@
+---
+title: "Capabilities (Caps)"
+description: "About Capabilities (Caps) in Nuwa"
+---
+## What Is A Cap?
+
+A Cap (capability) is the minimum functional unit in Nuwa. It is how developers package, publish, and monetize what an AI can do.
+
+At its core, a Cap is a small, declarative bundle:
+
+- Prompt: a starting system prompt with optional variables and suggestions
+- Model: the model/provider configuration the Cap runs with
+- MCP servers: optional Model Context Protocol tools the Cap can call
+- Artifact: optional URL to a UI (iframe) that renders rich experiences
+
+Caps are portable: the Nuwa Client can load a Cap by ID, resolve its prompt variables, connect tools, stream responses, and handle payment end-to-end.
+
+## Cap Shape
+
+This is the conceptual structure mirrored by `@nuwa-ai/cap-kit`:
+
+```ts
+type Cap = {
+  // Unique ID: <author DID>:<name>
+  authorDID: string;         // e.g. "did:rooch:0x..."
+  idName: string;            // lowercase [a-z0-9_], 6-20 chars
+
+  core: {
+    prompt: {
+      value: string;         // system prompt (supports variables like {{user_geo}})
+      suggestions?: string[];
+    };
+    model: {
+      providerId: 'openrouter' | 'anthropic' | 'google' | 'openai_chat_completion' | 'openai_responses' | 'groq' | 'togetherai' | 'azure' | 'deepseek' | 'mistral';
+      modelId: string;        // e.g. "openai/gpt-4o-mini"
+      parameters?: Record<string, any>;
+      supportedInputs: ('text'|'image'|'file'|'audio')[]; // must include 'text'
+      contextLength: number;  // tokens
+      customGatewayUrl?: string; // optional override of Nuwa LLM Gateway
+    };
+    mcpServers: Record<string, string>; // name -> MCP server URL
+    artifact?: { srcUrl: string };      // optional Cap UI (iframe)
+  };
+
+  metadata: {
+    displayName: string;
+    description: string;
+    introduction: string;
+    tags: string[];
+    homepage?: string;
+    repository?: string;
+    thumbnail?: string; // URL
+  };
+};
+```
+
+## Typical Flow
+
+- Author builds a Cap locally and registers it via `@nuwa-ai/cap-kit` (stores metadata, uploads to IPFS, and registers on-chain)
+- User selects the Cap in the Nuwa Client
+- Client resolves prompt variables, connects to MCP tools, and initializes payment channel
+- Requests flow through the Nuwa LLM Gateway (or your custom gateway) with DID auth and payment receipts attached
+- Results stream back; optional artifact UI renders inside the client
+
+<Tip>
+  Caps are intentionally small and composable. Use MCP servers when you need external tools, and use the artifact UI for rich, interactive surfaces.
+</Tip>

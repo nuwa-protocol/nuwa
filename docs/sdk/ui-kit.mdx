@@ -1,0 +1,247 @@
+---
+title: "UI Kit"
+description: "About Nuwa UI Kit"
+---
+## What It Is
+
+`@nuwa-ai/ui-kit` connects your Cap's iframe UI to the Nuwa Client and exposes an MCP transport over postMessage. Build interactive artifact UIs and tools that AI can drive.
+
+## Example
+
+```tsx
+import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
+
+function MyCapUI() {
+  const { nuwa, connected } = useNuwa();
+  return <button onClick={() => nuwa.sendPrompt('Analyze selections')} disabled={!connected}>Run</button>;
+}
+
+export default () => (
+  <NuwaProvider autoHeight debug>
+    <MyCapUI />
+  </NuwaProvider>
+);
+```
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/ui-kit
+```
+
+## NuwaClient
+
+### constructor
+Create a NuwaClient for parent iframe communication.
+
+**Inputs**
+
+Construct-time options
+
+<ResponseField name="options" type="object?">
+  <Expandable title="options">
+    <ResponseField name="allowedOrigins" type="string[]?" default="[*]"></ResponseField>
+    <ResponseField name="timeout" type="number?" default="2000">Connection timeout</ResponseField>
+    <ResponseField name="debug" type="boolean?"></ResponseField>
+    <ResponseField name="methodTimeout(s)" type="number? | record?">Per-call overrides</ResponseField>
+    <ResponseField name="methodRetries(map)" type="number? | record?">Retry overrides</ResponseField>
+    <ResponseField name="streamTimeout" type="number?" default="30000"></ResponseField>
+    <ResponseField name="streamRetries" type="number?" default="0"></ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="client" type="NuwaClient">Configured client instance</ResponseField>
+
+### connect / reconnect / disconnect / getStats / onThemeChange
+Lifecycle and utility methods.
+
+**Inputs**
+
+<ResponseField name="(varies)" type="-">See individual methods</ResponseField>
+
+**Returns**
+
+<ResponseField name="connect()" type="Promise<void>">Establish parent connection</ResponseField>
+<ResponseField name="reconnect()" type="Promise<void>">Reconnect to parent</ResponseField>
+<ResponseField name="disconnect()" type="void">Tear down connection</ResponseField>
+<ResponseField name="getStats()" type="object">Client stats (contains options)</ResponseField>
+<ResponseField name="onThemeChange(cb)" type="function">Unsubscribe function</ResponseField>
+
+### sendPrompt
+Send a message to the parent client chat.
+
+**Inputs**
+
+<ResponseField name="prompt" type="string" required>Text to send</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Promise<void>">Resolves when sent</ResponseField>
+
+### setHeight
+Set iframe height in the parent.
+
+**Inputs**
+
+<ResponseField name="height" type="string | number" required>CSS size or number</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Promise<void>">Resolves when applied</ResponseField>
+
+### addSelection
+Add a selection (label + message) to parent UI.
+
+**Inputs**
+
+<ResponseField name="label" type="string" required>Selection title</ResponseField>
+<ResponseField name="message" type="string | object" required>Payload to display/persist</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Promise<void>">Resolves when added</ResponseField>
+
+### saveState / getState
+Persist and retrieve state via parent.
+
+**Inputs**
+
+<ResponseField name="state" type="any?">State to save (for saveState)</ResponseField>
+
+**Returns**
+
+<ResponseField name="saveState" type="Promise<void>">Resolves when persisted</ResponseField>
+<ResponseField name="getState" type="Promise<any|null>">Previously saved state</ResponseField>
+
+### createAIStream
+Start a server-side stream (e.g., LLM streaming) controlled by parent.
+
+**Inputs**
+
+Streaming request
+
+<ResponseField name="request" type="object" required>
+  <Expandable title="request">
+    <ResponseField name="prompt" type="string" required>Prompt to stream</ResponseField>
+    <ResponseField name="capId" type="string?">Optional Cap identifier</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="handle" type="StreamHandle">Control/observe the stream</ResponseField>
+
+#### StreamHandle.execute / abort
+Run the stream and observe live chunks/errors.
+
+**Inputs**
+
+Optional callbacks
+
+<ResponseField name="options" type="object?">
+  <Expandable title="options">
+    <ResponseField name="onChunk" type="function?">Receive live content/error frames</ResponseField>
+    <ResponseField name="onError" type="function?">Receive immediate error</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="execute" type="Promise">Final stream result and error (object with `result` and `error`)</ResponseField>
+<ResponseField name="abort" type="void">Cancel the stream</ResponseField>
+
+## React Helpers
+
+### NuwaProvider
+Wrap your app and auto-manage connection and resizing.
+
+**Inputs**
+
+Provider properties
+
+<ResponseField name="props" type="object">
+  <Expandable title="props">
+    <ResponseField name="autoHeight" type="boolean?" default="true"></ResponseField>
+    <ResponseField name="allowedOrigins" type="string[]?"></ResponseField>
+    <ResponseField name="timeout" type="number?"></ResponseField>
+    <ResponseField name="debug" type="boolean?"></ResponseField>
+    <ResponseField name="methodTimeout(s)/Retries(map)" type="number? | record?">Overrides</ResponseField>
+    <ResponseField name="streamTimeout/streamRetries" type="number?">Streaming</ResponseField>
+    <ResponseField name="onConnected" type="function?"></ResponseField>
+    <ResponseField name="onError" type="function?"></ResponseField>
+    <ResponseField name="className/style" type="string | object?"></ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="element" type="ReactElement">Rendered provider element</ResponseField>
+
+### useNuwa
+Access the client, theme, and connection status.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">Hook takes no parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="nuwa" type="NuwaClient">Client instance</ResponseField>
+<ResponseField name="theme" type='"light"|"dark"'>Current theme</ResponseField>
+<ResponseField name="connected" type="boolean">Connection state</ResponseField>
+
+## MCP Transport
+
+### PostMessageMCPTransport (constructor)
+A Transport for official MCP SDK over postMessage.
+
+**Inputs**
+
+Constructor options
+
+<ResponseField name="options" type="object?">
+  <Expandable title="options">
+    <ResponseField name="targetWindow" type="Window?"></ResponseField>
+    <ResponseField name="targetOrigin" type="string?" default="*"></ResponseField>
+    <ResponseField name="allowedOrigins" type="string[]?" default="[*]"></ResponseField>
+    <ResponseField name="timeout" type="number?" default="30000"></ResponseField>
+    <ResponseField name="debug" type="boolean?"></ResponseField>
+    <ResponseField name="securityPolicy" type="object?">Fields: enforceOriginValidation?, maxMessageSize?, rateLimits?</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="transport" type="PostMessageMCPTransport">Configured transport</ResponseField>
+
+### start / send / connect / disconnect
+Transport lifecycle and messaging.
+
+**Inputs**
+
+<ResponseField name="(varies)" type="-">See individual methods</ResponseField>
+
+**Returns**
+
+<ResponseField name="start" type="Promise<void>">Begin listening</ResponseField>
+<ResponseField name="send" type="Promise<void>">Send JSON-RPC message</ResponseField>
+<ResponseField name="connect" type="Promise<void>">Connect to window</ResponseField>
+<ResponseField name="disconnect" type="void">Tear down transport</ResponseField>
+<ResponseField name="connected/ready" type="boolean">Current status flags</ResponseField>
+
+### UI Helpers
+Return UI resources from MCP tools.
+
+**Inputs**
+
+<ResponseField name="path" type="string" required>Path relative to artifact origin</ResponseField>
+<ResponseField name="name/description/uiType" type="string?">Optional metadata</ResponseField>
+
+**Returns**
+
+<ResponseField name="resource" type="UIResource">Result for createUIResource</ResponseField>
+<ResponseField name="toolResult" type="UIToolResult">Result for createUIToolResult</ResponseField>
+
+ 

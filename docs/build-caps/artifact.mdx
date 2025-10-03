@@ -1,0 +1,54 @@
+---
+title: "Artifact"
+description: "About Artifact in Nuwa"
+---
+## Artifact UI
+
+An Artifact lets your Cap render a rich, interactive UI inside the Nuwa Client via an iframe. Use it to visualize results, collect structured input, or orchestrate multi-step workflows.
+
+In the Cap, set a public URL:
+
+```ts
+core: {
+  artifact: { srcUrl: 'https://your-cap-ui.example.com' }
+}
+```
+
+## Connect To The Client
+
+Use `@nuwa-ai/ui-kit` to communicate with the Nuwa Client from your iframe:
+
+```tsx
+import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
+
+function MyCapUI() {
+  const { nuwa, connected, theme } = useNuwa();
+
+  async function run() {
+    // persist local state in parent
+    await nuwa.saveState({ step: 'started' });
+    // send a prompt to the current chat
+    await nuwa.sendPrompt('Please analyze the selected notes.');
+  }
+
+  return (
+    <div className={theme === 'dark' ? 'dark' : ''}>
+      <button onClick={run} disabled={!connected}>Run</button>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <NuwaProvider autoHeight debug>
+      <MyCapUI />
+    </NuwaProvider>
+  );
+}
+```
+
+## MCP + UI
+
+You can expose MCP tools from your UI process (postMessage transport) so AI can control the UI. Return UI resources from tools to request the client to render a particular view.
+
+See SDK -> UI Kit for transports and resource types, and Build -> MCP for payment-aware tools.

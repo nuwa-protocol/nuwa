@@ -1,0 +1,33 @@
+---
+title: "Prompt"
+description: "About Prompt in Nuwa"
+---
+## Prompt Basics
+
+The Cap prompt is the system instruction the client uses to start conversations. Keep it concise and explicit about the tool's role and boundaries.
+
+```ts
+core: {
+  prompt: {
+    value: 'You are a helpful travel planner. Today the user is in {{user_geo}}. Always ask one clarifying question.',
+    suggestions: [
+      'Plan a 3-day trip to Osaka',
+      'Find kid-friendly activities near me',
+    ],
+  }
+}
+```
+
+### Variables
+
+The Nuwa Client resolves simple variables before sending the prompt to the model.
+
+- `{{user_geo}}`: user location heuristics (geolocation if permitted; otherwise timezone hint)
+
+Variables are intentionally minimal; prefer MCP tools for dynamic context (calendars, files, etc.).
+
+## Tips
+
+- Give examples of desired inputs and outputs
+- Declare safety limits and escalation rules
+- Keep the first sentence crisp - it affects model behavior disproportionately

@@ -1,0 +1,233 @@
+---
+title: "Payment Kit"
+description: "About Nuwa Payment Kit"
+---
+## Overview
+
+`@nuwa-ai/payment-kit` implements Nuwa's unidirectional payment channels (NIP-4) for HTTP and MCP. It manages channel lifecycle, SubRAV receipts, streaming, and settlement.
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/payment-kit @nuwa-ai/identity-kit @roochnetwork/rooch-sdk
+```
+
+## HTTP Client
+
+### createHttpClient
+Factory that builds a PaymentChannelHttpClient from an IdentityEnv.
+
+**Inputs**
+
+Creation options
+
+<ResponseField name="options" type="object" required>
+  <Expandable title="options">
+    <ResponseField name="baseUrl" type="string" required>Target service base URL</ResponseField>
+    <ResponseField name="env" type="IdentityEnv" required>Identity environment</ResponseField>
+    <ResponseField name="maxAmount" type="bigint?">Per-request budget (asset base unit)</ResponseField>
+    <ResponseField name="debug" type="boolean?">Enable internal logging</ResponseField>
+    <ResponseField name="fetchImpl" type="function?">Custom fetch replacement</ResponseField>
+    <ResponseField name="mappingStore" type="HostChannelMappingStore?">Persist client state by host</ResponseField>
+    <ResponseField name="channelRepo" type="ChannelRepository?">Channel meta storage</ResponseField>
+    <ResponseField name="timeoutMs" type="number?">Non-streaming resolve timeout</ResponseField>
+    <ResponseField name="timeoutMsStream" type="number?">Per-frame idle timeout for streams</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Returns**
+
+<ResponseField name="client" type="PaymentChannelHttpClient">Configured HTTP payer client</ResponseField>
+
+### PaymentChannelHttpClient.requestWithPayment
+Create a payable request and return both response and payment promises.
+
+**Inputs**
+
+<ResponseField name="method" type='"GET"|"POST"|"PUT"|"DELETE"|"PATCH"' required>HTTP method</ResponseField>
+<ResponseField name="path" type="string" required>Relative URL or path</ResponseField>
+<ResponseField name="init" type="RequestInit?">Headers, body, and signal</ResponseField>
+
+**Returns**
+
+<ResponseField name="clientTxRef" type="string">Correlation id</ResponseField>
+<ResponseField name="response" type="Promise">Raw fetch response promise</ResponseField>
+<ResponseField name="payment" type="Promise">Resolved payment info (PaymentInfo or undefined)</ResponseField>
+<ResponseField name="done" type="Promise">Resolves to object with `data` and `payment`</ResponseField>
+<ResponseField name="abort" type="function">Cancel the request</ResponseField>
+
+### PaymentChannelHttpClient.request
+Convenience wrapper returning only the HTTP response.
+
+**Inputs**
+
+<ResponseField name="method" type='"GET"|"POST"|"PUT"|"DELETE"|"PATCH"' required>HTTP method</ResponseField>
+<ResponseField name="path" type="string" required>Relative URL or path</ResponseField>
+<ResponseField name="init" type="RequestInit?">Request options</ResponseField>
+
+**Returns**
+
+<ResponseField name="response" type="Promise">Raw fetch response promise</ResponseField>
+
+### PaymentChannelHttpClient.requestAndWaitForPayment
+Wait for both HTTP response and payment resolution.
+
+**Inputs**
+
+<ResponseField name="method" type='"GET"|"POST"|"PUT"|"DELETE"|"PATCH"' required>HTTP method</ResponseField>
+<ResponseField name="path" type="string" required>Relative URL or path</ResponseField>
+<ResponseField name="init" type="RequestInit?">Request options</ResponseField>
+
+**Returns**
+
+<ResponseField name="data" type="Response">Raw fetch response</ResponseField>
+<ResponseField name="payment" type="PaymentInfo | undefined">Payment result (if billed)</ResponseField>
+
+### PaymentChannelHttpClient.get/post/put/patch/delete
+JSON helpers that parse the response and return `{ data, payment }`.
+
+**Inputs**
+
+<ResponseField name="path" type="string" required>Relative URL or path</ResponseField>
+<ResponseField name="body" type="any?">JSON body for POST/PUT/PATCH</ResponseField>
+<ResponseField name="init" type="RequestInit?">Request options</ResponseField>
+
+**Returns**
+
+<ResponseField name="data" type="any">Parsed JSON payload</ResponseField>
+<ResponseField name="payment" type="PaymentInfo | undefined">Payment result (if billed)</ResponseField>
+
+### PaymentChannelHttpClient.getPendingSubRAV
+Return the latest unsigned proposal (if any).
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="subRav" type="SubRAV | null">Current pending SubRAV</ResponseField>
+
+### PaymentChannelHttpClient.getPayerClient
+Access the low-level payer client.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="payerClient" type="PaymentChannelPayerClient">Low-level client</ResponseField>
+
+### PaymentChannelHttpClient.healthCheck
+Check service health (free).
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="health" type="HealthResponse">Server health payload</ResponseField>
+
+### PaymentChannelHttpClient.recoverFromService
+Recover latest SubRAV from service after failures.
+
+**Inputs**
+
+<ResponseField name="(none)" type="void">No input parameters</ResponseField>
+
+**Returns**
+
+<ResponseField name="recovery" type="RecoveryResponse">Recovery payload</ResponseField>
+
+### PaymentChannelHttpClient.logoutCleanup
+Abort pending requests, reset state, and optionally clear persisted mapping.
+
+**Inputs**
+
+<ResponseField name="clearMapping" type="boolean?" default="true">Delete persisted mapping store</ResponseField>
+<ResponseField name="reason" type="string?">Optional note for logs</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="void">No return value</ResponseField>
+
+## MCP Client
+
+### PaymentChannelMcpClient (constructor)
+Create an MCP client with payment channels.
+
+<ResponseField name="options" type="object" required>
+  <Expandable title="options">
+    <ResponseField name="baseUrl" type="string" required>MCP server endpoint</ResponseField>
+    <ResponseField name="signer" type="SignerInterface" required></ResponseField>
+    <ResponseField name="keyId" type="string" required></ResponseField>
+    <ResponseField name="chainConfig" type="ChainConfig" required></ResponseField>
+    <ResponseField name="maxAmount" type="bigint" required>Per-call budget</ResponseField>
+    <ResponseField name="storageOptions" type="object?">channelRepo?, namespace?</ResponseField>
+    <ResponseField name="mappingStore" type="HostChannelMappingStore?">Persist client state</ResponseField>
+    <ResponseField name="transactionStore" type="TransactionStore?">Tx logging</ResponseField>
+    <ResponseField name="transactionLog" type="object?">Fields: enabled?, persist?, maxRecords?, sanitizeRequest?</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="returns" type="PaymentChannelMcpClient"></ResponseField>
+
+### PaymentChannelMcpClient.callTool
+Call an MCP tool; payment handled internally.
+
+<ResponseField name="name" type="string" required></ResponseField>
+<ResponseField name="args" type="any?">Tool params</ResponseField>
+<ResponseField name="returns" type="object">Object containing `content: any[]`</ResponseField>
+
+### PaymentChannelMcpClient.callToolWithPayment
+Call a tool and return both business content and payment info.
+
+<ResponseField name="name" type="string" required></ResponseField>
+<ResponseField name="args" type="any?">Tool params</ResponseField>
+<ResponseField name="clientTxRef" type="string?">Correlation id</ResponseField>
+<ResponseField name="returns" type="object">Object with `content` and optional `payment`</ResponseField>
+
+### PaymentChannelMcpClient.listTools
+List server tools with internal reserved params removed.
+
+<ResponseField name="options" type="object?">Optional flags (e.g., includeBuiltinTools)</ResponseField>
+<ResponseField name="returns" type="record">Map of tool name to definition</ResponseField>
+
+### PaymentChannelMcpClient.tools
+Return AI SDK compatible ToolSet.
+
+<ResponseField name="returns" type="ToolSet"></ResponseField>
+
+### PaymentChannelMcpClient.listPrompts / loadPrompt
+Prompt discovery helpers.
+
+<ResponseField name="name" type="string?">For loadPrompt</ResponseField>
+<ResponseField name="args" type="any?">Prompt args</ResponseField>
+<ResponseField name="returns" type="any | string"></ResponseField>
+
+### PaymentChannelMcpClient.listResources / listResourceTemplates / readResource
+Resource discovery helpers.
+
+<ResponseField name="params" type="string | object?">For readResource (string or `uri` object)</ResponseField>
+<ResponseField name="returns" type="any[] | any"></ResponseField>
+
+### PaymentChannelMcpClient.getPendingSubRAV / commitSubRAV
+Inspect or commit pending SubRAV.
+
+<ResponseField name="signed" type="SignedSubRAV">For commitSubRAV</ResponseField>
+<ResponseField name="returns" type="SubRAV | object | null">Signed subRAV or success marker or null</ResponseField>
+
+### PaymentChannelMcpClient.healthCheck / recoverFromService
+Free endpoints for health and recovery.
+
+<ResponseField name="returns" type="HealthResponse | RecoveryResponse"></ResponseField>
+
+### PaymentChannelMcpClient.close / clearPersistedState / getPayerClient / getTransactionStore
+Lifecycle and accessors.
+
+<ResponseField name="returns" type="void | PaymentChannelPayerClient | TransactionStore"></ResponseField>
+
+## Streaming
+
+SSE/NDJSON responses include a payment frame that the client extracts and removes transparently. Use the same code paths for streaming and non-streaming.
