@@ -88,7 +88,7 @@ export class UniversalMcpClient {
     this.logger.setLevel(options.debug ? 'debug' : 'info');
   }
 
-  // ===== 完全兼容现有 API =====
+  // ===== Fully compatible with existing API =====
 
   /**
    * Call a tool with payment processing and optional result validation
@@ -308,7 +308,7 @@ export class UniversalMcpClient {
     return this.normalizeResourceResult(result);
   }
 
-  // ===== 新增方法 =====
+  // ===== New methods =====
 
   /**
    * Get detected server type
@@ -384,7 +384,7 @@ export class UniversalMcpClient {
     return this.detectionResult!;
   }
 
-  // ===== 生命周期管理 =====
+  // ===== Lifecycle Management =====
 
   /**
    * Close the client and clean up resources
@@ -411,7 +411,7 @@ export class UniversalMcpClient {
     }
   }
 
-  // ===== 内部实现 =====
+  // ===== Internal Implementation =====
 
   /**
    * Ensure client is initialized and server type is detected
@@ -574,7 +574,7 @@ export class UniversalMcpClient {
     return res;
   }
 
-  // ===== 兼容方法代理 =====
+  // ===== Compatibility method proxies =====
 
   /**
    * Get underlying payment client (if available)
