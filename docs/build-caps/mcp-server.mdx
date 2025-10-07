@@ -1,0 +1,133 @@
+---
+title: "MCP Server"
+description: "Build a native pay‑per‑call MCP server using the Nuwa Payment Kit"
+---
+
+## Why a native server
+
+Own the full tool surface, validation, and pricing by building directly with the Payment Kit. You expose a single JSON‑RPC endpoint (`/mcp`) and declare free and paid tools with schemas.
+
+<Tip>
+Start here when you don't have an upstream MCP yet, or you need deeper control than a proxy can provide.
+</Tip>
+
+## Quick start
+
+<Steps>
+<Step title="Install">
+
+```bash
+pnpm add @nuwa-ai/payment-kit @nuwa-ai/identity-kit
+```
+
+</Step>
+
+<Step title="Create a minimal server (from env)">
+
+```ts
+import { IdentityKit, KeyManager } from '@nuwa-ai/identity-kit';
+import { createFastMcpServerFromEnv } from '@nuwa-ai/payment-kit/mcp';
+import { z } from 'zod';
+
+async function main() {
+  const serviceKey = process.env.SERVICE_KEY || '';
+  if (!serviceKey) throw new Error('SERVICE_KEY is required');
+
+  const keyManager = await KeyManager.fromSerializedKey(serviceKey);
+  const serviceDid = await keyManager.getDid();
+
+  const env = await IdentityKit.bootstrap({
+    method: 'rooch',
+    keyStore: keyManager.getStore(),
+    vdrOptions: { network: 'test' },
+  });
+
+  const server = await createFastMcpServerFromEnv(env, {
+    serviceId: 'nuwa-mcp-demo',
+    adminDid: serviceDid,
+    debug: true,
+    port: Number(process.env.PORT || 8080),
+    endpoint: '/mcp',
+  });
+
+  // Paid tool
+  server.paidTool({
+    name: 'analyze',
+    description: 'Analyze input',
+    pricePicoUSD: 1_000_000_000n, // 0.001 USD
+    parameters: { text: z.string().describe('Text to analyze') },
+    async execute({ text }) { return { summary: `Analysis of: ${text}` }; },
+  });
+
+  // Free tool
+  server.freeTool({
+    name: 'ping',
+    description: 'Health check',
+    parameters: z.object({}),
+    async execute() { return { ok: true }; },
+  });
+
+  await server.start();
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
+```
+
+</Step>
+
+<Step title="Set environment variables and run">
+
+```bash
+export SERVICE_KEY=...    # ServiceDID private key (serialized)
+export PORT=8080          # optional
+node server.js            # or tsx src/index.ts in your project
+```
+
+</Step>
+
+<Step title="Call from a client">
+
+Use the MCP Client guide to initialize and call tools (env + createMcpClient or direct constructor).
+
+<Card title="MCP Client" icon="bolt" href="/build-caps/mcp-client">
+  Initialize, call tools, stream, and recover channels.
+</Card>
+
+</Step>
+</Steps>
+
+## Tool shapes and validation
+
+- Declare schemas per tool (JSON Schema). The adapter merges reserved fields into every input schema:
+  - `__nuwa_auth` for DIDAuth v1
+  - `__nuwa_payment` for payment request payload
+- Return business `content` and the payment resource is attached automatically when billed.
+
+## Streaming & UI
+
+- Streaming (SSE/NDJSON) is supported; payment frames are injected in‑band.
+- Return UI resources to render iframe‑based artifact UIs; see SDK → UI Kit.
+
+## Pricing strategies
+
+- Per‑call fixed price via `pricePicoUSD`.
+- For advanced models (token/frames), emit incremental receipts per chunk; the client handles reconciliation.
+
+## Deployment
+
+- Any Node hosting works; ensure secrets are mounted (service key), and `PORT` is open.
+- Use health checks and logs to monitor availability.
+
+<CardGroup cols={3}>
+  <Card title="MCP overview" icon="book" href="/build-caps/mcp">
+    Conceptual overview and selection guide.
+  </Card>
+  <Card title="Proxy existing MCP" icon="right-left" href="/build-caps/mcp-proxy">
+    Keep your upstream as‑is and add pricing at the edge.
+  </Card>
+  <Card title="MCP Client" icon="bolt" href="/build-caps/mcp-client">
+    Initialize, call tools, stream, and recover channels.
+  </Card>
+</CardGroup>
+
+

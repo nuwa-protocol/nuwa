@@ -1,0 +1,115 @@
+---
+title: "MCP Client"
+description: "Use a payer‑side MCP client with Nuwa payment channels"
+---
+
+## Overview
+
+Use `createMcpClient` with an `IdentityKit` environment to call MCP servers with DIDAuth v1 and Nuwa payment channels. It returns a concrete `PaymentChannelMcpClient`. Works with non‑streaming and streaming (SSE/NDJSON) servers.
+
+## Install
+
+```bash
+pnpm add @nuwa-ai/payment-kit @nuwa-ai/identity-kit
+```
+
+## Initialize (env + createMcpClient)
+
+```ts
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+import { createMcpClient } from '@nuwa-ai/payment-kit';
+
+// 1) Bootstrap Identity environment (loads VDR + KeyManager)
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { network: 'test' },
+  // keyStore: your implementation if not using a default one
+});
+
+// 2) Create a payer MCP client
+const baseUrl = process.env.MCP_URL || 'http://localhost:8080/mcp';
+const payer = await createMcpClient({
+  baseUrl,
+  env,                 // provides signer and chain context
+  maxAmount: 10_000_000n, // per-call budget (asset base unit)
+  // mappingStore, transactionStore, debug ... (optional)
+});
+```
+
+### Direct constructor (equivalent)
+
+You can also construct the underlying `PaymentChannelMcpClient` directly:
+
+```ts
+import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit/mcp';
+
+const baseUrl = process.env.MCP_URL || 'http://localhost:8080/mcp';
+const client = new PaymentChannelMcpClient({
+  baseUrl,
+  signer: env.keyManager, // any IdentityKit-compatible signer
+  // keyId, chainConfig, maxAmount, mappingStore, transactionStore ... (optional)
+});
+```
+
+## Call a tool
+
+```ts
+const { content, payment } = await payer.callToolWithPayment('analyze', { text: 'Sample' });
+console.log(content, payment);
+```
+
+## Tooling essentials
+
+- `listTools()` – discover available tools and their schemas (reserved inputs are merged internally):
+  - `__nuwa_auth` (DIDAuth v1 header)
+  - `__nuwa_payment` (serialized payment request payload)
+- `call(name, args)` – invoke a tool; returns business `content` and optional `payment` info when billed.
+
+## Payment response shape
+
+When a tool is billed, the client exposes a `payment` object alongside your business `content`:
+
+```ts
+const { content, payment } = await payer.callToolWithPayment('echo', { text: 'hi' });
+console.log({
+  cost: payment?.cost,
+  costUsd: payment?.costUsd,
+  clientTxRef: payment?.clientTxRef,
+  serviceTxRef: payment?.serviceTxRef,
+  channelId: payment?.channelId,
+  nonce: payment?.nonce,
+  vmIdFragment: payment?.vmIdFragment,
+  assetId: payment?.assetId,
+  timestamp: payment?.timestamp,
+});
+```
+
+Servers may also emit a payment resource frame on the raw MCP stream. The payer client extracts it for you; for reference the resource looks like:
+
+```json
+{ "type": "resource", "resource": { "uri": "nuwa:payment", "mimeType": "application/vnd.nuwa.payment+json", "text": "{...}" } }
+```
+
+## Resources & prompts
+
+- `listResources / readResource` – resource discovery and reads
+- `listPrompts / loadPrompt` – prompt discovery helpers
+
+## Recovery & storage
+
+- `recoverFromService()` – retrieve the latest channel state after failures
+- `mappingStore` – persist host→channel mapping across sessions
+- `transactionStore` – optional persistent log for auditing
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Payment Kit" icon="credit-card" href="/sdk/payment-kit">
+    Channels, pricing, streaming, recovery, and storage.
+  </Card>
+  <Card title="MCP (overview)" icon="book" href="/build-caps/mcp">
+    Architecture and build options (proxy vs native server).
+  </Card>
+</CardGroup>
+
+
