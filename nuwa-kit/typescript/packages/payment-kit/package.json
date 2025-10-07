@@ -113,7 +113,7 @@
     "@roochnetwork/rooch-sdk": "^0.4.0",
     "@types/js-yaml": "^4.0.9",
     "@types/pg": "^8.15.4",
-    "ai": "^5.0.44",
+    "ai": "^5.0.60",
     "fastmcp": "^3.5.0",
     "js-yaml": "^4.1.0",
     "lossless-json": "^4.1.1",
