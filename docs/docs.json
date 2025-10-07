@@ -39,8 +39,7 @@
                   "build-caps/mcp",
                   "build-caps/mcp-client",
                   "build-caps/mcp-proxy",
-                  "build-caps/mcp-server"
-                  
+                  "build-caps/mcp-server" 
                 ]
               },
               "build-caps/prompt",
