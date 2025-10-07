@@ -29,6 +29,7 @@ import { McpChannelManager } from './McpChannelManager';
 import { PaymentKitError } from '../../errors/PaymentKitError';
 import type { ZodTypeAny } from 'zod';
 import type { Tool, ToolCallOptions, ToolSet } from 'ai';
+import { McpToolConverter } from './McpToolConverter';
 
 /**
  * CallToolResult type compatible with AI SDK's MCP implementation
@@ -970,14 +971,40 @@ export class PaymentChannelMcpClient {
         // Handle { tools: [...] } format
         for (const tool of rawTools.tools) {
           if (tool && typeof tool === 'object' && tool.name) {
-            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+            aiSdkTools[tool.name] = McpToolConverter.convertToAiSdkFormat(
+              tool,
+              async (args: any, options?: ToolCallOptions) => {
+                // Use AI SDK's toolCallId as clientTxRef
+                const clientTxRef = options?.toolCallId;
+                const { content, payment: _ } = await this.callToolWithPayment(
+                  tool.name,
+                  args,
+                  clientTxRef
+                );
+                // We don't return the payment here, because the AI do not need to know about it
+                return { content };
+              }
+            );
           }
         }
       } else if (Array.isArray(rawTools)) {
         // Handle [...] format
         for (const tool of rawTools) {
           if (tool && typeof tool === 'object' && tool.name) {
-            aiSdkTools[tool.name] = this.convertToolToAiSdkFormat(tool);
+            aiSdkTools[tool.name] = McpToolConverter.convertToAiSdkFormat(
+              tool,
+              async (args: any, options?: ToolCallOptions) => {
+                // Use AI SDK's toolCallId as clientTxRef
+                const clientTxRef = options?.toolCallId;
+                const { content, payment: _ } = await this.callToolWithPayment(
+                  tool.name,
+                  args,
+                  clientTxRef
+                );
+                // We don't return the payment here, because the AI do not need to know about it
+                return { content };
+              }
+            );
           }
         }
       } else {
@@ -985,47 +1012,26 @@ export class PaymentChannelMcpClient {
         for (const [name, toolDef] of Object.entries(rawTools)) {
           if (toolDef && typeof toolDef === 'object') {
             const tool = { name, ...(toolDef as any) };
-            aiSdkTools[name] = this.convertToolToAiSdkFormat(tool);
+            aiSdkTools[name] = McpToolConverter.convertToAiSdkFormat(
+              tool,
+              async (args: any, options?: ToolCallOptions) => {
+                // Use AI SDK's toolCallId as clientTxRef
+                const clientTxRef = options?.toolCallId;
+                const { content, payment: _ } = await this.callToolWithPayment(
+                  tool.name,
+                  args,
+                  clientTxRef
+                );
+                // We don't return the payment here, because the AI do not need to know about it
+                return { content };
+              }
+            );
           }
         }
       }
     }
 
     return aiSdkTools;
-  }
-
-  /**
-   * Convert MCP tool definition to AI SDK compatible format
-   * @param tool - MCP tool definition
-   * @returns AI SDK compatible tool with proper typing
-   */
-  private convertToolToAiSdkFormat(tool: {
-    name: string;
-    description?: string;
-    inputSchema?: any;
-    parameters?: any;
-    input_schema?: any;
-  }): Tool<Record<string, any>, CallToolResult> {
-    // Extract schema from various possible locations
-    // Note: tool should already be sanitized by listTools() -> sanitizeTools()
-    const schema = tool.inputSchema || tool.parameters || tool.input_schema || {};
-
-    return {
-      description: tool.description || `Tool: ${tool.name}`,
-      inputSchema: schema,
-      // Add execute method that uses callToolWithPayment
-      execute: async (args: any, options?: ToolCallOptions) => {
-        // Use AI SDK's toolCallId as clientTxRef
-        const clientTxRef = options?.toolCallId;
-        const { content, payment: _ } = await this.callToolWithPayment(
-          tool.name,
-          args,
-          clientTxRef
-        );
-        // We don't return the payment here, because the AI do not need to know about it
-        return { content };
-      },
-    } as Tool<Record<string, any>, CallToolResult>;
   }
 
   /**

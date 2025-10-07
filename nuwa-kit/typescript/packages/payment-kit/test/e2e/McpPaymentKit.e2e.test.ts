@@ -11,7 +11,7 @@
  */
 
 import { jest, describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import { PaymentChannelMcpClient } from '../../src/integrations/mcp/PaymentChannelMcpClient';
+import { UniversalMcpClient } from '../../src/integrations/mcp/UniversalMcpClient';
 import { createFastMcpServer } from '../../src/transport/mcp/FastMcpStarter';
 import { PaymentHubClient } from '../../src/client/PaymentHubClient';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
@@ -38,7 +38,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
   let payee: CreateSelfDidResult;
   let testAsset: AssetInfo;
   let mcpServer: Server;
-  let mcpClient: PaymentChannelMcpClient;
+  let mcpClient: UniversalMcpClient;
   let hubClient: PaymentHubClient;
   let logger: DebugLogger;
   let serverUrl: string;
@@ -207,16 +207,24 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     mcpServer = await app.start();
 
-    // Create MCP client
+    // Create MCP client - force payment mode since this is a payment protocol test
     mcpClient = await createMcpClient({
       baseUrl: serverUrl,
       env: payer.identityEnv,
       debug: true,
       maxAmount: BigInt(1000000000), // 10 RGas
+      forceMode: 'payment', // Force payment mode for E2E tests
     });
 
+    // Trigger initialization to ensure PaymentClient is available
+    await mcpClient.listTools();
+
     // Fund the payer's hub
-    hubClient = mcpClient.getPayerClient().getHubClient();
+    const payerClient = mcpClient.getPayerClient();
+    if (!payerClient) {
+      throw new Error('PayerClient not available - server may not support payment protocol');
+    }
+    hubClient = payerClient.getHubClient();
     const depositTx = await hubClient.deposit(testAsset.assetId, BigInt('1000000000')); // 10 RGas
     logger.debug('💰 Deposit tx:', depositTx);
 
@@ -550,7 +558,11 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
       });
 
       // Commit the SubRAV
-      const signedSubRAV = await mcpClient.getPayerClient().signSubRAV(pendingSubRAV);
+      const payerClient = mcpClient.getPayerClient();
+      if (!payerClient) {
+        throw new Error('PayerClient not available');
+      }
+      const signedSubRAV = await payerClient.signSubRAV(pendingSubRAV);
       const commitResult = await mcpClient.commitSubRAV(signedSubRAV);
 
       expect(commitResult).toEqual({ success: true });
@@ -635,6 +647,9 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
 
     // Get channel info from client
     const payerClient = mcpClient.getPayerClient();
+    if (!payerClient) {
+      throw new Error('PayerClient not available');
+    }
     const clientChannelInfo = await payerClient.getChannelInfo(channelId);
 
     // Get channel info from blockchain

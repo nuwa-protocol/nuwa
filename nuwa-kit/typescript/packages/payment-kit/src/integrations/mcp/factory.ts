@@ -1,12 +1,14 @@
 import type { SignerInterface, IdentityEnv } from '@nuwa-ai/identity-kit';
 import type { McpPayerOptions } from './PaymentChannelMcpClient';
 import { PaymentChannelMcpClient } from './PaymentChannelMcpClient';
+import { UniversalMcpClient } from './UniversalMcpClient';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { TransactionStore } from '../../storage';
 import type { HostChannelMappingStore } from '../http/types';
 
 /**
- * Simple options for creating PaymentChannelMcpClient with IdentityEnv (recommended)
+ * Enhanced options for creating UniversalMcpClient with IdentityEnv (recommended)
+ * Supports both payment-enabled and standard MCP servers with automatic detection
  */
 export interface CreateMcpClientOptions {
   /** MCP server endpoint, e.g., http://localhost:8080/mcp */
@@ -44,6 +46,28 @@ export interface CreateMcpClientOptions {
 
   /** Optional mapping store for state persistence. If not provided, uses default store */
   mappingStore?: HostChannelMappingStore;
+
+  // ===== New Universal Client Options =====
+
+  /**
+   * Force specific client mode (default: 'auto' for automatic detection)
+   * - 'auto': Automatically detect server type and use appropriate client
+   * - 'payment': Force use of payment-enabled client (PaymentChannelMcpClient)
+   * - 'standard': Force use of standard MCP client
+   */
+  forceMode?: 'auto' | 'payment' | 'standard';
+
+  /**
+   * Timeout for server detection in milliseconds (default: 5000)
+   * Only used when forceMode is 'auto'
+   */
+  detectionTimeout?: number;
+
+  /**
+   * Enable fallback mechanism (default: true)
+   * When payment calls fail, automatically retry with standard MCP
+   */
+  enableFallback?: boolean;
 }
 
 /**
@@ -100,11 +124,12 @@ export interface CreateMcpPayerClientOptions {
 }
 
 /**
- * Create PaymentChannelMcpClient with IdentityEnv (recommended approach)
- * Automatically uses optimal defaults and chain configuration from IdentityEnv
+ * Create UniversalMcpClient with IdentityEnv (recommended approach)
+ * Automatically detects server type and uses appropriate client implementation
+ * Fully backward compatible with existing PaymentChannelMcpClient API
  *
- * @param options - Simple configuration options with IdentityEnv
- * @returns Promise resolving to configured PaymentChannelMcpClient instance
+ * @param options - Enhanced configuration options with IdentityEnv
+ * @returns Promise resolving to configured UniversalMcpClient instance
  *
  * @example
  * ```typescript
@@ -116,20 +141,40 @@ export interface CreateMcpPayerClientOptions {
  *   vdrOptions: { rpcUrl: 'https://testnet.rooch.network', network: 'test' }
  * });
  *
- * // 2. Create MCP client with automatic configuration
+ * // 2. Create universal MCP client with automatic detection (recommended)
  * const client = await createMcpClient({
  *   baseUrl: 'http://localhost:8080/mcp',
  *   env,
  *   maxAmount: BigInt('500000000000'), // 50 cents USD
  * });
  *
- * // 3. Use it!
+ * // 3. Use it! (API is fully compatible with PaymentChannelMcpClient)
  * const result = await client.call('some_tool', { param: 'value' });
+ *
+ * // 4. Check what type of server was detected
+ * console.log('Server type:', client.getServerType()); // 'payment' | 'standard'
+ * console.log('Supports payment:', client.supportsPayment());
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Force specific mode (skip auto-detection)
+ * const paymentClient = await createMcpClient({
+ *   baseUrl: 'http://payment-server:8080/mcp',
+ *   env,
+ *   forceMode: 'payment', // Skip detection, use payment client directly
+ * });
+ *
+ * const standardClient = await createMcpClient({
+ *   baseUrl: 'http://standard-server:8080/mcp',
+ *   env,
+ *   forceMode: 'standard', // Skip detection, use standard MCP client
+ * });
  * ```
  */
 export async function createMcpClient(
   options: CreateMcpClientOptions
-): Promise<PaymentChannelMcpClient> {
+): Promise<UniversalMcpClient> {
   const chainConfig = getChainConfigFromEnv(options.env);
   let keyId;
   const keyIds = await options.env.keyManager.listKeyIds?.();
@@ -138,7 +183,12 @@ export async function createMcpClient(
   } else {
     throw new Error('No keyId available');
   }
-  const mcpPayerOptions: McpPayerOptions = {
+
+  const mcpPayerOptions: McpPayerOptions & {
+    forceMode?: 'auto' | 'payment' | 'standard';
+    detectionTimeout?: number;
+    enableFallback?: boolean;
+  } = {
     baseUrl: options.baseUrl,
     chainConfig,
     signer: options.env.keyManager,
@@ -149,9 +199,51 @@ export async function createMcpClient(
     transactionStore: options.transactionStore,
     transactionLog: options.transactionLog,
     mappingStore: options.mappingStore,
+
+    // Universal client options
+    forceMode: options.forceMode || 'auto',
+    detectionTimeout: options.detectionTimeout || 5000,
+    enableFallback: options.enableFallback !== false,
   };
 
-  const client = new PaymentChannelMcpClient(mcpPayerOptions);
-
+  const client = new UniversalMcpClient(mcpPayerOptions);
   return client;
+}
+
+// ===== Backward Compatibility =====
+
+/**
+ * @deprecated Use createMcpClient instead. This function now returns UniversalMcpClient
+ * for backward compatibility, but the API remains the same.
+ *
+ * Create PaymentChannelMcpClient with IdentityEnv (legacy function)
+ * Now returns UniversalMcpClient but maintains full API compatibility
+ */
+export async function createPaymentMcpClient(
+  options: CreateMcpClientOptions
+): Promise<UniversalMcpClient> {
+  // Force payment mode for legacy function
+  return createMcpClient({
+    ...options,
+    forceMode: 'payment',
+  });
+}
+
+/**
+ * Create standard MCP client (new function)
+ * Forces standard MCP mode without payment protocol
+ */
+export async function createStandardMcpClient(
+  options: Omit<CreateMcpClientOptions, 'maxAmount' | 'chainConfig' | 'signer' | 'keyId'> & {
+    /** Optional timeout for requests */
+    timeout?: number;
+  }
+): Promise<UniversalMcpClient> {
+  // Create minimal options for standard client
+  // We still need env for potential future extensions
+  return createMcpClient({
+    ...options,
+    forceMode: 'standard',
+    maxAmount: BigInt(0), // Not used in standard mode
+  });
 }
