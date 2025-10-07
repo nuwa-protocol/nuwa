@@ -1,5 +1,7 @@
 ![nuwa ai readme banner](website/docs/public/assets/readme-bg.png)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nuwa-protocol/nuwa)
+
 ## 🧠 What is Nuwa?
 Nuwa is an AI platform where users pay directly to the developers who contributes AI models and agents. Payments use cryptos secured by blockchain. User data and authentications are based on Decentralized Identity (DID).
 
