@@ -1,62 +1,48 @@
 ---
 title: "MCP"
-description: "About MCP in Nuwa"
+description: "Overview and choices for building or proxying MCP with Nuwa"
 ---
-## Model Context Protocol (MCP)
 
-MCP tools extend your Cap with external capabilities: fetch data, call APIs, run analysis, or render UI. Nuwa ships first-class MCP support on both client and service sides, including payment.
+## What is MCP in Nuwa
 
-## Server (FastMCP)
+Model Context Protocol (MCP) lets your Cap call external tools for data, actions, or UI. Nuwa provides first‑class support on both client and service sides, including DIDAuth and pay‑per‑call settlement.
 
-Use Payment Kit's FastMCP adapter to declare free or paid tools. It handles DID auth, request validation (Ajv), and payment settlement.
+## Choose your path
 
-```ts
-import { createFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+Use this page to decide between a quick proxy for an existing MCP vs. building a native MCP server with payment built‑in.
 
-const app = await createFastMcpServer({
-  // Free tool example
-  freeTool: {
-    name: 'ping',
-    description: 'Health check',
-    execute: async () => ({ ok: true }),
-  },
+<CardGroup cols={2}>
+  <Card title="Proxy an existing MCP" icon="right-left" href="/build-caps/mcp-proxy">
+    Keep your upstream as‑is and add pricing/DIDAuth at the edge.
+  </Card>
+  <Card title="Build a native MCP server" icon="bolt" href="/build-caps/mcp-server">
+    Implement tools directly with schemas and pricing using the Payment Kit.
+  </Card>
+</CardGroup>
 
-  // Paid tool example
-  paidTool: {
-    name: 'analyze',
-    description: 'Analyze data (paid)',
-    pricePicoUSD: 1_000_000_000n, // 0.001 USD
-    parameters: { type: 'object', properties: { data: { type: 'string' } } },
-    execute: async ({ data }) => ({ analysis: `Analysis of "${data}"` }),
-  },
-});
+## How requests are authorized and billed
 
-await app.start();
-```
+- The client includes DIDAuth v1 and payment metadata on each call.
+- Servers validate authorization and settle per call or per stream frame.
+- Reserved input fields are merged into each tool schema by adapters:
+  - `__nuwa_auth`: DIDAuth v1 header string
+  - `__nuwa_payment`: serialized payment request payload
 
-Response shape includes your normal MCP `content` plus a payment resource:
+## Related
 
-```json
-{ "type": "resource", "resource": { "uri": "nuwa:payment", "mimeType": "application/vnd.nuwa.payment+json", "text": "{...}" } }
-```
-
-Reserved request parameters (merged into each tool schema):
-
-- `__nuwa_auth`: DIDAuth v1 header string
-- `__nuwa_payment`: serialized payment request payload
+<CardGroup cols={2}>
+  <Card title="Payment Kit" icon="credit-card" href="/sdk/payment-kit">
+    HTTP and MCP payment channels, streaming, recovery, and storage.
+  </Card>
+  <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
+    Return UI resources from tools and render them inside the client.
+  </Card>
+</CardGroup>
 
 ## Client
 
-The Nuwa Client embeds a payer MCP client. If you call MCP servers programmatically, use:
+See the dedicated SDK guide for payer‑side MCP client usage and APIs.
 
-```ts
-import { PaymentChannelMcpClient } from '@nuwa-ai/payment-kit/mcp';
-
-const client = new PaymentChannelMcpClient({ baseUrl: 'http://localhost:8080/mcp', signer });
-const result = await client.call('analyze', { data: 'Sample' });
-console.log(result.data, result.payment);
-```
-
-## UI Over MCP
-
-If your MCP tool needs a rich UI, return a UI resource and render it with `@nuwa-ai/ui-kit` in an iframe artifact. See Build -> Artifact and SDK -> UI Kit.
+<Card title="MCP Client (SDK)" icon="bolt" href="/build-caps/mcp-client">
+  Initialize, call tools, stream, and recover channels.
+</Card>

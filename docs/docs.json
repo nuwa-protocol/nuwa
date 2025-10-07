@@ -33,7 +33,16 @@
             "pages": [
               "build-caps/index",
               "build-caps/models",
-              "build-caps/mcp",
+              {
+                "group": "MCP",
+                "pages": [
+                  "build-caps/mcp",
+                  "build-caps/mcp-client",
+                  "build-caps/mcp-proxy",
+                  "build-caps/mcp-server"
+                  
+                ]
+              },
               "build-caps/prompt",
               "build-caps/artifact"
             ]
