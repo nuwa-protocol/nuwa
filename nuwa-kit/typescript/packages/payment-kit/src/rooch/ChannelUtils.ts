@@ -6,7 +6,14 @@
  */
 
 import { parseDid } from '@nuwa-ai/identity-kit';
-import { bcs, sha3_256, toHEX, Serializer, RoochAddress } from '@roochnetwork/rooch-sdk';
+import {
+  bcs,
+  sha3_256,
+  toHEX,
+  Serializer,
+  RoochAddress,
+  normalizeRoochAddress,
+} from '@roochnetwork/rooch-sdk';
 
 /**
  * Channel key structure matching Move contract ChannelKey
@@ -84,6 +91,17 @@ export interface PaymentHub {
 export const PaymentHubSchema: any = bcs.struct('PaymentHub', {
   multi_coin_store: bcs.ObjectId,
   active_channels: bcs.ObjectId, // Table<String, u64>
+});
+
+// PaymentRevenueHub structure definition matching the Move contract
+export interface PaymentRevenueHub {
+  multi_coin_store: string; // ObjectID as hex string
+  revenue_by_source: string; // ObjectID as hex string (Table<String, Table<String, u256>>)
+}
+
+export const PaymentRevenueHubSchema: any = bcs.struct('PaymentRevenueHub', {
+  multi_coin_store: bcs.ObjectId,
+  revenue_by_source: bcs.ObjectId, // Table<String, Table<String, u256>>
 });
 
 // Balance struct - matches multi_coin_store.move
@@ -413,6 +431,34 @@ export function parsePaymentHubData(value: string): PaymentHub {
 }
 
 /**
+ * Parse PaymentRevenueHub from BCS hex string
+ * @param value BCS encoded hex string from object state
+ * @returns Parsed PaymentRevenueHub
+ */
+export function parsePaymentRevenueHubData(value: string): PaymentRevenueHub {
+  try {
+    if (typeof value === 'string' && value.startsWith('0x')) {
+      // Parse BCS bytes using PaymentRevenueHubSchema (browser-friendly hex decode)
+      const hex = value.slice(2);
+      const bcsBytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bcsBytes.length; i++) {
+        bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+      }
+      const parsed = PaymentRevenueHubSchema.parse(bcsBytes);
+
+      return {
+        multi_coin_store: parsed.multi_coin_store,
+        revenue_by_source: parsed.revenue_by_source,
+      };
+    } else {
+      throw new Error('Unexpected PaymentRevenueHub value format');
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse PaymentRevenueHub data: ${error}`);
+  }
+}
+
+/**
  * Parse a DynamicField<String, SubChannel> from BCS hex string
  * @param value BCS encoded hex string from a DynamicField
  * @returns Parsed DynamicField<String, SubChannel> object
@@ -502,5 +548,147 @@ export function safeBalanceToBigint(balanceValue: any): bigint {
     return balanceValue;
   } else {
     return BigInt(0);
+  }
+}
+
+// ==================== Revenue-related Utility Functions ====================
+
+/**
+ * Calculate PaymentRevenueHub object ID for a given owner address
+ * This matches the Move contract's object::account_named_object_id<PaymentRevenueHub>(owner)
+ * Uses the same calculation approach as calculatePaymentHubId but for PaymentRevenueHub struct
+ * @param ownerAddress The owner's address (without did:rooch: prefix)
+ * @returns The calculated revenue hub object ID
+ */
+export function calculateRevenueHubId(ownerAddress: string): string {
+  try {
+    // Create PaymentRevenueHub struct tag using the same approach as PaymentHub
+    const paymentRevenueHubStructTag = {
+      address: '0x3',
+      module: 'payment_revenue',
+      name: 'PaymentRevenueHub',
+      type_params: [],
+    };
+
+    // Get canonical string representation using Serializer
+    const canonicalStructTag = Serializer.structTagToCanonicalString(paymentRevenueHubStructTag);
+
+    const roochAddress = new RoochAddress(ownerAddress);
+
+    // Convert owner address to bytes - Rooch SDK handles the address format conversion
+    const ownerBytes = roochAddress.toBytes();
+
+    // Append struct tag bytes (canonical string format)
+    const structTagBytes = new TextEncoder().encode(canonicalStructTag);
+
+    // Combine owner address bytes + struct tag bytes (browser-friendly)
+    const combined = new Uint8Array(ownerBytes.length + structTagBytes.length);
+    combined.set(ownerBytes, 0);
+    combined.set(structTagBytes, ownerBytes.length);
+
+    // Calculate SHA3-256 hash
+    const hash = sha3_256(combined);
+
+    // Return as hex string with 0x prefix (ObjectID format)
+    return '0x' + toHEX(hash);
+  } catch (error) {
+    // If address parsing fails, fall back to a deterministic hash approach
+    const normalizedAddress = normalizeRoochAddress(ownerAddress);
+    const typeIdentifier = 'PaymentRevenueHub';
+    const combined = `${normalizedAddress}::${typeIdentifier}`;
+    const hash = sha3_256(new TextEncoder().encode(combined));
+    return `0x${toHEX(hash)}`;
+  }
+}
+
+/**
+ * Parse u256 value from BCS hex string
+ * @param value BCS encoded hex string containing a u256 value
+ * @returns Parsed u256 as bigint
+ */
+export function parseU256FromBCS(value: string): bigint {
+  try {
+    const hex = value.startsWith('0x') ? value.slice(2) : value;
+    const bcsBytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bcsBytes.length; i++) {
+      bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    }
+
+    // Parse u256 using BCS
+    const parsed = bcs.u256().parse(bcsBytes);
+    return BigInt(parsed);
+  } catch (error) {
+    throw new Error(`Failed to parse u256 from BCS: ${error}`);
+  }
+}
+
+/**
+ * Extract string value from a dynamic field key
+ * @param fieldKey The field key to decode
+ * @returns The extracted string value or null if parsing fails
+ */
+export function extractStringFromFieldKey(fieldKey: string): string | null {
+  try {
+    // This is a placeholder implementation
+    // The actual implementation would need to decode the BCS-encoded field key
+    // For now, we assume the field key contains the string in a decodable format
+
+    if (fieldKey.startsWith('0x')) {
+      const hex = fieldKey.slice(2);
+      const bcsBytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bcsBytes.length; i++) {
+        bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+      }
+
+      // Try to parse as string
+      const parsed = bcs.string().parse(bcsBytes);
+      return parsed;
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Extract asset ID from a coin store field key
+ * @param fieldKey The field key to decode
+ * @returns The extracted asset ID or null if parsing fails
+ */
+export function extractAssetIdFromFieldKey(fieldKey: string): string | null {
+  try {
+    // This is similar to extractStringFromFieldKey but specifically for asset IDs
+    return extractStringFromFieldKey(fieldKey);
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Extract table ID from a dynamic field value
+ * @param fieldValue The field value containing a table reference
+ * @returns The extracted table ID or null if parsing fails
+ */
+export function extractTableIdFromField(fieldValue: any): string | null {
+  try {
+    if (typeof fieldValue === 'string' && fieldValue.startsWith('0x')) {
+      // This is a placeholder implementation
+      // The actual implementation would parse the BCS data to extract the table ObjectID
+
+      const hex = fieldValue.slice(2);
+      const bcsBytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < bcsBytes.length; i++) {
+        bcsBytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+      }
+
+      // Try to parse as ObjectId (assuming it's stored as the table reference)
+      const parsed = bcs.ObjectId.parse(bcsBytes);
+      return parsed;
+    }
+
+    return null;
+  } catch (error) {
+    return null;
   }
 }

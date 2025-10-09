@@ -246,8 +246,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@4.9.5)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.0
-        version: 0.6.0(express@5.1.0)(typescript@4.9.5)
+        specifier: ^0.6.2
+        version: 0.6.2(express@5.1.0)(typescript@4.9.5)
       '@peculiar/asn1-schema':
         specifier: ^2.3.8
         version: 2.5.0
@@ -432,14 +432,14 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/gateway@1.0.30':
-    resolution: {integrity: sha512-QdrSUryr/CLcsCISokLHOImcHj1adGXk1yy4B3qipqLhcNc33Kj/O/3crI790Qp85oDx7sc4vm7R4raf9RA/kg==}
+  '@ai-sdk/gateway@1.0.35':
+    resolution: {integrity: sha512-cdsXbeRRMi6QxbZscin69Asx2fi0d2TmmPngcPFUMpZbchGEBiJYVNvIfiALKFKXEq0l/w0xGNV3E13vroaleA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@3.0.10':
-    resolution: {integrity: sha512-T1gZ76gEIwffep6MWI0QNy9jgoybUHE7TRaHB5k54K8mF91ciGFlbtCGxDYhMH3nCRergKwYFIDeFF0hJSIQHQ==}
+  '@ai-sdk/provider-utils@3.0.11':
+    resolution: {integrity: sha512-4hgHj89VqyOHzGaV85TkcgvO8WjecVF35TOUVg+C56vnzpWSgdIZu/ZWZNdZ6BTrv8y0N1toBWW7XcWiRRicLg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1349,8 +1349,8 @@ packages:
   '@levischuck/tiny-cbor@0.2.11':
     resolution: {integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==}
 
-  '@modelcontextprotocol/sdk@1.18.2':
-    resolution: {integrity: sha512-beedclIvFcCnPrYgHsylqiYJVJ/CI47Vyc4tY8no1/Li/O8U4BTlJfy6ZwxkYwx+Mx10nrgwSVrA7VBbhh4slg==}
+  '@modelcontextprotocol/sdk@1.19.1':
+    resolution: {integrity: sha512-3Y2h3MZKjec1eAqSTBclATlX+AbC6n1LgfVzRMJLt3v6w0RCYgwLrjbxPDbhsYHt6Wdqc/aCceNJYgj448ELQQ==}
     engines: {node: '>=18'}
 
   '@mysten/bcs@1.0.4':
@@ -1438,8 +1438,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.0':
-    resolution: {integrity: sha512-OGhXMPPG39qPiSIKXlzFQOgUv6ZZyxHmy3XXm318IR5p338iAGV5GY5ixm3GgJOheKynAo0EDAJlmJZuLIiyWA==}
+  '@nuwa-ai/payment-kit@0.6.2':
+    resolution: {integrity: sha512-zrcViASwy47yMo3rxRX24jhW/2qENlVBbrebqiZWKdGpAn7zf+sc4XAQSStbTd6G5TViEEa7xYwnWaFw3AijUw==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -2393,6 +2393,10 @@ packages:
     peerDependencies:
       '@vanilla-extract/css': ^1.0.0
 
+  '@vercel/oidc@3.0.2':
+    resolution: {integrity: sha512-JekxQ0RApo4gS4un/iMGsIL1/k4KUBe3HmnGcDvzHuFBdQdudEJgTqcsJC7y6Ul4Yw5CeykgvQbX2XeEJd0+DA==}
+    engines: {node: '>= 20'}
+
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -2436,8 +2440,8 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
-  ai@5.0.56:
-    resolution: {integrity: sha512-Rl++Ogg6DxzFkVHAOJZzhqcqvqtBLGOP9mMxJOGr2EJWj5HH5zjqDcnRh6x5vBoca5kj/Gd0rvUZFMnyI+sRiw==}
+  ai@5.0.63:
+    resolution: {integrity: sha512-rQB8xSCDCZLvAue51hvufhSP82NtzZh8CMH7/Oj5rnn/5vNI2y+Rn0lmODJ/kC4bPvFX8XgDfys8i4r86YfkmQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3280,8 +3284,8 @@ packages:
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
-  fastmcp@3.18.0:
-    resolution: {integrity: sha512-Td8+QMHmA8WeLTczlMIvV+/Xvk164d/047Hku3kwExuwm3tgMTrwmTI10euP04lNE5WCFZ1xdF9XISnMxeJ3yw==}
+  fastmcp@3.19.1:
+    resolution: {integrity: sha512-XiEFTW26i5lDStmWOCVhDx8v2jQfQvtd6KC4PHuRg9z5eoo8rP9YUt1yuzgPD4BByNTeksZnxGtXttr+GQK23Q==}
     hasBin: true
 
   fastq@1.19.1:
@@ -4121,8 +4125,8 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
-  lossless-json@4.2.0:
-    resolution: {integrity: sha512-bsHH3x+7acZfqokfn9Ks/ej96yF/z6oGGw1aBmXesq4r3fAjhdG4uYuqzDgZMk5g1CZUd5w3kwwIp9K1LOYUiA==}
+  lossless-json@4.3.0:
+    resolution: {integrity: sha512-ToxOC+SsduRmdSuoLZLYAr5zy1Qu7l5XhmPWM3zefCZ5IcrzW/h108qbJUKfOlDlhvhjUK84+8PSVX0kxnit0g==}
 
   loupe@2.3.7:
     resolution: {integrity: sha512-zSMINGVYkdpYSOBmLi0D1Uo7JU9nVdQKrHxC8eYlV+9YKK9WePqAlL7lSlorG/U2Fw1w0hTBmaa/jrQ3UbPHtA==}
@@ -4159,8 +4163,8 @@ packages:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
 
-  mcp-proxy@5.6.1:
-    resolution: {integrity: sha512-307KBxoJ4YS4fsa26MFkHLcuWYUoy/bTj/VNG/Km8/elgydEh0o+YpJiG7ywUrHhSsaYKpBc9OgMRxibUCjKKA==}
+  mcp-proxy@5.8.1:
+    resolution: {integrity: sha512-tlBekDacLg8iR6pe9k0AnOEi52zn2JLOWY3fPmbL/rhO+MRYIjEMsrBVWHD+D7vbAjR+gmZIzMUbvg3TawjafQ==}
     hasBin: true
 
   media-query-parser@2.0.2:
@@ -5671,13 +5675,14 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/gateway@1.0.30(zod@3.25.76)':
+  '@ai-sdk/gateway@1.0.35(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.10(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.11(zod@3.25.76)
+      '@vercel/oidc': 3.0.2
       zod: 3.25.76
 
-  '@ai-sdk/provider-utils@3.0.10(zod@3.25.76)':
+  '@ai-sdk/provider-utils@3.0.11(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
@@ -6571,7 +6576,7 @@ snapshots:
 
   '@levischuck/tiny-cbor@0.2.11': {}
 
-  '@modelcontextprotocol/sdk@1.18.2':
+  '@modelcontextprotocol/sdk@1.19.1':
     dependencies:
       ajv: 6.12.6
       content-type: 1.0.5
@@ -6662,18 +6667,18 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.0(express@5.1.0)(typescript@4.9.5)':
+  '@nuwa-ai/payment-kit@0.6.2(express@5.1.0)(typescript@4.9.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.18.2
+      '@modelcontextprotocol/sdk': 1.19.1
       '@nuwa-ai/identity-kit': 0.6.0(typescript@4.9.5)
       '@roochnetwork/rooch-sdk': 0.4.0(typescript@4.9.5)
       '@types/js-yaml': 4.0.9
       '@types/pg': 8.15.5
-      ai: 5.0.56(zod@3.25.76)
-      fastmcp: 3.18.0
+      ai: 5.0.63(zod@3.25.76)
+      fastmcp: 3.19.1
       js-yaml: 4.1.0
-      lossless-json: 4.2.0
-      mcp-proxy: 5.6.1
+      lossless-json: 4.3.0
+      mcp-proxy: 5.8.1
       on-headers: 1.1.0
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
@@ -7862,6 +7867,8 @@ snapshots:
     dependencies:
       '@vanilla-extract/css': 1.17.4
 
+  '@vercel/oidc@3.0.2': {}
+
   '@vitejs/plugin-react@4.7.0(vite@5.4.20(@types/node@16.18.126))':
     dependencies:
       '@babel/core': 7.28.4
@@ -7923,11 +7930,11 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@5.0.56(zod@3.25.76):
+  ai@5.0.63(zod@3.25.76):
     dependencies:
-      '@ai-sdk/gateway': 1.0.30(zod@3.25.76)
+      '@ai-sdk/gateway': 1.0.35(zod@3.25.76)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.10(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.11(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
       zod: 3.25.76
 
@@ -9123,14 +9130,14 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fastmcp@3.18.0:
+  fastmcp@3.19.1:
     dependencies:
-      '@modelcontextprotocol/sdk': 1.18.2
+      '@modelcontextprotocol/sdk': 1.19.1
       '@standard-schema/spec': 1.0.0
       execa: 9.6.0
       file-type: 21.0.0
       fuse.js: 7.1.0
-      mcp-proxy: 5.6.1
+      mcp-proxy: 5.8.1
       strict-event-emitter-types: 2.0.0
       undici: 7.16.0
       uri-templates: 0.2.0
@@ -10241,7 +10248,7 @@ snapshots:
     dependencies:
       js-tokens: 4.0.0
 
-  lossless-json@4.2.0: {}
+  lossless-json@4.3.0: {}
 
   loupe@2.3.7:
     dependencies:
@@ -10275,7 +10282,7 @@ snapshots:
 
   math-intrinsics@1.1.0: {}
 
-  mcp-proxy@5.6.1: {}
+  mcp-proxy@5.8.1: {}
 
   media-query-parser@2.0.2:
     dependencies:

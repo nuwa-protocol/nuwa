@@ -87,6 +87,7 @@ const standardClient = await createMcpClient({
 The main client that provides intelligent server detection and unified API access.
 
 **Key Methods:**
+
 - `call()` - Execute tools with payment support
 - `callTool()` - Execute tools and return raw content
 - `tools()` - Get AI SDK compatible tool definitions
@@ -98,6 +99,7 @@ The main client that provides intelligent server detection and unified API acces
 Specialized client for payment-enabled MCP servers with full Nuwa protocol support.
 
 **Features:**
+
 - Payment channel management
 - DID-based authentication
 - Transaction logging
@@ -109,6 +111,7 @@ Specialized client for payment-enabled MCP servers with full Nuwa protocol suppo
 Shared utility for converting MCP tool definitions to AI SDK compatible format.
 
 **Features:**
+
 - Handles nested `jsonSchema` structures
 - Supports multiple schema locations (`inputSchema`, `parameters`, `input_schema`)
 - Provides proper TypeScript typing
@@ -119,6 +122,7 @@ Shared utility for converting MCP tool definitions to AI SDK compatible format.
 Automatic server capability detection through well-known endpoints and MCP handshake.
 
 **Detection Process:**
+
 1. Check `/.well-known/nuwa-payment/info` for payment protocol support
 2. Connect to MCP server to get standard capabilities
 3. Merge information to determine server type and features
@@ -363,4 +367,3 @@ When contributing to the MCP integration:
 3. Update type definitions
 4. Document new features
 5. Follow existing code patterns
-

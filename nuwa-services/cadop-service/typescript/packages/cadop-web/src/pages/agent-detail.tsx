@@ -16,6 +16,7 @@ import {
   Tag,
 } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
+import { ConditionalRevenueCard } from '@/components/revenue/ConditionalRevenueCard';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
 import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2 } from 'lucide-react';
@@ -271,6 +272,16 @@ export function AgentDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Revenue Overview Card - Always shown, but withdraw is controller-only */}
+            {did && (
+              <ConditionalRevenueCard
+                agentDid={did}
+                showTrend={true}
+                onWithdrawSuccess={refetchAgentAccountBalances}
+                isController={isController}
+              />
+            )}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">

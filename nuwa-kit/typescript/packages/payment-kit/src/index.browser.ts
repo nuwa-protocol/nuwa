@@ -9,11 +9,13 @@ export * from './core/PaymentUtils';
 
 // Contract interfaces
 export * from './contracts/IPaymentChannelContract';
+export * from './contracts/IPaymentRevenueContract';
 
 // Chain-agnostic clients
 export * from './client/PaymentChannelPayerClient';
 export * from './client/PaymentChannelPayeeClient';
 export * from './client/PaymentHubClient';
+export * from './client/PaymentRevenueClient';
 
 // Factory for creating clients
 export * from './factory/chainFactory';
@@ -24,6 +26,8 @@ export { HttpBillingMiddleware } from './middlewares/http/HttpBillingMiddleware'
 
 // Rooch implementation (rooch-sdk is browser-compatible)
 export * from './rooch/RoochPaymentChannelContract';
+export * from './rooch/RoochPaymentRevenueContract';
+export * from './rooch/RoochContractBase';
 
 // HTTP Payer Client integration
 export * from './integrations/http';

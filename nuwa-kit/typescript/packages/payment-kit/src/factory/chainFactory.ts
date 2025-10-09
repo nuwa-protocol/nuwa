@@ -11,10 +11,8 @@ import {
   PaymentChannelPayerClient,
   type PaymentChannelPayerClientOptions,
 } from '../client/PaymentChannelPayerClient';
-import {
-  RoochPaymentChannelContract,
-  type RoochContractOptions,
-} from '../rooch/RoochPaymentChannelContract';
+import { RoochPaymentChannelContract } from '../rooch/RoochPaymentChannelContract';
+import { type RoochContractOptions } from '../rooch/RoochContractBase';
 
 /**
  * Supported blockchain networks
