@@ -1,11 +1,11 @@
 import { DebugLogger} from '@nuwa-ai/identity-kit';
 import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
-import { type TransactionStore, PaymentChannelMcpClient, createMcpClient } from '@nuwa-ai/payment-kit';
+import { type TransactionStore, UniversalMcpClient, createMcpClient } from '@nuwa-ai/payment-kit';
 
 // Cache PaymentChannelHttpClient per host to avoid duplicate instances
 const clientsByHost = new Map<string, PaymentChannelHttpClient>();
-const mcpClientsByHost = new Map<string, PaymentChannelMcpClient>();
+const mcpClientsByHost = new Map<string, UniversalMcpClient>();
 DebugLogger.setGlobalLevel('debug');
 function getHostKey(baseUrl: string): string {
   try {
@@ -36,7 +36,7 @@ export async function getMcpClient(
   sdk: IdentityKitWeb,
   mcpBaseUrl: string,
   shareFromBaseUrl?: string
-): Promise<PaymentChannelMcpClient> {
+): Promise<UniversalMcpClient> {
   const key = getHostKey(mcpBaseUrl);
   const existing = mcpClientsByHost.get(key);
   if (existing) return existing;

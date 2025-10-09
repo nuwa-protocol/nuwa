@@ -18,7 +18,6 @@ interface TestEnv {
   vdrRegistry: any;
   roochVDR: any;
   fundAccount(address: string, amount?: bigint): Promise<void>;
-  auth: boolean
 }
 
 /**
