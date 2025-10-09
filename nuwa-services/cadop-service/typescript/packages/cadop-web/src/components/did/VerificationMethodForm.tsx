@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Button,
@@ -19,15 +19,14 @@ import {
   AlertTitle,
   AlertDescription,
 } from '@/components/ui';
-import type { OperationalKeyInfo, VerificationRelationship } from '@nuwa-ai/identity-kit';
-import { MultibaseCodec, KeyType } from '@nuwa-ai/identity-kit';
+import type { VerificationRelationship } from '@nuwa-ai/identity-kit';
 import {
   generateKeyPair,
   methodTypeToKeyType,
   getKeyTypeDisplayName,
   type GeneratedKeyInfo,
 } from '@/lib/crypto/keyGeneration';
-import { Key, Shield, AlertTriangle } from 'lucide-react';
+import { Key, Shield, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export interface VerificationMethodFormValues {
   type: string;
@@ -54,6 +53,11 @@ export function VerificationMethodForm({
   const [generatedKey, setGeneratedKey] = useState<GeneratedKeyInfo | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [isFormModified, setIsFormModified] = useState(false);
+  const [originalGeneratedParams, setOriginalGeneratedParams] = useState<{
+    fragment: string;
+    type: string;
+  } | null>(null);
 
   const form = useForm<VerificationMethodFormValues>({
     defaultValues: {
@@ -63,6 +67,18 @@ export function VerificationMethodForm({
       idFragment: initial?.idFragment || `key-${Date.now()}`,
     },
   });
+
+  // Watch form changes to detect if user modified generated key parameters
+  const watchedFragment = form.watch('idFragment');
+  const watchedType = form.watch('type');
+
+  useEffect(() => {
+    if (generatedKey && originalGeneratedParams) {
+      const fragmentChanged = watchedFragment !== originalGeneratedParams.fragment;
+      const typeChanged = watchedType !== originalGeneratedParams.type;
+      setIsFormModified(fragmentChanged || typeChanged);
+    }
+  }, [watchedFragment, watchedType, generatedKey, originalGeneratedParams]);
 
   const handleSubmit = (values: VerificationMethodFormValues) => {
     onSubmit(values);
@@ -85,10 +101,19 @@ export function VerificationMethodForm({
       const keyInfo = await generateKeyPair(did, keyType, fragment);
       setGeneratedKey(keyInfo);
 
+      // Store original parameters for comparison
+      setOriginalGeneratedParams({
+        fragment: keyInfo.idFragment,
+        type: selectedType,
+      });
+
       // Auto-fill the form with generated values
       form.setValue('publicKeyMultibase', keyInfo.publicKeyMultibase);
       form.setValue('idFragment', keyInfo.idFragment);
       form.setValue('type', getKeyTypeDisplayName(keyInfo.keyType));
+
+      // Reset modification flag
+      setIsFormModified(false);
 
       // Set default relationships for authentication
       if (!form.getValues('relationships').length) {
@@ -96,6 +121,38 @@ export function VerificationMethodForm({
       }
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : 'Failed to generate key');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleRegenerateKey = async () => {
+    if (!did || !generatedKey) return;
+
+    setGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const selectedType = form.getValues('type');
+      const keyType = methodTypeToKeyType(selectedType);
+      const fragment = form.getValues('idFragment') || `key-${Date.now()}`;
+
+      const keyInfo = await generateKeyPair(did, keyType, fragment);
+      setGeneratedKey(keyInfo);
+
+      // Update original parameters
+      setOriginalGeneratedParams({
+        fragment: keyInfo.idFragment,
+        type: selectedType,
+      });
+
+      // Update form with new values
+      form.setValue('publicKeyMultibase', keyInfo.publicKeyMultibase);
+
+      // Reset modification flag
+      setIsFormModified(false);
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Failed to regenerate key');
     } finally {
       setGenerating(false);
     }
@@ -118,24 +175,48 @@ export function VerificationMethodForm({
               as a Service Key for server deployment.
             </p>
 
-            <Button
-              type="button"
-              onClick={handleGenerateKey}
-              disabled={generating || submitting}
-              className="mb-3"
-            >
-              {generating ? (
-                <>
-                  <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Key className="mr-2 h-3 w-3" />
-                  Generate Key Pair
-                </>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleGenerateKey}
+                disabled={generating || submitting}
+                className="mb-3"
+              >
+                {generating ? (
+                  <>
+                    <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Key className="mr-2 h-3 w-3" />
+                    Generate Key Pair
+                  </>
+                )}
+              </Button>
+
+              {generatedKey && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleRegenerateKey}
+                  disabled={generating || submitting}
+                  className="mb-3"
+                >
+                  {generating ? (
+                    <>
+                      <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-3 w-3" />
+                      Regenerate Service Key
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+            </div>
 
             {generationError && (
               <Alert variant="destructive" className="mb-3">
@@ -153,9 +234,30 @@ export function VerificationMethodForm({
                 </AlertTitle>
                 <AlertDescription className="mt-2">
                   <p className="text-sm text-green-700 dark:text-green-300 mb-3">
-                    <strong>Important:</strong> Copy and save the Service Key immediately. You won't
-                    be able to view it again.
+                    <strong>Important:</strong> Copy and save the Service Key immediately. You
+                    won&apos;t be able to view it again.
                   </p>
+
+                  {isFormModified && (
+                    <Alert variant="destructive" className="mb-3">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Service Key Outdated</AlertTitle>
+                      <AlertDescription>
+                        The form has been modified after key generation. The Service Key below may
+                        not match the current form values.{' '}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="p-0 h-auto ml-1 text-red-600 underline"
+                          onClick={handleRegenerateKey}
+                          disabled={generating}
+                        >
+                          Regenerate with current values
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="bg-white dark:bg-gray-800 border rounded p-3 mb-3">
                     <div className="flex items-center justify-between">
                       <code className="text-xs font-mono break-all pr-2 text-gray-700 dark:text-gray-300">
@@ -170,7 +272,7 @@ export function VerificationMethodForm({
                   </div>
                   <p className="text-xs text-green-600 dark:text-green-400">
                     Add this to your server environment variables:{' '}
-                    <code>SERVICE_KEY="&lt;copied_value&gt;"</code>
+                    <code>SERVICE_KEY=&quot;&lt;copied_value&gt;&quot;</code>
                   </p>
                 </AlertDescription>
               </Alert>
