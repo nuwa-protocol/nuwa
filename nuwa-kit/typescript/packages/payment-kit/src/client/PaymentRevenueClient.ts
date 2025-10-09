@@ -78,7 +78,8 @@ export class PaymentRevenueClient {
     // Create a simple rate provider that returns a fixed price for testing
     return {
       getPricePicoUSD: async (assetId: string): Promise<bigint> => {
-        // Return 1 USD = 1,000,000 picoUSD for testing
+        //TODO: Replace with actual price
+        // Return 1 RGas = 1,000,000 picoUSD
         return BigInt(1000000);
       },
       getAssetInfo: async (assetId: string): Promise<AssetInfo | null> => {
