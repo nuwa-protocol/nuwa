@@ -15,6 +15,12 @@ import type {
   DepositParams,
   WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
+import type {
+  IPaymentRevenueContract,
+  WithdrawRevenueParams,
+  WithdrawalPreview,
+  RevenueSource,
+} from '../contracts/IPaymentRevenueContract';
 import type { ChannelInfo, AssetInfo } from '../core/types';
 import type { DIDResolver, DIDDocument } from '@nuwa-ai/identity-kit';
 import { KeyStoreSigner, KeyManager, MultibaseCodec } from '@nuwa-ai/identity-kit';
@@ -180,6 +186,112 @@ export class MockContract implements IPaymentChannelContract {
 
   async getAssetPrice(assetId: string): Promise<bigint> {
     return BigInt(1000000); // 1 USD in pUSD (6 decimals)
+  }
+}
+
+/**
+ * Mock Payment Revenue Contract implementation
+ * Simulates revenue management functionality for testing
+ */
+export class MockRevenueContract implements IPaymentRevenueContract {
+  private revenueHubs = new Map<string, boolean>(); // DID -> exists
+  private revenueBalances = new Map<string, bigint>(); // DID:assetId -> balance
+  private revenueBySource = new Map<string, bigint>(); // DID:sourceType:assetId -> amount
+  private txCounter = 0;
+
+  /**
+   * Reset the contract state (useful for test isolation)
+   */
+  reset(): void {
+    this.revenueHubs.clear();
+    this.revenueBalances.clear();
+    this.revenueBySource.clear();
+    this.txCounter = 0;
+  }
+
+  async createRevenueHub(ownerDid: string, signer: any): Promise<TxResult> {
+    this.revenueHubs.set(ownerDid, true);
+    return {
+      txHash: `revenue-hub-tx-${++this.txCounter}-${Date.now()}`,
+      blockHeight: BigInt(1000 + this.txCounter),
+    };
+  }
+
+  async revenueHubExists(ownerDid: string): Promise<boolean> {
+    return this.revenueHubs.get(ownerDid) || false;
+  }
+
+  async withdrawRevenue(params: WithdrawRevenueParams): Promise<TxResult> {
+    const balanceKey = `${params.ownerDid}:${params.assetId}`;
+    const currentBalance = this.revenueBalances.get(balanceKey) || BigInt(0);
+
+    if (currentBalance < params.amount) {
+      throw new Error('Insufficient revenue balance');
+    }
+
+    // Deduct the withdrawn amount
+    this.revenueBalances.set(balanceKey, currentBalance - params.amount);
+
+    return {
+      txHash: `withdraw-revenue-tx-${++this.txCounter}-${Date.now()}`,
+      blockHeight: BigInt(2000 + this.txCounter),
+    };
+  }
+
+  async previewWithdrawalFee(
+    ownerDid: string,
+    assetId: string,
+    amount: bigint
+  ): Promise<WithdrawalPreview> {
+    // Mock implementation with no fees (like the real contract currently)
+    return {
+      grossAmount: amount,
+      feeAmount: BigInt(0),
+      netAmount: amount,
+      feeRateBps: 0,
+    };
+  }
+
+  async getRevenueBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    const balanceKey = `${ownerDid}:${assetId}`;
+    return this.revenueBalances.get(balanceKey) || BigInt(0);
+  }
+
+  async getRevenueBySource(ownerDid: string, sourceType: string, assetId: string): Promise<bigint> {
+    const sourceKey = `${ownerDid}:${sourceType}:${assetId}`;
+    return this.revenueBySource.get(sourceKey) || BigInt(0);
+  }
+
+  // -------- Test helper methods --------
+
+  /**
+   * Add revenue balance for testing (simulates revenue deposit from payment channels)
+   */
+  addRevenueBalance(ownerDid: string, assetId: string, amount: bigint, sourceType?: string): void {
+    const balanceKey = `${ownerDid}:${assetId}`;
+    const currentBalance = this.revenueBalances.get(balanceKey) || BigInt(0);
+    this.revenueBalances.set(balanceKey, currentBalance + amount);
+
+    // Also update source-specific balance if provided
+    if (sourceType) {
+      const sourceKey = `${ownerDid}:${sourceType}:${assetId}`;
+      const currentSourceBalance = this.revenueBySource.get(sourceKey) || BigInt(0);
+      this.revenueBySource.set(sourceKey, currentSourceBalance + amount);
+    }
+  }
+
+  /**
+   * Get all revenue balances for a DID (for debugging)
+   */
+  getDebugBalances(ownerDid: string): Record<string, bigint> {
+    const result: Record<string, bigint> = {};
+    for (const [key, balance] of this.revenueBalances.entries()) {
+      if (key.startsWith(ownerDid + ':')) {
+        const assetId = key.split(':')[1];
+        result[assetId] = balance;
+      }
+    }
+    return result;
   }
 }
 
@@ -368,6 +480,7 @@ export function createTestId(): string {
 export async function createTestEnvironment(testId?: string): Promise<{
   testId: string;
   contract: MockContract;
+  revenueContract: MockRevenueContract;
   payerSigner: KeyStoreSigner;
   payeeSigner: KeyStoreSigner;
   payerKeyId: string;
@@ -382,6 +495,7 @@ export async function createTestEnvironment(testId?: string): Promise<{
   const payeeDid = `did:test:payee-${id}`;
 
   const contract = new MockContract();
+  const revenueContract = new MockRevenueContract();
   const signerFactory = new TestSignerFactory();
 
   const signerPair = await signerFactory.createSignerPair(payerDid, payeeDid);
@@ -389,6 +503,7 @@ export async function createTestEnvironment(testId?: string): Promise<{
   return {
     testId: id,
     contract,
+    revenueContract,
     payerSigner: signerPair.payerSigner,
     payeeSigner: signerPair.payeeSigner,
     payerKeyId: signerPair.payerKeyId,

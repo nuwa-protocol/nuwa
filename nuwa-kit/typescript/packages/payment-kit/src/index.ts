@@ -15,11 +15,13 @@ export * from './core/PaymentUtils';
 
 // Contract interfaces
 export * from './contracts/IPaymentChannelContract';
+export * from './contracts/IPaymentRevenueContract';
 
 // Chain-agnostic clients
 export * from './client/PaymentChannelPayerClient';
 export * from './client/PaymentChannelPayeeClient';
 export * from './client/PaymentHubClient';
+export * from './client/PaymentRevenueClient';
 
 // Factory for creating clients
 export * from './factory/chainFactory';
@@ -32,6 +34,8 @@ export * from './middlewares/http/HttpBillingMiddleware';
 
 // Rooch implementation
 export * from './rooch/RoochPaymentChannelContract';
+export * from './rooch/RoochPaymentRevenueContract';
+export * from './rooch/RoochContractBase';
 
 // Core SubRAV utilities for advanced use cases
 export {

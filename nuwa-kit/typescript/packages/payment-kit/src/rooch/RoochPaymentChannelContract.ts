@@ -7,12 +7,8 @@
 
 import {
   RoochClient,
-  Transaction,
   Args,
-  Signer,
   EventView,
-  getRoochNodeUrl,
-  type NetworkType,
   Serializer,
   normalizeRoochAddress,
   sha3_256,
@@ -71,13 +67,7 @@ import {
   mapTxFailureToPaymentKitError,
   internalError,
 } from '../errors/RoochErrorMapper';
-
-export interface RoochContractOptions {
-  rpcUrl?: string;
-  network?: 'local' | 'dev' | 'test' | 'main';
-  contractAddress?: string;
-  debug?: boolean;
-}
+import { RoochContractBase, type RoochContractOptions } from './RoochContractBase';
 
 // BCS Schema definitions for Rooch Move types
 export const CloseProofSchema: any = bcs.struct('CloseProof', {
@@ -117,27 +107,17 @@ const DEFAULT_PAYMENT_CHANNEL_MODULE = '0x3::payment_channel';
  * This implementation provides complete functionality for payment channels
  * using the Rooch blockchain and corresponding Move contracts.
  */
-export class RoochPaymentChannelContract implements IPaymentChannelContract {
-  private client: RoochClient;
-  private contractAddress: string;
-  private logger: DebugLogger;
-
+export class RoochPaymentChannelContract
+  extends RoochContractBase
+  implements IPaymentChannelContract
+{
   constructor(options: RoochContractOptions = {}) {
-    const rpcUrl = options.rpcUrl || this.getDefaultRpcUrl(options.network || 'test');
-    this.client = new RoochClient({ url: rpcUrl });
-    this.contractAddress = options.contractAddress || DEFAULT_PAYMENT_CHANNEL_MODULE;
-    this.logger = DebugLogger.get('RoochPaymentChannelContract');
-
-    if (options.debug) {
-      this.logger.setLevel('debug');
-    }
-
-    this.logger.debug(`RoochPaymentChannelContract initialized with rpcUrl: ${rpcUrl}`);
+    super(options, DEFAULT_PAYMENT_CHANNEL_MODULE, 'RoochPaymentChannelContract');
   }
 
   async openChannel(params: OpenChannelParams): Promise<OpenChannelResult> {
     try {
-      this.logger.debug('Opening payment channel with params:', params);
+      this.getLogger().debug('Opening payment channel with params:', params);
 
       // Parse and validate DIDs first
       const payerParsed = parseDid(params.payerDid);
@@ -155,16 +135,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Create transaction to open channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::open_channel_entry`,
+        target: `${this.getContractAddress()}::open_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier)],
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing openChannel transaction');
+      this.getLogger().debug('Executing openChannel transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -188,7 +168,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error opening channel:', error);
+      this.getLogger().error('Error opening channel:', error);
       throw wrapUnknownError('openChannel', error);
     }
   }
@@ -197,7 +177,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     params: OpenChannelWithSubChannelParams
   ): Promise<OpenChannelResult> {
     try {
-      this.logger.debug('Opening payment channel with sub-channel in one step:', params);
+      this.getLogger().debug('Opening payment channel with sub-channel in one step:', params);
 
       // Parse and validate DIDs first
       const payerParsed = parseDid(params.payerDid);
@@ -215,16 +195,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Create transaction to open channel with sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::open_channel_with_sub_channel_entry`,
+        target: `${this.getContractAddress()}::open_channel_with_sub_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing openChannelWithSubChannel transaction');
+      this.getLogger().debug('Executing openChannelWithSubChannel transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -248,29 +228,29 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error opening channel with sub-channel:', error);
+      this.getLogger().error('Error opening channel with sub-channel:', error);
       throw wrapUnknownError('openChannelWithSubChannel', error);
     }
   }
 
   async authorizeSubChannel(params: AuthorizeSubChannelParams): Promise<TxResult> {
     try {
-      this.logger.debug('Authorizing sub-channel with params:', params);
+      this.getLogger().debug('Authorizing sub-channel with params:', params);
 
       const signer = await this.convertSigner(params.signer);
 
       // Create transaction to authorize sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::authorize_sub_channel_entry`,
+        target: `${this.getContractAddress()}::authorize_sub_channel_entry`,
         args: [Args.objectId(params.channelId), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing authorizeSubChannel transaction');
+      this.getLogger().debug('Executing authorizeSubChannel transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -286,14 +266,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error authorizing sub-channel:', error);
+      this.getLogger().error('Error authorizing sub-channel:', error);
       throw wrapUnknownError('authorizeSubChannel', error);
     }
   }
 
   async claimFromChannel(params: ClaimParams): Promise<ClaimResult> {
     try {
-      this.logger.debug('Claiming from channel with params:', params);
+      this.getLogger().debug('Claiming from channel with params:', params);
 
       const signer = await this.convertSigner(params.signer);
       const { subRav, signature } = params.signedSubRAV;
@@ -301,7 +281,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Create transaction to claim from channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::claim_from_channel_entry`,
+        target: `${this.getContractAddress()}::claim_from_channel_entry`,
         args: [
           Args.objectId(subRav.channelId),
           Args.string(subRav.vmIdFragment),
@@ -312,10 +292,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing claimFromChannel transaction');
+      this.getLogger().debug('Executing claimFromChannel transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -335,14 +315,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error claiming from channel:', error);
+      this.getLogger().error('Error claiming from channel:', error);
       throw wrapUnknownError('claimFromChannel', error);
     }
   }
 
   async closeChannel(params: CloseParams): Promise<TxResult> {
     try {
-      this.logger.debug('Closing channel with params:', params);
+      this.getLogger().debug('Closing channel with params:', params);
 
       const signer = await this.convertSigner(params.signer);
 
@@ -353,23 +333,23 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         const serializedProofs = CloseProofsSchema.serialize(params.closeProofs).toBytes();
 
         transaction.callFunction({
-          target: `${this.contractAddress}::close_channel_entry`,
+          target: `${this.getContractAddress()}::close_channel_entry`,
           args: [Args.objectId(params.channelId), Args.vec('u8', serializedProofs)],
           maxGas: 100000000,
         });
       } else {
         // Force close (initiate cancellation)
         transaction.callFunction({
-          target: `${this.contractAddress}::initiate_cancellation_entry`,
+          target: `${this.getContractAddress()}::initiate_cancellation_entry`,
           args: [Args.objectId(params.channelId)],
           maxGas: 100000000,
         });
       }
 
-      this.logger.debug('Executing closeChannel transaction');
+      this.getLogger().debug('Executing closeChannel transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -385,17 +365,17 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error closing channel:', error);
+      this.getLogger().error('Error closing channel:', error);
       throw wrapUnknownError('closeChannel', error);
     }
   }
 
   async getChannelStatus(params: ChannelStatusParams): Promise<ChannelInfo> {
     try {
-      this.logger.debug('Getting channel status for channel:', params.channelId);
+      this.getLogger().debug('Getting channel status for channel:', params.channelId);
 
       // Get channel state from blockchain
-      const channelObject = await this.client.getObjectStates({
+      const channelObject = await this.getClient().getObjectStates({
         ids: [params.channelId],
       });
 
@@ -422,17 +402,17 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         status: statusString,
       };
     } catch (error) {
-      this.logger.error('Error getting channel status:', error);
+      this.getLogger().error('Error getting channel status:', error);
       throw wrapUnknownError('getChannelStatus', error);
     }
   }
 
   async getSubChannel(params: SubChannelParams): Promise<SubChannelInfo> {
     try {
-      this.logger.debug('Getting sub-channel info for:', params);
+      this.getLogger().debug('Getting sub-channel info for:', params);
 
       // First get the channel to obtain the sub_channels table ID
-      const channelObject = await this.client.getObjectStates({
+      const channelObject = await this.getClient().getObjectStates({
         ids: [params.channelId],
       });
 
@@ -464,13 +444,13 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         lastConfirmedNonce: subChannelData.last_confirmed_nonce,
       };
     } catch (error) {
-      this.logger.error('Error getting sub-channel info:', error);
+      this.getLogger().error('Error getting sub-channel info:', error);
       throw wrapUnknownError('getSubChannel', error);
     }
   }
 
   async getAssetInfo(assetId: string): Promise<AssetInfo> {
-    this.logger.debug('Getting asset info for:', assetId);
+    this.getLogger().debug('Getting asset info for:', assetId);
     let canonicalAssetId = normalizeAssetId(assetId);
     // TODO: Add support for other assets
     if (canonicalAssetId === RGAS_CANONICAL_TAG) {
@@ -486,7 +466,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   async getAssetPrice(assetId: string): Promise<bigint> {
     try {
-      this.logger.debug('Getting asset price for:', assetId);
+      this.getLogger().debug('Getting asset price for:', assetId);
 
       // Normalize asset ID to canonical string
       const canonicalAssetId = normalizeAssetId(assetId);
@@ -505,27 +485,27 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Unknown asset type
       throw badRequest(`Unsupported asset type: ${assetId}`);
     } catch (error) {
-      this.logger.error('Error getting asset price:', error);
+      this.getLogger().error('Error getting asset price:', error);
       throw wrapUnknownError('getAssetPrice', error);
     }
   }
 
   async getChainId(): Promise<bigint> {
     try {
-      this.logger.debug('Getting chain ID');
+      this.getLogger().debug('Getting chain ID');
 
       // Use RoochClient's getChainId method
-      const chainId = await this.client.getChainId();
+      const chainId = await this.getClient().getChainId();
       return BigInt(chainId);
     } catch (error) {
-      this.logger.error('Error getting chain ID:', error);
+      this.getLogger().error('Error getting chain ID:', error);
       throw wrapUnknownError('getChainId', error);
     }
   }
 
   async depositToHub(params: DepositParams): Promise<TxResult> {
     try {
-      this.logger.debug('Depositing to payment hub with params:', params);
+      this.getLogger().debug('Depositing to payment hub with params:', params);
 
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
@@ -538,16 +518,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Create transaction to deposit to hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::deposit_to_hub_entry`,
+        target: `${this.getContractAddress()}::deposit_to_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(ownerParsed.identifier), Args.u256(params.amount)],
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing depositToHub transaction');
+      this.getLogger().debug('Executing depositToHub transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -563,14 +543,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error depositing to hub:', error);
+      this.getLogger().error('Error depositing to hub:', error);
       throw wrapUnknownError('depositToHub', error);
     }
   }
 
   async withdrawFromHub(params: WithdrawParams): Promise<TxResult> {
     try {
-      this.logger.debug('Withdrawing from payment hub with params:', params);
+      this.getLogger().debug('Withdrawing from payment hub with params:', params);
 
       // Parse and validate owner DID
       const ownerParsed = parseDid(params.ownerDid);
@@ -583,16 +563,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       // Create transaction to withdraw from hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.contractAddress}::withdraw_from_hub_entry`,
+        target: `${this.getContractAddress()}::withdraw_from_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.u256(params.amount)],
         maxGas: 100000000,
       });
 
-      this.logger.debug('Executing withdrawFromHub transaction');
+      this.getLogger().debug('Executing withdrawFromHub transaction');
 
       // Execute transaction
-      const result = await this.client.signAndExecuteTransaction({
+      const result = await this.getClient().signAndExecuteTransaction({
         transaction,
         signer,
         option: { withOutput: true },
@@ -608,33 +588,33 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         events: result.output?.events,
       };
     } catch (error) {
-      this.logger.error('Error withdrawing from hub:', error);
+      this.getLogger().error('Error withdrawing from hub:', error);
       throw wrapUnknownError('withdrawFromHub', error);
     }
   }
 
   async getHubBalance(ownerDid: string, assetId: string): Promise<bigint> {
     try {
-      this.logger.debug('Getting hub balance for DID:', ownerDid, 'asset:', assetId);
+      this.getLogger().debug('Getting hub balance for DID:', ownerDid, 'asset:', assetId);
 
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
-        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
         return BigInt(0);
       }
 
-      this.logger.debug('MultiCoinStore ID extracted:', paymentHub.multi_coin_store);
+      this.getLogger().debug('MultiCoinStore ID extracted:', paymentHub.multi_coin_store);
       // Query the specific field for this coin type in the multi_coin_store
       const fieldKey = deriveCoinTypeFieldKey(assetId);
-      const fieldStates = await this.client.getFieldStates({
+      const fieldStates = await this.getClient().getFieldStates({
         objectId: paymentHub.multi_coin_store,
         fieldKey: [fieldKey],
       });
 
       if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
         // Asset not found in the store, balance is 0
-        this.logger.debug('Asset not found in multi_coin_store:', assetId);
+        this.getLogger().debug('Asset not found in multi_coin_store:', assetId);
         return BigInt(0);
       }
 
@@ -656,7 +636,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           // Extract balance from the parsed CoinStoreField and ensure it's bigint
           return safeBalanceToBigint(parsed.value.balance.value);
         } catch (parseError) {
-          this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
+          this.getLogger().warn('Failed to parse CoinStoreField BCS data:', parseError);
           return BigInt(0);
         }
       } else if (fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue) {
@@ -667,10 +647,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
         }
       }
 
-      this.logger.warn('Could not parse balance from field state');
+      this.getLogger().warn('Could not parse balance from field state');
       return BigInt(0);
     } catch (error) {
-      this.logger.error('Error getting hub balance:', error);
+      this.getLogger().error('Error getting hub balance:', error);
       // Return 0 instead of throwing for balance queries
       return BigInt(0);
     }
@@ -678,16 +658,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   async getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>> {
     try {
-      this.logger.debug('Getting all hub balances for DID:', ownerDid);
+      this.getLogger().debug('Getting all hub balances for DID:', ownerDid);
 
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
-        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
         return {};
       }
 
-      this.logger.debug(
+      this.getLogger().debug(
         'MultiCoinStore ID extracted for all balances:',
         paymentHub.multi_coin_store
       );
@@ -699,7 +679,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const pageSize = 100;
 
       // while (true) {
-      const fieldStates = await this.client.listFieldStates({
+      const fieldStates = await this.getClient().listFieldStates({
         objectId: paymentHub.multi_coin_store,
         cursor,
         limit: pageSize.toString(),
@@ -733,15 +713,15 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
                 balances[coinType] = balance;
               }
             } catch (parseError) {
-              this.logger.warn('Failed to parse CoinStoreField BCS data:', parseError);
+              this.getLogger().warn('Failed to parse CoinStoreField BCS data:', parseError);
               continue;
             }
           } else {
-            this.logger.warn('Could not parse balance from field state');
+            this.getLogger().warn('Could not parse balance from field state');
             throw new Error('Could not parse balance from field state');
           }
         } catch (parseError) {
-          this.logger.warn('Failed to parse field state for balance:', parseError);
+          this.getLogger().warn('Failed to parse field state for balance:', parseError);
           continue;
         }
       }
@@ -755,7 +735,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
       return balances;
     } catch (error) {
-      this.logger.error('Error getting all hub balances:', error);
+      this.getLogger().error('Error getting all hub balances:', error);
       // Return empty object instead of throwing
       return {};
     }
@@ -763,23 +743,23 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
   async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
     try {
-      this.logger.debug('Getting active channels counts for DID:', ownerDid);
+      this.getLogger().debug('Getting active channels counts for DID:', ownerDid);
 
       // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
-        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
         return {};
       }
 
-      this.logger.debug('Active channels table ID:', paymentHub.active_channels);
+      this.getLogger().debug('Active channels table ID:', paymentHub.active_channels);
 
       // List all field states in active_channels table to get all coin types and their counts
       const channelCounts: Record<string, number> = {};
       let cursor = null;
       const pageSize = 100;
 
-      const fieldStates = await this.client.listFieldStates({
+      const fieldStates = await this.getClient().listFieldStates({
         objectId: paymentHub.active_channels,
         cursor,
         limit: pageSize.toString(),
@@ -809,11 +789,14 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
               channelCounts[coinType] = count;
             }
           } catch (parseError) {
-            this.logger.warn('Failed to parse u64 BCS data:', parseError);
+            this.getLogger().warn('Failed to parse u64 BCS data:', parseError);
             continue;
           }
         } catch (parseError) {
-          this.logger.warn('Failed to parse field state for active channels count:', parseError);
+          this.getLogger().warn(
+            'Failed to parse field state for active channels count:',
+            parseError
+          );
           continue;
         }
       }
@@ -825,7 +808,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
       return channelCounts;
     } catch (error) {
-      this.logger.error('Error getting active channels counts:', error);
+      this.getLogger().error('Error getting active channels counts:', error);
       // Return empty object instead of throwing
       return {};
     }
@@ -836,7 +819,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
   // Get PaymentHub object for a given owner DID
   private async getPaymentHub(ownerDid: string): Promise<PaymentHub | null> {
     try {
-      this.logger.debug('Getting PaymentHub for DID:', ownerDid);
+      this.getLogger().debug('Getting PaymentHub for DID:', ownerDid);
 
       // Parse and validate owner DID
       const ownerParsed = parseDid(ownerDid);
@@ -848,10 +831,10 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const hubId = calculatePaymentHubId(ownerParsed.identifier);
 
       // Get PaymentHub object state
-      const hubObjectViews = await this.client.getObjectStates({ ids: [hubId] });
+      const hubObjectViews = await this.getClient().getObjectStates({ ids: [hubId] });
 
       if (!hubObjectViews || hubObjectViews.length === 0 || !hubObjectViews[0]) {
-        this.logger.debug('PaymentHub not found for owner:', ownerDid);
+        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
         return null;
       }
 
@@ -873,41 +856,16 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           throw new Error('Unexpected PaymentHub value format');
         }
       } catch (parseError) {
-        this.logger.error('Failed to parse PaymentHub object:', parseError);
+        this.getLogger().error('Failed to parse PaymentHub object:', parseError);
         return null;
       }
     } catch (error) {
-      this.logger.error('Error getting PaymentHub:', error);
+      this.getLogger().error('Error getting PaymentHub:', error);
       return null;
     }
   }
 
   // Helper methods
-  private async convertSigner(signer: SignerInterface | Signer): Promise<Signer> {
-    // If it implements SignerInterface, convert it to DidAccountSigner
-    if (isSignerInterface(signer)) {
-      return DidAccountSigner.create(signer);
-    }
-    // Fallback: assume it's Signer
-    return signer;
-  }
-
-  private createTransaction(): Transaction {
-    return new Transaction();
-  }
-
-  private getDefaultRpcUrl(network: string): string {
-    // Map our network names to Rooch SDK network names
-    const networkMap: { [key: string]: string } = {
-      local: 'localnet',
-      dev: 'devnet',
-      test: 'testnet',
-      main: 'mainnet',
-    };
-
-    const roochNetwork = networkMap[network] || network;
-    return getRoochNodeUrl(roochNetwork as any);
-  }
 
   private parseChannelIdFromEvents(events?: EventView[]): string {
     if (!events) {
@@ -930,7 +888,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
           // The PaymentChannelOpenedEvent should contain channel_id as first field
           return event.event_data; // Return the raw event data for now
         } catch (error) {
-          this.logger.error('Failed to parse channel ID from event:', error);
+          this.getLogger().error('Failed to parse channel ID from event:', error);
           throw internalError(`Failed to parse channel ID from event: ${error}`);
         }
       }
@@ -968,7 +926,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
     vmIdFragment: string
   ): Promise<SubChannel | null> {
     try {
-      this.logger.debug(
+      this.getLogger().debug(
         `Getting sub-channel data for: ${vmIdFragment} from table: ${subChannelsTableId}`
       );
 
@@ -976,13 +934,15 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
       const fieldKey = deriveFieldKeyFromString(vmIdFragment);
 
       // Query specific field by key using getFieldStates API
-      const fieldStates = await this.client.getFieldStates({
+      const fieldStates = await this.getClient().getFieldStates({
         objectId: subChannelsTableId,
         fieldKey: [fieldKey],
       });
 
       if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
-        this.logger.debug(`Sub-channel ${vmIdFragment} not found in table ${subChannelsTableId}`);
+        this.getLogger().debug(
+          `Sub-channel ${vmIdFragment} not found in table ${subChannelsTableId}`
+        );
         return null;
       }
 
@@ -993,7 +953,7 @@ export class RoochPaymentChannelContract implements IPaymentChannelContract {
 
       return dynamicField.value;
     } catch (error) {
-      this.logger.error('Error getting sub-channel data:', error);
+      this.getLogger().error('Error getting sub-channel data:', error);
       return null;
     }
   }

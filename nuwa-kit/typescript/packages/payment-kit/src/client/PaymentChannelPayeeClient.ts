@@ -12,6 +12,8 @@ import type { ChannelRepository, RAVRepository, PendingSubRAVRepository } from '
 import { SubRAVUtils } from '../core/SubRav';
 import { PaymentUtils } from '../core/PaymentUtils';
 import { PaymentHubClient } from './PaymentHubClient';
+import { PaymentRevenueClient } from './PaymentRevenueClient';
+import type { IPaymentRevenueContract } from '../contracts/IPaymentRevenueContract';
 
 /**
  * Storage options for PaymentChannelPayeeClient
@@ -27,6 +29,7 @@ export interface PaymentChannelPayeeClientOptions {
   signer: SignerInterface;
   didResolver: DIDResolver; // Required for signature verification
   storageOptions: PayeeStorageOptions;
+  revenueContract?: IPaymentRevenueContract; // Optional revenue contract for revenue operations
 }
 
 export interface VerificationResult {
@@ -81,12 +84,14 @@ export class PaymentChannelPayeeClient {
   private pendingSubRAVRepo: PendingSubRAVRepository;
   private chainIdCache?: bigint;
   private defaultAssetId: string;
+  private revenueContract?: IPaymentRevenueContract;
 
   constructor(options: PaymentChannelPayeeClientOptions) {
     this.contract = options.contract;
     this.signer = options.signer;
     this.didResolver = options.didResolver;
     this.defaultAssetId = '0x3::gas_coin::RGas';
+    this.revenueContract = options.revenueContract;
 
     // Initialize repositories
     this.channelRepo = options.storageOptions.channelRepo;
@@ -369,6 +374,25 @@ export class PaymentChannelPayeeClient {
   getHubClient(): PaymentHubClient {
     return new PaymentHubClient({
       contract: this.contract,
+      signer: this.signer,
+      defaultAssetId: this.defaultAssetId,
+    });
+  }
+
+  /**
+   * Get a PaymentRevenueClient instance for revenue management operations
+   * Requires revenueContract to be provided in constructor options
+   * @throws Error if revenueContract was not provided
+   */
+  getRevenueClient(): PaymentRevenueClient {
+    if (!this.revenueContract) {
+      throw new Error(
+        'PaymentRevenueClient requires revenueContract to be provided in PaymentChannelPayeeClientOptions'
+      );
+    }
+
+    return new PaymentRevenueClient({
+      contract: this.revenueContract,
       signer: this.signer,
       defaultAssetId: this.defaultAssetId,
     });
