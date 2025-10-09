@@ -147,7 +147,15 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
         try {
           res.status(status);
           // Emit an OpenAI-style SSE data frame with error payload, then a DONE sentinel
-          const payload = { error: { message: errMsg, type: safeDetails.type, code: safeDetails.code, status } };
+          const payload = { 
+            error: { 
+              message: errMsg, 
+              type: safeDetails.type, 
+              code: safeDetails.code, 
+              status,
+              upstream_details: d // Include full upstream error details
+            } 
+          };
           res.write(`data: ${JSON.stringify(payload)}\n\n`);
           res.write('data: [DONE]\n\n');
         } catch (writeErr) {
@@ -287,7 +295,9 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
       (res as any).locals.usage = pico; // USD -> picoUSD for PaymentKit
       logger.debug('[gateway] usage from provider:', { cost: totalCostUSD }, 'picoUSD=', pico);
       if (result.error) {
-        res.status(result.status).json({ success: false, error: result.error });
+        // If we have a structured error body, use it; otherwise create a simple error response
+        const errorResponse = result.body || { success: false, error: result.error };
+        res.status(result.status).json(errorResponse);
         return;
       }
       res.status(result.status).json(result.body);
@@ -434,7 +444,13 @@ export const defaultHandleNonStreamLLM: NonStreamHandler = async (req: Request) 
   }
 
   if ('error' in response) {
-    return { status: response.status || 500, body: { success: false, error: response.error } };
+    const errorBody = {
+      success: false,
+      error: response.error,
+      upstream_error: (response as any).details || null,
+      status_code: response.status || 500,
+    };
+    return { status: response.status || 500, body: errorBody };
   }
 
   const responseData = provider.parseResponse(response);
@@ -520,7 +536,14 @@ async function proxyNonStream(req: Request): Promise<ProxyResult> {
   }
   if ('error' in resp) {
     meta.upstream_status_code = resp.status || 500;
-    return { status: resp.status || 500, error: resp.error, meta };
+    // Include upstream error details in the response body
+    const errorBody = {
+      success: false,
+      error: resp.error,
+      upstream_error: (resp as any).details || null,
+      status_code: resp.status || 500,
+    };
+    return { status: resp.status || 500, error: resp.error, body: errorBody, meta };
   }
 
   meta.upstream_status_code = resp.status;
