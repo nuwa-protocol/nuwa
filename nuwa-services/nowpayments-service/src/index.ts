@@ -116,8 +116,7 @@ app.post(
       if (isSuccess && existing && !existing.transfer_tx && existing.payer_did) {
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         
-        // 计算网络费用（固定值，默认1美元）
-        const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * existing.amount_fiat; // 默认1美元
+        const networkFee = existing.estimated_network_fee || 0;
         const actualAmount = Math.max(0, existing.amount_fiat - networkFee); // 确保实际金额不为负数
         
         const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
@@ -153,7 +152,7 @@ app.post(
           console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
           if (amountReceivedUsd > 0) {
-            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * existing.amount_fiat; // 默认1美元
+            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * payload.actually_paid_at_fiat; // 默认1美元
             const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
@@ -278,7 +277,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
         details: parsed.error.format(),
       });
     }
-    const {
+    let {
       price_amount,
       price_currency,
       order_id,
@@ -289,6 +288,11 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       cases
     } = parsed.data;
 
+    // 计算预估网络费用
+    const estimatedNetworkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * price_amount;
+
+    price_amount = price_amount + estimatedNetworkFee;
+
     const payment = await client.createPayment({
       price_amount,
       price_currency,
@@ -298,8 +302,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       ipn_callback_url,
       case:cases ?? "success",
     });
-      console.log(payment)
-      console.log(payment.network)
+
     await supabase.upsertPayment({
       nowpayments_payment_id: payment.payment_id?.toString?.() || payment.id?.toString?.() || '',
       order_id,
@@ -325,6 +328,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       time_limit: payment.time_limit,
       burning_percent: payment.burning_percent,
       expiration_estimate_date: payment.expiration_estimate_date,
+      estimated_network_fee: estimatedNetworkFee,
     });
 
     res.status(201).json(payment);
