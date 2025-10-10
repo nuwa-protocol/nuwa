@@ -1,17 +1,22 @@
 ---
 title: "MCP Server"
-description: "Build a native pay‑per‑call MCP server using the Nuwa Payment Kit"
+description: "Build a Nuwa-Compatible pay‑per‑call MCP server"
 ---
 
-## Why a native server
 
-Own the full tool surface, validation, and pricing by building directly with the Payment Kit. You expose a single JSON‑RPC endpoint (`/mcp`) and declare free and paid tools with schemas.
+You can create a Nuwa-Compatible MCP server by using the Nuwa Payment Kit and Identityt Kit.
+- **Nuwa Identity Kit** helps to manage your DID key and signs transactions on your MCP server.
+- **Nuwa Payment Kit** provides a drop-in replacement version of the FastMCP server wrapper (`createFastMcpServerFromEnv`) that lets you config paid MCP tools easily.
 
-<Tip>
-Start here when you don't have an upstream MCP yet, or you need deeper control than a proxy can provide.
-</Tip>
+With these SDKs, you can expose a single `/mcp` endpoint and declare free and paid tools in the same way you build your MCP.
+
+
 
 ## Quick start
+
+<Tip>
+You can find a starter template in the [Nuwa Kit Examples](https://github.com/nuwa-protocol/nuwa-kit/tree/main/typescript/examples/mcp-server).
+</Tip>
 
 <Steps>
 <Step title="Install">
@@ -24,7 +29,7 @@ pnpm add @nuwa-ai/payment-kit @nuwa-ai/identity-kit
 
 <Step title="Create a minimal server (from env)">
 
-```ts
+```typescript mcp/index.ts
 import { IdentityKit, KeyManager } from '@nuwa-ai/identity-kit';
 import { createFastMcpServerFromEnv } from '@nuwa-ai/payment-kit/mcp';
 import { z } from 'zod';
@@ -96,38 +101,31 @@ Use the MCP Client guide to initialize and call tools (env + createMcpClient or 
 </Step>
 </Steps>
 
-## Tool shapes and validation
+## `createFastMcpServerFromEnv`
 
-- Declare schemas per tool (JSON Schema). The adapter merges reserved fields into every input schema:
-  - `__nuwa_auth` for DIDAuth v1
-  - `__nuwa_payment` for payment request payload
-- Return business `content` and the payment resource is attached automatically when billed.
+`createFastMcpServerFromEnv` is a drop-in replacement for the FastMCP server wrapper (`createFastMcpServer`). It injects extra fields in the input and output to make the it Nuwa-Compatible and payment possible:
 
-## Streaming & UI
+- The wrapper injects `__nuwa_auth` and `__nuwa_payment` into the input.
+- For output, it adds a payment resource to the returned object.
 
-- Streaming (SSE/NDJSON) is supported; payment frames are injected in‑band.
-- Return UI resources to render iframe‑based artifact UIs; see SDK → UI Kit.
 
-## Pricing strategies
+<Tip>
+For more details, refer to the  [Nuwa Payment Kit](https://github.com/nuwa-protocol/nuwa-kit/tree/main/typescript/packages/payment-kit).
+</Tip>
 
-- Per‑call fixed price via `pricePicoUSD`.
-- For advanced models (token/frames), emit incremental receipts per chunk; the client handles reconciliation.
 
-## Deployment
-
-- Any Node hosting works; ensure secrets are mounted (service key), and `PORT` is open.
-- Use health checks and logs to monitor availability.
-
-<CardGroup cols={3}>
-  <Card title="MCP overview" icon="book" href="/build-caps/mcp">
-    Conceptual overview and selection guide.
-  </Card>
-  <Card title="Proxy existing MCP" icon="right-left" href="/build-caps/mcp-proxy">
-    Keep your upstream as‑is and add pricing at the edge.
-  </Card>
-  <Card title="MCP Client" icon="bolt" href="/build-caps/mcp-client">
-    Initialize, call tools, stream, and recover channels.
-  </Card>
-</CardGroup>
+### Tool Caller DID
+You can obtain the DID of the MCP tool caller via the context input:
+```typescript
+server.freeTool({
+  name: 'get_did',
+  description: 'Get the DID of the caller.',
+  parameters: {},
+  async execute(_args: unknown, context: any) {
+    const did = context?.didInfo?.did || "unknown";
+    return { did };
+  },
+});
+```
 
 

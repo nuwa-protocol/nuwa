@@ -51,3 +51,18 @@ The site is deployed via Mintlify. The Mintlify GitHub App is connected for this
 ## Resources
 
 - Mintlify docs: https://mintlify.com/docs
+
+
+
+### to do
+- [ ] update the mcp-server example
+    - [ ] how to obtain service key
+    - [ ] how to return an UI resource
+    - [ ] set pico USD
+    - [ ] remove prompt and resource as they are not used by the client 
+    - [ ] how to use official mcp sdk
+    - [ ] default identity kit settings
+
+-[] artifact
+    - [] what is artifact
+    - 

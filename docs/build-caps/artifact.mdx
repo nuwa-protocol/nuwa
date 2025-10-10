@@ -1,6 +1,6 @@
 ---
 title: "Artifact"
-description: "About Artifact in Nuwa"
+description: "Integrate an Artifact UI panel to enable more functionality with your Cap."
 ---
 ## Artifact UI
 
@@ -13,6 +13,10 @@ core: {
   artifact: { srcUrl: 'https://your-cap-ui.example.com' }
 }
 ```
+
+Notes
+- The Artifact origin is also used when tools return a `capui:/<path>` UI resource; the client will combine this origin with the path.
+- Prefer HTTPS and a stable path structure (e.g., `/dashboard`, `/settings`).
 
 ## Connect To The Client
 
@@ -47,8 +51,34 @@ export default function App() {
 }
 ```
 
+Common actions
+- `nuwa.addSelection('Label', { ... })` to add structured results to the thread
+- `nuwa.saveState(data) / nuwa.getState()` to persist UI state between sessions
+- `nuwa.createAIStream({ prompt }).execute({ onChunk })` to stream AI output into your UI
+
 ## MCP + UI
 
 You can expose MCP tools from your UI process (postMessage transport) so AI can control the UI. Return UI resources from tools to request the client to render a particular view.
 
 See SDK -> UI Kit for transports and resource types, and Build -> MCP for payment-aware tools.
+
+Open in the Artifact panel
+
+```ts
+import { createUIResource } from '@nuwa-ai/ui-kit';
+
+// Hint the client to open this path in the Artifact area
+const resource = createUIResource('/reports', 'Reports', 'Monthly reports', 'artifact');
+return { content: [{ type: 'resource', resource }] };
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="UI Overview" icon="window-restore" href="/build-caps/ui">
+    Overview of UI patterns (Artifact & MCP)
+  </Card>
+  <Card title="MCP UI" icon="bolt" href="/build-caps/mcp-ui">
+    Return UI from tools and expose UI as MCP
+  </Card>
+</CardGroup>
