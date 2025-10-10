@@ -165,7 +165,7 @@ export function useRevenueHistory(
               typeDisplay: 'Revenue Withdrawn',
               timestamp,
               txHash,
-              assetId: data.coin_type, // 使用coin_type而不是asset_id
+              assetId: data.coin_type, // Use coin_type instead of asset_id
               amount: BigInt(data.amount),
               amountDisplay: formatTokenAmount(BigInt(data.amount)),
               relatedAddress: data.recipient,

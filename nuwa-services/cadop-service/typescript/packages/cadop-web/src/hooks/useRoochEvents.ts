@@ -122,7 +122,7 @@ export function useRoochEvents(
         let filteredEvents = newEvents;
         if (filter.timeFrom || filter.timeTo) {
           filteredEvents = newEvents.filter((event: any) => {
-            const eventTime = parseInt(event.created_at) / 1000; // Convert to milliseconds
+            const eventTime = parseInt(event.created_at); // event.created_at is in milliseconds
 
             if (filter.timeFrom && eventTime < filter.timeFrom) {
               return false;
