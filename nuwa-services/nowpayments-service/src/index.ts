@@ -83,7 +83,7 @@ app.post(
 
 
       // 获取现有记录
-      const existing = await supabase.getByPaymentId(paymentId);
+      const existing = await supabase.getByOrderId(orderId);
 
       const is_partially_paid_finished: boolean = existing?.status.toLowerCase() === 'partially_paid' && status.toLowerCase() === 'finished';
 

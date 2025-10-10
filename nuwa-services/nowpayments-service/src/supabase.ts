@@ -113,6 +113,16 @@ export class SupabaseService {
 		return data as any;
 	}
 
+    async getByOrderId(orderId: string): Promise<PaymentRecord | null> {
+		const { data, error } = await this.client
+			.from(this.table)
+			.select('*')
+			.eq('order_id', orderId)
+			.maybeSingle();
+		if (error) throw error;
+		return data as any;
+	}
+
 	async listByPayerDid(params: { did: string; status?: string[]; limit?: number; offset?: number }): Promise<PaymentRecord[]> {
 		const { did, status, limit = 50, offset = 0 } = params;
 		let query = this.client.from(this.table).select('*').eq('payer_did', did).order('created_at', { ascending: false });
