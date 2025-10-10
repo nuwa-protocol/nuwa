@@ -117,7 +117,7 @@ app.post(
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         
         // 计算网络费用（固定值，默认1美元）
-        const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+        const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * existing.amount_fiat; // 默认1美元
         const actualAmount = Math.max(0, existing.amount_fiat - networkFee); // 确保实际金额不为负数
         
         const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
@@ -153,8 +153,7 @@ app.post(
           console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
           if (amountReceivedUsd > 0) {
-            // 计算网络费用（固定值，默认1美元）
-            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * existing.amount_fiat; // 默认1美元
             const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
@@ -205,8 +204,7 @@ app.post(
           console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
           if (amountReceivedUsd > 0) {
-            // 计算网络费用（固定值，默认1美元）
-            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * payload.actually_paid_at_fiat; // 默认1美元
             const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
