@@ -89,7 +89,7 @@ app.post(
 
       console.log(`Processing webhook for order ${paymentId} with status ${status} is_partially_paid_finished: ${is_partially_paid_finished}`);
       // 更新支付记录
-      await supabase.upsertOrder({
+      await supabase.updateOrder({
         nowpayments_payment_id: paymentId,
         order_id: existing?.order_id,
         amount_fiat: existing?.amount_fiat ?? price_amount,
@@ -194,7 +194,7 @@ app.post(
 
       // const isExpired = status.toLowerCase() === 'expired';
       // const wasPartiallyPaid = existing?.status?.toLowerCase() === 'partially_paid';
-      //
+
       // if (isExpired && wasPartiallyPaid && existing && existing.payer_did && !existing.transfer_tx) {
       //   console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
       //
@@ -307,7 +307,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       case:cases ?? "success",
     });
 
-    await supabase.upsertOrder({
+    await supabase.upsertPayment({
       nowpayments_payment_id: payment.payment_id?.toString?.() || payment.id?.toString?.() || '',
       order_id,
       amount_fiat: price_amount,
