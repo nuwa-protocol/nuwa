@@ -89,7 +89,7 @@ app.post(
 
       console.log(`Processing webhook for order ${paymentId} with status ${status} is_partially_paid_finished: ${is_partially_paid_finished}`);
       // 更新支付记录
-      await supabase.upsertPayment({
+      await supabase.upsertOrder({
         nowpayments_payment_id: paymentId,
         order_id: existing?.order_id,
         amount_fiat: existing?.amount_fiat ?? price_amount,
@@ -192,56 +192,56 @@ app.post(
         }
       }
 
-      const isExpired = status.toLowerCase() === 'expired';
-      const wasPartiallyPaid = existing?.status?.toLowerCase() === 'partially_paid';
-      
-      if (isExpired && wasPartiallyPaid && existing && existing.payer_did && !existing.transfer_tx) {
-        console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
-        
-        try {
-          const amountReceivedUsd: number = Number(payload.actually_paid_at_fiat || 0);
-          const originalAmountUsd: number = Number(existing.amount_fiat || 0);
-          const alreadyTransferredRgas: bigint = BigInt(existing.transferred_amount ?? 0);
-        
-          console.log(`Handling expired partially paid order ${paymentId} for user ${existing.payer_did}`);
-          console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
-          
-          if (amountReceivedUsd > 0) {
-            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * payload.actually_paid_at_fiat; // 默认1美元
-            const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee);
-            
-            // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
-            const rgasPerUsd = Number(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(Math.floor(actualReceivedAmount * rgasPerUsd));
-            const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
-            
-            if (amountToTransferRgas > 0n) {
-              const amountRgas = amountToTransferRgas;
-              
-              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
-              
-              const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
-              if (tx) {
-                // 更新已转账 RGAS 数量
-                const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
-                await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
-                // 累加网络费用
-                await supabase.addNetworkFee(paymentId, networkFee);
-                console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD`);
-              } else {
-                console.error(`Expired partial transfer failed for payment ${paymentId}`);
-              }
-            } else {
-              console.log(`No additional RGAS to transfer for expired payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD)`);
-            }
-          } else {
-            console.log(`No amount received for payment ${paymentId}, skipping transfer`);
-          }
-          
-        } catch (expiredError) {
-          console.error(`Error handling expired partially paid order ${paymentId}:`, expiredError);
-        }
-      }
+      // const isExpired = status.toLowerCase() === 'expired';
+      // const wasPartiallyPaid = existing?.status?.toLowerCase() === 'partially_paid';
+      //
+      // if (isExpired && wasPartiallyPaid && existing && existing.payer_did && !existing.transfer_tx) {
+      //   console.log(`Payment ${paymentId} expired with partially_paid status, transferring RGAS for received amount`);
+      //
+      //   try {
+      //     const amountReceivedUsd: number = Number(payload.actually_paid_at_fiat || 0);
+      //     const originalAmountUsd: number = Number(existing.amount_fiat || 0);
+      //     const alreadyTransferredRgas: bigint = BigInt(existing.transferred_amount ?? 0);
+      //
+      //     console.log(`Handling expired partially paid order ${paymentId} for user ${existing.payer_did}`);
+      //     console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
+      //
+      //     if (amountReceivedUsd > 0) {
+      //       const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * payload.actually_paid_at_fiat; // 默认1美元
+      //       const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee);
+      //
+      //       // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
+      //       const rgasPerUsd = Number(process.env.RGAS_PER_USD || '100000000');
+      //       const receivedRgas: bigint = BigInt(Math.floor(actualReceivedAmount * rgasPerUsd));
+      //       const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
+      //
+      //       if (amountToTransferRgas > 0n) {
+      //         const amountRgas = amountToTransferRgas;
+      //
+      //         console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
+      //
+      //         const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
+      //         if (tx) {
+      //           // 更新已转账 RGAS 数量
+      //           const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
+      //           await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
+      //           // 累加网络费用
+      //           await supabase.addNetworkFee(paymentId, networkFee);
+      //           console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD`);
+      //         } else {
+      //           console.error(`Expired partial transfer failed for payment ${paymentId}`);
+      //         }
+      //       } else {
+      //         console.log(`No additional RGAS to transfer for expired payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD)`);
+      //       }
+      //     } else {
+      //       console.log(`No amount received for payment ${paymentId}, skipping transfer`);
+      //     }
+      //
+      //   } catch (expiredError) {
+      //     console.error(`Error handling expired partially paid order ${paymentId}:`, expiredError);
+      //   }
+      // }
 
       res.json({ ok: true });
     } catch (err: any) {
@@ -307,7 +307,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       case:cases ?? "success",
     });
 
-    await supabase.upsertPayment({
+    await supabase.upsertOrder({
       nowpayments_payment_id: payment.payment_id?.toString?.() || payment.id?.toString?.() || '',
       order_id,
       amount_fiat: price_amount,

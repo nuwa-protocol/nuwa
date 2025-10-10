@@ -46,10 +46,10 @@ export class SupabaseService {
 		this.client = createClient(url, key);
 	}
 
-	async upsertPayment(rec: PaymentRecord): Promise<PaymentRecord | null> {
+	async upsertOrder(rec: PaymentRecord): Promise<PaymentRecord | null> {
 		const { data, error } = await this.client
 			.from(this.table)
-			.upsert(rec, { onConflict: 'nowpayments_payment_id' })
+			.upsert(rec, { onConflict: 'order_id' })
 			.select()
 			.single();
 		if (error) throw error;
