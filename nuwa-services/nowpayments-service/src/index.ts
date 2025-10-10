@@ -469,7 +469,7 @@ app.get('/api/estimate-actual-cost', async (req: Request, res: Response) => {
 
     // 获取网络费用配置（固定值，默认1美元）
     const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
-    const actualCost = Math.max(0, orderAmount * 0.95 - networkFee);
+    const actualCost = Math.max(0, orderAmount * 1.05 + networkFee);
 
     res.json({
       order_amount: orderAmount,
