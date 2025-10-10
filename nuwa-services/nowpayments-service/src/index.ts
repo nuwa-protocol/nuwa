@@ -468,16 +468,12 @@ app.get('/api/estimate-actual-cost', async (req: Request, res: Response) => {
     }
 
     // 获取网络费用配置（固定值，默认1美元）
-    const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
-    const serviceFee = Number(process.env.SERVICE_FEE_FIXED || '0.05') * orderAmount;
-    const actualCost = Math.max(0, orderAmount + networkFee + serviceFee);
+    const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * orderAmount; // 默认1美元
+    const actualCost = Math.max(0, orderAmount + networkFee);
 
     res.json({
       order_amount: orderAmount,
-      transaction_fee: {
-          network_fee: networkFee,
-          service_fee: serviceFee
-      },
+      network_fee: networkFee,
       actual_cost: actualCost
     });
   } catch (err: any) {
