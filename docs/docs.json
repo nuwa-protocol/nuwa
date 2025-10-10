@@ -39,11 +39,19 @@
                   "build-caps/mcp",
                   "build-caps/mcp-client",
                   "build-caps/mcp-proxy",
-                  "build-caps/mcp-server" 
+                  "build-caps/mcp-server",
+                  "build-caps/mcp-pricing"
                 ]
               },
               "build-caps/prompt",
-              "build-caps/artifact"
+              {
+                "group": "UI",
+                "pages": [
+                  "build-caps/ui",
+                  "build-caps/mcp-ui",
+                  "build-caps/artifact"
+                ]
+              }
             ]
           },
           {

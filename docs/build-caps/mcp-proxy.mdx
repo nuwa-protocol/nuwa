@@ -3,24 +3,18 @@ title: "MCP Proxy"
 description: "Turn an existing MCP into a pay‑per‑call service using the Nuwa MCP Server Proxy"
 ---
 
-## What you'll build
-
-Convert an existing MCP server (HTTP/stream or stdio) into a Nuwa‑compatible, pay‑per‑call service without changing the upstream code. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics.
+With Nuwa MCP Proxy, you can convert an existing MCP server (HTTP/stream or stdio) into a Nuwa‑Compatible, pay‑per‑call service without changing the upstream code. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics.
 
 <Note>
-Use this when you already have an MCP server and want pricing and DID‑based authentication without refactoring the upstream.
+Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For multiple MCP servers, you have to deploy multiple Nuwa MCP Proxy instances.
 </Note>
-
-## Prerequisites
-
-- Node.js 18+ and pnpm
-- A Rooch RPC endpoint (testnet is fine)
-- A Service key (ServiceDID) for settlement
 
 ## Quick start
 
 <Steps>
 <Step title="Install and build">
+
+you can find the full implementation of [Nuwa MCP Proxy on Github](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy).
 
 ```bash
 cd nuwa-services/mcp-server-proxy
@@ -42,9 +36,9 @@ upstream:
   type: "httpStream"
   url: "https://api.example.com/mcp"
   # Optional auth to upstream
-  # auth:
-  #   scheme: "bearer"
-  #   token: "${UPSTREAM_API_TOKEN}"
+  auth:
+    scheme: "bearer"
+    token: "${UPSTREAM_API_TOKEN}"
 
 # Payment & network
 serviceId: "my-mcp-service"
@@ -72,9 +66,11 @@ node dist/index.js --config ./config.yaml
 # -> serves POST /mcp (JSON-RPC over streamable HTTP)
 ```
 
-<Check>
-Verify health and tools list via your MCP client (`initialize`, `tools/list`).
-</Check>
+</Step>
+
+<Step title="Verify the proxied MCP server">
+
+You can use the [MCP Debug tool](https://test-app.nuwa.dev/cap-studio/mcp) provided by Cap Studio to verify and debug the proxied MCP server.
 
 </Step>
 </Steps>
@@ -107,19 +103,7 @@ upstream:
 </Tab>
 </Tabs>
 
-## Pricing and settlement
 
-- Default price applies to all forwarded tools: `defaultPricePicoUSD`.
-- Override specific tools via `register.tools[].pricePicoUSD`.
-- Per‑call authorization and payment data are carried in reserved arguments merged into every tool schema:
-  - `__nuwa_auth`: DIDAuth v1 header string
-  - `__nuwa_payment`: serialized payment request payload
-- Responses can include a payment resource frame alongside normal MCP `content`.
-
-## Deployment
-
-- Works well on Railway or any Node hosting. See repository scripts under `nuwa-services/mcp-server-proxy/deployments/` for templates.
-- Use environment variables for secrets (`SERVICE_KEY`, upstream tokens).
 
 ## Preconfigured examples
 
@@ -162,21 +146,16 @@ Config reference: `deployments/instances/context7-proxy/config.yaml`
 </Tab>
 </Tabs>
 
-## When to use the proxy vs a custom server
 
-- **Proxy**: you already have an MCP, need pricing quickly, and prefer zero upstream changes.
-- **Custom server**: you want first‑class control, custom tool logic, or richer validation; see the native server guide.
+## Relevant Docs
 
-<CardGroup cols={3}>
-  <Card title="Native MCP server (with Payment Kit)" icon="bolt" href="/build-caps/mcp-server">
-    Build a pay‑per‑call MCP server directly using the Payment Kit.
-  </Card>
-  <Card title="MCP overview" icon="book" href="/build-caps/mcp">
-    Conceptual overview and selection guide.
-  </Card>
-  <Card title="MCP Client" icon="bolt" href="/build-caps/mcp-client">
-    Initialize, call tools, stream, and recover channels.
-  </Card>
+<CardGroup cols={2}>
+    <Card title="MCP Pricing" icon="dollar-sign" href="/build-caps/mcp-pricing">
+      Pricing for MCP tools
+    </Card>
+    <Card title="MCP Server" icon="server" href="/build-caps/mcp-server">
+      Build a pay‑per‑call MCP server directly using the Payment Kit.
+    </Card>
 </CardGroup>
 
 

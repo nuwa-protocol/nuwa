@@ -1,0 +1,53 @@
+---
+title: "UI Overview"
+description: "Ways to add interactive UI to your Cap: Artifact UI and MCP UI."
+---
+
+## What You Can Build
+
+Add a web UI that runs inside the Nuwa Client (iframe) to:
+
+- Guide users through multi‑step workflows with forms and controls
+- Visualize results (tables, charts, maps) alongside chat
+- Collect structured input and add selections back to the thread
+- Stream AI output directly into your UI
+- Persist UI state across sessions; adapt to client theme
+
+Implementation uses `@nuwa-ai/ui-kit`. Details live in the two pages below; this is only a high‑level overview.
+
+## Two UI Types
+
+1) Artifact UI
+- A dedicated, persistent panel for your Cap
+- Great for editors, dashboards, notebooks, or long‑lived tasks
+- Configure once in your Cap (artifact.srcUrl), then your UI talks to the client
+- Tools can also open artifact views by returning a UI resource that targets the artifact area
+
+2) MCP UI
+- On‑demand views opened by tool results
+- A tool can return a UI resource (capui:/path) to render a specific route in your UI
+- Your iframe can host an MCP server (postMessage) so AI can call into your UI logic
+- Ideal for AI‑driven wizards, inspectors, or side panels tied to a tool run
+
+## Choosing Between Them
+
+- Pick Artifact UI when you want a stable workspace that users revisit and drive directly.
+- Pick MCP UI when views are tied to specific tool executions or AI‑driven subflows.
+- Combine both: keep a primary artifact panel and still return targeted views from tools.
+
+## What You Need
+
+- A hosted UI origin (HTTPS) that the client can load
+- For Artifact UI: set core.artifact.srcUrl in your Cap
+- For MCP UI: have tools return UI resources (capui:/path) and optionally run an MCP server inside the iframe
+
+## Go Deeper
+
+<CardGroup cols={2}>
+  <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
+    Dedicated panel with your Cap UI
+  </Card>
+  <Card title="MCP UI" icon="bolt" href="/build-caps/mcp-ui">
+    Return UI from tools and expose UI as MCP
+  </Card>
+</CardGroup>
