@@ -123,8 +123,8 @@ app.post(
         const networkFee = existing.estimated_network_fee || 0;
         const actualAmount = Math.max(0, existing.amount_fiat - networkFee); // 确保实际金额不为负数
         
-        const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-        const amountRgas = BigInt(actualAmount) * rgasPerUsd;
+        const rgasPerUsd = Number(process.env.RGAS_PER_USD || '100000000');
+        const amountRgas = BigInt(Math.floor(actualAmount * rgasPerUsd));
         
         try {
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
