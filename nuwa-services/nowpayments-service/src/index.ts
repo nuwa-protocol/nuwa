@@ -330,6 +330,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       expiration_estimate_date: payment.expiration_estimate_date,
       estimated_network_fee: estimatedNetworkFee,
     });
+    payment.estimated_network_fee = estimatedNetworkFee;
 
     res.status(201).json(payment);
   } catch (err: any) {
