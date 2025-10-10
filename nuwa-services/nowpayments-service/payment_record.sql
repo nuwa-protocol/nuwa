@@ -29,5 +29,6 @@ CREATE TABLE IF NOT EXISTS public.nowpayments_payments (
   expiration_estimate_date timestamptz,
   transferred_amount numeric DEFAULT 0,
   transferred_tx_hash text,
-  network_fee numeric DEFAULT 0
+  network_fee numeric DEFAULT 0,
+  estimated_network_fee numeric DEFAULT 0
 );
