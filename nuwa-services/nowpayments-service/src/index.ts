@@ -87,7 +87,7 @@ app.post(
 
       const is_partially_paid_finished: boolean = existing?.status.toLowerCase() === 'partially_paid' && status.toLowerCase() === 'finished';
 
-      console.log(`Processing webhook for order ${orderId} with status ${status} is_partially_paid_finished: ${is_partially_paid_finished}`);
+      console.log(`Processing webhook for order ${paymentId} with status ${status} is_partially_paid_finished: ${is_partially_paid_finished}`);
       // 更新支付记录
       await supabase.upsertPayment({
         nowpayments_payment_id: paymentId,
