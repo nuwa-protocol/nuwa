@@ -120,7 +120,7 @@ app.post(
         const actualAmount = Math.max(0, existing.amount_fiat - networkFee); // 确保实际金额不为负数
         
         const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-        const amountRgas = BigInt(Math.round(actualAmount)) * rgasPerUsd;
+        const amountRgas = BigInt(actualAmount) * rgasPerUsd;
         
         try {
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
@@ -157,7 +157,7 @@ app.post(
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
             const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(Math.round(actualReceivedAmount)) * rgasPerUsd;
+            const receivedRgas: bigint = BigInt(actualReceivedAmount) * rgasPerUsd;
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
@@ -208,7 +208,7 @@ app.post(
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
             const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(Math.round(actualReceivedAmount)) * rgasPerUsd;
+            const receivedRgas: bigint = BigInt(actualReceivedAmount) * rgasPerUsd;
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
