@@ -115,14 +115,21 @@ app.post(
       const isSuccess = ['finished', 'confirmed', 'completed'].includes(status.toLowerCase());
       if (isSuccess && existing && !existing.transfer_tx && existing.payer_did) {
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
+        
+        // 计算网络费用（固定值，默认1美元）
+        const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+        const actualAmount = Math.max(0, existing.amount_fiat - networkFee); // 确保实际金额不为负数
+        
         const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-        const amountRgas = BigInt(existing.amount_fiat) * rgasPerUsd;
+        const amountRgas = BigInt(Math.round(actualAmount)) * rgasPerUsd;
         
         try {
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
           if (tx) {
             await supabase.markTransferred(paymentId, tx, amountRgas);
-            console.log(`Transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${existing.amount_fiat} USD`);
+            // 记录网络费用
+            await supabase.updateNetworkFee(paymentId, networkFee);
+            console.log(`Transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${actualAmount} USD (network fee: ${networkFee} USD)`);
           } else {
             console.error(`Transfer failed for payment ${paymentId}`);
           }
@@ -146,27 +153,33 @@ app.post(
           console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
           if (amountReceivedUsd > 0) {
-            // 计算需要转账的金额（已收到的金额减去已经转账的金额）
+            // 计算网络费用（固定值，默认1美元）
+            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+            const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
+            
+            // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
             const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(amountReceivedUsd) * rgasPerUsd;
+            const receivedRgas: bigint = BigInt(Math.round(actualReceivedAmount)) * rgasPerUsd;
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
               const amountRgas = amountToTransferRgas;
               
-              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${amountReceivedUsd} USD (already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
+              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
               
               const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
               if (tx) {
                 // 更新已转账 RGAS 数量
                 const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
                 await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
-                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}`);
+                // 累加网络费用
+                await supabase.addNetworkFee(paymentId, networkFee);
+                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD`);
               } else {
                 console.error(`Partial transfer failed for payment ${paymentId}`);
               }
             } else {
-              console.log(`No additional RGAS to transfer for payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${amountReceivedUsd})`);
+              console.log(`No additional RGAS to transfer for payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD)`);
             }
           } else {
             console.log(`No amount received for payment ${paymentId}, skipping transfer`);
@@ -192,27 +205,33 @@ app.post(
           console.log(`Order details: original_amount=${originalAmountUsd}, received_amount=${amountReceivedUsd}, already_transferred_rgas=${alreadyTransferredRgas.toString()}, currency=${existing.currency_fiat}`);
           
           if (amountReceivedUsd > 0) {
-            // 计算需要转账的金额（已收到的金额减去已经转账的金额）
+            // 计算网络费用（固定值，默认1美元）
+            const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+            const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
+            
+            // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
             const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(Math.round(amountReceivedUsd)) * rgasPerUsd;
+            const receivedRgas: bigint = BigInt(Math.round(actualReceivedAmount)) * rgasPerUsd;
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
               const amountRgas = amountToTransferRgas;
               
-              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${amountReceivedUsd} USD (already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
+              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
               
               const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
               if (tx) {
                 // 更新已转账 RGAS 数量
                 const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
                 await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
-                console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}`);
+                // 累加网络费用
+                await supabase.addNetworkFee(paymentId, networkFee);
+                console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD`);
               } else {
                 console.error(`Expired partial transfer failed for payment ${paymentId}`);
               }
             } else {
-              console.log(`No additional RGAS to transfer for expired payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${amountReceivedUsd})`);
+              console.log(`No additional RGAS to transfer for expired payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD)`);
             }
           } else {
             console.log(`No amount received for payment ${paymentId}, skipping transfer`);
@@ -432,6 +451,34 @@ app.get('/api/estimate', async (req: Request, res: Response) => {
   } catch (err: any) {
       console.log(err)
     res.status(500).json({ error: err.response?.data || 'get estimate failed' });
+  }
+});
+
+// 预估实际费用接口（扣除网络费用）
+app.get('/api/estimate-actual-cost', async (req: Request, res: Response) => {
+  try {
+    const { order_amount } = req.query;
+    if (!order_amount) {
+      return res.status(400).json({ error: 'missing order_amount parameter' });
+    }
+
+    const orderAmount = Number(order_amount);
+    if (isNaN(orderAmount) || orderAmount <= 0) {
+      return res.status(400).json({ error: 'order_amount must be a positive number' });
+    }
+
+    // 获取网络费用配置（固定值，默认1美元）
+    const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1'); // 默认1美元
+    const actualCost = Math.max(0, orderAmount * 0.95 - networkFee);
+
+    res.json({
+      order_amount: orderAmount,
+      network_fee: networkFee,
+      actual_cost: actualCost
+    });
+  } catch (err: any) {
+    console.error('Estimate actual cost error:', err);
+    res.status(500).json({ error: 'estimate actual cost failed' });
   }
 });
 

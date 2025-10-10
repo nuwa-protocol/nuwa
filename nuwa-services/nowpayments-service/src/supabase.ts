@@ -31,6 +31,7 @@ export interface PaymentRecord {
 	expiration_estimate_date?: string;
     transferred_amount?: number | string;
 	transferred_tx_hash?: string;
+	network_fee?: number;
 }
 
 export class SupabaseService {
@@ -76,6 +77,27 @@ export class SupabaseService {
 				transferred_amount: normalizedAmount,
 				transferred_tx_hash: txHash
 			})
+			.eq('nowpayments_payment_id', paymentId);
+		if (error) throw error;
+	}
+
+	async updateNetworkFee(paymentId: string, networkFee: number): Promise<void> {
+		const { error } = await this.client
+			.from(this.table)
+			.update({ network_fee: networkFee })
+			.eq('nowpayments_payment_id', paymentId);
+		if (error) throw error;
+	}
+
+	async addNetworkFee(paymentId: string, additionalNetworkFee: number): Promise<void> {
+		// 先获取当前的网络费用
+		const existing = await this.getByPaymentId(paymentId);
+		const currentNetworkFee = existing?.network_fee || 0;
+		const newNetworkFee = currentNetworkFee + additionalNetworkFee;
+		
+		const { error } = await this.client
+			.from(this.table)
+			.update({ network_fee: newNetworkFee })
 			.eq('nowpayments_payment_id', paymentId);
 		if (error) throw error;
 	}
