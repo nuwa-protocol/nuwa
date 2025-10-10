@@ -73,17 +73,21 @@ app.post(
       const price_amount: number = Number(payload.price_amount || 0);
       const price_currency: string = payload.price_currency || 'usd';
       const pay_currency: string | undefined = payload.pay_currency;
+      const orderId = payload.order_id?.toString?.();
+
 
       if (!paymentId) {
         console.error('Missing payment_id in webhook payload');
         return res.status(400).json({ error: 'missing payment_id' });
       }
 
-      console.log(`Processing webhook for payment ${paymentId} with status ${status}`);
 
       // 获取现有记录
       const existing = await supabase.getByPaymentId(paymentId);
-      
+
+      const is_partially_paid_finished: boolean = existing?.status.toLowerCase() === 'partially_paid' && status.toLowerCase() === 'finished';
+
+      console.log(`Processing webhook for order ${orderId} with status ${status} is_partially_paid_finished: ${is_partially_paid_finished}`);
       // 更新支付记录
       await supabase.upsertPayment({
         nowpayments_payment_id: paymentId,
@@ -113,7 +117,7 @@ app.post(
 
       // 处理支付成功的情况
       const isSuccess = ['finished'].includes(status.toLowerCase());
-      if (isSuccess && existing && !existing.transfer_tx && existing.payer_did) {
+      if (isSuccess && existing && !existing.transfer_tx && existing.payer_did && !is_partially_paid_finished) {
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         
         const networkFee = existing.estimated_network_fee || 0;
@@ -138,8 +142,8 @@ app.post(
       }
 
       // 处理 partially_paid 状态直接转账
-      const isPartiallyPaid = status.toLowerCase() === 'partially_paid';
-      if (isPartiallyPaid && existing && existing.payer_did) {
+      const isPartiallyPaid = status.toLowerCase() === 'partially_paid' || is_partially_paid_finished;
+      if (isPartiallyPaid && existing && existing.payer_did){
         console.log(`Payment ${paymentId} is partially paid, processing transfer`);
         
         try {
