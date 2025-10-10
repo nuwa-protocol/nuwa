@@ -112,7 +112,7 @@ app.post(
       });
 
       // 处理支付成功的情况
-      const isSuccess = ['finished', 'confirmed', 'completed'].includes(status.toLowerCase());
+      const isSuccess = ['finished'].includes(status.toLowerCase());
       if (isSuccess && existing && !existing.transfer_tx && existing.payer_did) {
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         
@@ -145,7 +145,7 @@ app.post(
         try {
           const amountReceivedUsd: number = Number(payload.actually_paid_at_fiat || payload.amount_received || 0);
           const originalAmountUsd: number = Number(existing.amount_fiat || 0);
-          // 数据库存储的已转账数量改为 RGAS（可能是 string），读取后转为 bigint 参与计算
+
           const alreadyTransferredRgas: bigint = BigInt(existing.transferred_amount ?? 0);
           
           console.log(`Handling partially paid order ${paymentId} for user ${existing.payer_did}`);
@@ -156,8 +156,8 @@ app.post(
             const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
-            const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(actualReceivedAmount) * rgasPerUsd;
+            const rgasPerUsd = Number(process.env.RGAS_PER_USD || '100000000');
+            const receivedRgas: bigint = BigInt(Math.floor(actualReceivedAmount * rgasPerUsd));
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
@@ -204,11 +204,11 @@ app.post(
           
           if (amountReceivedUsd > 0) {
             const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1') + Number(process.env.SERVICE_FEE_FIXED || '0.05') * payload.actually_paid_at_fiat; // 默认1美元
-            const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee); // 确保实际金额不为负数
+            const actualReceivedAmount = Math.max(0, amountReceivedUsd - networkFee);
             
             // 计算需要转账的金额（已收到的金额减去网络费用，再减去已经转账的金额）
-            const rgasPerUsd = BigInt(process.env.RGAS_PER_USD || '100000000');
-            const receivedRgas: bigint = BigInt(actualReceivedAmount) * rgasPerUsd;
+            const rgasPerUsd = Number(process.env.RGAS_PER_USD || '100000000');
+            const receivedRgas: bigint = BigInt(Math.floor(actualReceivedAmount * rgasPerUsd));
             const amountToTransferRgas: bigint = receivedRgas - alreadyTransferredRgas;
             
             if (amountToTransferRgas > 0n) {
