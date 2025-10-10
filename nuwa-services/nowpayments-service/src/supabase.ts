@@ -32,6 +32,7 @@ export interface PaymentRecord {
     transferred_amount?: number | string;
 	transferred_tx_hash?: string;
 	network_fee?: number;
+	estimated_network_fee?: number;
 }
 
 export class SupabaseService {
