@@ -159,7 +159,7 @@ app.post(
           
           if (amountReceivedUsd > 0) {
             const networkFee = Number(process.env.NETWORK_FEE_FIXED || '1');
-            const serviceFee = Number(process.env.SERVICE_FEE_FIXED || '0.05') * amountReceivedUsd;
+            const serviceFee = Number(process.env.SERVICE_FEE_FIXED || '0.05') * (amountReceivedUsd - networkFee);
             const totalFee = networkFee + serviceFee;
             const actualReceivedAmount = Math.max(0, amountReceivedUsd - totalFee); // 确保实际金额不为负数
             
