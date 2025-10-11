@@ -462,9 +462,12 @@ export class UniversalMcpClient {
    */
   private async createStandardMcpClient(): Promise<McpClient> {
     // Use custom transport if provided, otherwise use HTTP transport
-    const transport =
-      this.options.customTransport ||
-      new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    let transport: Transport;
+    if (this.options.customTransport) {
+      transport = this.options.customTransport;
+    } else {
+      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    }
 
     const client = new McpClient({
       name: 'nuwa-universal-mcp-client',

@@ -759,9 +759,12 @@ export class PaymentChannelMcpClient {
     }
 
     // Use custom transport if provided, otherwise use HTTP transport
-    const transport =
-      this.options.customTransport ||
-      new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    let transport: Transport;
+    if (this.options.customTransport) {
+      transport = this.options.customTransport;
+    } else {
+      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    }
 
     this.mcpClient = new McpClient({
       name: 'nuwa-payment-kit-client',
