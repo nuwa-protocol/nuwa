@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Activity, Settings } from 'lucide-react';
+import { DollarSign, Activity, Settings, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Skeleton } from '@/components/ui';
 import { useRevenueData } from '@/hooks/useRevenueData';
 import { WithdrawRevenueModal } from './WithdrawRevenueModal';
@@ -155,6 +155,15 @@ export function RevenueOverviewCard({
                   Withdraw
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/agent/${agentDid}/revenue-history`)}
+                className="w-full"
+              >
+                <History className="mr-2 h-4 w-4" />
+                View History
+              </Button>
             </div>
           </div>
 
