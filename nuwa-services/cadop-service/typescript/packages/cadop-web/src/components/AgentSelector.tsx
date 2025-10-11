@@ -1,10 +1,10 @@
 import { Check } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { SpinnerContainer } from '@/components/ui';
-import { DEFAULT_ASSET_ID } from '@/config/env';
 import { usePaymentHubClient } from '../hooks/usePaymentHubClient';
 import { useAuth } from '../lib/auth/AuthContext';
 import { UserStore } from '../lib/storage';
+import { formatBigIntWithDecimals } from '@/utils/formatters';
 
 interface AgentSelectorProps {
   onSelect: (did: string) => void;
@@ -33,26 +33,6 @@ function AgentItem({ did, isSelected, onSelect }: AgentItemProps) {
     return `${did.slice(0, 25)}...${did.slice(-10)}`;
   };
 
-  // Format bigint with decimals
-  const formatBigIntWithDecimals = useCallback(
-    (value: bigint, decimals: number, fractionDigits?: number): string => {
-      const negative = value < 0n;
-      const v = negative ? -value : value;
-      const base = 10n ** BigInt(decimals);
-      const integer = v / base;
-      let fraction = (v % base).toString().padStart(decimals, '0');
-      if (typeof fractionDigits === 'number') {
-        fraction = fraction.slice(0, fractionDigits);
-      }
-      const fracPart =
-        fraction && fraction !== '0'.repeat(fraction.length)
-          ? `.${fraction.replace(/0+$/, '')}`
-          : '';
-      return `${negative ? '-' : ''}${integer.toString()}${fracPart}`;
-    },
-    []
-  );
-
   // Get USD balance from payment hub
   useEffect(() => {
     const fetchUsdBalance = async () => {
@@ -75,7 +55,7 @@ function AgentItem({ did, isSelected, onSelect }: AgentItemProps) {
     };
 
     fetchUsdBalance();
-  }, [hubClient, formatBigIntWithDecimals]);
+  }, [hubClient]);
 
   return (
     <button

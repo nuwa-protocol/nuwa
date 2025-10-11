@@ -5,6 +5,7 @@ import type {
   OperationalKeyInfo,
   VerificationRelationship,
   SignerInterface,
+  DIDDocument,
 } from '@nuwa-ai/identity-kit';
 import { SignerFactory } from '../auth/signers/SignerFactory';
 
@@ -70,7 +71,7 @@ export class DIDService {
     }
   }
 
-  async getDIDDocument(forceRefresh?: boolean): Promise<unknown> {
+  async getDIDDocument(forceRefresh?: boolean): Promise<DIDDocument> {
     if (forceRefresh) {
       return VDRRegistry.getInstance().resolveDID(this.did, { forceRefresh: true });
     }

@@ -10,7 +10,8 @@ interface ConditionalRevenueCardProps {
 }
 
 /**
- * A wrapper component that renders RevenueOverviewCard with controller-based permissions.
+ * A wrapper component that conditionally renders RevenueOverviewCard based on revenue hub existence.
+ * Only shows the revenue card if the user has a revenue object (hub exists), even if balance is 0.
  * Revenue information is public, but withdraw functionality is only available to controllers.
  */
 export function ConditionalRevenueCard({
@@ -20,14 +21,20 @@ export function ConditionalRevenueCard({
   onWithdrawSuccess,
   isController = false,
 }: ConditionalRevenueCardProps) {
-  const { loading, error } = useRevenueData(agentDid);
+  const { loading, error, hubExists } = useRevenueData(agentDid);
 
   // Don't render anything while loading or if there's an error
   if (loading || error) {
     return null;
   }
 
-  // Always render the RevenueOverviewCard, but pass controller permission
+  // Only render if revenue hub exists (revenue object exists)
+  // This means we show the card even if balance is 0, as long as the hub exists
+  if (!hubExists) {
+    return null;
+  }
+
+  // Render the RevenueOverviewCard with controller permission
   return (
     <RevenueOverviewCard
       agentDid={agentDid}

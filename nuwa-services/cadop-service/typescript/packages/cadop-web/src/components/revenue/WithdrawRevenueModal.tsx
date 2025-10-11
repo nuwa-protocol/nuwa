@@ -15,6 +15,7 @@ import {
   Badge,
 } from '@/components/ui';
 import { useRevenueOperations, type RevenueBalance } from '@/hooks/useRevenueData';
+import { formatTokenAmount, parseAmount } from '@/utils/formatters';
 
 // Import WithdrawalPreview type from payment-kit
 interface WithdrawalPreview {
@@ -58,35 +59,6 @@ export function WithdrawRevenueModal({
 
   // Get selected asset info
   const selectedAssetInfo = availableBalances.find(b => b.assetId === selectedAsset);
-
-  // Format token amount with decimals
-  const formatTokenAmount = (amount: bigint, decimals: number = 8): string => {
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const integer = amount / divisor;
-    const fraction = amount % divisor;
-
-    if (fraction === 0n) {
-      return integer.toString();
-    }
-
-    const fractionStr = fraction.toString().padStart(decimals, '0');
-    const trimmedFraction = fractionStr.replace(/0+$/, '');
-    return `${integer}.${trimmedFraction}`;
-  };
-
-  // Parse amount string to bigint
-  const parseAmount = (amountStr: string, decimals: number = 8): bigint => {
-    if (!amountStr || amountStr === '') return 0n;
-
-    const parts = amountStr.split('.');
-    const integerPart = parts[0] || '0';
-    const fractionalPart = (parts[1] || '').padEnd(decimals, '0').slice(0, decimals);
-
-    const integerBigInt = BigInt(integerPart) * BigInt(10) ** BigInt(decimals);
-    const fractionalBigInt = BigInt(fractionalPart);
-
-    return integerBigInt + fractionalBigInt;
-  };
 
   // Update preview when amount or asset changes
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useRoochEvents, parseEventData, getEventTimestamp } from './useRoochEvents';
 import type { RoochEventFilter } from './useRoochEvents';
+import { formatTokenAmount } from '@/utils/formatters';
 
 // Revenue event types based on the payment_revenue module
 export const REVENUE_EVENT_TYPES = {
@@ -247,23 +248,6 @@ export function useRevenueHistory(
     refetch,
     reset,
   };
-}
-
-/**
- * Format token amount with decimals for display
- */
-function formatTokenAmount(amount: bigint, decimals: number = 8): string {
-  const divisor = 10n ** BigInt(decimals);
-  const integer = amount / divisor;
-  const fraction = amount % divisor;
-
-  if (fraction === 0n) {
-    return integer.toString();
-  }
-
-  const fractionStr = fraction.toString().padStart(decimals, '0');
-  const trimmedFraction = fractionStr.replace(/0+$/, '');
-  return `${integer}.${trimmedFraction}`;
 }
 
 /**
