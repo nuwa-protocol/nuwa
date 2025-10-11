@@ -2,75 +2,92 @@
 title: "Artifact"
 description: "Integrate an Artifact UI panel to enable more functionality with your Cap."
 ---
-## Artifact UI
+
 
 An Artifact lets your Cap render a rich, interactive UI inside the Nuwa Client via an iframe. Use it to visualize results, collect structured input, or orchestrate multi-step workflows.
 
-In the Cap, set a public URL:
+To set the Artifact UI for your Cap, set a public and iframe-compatible URL:
 
-```ts
+```json cap
 core: {
   artifact: { srcUrl: 'https://your-cap-ui.example.com' }
 }
 ```
 
-Notes
-- The Artifact origin is also used when tools return a `capui:/<path>` UI resource; the client will combine this origin with the path.
-- Prefer HTTPS and a stable path structure (e.g., `/dashboard`, `/settings`).
+## Expose MCP tools from your Artifact UI
 
-## Connect To The Client
+You can expose MCP tools from your Artifact UI to allow the AI to call into your UI. The overall building process is the same as building an MCP server, except that this time you're building an MCP server in the frontend.
 
-Use `@nuwa-ai/ui-kit` to communicate with the Nuwa Client from your iframe:
+[`@nuwa-ai/ui-kit`](/sdk/ui-kit) uses a customized MCP transport `PostMessageMCPTransport`, which allows you to expose MCP tools from your Artifact UI.
 
-```tsx
-import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
+```tsx hooks/useArtifactMCP.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { useNuwaMCP } from '@nuwa-ai/ui-kit';
+import { z } from 'zod';
 
-function MyCapUI() {
-  const { nuwa, connected, theme } = useNuwa();
+export const useArtifactMCP = () => {
+  const server = new McpServer({ name: 'my-cap-ui', version: '1.0.0' });
 
-  async function run() {
-    // persist local state in parent
-    await nuwa.saveState({ step: 'started' });
-    // send a prompt to the current chat
-    await nuwa.sendPrompt('Please analyze the selected notes.');
-  }
-
-  return (
-    <div className={theme === 'dark' ? 'dark' : ''}>
-      <button onClick={run} disabled={!connected}>Run</button>
-    </div>
+  server.registerTool(
+    'update_content',
+    {
+      title: 'Update UI Content',
+      description: 'Replace visible content in the iframe',
+      inputSchema: { content: z.string().describe('new content') },
+    },
+    ({ content }) => {
+      // your UI state update here
+      return { content: [{ type: 'text', text: 'OK' }] };
+    },
   );
+
+  useNuwaMCP(server);
 }
 
-export default function App() {
-  return (
-    <NuwaProvider autoHeight debug>
-      <MyCapUI />
-    </NuwaProvider>
+```
+
+### What does `useNuwaMCP` do?
+
+Building MCP in the frontend can be a weird experience as the MCP server is usually not a React component. You have to handle mount and unmount, as well as the possibility of multiple instances of the same MCP server. The `useNuwaMCP` hook is a React hook that you can use to stablized the MCP instance. It will automatically handle the mount and unmount, as well as using refs to ensure there's only one active MCP server at a time. It also handles the transport connection to the Nuwa Client.
+
+### Call Nuwa Client in MCP Tool execution
+
+You can also call the Nuwa Client functions in the MCP tool execution.
+
+```tsx hooks/useArtifactMCP.ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { useNuwaMCP } from '@nuwa-ai/ui-kit';
+import { z } from 'zod';
+
+export const useArtifactMCP = (nuwaClient: NuwaClient) => {
+  const server = new McpServer({ name: 'my-cap-ui', version: '1.0.0' });
+
+  server.registerTool(
+    'generate_ai_content',
+    {
+      title: 'Generate AI Content',
+      description: 'Stream AI-generated content',
+      prompt: z.string().describe("Prompt for AI to generate content"),
+    },
+    async ({ prompt }) => {
+      const stream = await nuwaClient.createAIStream({ prompt })
+      const { result } = await stream.execute({
+        onChunk: (chunk) => {
+          // update UI with the chunk
+        },
+        onError: (error) => {
+          // handle error
+        },
+      });
+      return { content: [{ type: 'text', text: result }] };
+    },
   );
+
+  useNuwaMCP(server);
 }
+
 ```
 
-Common actions
-- `nuwa.addSelection('Label', { ... })` to add structured results to the thread
-- `nuwa.saveState(data) / nuwa.getState()` to persist UI state between sessions
-- `nuwa.createAIStream({ prompt }).execute({ onChunk })` to stream AI output into your UI
-
-## MCP + UI
-
-You can expose MCP tools from your UI process (postMessage transport) so AI can control the UI. Return UI resources from tools to request the client to render a particular view.
-
-See SDK -> UI Kit for transports and resource types, and Build -> MCP for payment-aware tools.
-
-Open in the Artifact panel
-
-```ts
-import { createUIResource } from '@nuwa-ai/ui-kit';
-
-// Hint the client to open this path in the Artifact area
-const resource = createUIResource('/reports', 'Reports', 'Monthly reports', 'artifact');
-return { content: [{ type: 'resource', resource }] };
-```
 
 ## See Also
 
@@ -78,7 +95,7 @@ return { content: [{ type: 'resource', resource }] };
   <Card title="UI Overview" icon="window-restore" href="/build-caps/ui">
     Overview of UI patterns (Artifact & MCP)
   </Card>
-  <Card title="MCP UI" icon="bolt" href="/build-caps/mcp-ui">
-    Return UI from tools and expose UI as MCP
+  <Card title="@nuwa-ai/ui-kit" icon="bolt" href="/sdk/ui-kit">
+    UI Kit Specifications
   </Card>
 </CardGroup>

@@ -1,38 +1,30 @@
 ---
 title: "MCP UI"
-description: "You can return an interactive UI from an MCP tool call to improve the user experience of your Cap."
+description: "Return UI resource from MCP tools"
 ---
 
 
-## Concept
+MCP specifications supports [returning resources](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#embedded-resources) along with a tool result. We leveraged this mechanism and defined a resource schema for UI resources. When a tool returns a UI resource, the client will render an iframe that embeds the UI described by this UI resource.
 
-Let tools open parts of your UI and allow AI to control your UI. There are two building blocks in `@nuwa-ai/ui-kit`:
+## UI Resource Schema
 
-- Returning a UI resource from a tool call (client renders a path from your UI origin)
-- Hosting an MCP server inside your UI (postMessage transport) so AI can call your UI logic
-
-This enables back‑and‑forth: your UI can call the client (prompts, selections, streaming) and AI can call your UI (MCP tools).
-
-## Return a UI from a tool
-
-When a tool returns a UI resource, the client renders an iframe that navigates to your path at the Cap UI origin. Use helpers:
+Here's the UI resource schema:
 
 ```ts
-import { createUIToolResult } from '@nuwa-ai/ui-kit';
-
-// Return a UI resource that asks the client to open /dashboard?period=week
-export function show_dashboard({ period }: { period: string }) {
-  return createUIToolResult(
-    `/dashboard?period=${encodeURIComponent(period)}`,
-    'Analytics Dashboard',
-    `Dashboard for ${period}`,
-  );
+interface UIResource {
+  uri: string;                  // capui:/<path>
+  name: string;                 // display name
+  description?: string;
+  mimeType: 'text/x-nuwa-capui-path';
+  text: string;                 // path
 }
 ```
 
-Behavior
-- The client constructs a full URL by combining the Cap UI origin with your `path`.
-- Default render target is inline; set `uiType: 'artifact'` to prefer the Artifact panel.
+<Warning>TODO: update the UI resource schema and expalin each field</Warning>
+
+## `createUIResource` 
+
+The `@nuwa-ai/ui-kit` provides a helper function for constructing a UI resource:
 
 ```ts
 import { createUIResource } from '@nuwa-ai/ui-kit';
@@ -42,94 +34,5 @@ const resource = createUIResource('/settings', 'Settings', 'Edit preferences', '
 return { content: [{ type: 'resource', resource }] };
 ```
 
-Resource shape (for reference)
+<Warning>TODO: update the example above</Warning>
 
-```ts
-interface UIResource {
-  uri: string;                  // capui:/<path>
-  name: string;                 // display name
-  description?: string;
-  mimeType: 'text/x-nuwa-capui-path';
-  text: string;                 // path, must start with '/'
-  annotations?: { uiType?: 'inline' | 'artifact' };
-}
-```
-
-## Expose tools from your UI (postMessage)
-
-Run an MCP server in your iframe so AI can call into your UI. Use the packaged PostMessage transport.
-
-```tsx
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { PostMessageMCPTransport } from '@nuwa-ai/ui-kit';
-import { z } from 'zod';
-
-const transport = new PostMessageMCPTransport({ debug: true });
-const server = new McpServer({ name: 'my-cap-ui', version: '1.0.0' });
-
-server.registerTool(
-  'update_content',
-  {
-    title: 'Update UI Content',
-    description: 'Replace visible content in the iframe',
-    inputSchema: { content: z.string().describe('new content') },
-  },
-  ({ content }) => {
-    // your UI state update here
-    window.dispatchEvent(new CustomEvent('setContent', { detail: content }));
-    return { content: [{ type: 'text', text: 'OK' }] };
-  },
-);
-
-server.connect(transport);
-```
-
-React helper
-
-```tsx
-import { useNuwaMCP } from '@nuwa-ai/ui-kit';
-
-function Root() {
-  const server = useMemo(() => new McpServer({ name: 'ui', version: '1.0.0' }), []);
-  useEffect(() => {
-    server.registerTool('ping', { title: 'Ping', inputSchema: {} }, () => ({ content: [{ type: 'text', text: 'pong' }] }));
-  }, [server]);
-  useNuwaMCP(server, { debug: true });
-  return <App />;
-}
-```
-
-Transport options
-
-```ts
-new PostMessageMCPTransport({
-  targetWindow: window.parent,    // default
-  targetOrigin: '*',              // restrict in prod
-  allowedOrigins: ['https://your.app'],
-  timeout: 10000,
-  debug: false,
-  securityPolicy: {
-    enforceOriginValidation: true,
-    maxMessageSize: 1024 * 1024,
-    rateLimits: [{ windowMs: 60000, maxRequests: 100 }],
-  },
-});
-```
-
-## End‑to‑end flow
-
-1) User runs your Cap; a tool returns a UI resource with a path.
-2) The client opens your path under the Cap UI origin (inline or artifact).
-3) Your iframe UI uses `NuwaProvider`/`NuwaClient` to talk to the client (prompts, selections, state, streams).
-4) Optionally, your iframe starts an MCP server so AI can call back into your UI.
-
-## See Also
-
-<CardGroup cols={2}>
-  <Card title="UI Overview" icon="window-restore" href="/build-caps/ui">
-    Overview of UI patterns (Artifact & MCP)
-  </Card>
-  <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
-    Dedicated panel with your Cap UI
-  </Card>
-</CardGroup>
