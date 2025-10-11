@@ -33,6 +33,7 @@ export interface PaymentRecord {
 	transferred_tx_hash?: string;
 	network_fee?: number;
 	estimated_network_fee?: number;
+	service_fee?: number;
 }
 
 export class SupabaseService {
@@ -91,23 +92,40 @@ export class SupabaseService {
 		if (error) throw error;
 	}
 
-	async updateNetworkFee(paymentId: string, networkFee: number): Promise<void> {
+	async updateFees(paymentId: string, networkFee?: number, serviceFee?: number): Promise<void> {
+		const updateData: any = {};
+		if (networkFee !== undefined) {
+			updateData.network_fee = networkFee;
+		}
+		if (serviceFee !== undefined) {
+			updateData.service_fee = serviceFee;
+		}
+		
 		const { error } = await this.client
 			.from(this.table)
-			.update({ network_fee: networkFee })
+			.update(updateData)
 			.eq('nowpayments_payment_id', paymentId);
 		if (error) throw error;
 	}
 
-	async addNetworkFee(paymentId: string, additionalNetworkFee: number): Promise<void> {
-		// 先获取当前的网络费用
+	async addFees(paymentId: string, additionalNetworkFee?: number, additionalServiceFee?: number): Promise<void> {
+		// 先获取当前的费用
 		const existing = await this.getByPaymentId(paymentId);
-		const currentNetworkFee = existing?.network_fee || 0;
-		const newNetworkFee = currentNetworkFee + additionalNetworkFee;
+		const updateData: any = {};
+		
+		if (additionalNetworkFee !== undefined) {
+			const currentNetworkFee = existing?.network_fee || 0;
+			updateData.network_fee = currentNetworkFee + additionalNetworkFee;
+		}
+		
+		if (additionalServiceFee !== undefined) {
+			const currentServiceFee = existing?.service_fee || 0;
+			updateData.service_fee = currentServiceFee + additionalServiceFee;
+		}
 		
 		const { error } = await this.client
 			.from(this.table)
-			.update({ network_fee: newNetworkFee })
+			.update(updateData)
 			.eq('nowpayments_payment_id', paymentId);
 		if (error) throw error;
 	}

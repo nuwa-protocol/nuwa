@@ -30,5 +30,6 @@ CREATE TABLE IF NOT EXISTS public.nowpayments_payments (
   transferred_amount numeric DEFAULT 0,
   transferred_tx_hash text,
   network_fee numeric DEFAULT 0,
-  estimated_network_fee numeric DEFAULT 0
+  estimated_network_fee numeric DEFAULT 0,
+  service_fee numeric DEFAULT 0
 );
