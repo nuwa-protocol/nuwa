@@ -9,6 +9,12 @@ With Nuwa MCP Proxy, you can convert an existing MCP server (HTTP/stream or stdi
 Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For multiple MCP servers, you have to deploy multiple Nuwa MCP Proxy instances.
 </Note>
 
+<Note>
+Before you start: obtain a Service Key for your service DID. See the
+<a href="/build-caps/service-key">Service Key guide</a> and use the copied value as
+<code>SERVICE_KEY</code>.
+</Note>
+
 ## Quick start
 
 <Steps>
@@ -53,6 +59,11 @@ register:
     - name: "example.search"
       pricePicoUSD: "200000000"     # 0.0002 USD
 ```
+
+<Tip>
+Not sure where <code>SERVICE_KEY</code> comes from? Follow the
+<a href="/build-caps/service-key">Service Key guide</a> to generate it via cadop-web.
+</Tip>
 
 </Step>
 
@@ -152,6 +163,12 @@ Config reference: `deployments/instances/context7-proxy/config.yaml`
 <CardGroup cols={2}>
     <Card title="MCP Pricing" icon="dollar-sign" href="/build-caps/mcp-pricing">
       Pricing for MCP tools
+    </Card>
+    <Card title="Revenue" icon="activity" href="/build-caps/revenue">
+      View balances, withdraw, and audit revenue history
+    </Card>
+    <Card title="Service Key" icon="key" href="/build-caps/service-key">
+      How to obtain and configure SERVICE_KEY
     </Card>
     <Card title="MCP Server" icon="server" href="/build-caps/mcp-server">
       Build a pay‑per‑call MCP server directly using the Payment Kit.

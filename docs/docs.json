@@ -45,6 +45,13 @@
               },
               "build-caps/prompt",
               {
+                "group": "Payments & Revenue",
+                "pages": [
+                  "build-caps/service-key",
+                  "build-caps/revenue"
+                ]
+              },
+              {
                 "group": "UI",
                 "pages": [
                   "build-caps/ui",

@@ -12,6 +12,12 @@ With these SDKs, you can expose a single `/mcp` endpoint and declare free and pa
 
 
 
+<Note>
+Before you start: you need a Service Key for your service DID. Follow the
+<a href="/build-caps/service-key">Service Key guide</a> to create one on cadop-web and copy it
+as <code>SERVICE_KEY</code>.
+</Note>
+
 ## Quick start
 
 <Tip>
@@ -88,6 +94,12 @@ export PORT=8080          # optional
 node server.js            # or tsx src/index.ts in your project
 ```
 
+<Tip>
+The <code>SERVICE_KEY</code> value is generated in the
+<a href="/build-caps/service-key">Service Key guide</a> when you add an authentication method to
+your Agent DID.
+</Tip>
+
 </Step>
 
 <Step title="Call from a client">
@@ -100,6 +112,17 @@ Use the MCP Client guide to initialize and call tools (env + createMcpClient or 
 
 </Step>
 </Steps>
+
+## Relevant Docs
+
+<CardGroup cols={2}>
+  <Card title="Revenue" icon="dollar-sign" href="/build-caps/revenue">
+    View balances, withdraw, and audit revenue history
+  </Card>
+  <Card title="Service Key" icon="key" href="/build-caps/service-key">
+    How to obtain and configure SERVICE_KEY
+  </Card>
+</CardGroup>
 
 ## `createFastMcpServerFromEnv`
 
