@@ -14,6 +14,7 @@ import { McpServerType } from './types';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ZodTypeAny } from 'zod';
 import type { Tool, ToolCallOptions, ToolSet } from 'ai';
 import { McpToolConverter } from './McpToolConverter';
@@ -76,7 +77,6 @@ export class UniversalMcpClient {
     private options: McpPayerOptions & {
       forceMode?: 'auto' | 'payment' | 'standard';
       detectionTimeout?: number;
-      enableFallback?: boolean;
     }
   ) {
     this.detector = new ServerDetector({
@@ -423,7 +423,7 @@ export class UniversalMcpClient {
     if (this.options.forceMode === 'payment') {
       this.serverType = McpServerType.PAYMENT_ENABLED;
       // Create clean options without Universal-specific properties
-      const { forceMode, detectionTimeout, enableFallback, ...cleanOptions } = this.options;
+      const { forceMode, detectionTimeout, ...cleanOptions } = this.options;
       this.paymentClient = new PaymentChannelMcpClient(cleanOptions);
       this.capabilities = { nuwa: { payment: { supported: true } } };
       this.logger.debug('Forced payment mode');
@@ -446,7 +446,7 @@ export class UniversalMcpClient {
     // Create appropriate client
     if (this.serverType === McpServerType.PAYMENT_ENABLED) {
       // Create clean options without Universal-specific properties
-      const { forceMode, detectionTimeout, enableFallback, ...cleanOptions } = this.options;
+      const { forceMode, detectionTimeout, ...cleanOptions } = this.options;
       this.paymentClient = new PaymentChannelMcpClient(cleanOptions);
       this.logger.debug('Created payment-enabled client');
     } else {
@@ -459,7 +459,14 @@ export class UniversalMcpClient {
    * Create standard MCP client
    */
   private async createStandardMcpClient(): Promise<McpClient> {
-    const transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    // Use custom transport if provided, otherwise use HTTP transport
+    let transport: Transport;
+    if (this.options.customTransport) {
+      transport = this.options.customTransport;
+    } else {
+      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    }
+
     const client = new McpClient({
       name: 'nuwa-universal-mcp-client',
       version: '1.0.0',

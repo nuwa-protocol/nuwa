@@ -367,5 +367,3 @@ When contributing to the MCP integration:
 3. Update type definitions
 4. Document new features
 5. Follow existing code patterns
-
-
