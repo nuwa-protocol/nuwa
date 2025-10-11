@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Activity, Settings, History } from 'lucide-react';
+import { DollarSign, Activity, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Skeleton } from '@/components/ui';
 import { useRevenueData } from '@/hooks/useRevenueData';
 import { WithdrawRevenueModal } from './WithdrawRevenueModal';
@@ -161,17 +161,6 @@ export function RevenueOverviewCard({
                   ? 'Configure your services to start earning.'
                   : 'Services not configured yet.'}
               </div>
-              {isController && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/agent/${agentDid}/add-auth-method`)}
-                  className="gap-2"
-                >
-                  <Settings className="h-4 w-4" />
-                  Configure Services
-                </Button>
-              )}
             </div>
           )}
         </CardContent>
