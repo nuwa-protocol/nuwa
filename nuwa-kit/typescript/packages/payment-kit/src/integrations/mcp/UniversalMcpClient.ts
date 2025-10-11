@@ -14,6 +14,7 @@ import { McpServerType } from './types';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ZodTypeAny } from 'zod';
 import type { Tool, ToolCallOptions, ToolSet } from 'ai';
 import { McpToolConverter } from './McpToolConverter';
@@ -77,6 +78,7 @@ export class UniversalMcpClient {
       forceMode?: 'auto' | 'payment' | 'standard';
       detectionTimeout?: number;
       enableFallback?: boolean;
+      customTransport?: Transport;
     }
   ) {
     this.detector = new ServerDetector({
@@ -459,7 +461,11 @@ export class UniversalMcpClient {
    * Create standard MCP client
    */
   private async createStandardMcpClient(): Promise<McpClient> {
-    const transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+    // Use custom transport if provided, otherwise use HTTP transport
+    const transport =
+      this.options.customTransport ||
+      new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+
     const client = new McpClient({
       name: 'nuwa-universal-mcp-client',
       version: '1.0.0',

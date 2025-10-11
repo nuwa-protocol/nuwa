@@ -14,6 +14,7 @@ import { PaymentState } from '../http/core/PaymentState';
 import { HttpPaymentCodec } from '../../middlewares/http/HttpPaymentCodec';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   createDefaultChannelRepo,
   createDefaultTransactionStore,
@@ -108,6 +109,8 @@ export interface McpPayerOptions {
   };
   /** Optional mapping store for state persistence. If not provided, uses default store */
   mappingStore?: HostChannelMappingStore;
+  /** Optional custom transport (e.g., PostMessage for iframe communication) */
+  customTransport?: Transport;
 }
 
 export interface ListToolsOptions {
@@ -754,8 +757,12 @@ export class PaymentChannelMcpClient {
     if (!this.options.baseUrl) {
       throw new Error('MCP baseUrl is required to create client');
     }
-    const base = String(this.options.baseUrl);
-    const transport = new StreamableHTTPClientTransport(new URL(base));
+
+    // Use custom transport if provided, otherwise use HTTP transport
+    const transport =
+      this.options.customTransport ||
+      new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+
     this.mcpClient = new McpClient({
       name: 'nuwa-payment-kit-client',
       version: '1.0.0',
