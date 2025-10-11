@@ -1,1 +1,0 @@
-memory::remember_user {"content":"User has chosen to begin their Crypto life simulation as an 'Investor' (B).","context":"preference","is_long_term":true"}

@@ -1,8 +1,0 @@
-{
-    "package_id": "0x8a09278c76149377ab2d949a042c7e1cf49df31f6ff6dfc2ef93956538360ed2",
-    "openai_api_key": "sk-proj-",
-    "agent_address": "The ai agent address",
-    "poll_interval": 10,
-    "debug": true,
-    "model_name": "gpt-4o"
-}
