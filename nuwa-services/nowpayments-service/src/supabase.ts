@@ -33,6 +33,7 @@ export interface PaymentRecord {
 	transferred_tx_hash?: string;
 	network_fee?: number;
 	estimated_network_fee?: number;
+	estimated_service_fee?: number;
 	service_fee?: number;
 }
 

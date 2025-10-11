@@ -132,9 +132,9 @@ app.post(
           const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
           if (tx) {
             await supabase.markTransferred(paymentId, tx, amountRgas);
-            // 记录网络费用和服务费用
+            // 记录网络费用和预估服务费用
             await supabase.updateFees(paymentId, networkFee, serviceFee);
-            console.log(`Transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${actualAmount} USD (network fee: ${networkFee} USD, service fee: ${serviceFee} USD)`);
+            console.log(`Transfer completed for payment ${paymentId}, tx: ${tx}, amount: ${actualAmount} USD (network fee: ${networkFee} USD, estimated service fee: ${serviceFee} USD)`);
           } else {
             console.error(`Transfer failed for payment ${paymentId}`);
           }
@@ -171,21 +171,21 @@ app.post(
             if (amountToTransferRgas > 0n) {
               const amountRgas = amountToTransferRgas;
               
-              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, service fee: ${serviceFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
+              console.log(`Transferring ${amountRgas.toString()} RGAS for received ${actualReceivedAmount} USD (network fee: ${networkFee} USD, estimated service fee: ${serviceFee} USD, already transferred RGAS: ${alreadyTransferredRgas.toString()})`);
               
               const tx = await transferFromHubToUser(existing.payer_did, amountRgas);
               if (tx) {
                 // 更新已转账 RGAS 数量
                 const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
                 await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
-                // 累加网络费用和服务费用
+                // 累加网络费用和预估服务费用
                 await supabase.addFees(paymentId, networkFee, serviceFee);
-                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD, additional service fee: ${serviceFee} USD`);
+                console.log(`Partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD, additional estimated service fee: ${serviceFee} USD`);
               } else {
                 console.error(`Partial transfer failed for payment ${paymentId}`);
               }
             } else {
-              console.log(`No additional RGAS to transfer for payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD, service fee: ${serviceFee} USD)`);
+              console.log(`No additional RGAS to transfer for payment ${paymentId} (already transferred RGAS: ${alreadyTransferredRgas.toString()}, received USD: ${actualReceivedAmount}, network fee: ${networkFee} USD, estimated service fee: ${serviceFee} USD)`);
             }
           } else {
             console.log(`No amount received for payment ${paymentId}, skipping transfer`);
@@ -229,8 +229,8 @@ app.post(
       //           // 更新已转账 RGAS 数量
       //           const newTransferredRgas: bigint = alreadyTransferredRgas + amountRgas;
       //           await supabase.updateTransferredAmount(paymentId, newTransferredRgas, tx);
-      //           // 累加网络费用和服务费用
-      //           await supabase.addFees(paymentId, networkFee, serviceFee);
+      //           // 累加网络费用和预估服务费用
+      //           await supabase.addFees(paymentId, networkFee, estimatedServiceFee);
       //           console.log(`Expired partial transfer completed for payment ${paymentId}, tx: ${tx}, amountRgas: ${amountRgas.toString()}, total transferred RGAS: ${newTransferredRgas.toString()}, additional network fee: ${networkFee} USD`);
       //         } else {
       //           console.error(`Expired partial transfer failed for payment ${paymentId}`);
@@ -339,7 +339,7 @@ app.post('/api/payment', async (req: Request, res: Response) => {
       burning_percent: payment.burning_percent,
       expiration_estimate_date: payment.expiration_estimate_date,
       estimated_network_fee: estimatedNetworkFee,
-      service_fee: estimatedServiceFee,
+      estimated_service_fee: estimatedServiceFee,
     });
     payment.estimated_network_fee = estimatedNetworkFee;
     payment.estimated_service_fee = estimatedServiceFee;
