@@ -4,6 +4,7 @@ import { DollarSign, Activity, Settings, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Skeleton } from '@/components/ui';
 import { useRevenueData } from '@/hooks/useRevenueData';
 import { WithdrawRevenueModal } from './WithdrawRevenueModal';
+import { formatUSD, formatTokenAmount } from '@/utils/formatters';
 
 interface RevenueOverviewCardProps {
   agentDid: string;
@@ -23,27 +24,6 @@ export function RevenueOverviewCard({
   const navigate = useNavigate();
   const { balances, totalUSD, loading, error, refetch } = useRevenueData(agentDid);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-
-  // Format USD amount from pico-USD to display format
-  const formatUSD = (picoUSD: bigint): string => {
-    const usd = Number(picoUSD) / 1_000_000_000_000; // Convert from pico-USD
-    return usd.toFixed(2);
-  };
-
-  // Format token amount with decimals
-  const formatTokenAmount = (amount: bigint, decimals: number = 8): string => {
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const integer = amount / divisor;
-    const fraction = amount % divisor;
-
-    if (fraction === 0n) {
-      return integer.toString();
-    }
-
-    const fractionStr = fraction.toString().padStart(decimals, '0');
-    const trimmedFraction = fractionStr.replace(/0+$/, '');
-    return `${integer}.${trimmedFraction}`;
-  };
 
   const handleWithdrawSuccess = () => {
     setShowWithdrawModal(false);

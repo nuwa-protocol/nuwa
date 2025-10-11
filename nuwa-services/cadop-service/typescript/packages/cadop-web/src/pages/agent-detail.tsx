@@ -34,7 +34,8 @@ import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
 import { useHubDeposit } from '@/hooks/useHubDeposit';
-import { hasControllerAccess, isUserController } from '@/lib/utils/didCompatibility';
+import { hasControllerAccess } from '@/lib/utils/didCompatibility';
+import { formatBigIntWithDecimals } from '@/utils/formatters';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
@@ -119,24 +120,6 @@ export function AgentDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [didService, userDid]);
 
-  // Format bigint with decimals
-  const formatBigIntWithDecimals = (
-    value: bigint,
-    decimals: number,
-    fractionDigits?: number
-  ): string => {
-    const negative = value < 0n;
-    const v = negative ? -value : value;
-    const base = 10n ** BigInt(decimals);
-    const integer = v / base;
-    let fraction = (v % base).toString().padStart(decimals, '0');
-    if (typeof fractionDigits === 'number') {
-      fraction = fraction.slice(0, Math.min(decimals, fractionDigits));
-    }
-    const fracPart = fraction.length > 0 ? `.${fraction}` : '';
-    return `${negative ? '-' : ''}${integer.toString()}${fracPart}`;
-  };
-
   // PaymentHub RGas (default asset) balance with USD
   const [paymentHubRgasLoading, setPaymentHubRgasLoading] = useState(false);
   const [paymentHubRgasError, setPaymentHubRgasError] = useState<string | null>(null);
@@ -175,10 +158,10 @@ export function AgentDetailPage() {
       const doc = await didService.getDIDDocument();
 
       if (doc) {
-        setDidDocument(doc);
+        setDidDocument(doc as DIDDocument);
 
         if (isAuthenticated && userDid) {
-          const hasAccess = hasControllerAccess(userDid, doc.verificationMethod);
+          const hasAccess = hasControllerAccess(userDid, (doc as DIDDocument).verificationMethod);
           setIsController(hasAccess);
         } else {
           setIsController(false);
@@ -198,7 +181,7 @@ export function AgentDetailPage() {
       setLoading(true);
       await didService.removeVerificationMethod(keyId);
       const updatedDoc = await didService.getDIDDocument();
-      setDidDocument(updatedDoc);
+      setDidDocument(updatedDoc as DIDDocument);
       toast({
         variant: 'default',
         title: t('agent.removed', { defaultValue: 'Removed' }),
