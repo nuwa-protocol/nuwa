@@ -158,10 +158,10 @@ export function AgentDetailPage() {
       const doc = await didService.getDIDDocument();
 
       if (doc) {
-        setDidDocument(doc as DIDDocument);
+        setDidDocument(doc);
 
         if (isAuthenticated && userDid) {
-          const hasAccess = hasControllerAccess(userDid, (doc as DIDDocument).verificationMethod);
+          const hasAccess = hasControllerAccess(userDid, doc.verificationMethod);
           setIsController(hasAccess);
         } else {
           setIsController(false);
@@ -181,7 +181,7 @@ export function AgentDetailPage() {
       setLoading(true);
       await didService.removeVerificationMethod(keyId);
       const updatedDoc = await didService.getDIDDocument();
-      setDidDocument(updatedDoc as DIDDocument);
+      setDidDocument(updatedDoc);
       toast({
         variant: 'default',
         title: t('agent.removed', { defaultValue: 'Removed' }),
