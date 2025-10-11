@@ -77,8 +77,6 @@ export class UniversalMcpClient {
     private options: McpPayerOptions & {
       forceMode?: 'auto' | 'payment' | 'standard';
       detectionTimeout?: number;
-      enableFallback?: boolean;
-      customTransport?: Transport;
     }
   ) {
     this.detector = new ServerDetector({
@@ -425,7 +423,7 @@ export class UniversalMcpClient {
     if (this.options.forceMode === 'payment') {
       this.serverType = McpServerType.PAYMENT_ENABLED;
       // Create clean options without Universal-specific properties
-      const { forceMode, detectionTimeout, enableFallback, ...cleanOptions } = this.options;
+      const { forceMode, detectionTimeout, ...cleanOptions } = this.options;
       this.paymentClient = new PaymentChannelMcpClient(cleanOptions);
       this.capabilities = { nuwa: { payment: { supported: true } } };
       this.logger.debug('Forced payment mode');
@@ -448,7 +446,7 @@ export class UniversalMcpClient {
     // Create appropriate client
     if (this.serverType === McpServerType.PAYMENT_ENABLED) {
       // Create clean options without Universal-specific properties
-      const { forceMode, detectionTimeout, enableFallback, ...cleanOptions } = this.options;
+      const { forceMode, detectionTimeout, ...cleanOptions } = this.options;
       this.paymentClient = new PaymentChannelMcpClient(cleanOptions);
       this.logger.debug('Created payment-enabled client');
     } else {
