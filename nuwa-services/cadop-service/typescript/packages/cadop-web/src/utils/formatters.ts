@@ -51,7 +51,7 @@ export function formatBigIntWithDecimals(
   let fraction = (v % base).toString().padStart(decimals, '0');
 
   if (typeof fractionDigits === 'number') {
-    fraction = fraction.slice(0, fractionDigits);
+    fraction = fraction.slice(0, Math.min(fractionDigits, decimals));
   }
 
   const fracPart =
