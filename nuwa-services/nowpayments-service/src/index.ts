@@ -121,7 +121,7 @@ app.post(
         console.log(`Payment ${paymentId} completed, transferring RGAS to ${existing.payer_did}`);
         
         const networkFee = existing.estimated_network_fee || 0;
-        const serviceFee = Number(process.env.SERVICE_FEE_FIXED || '0.05') * existing.amount_fiat;
+        const serviceFee = existing.estimated_service_fee || 0;
         const totalFee = networkFee + serviceFee;
         const actualAmount = Math.max(0, existing.amount_fiat - totalFee); // 确保实际金额不为负数
         
