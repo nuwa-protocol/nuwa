@@ -1,0 +1,227 @@
+---
+title: "Use Nuwa Client"
+description: "Integrate Nuwa Client functions into your UI"
+---
+
+[`@nuwa-ai/ui-kit`](/sdk/ui-kit) gives you a React hook (`useNuwa`) and a context provider (`NuwaProvider`) to talk to the Nuwa Client from your Cap UI. With it you can send prompts, persist UI state per chat thread, stream AI output, add selections, and manage iframe height/theme.
+
+
+## Connect To The Client
+
+Wrap your UI with `NuwaProvider`, then call `useNuwa()` inside to access the `nuwa` client instance and connection state.
+
+For all props and return types, see: /sdk/ui-kit#nuwaprovider and /sdk/ui-kit#usenuwa
+
+```tsx
+import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
+
+function MyCapUI() {
+  const { nuwa, connected, theme } = useNuwa();
+
+  const run = async () => {
+    // Persist local UI state to the current chat thread
+    await nuwa.saveState({ step: 'started' });
+    // Send a prompt to the active conversation
+    await nuwa.sendPrompt('Please analyze the selected notes.');
+  };
+
+  return (
+    <div className={theme === 'dark' ? 'dark' : ''}>
+      <button onClick={run} disabled={!connected}>Run</button>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <NuwaProvider autoHeight onConnected={() => console.log('Nuwa connected')} onError={console.error}>
+      <MyCapUI />
+    </NuwaProvider>
+  );
+}
+```
+
+## NuwaProvider
+
+`NuwaProvider` sets up the client connection and exposes it via context.
+- provides a `nuwa` client instance for calling Nuwa Client functions
+- optional `autoHeight` resizes the parent iframe to fit your content
+- syncs light/dark `theme` from the Nuwa Client to your UI wrapper
+
+Example with options:
+
+```tsx
+<NuwaProvider
+  autoHeight
+  debug
+  methodTimeout={3000}
+  streamTimeout={45000}
+  onConnected={() => console.log('connected')}
+  onError={(e) => console.error('nuwa error', e)}
+>
+  <App />
+</NuwaProvider>
+```
+
+[See full provider API and option types](/sdk/ui-kit#nuwaprovider)
+
+## Send Prompt
+Send a message to the current chat thread with `nuwa.sendPrompt(message)`
+
+[See full method signature](/sdk/ui-kit#sendprompt)
+
+
+
+```tsx
+function SendPromptButton() {
+  const { nuwa, connected } = useNuwa();
+  return (
+    <button
+      disabled={!connected}
+      onClick={() => nuwa.sendPrompt('Summarize the selected notes.')}
+    >
+      Ask AI
+    </button>
+  );
+}
+```
+
+
+## UI State
+Persist and retrieve UI state per chat thread with `nuwa.saveState()` and `nuwa.getState()`. You can save UI state at any time, as any object types. When the user returns to the same chat thread, your latest saved state is delivered back to the UI.
+
+[See full method signature](/sdk/ui-kit#savestate)
+
+<Note>You can save any object types as UI state but you need to make sure your UI can handle the state object. For example, if you save a state object with a property `title`, you need to make sure your UI can handle the `title` property.</Note>
+
+
+```tsx
+import { useEffect, useState } from 'react';
+
+function ThreadStateExample() {
+  const { nuwa } = useNuwa();
+  const [title, setTitle] = useState('');
+
+  // Load previously saved state for this chat thread
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const prev = await nuwa.getState<{ title?: string } | null>();
+      if (mounted && prev?.title) setTitle(prev.title);
+    })();
+    return () => { mounted = false; };
+  }, [nuwa]);
+
+  // Save on change
+  const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setTitle(v);
+    await nuwa.saveState({ title: v });
+  };
+
+  return <input value={title} onChange={onChange} placeholder="Title" />;
+}
+```
+
+
+## AI Stream
+
+Stream AI output and update the UI incrementally.
+
+- `nuwa.createAIStream({ prompt, capId? }) -> StreamHandle`
+- `await handle.execute({ onChunk?, onError? }) -> { result, error }`
+- `handle.abort()` to cancel; inspect `handle.status | error | result`
+
+[See full streaming API](/sdk/ui-kit#createaistream)
+
+<Note>This function only supports streaming text-based LLM output at the moment.</Note>
+
+```tsx
+import { useState } from 'react';
+
+function StreamingExample() {
+  const { nuwa } = useNuwa();
+  const [out, setOut] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    setOut('');
+    setBusy(true);
+    const stream = nuwa.createAIStream({ prompt: 'Write a haiku about Nuwa.' });
+    const { result, error } = await stream.execute({
+      onChunk: (chunk) => {
+        if (chunk.type === 'content') setOut((s) => s + chunk.content);
+      },
+      onError: (e) => console.error('stream error', e),
+    });
+    setBusy(false);
+    if (error) console.warn('ended with error', error);
+    console.log('final result', result);
+  };
+
+  return (
+    <div>
+      <button onClick={run} disabled={busy}>Generate</button>
+      <pre>{out}</pre>
+    </div>
+  );
+}
+```
+
+## Add Selection
+Add a selection (label + message) to parent UI. The selection message is provided to the AI as part of the system prompt. You can set it with the [prompt variable](/build-caps/prompt#variables) `{{artifact_selections}}` in the Cap's prompt field.
+
+- `nuwa.addSelection(label: string, message: string | object): Promise<void>`
+
+[More details and types](/sdk/ui-kit#addselection)
+
+```tsx
+function AddSelectionButtons() {
+  const { nuwa } = useNuwa();
+
+  const addText = () => nuwa.addSelection('Notes', 'User selected 3 notes.');
+  const addObject = () =>
+    nuwa.addSelection('Page', {
+      url: window.location.href,
+      title: document.title,
+      excerpt: 'First 200 chars...'
+    });
+
+  return (
+    <div>
+      <button onClick={addText}>Add Text Selection</button>
+      <button onClick={addObject}>Add Structured Selection</button>
+    </div>
+  );
+}
+```
+
+## Height And Theme
+
+`NuwaProvider` with `autoHeight` keeps your iframe fully visible. You can also set height manually when needed.
+
+- Auto height: `<NuwaProvider autoHeight>` (enabled by default)
+- Manual: `nuwa.setHeight(pxOrCss): Promise<void>`
+
+```tsx
+function ManualHeightSection() {
+  const { nuwa } = useNuwa();
+  // e.g., after expanding/collapsing panels
+  const update = () => nuwa.setHeight(document.body.scrollHeight);
+  return <button onClick={update}>Recalculate Height</button>;
+}
+```
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="MCP UI" icon="server" href="/build-caps/mcp-ui">
+    Return UI resource from MCP tools
+  </Card>
+  <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
+    Dedicated panel with your Cap UI
+  </Card>
+  <Card title="UI Kit" icon="code" href="/sdk/ui-kit">
+   UI Kit specifications
+  </Card>
+</CardGroup>

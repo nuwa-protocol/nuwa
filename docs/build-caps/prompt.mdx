@@ -1,16 +1,15 @@
 ---
 title: "Prompt"
-description: "About Prompt in Nuwa"
+description: "Set the Prompt for your Cap"
 ---
-## Prompt Basics
 
-The Cap prompt is the system instruction the client uses to start conversations. Keep it concise and explicit about the tool's role and boundaries.
+The prompt in a Cap is loaded as the system prompt sent to the model when the user uses your Cap in the Nuwa Client. You can set it as part of the Cap config.
 
-```ts
+```ts cap.json
 core: {
   prompt: {
     value: 'You are a helpful travel planner. Today the user is in {{user_geo}}. Always ask one clarifying question.',
-    suggestions: [
+    suggestions: [ // the optional conversation opener for your Cap
       'Plan a 3-day trip to Osaka',
       'Find kid-friendly activities near me',
     ],
@@ -18,16 +17,12 @@ core: {
 }
 ```
 
-### Variables
-
-The Nuwa Client resolves simple variables before sending the prompt to the model.
+### Prompt Variables
+You can set some prompt variables in the prompt value. The Nuwa Client resolves these variables with actual value before sending the request to the model. For example:
 
 - `{{user_geo}}`: user location heuristics (geolocation if permitted; otherwise timezone hint)
+- `{{artifact_selections}}`: the current selections from the artifact
 
-Variables are intentionally minimal; prefer MCP tools for dynamic context (calendars, files, etc.).
+You can find all the available prompt variables in the [Cap Studio](https://test-app.nuwa.dev/cap-studio).
 
-## Tips
-
-- Give examples of desired inputs and outputs
-- Declare safety limits and escalation rules
-- Keep the first sentence crisp - it affects model behavior disproportionately
+<Tip>Variables are intentionally minimal; use MCP tools for dynamic context (calendars, files, etc.).</Tip>

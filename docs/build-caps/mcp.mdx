@@ -3,46 +3,17 @@ title: "MCP"
 description: "Overview and choices for building or proxying MCP with Nuwa"
 ---
 
-## What is MCP in Nuwa
+## MCP in Nuwa
 
-Model Context Protocol (MCP) lets your Cap call external tools for data, actions, or UI. Nuwa provides first‑class support on both client and service sides, including DIDAuth and pay‑per‑call settlement.
+Via the Model Context Protocol (MCP) protocol, your Cap can call external tools for data, actions, or even [return an interactive UI](/build-caps/mcp-ui). You can integrate the Nuwa Kit to your existing MCP server to make it compatible with Nuwa Client and be a part of a Cap.
 
 ## Choose your path
-
-Use this page to decide between a quick proxy for an existing MCP vs. building a native MCP server with payment built‑in.
 
 <CardGroup cols={2}>
   <Card title="Proxy an existing MCP" icon="right-left" href="/build-caps/mcp-proxy">
     Keep your upstream as‑is and add pricing/DIDAuth at the edge.
   </Card>
-  <Card title="Build a native MCP server" icon="bolt" href="/build-caps/mcp-server">
+  <Card title="Migrate MCP server" icon="bolt" href="/build-caps/mcp-server">
     Implement tools directly with schemas and pricing using the Payment Kit.
   </Card>
 </CardGroup>
-
-## How requests are authorized and billed
-
-- The client includes DIDAuth v1 and payment metadata on each call.
-- Servers validate authorization and settle per call or per stream frame.
-- Reserved input fields are merged into each tool schema by adapters:
-  - `__nuwa_auth`: DIDAuth v1 header string
-  - `__nuwa_payment`: serialized payment request payload
-
-## Related
-
-<CardGroup cols={2}>
-  <Card title="Payment Kit" icon="credit-card" href="/sdk/payment-kit">
-    HTTP and MCP payment channels, streaming, recovery, and storage.
-  </Card>
-  <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
-    Return UI resources from tools and render them inside the client.
-  </Card>
-</CardGroup>
-
-## Client
-
-See the dedicated SDK guide for payer‑side MCP client usage and APIs.
-
-<Card title="MCP Client (SDK)" icon="bolt" href="/build-caps/mcp-client">
-  Initialize, call tools, stream, and recover channels.
-</Card>

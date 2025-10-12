@@ -5,7 +5,10 @@ description: "Obtain and configure SERVICE_KEY for your Nuwa-compatible services
 
 ## Overview
 
-A Service Key is the serialized private key for a service-owned DID. It enables Nuwa services (e.g., MCP Server/Proxy, LLM Gateway) to authenticate/authorize, price requests, and settle revenue. We strongly recommend using a dedicated service DID, not your client/user DID.
+A Service Key is the serialized private key for a service-owned DID. It enables Nuwa services (e.g., MCP Server/Proxy, LLM Gateway) to authenticate/authorize, price requests, and settle revenue. 
+
+<Warning>Please use a dedicated service DID to generate your service key, not your client/user DID. It may lead to unexpected behavior if you use the same DID for both.</Warning>
+
 
 ## Prerequisites
 

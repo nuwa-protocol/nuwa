@@ -2,9 +2,8 @@
 title: "UI Kit"
 description: "About Nuwa UI Kit"
 ---
-## What It Is
 
-`@nuwa-ai/ui-kit` connects your Cap's iframe UI to the Nuwa Client and exposes an MCP transport over postMessage. Build interactive artifact UIs and tools that AI can drive.
+[`@nuwa-ai/ui-kit`](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/packages/ui-kit) provides a `NuwaClient` class and a set of React hooks to help you build interactive UI for your Cap.
 
 ## Example
 
@@ -31,8 +30,18 @@ pnpm add @nuwa-ai/ui-kit
 
 ## NuwaClient
 
+`NuwaClient` is the main class that you can use to interact with the Nuwa Client. It provides a set of methods that you can use to interact with the Nuwa Client.
+
+You can initialize a `NuwaClient` instance directly, or [use the `useNuwa` hook](#React-Helpers) to get a `NuwaClient` instance.
+
 ### constructor
 Create a NuwaClient for parent iframe communication.
+
+```ts
+const nuwaClient = new NuwaClient(options); // initialize a NuwaClient instance
+
+nuwaClient.connect(); // connect to the Nuwa Client
+```
 
 **Inputs**
 
@@ -54,34 +63,20 @@ Construct-time options
 
 <ResponseField name="client" type="NuwaClient">Configured client instance</ResponseField>
 
-### connect / reconnect / disconnect / getStats / onThemeChange
-Lifecycle and utility methods.
-
-**Inputs**
-
-<ResponseField name="(varies)" type="-">See individual methods</ResponseField>
-
-**Returns**
-
-<ResponseField name="connect()" type="Promise<void>">Establish parent connection</ResponseField>
-<ResponseField name="reconnect()" type="Promise<void>">Reconnect to parent</ResponseField>
-<ResponseField name="disconnect()" type="void">Tear down connection</ResponseField>
-<ResponseField name="getStats()" type="object">Client stats (contains options)</ResponseField>
-<ResponseField name="onThemeChange(cb)" type="function">Unsubscribe function</ResponseField>
 
 ### sendPrompt
 Send a message to the parent client chat.
 
 **Inputs**
 
-<ResponseField name="prompt" type="string" required>Text to send</ResponseField>
+<ResponseField name="prompt" type="string" required>Text message to send</ResponseField>
 
 **Returns**
 
 <ResponseField name="result" type="Promise<void>">Resolves when sent</ResponseField>
 
 ### setHeight
-Set iframe height in the parent.
+Set the UI iframe height in the Nuwa Client.
 
 **Inputs**
 
@@ -93,30 +88,40 @@ Set iframe height in the parent.
 
 ### addSelection
 Add a selection (label + message) to parent UI.
-
 **Inputs**
 
-<ResponseField name="label" type="string" required>Selection title</ResponseField>
-<ResponseField name="message" type="string | object" required>Payload to display/persist</ResponseField>
+<ResponseField name="label" type="string" required>Selection title. This will be displayed as a badge in the user's input.</ResponseField>
+<ResponseField name="message" type="string | object" required>Payload message. This will be provided to the AI as part of the system prompt.</ResponseField>
 
 **Returns**
 
 <ResponseField name="result" type="Promise<void>">Resolves when added</ResponseField>
 
-### saveState / getState
-Persist and retrieve state via parent.
+### saveState
+Save state to the Nuwa Client. 
 
 **Inputs**
 
-<ResponseField name="state" type="any?">State to save (for saveState)</ResponseField>
+<ResponseField name="state" type="any">State to save</ResponseField>
 
 **Returns**
 
-<ResponseField name="saveState" type="Promise<void>">Resolves when persisted</ResponseField>
-<ResponseField name="getState" type="Promise<any|null>">Previously saved state</ResponseField>
+<ResponseField name="result" type="Promise<void>">Resolves when applied</ResponseField>
+
+### getState
+Retrieve the state from the Nuwa Client.
+
+**Inputs**
+
+<ResponseField name="state" type="any?">Retrieve the state</ResponseField>
+
+**Returns**
+
+<ResponseField name="result" type="Promise<any>">Resolves when applied</ResponseField>
+
 
 ### createAIStream
-Start a server-side stream (e.g., LLM streaming) controlled by parent.
+Start a LLM stream controlled by nuwa client.
 
 **Inputs**
 
@@ -125,7 +130,6 @@ Streaming request
 <ResponseField name="request" type="object" required>
   <Expandable title="request">
     <ResponseField name="prompt" type="string" required>Prompt to stream</ResponseField>
-    <ResponseField name="capId" type="string?">Optional Cap identifier</ResponseField>
   </Expandable>
 </ResponseField>
 

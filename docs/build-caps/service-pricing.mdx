@@ -1,0 +1,46 @@
+---
+title: "Service Pricing"
+description: "Pricing for your models and MCP tools"
+---
+import { PicoUsdConverter } from '/snippets/PicoUsdConverter.jsx';
+
+When integrating the Nuwa Kit to your AI services, with either model endpoint or MCPs, you will be setting a fixed per-request price.
+
+The unit price is [Pico](https://www.bipm.org/en/measurement-units/si-prefixes) USD, which is 1/1,000,000,000,000 USD (1e-12).
+
+Here's a simple converter to help you convert between USD and PicoUSD:
+
+<PicoUsdConverter />
+
+## Converter Function
+
+Here's a code snippet to help you convert between USD and PicoUSD:
+
+```ts UsdToPico.ts
+// Convert a USD amount to Pico USD (1 USD = 1e12 pico USD) with round-half-up at 12 decimals.
+const USD_SCALE = 1_000_000_000_000n; // 1e12
+
+export function usdToPico(usd: string | number): bigint {
+  const s = typeof usd === "number" ? usd.toString() : usd;
+  const clean = s.trim();
+  if (!clean || !/^\d*(?:\.\d*)?$/.test(clean)) {
+    throw new Error("Invalid USD amount");
+  }
+  const [intPart = "0", frac = ""] = clean.split(".");
+  const frac12 = (frac + "000000000000").slice(0, 12); // pad/truncate to 12
+  const nextDigit = frac.length > 12 ? Number(frac[12]) : 0; // 13th digit for rounding
+  let scaled = BigInt(intPart || "0") * USD_SCALE + BigInt(frac12 || "0");
+  if (nextDigit >= 5) scaled += 1n; // round-half-up
+  return scaled;
+}
+
+// Examples
+const p1 = usdToPico("0.0035"); // 3500000000n
+const p2 = usdToPico(0.1);       // 100000000000n
+
+// If your API expects a string or JSON value instead of BigInt:
+const pricePicoUSD = usdToPico("0.0035").toString();
+
+```
+
+

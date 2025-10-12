@@ -1,53 +1,35 @@
 ---
-title: "UI Overview"
+title: "Overview"
 description: "Ways to add interactive UI to your Cap: Artifact UI and MCP UI."
 ---
 
-## What You Can Build
+## How does Cap UI work in Nuwa?
 
-Add a web UI that runs inside the Nuwa Client (iframe) to:
+You can build the UI with all the frontend framework and tech stacks you are fimiliar with. You UI will eventually be embeded via iframe in the Nuwa Client to the user. 
 
-- Guide users through multi‑step workflows with forms and controls
-- Visualize results (tables, charts, maps) alongside chat
-- Collect structured input and add selections back to the thread
-- Stream AI output directly into your UI
-- Persist UI state across sessions; adapt to client theme
+To enable more functions, you can use [`@nuwa-ai/ui-kit`](/sdk/ui-kit) to interact with the Nuwa Client, such as making an AI streaming request, sending a prompt, or saving UI state. The communication between the UI and the Nuwa Client is done via postMessage function, ensuring security.
 
-Implementation uses `@nuwa-ai/ui-kit`. Details live in the two pages below; this is only a high‑level overview.
+Currently, there are two types of UI you can build for your Cap: Artifact UI and MCP UI.
 
-## Two UI Types
+### MCP UI
+<Warning>TODO: add an example image to show the MCP ui</Warning>
 
-1) Artifact UI
-- A dedicated, persistent panel for your Cap
-- Great for editors, dashboards, notebooks, or long‑lived tasks
-- Configure once in your Cap (artifact.srcUrl), then your UI talks to the client
-- Tools can also open artifact views by returning a UI resource that targets the artifact area
+You can return a **UI resource** that gets rendered in the Nuwa Client upon the result of a MCP tool call. The UI can be used for rendering the tool execution result. Or you could build a dedicated tool just for the AI to render a specific UI and control the UI via the tool input arguments.
 
-2) MCP UI
-- On‑demand views opened by tool results
-- A tool can return a UI resource (capui:/path) to render a specific route in your UI
-- Your iframe can host an MCP server (postMessage) so AI can call into your UI logic
-- Ideal for AI‑driven wizards, inspectors, or side panels tied to a tool run
+### Artifact UI
+<Warning>TODO: add an example image to show the MCP ui</Warning>
 
-## Choosing Between Them
+Artifact UI is a dedicated, persistent panel for your Cap. It is great for editors, dashboards, notebooks, or long‑lived tasks. It shows when the user runs your Cap.
 
-- Pick Artifact UI when you want a stable workspace that users revisit and drive directly.
-- Pick MCP UI when views are tied to specific tool executions or AI‑driven subflows.
-- Combine both: keep a primary artifact panel and still return targeted views from tools.
-
-## What You Need
-
-- A hosted UI origin (HTTPS) that the client can load
-- For Artifact UI: set core.artifact.srcUrl in your Cap
-- For MCP UI: have tools return UI resources (capui:/path) and optionally run an MCP server inside the iframe
+An Artifact UI can not only interact with the Nuwa Client via [`@nuwa-ai/ui-kit`](/sdk/ui-kit) but also can **expose customized functions to the AI via MCP tools** defined directly in the frontend.
 
 ## Go Deeper
 
 <CardGroup cols={2}>
   <Card title="Artifact UI" icon="window-restore" href="/build-caps/artifact">
-    Dedicated panel with your Cap UI
+    Dedicated UI panel with your Cap
   </Card>
   <Card title="MCP UI" icon="bolt" href="/build-caps/mcp-ui">
-    Return UI from tools and expose UI as MCP
+    Return UI from MCP tools
   </Card>
 </CardGroup>

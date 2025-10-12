@@ -11,14 +11,13 @@ You can create a Nuwa-Compatible MCP server by using the Nuwa Payment Kit and Id
 With these SDKs, you can expose a single `/mcp` endpoint and declare free and paid tools in the same way you build your MCP.
 
 
+## Quick start
 
 <Note>
 Before you start: you need a Service Key for your service DID. Follow the
 <a href="/build-caps/service-key">Service Key guide</a> to create one on cadop-web and copy it
 as <code>SERVICE_KEY</code>.
 </Note>
-
-## Quick start
 
 <Tip>
 You can find a starter template in the [Nuwa Kit Examples](https://github.com/nuwa-protocol/nuwa-kit/tree/main/typescript/examples/mcp-server).
@@ -102,27 +101,14 @@ your Agent DID.
 
 </Step>
 
-<Step title="Call from a client">
+<Step title="Try Your MCP with Cap Studio">
 
-Use the MCP Client guide to initialize and call tools (env + createMcpClient or direct constructor).
+Go to [Nuwa Cap Studio](https://test-app.nuwa.dev/cap-studio) and use the MCP tools to try your MCP server.
 
-<Card title="MCP Client" icon="bolt" href="/build-caps/mcp-client">
-  Initialize, call tools, stream, and recover channels.
-</Card>
+![MCP Tool in the Cap Studio](./images/mcp-server/mcp-tool.png)
 
 </Step>
 </Steps>
-
-## Relevant Docs
-
-<CardGroup cols={2}>
-  <Card title="Revenue" icon="dollar-sign" href="/build-caps/revenue">
-    View balances, withdraw, and audit revenue history
-  </Card>
-  <Card title="Service Key" icon="key" href="/build-caps/service-key">
-    How to obtain and configure SERVICE_KEY
-  </Card>
-</CardGroup>
 
 ## `createFastMcpServerFromEnv`
 
@@ -152,3 +138,14 @@ server.freeTool({
 ```
 
 
+
+## Relevant Docs
+
+<CardGroup cols={2}>
+  <Card title="Revenue" icon="money-bill-wave" href="/build-caps/revenue">
+    View balances, withdraw, and audit revenue history
+  </Card>
+  <Card title="Service Key" icon="key" href="/build-caps/service-key">
+    How to obtain and configure SERVICE_KEY
+  </Card>
+</CardGroup>
