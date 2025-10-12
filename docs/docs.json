@@ -9,115 +9,62 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "tabs": [
+    "groups": [
       {
-        "tab": "Documentation",
-        "groups": [
-          {
-            "group": "Introduction",
-            "pages": [
-              "introduction/nuwa-ai",
-              {
-                "group": "Core Concepts",
-                "pages": [
-                  "introduction/core-concepts/capabilities",
-                  "introduction/core-concepts/payment",
-                  "introduction/core-concepts/identity"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Development",
-            "pages": [
-              "build-caps/quickstart",
-              {
-                "group": "Payments",
-                "pages": [
-                  "build-caps/service-key",
-                  "build-caps/service-pricing",
-                  "build-caps/revenue"
-                ]
-              },
-              "build-caps/models",
-              {
-                "group": "MCP",
-                "pages": [
-                  "build-caps/mcp",
-                  "build-caps/mcp-proxy",
-                  "build-caps/mcp-server"
-                ]
-              },
-              "build-caps/prompt",
-              {
-                "group": "UI",
-                "pages": [
-                  "build-caps/ui",
-                  "build-caps/build-ui",
-                  "build-caps/mcp-ui",
-                  "build-caps/artifact"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "SDK",
-            "pages": [
-              "sdk/index",
-              "sdk/cap-kit",
-              "sdk/payment-kit",
-              "sdk/identity-kit",
-              "sdk/ui-kit"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Examples",
+        "group": "Introduction",
         "pages": [
-          "examples/nuwa-note-editor"
+          "introduction/nuwa-ai",
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "introduction/core-concepts/capabilities",
+              "introduction/core-concepts/payment",
+              "introduction/core-concepts/identity"
+            ]
+          }
         ]
       },
       {
-        "tab": "Example Docs",
-        "groups": [
+        "group": "Development",
+        "pages": [
+          "build-caps/quickstart",
           {
-            "group": "Example Docs",
+            "group": "Payments",
             "pages": [
-              "example-docs/index",
-              "example-docs/quickstart",
-              "example-docs/development"
+              "build-caps/service-key",
+              "build-caps/service-pricing",
+              "build-caps/revenue"
             ]
           },
+          "build-caps/models",
           {
-            "group": "Essentials",
+            "group": "MCP",
             "pages": [
-              "example-docs/essentials/code",
-              "example-docs/essentials/images",
-              "example-docs/essentials/markdown",
-              "example-docs/essentials/navigation",
-              "example-docs/essentials/reusable-snippets",
-              "example-docs/essentials/settings"
+              "build-caps/mcp",
+              "build-caps/mcp-proxy",
+              "build-caps/mcp-server"
             ]
           },
+          "build-caps/prompt",
           {
-            "group": "AI Tools",
+            "group": "UI",
             "pages": [
-              "example-docs/ai-tools/cursor",
-              "example-docs/ai-tools/claude-code",
-              "example-docs/ai-tools/windsurf"
-            ]
-          },
-          {
-            "group": "API Reference",
-            "pages": [
-              "example-docs/api-reference/introduction",
-              "example-docs/api-reference/endpoint/create",
-              "example-docs/api-reference/endpoint/delete",
-              "example-docs/api-reference/endpoint/get",
-              "example-docs/api-reference/endpoint/webhook"
+              "build-caps/ui",
+              "build-caps/build-ui",
+              "build-caps/mcp-ui",
+              "build-caps/artifact"
             ]
           }
+        ]
+      },
+      {
+        "group": "SDK",
+        "pages": [
+          "sdk/index",
+          "sdk/cap-kit",
+          "sdk/payment-kit",
+          "sdk/identity-kit",
+          "sdk/ui-kit"
         ]
       }
     ],
