@@ -21,7 +21,7 @@ export type {
 
 // ===== Factory Functions =====
 export { createMcpClient, createPaymentMcpClient, createStandardMcpClient } from './factory';
-export type { CreateMcpClientOptions, CreateMcpPayerClientOptions } from './factory';
+export type { CreateMcpClientOptions } from './factory';
 
 // ===== Backward Compatibility Type Aliases =====
 import type { UniversalMcpClient } from './UniversalMcpClient';

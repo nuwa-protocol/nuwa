@@ -14,9 +14,14 @@ import {
   Spinner,
   SpinnerContainer,
   Tag,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '@/components/ui';
 import { DIDDisplay } from '@/components/did/DIDDisplay';
 import { ConditionalRevenueCard } from '@/components/revenue/ConditionalRevenueCard';
+import { ServiceManagement } from '@/components/service/ServiceManagement';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
 import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2 } from 'lucide-react';
@@ -29,7 +34,8 @@ import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
 import { useHubDeposit } from '@/hooks/useHubDeposit';
-import { hasControllerAccess, isUserController } from '@/lib/utils/didCompatibility';
+import { hasControllerAccess } from '@/lib/utils/didCompatibility';
+import { formatBigIntWithDecimals } from '@/utils/formatters';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
@@ -47,7 +53,8 @@ export function AgentDetailPage() {
   // state for delete confirmation modal
   const [pendingDeletion, setPendingDeletion] = useState<VerificationMethod | null>(null);
 
-  // Tab state (reserved for future use)
+  // Tab state
+  const [activeTab, setActiveTab] = useState('overview');
 
   const {
     balances: agentAccountBalances,
@@ -112,24 +119,6 @@ export function AgentDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [didService, userDid]);
-
-  // Format bigint with decimals
-  const formatBigIntWithDecimals = (
-    value: bigint,
-    decimals: number,
-    fractionDigits?: number
-  ): string => {
-    const negative = value < 0n;
-    const v = negative ? -value : value;
-    const base = 10n ** BigInt(decimals);
-    const integer = v / base;
-    let fraction = (v % base).toString().padStart(decimals, '0');
-    if (typeof fractionDigits === 'number') {
-      fraction = fraction.slice(0, Math.min(decimals, fractionDigits));
-    }
-    const fracPart = fraction.length > 0 ? `.${fraction}` : '';
-    return `${negative ? '-' : ''}${integer.toString()}${fracPart}`;
-  };
 
   // PaymentHub RGas (default asset) balance with USD
   const [paymentHubRgasLoading, setPaymentHubRgasLoading] = useState(false);
@@ -257,7 +246,7 @@ export function AgentDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left Column - Agent Info */}
+          {/* Left Column - Agent Info and Tabs */}
           <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
@@ -273,173 +262,190 @@ export function AgentDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Revenue Overview Card - Always shown, but withdraw is controller-only */}
-            {did && (
-              <ConditionalRevenueCard
-                agentDid={did}
-                showTrend={true}
-                onWithdrawSuccess={refetchAgentAccountBalances}
-                isController={isController}
-              />
-            )}
+            {/* Tabbed Content */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="services">Services</TabsTrigger>
+                <TabsTrigger value="auth">Authentication</TabsTrigger>
+              </TabsList>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>{t('agent.balance')}</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchAgentAccountBalances()}
-                  className="h-8 w-8 p-0"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {agentAccountLoading ? (
-                  <SpinnerContainer loading={true} size="small" />
-                ) : agentAccountBalances.length > 0 ? (
-                  <div className="space-y-2">
-                    {agentAccountBalances.map((bal, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
-                      >
-                        <div className="flex items-center">
-                          <span className="font-medium">{bal.symbol}</span>
-                          <span className="ml-2 text-xs text-gray-500">{bal.name}</span>
-                        </div>
-                        <span>{bal.fixedBalance}</span>
+              <TabsContent value="overview" className="space-y-6">
+                {/* Revenue Overview Card - Always shown, but withdraw is controller-only */}
+                {did && (
+                  <ConditionalRevenueCard
+                    agentDid={did}
+                    showTrend={true}
+                    onWithdrawSuccess={refetchAgentAccountBalances}
+                    isController={isController}
+                  />
+                )}
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>{t('agent.balance')}</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchAgentAccountBalances()}
+                      className="h-8 w-8 p-0"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {agentAccountLoading ? (
+                      <SpinnerContainer loading={true} size="small" />
+                    ) : agentAccountBalances.length > 0 ? (
+                      <div className="space-y-2">
+                        {agentAccountBalances.map((bal, idx) => (
+                          <div
+                            key={idx}
+                            className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
+                          >
+                            <div className="flex items-center">
+                              <span className="font-medium">{bal.symbol}</span>
+                              <span className="ml-2 text-xs text-gray-500">{bal.name}</span>
+                            </div>
+                            <span>{bal.fixedBalance}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : agentAccountError ? (
-                  <div className="text-center py-2">
-                    <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
-                  </div>
-                ) : (
-                  <span className="text-gray-500">{t('agent.noBalance')}</span>
-                )}
-              </CardContent>
-            </Card>
+                    ) : agentAccountError ? (
+                      <div className="text-center py-2">
+                        <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">{t('agent.noBalance')}</span>
+                    )}
+                  </CardContent>
+                </Card>
 
-            {/* PaymentHub Balances - moved below account balance to keep same width */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>PaymentHub</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    refetchPaymentHubState();
-                    refetchPaymentHubRgas();
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {paymentHubStateLoading || paymentHubRgasLoading ? (
-                  <SpinnerContainer loading={true} size="small" />
-                ) : paymentHubStateError || paymentHubRgasError ? (
-                  <div className="text-center py-2">
-                    <span className="text-red-500">
-                      {paymentHubStateError || paymentHubRgasError}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                    <div className="flex items-center">
-                      <span className="font-medium">RGas</span>
-                      {paymentHubActiveCounts[DEFAULT_ASSET_ID] !== undefined && (
-                        <Tag variant="info" className="ml-2">
-                          {t('agent.activeChannels', { defaultValue: 'Active Channels' })}:{' '}
-                          {paymentHubActiveCounts[DEFAULT_ASSET_ID]}
-                        </Tag>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div>{paymentHubRgasAmount}</div>
-                      <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('agent.authMethods')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  {didDocument?.verificationMethod?.map((method, index) => {
-                    const fragment = method.id.split('#')[1];
-                    const isAuthentication = didDocument.authentication?.includes(method.id);
-                    const isAssertionMethod = didDocument.assertionMethod?.includes(method.id);
-                    const isKeyAgreement = didDocument.keyAgreement?.includes(method.id);
-                    const isCapabilityInvocation = didDocument.capabilityInvocation?.includes(
-                      method.id
-                    );
-                    const isCapabilityDelegation = didDocument.capabilityDelegation?.includes(
-                      method.id
-                    );
-
-                    return (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-center mb-2">
-                          <Key className="mr-2 h-4 w-4" />
-                          <span className="font-mono font-bold">{fragment}</span>
-                          <span className="ml-2">{method.type}</span>
-                          {isController && (
+                {/* PaymentHub Balances - moved below account balance to keep same width */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>PaymentHub</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        refetchPaymentHubState();
+                        refetchPaymentHubRgas();
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {paymentHubStateLoading || paymentHubRgasLoading ? (
+                      <SpinnerContainer loading={true} size="small" />
+                    ) : paymentHubStateError || paymentHubRgasError ? (
+                      <div className="text-center py-2">
+                        <span className="text-red-500">
+                          {paymentHubStateError || paymentHubRgasError}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center">
+                          <span className="font-medium">RGas</span>
+                          {paymentHubActiveCounts[DEFAULT_ASSET_ID] !== undefined && (
                             <Tag variant="info" className="ml-2">
-                              {t('agent.controller')}
+                              {t('agent.activeChannels', { defaultValue: 'Active Channels' })}:{' '}
+                              {paymentHubActiveCounts[DEFAULT_ASSET_ID]}
                             </Tag>
                           )}
-                          {isController && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="ml-2 text-destructive hover:bg-destructive/10"
-                              onClick={() => confirmRemoveKey(method)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
                         </div>
-                        <div className="text-xs text-gray-400 mb-2">
-                          {t('agent.controllerLabel')}: {method.controller}
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center">
-                            <Users className="mr-2 h-4 w-4" />
-                            <span className="text-gray-500">{t('agent.capabilities')}:</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {isAuthentication && (
-                              <Tag variant="success">{t('agent.authentication')}</Tag>
-                            )}
-                            {isAssertionMethod && (
-                              <Tag variant="secondary">{t('agent.assertion')}</Tag>
-                            )}
-                            {isKeyAgreement && (
-                              <Tag variant="secondary">{t('agent.keyAgreement')}</Tag>
-                            )}
-                            {isCapabilityInvocation && (
-                              <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
-                            )}
-                            {isCapabilityDelegation && (
-                              <Tag variant="default">{t('agent.capabilityDelegation')}</Tag>
-                            )}
-                          </div>
+                        <div className="text-right">
+                          <div>{paymentHubRgasAmount}</div>
+                          <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="services" className="space-y-6">
+                {did && <ServiceManagement agentDid={did} isController={isController} />}
+              </TabsContent>
+
+              <TabsContent value="auth" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t('agent.authMethods')}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col gap-4">
+                      {didDocument?.verificationMethod?.map((method, index) => {
+                        const fragment = method.id.split('#')[1];
+                        const isAuthentication = didDocument.authentication?.includes(method.id);
+                        const isAssertionMethod = didDocument.assertionMethod?.includes(method.id);
+                        const isKeyAgreement = didDocument.keyAgreement?.includes(method.id);
+                        const isCapabilityInvocation = didDocument.capabilityInvocation?.includes(
+                          method.id
+                        );
+                        const isCapabilityDelegation = didDocument.capabilityDelegation?.includes(
+                          method.id
+                        );
+
+                        return (
+                          <div key={index} className="border rounded-lg p-4">
+                            <div className="flex items-center mb-2">
+                              <Key className="mr-2 h-4 w-4" />
+                              <span className="font-mono font-bold">{fragment}</span>
+                              <span className="ml-2">{method.type}</span>
+                              {isController && (
+                                <Tag variant="info" className="ml-2">
+                                  {t('agent.controller')}
+                                </Tag>
+                              )}
+                              {isController && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="ml-2 text-destructive hover:bg-destructive/10"
+                                  onClick={() => confirmRemoveKey(method)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400 mb-2">
+                              {t('agent.controllerLabel')}: {method.controller}
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center">
+                                <Users className="mr-2 h-4 w-4" />
+                                <span className="text-gray-500">{t('agent.capabilities')}:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {isAuthentication && (
+                                  <Tag variant="success">{t('agent.authentication')}</Tag>
+                                )}
+                                {isAssertionMethod && (
+                                  <Tag variant="secondary">{t('agent.assertion')}</Tag>
+                                )}
+                                {isKeyAgreement && (
+                                  <Tag variant="secondary">{t('agent.keyAgreement')}</Tag>
+                                )}
+                                {isCapabilityInvocation && (
+                                  <Tag variant="warning">{t('agent.capabilityInvocation')}</Tag>
+                                )}
+                                {isCapabilityDelegation && (
+                                  <Tag variant="default">{t('agent.capabilityDelegation')}</Tag>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Right Column - Actions */}

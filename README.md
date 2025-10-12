@@ -37,7 +37,6 @@ This repository is a monorepo containing various components of the Nuwa Protocol
 *   **`nuwa-kit/`**: [Development Kits](./nuwa-kit/README.md) for building applications and services on Nuwa. This includes client SDKs and service development frameworks for various languages (e.g., TypeScript, Python).
 *   **`nuwa-services/`**: Reference implementations of key [Nuwa Services](./nuwa-services/README.md) (e.g., Custodian Service, LLM Proxy Service).
 *   **`website/`**: Websites for Nuwa AI docs and landing page and stuff.
-*   **`archives/`**: Some early experiments. Feel free to explore.
 
 Please refer to the `README.md` file within each directory for more specific details.
 

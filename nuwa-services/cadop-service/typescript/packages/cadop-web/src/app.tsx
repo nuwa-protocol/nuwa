@@ -9,6 +9,7 @@ import { AddAuthMethodPage } from './pages/add-auth-method';
 import { AddKeyPage } from './pages/add-key';
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard';
 import { OnboardingPage } from './pages/onboarding';
+import { RevenueHistoryPage } from './pages/revenue-history';
 import { Toaster } from './components/ui/toaster';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
@@ -47,6 +48,15 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <AddAuthMethodPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agent/:did/revenue-history"
+          element={
+            <ProtectedRoute>
+              <RevenueHistoryPage />
             </ProtectedRoute>
           }
         />

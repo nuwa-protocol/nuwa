@@ -5,6 +5,7 @@ import { UniversalMcpClient } from './UniversalMcpClient';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { TransactionStore } from '../../storage';
 import type { HostChannelMappingStore } from '../http/types';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 /**
  * Enhanced options for creating UniversalMcpClient with IdentityEnv (recommended)
@@ -47,7 +48,10 @@ export interface CreateMcpClientOptions {
   /** Optional mapping store for state persistence. If not provided, uses default store */
   mappingStore?: HostChannelMappingStore;
 
-  // ===== New Universal Client Options =====
+  /** Optional custom transport (e.g., PostMessage for iframe communication) */
+  customTransport?: Transport;
+
+  // ===== Universal Client Options =====
 
   /**
    * Force specific client mode (default: 'auto' for automatic detection)
@@ -62,65 +66,6 @@ export interface CreateMcpClientOptions {
    * Only used when forceMode is 'auto'
    */
   detectionTimeout?: number;
-
-  /**
-   * Enable fallback mechanism (default: true)
-   * When payment calls fail, automatically retry with standard MCP
-   */
-  enableFallback?: boolean;
-}
-
-/**
- * Advanced options for creating PaymentChannelMcpClient with manual configuration
- * Most users should prefer CreateMcpClientOptions with IdentityEnv
- */
-export interface CreateMcpPayerClientOptions {
-  /** MCP server endpoint, e.g., http://localhost:8080/mcp */
-  baseUrl: string;
-
-  /** Signer for payment channel operations and DID authentication */
-  signer: SignerInterface;
-
-  /** Optional key ID (defaults to first available) */
-  keyId?: string;
-
-  /** Optional RPC URL (defaults to localhost) */
-  rpcUrl?: string;
-
-  /** Optional network (defaults to 'local') */
-  network?: 'local' | 'dev' | 'test' | 'main';
-
-  /** Optional DID (will be derived from signer if not provided) */
-  payerDid?: string;
-
-  /** Optional maximum amount per request */
-  maxAmount?: bigint;
-
-  /** Optional debug mode */
-  debug?: boolean;
-
-  /** Optional storage configuration */
-  storageOptions?: {
-    channelRepo?: any;
-    namespace?: string;
-  };
-
-  /** Optional transaction store */
-  transactionStore?: TransactionStore;
-
-  /** Optional transaction logging configuration */
-  transactionLog?: {
-    enabled?: boolean;
-    persist?: 'memory' | 'indexeddb' | 'custom';
-    maxRecords?: number;
-    sanitizeRequest?: (
-      headers: Record<string, string>,
-      body?: any
-    ) => { headersSummary?: Record<string, string>; requestBodyHash?: string };
-  };
-
-  /** Optional mapping store for state persistence */
-  mappingStore?: HostChannelMappingStore;
 }
 
 /**
@@ -187,7 +132,6 @@ export async function createMcpClient(
   const mcpPayerOptions: McpPayerOptions & {
     forceMode?: 'auto' | 'payment' | 'standard';
     detectionTimeout?: number;
-    enableFallback?: boolean;
   } = {
     baseUrl: options.baseUrl,
     chainConfig,
@@ -199,11 +143,11 @@ export async function createMcpClient(
     transactionStore: options.transactionStore,
     transactionLog: options.transactionLog,
     mappingStore: options.mappingStore,
+    customTransport: options.customTransport,
 
     // Universal client options
     forceMode: options.forceMode || 'auto',
     detectionTimeout: options.detectionTimeout || 5000,
-    enableFallback: options.enableFallback !== false,
   };
 
   const client = new UniversalMcpClient(mcpPayerOptions);

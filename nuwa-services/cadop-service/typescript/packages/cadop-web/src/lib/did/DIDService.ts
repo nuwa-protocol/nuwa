@@ -1,19 +1,23 @@
 import { IdentityKit, VDRRegistry } from '@nuwa-ai/identity-kit';
+import type { ServiceInfo } from '@nuwa-ai/identity-kit';
 import { ensureVDRInitialized } from '../identity/VDRManager';
 import type {
   OperationalKeyInfo,
   VerificationRelationship,
   SignerInterface,
+  DIDDocument,
 } from '@nuwa-ai/identity-kit';
 import { SignerFactory } from '../auth/signers/SignerFactory';
 
 export class DIDService {
   private identityKit: IdentityKit;
   private signer: SignerInterface;
+  private did: string;
 
-  constructor(identityKit: IdentityKit, signer: SignerInterface) {
+  constructor(identityKit: IdentityKit, signer: SignerInterface, did: string) {
     this.identityKit = identityKit;
     this.signer = signer;
+    this.did = did;
   }
 
   static async initialize(did: string, credentialId?: string): Promise<DIDService> {
@@ -38,7 +42,7 @@ export class DIDService {
       });
 
       const identityKit = await IdentityKit.fromDIDDocument(didDocument, signer);
-      return new DIDService(identityKit, signer);
+      return new DIDService(identityKit, signer, did);
     } catch (error) {
       console.error('[DIDService] Failed to initialize:', error);
       throw error;
@@ -67,11 +71,32 @@ export class DIDService {
     }
   }
 
-  async getDIDDocument(): Promise<any> {
+  async getDIDDocument(forceRefresh?: boolean): Promise<DIDDocument> {
+    if (forceRefresh) {
+      return VDRRegistry.getInstance().resolveDID(this.did, { forceRefresh: true });
+    }
     return this.identityKit.getDIDDocument();
   }
 
   getSigner(): SignerInterface {
     return this.signer;
+  }
+
+  async addService(serviceInfo: ServiceInfo): Promise<void> {
+    try {
+      await this.identityKit.addService(serviceInfo);
+    } catch (error) {
+      console.error('[DIDService] Failed to add service:', error);
+      throw error;
+    }
+  }
+
+  async removeService(serviceId: string): Promise<void> {
+    try {
+      await this.identityKit.removeService(serviceId);
+    } catch (error) {
+      console.error('[DIDService] Failed to remove service:', error);
+      throw error;
+    }
   }
 }
