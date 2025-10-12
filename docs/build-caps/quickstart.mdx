@@ -13,31 +13,33 @@ This guide shows how to launch your first Cap using the Nuwa Client (Beta), conf
 
 ## Step 1: Sign in and enable Cap Studio
 
-1) Open the Nuwa Client Beta: https://test-app.nuwa.dev/
+1) Go to the Nuwa Client Beta: https://test-app.nuwa.dev/
 2) Create and authenticate your DID with your device passkey
-3) Go to Settings and enable Developer Mode
+3) Go to Settings -> System -> Enable Developer Mode
 4) You will see Cap Studio in the sidebar
 
-## Step 2: Create a new Cap
+## Step 2: Create a Cap
 
-There are two ways to create a Cap:
+Once you are in the Cap Studio, there are two ways to start creating a Cap:
 
 <AccordionGroup>
-  <Accordion title="Online Editor (Cap Studio)">
-    - In Cap Studio, click New Cap
-    - Use the editor to configure Prompt, Model, and MCP servers
-    - Use the MCP Tools tab to connect and test your MCP endpoints
+  <Accordion title="Use Online Editor (Recommended)">
+    - In Cap Studio, just click New Cap
+    - Use the form based editor to configure Prompt, Model, MCP servers and UI
   </Accordion>
 
   <Accordion title="Upload a JSON file">
-    - Create a Cap JSON file locally that follows the Cap shape (see Core Concepts -> Capabilities)
+  <Tip>
+  This approach is for developers who want to load a cap config from a JSON file.
+</Tip>
+    - Create a Cap JSON file locally that follows the Cap shape (see [Capabilities](/introduction/core-concepts/capabilities))
     - In Cap Studio, choose Upload/Import JSON to load your file
-    - Review fields in the editor and continue to publish
 
     Minimal example (cap.json):
 
     ```json cap.json
     {
+      // no need to fill in the id and authorDID, it will be filled in automatically when you upload the json to Cap Studio
       "idName": "my_first_cap",
       "core": {
         "prompt": {
@@ -63,10 +65,7 @@ There are two ways to create a Cap:
   </Accordion>
 </AccordionGroup>
 
-<Tip>
-  Prefer small, composable Caps. Add MCP servers only when you need external tools, and use an optional artifact UI for richer experiences.
-  See Build Caps -> Models/Prompt/MCP and Core Concepts -> Capabilities for details.
-</Tip>
+
 
 ## Step 3: Publish the Cap
 
@@ -76,17 +75,14 @@ There are two ways to create a Cap:
 
 ## Next steps
 
-<CardGroup cols={2}>
-  <Card title="Build Caps" icon="hammer" href="/build-caps/index">
-    Compose Model, Prompt, MCP, and optional UI artifact
-  </Card>
+<CardGroup cols={3}>
   <Card title="Core Concepts" icon="book" href="/core-concepts/capabilities">
-    Learn Caps, identity, and payment channels
+    Review the core concepts of Nuwa.
   </Card>
-  <Card title="SDKs" icon="code" href="/sdk/index">
-    Identity, Payment, Cap, and UI kits with examples
+  <Card title="Nuwa AI Client" icon="rocket" href="https://test-app.nuwa.dev">
+    Try Cap Studio on Nuwa Client beta.
   </Card>
-  <Card title="Nuwa Client" icon="rocket" href="https://github.com/nuwa-protocol/nuwa-client">
-    Run the client locally and develop faster
+  <Card title="Nuwa Kit" icon="code" href="/sdk/index">
+    Integrate Nuwa Kit to your AI services.
   </Card>
 </CardGroup>

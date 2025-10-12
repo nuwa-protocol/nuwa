@@ -1,9 +1,9 @@
 ---
 title: "MCP Proxy"
-description: "Turn an existing MCP into a pay‑per‑call service using the Nuwa MCP Server Proxy"
+description: "Set up your existing MCP server with a Nuwa MCP Proxy to start accepting payments"
 ---
 
-With Nuwa MCP Proxy, you can convert an existing MCP server (HTTP/stream or stdio) into a Nuwa‑Compatible, pay‑per‑call service without changing the upstream code. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics.
+With [Nuwa MCP Proxy](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy), you can convert an existing MCP server (Streamable HTTP or STDIO) into a Nuwa‑Compatible MCP endpoint, enable DID authentication for the server and payment for your MCP tools, without changing the service. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics. 
 
 <Note>
 Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For multiple MCP servers, you have to deploy multiple Nuwa MCP Proxy instances.
@@ -14,14 +14,14 @@ Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For 
 <Steps>
 <Step title="Install and build">
 
-you can find the full implementation of [Nuwa MCP Proxy on Github](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy).
+you can find the full implementation of [Nuwa MCP Proxy on in the Nuwa Monorepo](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy).
 
 ```bash
-cd nuwa-services/mcp-server-proxy
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/mcp-server-proxy
 pnpm install
 pnpm build
 ```
-
 </Step>
 
 <Step title="Create a config.yaml">
@@ -31,7 +31,7 @@ pnpm build
 port: 8088
 endpoint: "/mcp"
 
-# Upstream MCP (http stream or stdio)
+# Upstream MCP (streamable http or stdio)
 upstream:
   type: "httpStream"
   url: "https://api.example.com/mcp"

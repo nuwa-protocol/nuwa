@@ -1,0 +1,43 @@
+---
+title: "Decentralized Identity"
+description: "About Decentralized Identity in Nuwa"
+---
+## Overview
+
+Identity in Nuwa is based on the [W3C Decentralized Identifiers (DIDs)](https://www.w3.org/TR/did-1.1/). Both users and Caps are identified by unique DIDs, which can be binded with a set of cryptographic private keys.
+
+
+## Basic Usage With Identity Kit
+
+```ts
+import { IdentityKit, DIDAuth, KeyType } from '@nuwa-ai/identity-kit';
+
+// Bootstrap environment (register VDRs, create KeyManager & KeyStore)
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network' },
+});
+
+// Load or create a DID (shortened)
+const kit = await env.loadDid('did:rooch:0xYourDid');
+
+// Sign a DIDAuth v1 payload
+const sig = await DIDAuth.v1.createSignature(
+  { operation: 'example', params: { message: 'hello' } },
+  env.keyManager,
+  kit.getDIDDocument().verificationMethod![0].id
+);
+
+// Convert to Authorization header value
+const header = DIDAuth.v1.toAuthorizationHeader(sig);
+// -> pass `header` as `Authorization: DIDAuthV1 <...>` when calling services
+```
+
+## Onboarding (CADOP)
+
+For onboarding the users and developers, we provide a custodian service called CADOP to help you mint a DID with a device passkey.
+
+- As users, you will login to the Nuwa Client with a device passkey, which will mint a User DID for you.
+- As developers, you can also mint a service DID key with a device passkey or simply provide a private key to identify your service for receiving payment.
+
+The CADOP service will help to relay on-chain transactions and cover gas for first-time users.

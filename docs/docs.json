@@ -14,33 +14,31 @@
         "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
             "pages": [
-              "getting-started/index",
-              "getting-started/quickstart"
-            ]
-          },
-          {
-            "group": "Core Concepts",
-            "pages": [
-              "core-concepts/capabilities",
-              "core-concepts/payment",
-              "core-concepts/identity"
+              "introduction/nuwa-ai",
+              {
+                "group": "Core Concepts",
+                "pages": [
+                  "introduction/core-concepts/capabilities",
+                  "introduction/core-concepts/payment",
+                  "introduction/core-concepts/identity"
+                ]
+              }
             ]
           },
           {
             "group": "Development",
             "pages": [
-              "build-caps/index",
+              "build-caps/quickstart",
+              "build-caps/pricing",
               "build-caps/models",
               {
                 "group": "MCP",
                 "pages": [
                   "build-caps/mcp",
-                  "build-caps/mcp-client",
                   "build-caps/mcp-proxy",
-                  "build-caps/mcp-server",
-                  "build-caps/mcp-pricing"
+                  "build-caps/mcp-server"
                 ]
               },
               "build-caps/prompt",

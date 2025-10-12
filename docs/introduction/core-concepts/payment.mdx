@@ -1,0 +1,59 @@
+---
+title: "Payment"
+description: "About Payment in Nuwa"
+---
+
+Nuwa uses crypto micropayments so users can pay developers directly for AI services such as LLM model inference and MCP tool usage. Payments are fast, low-overhead, and work for both request/response and streaming APIs.
+
+
+## How It Works
+Under the hood, Nuwa implements unidirectional payment channels with on-chain settlement:
+
+- Off-chain receipts (SubRAV) are exchanged per request between the Nuwa Client and the AI services
+- Receipts are issued by the payee (the service provider) and signed by the payer's DID key (which is managed by the Nuwa Client, authorized by the user), and then sent back to and collected by the payee
+- The service providers can take the signed receipts to claim the payment on-chain
+
+The whole process is transparent and automated. By integrating Nuwa Kit, you can focus on building your AI services while monetize them and let Nuwa Kit handle the payment and authentication.
+
+
+## Client Integration (HTTP)
+
+Use `@nuwa-ai/payment-kit` to automatically manage payment channels and attach payment receipt headers:
+
+```ts
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+import { createHttpClient } from '@nuwa-ai/payment-kit';
+
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: { rpcUrl: 'https://test-seed.rooch.network', network: 'test' },
+});
+
+const http = await createHttpClient({
+  baseUrl: 'http://localhost:3003',
+  env,
+  maxAmount: 1_000_000_000n, // per-request price in pico USD unit
+});
+
+const { data, payment } = await http.get('/echo?message=hello');
+console.log(payment?.cost?.toString());
+```
+
+## MCP Integration
+
+For Model Context Protocol tools, the same payment channel primitives are available. The Nuwa client includes a payer-side MCP client; services can opt-in using the server adapter:
+
+```ts
+// Server
+import { createFastMcpServer } from '@nuwa-ai/payment-kit/mcp';
+const app = await createFastMcpServer({ /* declare free & paid tools */ });
+await app.start();
+```
+
+## Wallets & Assets
+
+Nuwa channels currently settle on Rooch using BCS-encoded receipts. Assets are identified by `assetId` (e.g., `0x3::gas_coin::RGas`). The client can manage deposits, sub-channel authorization for multiple devices, and cooperative close.
+
+<Note>
+  Custodial onboarding flows are available via CADOP (see Identity). You can start with a passkey and still pay cryptographically from your DID.
+</Note>
