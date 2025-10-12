@@ -31,7 +31,14 @@
             "group": "Development",
             "pages": [
               "build-caps/quickstart",
-              "build-caps/pricing",
+              {
+                "group": "Payments",
+                "pages": [
+                  "build-caps/service-key",
+                  "build-caps/service-pricing",
+                  "build-caps/revenue"
+                ]
+              },
               "build-caps/models",
               {
                 "group": "MCP",
@@ -42,13 +49,6 @@
                 ]
               },
               "build-caps/prompt",
-              {
-                "group": "Payments & Revenue",
-                "pages": [
-                  "build-caps/service-key",
-                  "build-caps/revenue"
-                ]
-              },
               {
                 "group": "UI",
                 "pages": [
