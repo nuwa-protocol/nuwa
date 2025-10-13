@@ -7,7 +7,7 @@
     "light": "#FF5DEC",
     "dark": "#FF15FB"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "./favicon.png",
   "navigation": {
     "groups": [
       {
@@ -72,19 +72,14 @@
   },
   "logo": {
     "light": "/logo/light.png",
-    "dark": "/logo/dark.png"
+    "dark": "/logo/dark.png",
+    "href": "https://nuwa.dev/"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Nuwa AI Beta",
+      "href": "https://test-app.nuwa.dev/"
     }
   },
   "contextual": {
@@ -101,9 +96,15 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "website": "https://nuwa.dev",
+      "x": "https://x.com/NuwaDev",
+      "github": "https://github.com/nuwa-protocol/",
+      "linkedin": "https://www.linkedin.com/company/nuwadev",
+      "youtube": "https://www.youtube.com/@NuwaDev",
+      "medium": "https://medium.com/@NuwaDev",
+      "instagram": "https://www.instagram.com/nuwa.dev",
+      "discord": "https://discord.gg/y98PKeJQMY",
+      "telegram": "https://t.me/Nuwa_Dev"
     }
   }
 }
