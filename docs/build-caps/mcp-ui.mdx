@@ -67,7 +67,7 @@ function WeatherContent() {
 
 export default function App() {
   return (
-    <NuwaProvider> // wrap your app with NuwaProvider so the auto height adjustment works
+    <NuwaProvider> {/* wrap your app with NuwaProvider so the auto height adjustment works */}
       <React.Suspense fallback={<div>Loading weather...</div>}>
         <WeatherContent />
       </React.Suspense>
