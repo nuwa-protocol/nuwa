@@ -1,16 +1,26 @@
 import axios, { AxiosResponse } from "axios";
+import { LLMProvider } from "../providers/LLMProvider.js";
 
 /**
  * Minimal service adapter for proxying requests to a LiteLLM Proxy instance.
  * It mirrors the key methods used by `OpenRouterService` so the same routing
  * layer can operate on either backend.
  */
-class LiteLLMService {
+class LiteLLMService implements LLMProvider {
   private baseURL: string;
 
-  constructor() {
+    constructor() {
     // Base URL of the LiteLLM Proxy
     this.baseURL = process.env.LITELLM_BASE_URL || "http://localhost:4000";
+  }
+
+  /**
+   * Prepare request data for LiteLLM API
+   * LiteLLM typically doesn't need special modifications, return as-is
+   */
+  prepareRequestData(data: any, isStream: boolean): any {
+    // LiteLLM handles usage tracking automatically, no modifications needed
+    return data;
   }
 
   /**
@@ -18,7 +28,7 @@ class LiteLLMService {
    * Only POST/GET are expected in practice, but other verbs are accepted.
    */
   async forwardRequest(
-    apiKey: string, // ignored for now; LiteLLM uses its own auth header
+    apiKey: string | null, // Can be null if provider doesn't require API key
     apiPath: string,
     method: string = "POST",
     requestData?: any,
@@ -29,17 +39,20 @@ class LiteLLMService {
         "Content-Type": "application/json",
       };
 
-      // If a user-specific key is provided, forward it; otherwise assume public access or MASTER_KEY routing.
+      // Add Authorization header only if API key is provided
       if (apiKey) {
         headers["Authorization"] = `Bearer ${apiKey}`;
       }
+
+      // Prepare request data using provider-specific logic
+      const finalData = this.prepareRequestData(requestData, isStream);
 
       const fullUrl = `${this.baseURL}${apiPath}`; // Note: apiPath already contains leading slash
 
       const response = await axios({
         method: method.toLowerCase(),
         url: fullUrl,
-        data: requestData,
+        data: finalData,
         headers,
         responseType: isStream ? "stream" : "json",
       });
@@ -58,9 +71,29 @@ class LiteLLMService {
     return response.data;
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Helper utils                                                       */
-  /* ------------------------------------------------------------------ */
+  /**
+   * Extract USD cost from LiteLLM response
+   * LiteLLM may provide cost in x-litellm-response-cost header
+   */
+  extractProviderUsageUsd(response: AxiosResponse): number | undefined {
+    try {
+      const headers = response.headers || {};
+      const costHeader = headers['x-litellm-response-cost'];
+      if (typeof costHeader === 'string') {
+        const cost = Number(costHeader);
+        if (Number.isFinite(cost)) {
+          return cost;
+        }
+      }
+    } catch (error) {
+      console.error("Error extracting USD cost from LiteLLM response:", error);
+    }
+    return undefined;
+  }
+
+  /* ------------------------------------------------------------------
+   * Helper utils                                                       
+   * ------------------------------------------------------------------ */
 
   private extractErrorInfo(error: any): { message: string; statusCode: number } {
     if (error?.response) {
@@ -73,89 +106,6 @@ class LiteLLMService {
       return { message: "No response from LiteLLM", statusCode: 503 };
     }
     return { message: error?.message || "Unknown error", statusCode: 500 };
-  }
-
-  /* ---------------------------------------------------------------------------
-   * Virtual Key management
-   * ------------------------------------------------------------------------*/
-
-  /**
-   * Create a new virtual API key using the proxy master key.
-   * Expects env LITELLM_MASTER_KEY to be set.
-   * Returns the raw key (sk-...) plus the JSON payload returned by LiteLLM.
-   */
-  async createApiKey(request: {
-    name: string;
-    limit?: number;
-  }): Promise<{ key: string; data: any } | null> {
-    const masterKey = process.env.LITELLM_MASTER_KEY;
-    if (!masterKey) {
-      console.error("LITELLM_MASTER_KEY not configured");
-      return null;
-    }
-
-    try {
-      // Docs: POST /key/generate
-      const body: Record<string, any> = {
-        metadata: { name: request.name },
-      };
-      // LiteLLM requires `models` param; fall back to wildcard if not specified via env
-      const defaultModels = process.env.LITELLM_KEY_DEFAULT_MODELS;
-      if (defaultModels) {
-        body.models = defaultModels.split(",").map((m) => m.trim());
-      }
-      if (request.limit !== undefined) {
-        body.max_budget = request.limit; // USD budget
-      }
-
-      const url = `${this.baseURL.replace(/\/$/, "")}/key/generate`;
-      const resp = await axios.post(url, body, {
-        headers: {
-          Authorization: `Bearer ${masterKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const responseData = resp.data || {};
-      const key = responseData.key as string;
-      if (!key) {
-        console.error("LiteLLM create key response missing 'key' field");
-        return null;
-      }
-      return { key, data: responseData };
-    } catch (error: any) {
-      const info = this.extractErrorInfo(error);
-      console.error(`Error creating LiteLLM key: ${info.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Deletes (or blocks) a virtual key.
-   * LiteLLM doesn't have a hard delete; we call /key/block to disable the key.
-   */
-  async deleteApiKey(key: string): Promise<boolean> {
-    const masterKey = process.env.LITELLM_MASTER_KEY;
-    if (!masterKey) return false;
-
-    try {
-      const url = `${this.baseURL.replace(/\/$/, "")}/key/block`;
-      await axios.post(
-        url,
-        { key },
-        {
-          headers: {
-            Authorization: `Bearer ${masterKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      return true;
-    } catch (error: any) {
-      const info = this.extractErrorInfo(error);
-      console.error(`Error deleting LiteLLM key: ${info.message}`);
-      return false;
-    }
   }
 }
 

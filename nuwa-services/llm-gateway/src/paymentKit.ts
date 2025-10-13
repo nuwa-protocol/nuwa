@@ -7,6 +7,9 @@ import { Router } from 'express';
 import SupabaseService from './database/supabase.js';
 import OpenRouterService from './services/openrouter.js';
 import LiteLLMService from './services/litellm.js';
+import { OpenAIProvider } from './providers/openai.js';
+import { providerRegistry, ProviderRegistry } from './providers/registry.js';
+import { UsagePolicy } from './billing/usagePolicy.js';
 import { parse } from 'url';
 import type { DIDInfo } from './types/index.js';
 
@@ -15,12 +18,7 @@ import type { DIDInfo } from './types/index.js';
 export type NonStreamHandler = (req: Request) => Promise<{ status: number; body: any; usage?: { cost?: number } }>;
 export type UsageQueryHandler = (req: Request, res: Response) => Promise<void>;
 
-const logger = DebugLogger.get('LLM-Gateway');
-
-// ------------------------
-// Types for upstream meta and proxy results
-// ------------------------
-export interface UpstreamMeta {
+interface UpstreamMeta {
   upstream_name: string;
   upstream_method: string;
   upstream_path: string;
@@ -45,6 +43,7 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
   handleNonStreamLLM?: NonStreamHandler;
   registerUsageHandler?: UsageQueryHandler;
 }): Promise<ExpressPaymentKit> {
+  
   const env = await IdentityKit.bootstrap({
     method: 'rooch',
     vdrOptions: {
@@ -78,224 +77,135 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
     DebugLogger.setGlobalLevel('info');
   }
 
-  if (process.env.DEBUG === 'true') {
-    logger.setLevel('debug');
-  }else{
-    logger.setLevel('info');
-  }
+  // Initialize providers
+  initializeProviders();
 
-  // --- Helpers shared by stream/non-stream branches (moved to module scope) ---
+  // Create provider-specific routes
+  createProviderRouters(billing);
 
-  async function proxyStream(req: Request, res: Response): Promise<void> {
-    const didInfo = (req as any).didInfo as DIDInfo;
-    if (!didInfo?.did) {
-      res.status(401).json({ success: false, error: 'Unauthorized' });
-      return;
-    }
+  // Free: provider status route (no auth required for monitoring)
+  billing.get('/providers/status', { pricing: '0', authRequired: false }, async (req: Request, res: Response) => {
+    const providers = providerRegistry.list().map(name => {
+      const config = providerRegistry.get(name)!;
+      return {
+        name,
+        requiresApiKey: config.requiresApiKey,
+        supportsNativeUsdCost: config.supportsNativeUsdCost,
+        status: 'registered'
+      };
+    });
 
-    const apiPath = normalizeApiPath(req);
-    const { isLiteLLM, provider, providerName } = (() => {
-      const r = resolveProvider(req);
-      return { ...r, providerName: r.isLiteLLM ? 'litellm' : 'openrouter' };
-    })();
-
-    // Build payload; for OpenRouter, enable usage tracking in stream too
-    const baseBody = getRequestData(req) ? { ...(req.body || {}), stream: true } : undefined;
-    const requestData = !baseBody
-      ? undefined
-      : isLiteLLM
-      ? baseBody
-      : { ...baseBody, usage: { include: true, ...(baseBody as any).usage } };
-
-    const apiKey = await ensureUserApiKey(didInfo.did, isLiteLLM);
-    if (!apiKey) {
-      res.status(404).json({ success: false, error: 'User API key not found' });
-      return;
-    }
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    const meta: UpstreamMeta = {
-      upstream_name: providerName,
-      upstream_method: 'POST',
-      upstream_path: apiPath,
-      upstream_streamed: true,
+    const envStatus = {
+      // Only show relevant environment variables
+      OPENROUTER_BASE_URL: !!process.env.OPENROUTER_BASE_URL,
+      LITELLM_BASE_URL: !!process.env.LITELLM_BASE_URL,
+      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
+      PRICING_OVERRIDES: !!process.env.PRICING_OVERRIDES,
     };
 
-    const started = Date.now();
-    try {
-      const upstream = await provider.forwardRequest(apiKey, apiPath, 'POST', requestData, true) as any;
-      if (!upstream || 'error' in upstream) {
-        const status = (upstream as any)?.status || 502;
-        const errMsg = (upstream as any)?.error || 'Upstream error';
-        const d = (upstream as any)?.details || {};
-        const safeDetails = {
-          code: d.code,
-          type: d.type,
-          requestId: d.requestId,
-          statusText: d.statusText,
-        } as any;
-        if (upstream && (upstream as any).details) {
-          logger.error('[gateway][stream] upstream error details:', (upstream as any).details);
-        }
-        meta.upstream_status_code = status;
-        meta.upstream_duration_ms = Date.now() - started;
-        (res as any).locals.upstream = meta;
-        try {
-          res.status(status);
-          // Emit an OpenAI-style SSE data frame with error payload, then a DONE sentinel
-          const payload = { 
-            error: { 
-              message: errMsg, 
-              type: safeDetails.type, 
-              code: safeDetails.code, 
-              status,
-              upstream_details: d // Include full upstream error details
-            } 
-          };
-          res.write(`data: ${JSON.stringify(payload)}\n\n`);
-          res.write('data: [DONE]\n\n');
-        } catch (writeErr) {
-          logger.warn('[gateway][stream] failed to write SSE error payload:', writeErr);
-        }
-        try { res.end(); } catch (endErr) {
-          logger.warn('[gateway][stream] failed to end SSE after error:', endErr);
-        }
-        return;
-      }
+    // Show which providers are available vs configured
+    const allProviders = ['openrouter', 'openai', 'litellm'];
+    const availableProviders = providerRegistry.list();
+    const unavailableProviders = allProviders.filter(p => !availableProviders.includes(p));
 
-      let usageUsd = 0;
-      let bytes = 0;
-      let closed = false;
-      upstream.data.on('data', (chunk: Buffer) => {
-        bytes += chunk.length;
-        const s = chunk.toString();
-        if (!closed && !res.destroyed) {
-          // Always forward upstream bytes first to avoid truncating frames in the same chunk
-          try { res.write(chunk); } catch (chunkErr) {
-            logger.warn('[gateway][stream] failed to forward upstream chunk:', chunkErr);
-          }
-        }
-        const lines = s.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed === 'data: [DONE]') {
-            (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
-            if (!closed && !res.destroyed) {
-              closed = true;
-              try { res.end(); } catch (endErr) {
-                logger.warn('[gateway][stream] failed to end SSE on DONE:', endErr);
-              }
-            }
-            break;
-          }
-          if (line.startsWith('data: ') && line.includes('"usage"')) {
-            try {
-              const obj = JSON.parse(line.slice(6));
-              if (obj?.usage?.cost) usageUsd = obj.usage.cost;
-            } catch (parseErr) {
-              logger.debug('[gateway][stream] failed to parse usage from SSE line');
-            }
-          }
-        }
-      });
-      upstream.data.on('end', () => {
-        (res as any).locals.usage = Math.round(Number(usageUsd || 0) * 1e12);
-        meta.upstream_bytes = bytes;
-        meta.upstream_cost_usd = usageUsd || undefined;
-        meta.upstream_status_code = upstream.status;
-        meta.upstream_duration_ms = Date.now() - started;
-        (res as any).locals.upstream = meta;
-        if (!closed && !res.destroyed) {
-          closed = true;
-          res.end();
-        }
-      });
-      upstream.data.on('error', (err: any) => {
-        meta.upstream_bytes = bytes;
-        meta.upstream_status_code = upstream.status;
-        meta.upstream_duration_ms = Date.now() - started;
-        (res as any).locals.upstream = meta;
-        logger.error('[gateway][stream] upstream stream error:', err);
-        if (!closed) {
-          closed = true;
-          try {
-            // best-effort SSE error frame in OpenAI-compatible shape
-            const payload = { error: { message: 'Upstream stream error', status: upstream.status } } as any;
-            res.write(`data: ${JSON.stringify(payload)}\n\n`);
-            res.write('data: [DONE]\n\n');
-          } catch (writeErr) {
-            logger.warn('[gateway][stream] failed to write SSE upstream error payload:', writeErr);
-          }
-          try { res.end(); } catch (endErr) {
-            logger.warn('[gateway][stream] failed to end SSE after upstream error:', endErr);
-          }
-        }
-      });
-      res.on('close', () => {
-        try { upstream.data.destroy(); } catch (destroyErr) {
-          logger.debug('[gateway][stream] failed to destroy upstream on close');
-        }
-      });
-    } catch (e) {
-      meta.upstream_duration_ms = Date.now() - started;
-      (res as any).locals.upstream = meta;
-      logger.error('Error in /api/v1/chat/completions handler:', e);
-      if (!res.headersSent) res.status(500).end();
-    }
-  }
+    res.json({
+      success: true,
+      data: {
+        registered: providers,
+        available: availableProviders,
+        unavailable: unavailableProviders,
+        environment: envStatus,
+        registrationTime: new Date().toISOString(),
+        note: 'New route structure: /{provider}/api/v1/* (e.g., /openai/api/v1/chat/completions)'
+      }
+    });
+  }, 'providers.status');
 
-  const ensureUserApiKey = async (did: string, isLiteLLM: boolean): Promise<string | null> => {
-    // try fetch existing key
-    let apiKey = await supabaseService.getUserActualApiKey(did, isLiteLLM ? 'litellm' : 'openrouter');
-    if (apiKey) return apiKey;
-    // auto-create (match non-stream semantics)
-    const keyName = `nuwa-generated-did_${did}`;
-    if (isLiteLLM) {
-      const created = await litellmProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          did,
-          created.key,
-          created.key,
-          keyName,
-          'litellm'
-        );
-        if (ok) apiKey = created.key;
-      }
-    } else {
-      const created = await openrouterProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          did,
-          created.data?.hash || created.key,
-          created.key,
-          keyName,
-          'openrouter'
-        );
-        if (ok) apiKey = created.key;
-      }
+  app.use(billing.router);
+  return billing;
+}
+
+const supabaseService = new SupabaseService();
+const openrouterProvider = new OpenRouterService();
+const litellmProvider = new LiteLLMService();
+const openaiProvider = new OpenAIProvider();
+
+/**
+ * Get API key for a provider using the registry
+ * @param providerName Provider name
+ * @returns API key string or null if provider doesn't require API key
+ * @throws Error if provider not found or required API key not available
+ */
+const getProviderApiKey = (providerName: string): string | null => {
+  return providerRegistry.getProviderApiKey(providerName);
+};
+
+/**
+ * Create provider-specific routers for the new route structure
+ */
+function createProviderRouters(billing: ExpressPaymentKit): void {
+  // 1. 先注册具体的 Legacy 路由（优先级高，避免被通配符路由匹配）
+  const legacyHandler = (req: Request, res: Response) => {
+    // Mark as legacy route in access log
+    if ((res as any).locals?.accessLog) {
+      (res as any).locals.accessLog.is_legacy_route = true;
     }
-    return apiKey || null;
+    return handleProviderRequest(req, res, 'openrouter');
   };
+  
+  billing.post('/api/v1/chat/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.chat.completions');
+  billing.post('/api/v1/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.completions');
+  billing.get('/api/v1/models', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.models');
 
-  // Billable: chat completions (non-stream and stream in one path, controlled by body.stream)
-  billing.post('/api/v1/chat/completions', { pricing: { type: 'FinalCost' } }, async (req: Request, res: Response) => {
-    const isStream = !!(req.body && (req.body as any).stream);
+  // 2. 后注册通配符路由（兜底处理所有 provider 请求）
+  const dynamicHandler = async (req: Request, res: Response) => {
+    const providerName = req.params.provider;
+    const endpoint = req.params[0]; // 获取 * 匹配的部分
+    
+    // 验证 provider 是否存在
+    if (!providerRegistry.has(providerName)) {
+      return res.status(404).json({ 
+        error: `Provider '${providerName}' not found`,
+        availableProviders: providerRegistry.list(),
+        suggestion: `Use one of: ${providerRegistry.list().map(p => `/${p}/api/v1/${endpoint}`).join(', ')}`
+      });
+    }
+    
+    // 验证 endpoint 是否支持（可选，提供更好的错误信息）
+    const supportedEndpoints = ['chat/completions', 'completions', 'embeddings', 'models'];
+    if (!supportedEndpoints.includes(endpoint)) {
+      return res.status(404).json({ 
+        error: `Endpoint '${endpoint}' not supported`,
+        supportedEndpoints,
+        suggestion: `Try: /${providerName}/api/v1/{${supportedEndpoints.join('|')}}`
+      });
+    }
+    
+    await handleProviderRequest(req, res, providerName);
+  };
+  
+  // 注册各种 HTTP 方法的通配符路由
+  billing.post('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.post');
+  billing.get('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.get');
+  billing.put('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.put');
+  billing.delete('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.delete');
+}
+
+/**
+ * Unified request handler for both streaming and non-streaming requests
+ */
+async function handleProviderRequest(req: Request, res: Response, providerName: string): Promise<void> {
+  const isStream = !!(req.body && req.body.stream);
 
     if (!isStream) {
-      // Non-stream branch (FinalCost post-flight)
-      const result = await proxyNonStream(req);
+    // Non-stream request
+    const result = await handleNonStreamRequest(req, providerName);
       (res as any).locals.upstream = result.meta;
       const totalCostUSD = result.usageUsd ?? 0;
       const pico = Math.round(Number(totalCostUSD) * 1e12);
-      (res as any).locals.usage = pico; // USD -> picoUSD for PaymentKit
-      logger.debug('[gateway] usage from provider:', { cost: totalCostUSD }, 'picoUSD=', pico);
+    (res as any).locals.usage = pico;
+    
       if (result.error) {
-        // If we have a structured error body, use it; otherwise create a simple error response
         const errorResponse = result.body || { success: false, error: result.error };
         res.status(result.status).json(errorResponse);
         return;
@@ -304,239 +214,81 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
       return;
     }
 
-    await proxyStream(req, res);
-  }, 'llm.chat.completions');
-
-  // Free: usage route, still requires DID auth via PaymentKit
-  billing.get('/usage', { pricing: '0', authRequired: true }, async (req: Request, res: Response) => {
-    const handler = deps?.registerUsageHandler || defaultUsageHandler;
-    await handler(req, res);
-  }, 'usage.get');
-
-  app.use(billing.router);
-  return billing;
+  // Stream request
+  await handleStreamRequest(req, res, providerName);
 }
 
-// ------------------------
-// Default handlers (non-stream, usage)
-// ------------------------
-
-const supabaseService = new SupabaseService();
-const openrouterProvider = new OpenRouterService();
-const litellmProvider = new LiteLLMService();
-
-// Module-scope helpers for non-stream proxy (do not rely on inner closures)
-function normalizeApiPath(req: Request): string {
-  const { pathname } = parse(req.url);
-  let apiPath = (pathname || '').replace(/^\/api\/v1(?=\/?)/, '') || '/';
-  if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
-  return apiPath;
-}
-
-function getRequestData(req: Request): any | undefined {
-  const method = req.method;
-  return ['GET', 'DELETE'].includes(method) ? undefined : req.body;
-}
-
-function resolveProvider(req: Request) {
-  const providerHeader = (req.headers['x-llm-provider'] as string | undefined)?.toLowerCase();
-  let backendEnvVar = (process.env.LLM_BACKEND || 'both').toLowerCase();
-  if (backendEnvVar === 'both') backendEnvVar = 'openrouter';
-  const providerName = providerHeader || backendEnvVar;
-  const isLiteLLM = providerName === 'litellm';
-  const provider = isLiteLLM ? litellmProvider : openrouterProvider;
-  return { providerName, isLiteLLM, provider } as const;
-}
-
-export const defaultHandleNonStreamLLM: NonStreamHandler = async (req: Request) => {
+/**
+ * Handle non-streaming requests for a specific provider
+ */
+async function handleNonStreamRequest(req: Request, providerName: string): Promise<ProxyResult> {
   const didInfo = (req as any).didInfo as DIDInfo;
   if (!didInfo?.did) {
-    return { status: 401, body: { success: false, error: 'Unauthorized' } };
+    return { 
+      status: 401, 
+      error: 'Unauthorized', 
+      meta: {
+        upstream_name: providerName, 
+        upstream_method: req.method, 
+        upstream_path: req.path
+      } 
+    } as ProxyResult;
   }
 
-  // Only pathname part, and normalize by stripping leading /api/v1 so providers receive pure endpoint path
-  const { pathname } = parse(req.url);
-  let apiPath = pathname || '';
-  // Strip prefix '/api/v1' added by billing route so OpenRouter receives '/chat/completions'
-  apiPath = apiPath.replace(/^\/api\/v1(?=\/?)/, '') || '/';
-  if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
-  const method = req.method;
-
-  // Provider selection
-  const providerHeader = (req.headers['x-llm-provider'] as string | undefined)?.toLowerCase();
-  let backendEnvVar = (process.env.LLM_BACKEND || 'both').toLowerCase();
-  if (backendEnvVar === 'both') backendEnvVar = 'openrouter';
-  const providerName = providerHeader || backendEnvVar;
-  const isLiteLLM = providerName === 'litellm';
-
-  // Payload (non-stream)
-  const requestData = ['GET', 'DELETE'].includes(method) ? undefined : req.body;
-
-  // Get user API key; if missing, auto-create like original middleware
-  let apiKey = await supabaseService.getUserActualApiKey(
-    didInfo.did,
-    isLiteLLM ? 'litellm' : 'openrouter'
-  );
-  if (!apiKey) {
-    const keyName = `nuwa-generated-did_${didInfo.did}`;
-    if (isLiteLLM) {
-      // Create LiteLLM key via master key
-      const created = await litellmProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          didInfo.did,
-          created.key, // provider_key_id – LiteLLM may not return a separate id
-          created.key,
-          keyName,
-          'litellm'
-        );
-        if (ok) {
-          apiKey = created.key;
-        }
-      }
-    } else {
-      const created = await openrouterProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          didInfo.did,
-          created.data?.hash || created.key,
-          created.key,
-          keyName,
-          'openrouter'
-        );
-        if (ok) {
-          apiKey = created.key;
-        }
-      }
-    }
-    if (!apiKey) {
-      return { status: 404, body: { success: false, error: 'User API key not found' } };
-    }
+  const provider = providerRegistry.getProvider(providerName);
+  if (!provider) {
+    return { 
+      status: 404, 
+      error: `Provider '${providerName}' not found`, 
+      meta: {
+        upstream_name: providerName, 
+        upstream_method: req.method, 
+        upstream_path: req.path
+      } 
+    } as ProxyResult;
   }
 
-  // Forward
-  const provider = isLiteLLM ? litellmProvider : openrouterProvider;
-  let finalRequestData = requestData;
-  // Per OpenRouter usage accounting docs, inject usage.include=true to receive usage in response
-  // https://openrouter.ai/docs/use-cases/usage-accounting
-  if (!isLiteLLM) {
-    // Only applies to OpenRouter paths (non-stream here)
-    if (!finalRequestData || typeof finalRequestData !== 'object') {
-      finalRequestData = {};
-    }
-    const prev = (finalRequestData as any).usage;
-    if (!prev || prev.include !== true) {
-      (finalRequestData as any).usage = { include: true };
-      logger.debug('[gateway] injected usage.include=true for OpenRouter request');
-    }
-  }
-
-  const response: any = await provider.forwardRequest(
-    apiKey,
-    apiPath,
-    method,
-    finalRequestData,
-    false
-  );
-
-  if (!response) {
-    return { status: 502, body: { success: false, error: 'Failed to process request' } };
-  }
-
-  if ('error' in response) {
-    const errorBody = {
-      success: false,
-      error: response.error,
-      upstream_error: (response as any).details || null,
-      status_code: response.status || 500,
-    };
-    return { status: response.status || 500, body: errorBody };
-  }
-
-  const responseData = provider.parseResponse(response);
-
-  // Extract provider-reported USD cost if available
-  const usageCostUSD: number | undefined = responseData?.usage?.cost;
-
-  return {
-    status: response.status,
-    body: responseData,
-    usage: typeof usageCostUSD === 'number' ? { cost: usageCostUSD } : undefined,
-  };
-};
-
-// Unified non-stream proxy using providers and upstream meta
-async function proxyNonStream(req: Request): Promise<ProxyResult> {
-  const didInfo = (req as any).didInfo as DIDInfo;
-  if (!didInfo?.did) {
-    return { status: 401, error: 'Unauthorized', meta: {
-      upstream_name: 'unknown', upstream_method: req.method, upstream_path: normalizeApiPath(req)
-    } } as ProxyResult;
-  }
-
-  const apiPath = normalizeApiPath(req);
-  const { isLiteLLM, provider } = resolveProvider(req);
-  const providerName = isLiteLLM ? 'litellm' : 'openrouter';
   const meta: UpstreamMeta = {
     upstream_name: providerName,
     upstream_method: req.method,
-    upstream_path: apiPath,
+    upstream_path: req.path,
     upstream_streamed: false,
   };
 
-  // Payload (non-stream)
-  let finalRequestData = getRequestData(req);
-  if (!isLiteLLM) {
-    if (!finalRequestData || typeof finalRequestData !== 'object') finalRequestData = {};
-    const prev = (finalRequestData as any).usage;
-    if (!prev || prev.include !== true) (finalRequestData as any).usage = { include: true };
+  // Set provider info in access log
+  if ((req as any).res?.locals?.accessLog) {
+    (req as any).res.locals.accessLog.provider = providerName;
   }
 
-  // Get or create API key
-  let apiKey = await supabaseService.getUserActualApiKey(didInfo.did, isLiteLLM ? 'litellm' : 'openrouter');
-  if (!apiKey) {
-    const keyName = `nuwa-generated-did_${didInfo.did}`;
-    if (isLiteLLM) {
-      const created = await litellmProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          didInfo.did,
-          created.key,
-          created.key,
-          keyName,
-          'litellm'
-        );
-        if (ok) apiKey = created.key;
-      }
-    } else {
-      const created = await openrouterProvider.createApiKey({ name: keyName });
-      if (created && created.key) {
-        const ok = await supabaseService.createUserApiKey(
-          didInfo.did,
-          created.data?.hash || created.key,
-          created.key,
-          keyName,
-          'openrouter'
-        );
-        if (ok) apiKey = created.key;
-      }
-    }
-    if (!apiKey) {
-      return { status: 404, error: 'User API key not found', meta };
-    }
+  // Prepare request data using provider-specific logic
+  let finalRequestData = getRequestData(req);
+  if (finalRequestData && provider.prepareRequestData) {
+    finalRequestData = provider.prepareRequestData(finalRequestData, false);
+  }
+
+  // Get API key from registry
+  let apiKey: string | null;
+  try {
+    apiKey = getProviderApiKey(providerName);
+  } catch (error) {
+    return { 
+      status: 404, 
+      error: `Provider configuration error: ${(error as Error).message}`, 
+      meta 
+    };
   }
 
   const started = Date.now();
-  const resp: any = await provider.forwardRequest(apiKey, apiPath, req.method, finalRequestData, false);
+  const resp: any = await provider.forwardRequest(apiKey, req.path, req.method, finalRequestData, false);
   meta.upstream_duration_ms = Date.now() - started;
 
   if (!resp) {
     meta.upstream_status_code = 502;
     return { status: 502, error: 'Failed to process request', meta };
   }
+  
   if ('error' in resp) {
     meta.upstream_status_code = resp.status || 500;
-    // Include upstream error details in the response body
     const errorBody = {
       success: false,
       error: resp.error,
@@ -547,36 +299,322 @@ async function proxyNonStream(req: Request): Promise<ProxyResult> {
   }
 
   meta.upstream_status_code = resp.status;
+  
+  // Extract useful headers for monitoring
   const hdrs = (resp as any).headers || {};
   meta.upstream_headers_subset = {
     'x-usage': hdrs['x-usage'],
-    'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
+    'x-ratelimit-limit': hdrs['x-ratelimit-limit'], 
     'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
+    'x-request-id': hdrs['x-request-id'],
   };
-
+  
+  // Set request ID if available
+  meta.upstream_request_id = hdrs['x-request-id'] || (resp as any).requestId;
+  
   const responseData = provider.parseResponse(resp);
-  const usageCostUSD: number | undefined = responseData?.usage?.cost;
+  
+  // Calculate response size
+  const responseStr = JSON.stringify(responseData);
+  meta.upstream_bytes = Buffer.byteLength(responseStr, 'utf8');
+  
+  // Calculate cost using pricing system
+  const model = finalRequestData?.model || 'unknown';
+  const providerCostUsd = provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(resp) : undefined;
+  const pricingResult = UsagePolicy.processNonStreamResponse(model, responseData, providerCostUsd);
+  
+  // Set cost in meta
+  meta.upstream_cost_usd = pricingResult?.costUsd;
+  
   return {
     status: resp.status,
     body: responseData,
-    usageUsd: typeof usageCostUSD === 'number' ? usageCostUSD : undefined,
-    meta,
+    usageUsd: pricingResult?.costUsd,
+    meta
   };
 }
 
-export const defaultUsageHandler: UsageQueryHandler = async (req: Request, res: Response) => {
+/**
+ * Handle streaming requests for a specific provider  
+ */
+async function handleStreamRequest(req: Request, res: Response, providerName: string): Promise<void> {
   const didInfo = (req as any).didInfo as DIDInfo;
   if (!didInfo?.did) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
     return;
   }
-  const { start_date, end_date } = req.query as { start_date?: string; end_date?: string };
-  const usageStats = await supabaseService.getUserUsageStats(didInfo.did, start_date, end_date);
-  if (!usageStats) {
-    res.status(500).json({ success: false, error: 'Failed to get usage statistics' });
+
+  const provider = providerRegistry.getProvider(providerName);
+  if (!provider) {
+    res.status(404).json({ success: false, error: `Provider '${providerName}' not found` });
     return;
   }
-  res.json({ success: true, data: usageStats });
-};
 
+  // Set provider info in access log
+  if ((res as any).locals?.accessLog) {
+    (res as any).locals.accessLog.provider = providerName;
+  }
 
+  // Prepare request data using provider-specific logic
+  const baseBody = getRequestData(req) ? { ...(req.body || {}), stream: true } : undefined;
+  let requestData: any;
+  
+  if (baseBody && provider.prepareRequestData) {
+    requestData = provider.prepareRequestData(baseBody, true);
+  } else {
+    requestData = baseBody;
+  }
+
+  let apiKey: string | null;
+  try {
+    apiKey = getProviderApiKey(providerName);
+  } catch (error) {
+    res.status(404).json({ 
+      success: false, 
+      error: `Provider configuration error: ${(error as Error).message}` 
+    });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  const meta: UpstreamMeta = {
+    upstream_name: providerName,
+    upstream_method: 'POST',
+    upstream_path: req.path,
+    upstream_streamed: true,
+  };
+
+  const started = Date.now();
+  try {
+    const upstream = await provider.forwardRequest(apiKey, req.path, 'POST', requestData, true);
+    meta.upstream_duration_ms = Date.now() - started;
+
+    if (!upstream) {
+      meta.upstream_status_code = 502;
+      (res as any).locals.upstream = meta;
+      if (!res.headersSent) res.status(502).end();
+      return;
+    }
+
+    if ('error' in upstream) {
+      meta.upstream_status_code = upstream.status || 500;
+      (res as any).locals.upstream = meta;
+      if (!res.headersSent) res.status(upstream.status || 500).json({ success: false, error: upstream.error });
+      return;
+    }
+
+    meta.upstream_status_code = 200;
+    (res as any).locals.upstream = meta;
+
+    // Extract headers for monitoring
+    const hdrs = (upstream as any).headers || {};
+    meta.upstream_headers_subset = {
+      'x-usage': hdrs['x-usage'],
+      'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
+      'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
+      'x-request-id': hdrs['x-request-id'],
+    };
+    meta.upstream_request_id = hdrs['x-request-id'] || (upstream as any).requestId;
+
+    // Process stream response with usage tracking
+    const streamProcessor = UsagePolicy.createStreamProcessor(
+      req.body?.model || 'unknown',
+      provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(upstream) : undefined
+    );
+
+    let totalBytes = 0;
+    upstream.data.on('data', (chunk: Buffer) => {
+      const chunkStr = chunk.toString();
+      totalBytes += chunk.length;
+      streamProcessor.processChunk(chunkStr);
+      res.write(chunk);
+    });
+
+    upstream.data.on('end', () => {
+      const finalCost = streamProcessor.getFinalCost();
+      
+      // Update meta with final metrics
+      meta.upstream_bytes = totalBytes;
+      meta.upstream_cost_usd = finalCost?.costUsd;
+      
+      if (finalCost) {
+        const picoUsd = Math.round(Number(finalCost.costUsd || 0) * 1e12);
+        (res as any).locals.usage = picoUsd;
+        
+        // Set access log info
+        if ((res as any).locals?.accessLog) {
+          (res as any).locals.accessLog.total_cost_usd = finalCost.costUsd;
+          (res as any).locals.accessLog.usage_source = finalCost.source;
+          (res as any).locals.accessLog.input_tokens = finalCost.usage?.promptTokens;
+          (res as any).locals.accessLog.output_tokens = finalCost.usage?.completionTokens;
+        }
+      }
+      res.end();
+    });
+
+    upstream.data.on('error', (error: Error) => {
+      console.error('Stream error:', error);
+      if (!res.headersSent) res.status(502).end();
+    });
+
+  } catch (e: any) {
+    meta.upstream_duration_ms = Date.now() - started;
+    meta.upstream_status_code = 500;
+    (res as any).locals.upstream = meta;
+    console.error('Error in stream proxy:', e);
+    if (!res.headersSent) res.status(500).end();
+  }
+}
+
+/**
+ * Initialize and register all providers based on environment configuration
+ */
+function initializeProviders(): void {
+  const registeredProviders: string[] = [];
+  const skippedProviders: string[] = [];
+
+  // Provider configurations with their required environment variables
+  const providerConfigs = [
+    {
+      name: 'openrouter',
+      instance: openrouterProvider,
+      requiresApiKey: true,
+      supportsNativeUsdCost: true,
+      apiKeyEnvVar: 'OPENROUTER_API_KEY',
+      requiredEnvVars: ['OPENROUTER_API_KEY'], // Requires API key
+      optionalEnvVars: ['OPENROUTER_BASE_URL'], // Has default
+      defaultCheck: () => !!process.env.OPENROUTER_API_KEY
+    },
+    {
+      name: 'litellm', 
+      instance: litellmProvider,
+      requiresApiKey: true,
+      supportsNativeUsdCost: true,
+      apiKeyEnvVar: 'LITELLM_API_KEY',
+      requiredEnvVars: ['LITELLM_BASE_URL', 'LITELLM_API_KEY'], // Requires both URL and API key
+      optionalEnvVars: [],
+      defaultCheck: () => !!process.env.LITELLM_BASE_URL && !!process.env.LITELLM_API_KEY
+    },
+    {
+      name: 'openai',
+      instance: openaiProvider,
+      requiresApiKey: true,
+      supportsNativeUsdCost: false,
+      apiKeyEnvVar: 'OPENAI_API_KEY',
+      requiredEnvVars: ['OPENAI_API_KEY'], // Requires API key
+      optionalEnvVars: ['OPENAI_BASE_URL'], // Has default
+      defaultCheck: () => !!process.env.OPENAI_API_KEY
+    }
+  ];
+
+  for (const config of providerConfigs) {
+    // Check if provider should be registered
+    const missingRequired = config.requiredEnvVars.filter(envVar => !process.env[envVar]);
+    const shouldRegister = missingRequired.length === 0 && config.defaultCheck();
+
+    if (shouldRegister) {
+      // Resolve API key if required
+      let apiKey: string | undefined;
+      if (config.requiresApiKey) {
+        if (!config.apiKeyEnvVar) {
+          console.error(`Provider ${config.name} requires API key but apiKeyEnvVar not specified. Skipping registration.`);
+          skippedProviders.push(`${config.name} (missing apiKeyEnvVar configuration)`);
+          continue;
+        }
+        
+        apiKey = process.env[config.apiKeyEnvVar];
+        if (!apiKey) {
+          console.error(`API key not found for provider ${config.name}: Environment variable '${config.apiKeyEnvVar}' is not set`);
+          skippedProviders.push(`${config.name} (missing ${config.apiKeyEnvVar})`);
+          continue;
+        }
+      }
+
+      providerRegistry.register({
+        name: config.name,
+        instance: config.instance,
+        requiresApiKey: config.requiresApiKey,
+        supportsNativeUsdCost: config.supportsNativeUsdCost,
+        apiKey: apiKey, // Directly pass the resolved API key
+      });
+      registeredProviders.push(config.name);
+      
+      // Log configuration status for each provider
+      const configStatus = [];
+      if (config.requiresApiKey) configStatus.push(`API key: ${config.apiKeyEnvVar}`);
+      config.requiredEnvVars.forEach(envVar => {
+        if (envVar !== config.apiKeyEnvVar) configStatus.push(`${envVar}: configured`);
+      });
+      config.optionalEnvVars.forEach(envVar => {
+        if (process.env[envVar]) configStatus.push(`${envVar}: custom`);
+        else configStatus.push(`${envVar}: default`);
+      });
+      
+      if (configStatus.length > 0) {
+        console.log(`   ${config.name}: ${configStatus.join(', ')}`);
+      }
+    } else {
+      skippedProviders.push(`${config.name} (missing: ${missingRequired.join(', ')})`);
+    }
+  }
+
+  // Log results
+  console.log('🔌 Registered providers:', registeredProviders.join(', '));
+  console.log('📝 All providers require manual API key import');
+  
+  if (skippedProviders.length > 0) {
+    console.log('⏭️  Skipped providers:', skippedProviders.join(', '));
+    console.log('💡 Configure required environment variables to enable these providers');
+  }
+
+  if (registeredProviders.length === 0) {
+    console.warn('⚠️  No providers registered! Please check your environment configuration.');
+  }
+
+  // Log current environment status in debug mode
+  if (process.env.DEBUG === 'true') {
+    logEnvironmentStatus();
+  }
+}
+
+/**
+ * Log environment status for debugging
+ */
+function logEnvironmentStatus(): void {
+  const envStatus = {
+    // OpenRouter - no special env vars needed, uses user's own API keys
+    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai (default)',
+    
+    // LiteLLM - needs to know where the LiteLLM proxy is running
+    LITELLM_BASE_URL: process.env.LITELLM_BASE_URL || '❌ Not configured',
+    
+    // OpenAI - uses official API, no special config needed
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1 (default)',
+    
+    // Pricing configuration
+    PRICING_OVERRIDES: process.env.PRICING_OVERRIDES ? '✅ Custom pricing set' : '❌ Using defaults',
+  };
+
+  console.log('🔧 Environment Status:');
+  Object.entries(envStatus).forEach(([key, value]) => {
+    console.log(`   ${key}: ${value}`);
+  });
+  console.log('');
+}
+
+function getRequestData(req: Request): any | undefined {
+  const method = req.method;
+  return ['GET', 'DELETE'].includes(method) ? undefined : req.body;
+}
+
+// Default usage handler
+async function defaultUsageHandler(req: Request, res: Response): Promise<void> {
+  res.json({
+    success: true,
+    message: 'Usage endpoint - implement your usage tracking logic here'
+  });
+}
