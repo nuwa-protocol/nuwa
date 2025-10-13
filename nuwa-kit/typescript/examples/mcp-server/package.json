@@ -12,11 +12,12 @@
     "zod": "^3.25.0",
     "dotenv": "^16.3.1",
     "@nuwa-ai/identity-kit": "workspace:*",
-    "@nuwa-ai/payment-kit": "workspace:*"
+    "@nuwa-ai/payment-kit": "workspace:*",
+    "@nuwa-ai/ui-kit": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "tsx": "^4.7.0",
     "typescript": "~5.4.0"
   }
-} 
+}

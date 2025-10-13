@@ -28,7 +28,7 @@ export interface NuwaProviderProps extends NuwaClientOptions {
 export function NuwaProvider(props: NuwaProviderProps) {
   const {
     children,
-    autoHeight = false,
+    autoHeight = true,
     onConnected,
     onError,
     className,

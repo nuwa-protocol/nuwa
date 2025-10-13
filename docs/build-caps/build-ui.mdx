@@ -10,7 +10,7 @@ description: "Integrate Nuwa Client functions into your UI"
 
 Wrap your UI with `NuwaProvider`, then call `useNuwa()` inside to access the `nuwa` client instance and connection state.
 
-For all props and return types, see: /sdk/ui-kit#nuwaprovider and /sdk/ui-kit#usenuwa
+For all props and return types, see: [NuwaProvider](/sdk/ui-kit#nuwaprovider) and [useNuwa](/sdk/ui-kit#usenuwa)
 
 ```tsx
 import { NuwaProvider, useNuwa } from '@nuwa-ai/ui-kit';
@@ -34,7 +34,7 @@ function MyCapUI() {
 
 export default function App() {
   return (
-    <NuwaProvider autoHeight onConnected={() => console.log('Nuwa connected')} onError={console.error}>
+    <NuwaProvider onConnected={() => console.log('Nuwa connected')} onError={console.error}>
       <MyCapUI />
     </NuwaProvider>
   );
@@ -44,6 +44,7 @@ export default function App() {
 ## NuwaProvider
 
 `NuwaProvider` sets up the client connection and exposes it via context.
+- automatically connects to the Nuwa Client
 - provides a `nuwa` client instance for calling Nuwa Client functions
 - optional `autoHeight` resizes the parent iframe to fit your content
 - syncs light/dark `theme` from the Nuwa Client to your UI wrapper
