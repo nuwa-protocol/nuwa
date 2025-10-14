@@ -53,10 +53,6 @@ export class PricingConfigLoader {
     }
 
     try {
-      if (process.env.PRICING_CONFIG_PATH) {
-        console.log(`📊 Loading custom pricing config from: ${process.env.PRICING_CONFIG_PATH}`);
-      }
-      
       console.log(`📊 Using embedded pricing config (${defaultPricingConfig.version})`);
       this.config = defaultPricingConfig as PricingConfig;
       
