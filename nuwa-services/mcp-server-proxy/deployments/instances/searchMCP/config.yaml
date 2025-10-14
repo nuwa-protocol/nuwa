@@ -1,0 +1,21 @@
+# searchMCP MCP Proxy Configuration
+
+# Server settings
+port: ${PORT}
+endpoint: "/mcp"
+
+# searchMCP MCP server
+upstream:
+  type: "httpStream"
+  url: "https://api.searchmcp.io/mcp"
+  auth:
+    scheme: "header"
+    header: "x-api-key"
+    value: "${SEARCHMCP_API_KEY}"
+
+# Payment configuration
+serviceId: "searchmcp-mcp-proxy"
+serviceKey: "${SERVICE_KEY}"
+network: "test"
+defaultPricePicoUSD: "3000000000"  # 0.0003 USD
+debug: ${DEBUG}
