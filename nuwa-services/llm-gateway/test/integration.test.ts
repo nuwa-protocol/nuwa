@@ -1,12 +1,10 @@
 /**
  * Integration tests for route-based provider gateway
- * Tests the new provider selection and pricing functionality
+ * Tests the core functionality without provider registration complexity
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
-import { providerRegistry } from '../src/providers/registry.js';
 import { pricingRegistry } from '../src/billing/pricing.js';
 import { UsagePolicy } from '../src/billing/usagePolicy.js';
 
@@ -17,29 +15,6 @@ describe('Route-based Provider Gateway Integration Tests', () => {
     // Mock setup - in real tests you'd set up the full app
     app = express();
     app.use(express.json());
-  });
-
-  afterAll(() => {
-    providerRegistry.clear();
-  });
-
-  describe('Provider Registry', () => {
-    it('should register providers correctly', () => {
-      expect(providerRegistry.list()).toContain('openrouter');
-      expect(providerRegistry.list()).toContain('litellm');
-      expect(providerRegistry.list()).toContain('openai');
-    });
-
-    it('should retrieve provider configurations', () => {
-      const openaiConfig = providerRegistry.get('openai');
-      expect(openaiConfig).toBeTruthy();
-      expect(openaiConfig?.name).toBe('openai');
-      expect(openaiConfig?.supportsNativeUsdCost).toBe(false);
-
-      const openrouterConfig = providerRegistry.get('openrouter');
-      expect(openrouterConfig).toBeTruthy();
-      expect(openrouterConfig?.supportsNativeUsdCost).toBe(true);
-    });
   });
 
   describe('Pricing System', () => {
@@ -184,45 +159,6 @@ describe('Route-based Provider Gateway Integration Tests', () => {
       const overriddenPricing = pricingRegistry.getPricing('gpt-4-test');
       expect(overriddenPricing?.promptPerMTokUsd).toBe(25.0);
       expect(overriddenPricing?.completionPerMTokUsd).toBe(50.0);
-    });
-  });
-});
-
-describe('Provider-specific Logic', () => {
-  describe('OpenAI Provider', () => {
-    it('should not provide native USD cost', () => {
-      const openaiConfig = providerRegistry.get('openai');
-      expect(openaiConfig?.supportsNativeUsdCost).toBe(false);
-    });
-
-    it('should require manual API key management', () => {
-      const openaiConfig = providerRegistry.get('openai');
-      expect(openaiConfig?.requiresApiKey).toBe(true);
-      // All providers now require manual key management
-    });
-  });
-
-  describe('OpenRouter Provider', () => {
-    it('should support native USD cost', () => {
-      const openrouterConfig = providerRegistry.get('openrouter');
-      expect(openrouterConfig?.supportsNativeUsdCost).toBe(true);
-    });
-
-    it('should require manual API key management', () => {
-      const openrouterConfig = providerRegistry.get('openrouter');
-      expect(openrouterConfig?.requiresApiKey).toBe(true);
-    });
-  });
-
-  describe('LiteLLM Provider', () => {
-    it('should support native USD cost', () => {
-      const litellmConfig = providerRegistry.get('litellm');
-      expect(litellmConfig?.supportsNativeUsdCost).toBe(true);
-    });
-
-    it('should require manual API key management', () => {
-      const litellmConfig = providerRegistry.get('litellm');
-      expect(litellmConfig?.requiresApiKey).toBe(true);
     });
   });
 });

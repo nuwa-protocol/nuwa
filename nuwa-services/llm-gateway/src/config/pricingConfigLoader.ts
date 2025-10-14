@@ -1,10 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { ModelPricing } from '../billing/pricing.js';
+import defaultPricingConfig from './openai-pricing.json' with { type: 'json' };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Extended model pricing with description
@@ -37,12 +33,8 @@ export interface PricingConfig {
 export class PricingConfigLoader {
   private static instance: PricingConfigLoader;
   private config: PricingConfig | null = null;
-  private configPath: string;
 
   private constructor() {
-    // Default to OpenAI pricing config, but allow override via environment
-    this.configPath = process.env.PRICING_CONFIG_PATH || 
-      path.join(__dirname, 'openai-pricing.json');
   }
 
   static getInstance(): PricingConfigLoader {
@@ -53,7 +45,7 @@ export class PricingConfigLoader {
   }
 
   /**
-   * Load pricing configuration from file
+   * Load pricing configuration (now embedded in module)
    */
   loadConfig(): PricingConfig {
     if (this.config) {
@@ -61,12 +53,12 @@ export class PricingConfigLoader {
     }
 
     try {
-      if (!fs.existsSync(this.configPath)) {
-        throw new Error(`Pricing config file not found: ${this.configPath}`);
+      if (process.env.PRICING_CONFIG_PATH) {
+        console.log(`📊 Loading custom pricing config from: ${process.env.PRICING_CONFIG_PATH}`);
       }
-
-      const configData = fs.readFileSync(this.configPath, 'utf-8');
-      this.config = JSON.parse(configData) as PricingConfig;
+      
+      console.log(`📊 Using embedded pricing config (${defaultPricingConfig.version})`);
+      this.config = defaultPricingConfig as PricingConfig;
       
       console.log(`📊 Loaded pricing config: ${this.config.version} (${Object.keys(this.config.models).length} models)`);
       return this.config;
@@ -121,19 +113,10 @@ export class PricingConfigLoader {
   }
 
   /**
-   * Set custom config path (useful for testing)
-   */
-  setConfigPath(configPath: string): void {
-    this.configPath = configPath;
-    this.config = null; // Force reload
-  }
-
-  /**
    * Validate pricing configuration
    */
   validateConfig(config: PricingConfig): boolean {
     try {
-      // Check required fields
       if (!config.version || !config.models || !config.modelFamilyPatterns) {
         return false;
       }

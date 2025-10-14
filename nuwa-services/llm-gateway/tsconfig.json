@@ -4,7 +4,6 @@
     "module": "NodeNext",
     "lib": ["ES2020", "DOM", "ESNext"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
