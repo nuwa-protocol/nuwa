@@ -1,9 +1,12 @@
 {
-  "name": "@nuwa-services/mcp-server-proxy",
-  "version": "0.1.0",
+  "name": "@nuwa-ai/mcp-server-proxy",
+  "version": "0.6.2",
   "description": "MCP Server Proxy with DIDAuth support for Nuwa ecosystem",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "mcp-server-proxy": "dist/index.js"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "node build.js",
@@ -44,5 +47,25 @@
   },
   "author": "Nuwa Team",
   "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "proxy",
+    "server",
+    "nuwa",
+    "rooch",
+    "payment",
+    "blockchain",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nuwa-protocol/nuwa.git",
+    "directory": "nuwa-services/mcp-server-proxy"
+  },
+  "homepage": "https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy",
+  "bugs": {
+    "url": "https://github.com/nuwa-protocol/nuwa/issues"
+  },
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
 }

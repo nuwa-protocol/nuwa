@@ -4,6 +4,33 @@ MCP Server Proxy is a streamlined MCP service that provides upstream forwarding 
 
 This implementation follows the V2 design (see [PROPOSAL_V2_SINGLE_UPSTREAM_PAYMENT.md](./docs/PROPOSAL_V2_SINGLE_UPSTREAM_PAYMENT.md)) which simplifies the architecture to focus on per-call payment and tool execution.
 
+## 🚀 Quick Start (NPM Package)
+
+The easiest way to get started is using the published npm package:
+
+```bash
+# Install globally
+npm install -g @nuwa-ai/mcp-server-proxy
+
+# Create a simple config file
+echo "port: 8088
+endpoint: /mcp
+serviceId: my-service" > config.yaml
+
+# Set your service key
+export SERVICE_KEY=your_service_key_here
+
+# Start the server
+mcp-server-proxy --config config.yaml
+```
+
+Or use without installation:
+
+```bash
+# Run directly with npx
+npx @nuwa-ai/mcp-server-proxy --port 8088 --service-id my-service
+```
+
 ## Features
 
 - **Single MCP Endpoint**: Provides `/mcp` endpoint with JSON-RPC over streamable HTTP
@@ -15,6 +42,34 @@ This implementation follows the V2 design (see [PROPOSAL_V2_SINGLE_UPSTREAM_PAYM
 
 ### 1. Installation
 
+You have two options to use MCP Server Proxy:
+
+#### Option A: Use Published NPM Package (Recommended)
+
+Install the published package globally or locally:
+
+```bash
+# Install globally (recommended for easy CLI usage)
+npm install -g @nuwa-ai/mcp-server-proxy
+
+# Or install locally in your project
+npm install @nuwa-ai/mcp-server-proxy
+```
+
+Then you can run it directly:
+
+```bash
+# Run with global installation
+mcp-server-proxy --help
+
+# Run with local installation
+npx @nuwa-ai/mcp-server-proxy --help
+```
+
+#### Option B: Build from Source
+
+If you want to modify the source code or contribute to development:
+
 ```bash
 cd nuwa-services/mcp-server-proxy
 pnpm install
@@ -22,32 +77,45 @@ pnpm install
 
 ### 2. Configuration
 
-Create a `config.yaml` file by copying the example:
+Create a `config.yaml` file for your proxy configuration. You can start with the provided example:
 
 ```bash
+# Copy the example configuration
+curl -o config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/config.yaml.example
+
+# Or if you have the source code:
 cp config.yaml.example config.yaml
 ```
 
-Now, edit `config.yaml` to match your needs. Here is a minimal example:
+Then edit `config.yaml` to match your needs. Here are some examples:
+
+#### Example 1: Basic Configuration (No Upstream)
 
 ```yaml
 # Server settings
 port: 8088
 endpoint: "/mcp"
 
-# Optional upstream MCP server
+# Payment configuration
+serviceId: "my-mcp-service"
+network: "test"
+rpcUrl: "https://test-seed.rooch.network:443"
+defaultPricePicoUSD: "100000000"  # 0.0001 USD - Default price for all tools
+```
+
+#### Example 2: With HTTP Upstream
+
+```yaml
+# Server settings
+port: 8088
+endpoint: "/mcp"
+
+# Upstream MCP server
 upstream:
   type: "httpStream"
   url: "https://api.example.com/mcp?key=${API_KEY}"
 
-# Alternative: stdio upstream
-# upstream:
-#   type: "stdio"
-#   command: ["npx", "@example/mcp-server"]
-#   env:
-#     API_KEY: "${API_KEY}"
-
-# Optional payment configuration
+# Payment configuration
 serviceId: "my-mcp-service"
 network: "test"
 rpcUrl: "${ROOCH_RPC_URL}"
@@ -60,8 +128,26 @@ register:
       pricePicoUSD: "200000000"  # 0.0002 USD - Explicit price, overrides default
     - name: "free.tool"
       pricePicoUSD: "0"  # Free tool
-    - name: "default.price.tool"
-      # No pricePicoUSD specified - uses defaultPricePicoUSD
+```
+
+#### Example 3: With Stdio Upstream
+
+```yaml
+# Server settings  
+port: 8088
+endpoint: "/mcp"
+
+# Stdio upstream MCP server
+upstream:
+  type: "stdio"
+  command: ["npx", "@example/mcp-server"]
+  env:
+    API_KEY: "${API_KEY}"
+
+# Payment configuration
+serviceId: "my-mcp-service"
+network: "test"
+defaultPricePicoUSD: "100000000"
 ```
 
 Set any required environment variables:
@@ -71,6 +157,34 @@ export ROOCH_RPC_URL=https://test-seed.rooch.network:443
 ```
 
 ### 3. Running the Server
+
+#### Using NPM Package
+
+If you installed via npm, you can run the server directly:
+
+```bash
+# Show help and available options
+mcp-server-proxy --help
+
+# Start with default configuration (looks for config.yaml in current directory)
+mcp-server-proxy
+
+# Start with custom port and debug
+mcp-server-proxy --port 3000 --debug
+
+# Start with custom config file
+mcp-server-proxy --config ./custom-config.yaml
+
+# Start with payment configuration
+mcp-server-proxy --service-id my-service --network test --default-price-pico-usd 100000000
+
+# Use with npx (no global installation needed)
+npx @nuwa-ai/mcp-server-proxy --config ./my-config.yaml
+```
+
+#### From Source Code
+
+If you're building from source:
 
 - **Development mode** (with hot-reloading):
   ```bash
@@ -144,6 +258,31 @@ DEBUG=true
 #### Using Pre-configured Instances
 
 You can directly use the pre-configured instances for local development:
+
+**Using NPM Package:**
+
+```bash
+# Run Amap proxy locally
+export AMAP_API_KEY=your_amap_api_key_here
+export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
+export PORT=8088
+
+# Use the pre-configured amap instance (download config from repository)
+curl -o amap-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
+mcp-server-proxy --config ./amap-config.yaml
+```
+
+```bash
+# Run Context7 proxy locally  
+export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
+export PORT=8089
+
+# Use the pre-configured context7 instance (download config from repository)
+curl -o context7-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
+mcp-server-proxy --config ./context7-config.yaml
+```
+
+**From Source Code:**
 
 ```bash
 # Run Amap proxy locally
@@ -237,7 +376,45 @@ See [deployments/QUICKSTART.md](./deployments/QUICKSTART.md) for detailed deploy
 
 ## Docker
 
-You can also build and run the proxy using Docker:
+### Using Published NPM Package (Recommended)
+
+Create a simple Dockerfile using the published npm package:
+
+```dockerfile
+FROM node:20-alpine
+
+# Install the MCP Server Proxy globally
+RUN npm install -g @nuwa-ai/mcp-server-proxy
+
+# Create app directory
+WORKDIR /app
+
+# Copy your configuration file
+COPY config.yaml ./
+
+# Expose port
+EXPOSE 8088
+
+# Start the server
+CMD ["mcp-server-proxy", "--config", "./config.yaml"]
+```
+
+Build and run:
+
+```bash
+# Build the image
+docker build -t my-mcp-proxy .
+
+# Run the container
+docker run -p 8088:8088 \
+  -e SERVICE_KEY="your_service_key" \
+  -e API_KEY="your_api_key" \
+  my-mcp-proxy
+```
+
+### Building from Source
+
+You can also build and run the proxy using Docker from source:
 
 ```bash
 # 1. Build the image
