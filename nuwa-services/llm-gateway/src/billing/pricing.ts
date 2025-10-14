@@ -1,6 +1,11 @@
 import { pricingConfigLoader } from '../config/pricingConfigLoader.js';
 
 /**
+ * Constants for pricing calculations
+ */
+const TOKENS_PER_MILLION = 1_000_000;
+
+/**
  * Model pricing configuration
  */
 export interface ModelPricing {
@@ -117,9 +122,9 @@ export class PricingRegistry {
     const promptTokens = usage.promptTokens || 0;
     const completionTokens = usage.completionTokens || 0;
 
-    // Calculate cost: (tokens / 1,000,000) * price_per_million
-    const promptCost = (promptTokens / 1_000_000) * pricing.promptPerMTokUsd;
-    const completionCost = (completionTokens / 1_000_000) * pricing.completionPerMTokUsd;
+    // Calculate cost: (tokens / TOKENS_PER_MILLION) * price_per_million
+    const promptCost = (promptTokens / TOKENS_PER_MILLION) * pricing.promptPerMTokUsd;
+    const completionCost = (completionTokens / TOKENS_PER_MILLION) * pricing.completionPerMTokUsd;
     const totalCost = promptCost + completionCost;
 
     return {
