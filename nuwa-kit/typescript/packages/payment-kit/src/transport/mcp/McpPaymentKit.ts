@@ -64,8 +64,6 @@ export class McpPaymentKit {
       pendingSubRAVRepo: PendingSubRAVRepository;
     }
   ) {
-    // Ensure billing strategies are registered for MCP runtime
-    registerBuiltinStrategies();
     this.logger = DebugLogger.get('McpPaymentKit');
     this.logger.setLevel(opts.debug ? 'debug' : 'info');
     this.billableRouter = new BillableRouter({

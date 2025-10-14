@@ -140,6 +140,11 @@ export interface BillingRule {
   adminOnly?: boolean;
   /** Whether payment (signed SubRAV) is required for this rule */
   paymentRequired?: boolean;
+  /**
+   * Original RegExp object with flags preserved (when path was provided as RegExp)
+   * This takes precedence over pathRegex string for matching to preserve flags like 'i', 'g', etc.
+   */
+  originalRegex?: RegExp;
 }
 
 /**

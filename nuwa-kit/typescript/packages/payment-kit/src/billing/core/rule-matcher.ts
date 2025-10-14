@@ -1,5 +1,8 @@
 import { BillingRule } from './types';
 
+// Cache for compiled regex patterns to improve performance
+const regexCache = new Map<string, RegExp>();
+
 /**
  * Pure functional implementation of rule matching used by all environments
  * (Express / Koa / Cloudflare Workers / …).
@@ -15,6 +18,37 @@ export function findRule(meta: Record<string, any>, rules: BillingRule[]): Billi
     }
   }
   return undefined;
+}
+
+/**
+ * Get or create a cached RegExp object for the given pattern
+ * @throws {Error} If the pattern is not a valid regular expression
+ */
+function getCachedRegex(pattern: string): RegExp {
+  let regex = regexCache.get(pattern);
+  if (!regex) {
+    try {
+      regex = new RegExp(pattern);
+    } catch (error) {
+      // Provide a more user-friendly error message for invalid regex patterns
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Invalid regular expression pattern "${pattern}": ${errorMessage}. ` +
+          'Please check your billing rule configuration and ensure the pathRegex field contains a valid regular expression.'
+      );
+    }
+
+    // Limit cache size to prevent memory leaks
+    if (regexCache.size >= 100) {
+      // Remove oldest entry when cache is full
+      const firstKey = regexCache.keys().next().value;
+      if (firstKey) {
+        regexCache.delete(firstKey);
+      }
+    }
+    regexCache.set(pattern, regex);
+  }
+  return regex;
 }
 
 /**
@@ -38,10 +72,24 @@ function matchesRule(meta: Record<string, any>, rule: BillingRule): boolean {
     return false;
   }
 
-  // Path regex match
+  // Path regex match (optimized with caching)
   if (when.pathRegex) {
-    const regex = new RegExp(when.pathRegex);
-    if (!regex.test(meta.path || '')) {
+    try {
+      // Check if we have an original RegExp with flags
+      if (rule.originalRegex && rule.originalRegex instanceof RegExp) {
+        if (!rule.originalRegex.test(meta.path || '')) {
+          return false;
+        }
+      } else {
+        const regex = getCachedRegex(when.pathRegex);
+        if (!regex.test(meta.path || '')) {
+          return false;
+        }
+      }
+    } catch (error) {
+      // If regex compilation fails, log the error and treat as non-matching
+      // This prevents invalid regex patterns from crashing the application
+      console.error(`[BillingRule] Failed to compile regex pattern for rule "${rule.id}":`, error);
       return false;
     }
   }
