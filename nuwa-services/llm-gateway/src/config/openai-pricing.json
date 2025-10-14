@@ -1,0 +1,212 @@
+{
+  "version": "2025-10",
+  "models": {
+    "gpt-4": {
+      "promptPerMTokUsd": 30.0,
+      "completionPerMTokUsd": 60.0,
+      "description": "GPT-4 base model"
+    },
+    "gpt-4-0613": {
+      "promptPerMTokUsd": 30.0,
+      "completionPerMTokUsd": 60.0,
+      "description": "GPT-4 June 2023 snapshot"
+    },
+    "gpt-4-turbo": {
+      "promptPerMTokUsd": 10.0,
+      "completionPerMTokUsd": 30.0,
+      "description": "GPT-4 Turbo"
+    },
+    "gpt-4-turbo-preview": {
+      "promptPerMTokUsd": 10.0,
+      "completionPerMTokUsd": 30.0,
+      "description": "GPT-4 Turbo Preview"
+    },
+    "gpt-4o": {
+      "promptPerMTokUsd": 2.5,
+      "completionPerMTokUsd": 10.0,
+      "description": "GPT-4o optimized model"
+    },
+    "gpt-4o-mini": {
+      "promptPerMTokUsd": 0.15,
+      "completionPerMTokUsd": 0.6,
+      "description": "GPT-4o Mini - cost-effective variant"
+    },
+    "gpt-4o-2024-05-13": {
+      "promptPerMTokUsd": 5.0,
+      "completionPerMTokUsd": 15.0,
+      "description": "GPT-4o May 2024 snapshot"
+    },
+    "o1": {
+      "promptPerMTokUsd": 15.0,
+      "completionPerMTokUsd": 60.0,
+      "description": "O1 reasoning model"
+    },
+    "o1-mini": {
+      "promptPerMTokUsd": 1.1,
+      "completionPerMTokUsd": 4.4,
+      "description": "O1 Mini reasoning model"
+    },
+    "o1-pro": {
+      "promptPerMTokUsd": 150.0,
+      "completionPerMTokUsd": 600.0,
+      "description": "O1 Pro reasoning model"
+    },
+    "gpt-4-turbo-2024-04-09": {
+      "promptPerMTokUsd": 10.0,
+      "completionPerMTokUsd": 30.0,
+      "description": "GPT-4 Turbo April 2024"
+    },
+    "chatgpt-4o-latest": {
+      "promptPerMTokUsd": 5.0,
+      "completionPerMTokUsd": 15.0,
+      "description": "ChatGPT-4o Latest"
+    },
+    "gpt-3.5-turbo": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "GPT-3.5 Turbo"
+    },
+    "gpt-3.5-turbo-0125": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "GPT-3.5 Turbo January 2024 snapshot"
+    },
+    "gpt-3.5-turbo-instruct": {
+      "promptPerMTokUsd": 1.5,
+      "completionPerMTokUsd": 2.0,
+      "description": "GPT-3.5 Turbo Instruct"
+    },
+    "text-embedding-ada-002": {
+      "promptPerMTokUsd": 0.1,
+      "completionPerMTokUsd": 0.0,
+      "description": "Text Embedding Ada 002"
+    },
+    "text-embedding-3-small": {
+      "promptPerMTokUsd": 0.02,
+      "completionPerMTokUsd": 0.0,
+      "description": "Text Embedding 3 Small"
+    },
+    "text-embedding-3-large": {
+      "promptPerMTokUsd": 0.13,
+      "completionPerMTokUsd": 0.0,
+      "description": "Text Embedding 3 Large"
+    },
+    "whisper-1": {
+      "promptPerMTokUsd": 6.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Whisper speech-to-text ($0.006 per minute, approximated)"
+    },
+    "tts-1": {
+      "promptPerMTokUsd": 15.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Text-to-speech 1 ($15.00 per 1M characters)"
+    },
+    "tts-1-hd": {
+      "promptPerMTokUsd": 30.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Text-to-speech 1 HD ($30.00 per 1M characters)"
+    },
+    "dall-e-2": {
+      "promptPerMTokUsd": 16.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "DALL-E 2 image generation ($0.016-$0.020 per image)"
+    },
+    "dall-e-3": {
+      "promptPerMTokUsd": 40.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "DALL-E 3 image generation ($0.040-$0.120 per image)"
+    }
+  },
+  "modelFamilyPatterns": [
+    {
+      "pattern": "^o1-pro",
+      "baseModel": "o1-pro",
+      "description": "O1 Pro variants"
+    },
+    {
+      "pattern": "^o1-mini",
+      "baseModel": "o1-mini",
+      "description": "O1 Mini variants"
+    },
+    {
+      "pattern": "^o1",
+      "baseModel": "o1",
+      "description": "O1 variants"
+    },
+    {
+      "pattern": "^gpt-4o-2024-05-13",
+      "baseModel": "gpt-4o-2024-05-13",
+      "description": "GPT-4o May 2024 variants"
+    },
+    {
+      "pattern": "^gpt-4o-mini",
+      "baseModel": "gpt-4o-mini",
+      "description": "GPT-4o Mini variants"
+    },
+    {
+      "pattern": "^gpt-4o",
+      "baseModel": "gpt-4o",
+      "description": "GPT-4o variants"
+    },
+    {
+      "pattern": "^gpt-4-turbo",
+      "baseModel": "gpt-4-turbo",
+      "description": "GPT-4 Turbo variants"
+    },
+    {
+      "pattern": "^gpt-4",
+      "baseModel": "gpt-4",
+      "description": "GPT-4 variants"
+    },
+    {
+      "pattern": "^gpt-3\\.5-turbo-instruct",
+      "baseModel": "gpt-3.5-turbo-instruct",
+      "description": "GPT-3.5 Turbo Instruct variants"
+    },
+    {
+      "pattern": "^gpt-3\\.5-turbo",
+      "baseModel": "gpt-3.5-turbo",
+      "description": "GPT-3.5 Turbo variants"
+    },
+    {
+      "pattern": "^text-embedding-3-large",
+      "baseModel": "text-embedding-3-large",
+      "description": "Text Embedding 3 Large variants"
+    },
+    {
+      "pattern": "^text-embedding-3-small",
+      "baseModel": "text-embedding-3-small",
+      "description": "Text Embedding 3 Small variants"
+    },
+    {
+      "pattern": "^text-embedding-ada",
+      "baseModel": "text-embedding-ada-002",
+      "description": "Text Embedding Ada variants"
+    },
+    {
+      "pattern": "^whisper",
+      "baseModel": "whisper-1",
+      "description": "Whisper variants"
+    },
+    {
+      "pattern": "^tts-1-hd",
+      "baseModel": "tts-1-hd",
+      "description": "TTS 1 HD variants"
+    },
+    {
+      "pattern": "^tts",
+      "baseModel": "tts-1",
+      "description": "TTS variants"
+    },
+    {
+      "pattern": "^dall-e-3",
+      "baseModel": "dall-e-3",
+      "description": "DALL-E 3 variants"
+    },
+    {
+      "pattern": "^dall-e",
+      "baseModel": "dall-e-2",
+      "description": "DALL-E variants"
+    }
+  ]
+}
