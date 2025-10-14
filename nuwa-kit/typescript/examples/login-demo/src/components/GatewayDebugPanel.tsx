@@ -11,7 +11,7 @@ export function GatewayDebugPanel() {
   const [mcpUrl, setMcpUrlState] = useState(getMcpUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
-  const [provider, setProvider] = useState<'openrouter' | 'litellm'>('openrouter');
+  const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai'>('openrouter');
   const [isStream, setIsStream] = useState<boolean>(false);
   const [requestBody, setRequestBody] = useState(`{
     "model": "deepseek/deepseek-r1-0528:free",
@@ -20,6 +20,67 @@ export function GatewayDebugPanel() {
       { "role": "user", "content": "Hello, who are you?" }
     ]
   }`);
+
+  // Provider configurations
+  const getProviderConfig = (providerName: string) => {
+    switch (providerName) {
+      case 'openrouter':
+        return {
+          defaultPath: '/api/v1/chat/completions',
+          defaultModel: 'openai/gpt-4o-mini',
+          paths: ['/api/v1/chat/completions', '/api/v1/models', '/api/v1/completions']
+        };
+      case 'openai':
+        return {
+          defaultPath: '/v1/chat/completions',
+          defaultModel: 'gpt-4o-mini',
+          paths: ['/v1/chat/completions', '/v1/models', '/v1/completions', '/v1/embeddings']
+        };
+      case 'litellm':
+        return {
+          defaultPath: '/chat/completions',
+          defaultModel: 'gpt-4o-mini',
+          paths: ['/chat/completions', '/models', '/completions']
+        };
+      default:
+        return {
+          defaultPath: '/api/v1/chat/completions',
+          defaultModel: 'gpt-4o-mini',
+          paths: ['/api/v1/chat/completions']
+        };
+    }
+  };
+
+  // Build the actual request path based on new provider-first routing
+  const buildRequestPath = (provider: string, apiPath: string): string => {
+    return `/${provider}${apiPath}`;
+  };
+
+  // Handle provider change - update path and model
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider as any);
+    const config = getProviderConfig(newProvider);
+    setApiPath(config.defaultPath);
+    
+    // Update request body with new default model
+    try {
+      const currentBody = JSON.parse(requestBody);
+      const updatedBody = {
+        ...currentBody,
+        model: config.defaultModel
+      };
+      setRequestBody(JSON.stringify(updatedBody, null, 2));
+    } catch (e) {
+      // If parsing fails, create a new default body
+      setRequestBody(`{
+    "model": "${config.defaultModel}",
+    "messages": [
+      { "role": "system", "content": "You are a helpful assistant." },
+      { "role": "user", "content": "Hello, who are you?" }
+    ]
+  }`);
+    }
+  };
   const [responseText, setResponseText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,17 +257,16 @@ export function GatewayDebugPanel() {
       setLoading(true);
       setError(null);
       setResponseText(null);
-      const additionalHeaders: Record<string, string> = {};
-      if (provider) {
-        additionalHeaders['X-LLM-Provider'] = provider;
-      }
+      
+      // Build the new provider-based path
+      const finalPath = buildRequestPath(provider, apiPath);
 
       // Send via Payment Channel client using sdk
       if (!sdk) throw new Error('SDK not initialized');
       const parsedBody = method !== 'GET' && method !== 'DELETE' && requestBody ? JSON.parse(requestBody) : undefined;
       if (isStream) {
         const bodyWithStream = parsedBody ? { ...parsedBody, stream: true } : { stream: true };
-        const handle = await requestWithPaymentRaw(sdk, gatewayUrl, 'POST', apiPath, bodyWithStream, additionalHeaders);
+        const handle = await requestWithPaymentRaw(sdk, gatewayUrl, 'POST', finalPath, bodyWithStream);
         const resp = await handle.response;
         if (!resp.body) throw new Error('No response body for stream');
         // Read full stream into text for debug panel (app-level would normally consume incrementally)
@@ -237,7 +297,7 @@ export function GatewayDebugPanel() {
         // payment will be resolved asynchronously inside client via in-band frame; we cannot access it directly here
         
       } else {
-        const { data, payment } = await requestWithPayment(sdk, gatewayUrl, method, apiPath, parsedBody, additionalHeaders);
+        const { data, payment } = await requestWithPayment(sdk, gatewayUrl, method, finalPath, parsedBody);
         if (!payment) {
           setPaymentNote('No payment info from server.');
         } else {
@@ -388,23 +448,37 @@ export function GatewayDebugPanel() {
           <option value="PUT">PUT</option>
           <option value="DELETE">DELETE</option>
         </select>
+        <select 
+          value={apiPath} 
+          onChange={e => setApiPath(e.target.value)}
+          style={{ marginLeft: '8px', width: '200px' }}
+        >
+          {getProviderConfig(provider).paths.map(path => (
+            <option key={path} value={path}>{path}</option>
+          ))}
+        </select>
         <input
           type="text"
           value={apiPath}
           onChange={e => setApiPath(e.target.value)}
-          style={{ width: '70%', marginLeft: '8px' }}
+          style={{ width: '40%', marginLeft: '8px' }}
+          placeholder="Custom path..."
         />
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
+          Final path: <code>/{provider}{apiPath}</code>
+        </div>
       </div>
       )}
 
       {activeTab === 'http' && (
       <div className="provider-select" style={{ marginBottom: '1rem' }}>
         <label style={{ marginRight: '8px' }}>Provider:</label>
-        <select value={provider} onChange={e => setProvider(e.target.value as any)}>
-          <option value="openrouter">openrouter</option>
-          <option value="litellm">litellm</option>
+        <select value={provider} onChange={e => handleProviderChange(e.target.value)}>
+          <option value="openrouter">OpenRouter</option>
+          <option value="openai">OpenAI</option>
+          <option value="litellm">LiteLLM</option>
         </select>
-        <small style={{ marginLeft: '8px' }}>(adds X-LLM-Provider header)</small>
+        <small style={{ marginLeft: '8px' }}>(uses /{provider}/* path routing)</small>
       </div>
       )}
 
