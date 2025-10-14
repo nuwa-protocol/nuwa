@@ -134,12 +134,33 @@ function loadConfigFile(configPath: string): any {
 
   try {
     const configYaml = fs.readFileSync(configPath, "utf8");
+    const missingVars: string[] = [];
+
     const configWithEnvVars = configYaml.replace(
       /\${([^}]+)}/g,
-      (_, varName) => {
-        return process.env[varName] || "";
+      (match, varName) => {
+        const value = process.env[varName];
+        if (value === undefined || value === "") {
+          missingVars.push(varName);
+          return ""; // Keep empty string for now, but track missing vars
+        }
+        return value;
       },
     );
+
+    // Warn about missing environment variables
+    if (missingVars.length > 0) {
+      console.warn(
+        `⚠️  Warning: Missing environment variables in config file ${configPath}:`,
+      );
+      missingVars.forEach((varName) => {
+        console.warn(`   - ${varName} (referenced as \${${varName}})`);
+      });
+      console.warn(
+        "   These variables will be treated as empty strings, which may cause runtime errors.",
+      );
+    }
+
     return yaml.load(configWithEnvVars) as any;
   } catch (error) {
     console.error(`Error loading config file ${configPath}:`, error);

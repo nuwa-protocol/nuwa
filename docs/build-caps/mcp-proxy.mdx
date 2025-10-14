@@ -3,7 +3,9 @@ title: "MCP Proxy"
 description: "Set up your existing MCP server with a Nuwa MCP Proxy to start accepting payments"
 ---
 
-With [Nuwa MCP Proxy](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy), you can convert an existing MCP server (Streamable HTTP or STDIO) into a Nuwa‑Compatible MCP endpoint, enable DID authentication for the server and payment for your MCP tools, without changing the service. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics. 
+With [Nuwa MCP Proxy](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy), you can convert an existing MCP server (Streamable HTTP or STDIO) into a Nuwa‑Compatible MCP endpoint, enable DID authentication for the server and payment for your MCP tools, without changing the service. The proxy exposes a single JSON‑RPC endpoint (`/mcp`) over streamable HTTP, forwards tools, and attaches Nuwa payment semantics.
+
+**NPM Package**: [`@nuwa-ai/mcp-server-proxy`](https://www.npmjs.com/package/@nuwa-ai/mcp-server-proxy) - Ready to use without building from source. 
 
 <Note>
 Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For multiple MCP servers, you have to deploy multiple Nuwa MCP Proxy instances.
@@ -11,24 +13,26 @@ Nuwa MCP Proxy is designed to be single-server, single-endpoint MCP server. For 
 
 ## Quick start
 
-
 <Note>
 Before you start: obtain a Service Key for your service DID. See the
 <a href="/build-caps/service-key">Service Key guide</a> and use the copied value as
 <code>SERVICE_KEY</code>.
 </Note>
 
-<Steps>
-<Step title="Install and build">
+<Tabs>
+<Tab title="Using NPM Package (Recommended)">
 
-you can find the full implementation of [Nuwa MCP Proxy on in the Nuwa Monorepo](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/mcp-server-proxy).
+<Steps>
+<Step title="Install globally">
 
 ```bash
-git clone https://github.com/nuwa-protocol/nuwa.git
-cd nuwa/nuwa-services/mcp-server-proxy
-pnpm install
-pnpm build
+# Install the published package
+npm install -g @nuwa-ai/mcp-server-proxy
+
+# Or use without installation
+npx @nuwa-ai/mcp-server-proxy --help
 ```
+
 </Step>
 
 <Step title="Create a config.yaml">
@@ -74,8 +78,13 @@ Not sure where <code>SERVICE_KEY</code> comes from? Follow the
 export SERVICE_KEY=...          # required for settlement
 export UPSTREAM_API_TOKEN=...   # if your upstream requires it
 
-node dist/index.js --config ./config.yaml
-# -> serves POST /mcp (JSON-RPC over streamable HTTP)
+# Run with global installation
+mcp-server-proxy --config ./config.yaml
+
+# Or run with npx (no installation needed)
+npx @nuwa-ai/mcp-server-proxy --config ./config.yaml
+
+# → serves POST /mcp (JSON-RPC over streamable HTTP)
 ```
 
 </Step>
@@ -86,6 +95,40 @@ You can use the [MCP Debug tool](https://test-app.nuwa.dev/cap-studio/mcp) provi
 
 </Step>
 </Steps>
+
+</Tab>
+
+<Tab title="Build from Source">
+
+<Steps>
+<Step title="Clone and build">
+
+For development or customization, you can build from source. Find the full implementation in the [Nuwa Monorepo](https://github.com/rooch-network/nuwa/tree/main/nuwa-services/mcp-server-proxy).
+
+```bash
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/mcp-server-proxy
+pnpm install
+pnpm build
+```
+</Step>
+
+<Step title="Create config and run">
+
+Create your `config.yaml` (same as above) and run:
+
+```bash
+export SERVICE_KEY=...
+export UPSTREAM_API_TOKEN=...
+
+node dist/index.js --config ./config.yaml
+```
+
+</Step>
+</Steps>
+
+</Tab>
+</Tabs>
 
 ## Upstream modes
 
@@ -119,17 +162,31 @@ upstream:
 
 ## Preconfigured examples
 
-Two ready-to-run examples are included in `nuwa-services/mcp-server-proxy`:
+Two ready-to-run examples are included. You can use them with either the npm package or source code:
 
 <Tabs>
 <Tab title="Amap proxy (HTTP upstream)">
 
+**Using NPM Package:**
+```bash
+# Download config file
+curl -o amap-config.yaml https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
+
+export AMAP_API_KEY=your_amap_api_key_here
+export SERVICE_KEY=your_service_key_here
+export PORT=8088
+
+# Run with npm package
+mcp-server-proxy --config ./amap-config.yaml
+# Or with npx
+npx @nuwa-ai/mcp-server-proxy --config ./amap-config.yaml
+```
+
+**Using Source Code:**
 ```bash
 cd nuwa-services/mcp-server-proxy
 export AMAP_API_KEY=your_amap_api_key_here
 export SERVICE_KEY=your_service_key_here
-
-# Optional: set a port (defaults in script)
 export PORT=8088
 
 ./examples/run-amap-local.sh
@@ -142,11 +199,24 @@ Config reference: `deployments/instances/amap-proxy/config.yaml`
 
 <Tab title="Context7 proxy (stdio upstream)">
 
+**Using NPM Package:**
+```bash
+# Download config file
+curl -o context7-config.yaml https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
+
+export SERVICE_KEY=your_service_key_here
+export PORT=8089
+
+# Run with npm package
+mcp-server-proxy --config ./context7-config.yaml
+# Or with npx
+npx @nuwa-ai/mcp-server-proxy --config ./context7-config.yaml
+```
+
+**Using Source Code:**
 ```bash
 cd nuwa-services/mcp-server-proxy
 export SERVICE_KEY=your_service_key_here
-
-# Optional: set a port (defaults in script)
 export PORT=8089
 
 ./examples/run-context7-local.sh

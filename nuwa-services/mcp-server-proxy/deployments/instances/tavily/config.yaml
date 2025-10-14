@@ -1,0 +1,17 @@
+# tavily MCP Proxy Configuration
+
+# Server settings
+port: ${PORT}
+endpoint: "/mcp"
+
+# tavily MCP server
+upstream:
+  type: "httpStream"
+  url: "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_API_KEY}" 
+
+# Payment configuration
+serviceId: "tavily-mcp-proxy"
+serviceKey: "${SERVICE_KEY}"
+network: "test"
+defaultPricePicoUSD: "8040000000"  # 0.00804 USD
+debug: ${DEBUG}
