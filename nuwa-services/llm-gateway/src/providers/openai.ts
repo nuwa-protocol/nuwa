@@ -10,7 +10,7 @@ export class OpenAIProvider implements LLMProvider {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+    this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com/";
   }
 
   /**

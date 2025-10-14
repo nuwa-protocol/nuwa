@@ -764,7 +764,7 @@ function logEnvironmentStatus(): void {
     LITELLM_BASE_URL: process.env.LITELLM_BASE_URL || '❌ Not configured',
     
     // OpenAI - uses official API, no special config needed
-    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/',
     
     // Pricing configuration
     PRICING_OVERRIDES: process.env.PRICING_OVERRIDES ? '✅ Custom pricing set' : '❌ Using defaults',
