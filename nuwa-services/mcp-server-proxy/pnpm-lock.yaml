@@ -15,8 +15,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.3
-        version: 0.6.3(express@5.1.0)(typescript@5.8.3)
+        specifier: ^0.6.4
+        version: 0.6.4(express@5.1.0)(typescript@5.8.3)
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
@@ -597,8 +597,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.3':
-    resolution: {integrity: sha512-VhpyFHcj8NKUwK1+fU+vEsSVDra7EwC6HIln8esFfIzwLK41fuuc61l4ioqFHWIQkhBNWrjsR4nwz922e3OyEA==}
+  '@nuwa-ai/payment-kit@0.6.4':
+    resolution: {integrity: sha512-TKlGX1jcGfecBEhzunV+GMAa90HTzgF2qXTeKYY5u3piFEC9UFRN5+rI1MBkjncBnd7nDoXfokIJjQd2r7UEew==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1677,6 +1677,9 @@ packages:
     resolution: {integrity: sha512-haREypq7xkM7ErfgIyA0z+Bj4AGKlMSdlQE2jvJo6huWD1EdkKYV+G/T4nq0YEF2vgTT8kqMFKo1uHn950r4SQ==}
     engines: {node: '>=12'}
 
+  path-to-regexp@6.3.0:
+    resolution: {integrity: sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==}
+
   path-to-regexp@8.2.0:
     resolution: {integrity: sha512-TdrF7fW9Rphjq4RjrW0Kp2AW0Ahwu9sRGTkS6bvDi0SCwZlEZYmcfDbEsTz8RVk0EHIS/Vd1bv3JhG+1xZuAyQ==}
     engines: {node: '>=16'}
@@ -2496,7 +2499,7 @@ snapshots:
       cors: 2.8.5
       cross-spawn: 7.0.6
       eventsource: 3.0.7
-      eventsource-parser: 3.0.3
+      eventsource-parser: 3.0.6
       express: 5.1.0
       express-rate-limit: 7.5.1(express@5.1.0)
       pkce-challenge: 5.0.0
@@ -2544,7 +2547,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.3(express@5.1.0)(typescript@5.8.3)':
+  '@nuwa-ai/payment-kit@0.6.4(express@5.1.0)(typescript@5.8.3)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.8.3)
@@ -2557,6 +2560,7 @@ snapshots:
       lossless-json: 4.2.0
       mcp-proxy: 5.5.6
       on-headers: 1.1.0
+      path-to-regexp: 6.3.0
       zod: 3.25.67
       zod-to-json-schema: 3.24.6(zod@3.25.67)
     optionalDependencies:
@@ -3749,6 +3753,8 @@ snapshots:
   path-key@3.1.1: {}
 
   path-key@4.0.0: {}
+
+  path-to-regexp@6.3.0: {}
 
   path-to-regexp@8.2.0: {}
 
