@@ -1,5 +1,8 @@
 import { BillingRule } from './types';
 
+// Cache for compiled regex patterns to improve performance
+const regexCache = new Map<string, RegExp>();
+
 /**
  * Pure functional implementation of rule matching used by all environments
  * (Express / Koa / Cloudflare Workers / …).
@@ -15,6 +18,26 @@ export function findRule(meta: Record<string, any>, rules: BillingRule[]): Billi
     }
   }
   return undefined;
+}
+
+/**
+ * Get or create a cached RegExp object for the given pattern
+ */
+function getCachedRegex(pattern: string): RegExp {
+  let regex = regexCache.get(pattern);
+  if (!regex) {
+    regex = new RegExp(pattern);
+    // Limit cache size to prevent memory leaks
+    if (regexCache.size >= 100) {
+      // Remove oldest entry when cache is full
+      const firstKey = regexCache.keys().next().value;
+      if (firstKey) {
+        regexCache.delete(firstKey);
+      }
+    }
+    regexCache.set(pattern, regex);
+  }
+  return regex;
 }
 
 /**
@@ -38,11 +61,19 @@ function matchesRule(meta: Record<string, any>, rule: BillingRule): boolean {
     return false;
   }
 
-  // Path regex match
+  // Path regex match (optimized with caching)
   if (when.pathRegex) {
-    const regex = new RegExp(when.pathRegex);
-    if (!regex.test(meta.path || '')) {
-      return false;
+    // Check if we have an original RegExp with flags
+    const originalRegex = (rule as any).originalRegex;
+    if (originalRegex && originalRegex instanceof RegExp) {
+      if (!originalRegex.test(meta.path || '')) {
+        return false;
+      }
+    } else {
+      const regex = getCachedRegex(when.pathRegex);
+      if (!regex.test(meta.path || '')) {
+        return false;
+      }
     }
   }
 

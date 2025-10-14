@@ -1,4 +1,5 @@
 import express, { Router, RequestHandler } from 'express';
+import { pathToRegexp } from 'path-to-regexp';
 import { findRule as coreFindRule } from '../../billing/core/rule-matcher';
 import type { BillingRule, StrategyConfig, RuleProvider } from '../../billing';
 
@@ -89,7 +90,7 @@ export class BillableRouter implements RuleProvider {
   // ---------------------------------------------------------------------
 
   get(
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -98,7 +99,7 @@ export class BillableRouter implements RuleProvider {
   }
 
   post(
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -107,7 +108,7 @@ export class BillableRouter implements RuleProvider {
   }
 
   put(
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -116,7 +117,7 @@ export class BillableRouter implements RuleProvider {
   }
 
   delete(
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -125,7 +126,7 @@ export class BillableRouter implements RuleProvider {
   }
 
   patch(
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -153,7 +154,7 @@ export class BillableRouter implements RuleProvider {
   // ---------------------------------------------------------------------
   private register(
     method: string,
-    path: string,
+    path: string | RegExp,
     options: RouteOptions | bigint | string | StrategyConfig,
     handler: RequestHandler,
     id?: string
@@ -168,6 +169,46 @@ export class BillableRouter implements RuleProvider {
     } else {
       // Legacy usage: pricing only (bigint, string, or StrategyConfig)
       routeOptions = { pricing: options as bigint | string | StrategyConfig };
+    }
+
+    // Handle path conversion to regex for billing rules
+    let pathRegex: string;
+    let pathForId: string;
+    let originalRegex: RegExp | undefined;
+
+    if (path instanceof RegExp) {
+      // Already a RegExp - use its source and preserve flags
+      pathRegex = path.source;
+      pathForId = path.toString();
+      originalRegex = path;
+    } else {
+      // String path - convert using path-to-regexp
+      try {
+        const regexp = pathToRegexp(path);
+        pathRegex = regexp.source;
+        pathForId = path;
+      } catch (error) {
+        // Handle path-to-regexp version differences and Express compatibility
+        let convertedPath = path;
+
+        // Convert Express 4.x wildcard syntax to path-to-regexp 6.x compatible format
+        if (path.includes('*')) {
+          convertedPath = path.replace(/\/\*$/, '/(.*)'); // Convert trailing /* to /(.*)
+          convertedPath = convertedPath.replace(/\*/, '(.*)'); // Convert other * to (.*)
+        }
+
+        try {
+          const regexp = pathToRegexp(convertedPath);
+          pathRegex = regexp.source;
+          pathForId = path;
+        } catch (secondError) {
+          // Final fallback: create a basic regex
+          let escapedPath = path.replace(/[.+?^${}()|[\]\\]/g, '\\$&'); // Escape regex chars but not *
+          escapedPath = escapedPath.replace(/\*/g, '.*'); // Convert * to .*
+          pathRegex = `^${escapedPath}$`;
+          pathForId = path;
+        }
+      }
     }
 
     // Determine strategy config
@@ -190,7 +231,7 @@ export class BillableRouter implements RuleProvider {
     // Validation: adminOnly implies authRequired
     if (adminOnly && authRequired === false) {
       throw new Error(
-        `Route ${method.toUpperCase()} ${path}: adminOnly requires authRequired to be true or undefined`
+        `Route ${method.toUpperCase()} ${pathForId}: adminOnly requires authRequired to be true or undefined`
       );
     }
 
@@ -226,9 +267,9 @@ export class BillableRouter implements RuleProvider {
 
     // Collect billing rule
     const rule: BillingRule = {
-      id: id || `${method}:${path}`,
+      id: id || `${method.toUpperCase()}:${pathForId}`,
       when: {
-        path,
+        pathRegex,
         method: method.toUpperCase(),
       },
       strategy,
@@ -236,6 +277,11 @@ export class BillableRouter implements RuleProvider {
       adminOnly,
       paymentRequired,
     };
+
+    // Store original RegExp with flags if available for proper matching
+    if (originalRegex) {
+      (rule as any).originalRegex = originalRegex;
+    }
 
     // Rule created
 

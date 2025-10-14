@@ -98,11 +98,26 @@ export interface ExpressPaymentKit {
   readonly router: Router;
 
   /** HTTP verb methods for registering routes with billing */
-  get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
-  post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
-  put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
-  delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
-  patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  get(path: string | RegExp, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  post(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this;
+  put(path: string | RegExp, options: RouteOptions, handler: RequestHandler, ruleId?: string): this;
+  delete(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this;
+  patch(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this;
 
   /** Get the underlying PayeeClient for advanced operations */
   getPayeeClient(): PaymentChannelPayeeClient;
@@ -674,31 +689,56 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
   }
 
   // HTTP verb methods
-  get(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+  get(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this {
     this.validateRouteOptions(options);
     this.billableRouter.get(path, options, handler, ruleId);
     return this;
   }
 
-  post(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+  post(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this {
     this.validateRouteOptions(options);
     this.billableRouter.post(path, options, handler, ruleId);
     return this;
   }
 
-  put(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+  put(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this {
     this.validateRouteOptions(options);
     this.billableRouter.put(path, options, handler, ruleId);
     return this;
   }
 
-  delete(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+  delete(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this {
     this.validateRouteOptions(options);
     this.billableRouter.delete(path, options, handler, ruleId);
     return this;
   }
 
-  patch(path: string, options: RouteOptions, handler: RequestHandler, ruleId?: string): this {
+  patch(
+    path: string | RegExp,
+    options: RouteOptions,
+    handler: RequestHandler,
+    ruleId?: string
+  ): this {
     this.validateRouteOptions(options);
     this.billableRouter.patch(path, options, handler, ruleId);
     return this;
