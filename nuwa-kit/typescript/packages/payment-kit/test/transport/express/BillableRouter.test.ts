@@ -56,12 +56,13 @@ describe('BillableRouter', () => {
         authRequired: false,
       };
 
-      router.get('/files/*', options, mockHandler, 'static-files');
+      // Use proper path-to-regexp 6.x syntax for wildcards
+      router.get('/files/(.*)', options, mockHandler, 'static-files');
 
       const rules = router.getRules();
       expect(rules).toHaveLength(1);
 
-      // Test wildcard matching - path-to-regexp converts '/files/*' to a proper regex
+      // Test wildcard matching - path-to-regexp converts '/files/(.*)' to a proper regex
       const rule1 = router.findRule('GET', '/files/images/test.png');
       expect(rule1).toBeDefined();
       expect(rule1?.id).toBe('static-files');
@@ -270,20 +271,66 @@ describe('BillableRouter', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle path-to-regexp conversion errors gracefully', () => {
+    it('should throw clear errors for invalid path patterns', () => {
       const options: RouteOptions = {
         pricing: '1000000',
         authRequired: true,
       };
 
-      // Test with a simpler potentially problematic path that won't break Express
+      // Test invalid wildcard syntax
       expect(() => {
-        router.get('/api/test?', options, mockHandler, 'questionmark-path');
+        router.get('/files/*', options, mockHandler, 'invalid-wildcard');
+      }).toThrow(/Invalid route path "\/files\/\*"/);
+
+      // Test invalid modifier syntax
+      expect(() => {
+        router.get('/api/test?', options, mockHandler, 'invalid-modifier');
+      }).toThrow(/Invalid route path "\/api\/test\?"/);
+
+      // Test unbalanced parentheses
+      expect(() => {
+        router.get('/api/(unclosed', options, mockHandler, 'unbalanced-parens');
+      }).toThrow(/Invalid route path "\/api\/\(unclosed"/);
+    });
+
+    it('should provide helpful error messages with usage hints', () => {
+      const options: RouteOptions = {
+        pricing: '1000000',
+        authRequired: true,
+      };
+
+      try {
+        router.get('/files/*', options, mockHandler, 'test-error-message');
+        fail('Expected error to be thrown');
+      } catch (error: any) {
+        expect(error.message).toContain('Invalid route path "/files/*"');
+        expect(error.message).toContain('Please use a valid Express.js route pattern');
+        expect(error.message).toContain('Use "/*" instead of "*" for wildcards');
+        expect(error.message).toContain('https://github.com/pillarjs/path-to-regexp#usage');
+      }
+    });
+
+    it('should accept valid path patterns', () => {
+      const options: RouteOptions = {
+        pricing: '1000000',
+        authRequired: true,
+      };
+
+      // These should work fine
+      expect(() => {
+        router.get('/api/test', options, mockHandler, 'simple-path');
+      }).not.toThrow();
+
+      expect(() => {
+        router.get('/api/users/:id', options, mockHandler, 'param-path');
+      }).not.toThrow();
+
+      expect(() => {
+        router.get('/files/(.*)', options, mockHandler, 'wildcard-path');
       }).not.toThrow();
 
       const rules = router.getRules();
-      expect(rules.length).toBeGreaterThan(0);
-      expect(rules[0].when?.pathRegex).toBeDefined();
+      expect(rules.length).toBeGreaterThanOrEqual(3);
     });
   });
 });
