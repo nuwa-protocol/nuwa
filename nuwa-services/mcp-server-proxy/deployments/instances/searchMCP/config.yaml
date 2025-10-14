@@ -10,7 +10,7 @@ upstream:
   url: "https://api.searchmcp.io/mcp"
   auth:
     scheme: "header"
-    header: "x-api-key"
+    header: "X-API-Key"
     value: "${SEARCHMCP_API_KEY}"
 
 # Payment configuration

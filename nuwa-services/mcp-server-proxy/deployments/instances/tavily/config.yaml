@@ -7,11 +7,7 @@ endpoint: "/mcp"
 # tavily MCP server
 upstream:
   type: "httpStream"
-  url: "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_API_KEY}"
-  auth:
-    scheme: "header"
-    header: "x-api-key"
-    value: "${TAVILY_API_KEY}"
+  url: "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_API_KEY}" 
 
 # Payment configuration
 serviceId: "tavily-mcp-proxy"
