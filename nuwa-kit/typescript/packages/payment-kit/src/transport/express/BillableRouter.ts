@@ -188,26 +188,17 @@ export class BillableRouter implements RuleProvider {
         pathRegex = regexp.source;
         pathForId = path;
       } catch (error) {
-        // Handle path-to-regexp version differences and Express compatibility
-        let convertedPath = path;
-
-        // Convert Express 4.x wildcard syntax to path-to-regexp 6.x compatible format
-        if (path.includes('*')) {
-          convertedPath = path.replace(/\/\*$/, '/(.*)'); // Convert trailing /* to /(.*)
-          convertedPath = convertedPath.replace(/\*/, '(.*)'); // Convert other * to (.*)
-        }
-
-        try {
-          const regexp = pathToRegexp(convertedPath);
-          pathRegex = regexp.source;
-          pathForId = path;
-        } catch (secondError) {
-          // Final fallback: create a basic regex
-          let escapedPath = path.replace(/[.+?^${}()|[\]\\]/g, '\\$&'); // Escape regex chars but not *
-          escapedPath = escapedPath.replace(/\*/g, '.*'); // Convert * to .*
-          pathRegex = `^${escapedPath}$`;
-          pathForId = path;
-        }
+        // pathToRegexp failed - provide clear error message to user
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Invalid route path "${path}": ${errorMessage}. ` +
+            'Please use a valid Express.js route pattern. ' +
+            'Common issues: ' +
+            '• Use "/*" instead of "*" for wildcards ' +
+            '• Ensure parentheses are properly balanced ' +
+            '• Use ":param" syntax for parameters ' +
+            'For more details, see: https://github.com/pillarjs/path-to-regexp#usage'
+        );
       }
     }
 
@@ -276,12 +267,9 @@ export class BillableRouter implements RuleProvider {
       authRequired,
       adminOnly,
       paymentRequired,
+      // Store original RegExp with flags if available for proper matching
+      originalRegex,
     };
-
-    // Store original RegExp with flags if available for proper matching
-    if (originalRegex) {
-      (rule as any).originalRegex = originalRegex;
-    }
 
     // Rule created
 

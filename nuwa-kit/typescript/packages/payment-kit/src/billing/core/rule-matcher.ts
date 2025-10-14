@@ -22,11 +22,22 @@ export function findRule(meta: Record<string, any>, rules: BillingRule[]): Billi
 
 /**
  * Get or create a cached RegExp object for the given pattern
+ * @throws {Error} If the pattern is not a valid regular expression
  */
 function getCachedRegex(pattern: string): RegExp {
   let regex = regexCache.get(pattern);
   if (!regex) {
-    regex = new RegExp(pattern);
+    try {
+      regex = new RegExp(pattern);
+    } catch (error) {
+      // Provide a more user-friendly error message for invalid regex patterns
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Invalid regular expression pattern "${pattern}": ${errorMessage}. ` +
+          'Please check your billing rule configuration and ensure the pathRegex field contains a valid regular expression.'
+      );
+    }
+
     // Limit cache size to prevent memory leaks
     if (regexCache.size >= 100) {
       // Remove oldest entry when cache is full
@@ -63,17 +74,23 @@ function matchesRule(meta: Record<string, any>, rule: BillingRule): boolean {
 
   // Path regex match (optimized with caching)
   if (when.pathRegex) {
-    // Check if we have an original RegExp with flags
-    const originalRegex = (rule as any).originalRegex;
-    if (originalRegex && originalRegex instanceof RegExp) {
-      if (!originalRegex.test(meta.path || '')) {
-        return false;
+    try {
+      // Check if we have an original RegExp with flags
+      if (rule.originalRegex && rule.originalRegex instanceof RegExp) {
+        if (!rule.originalRegex.test(meta.path || '')) {
+          return false;
+        }
+      } else {
+        const regex = getCachedRegex(when.pathRegex);
+        if (!regex.test(meta.path || '')) {
+          return false;
+        }
       }
-    } else {
-      const regex = getCachedRegex(when.pathRegex);
-      if (!regex.test(meta.path || '')) {
-        return false;
-      }
+    } catch (error) {
+      // If regex compilation fails, log the error and treat as non-matching
+      // This prevents invalid regex patterns from crashing the application
+      console.error(`[BillingRule] Failed to compile regex pattern for rule "${rule.id}":`, error);
+      return false;
     }
   }
 
