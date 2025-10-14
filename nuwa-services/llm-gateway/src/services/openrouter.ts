@@ -315,17 +315,27 @@ class OpenRouterService implements LLMProvider {
   /**
    * Extract USD cost from OpenRouter response
    * OpenRouter provides native USD cost in usage.cost or x-usage header
+   * 
+   * NOTE: For stream responses, cost is NOT available at request initiation time.
+   * Stream cost should be extracted from the final SSE chunks during stream processing.
    */
   extractProviderUsageUsd(response: AxiosResponse): number | undefined {
     try {
       const data = response.data;
       
-      // First try to get cost from response body
+      // Check if this is a stream response (data has pipe method)
+      if (data && typeof data === 'object' && typeof data.pipe === 'function') {
+        // For stream responses, cost is not available at this stage
+        // It will be extracted later from SSE chunks by UsagePolicy.extractUsageFromStreamChunk
+        return undefined;
+      }
+
+      // For non-stream responses, try to get cost from response body first
       if (data && typeof data === 'object' && data.usage && typeof data.usage.cost === 'number') {
         return data.usage.cost;
       }
 
-      // Fallback to x-usage header
+      // Fallback to x-usage header for non-stream responses
       const headers = response.headers || {};
       const usageHeader = headers['x-usage'] || headers['X-Usage'];
       if (typeof usageHeader === 'string' && usageHeader.length > 0) {

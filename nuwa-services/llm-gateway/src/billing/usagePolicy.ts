@@ -32,10 +32,10 @@ export class UsagePolicy {
   }
 
   /**
-   * Extract usage from streaming SSE data
-   * Looks for usage information in the final chunks
+   * Extract usage information and cost from streaming SSE data
+   * Returns both token usage and cost information if available
    */
-  static extractUsageFromStreamChunk(chunkText: string): UsageInfo | null {
+  static extractUsageFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
     try {
       const lines = chunkText.split('\n');
       
@@ -47,11 +47,20 @@ export class UsagePolicy {
           
           const data = JSON.parse(dataStr);
           if (data.usage) {
-            return {
-              promptTokens: data.usage.prompt_tokens || 0,
-              completionTokens: data.usage.completion_tokens || 0,
-              totalTokens: data.usage.total_tokens || (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0),
+            const result: { usage: UsageInfo; cost?: number } = {
+              usage: {
+                promptTokens: data.usage.prompt_tokens || 0,
+                completionTokens: data.usage.completion_tokens || 0,
+                totalTokens: data.usage.total_tokens || (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0),
+              }
             };
+            
+            // Also extract cost if available (OpenRouter provides this)
+            if (typeof data.usage.cost === 'number') {
+              result.cost = data.usage.cost;
+            }
+            
+            return result;
           }
         }
       }
@@ -153,14 +162,24 @@ export class UsagePolicy {
    */
   static createStreamProcessor(model: string, providerCostUsd?: number) {
     let accumulatedUsage: UsageInfo | null = null;
+    let extractedCost: number | undefined = undefined;
     let finalCost: PricingResult | null = null;
 
     return {
       processChunk: (chunkText: string): void => {
-        const usage = this.extractUsageFromStreamChunk(chunkText);
-        if (usage) {
-          accumulatedUsage = usage;
-          finalCost = this.calculateRequestCost(model, providerCostUsd, usage);
+        const result = this.extractUsageFromStreamChunk(chunkText);
+        if (result) {
+          accumulatedUsage = result.usage;
+          
+          // Update extracted cost if provided in stream
+          if (result.cost !== undefined) {
+            extractedCost = result.cost;
+          }
+          
+          // Calculate final cost when we have usage information
+          // Prefer stream-extracted cost over initial provider cost
+          const finalProviderCost = extractedCost !== undefined ? extractedCost : providerCostUsd;
+          finalCost = this.calculateRequestCost(model, finalProviderCost, accumulatedUsage);
         }
       },
       

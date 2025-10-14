@@ -127,10 +127,21 @@ describe('Route-based Provider Gateway Integration Tests', () => {
     it('should extract usage from SSE stream chunks', () => {
       const sseChunk = `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\ndata: [DONE]\n\n`;
 
-      const usage = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
-      expect(usage).toBeTruthy();
-      expect(usage?.promptTokens).toBe(10);
-      expect(usage?.completionTokens).toBe(5);
+      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
+      expect(result).toBeTruthy();
+      expect(result?.usage.promptTokens).toBe(10);
+      expect(result?.usage.completionTokens).toBe(5);
+      expect(result?.usage.totalTokens).toBe(15);
+    });
+
+    it('should extract usage and cost from SSE stream chunks (OpenRouter)', () => {
+      const sseChunkWithCost = `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"cost":0.000025}}\n\ndata: [DONE]\n\n`;
+
+      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunkWithCost);
+      expect(result).toBeTruthy();
+      expect(result?.usage.promptTokens).toBe(10);
+      expect(result?.usage.completionTokens).toBe(5);
+      expect(result?.cost).toBe(0.000025);
     });
   });
 
