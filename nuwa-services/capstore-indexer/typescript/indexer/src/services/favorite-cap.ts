@@ -4,7 +4,7 @@ import { Result } from "../type.js";
 
 async function favoriteCap({ capId, action }: { capId: string, action: 'add' | 'remove' | 'isFavorite' }, context: any) {
   try {
-    const userDID = context.session.did;
+    const userDID = context.didInfo.did;
     
     if (action === "isFavorite") {
       const result = await isUserFavoriteCap(userDID, capId);
@@ -83,6 +83,7 @@ export const favoriteCapTool = {
     capId: z.string().describe("Cap ID"),
     action: z.enum(["add", "remove", "isFavorite"]).describe("Action to perform")
   }),
+  pricePicoUSD: BigInt(1000000000), // 0.001 USD
   annotations: {
     readOnlyHint: true,
     openWorldHint: true

@@ -4,7 +4,7 @@ import { Result } from "../type.js";
 
 async function updateEnableCap({ capId, action }: { capId: string, action: 'enable' | 'disable' }, context: any) {
   try {
-    const userDID = context.session.did;
+    const userDID = context.didInfo.did;
     // check if the user is the owner of the cap
     const caps = await queryFromSupabase(capId);
     if (caps.items || caps.items.length > 0) {
@@ -77,9 +77,10 @@ export const updateEnableCapTool = {
     capId: z.string().describe("Cap ID"),
     action: z.enum(["enable", "disable"]).describe("Action to perform")
   }),
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true
-  },
+  pricePicoUSD: BigInt(1000000000), // 0.001 USD
+  // annotations: {
+  //   readOnlyHint: true,
+  //   openWorldHint: true
+  // },
   execute: updateEnableCap
 };
