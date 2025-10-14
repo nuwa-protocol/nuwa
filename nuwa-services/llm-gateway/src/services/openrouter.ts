@@ -238,15 +238,15 @@ class OpenRouterService implements LLMProvider {
       // Add Authorization header only if API key is provided
       if (apiKey) {
         headers["Authorization"] = `Bearer ${apiKey}`;
+      } else {
+        console.warn(`No API key provided for OpenRouter request`);
       }
 
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(requestData, isStream);
 
-      // Always concatenate baseURL and apiPath
-      const fullUrl = `${this.baseURL}/api/v1${apiPath}`;
-
-      console.log(`🔄 Forwarding ${method} request to: ${fullUrl}`);
+      // New logic: Use baseURL + apiPath directly (no hardcoded /api/v1 prefix)
+      const fullUrl = `${this.baseURL}${apiPath}`;
 
       const response = await axios({
         method: method.toLowerCase() as any,
@@ -255,6 +255,7 @@ class OpenRouterService implements LLMProvider {
         headers,
         responseType: isStream ? "stream" : "json",
       });
+      
       try {
         const u = (response.headers || {})['x-usage'];
         if (u) console.log('[openrouter] x-usage header:', u);
@@ -263,9 +264,14 @@ class OpenRouterService implements LLMProvider {
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      console.error(
-        `Error forwarding request to OpenRouter: ${errorInfo.message}`
-      );
+      
+      // Enhanced error logging for authentication failures
+      if (errorInfo.statusCode === 401) {
+        console.error(`OpenRouter authentication failed: ${errorInfo.message}`);
+        console.error(`URL: ${this.baseURL}${apiPath}`);
+      } else {
+        console.error(`OpenRouter request failed (${errorInfo.statusCode}): ${errorInfo.message}`);
+      }
 
       // Extract error information to return to client (attach details for higher-level logging)
       return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo };

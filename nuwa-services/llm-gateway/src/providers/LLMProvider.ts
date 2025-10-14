@@ -51,6 +51,8 @@ export interface ProviderConfig {
   requiresApiKey: boolean;
   supportsNativeUsdCost: boolean;
   apiKey?: string; // API key value (resolved during registration, undefined if not required)
+  baseUrl: string; // Provider's base URL (e.g., 'https://openrouter.ai', 'https://api.openai.com')
+  allowedPaths: string[]; // Allowed path patterns for security (e.g., ['/api/v1/chat/completions', '/api/v1/models'])
 }
 
 /**

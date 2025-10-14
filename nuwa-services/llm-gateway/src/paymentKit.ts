@@ -1,4 +1,5 @@
-import express, { Request, Response } from 'express';
+import * as express from 'express';
+import { Request, Response } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
 import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
 
@@ -141,10 +142,16 @@ const getProviderApiKey = (providerName: string): string | null => {
 };
 
 /**
- * Create provider-specific routers for the new route structure
+ * Create provider routers with simplified wildcard routing
+ * Uses PaymentKit's pathRegex support for /${provider}/* patterns
  */
 function createProviderRouters(billing: ExpressPaymentKit): void {
-  // 1. 先注册具体的 Legacy 路由（优先级高，避免被通配符路由匹配）
+  // Get all registered providers
+  const availableProviders = providerRegistry.list();
+
+  console.log(`🔌 Registering routes for providers: ${availableProviders.join(', ')}`);
+
+  // 1. Register Legacy routes first (highest priority)
   const legacyHandler = (req: Request, res: Response) => {
     // Mark as legacy route in access log
     if ((res as any).locals?.accessLog) {
@@ -152,43 +159,151 @@ function createProviderRouters(billing: ExpressPaymentKit): void {
     }
     return handleProviderRequest(req, res, 'openrouter');
   };
-  
+
   billing.post('/api/v1/chat/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.chat.completions');
   billing.post('/api/v1/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.completions');
   billing.get('/api/v1/models', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.models');
-
-  // 2. 后注册通配符路由（兜底处理所有 provider 请求）
-  const dynamicHandler = async (req: Request, res: Response) => {
-    const providerName = req.params.provider;
-    const endpoint = req.params[0]; // 获取 * 匹配的部分
-    
-    // 验证 provider 是否存在
-    if (!providerRegistry.has(providerName)) {
-      return res.status(404).json({ 
-        error: `Provider '${providerName}' not found`,
-        availableProviders: providerRegistry.list(),
-        suggestion: `Use one of: ${providerRegistry.list().map(p => `/${p}/api/v1/${endpoint}`).join(', ')}`
-      });
-    }
-    
-    // 验证 endpoint 是否支持（可选，提供更好的错误信息）
-    const supportedEndpoints = ['chat/completions', 'completions', 'embeddings', 'models'];
-    if (!supportedEndpoints.includes(endpoint)) {
-      return res.status(404).json({ 
-        error: `Endpoint '${endpoint}' not supported`,
-        supportedEndpoints,
-        suggestion: `Try: /${providerName}/api/v1/{${supportedEndpoints.join('|')}}`
-      });
-    }
-    
-    await handleProviderRequest(req, res, providerName);
-  };
   
-  // 注册各种 HTTP 方法的通配符路由
-  billing.post('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.post');
-  billing.get('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.get');
-  billing.put('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.put');
-  billing.delete('/:provider/api/v1/*', { pricing: { type: 'FinalCost' } }, dynamicHandler, 'dynamic.provider.delete');
+  console.log('✅ Registered legacy routes: /api/v1/*');
+
+  // 2. Register wildcard routes for each provider using pathRegex
+  availableProviders.forEach(providerName => {
+    const providerHandler = (req: Request, res: Response) => {
+      return handleProviderRequest(req, res, providerName);
+    };
+    
+    // Create regex pattern for /${providerName}/* 
+    const pathRegex = `^/${providerName}/.*`;
+    
+    // Register POST route with pathRegex
+    registerProviderRouteWithRegex(billing, 'POST', pathRegex, providerHandler, `${providerName}.post.wildcard`);
+    // Register GET route with pathRegex  
+    registerProviderRouteWithRegex(billing, 'GET', pathRegex, providerHandler, `${providerName}.get.wildcard`);
+    
+    console.log(`✅ Registered wildcard routes for provider: ${providerName} (${pathRegex})`);
+  });
+}
+
+/**
+ * Register a provider route using pathRegex by directly manipulating BillableRouter rules
+ * This extends PaymentKit to support our /${provider}/* routing pattern
+ */
+function registerProviderRouteWithRegex(
+  billing: ExpressPaymentKit, 
+  method: 'GET' | 'POST', 
+  pathRegex: string, 
+  handler: (req: Request, res: Response) => void,
+  ruleId: string
+): void {
+  // First register the Express route with a wildcard pattern
+  const expressPath = pathRegex.replace('^/', '/').replace('/.*', '/*');
+  
+  // Register with Express (for actual request handling)
+  if (method === 'POST') {
+    (billing as any).router.post(expressPath, handler);
+  } else {
+    (billing as any).router.get(expressPath, handler);  
+  }
+  
+  // Then manually add a BillingRule with pathRegex to the BillableRouter
+  const billableRouter = (billing as any).billableRouter;
+  if (billableRouter && billableRouter.rules) {
+    const rule = {
+      id: ruleId,
+      when: {
+        pathRegex: pathRegex,
+        method: method.toUpperCase(),
+      },
+      strategy: { type: 'FinalCost' },
+      authRequired: true,
+      adminOnly: false,
+      paymentRequired: true,
+    };
+    
+    // Insert before any default rules
+    const firstDefaultIndex = billableRouter.rules.findIndex((r: any) => r.default);
+    if (firstDefaultIndex >= 0) {
+      billableRouter.rules.splice(firstDefaultIndex, 0, rule);
+    } else {
+      billableRouter.rules.push(rule);
+    }
+    
+    console.log(`📋 Added pathRegex billing rule: ${ruleId} -> ${pathRegex}`);
+  } else {
+    console.warn(`⚠️ Could not access BillableRouter rules for ${ruleId}`);
+  }
+}
+
+/**
+ * Extract and validate the upstream path from the request path
+ * New logic: /:provider/$path → provider_url/$path (with security validation)
+ * @param req Express request object
+ * @param providerName Name of the provider
+ * @returns Cleaned path for upstream forwarding
+ */
+function getUpstreamPath(req: Request, providerName: string): string {
+  const fullPath = req.path;
+  
+  // Get provider configuration for validation
+  const providerConfig = providerRegistry.get(providerName);
+  if (!providerConfig) {
+    throw new Error(`Provider '${providerName}' not found in registry`);
+  }
+  
+  // For legacy routes (/api/v1/*), keep the full path
+  if (fullPath.startsWith('/api/v1/')) {
+    return fullPath;
+  }
+  
+  // For debug routes (/debug/:provider/$path), extract $path
+  if (fullPath.startsWith('/debug/')) {
+    const debugMatch = fullPath.match(/^\/debug\/[^\/]+(\/.*)$/);
+    if (debugMatch) {
+      const extractedPath = debugMatch[1];
+      
+      // Validate path against allowed paths
+      if (!isPathAllowed(extractedPath, providerConfig.allowedPaths)) {
+        throw new Error(`Path '${extractedPath}' is not allowed for provider '${providerName}'`);
+      }
+      
+      return extractedPath;
+    }
+  }
+  
+  // For provider routes (/:provider/$path), extract $path
+  const expectedPrefix = `/${providerName}/`;
+  if (fullPath.startsWith(expectedPrefix)) {
+    const extractedPath = fullPath.substring(expectedPrefix.length - 1); // Keep leading slash
+    
+    // Validate path against allowed paths
+    if (!isPathAllowed(extractedPath, providerConfig.allowedPaths)) {
+      throw new Error(`Path '${extractedPath}' is not allowed for provider '${providerName}'`);
+    }
+    
+    return extractedPath;
+  }
+  
+  // Fallback: return the path as-is
+  console.warn(`Unexpected path format: ${fullPath} for provider: ${providerName}`);
+  return fullPath;
+}
+
+/**
+ * Check if a path is allowed for a provider
+ * @param path The path to check
+ * @param allowedPaths Array of allowed path patterns
+ * @returns true if path is allowed
+ */
+function isPathAllowed(path: string, allowedPaths: string[]): boolean {
+  return allowedPaths.some(allowedPath => {
+    // Support exact match and wildcard patterns
+    if (allowedPath.endsWith('*')) {
+      const prefix = allowedPath.slice(0, -1);
+      return path.startsWith(prefix);
+    } else {
+      return path === allowedPath;
+    }
+  });
 }
 
 /**
@@ -197,22 +312,22 @@ function createProviderRouters(billing: ExpressPaymentKit): void {
 async function handleProviderRequest(req: Request, res: Response, providerName: string): Promise<void> {
   const isStream = !!(req.body && req.body.stream);
 
-    if (!isStream) {
+  if (!isStream) {
     // Non-stream request
     const result = await handleNonStreamRequest(req, providerName);
-      (res as any).locals.upstream = result.meta;
-      const totalCostUSD = result.usageUsd ?? 0;
-      const pico = Math.round(Number(totalCostUSD) * 1e12);
+    (res as any).locals.upstream = result.meta;
+    const totalCostUSD = result.usageUsd ?? 0;
+    const pico = Math.round(Number(totalCostUSD) * 1e12);
     (res as any).locals.usage = pico;
     
-      if (result.error) {
-        const errorResponse = result.body || { success: false, error: result.error };
-        res.status(result.status).json(errorResponse);
-        return;
-      }
-      res.status(result.status).json(result.body);
+    if (result.error) {
+      const errorResponse = result.body || { success: false, error: result.error };
+      res.status(result.status).json(errorResponse);
       return;
     }
+    res.status(result.status).json(result.body);
+    return;
+  }
 
   // Stream request
   await handleStreamRequest(req, res, providerName);
@@ -230,7 +345,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
       meta: {
         upstream_name: providerName, 
         upstream_method: req.method, 
-        upstream_path: req.path
+        upstream_path: getUpstreamPath(req, providerName)
       } 
     } as ProxyResult;
   }
@@ -243,7 +358,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
       meta: {
         upstream_name: providerName, 
         upstream_method: req.method, 
-        upstream_path: req.path
+        upstream_path: getUpstreamPath(req, providerName)
       } 
     } as ProxyResult;
   }
@@ -251,7 +366,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   const meta: UpstreamMeta = {
     upstream_name: providerName,
     upstream_method: req.method,
-    upstream_path: req.path,
+    upstream_path: getUpstreamPath(req, providerName),
     upstream_streamed: false,
   };
 
@@ -271,6 +386,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   try {
     apiKey = getProviderApiKey(providerName);
   } catch (error) {
+    console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
     return { 
       status: 404, 
       error: `Provider configuration error: ${(error as Error).message}`, 
@@ -279,7 +395,8 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   }
 
   const started = Date.now();
-  const resp: any = await provider.forwardRequest(apiKey, req.path, req.method, finalRequestData, false);
+  const upstreamPath = getUpstreamPath(req, providerName);
+  const resp: any = await provider.forwardRequest(apiKey, upstreamPath, req.method, finalRequestData, false);
   meta.upstream_duration_ms = Date.now() - started;
 
   if (!resp) {
@@ -304,14 +421,14 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   const hdrs = (resp as any).headers || {};
   meta.upstream_headers_subset = {
     'x-usage': hdrs['x-usage'],
-    'x-ratelimit-limit': hdrs['x-ratelimit-limit'], 
+    'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
     'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
     'x-request-id': hdrs['x-request-id'],
   };
   
   // Set request ID if available
   meta.upstream_request_id = hdrs['x-request-id'] || (resp as any).requestId;
-  
+
   const responseData = provider.parseResponse(resp);
   
   // Calculate response size
@@ -369,6 +486,7 @@ async function handleStreamRequest(req: Request, res: Response, providerName: st
   try {
     apiKey = getProviderApiKey(providerName);
   } catch (error) {
+    console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
     res.status(404).json({ 
       success: false, 
       error: `Provider configuration error: ${(error as Error).message}` 
@@ -384,13 +502,14 @@ async function handleStreamRequest(req: Request, res: Response, providerName: st
   const meta: UpstreamMeta = {
     upstream_name: providerName,
     upstream_method: 'POST',
-    upstream_path: req.path,
+    upstream_path: getUpstreamPath(req, providerName),
     upstream_streamed: true,
   };
 
   const started = Date.now();
   try {
-    const upstream = await provider.forwardRequest(apiKey, req.path, 'POST', requestData, true);
+    const upstreamPath = getUpstreamPath(req, providerName);
+    const upstream = await provider.forwardRequest(apiKey, upstreamPath, 'POST', requestData, true);
     meta.upstream_duration_ms = Date.now() - started;
 
     if (!upstream) {
@@ -474,6 +593,8 @@ async function handleStreamRequest(req: Request, res: Response, providerName: st
  * Initialize and register all providers based on environment configuration
  */
 function initializeProviders(): void {
+  console.log('🚀 [Provider] Starting provider initialization...');
+  
   const registeredProviders: string[] = [];
   const skippedProviders: string[] = [];
 
@@ -485,8 +606,16 @@ function initializeProviders(): void {
       requiresApiKey: true,
       supportsNativeUsdCost: true,
       apiKeyEnvVar: 'OPENROUTER_API_KEY',
-      requiredEnvVars: ['OPENROUTER_API_KEY'], // Requires API key
-      optionalEnvVars: ['OPENROUTER_BASE_URL'], // Has default
+      baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai',
+      allowedPaths: [
+        '/api/v1/chat/completions',
+        '/api/v1/completions', 
+        '/api/v1/models',
+        '/api/v1/embeddings',
+        '/api/v1/*' // Allow all /api/v1/* paths for flexibility
+      ],
+      requiredEnvVars: ['OPENROUTER_API_KEY'],
+      optionalEnvVars: ['OPENROUTER_BASE_URL'],
       defaultCheck: () => !!process.env.OPENROUTER_API_KEY
     },
     {
@@ -495,7 +624,16 @@ function initializeProviders(): void {
       requiresApiKey: true,
       supportsNativeUsdCost: true,
       apiKeyEnvVar: 'LITELLM_API_KEY',
-      requiredEnvVars: ['LITELLM_BASE_URL', 'LITELLM_API_KEY'], // Requires both URL and API key
+      baseUrl: process.env.LITELLM_BASE_URL || 'https://litellm.example.com',
+      allowedPaths: [
+        '/chat/completions',
+        '/completions',
+        '/models',
+        '/embeddings',
+        '/v1/*', // LiteLLM might use /v1/* paths
+        '/*' // LiteLLM proxy can be configured with various paths
+      ],
+      requiredEnvVars: ['LITELLM_BASE_URL', 'LITELLM_API_KEY'],
       optionalEnvVars: [],
       defaultCheck: () => !!process.env.LITELLM_BASE_URL && !!process.env.LITELLM_API_KEY
     },
@@ -505,8 +643,19 @@ function initializeProviders(): void {
       requiresApiKey: true,
       supportsNativeUsdCost: false,
       apiKeyEnvVar: 'OPENAI_API_KEY',
-      requiredEnvVars: ['OPENAI_API_KEY'], // Requires API key
-      optionalEnvVars: ['OPENAI_BASE_URL'], // Has default
+      baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com',
+      allowedPaths: [
+        '/v1/chat/completions',
+        '/v1/completions',
+        '/v1/models', 
+        '/v1/embeddings',
+        '/v1/images/generations',
+        '/v1/audio/transcriptions',
+        '/v1/audio/translations',
+        '/v1/*' // Allow all OpenAI v1 API paths
+      ],
+      requiredEnvVars: ['OPENAI_API_KEY'],
+      optionalEnvVars: ['OPENAI_BASE_URL'],
       defaultCheck: () => !!process.env.OPENAI_API_KEY
     }
   ];
@@ -540,8 +689,12 @@ function initializeProviders(): void {
         requiresApiKey: config.requiresApiKey,
         supportsNativeUsdCost: config.supportsNativeUsdCost,
         apiKey: apiKey, // Directly pass the resolved API key
+        baseUrl: config.baseUrl,
+        allowedPaths: config.allowedPaths,
       });
       registeredProviders.push(config.name);
+      
+      console.log(`✅ [Provider] Registered ${config.name}`);
       
       // Log configuration status for each provider
       const configStatus = [];
@@ -587,13 +740,13 @@ function initializeProviders(): void {
 function logEnvironmentStatus(): void {
   const envStatus = {
     // OpenRouter - no special env vars needed, uses user's own API keys
-    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai (default)',
+    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai',
     
     // LiteLLM - needs to know where the LiteLLM proxy is running
     LITELLM_BASE_URL: process.env.LITELLM_BASE_URL || '❌ Not configured',
     
     // OpenAI - uses official API, no special config needed
-    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1 (default)',
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
     
     // Pricing configuration
     PRICING_OVERRIDES: process.env.PRICING_OVERRIDES ? '✅ Custom pricing set' : '❌ Using defaults',
