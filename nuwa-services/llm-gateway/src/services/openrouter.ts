@@ -231,8 +231,6 @@ class OpenRouterService implements LLMProvider {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.HTTP_REFERER || "https://llm-gateway.local",
-        "X-Title": process.env.X_TITLE || "LLM Gateway",
       };
 
       // Add Authorization header only if API key is provided

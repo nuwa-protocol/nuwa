@@ -12,8 +12,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.9.2)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.1
-        version: 0.6.1(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
+        specifier: ^0.6.4
+        version: 0.6.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
       '@supabase/supabase-js':
         specifier: ^2.39.0
         version: 2.55.0
@@ -275,8 +275,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.1':
-    resolution: {integrity: sha512-CXiKNvpEwUG5GBf1kgBrB/NrKEyujBRcS68xcyC40Hm91o+kLDJtXfO2EooMpBnp5BzzmFKl5XQcmEa/9EzFNQ==}
+  '@nuwa-ai/payment-kit@0.6.4':
+    resolution: {integrity: sha512-TKlGX1jcGfecBEhzunV+GMAa90HTzgF2qXTeKYY5u3piFEC9UFRN5+rI1MBkjncBnd7nDoXfokIJjQd2r7UEew==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1002,6 +1002,9 @@ packages:
   path-to-regexp@0.1.12:
     resolution: {integrity: sha512-RA1GjUVMnvYFxuqovrEqZoxxW5NUZqbwKtYz/Tt7nXerk0LbLblQmrsgdeOxV5SFHf0UDggjS/bSeOZwt1pmEQ==}
 
+  path-to-regexp@6.3.0:
+    resolution: {integrity: sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==}
+
   path-to-regexp@8.3.0:
     resolution: {integrity: sha512-7jdwVIRtsP8MYpdXSwOS0YdD0Du+qOoF/AEPIt88PcCFrZCzx41oxku1jD88hZBwbNUIEfpqvuhjFaMAqMTWnA==}
 
@@ -1517,7 +1520,7 @@ snapshots:
       cors: 2.8.5
       cross-spawn: 7.0.6
       eventsource: 3.0.6
-      eventsource-parser: 3.0.3
+      eventsource-parser: 3.0.6
       express: 5.1.0
       express-rate-limit: 7.5.1(express@5.1.0)
       pkce-challenge: 5.0.0
@@ -1553,7 +1556,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.1(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
+  '@nuwa-ai/payment-kit@0.6.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.9.2)
@@ -1566,6 +1569,7 @@ snapshots:
       lossless-json: 4.2.0
       mcp-proxy: 5.6.0
       on-headers: 1.1.0
+      path-to-regexp: 6.3.0
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
     optionalDependencies:
@@ -2404,6 +2408,8 @@ snapshots:
   path-key@4.0.0: {}
 
   path-to-regexp@0.1.12: {}
+
+  path-to-regexp@6.3.0: {}
 
   path-to-regexp@8.3.0: {}
 

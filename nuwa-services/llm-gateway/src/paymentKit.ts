@@ -142,14 +142,21 @@ const getProviderApiKey = (providerName: string): string | null => {
 };
 
 /**
- * Create provider routers with simplified wildcard routing
- * Uses PaymentKit's pathRegex support for /${provider}/* patterns
+ * Create provider routers using native ExpressPaymentKit dynamic routing
+ * Now uses the built-in RegExp and path-to-regexp support
  */
 function createProviderRouters(billing: ExpressPaymentKit): void {
   // Get all registered providers
   const availableProviders = providerRegistry.list();
 
   console.log(`🔌 Registering routes for providers: ${availableProviders.join(', ')}`);
+  console.log(`📝 Available providers count: ${availableProviders.length}`);
+
+  if (availableProviders.length === 0) {
+    console.warn('⚠️  No providers available for route registration!');
+    console.warn('   This means no provider routes will be registered.');
+    console.warn('   Check provider initialization in initializeProviders()');
+  }
 
   // 1. Register Legacy routes first (highest priority)
   const legacyHandler = (req: Request, res: Response) => {
@@ -166,72 +173,27 @@ function createProviderRouters(billing: ExpressPaymentKit): void {
   
   console.log('✅ Registered legacy routes: /api/v1/*');
 
-  // 2. Register wildcard routes for each provider using pathRegex
-  availableProviders.forEach(providerName => {
+  // 2. Register wildcard routes for each provider using correct Express path patterns
+  availableProviders.forEach((providerName, index) => {
+    console.log(`📋 Registering routes for provider ${index + 1}/${availableProviders.length}: ${providerName}`);
+    
     const providerHandler = (req: Request, res: Response) => {
       return handleProviderRequest(req, res, providerName);
     };
     
-    // Create regex pattern for /${providerName}/* 
-    const pathRegex = `^/${providerName}/.*`;
+    // Use RegExp directly to avoid path-to-regexp interpretation issues
+    const pathPattern = new RegExp(`^\\/${providerName}\\/(.*)$`);
     
-    // Register POST route with pathRegex
-    registerProviderRouteWithRegex(billing, 'POST', pathRegex, providerHandler, `${providerName}.post.wildcard`);
-    // Register GET route with pathRegex  
-    registerProviderRouteWithRegex(billing, 'GET', pathRegex, providerHandler, `${providerName}.get.wildcard`);
-    
-    console.log(`✅ Registered wildcard routes for provider: ${providerName} (${pathRegex})`);
-  });
-}
-
-/**
- * Register a provider route using pathRegex by directly manipulating BillableRouter rules
- * This extends PaymentKit to support our /${provider}/* routing pattern
- */
-function registerProviderRouteWithRegex(
-  billing: ExpressPaymentKit, 
-  method: 'GET' | 'POST', 
-  pathRegex: string, 
-  handler: (req: Request, res: Response) => void,
-  ruleId: string
-): void {
-  // First register the Express route with a wildcard pattern
-  const expressPath = pathRegex.replace('^/', '/').replace('/.*', '/*');
-  
-  // Register with Express (for actual request handling)
-  if (method === 'POST') {
-    (billing as any).router.post(expressPath, handler);
-  } else {
-    (billing as any).router.get(expressPath, handler);  
-  }
-  
-  // Then manually add a BillingRule with pathRegex to the BillableRouter
-  const billableRouter = (billing as any).billableRouter;
-  if (billableRouter && billableRouter.rules) {
-    const rule = {
-      id: ruleId,
-      when: {
-        pathRegex: pathRegex,
-        method: method.toUpperCase(),
-      },
-      strategy: { type: 'FinalCost' },
-      authRequired: true,
-      adminOnly: false,
-      paymentRequired: true,
-    };
-    
-    // Insert before any default rules
-    const firstDefaultIndex = billableRouter.rules.findIndex((r: any) => r.default);
-    if (firstDefaultIndex >= 0) {
-      billableRouter.rules.splice(firstDefaultIndex, 0, rule);
-    } else {
-      billableRouter.rules.push(rule);
+    try {
+      // Register using native ExpressPaymentKit methods
+      billing.post(pathPattern, { pricing: { type: 'FinalCost' } }, providerHandler, `${providerName}.post.wildcard`);
+      billing.get(pathPattern, { pricing: { type: 'FinalCost' } }, providerHandler, `${providerName}.get.wildcard`);
+      
+      console.log(`   ✅ Successfully registered routes for ${providerName}`);
+    } catch (error) {
+      console.error(`   ❌ Failed to register routes for ${providerName}:`, error);
     }
-    
-    console.log(`📋 Added pathRegex billing rule: ${ruleId} -> ${pathRegex}`);
-  } else {
-    console.warn(`⚠️ Could not access BillableRouter rules for ${ruleId}`);
-  }
+  });
 }
 
 /**
@@ -239,53 +201,56 @@ function registerProviderRouteWithRegex(
  * New logic: /:provider/$path → provider_url/$path (with security validation)
  * @param req Express request object
  * @param providerName Name of the provider
- * @returns Cleaned path for upstream forwarding
+ * @returns Object with path and validation result
  */
-function getUpstreamPath(req: Request, providerName: string): string {
+function getUpstreamPath(req: Request, providerName: string): { path: string; error?: string } {
   const fullPath = req.path;
   
   // Get provider configuration for validation
   const providerConfig = providerRegistry.get(providerName);
   if (!providerConfig) {
-    throw new Error(`Provider '${providerName}' not found in registry`);
+    return { 
+      path: '', 
+      error: `Provider '${providerName}' not found in registry` 
+    };
   }
+  
+  let extractedPath: string;
   
   // For legacy routes (/api/v1/*), keep the full path
   if (fullPath.startsWith('/api/v1/')) {
-    return fullPath;
+    extractedPath = fullPath;
+  }
+  // Primary method: manual extraction for provider routes (/:provider/$path)
+  else if (fullPath.startsWith(`/${providerName}/`)) {
+    const expectedPrefix = `/${providerName}`;
+    const remainingPath = fullPath.substring(expectedPrefix.length);
+    extractedPath = remainingPath.startsWith('/') ? remainingPath : '/' + remainingPath;
+  }
+  // Fallback: try Express params if available
+  else if ((req as any).params && typeof (req as any).params[0] === 'string') {
+    const wildcardPath = (req as any).params[0];
+    extractedPath = wildcardPath.startsWith('/') ? wildcardPath : '/' + wildcardPath;
+  }
+  // Unexpected path format
+  else {
+    console.warn(`Unexpected path format: ${fullPath} for provider: ${providerName}`);
+    extractedPath = fullPath;
   }
   
-  // For debug routes (/debug/:provider/$path), extract $path
-  if (fullPath.startsWith('/debug/')) {
-    const debugMatch = fullPath.match(/^\/debug\/[^\/]+(\/.*)$/);
-    if (debugMatch) {
-      const extractedPath = debugMatch[1];
-      
-      // Validate path against allowed paths
-      if (!isPathAllowed(extractedPath, providerConfig.allowedPaths)) {
-        throw new Error(`Path '${extractedPath}' is not allowed for provider '${providerName}'`);
-      }
-      
-      return extractedPath;
-    }
+  // Clean up any double slashes
+  extractedPath = extractedPath.replace(/\/+/g, '/');
+  
+  // Validate path against allowed paths
+  if (!isPathAllowed(extractedPath, providerConfig.allowedPaths)) {
+    const errorMsg = `Path '${extractedPath}' is not allowed for provider '${providerName}'. Allowed paths: ${providerConfig.allowedPaths.join(', ')}`;
+    return { 
+      path: extractedPath, 
+      error: errorMsg
+    };
   }
   
-  // For provider routes (/:provider/$path), extract $path
-  const expectedPrefix = `/${providerName}/`;
-  if (fullPath.startsWith(expectedPrefix)) {
-    const extractedPath = fullPath.substring(expectedPrefix.length - 1); // Keep leading slash
-    
-    // Validate path against allowed paths
-    if (!isPathAllowed(extractedPath, providerConfig.allowedPaths)) {
-      throw new Error(`Path '${extractedPath}' is not allowed for provider '${providerName}'`);
-    }
-    
-    return extractedPath;
-  }
-  
-  // Fallback: return the path as-is
-  console.warn(`Unexpected path format: ${fullPath} for provider: ${providerName}`);
-  return fullPath;
+  return { path: extractedPath };
 }
 
 /**
@@ -295,13 +260,38 @@ function getUpstreamPath(req: Request, providerName: string): string {
  * @returns true if path is allowed
  */
 function isPathAllowed(path: string, allowedPaths: string[]): boolean {
+  // Normalize path: remove duplicate slashes and ensure it starts with /
+  const normalizedPath = ('/' + path).replace(/\/+/g, '/');
+  
+  // Security checks: block dangerous patterns
+  const dangerousPatterns = [
+    /\.\./,           // Directory traversal
+    /\/\.\//,         // Current directory reference
+    /\/\/+/,          // Multiple consecutive slashes (after normalization)
+    /%2e%2e/i,        // URL-encoded directory traversal
+    /%2f/i,           // URL-encoded slash
+    /[<>"|*?]/,       // Invalid filename characters
+    /[\x00-\x1f]/,    // Control characters
+  ];
+  
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(normalizedPath)) {
+      console.warn(`Blocked dangerous path pattern: ${normalizedPath}`);
+      return false;
+    }
+  }
+  
+  // Check against allowed paths
   return allowedPaths.some(allowedPath => {
+    // Normalize allowed path as well
+    const normalizedAllowed = ('/' + allowedPath).replace(/\/+/g, '/');
+    
     // Support exact match and wildcard patterns
-    if (allowedPath.endsWith('*')) {
-      const prefix = allowedPath.slice(0, -1);
-      return path.startsWith(prefix);
+    if (normalizedAllowed.endsWith('*')) {
+      const prefix = normalizedAllowed.slice(0, -1);
+      return normalizedPath.startsWith(prefix);
     } else {
-      return path === allowedPath;
+      return normalizedPath === normalizedAllowed;
     }
   });
 }
@@ -338,6 +328,22 @@ async function handleProviderRequest(req: Request, res: Response, providerName: 
  */
 async function handleNonStreamRequest(req: Request, providerName: string): Promise<ProxyResult> {
   const didInfo = (req as any).didInfo as DIDInfo;
+  
+  // Get upstream path early and handle errors
+  const pathResult = getUpstreamPath(req, providerName);
+  if (pathResult.error) {
+    return { 
+      status: 400, 
+      error: pathResult.error, 
+      meta: {
+        upstream_name: providerName, 
+        upstream_method: req.method, 
+        upstream_path: pathResult.path
+      } 
+    } as ProxyResult;
+  }
+  
+  // Require DID authentication for all routes (both legacy and provider routes need billing)
   if (!didInfo?.did) {
     return { 
       status: 401, 
@@ -345,7 +351,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
       meta: {
         upstream_name: providerName, 
         upstream_method: req.method, 
-        upstream_path: getUpstreamPath(req, providerName)
+        upstream_path: pathResult.path
       } 
     } as ProxyResult;
   }
@@ -358,7 +364,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
       meta: {
         upstream_name: providerName, 
         upstream_method: req.method, 
-        upstream_path: getUpstreamPath(req, providerName)
+        upstream_path: pathResult.path
       } 
     } as ProxyResult;
   }
@@ -366,7 +372,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   const meta: UpstreamMeta = {
     upstream_name: providerName,
     upstream_method: req.method,
-    upstream_path: getUpstreamPath(req, providerName),
+    upstream_path: pathResult.path,
     upstream_streamed: false,
   };
 
@@ -381,7 +387,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
     finalRequestData = provider.prepareRequestData(finalRequestData, false);
   }
 
-  // Get API key from registry
+  // Get API key from registry (uses global API key from environment variables)
   let apiKey: string | null;
   try {
     apiKey = getProviderApiKey(providerName);
@@ -395,7 +401,7 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   }
 
   const started = Date.now();
-  const upstreamPath = getUpstreamPath(req, providerName);
+  const upstreamPath = pathResult.path;
   const resp: any = await provider.forwardRequest(apiKey, upstreamPath, req.method, finalRequestData, false);
   meta.upstream_duration_ms = Date.now() - started;
 
@@ -456,6 +462,18 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
  */
 async function handleStreamRequest(req: Request, res: Response, providerName: string): Promise<void> {
   const didInfo = (req as any).didInfo as DIDInfo;
+  
+  // Get upstream path early and handle errors
+  const pathResult = getUpstreamPath(req, providerName);
+  if (pathResult.error) {
+    res.status(400).json({ 
+      success: false, 
+      error: pathResult.error 
+    });
+    return;
+  }
+  
+  // Require DID authentication for all routes (both legacy and provider routes need billing)
   if (!didInfo?.did) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
     return;
@@ -502,13 +520,13 @@ async function handleStreamRequest(req: Request, res: Response, providerName: st
   const meta: UpstreamMeta = {
     upstream_name: providerName,
     upstream_method: 'POST',
-    upstream_path: getUpstreamPath(req, providerName),
+    upstream_path: pathResult.path,
     upstream_streamed: true,
   };
 
   const started = Date.now();
   try {
-    const upstreamPath = getUpstreamPath(req, providerName);
+    const upstreamPath = pathResult.path;
     const upstream = await provider.forwardRequest(apiKey, upstreamPath, 'POST', requestData, true);
     meta.upstream_duration_ms = Date.now() - started;
 

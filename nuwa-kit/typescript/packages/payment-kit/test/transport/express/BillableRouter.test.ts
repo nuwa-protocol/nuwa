@@ -270,6 +270,84 @@ describe('BillableRouter', () => {
     });
   });
 
+  describe('LLM Gateway specific patterns', () => {
+    it('should handle provider wildcard routes correctly', () => {
+      const options: RouteOptions = {
+        pricing: { type: 'FinalCost' },
+        authRequired: true,
+      };
+
+      // Test the exact pattern used in LLM Gateway
+      router.post('/openrouter(.*)', options, mockHandler, 'openrouter-wildcard');
+      router.post('/openai(.*)', options, mockHandler, 'openai-wildcard');
+
+      const rules = router.getRules();
+      expect(rules.length).toBeGreaterThanOrEqual(2);
+
+      // Test that /openrouter/api/v1/chat/completions matches
+      const rule1 = router.findRule('POST', '/openrouter/api/v1/chat/completions');
+      expect(rule1).toBeDefined();
+      expect(rule1?.id).toBe('openrouter-wildcard');
+
+      // Test that /openai/v1/chat/completions matches  
+      const rule2 = router.findRule('POST', '/openai/v1/chat/completions');
+      expect(rule2).toBeDefined();
+      expect(rule2?.id).toBe('openai-wildcard');
+
+      // Test that non-matching paths don't match
+      const rule3 = router.findRule('POST', '/anthropic/v1/chat/completions');
+      expect(rule3).toBeUndefined();
+    });
+
+    it('should extract path parameters correctly for provider routes', () => {
+      const options: RouteOptions = {
+        pricing: { type: 'FinalCost' },
+        authRequired: true,
+      };
+
+      // Register the route
+      router.post('/openrouter(.*)', options, mockHandler, 'openrouter-test');
+
+      // Find the rule to verify it exists
+      const rule = router.findRule('POST', '/openrouter/api/v1/chat/completions');
+      expect(rule).toBeDefined();
+      expect(rule?.id).toBe('openrouter-test');
+    });
+
+    it('should handle both legacy and provider routes without conflicts', () => {
+      const legacyOptions: RouteOptions = {
+        pricing: { type: 'FinalCost' },
+        authRequired: true,
+      };
+
+      const providerOptions: RouteOptions = {
+        pricing: { type: 'FinalCost' }, 
+        authRequired: true,
+      };
+
+      // Register legacy routes first (higher priority)
+      router.post('/api/v1/chat/completions', legacyOptions, mockHandler, 'legacy-chat');
+      router.post('/api/v1/completions', legacyOptions, mockHandler, 'legacy-completions');
+
+      // Register provider routes
+      router.post('/openrouter(.*)', providerOptions, mockHandler, 'openrouter-wildcard');
+      router.post('/openai(.*)', providerOptions, mockHandler, 'openai-wildcard');
+
+      const rules = router.getRules();
+      expect(rules.length).toBeGreaterThanOrEqual(4);
+
+      // Legacy routes should match first
+      const legacyRule = router.findRule('POST', '/api/v1/chat/completions');
+      expect(legacyRule).toBeDefined();
+      expect(legacyRule?.id).toBe('legacy-chat');
+
+      // Provider routes should match their patterns
+      const providerRule = router.findRule('POST', '/openrouter/api/v1/chat/completions');
+      expect(providerRule).toBeDefined();
+      expect(providerRule?.id).toBe('openrouter-wildcard');
+    });
+  });
+
   describe('Error handling', () => {
     it('should throw clear errors for invalid path patterns', () => {
       const options: RouteOptions = {
