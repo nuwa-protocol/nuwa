@@ -5,17 +5,6 @@ import { incrementCapDownloads, queryFromSupabase } from "../supabase.js";
 
 async function downloadCap({ cid, dataFormat }: { cid: string, dataFormat: 'base64' | 'utf8' }, context: any) {
   try {
-    if (!context.session?.did) {
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            code: 401,
-            error: "Authentication required"
-          } as Result)
-        }]
-      };
-    }
     if (!/^Qm[1-9A-HJ-NP-Za-km-z]{44}$|^b[A-Za-z0-9]{58}$/.test(cid)) {
       return {
         content: [{
@@ -28,8 +17,6 @@ async function downloadCap({ cid, dataFormat }: { cid: string, dataFormat: 'base
       };
     }
 
-    const downloaderDid = context.session.did;
-    console.log(`📥 Download request from DID: ${downloaderDid}, CID: ${cid}`);
     const caps = await queryFromSupabase(null, null, cid);
 
     if (caps.items && caps.items.length > 0) {

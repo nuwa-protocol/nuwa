@@ -3,7 +3,8 @@ import { Args, RoochClient, Transaction } from "@roochnetwork/rooch-sdk";
 import * as yaml from "js-yaml";
 import { buildClient } from "./client";
 import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from "./type";
-import { experimental_createMCPClient as createMCPClient } from "ai";
+import { IdentityEnv } from "@nuwa-ai/identity-kit";
+import { PaymentChannelMcpClient } from "@nuwa-ai/payment-kit";
 
 export * from "./type";
 
@@ -11,31 +12,34 @@ export class CapKit {
 	protected roochClient: RoochClient;
 	protected contractAddress: string;
 	protected mcpUrl: string;
-	protected signer: SignerInterface;
-	protected mcpClient?: any;
+	protected env: IdentityEnv;
+	protected mcpClient?: PaymentChannelMcpClient;
 	protected mcpTools?: any;
 
 	constructor(option: {
 		mcpUrl: string;
 		roochUrl: string;
 		contractAddress: string;
-		signer: SignerInterface;
+		env: IdentityEnv;
 	}) {
 		this.roochClient = new RoochClient({ url: option.roochUrl });
 		this.contractAddress = option.contractAddress;
 		this.mcpUrl = option.mcpUrl;
-		this.signer = option.signer;
+		this.env = option.env;
 	}
 
 	async getTools() {
-		if (!this.mcpClient) {
-			const transport = await buildClient(this.mcpUrl, this.signer)
-			this.mcpClient = await createMCPClient({ transport });
-		}
 		if (!this.mcpTools) {
-			this.mcpTools = await this.mcpClient.tools();
+			this.mcpTools = await (await this.getMcpClient()).tools();
 		}
 		return this.mcpTools
+	}
+
+	async getMcpClient() {
+		if (!this.mcpClient) {
+			this.mcpClient = await buildClient(this.mcpUrl, this.env)
+		}
+		return this.mcpClient
 	}
 
 	async mcpClose() {
@@ -481,10 +485,10 @@ export class CapKit {
 		const acpContent = yaml.dump(cap);
 
 		// 2. Upload ACP file to IPFS using nuwa-cap-store MCP
-		const cid = await this.uploadToIPFS(cap.id, acpContent, this.signer);
+		const cid = await this.uploadToIPFS(cap.id, acpContent);
 
 		// 3. Call Move contract to register the capability
-		const result = await this.registerOnChain(cap.idName, cid, this.signer);
+		const result = await this.registerOnChain(cap.idName, cid, this.env.keyManager);
 
 		if (result.execution_info.status.type !== "executed") {
 			throw new Error("unknown error");
@@ -496,7 +500,6 @@ export class CapKit {
 	private async uploadToIPFS(
 		name: string,
 		content: string,
-		signer: SignerInterface,
 	): Promise<string> {
 
 		try {

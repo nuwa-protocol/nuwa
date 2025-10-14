@@ -4,7 +4,7 @@ import type { Result } from "../type.js";
 
 async function rateCap({ capId, rating }: { capId: string, rating: number }, context: any) {
   try {
-    const userDID = context.session.did;
+    const userDID = context.didInfo.did;
     const result = await queryFromSupabase(capId, null);
 
     if (!result.success || !result.items || result.items.length === 0) {
@@ -60,9 +60,10 @@ export const rateCapTool = {
     capId: z.string().describe("Resource identifier"),
     rating: z.number().describe("Rating"),
   }),
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true
-  },
+  pricePicoUSD: BigInt(1000000000), // 0.001 USD
+  // annotations: {
+  //   readOnlyHint: true,
+  //   openWorldHint: true
+  // },
   execute: rateCap
 };
