@@ -164,8 +164,6 @@ class ExpressPaymentKitImpl implements ExpressPaymentKit {
     this.config = config;
     this.rateProvider = deps.rateProvider;
     this.serviceDid = deps.serviceDid;
-    // Ensure built-in billing strategies are registered when server starts
-    registerBuiltinStrategies();
 
     // Resolve storage repositories
     const storage = prebuiltStorage ?? this.resolveStorageFromEnv();
