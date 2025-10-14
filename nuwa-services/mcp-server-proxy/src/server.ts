@@ -74,7 +74,7 @@ async function startServer(
   // Prepare upstream via shared helper if configured
   let upstream: Upstream | undefined;
   if (config.upstream) {
-    upstream = await initUpstream("default", config.upstream);
+    upstream = await initUpstream(config.upstream);
   }
 
   // Register tools from upstream if configured
@@ -126,14 +126,17 @@ async function startServer(
 
           // Register upstream tool as forwarding tool
           const forwardExecute = async (p: any, context?: any) => {
+            // Filter out Nuwa internal parameters before forwarding to upstream
+            const { __nuwa_auth, __nuwa_payment, ...cleanParams } = p || {};
+
             console.log(
               `Forwarding tool ${upstreamTool.name} to upstream with params:`,
-              p,
+              cleanParams,
               `(price: ${toolPrice} picoUSD)`,
             );
             const res = await upstream!.client.callTool({
               name: upstreamTool.name,
-              arguments: p || {},
+              arguments: cleanParams,
             });
             console.log(`Upstream response for ${upstreamTool.name}:`, res);
             if (res && Array.isArray(res.content)) {
@@ -176,7 +179,9 @@ async function startServer(
   }
 
   const server = await app.start();
-  console.log(`MCP Server started on endpoint ${config.endpoint || "/mcp"}`);
+  const port = Number(config.port || process.env.PORT || 8088);
+  const endpoint = config.endpoint || "/mcp";
+  console.log(`MCP Server started on http://localhost:${port}${endpoint}`);
 
   return {
     close: async () => {
