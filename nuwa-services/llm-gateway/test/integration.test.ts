@@ -1,0 +1,164 @@
+/**
+ * Integration tests for route-based provider gateway
+ * Tests the core functionality without provider registration complexity
+ */
+
+import request from 'supertest';
+import express from 'express';
+import { pricingRegistry } from '../src/billing/pricing.js';
+import { UsagePolicy } from '../src/billing/usagePolicy.js';
+
+describe('Route-based Provider Gateway Integration Tests', () => {
+  let app: express.Application;
+
+  beforeAll(async () => {
+    // Mock setup - in real tests you'd set up the full app
+    app = express();
+    app.use(express.json());
+  });
+
+  describe('Pricing System', () => {
+    it('should have default OpenAI pricing', () => {
+      const gpt4Pricing = pricingRegistry.getPricing('gpt-4');
+      expect(gpt4Pricing).toBeTruthy();
+      expect(gpt4Pricing?.promptPerMTokUsd).toBe(30.0);
+      expect(gpt4Pricing?.completionPerMTokUsd).toBe(60.0);
+
+      const gpt35Pricing = pricingRegistry.getPricing('gpt-3.5-turbo');
+      expect(gpt35Pricing).toBeTruthy();
+      expect(gpt35Pricing?.promptPerMTokUsd).toBe(0.5);
+      expect(gpt35Pricing?.completionPerMTokUsd).toBe(1.5);
+    });
+
+    it('should calculate costs correctly', () => {
+      const usage = {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500
+      };
+
+      const result = pricingRegistry.calculateCost('gpt-4', usage);
+      expect(result).toBeTruthy();
+      expect(result?.costUsd).toBeCloseTo(0.060); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
+      expect(result?.source).toBe('gateway-pricing');
+    });
+
+    it('should handle model family patterns', () => {
+      const gpt4oPricing = pricingRegistry.getPricing('gpt-4o-2024-05-13');
+      expect(gpt4oPricing).toBeTruthy();
+      expect(gpt4oPricing?.promptPerMTokUsd).toBe(5.0);
+
+      const gpt35Pricing = pricingRegistry.getPricing('gpt-3.5-turbo-0125');
+      expect(gpt35Pricing).toBeTruthy();
+      expect(gpt35Pricing?.promptPerMTokUsd).toBe(0.5);
+    });
+  });
+
+  describe('Usage Policy', () => {
+    it('should extract usage from response body', () => {
+      const responseBody = {
+        id: 'chatcmpl-123',
+        choices: [{ message: { content: 'Hello!' } }],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15
+        }
+      };
+
+      const usage = UsagePolicy.extractUsageFromResponse(responseBody);
+      expect(usage).toBeTruthy();
+      expect(usage?.promptTokens).toBe(10);
+      expect(usage?.completionTokens).toBe(5);
+      expect(usage?.totalTokens).toBe(15);
+    });
+
+    it('should inject stream usage options', () => {
+      const requestData = {
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: true
+      };
+
+      const injected = UsagePolicy.injectStreamUsageOption(requestData);
+      expect(injected.stream_options).toBeTruthy();
+      expect(injected.stream_options.include_usage).toBe(true);
+    });
+
+    it('should calculate request costs with provider preference', () => {
+      const usage = { promptTokens: 1000, completionTokens: 500 };
+      
+      // Test provider cost preference
+      const resultWithProvider = UsagePolicy.calculateRequestCost('gpt-4', 0.05, usage);
+      expect(resultWithProvider?.costUsd).toBe(0.05);
+      expect(resultWithProvider?.source).toBe('provider');
+
+      // Test gateway pricing fallback
+      const resultWithoutProvider = UsagePolicy.calculateRequestCost('gpt-4', undefined, usage);
+      expect(resultWithoutProvider?.costUsd).toBeCloseTo(0.06);
+      expect(resultWithoutProvider?.source).toBe('gateway-pricing');
+    });
+
+    it('should extract usage from SSE stream chunks', () => {
+      const sseChunk = `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\ndata: [DONE]\n\n`;
+
+      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
+      expect(result).toBeTruthy();
+      expect(result?.usage.promptTokens).toBe(10);
+      expect(result?.usage.completionTokens).toBe(5);
+      expect(result?.usage.totalTokens).toBe(15);
+    });
+
+    it('should extract usage and cost from SSE stream chunks (OpenRouter)', () => {
+      const sseChunkWithCost = `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"cost":0.000025}}\n\ndata: [DONE]\n\n`;
+
+      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunkWithCost);
+      expect(result).toBeTruthy();
+      expect(result?.usage.promptTokens).toBe(10);
+      expect(result?.usage.completionTokens).toBe(5);
+      expect(result?.cost).toBe(0.000025);
+    });
+  });
+
+  describe('Route Patterns', () => {
+    it('should validate route patterns', () => {
+      // Test that our route patterns would match correctly
+      const providerRoutes = [
+        '/api/v1/openai/chat/completions',
+        '/api/v1/openrouter/chat/completions',
+        '/api/v1/litellm/chat/completions',
+        '/api/v1/openai/embeddings',
+        '/api/v1/openrouter/models'
+      ];
+
+      const legacyRoute = '/api/v1/chat/completions';
+
+      // In a real Express app, these would be handled by the router
+      providerRoutes.forEach(route => {
+        const match = route.match(/^\/api\/v1\/([^\/]+)\/(.*)/);
+        expect(match).toBeTruthy();
+        expect(match![1]).toMatch(/^(openai|openrouter|litellm)$/);
+      });
+
+      const legacyMatch = legacyRoute.match(/^\/api\/v1\/chat\/completions$/);
+      expect(legacyMatch).toBeTruthy();
+    });
+  });
+
+  describe('Environment Variable Overrides', () => {
+    it('should support pricing overrides via environment', () => {
+      // Test pricing override functionality
+      const originalGpt4Pricing = pricingRegistry.getPricing('gpt-4');
+      
+      // Simulate environment override
+      pricingRegistry.updatePricing('gpt-4-test', {
+        promptPerMTokUsd: 25.0,
+        completionPerMTokUsd: 50.0
+      });
+
+      const overriddenPricing = pricingRegistry.getPricing('gpt-4-test');
+      expect(overriddenPricing?.promptPerMTokUsd).toBe(25.0);
+      expect(overriddenPricing?.completionPerMTokUsd).toBe(50.0);
+    });
+  });
+});

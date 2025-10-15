@@ -1,10 +1,6 @@
 import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
-import {
-  CreateApiKeyRequest,
-  CreateApiKeyResponse,
-  GetApiKeyResponse,
-} from "../types/index.js";
+import { LLMProvider } from "../providers/LLMProvider.js";
 
 // Native streamToString tool function, placed outside the class
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
@@ -18,24 +14,6 @@ function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
   });
 }
 
-interface CurrentApiKeyResponse {
-  data: {
-    label: string;
-    usage: number;
-    is_free_tier: boolean;
-    is_provisioning_key: boolean;
-    limit: number;
-    limit_remaining: number;
-  };
-}
-
-interface DeleteApiKeyResponse {
-  data: {
-    success: boolean;
-  };
-}
-
-// Structured error information extracted from upstream (OpenRouter)
 interface OpenRouterErrorInfo {
   message: string;
   statusCode: number;
@@ -55,13 +33,11 @@ interface UpstreamErrorResponse {
   details: OpenRouterErrorInfo;
 }
 
-class OpenRouterService {
+class OpenRouterService implements LLMProvider {
   private baseURL: string;
-  private provisioningApiKey: string | null;
 
   constructor() {
     this.baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";
-    this.provisioningApiKey = process.env.OPENROUTER_PROVISIONING_KEY || null;
   }
 
   // Extract error information from axios error (handles Buffer/Stream/object) and log structured details
@@ -225,204 +201,59 @@ class OpenRouterService {
     }
   }
 
-  // Create a new OpenRouter API Key
-  async createApiKey(
-    request: CreateApiKeyRequest
-  ): Promise<CreateApiKeyResponse | null> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return null;
+  /**
+   * Prepare request data for OpenRouter API
+   * Injects usage.include=true for usage tracking
+   */
+  prepareRequestData(data: any, isStream: boolean): any {
+    if (!data || typeof data !== 'object') {
+      return data;
     }
 
-    try {
-      const response = await axios.post<CreateApiKeyResponse>(
-        `${this.baseURL}/api/v1/keys`,
-        request,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log(`✅ Created OpenRouter API key: ${request.name}`);
-      return response.data;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(`Error creating OpenRouter API key: ${errorInfo.message}`);
-      return null;
-    }
-  }
-
-  // Get API key metadata by hash (won't return the actual key)
-  async getApiKeyFromHash(keyHash: string): Promise<GetApiKeyResponse | null> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return null;
-    }
-    try {
-      const response = await axios.get<GetApiKeyResponse>(
-        `${this.baseURL}/api/v1/keys/${keyHash}`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(
-        `Error getting OpenRouter API key info: ${errorInfo.message}`
-      );
-      return null;
-    }
-  }
-
-  // Get current API key information (only for current Bearer Token)
-  async getCurrentApiKey(): Promise<CurrentApiKeyResponse | null> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return null;
-    }
-    try {
-      const response = await axios.get<CurrentApiKeyResponse>(
-        `${this.baseURL}/api/v1/key`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(
-        `Error getting current OpenRouter API key info: ${errorInfo.message}`
-      );
-      return null;
-    }
-  }
-
-  // Update API key information (name, disabled status, limit)
-  async updateApiKey(
-    keyHash: string,
-    update: { name?: string; disabled?: boolean; limit?: number }
-  ): Promise<GetApiKeyResponse | null> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return null;
-    }
-    try {
-      const response = await axios.patch<GetApiKeyResponse>(
-        `${this.baseURL}/api/v1/keys/${keyHash}`,
-        update,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      return response.data;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(`Error updating OpenRouter API key: ${errorInfo.message}`);
-      return null;
-    }
-  }
-
-  // List all API Keys (supports offset/include_disabled parameters)
-  async listApiKeys(
-    offset?: number,
-    include_disabled?: boolean
-  ): Promise<GetApiKeyResponse[] | null> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return null;
-    }
-    try {
-      const params: any = {};
-      if (offset !== undefined) params.offset = offset;
-      if (include_disabled !== undefined)
-        params.include_disabled = include_disabled;
-
-      const response = await axios.get<{ data: GetApiKeyResponse[] }>(
-        `${this.baseURL}/api/v1/keys`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-          params,
-        }
-      );
-      return response.data.data;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(`Error listing OpenRouter API keys: ${errorInfo.message}`);
-      return null;
-    }
-  }
-
-  // Delete API Key
-  async deleteApiKey(keyHash: string): Promise<boolean> {
-    if (!this.provisioningApiKey) {
-      console.error("Provisioning API key not configured");
-      return false;
-    }
-
-    try {
-      const response = await axios.delete<DeleteApiKeyResponse>(
-        `${this.baseURL}/api/v1/keys/${keyHash}`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.provisioningApiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log(`✅ Deleted OpenRouter API key: ${keyHash}`);
-      return response.data.data.success;
-    } catch (error: any) {
-      const errorInfo = await this.extractErrorInfo(error);
-      console.error(`Error deleting OpenRouter API key: ${errorInfo.message}`);
-      return false;
-    }
+    // For OpenRouter, always inject usage tracking
+    return {
+      ...data,
+      usage: { 
+        include: true, 
+        ...(data.usage || {}) 
+      }
+    };
   }
 
   // Generic forwarding request to OpenRouter - supports any path
   async forwardRequest(
-    apiKey: string,
+    apiKey: string | null,
     apiPath: string,
     method: string = "POST",
     requestData?: any,
     isStream: boolean = false
   ): Promise<AxiosResponse | UpstreamErrorResponse | null> {
     try {
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
+      const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.HTTP_REFERER || "https://llm-gateway.local",
-        "X-Title": process.env.X_TITLE || "LLM Gateway",
       };
 
-      // Always concatenate baseURL and apiPath
-      const fullUrl = `${this.baseURL}/api/v1${apiPath}`;
+      // Add Authorization header only if API key is provided
+      if (apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      } else {
+        console.warn(`No API key provided for OpenRouter request`);
+      }
 
-      console.log(`🔄 Forwarding ${method} request to: ${fullUrl}`);
+      // Prepare request data using provider-specific logic
+      const finalData = this.prepareRequestData(requestData, isStream);
+
+      // New logic: Use baseURL + apiPath directly (no hardcoded /api/v1 prefix)
+      const fullUrl = `${this.baseURL}${apiPath}`;
 
       const response = await axios({
         method: method.toLowerCase() as any,
         url: fullUrl,
-        data: requestData,
+        data: finalData,
         headers,
         responseType: isStream ? "stream" : "json",
       });
+      
       try {
         const u = (response.headers || {})['x-usage'];
         if (u) console.log('[openrouter] x-usage header:', u);
@@ -431,9 +262,14 @@ class OpenRouterService {
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      console.error(
-        `Error forwarding request to OpenRouter: ${errorInfo.message}`
-      );
+      
+      // Enhanced error logging for authentication failures
+      if (errorInfo.statusCode === 401) {
+        console.error(`OpenRouter authentication failed: ${errorInfo.message}`);
+        console.error(`URL: ${this.baseURL}${apiPath}`);
+      } else {
+        console.error(`OpenRouter request failed (${errorInfo.statusCode}): ${errorInfo.message}`);
+      }
 
       // Extract error information to return to client (attach details for higher-level logging)
       return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo };
@@ -474,6 +310,55 @@ class OpenRouterService {
     sourceStream.on("close", () => {
       console.log("Source stream closed");
     });
+  }
+
+  /**
+   * Extract USD cost from OpenRouter response
+   * OpenRouter provides native USD cost in usage.cost or x-usage header
+   * 
+   * NOTE: For stream responses, cost is NOT available at request initiation time.
+   * Stream cost should be extracted from the final SSE chunks during stream processing.
+   */
+  extractProviderUsageUsd(response: AxiosResponse): number | undefined {
+    try {
+      const data = response.data;
+      
+      // Check if this is a stream response (data has pipe method)
+      if (data && typeof data === 'object' && typeof data.pipe === 'function') {
+        // For stream responses, cost is not available at this stage
+        // It will be extracted later from SSE chunks by UsagePolicy.extractUsageFromStreamChunk
+        return undefined;
+      }
+
+      // For non-stream responses, try to get cost from response body first
+      if (data && typeof data === 'object' && data.usage && typeof data.usage.cost === 'number') {
+        return data.usage.cost;
+      }
+
+      // Fallback to x-usage header for non-stream responses
+      const headers = response.headers || {};
+      const usageHeader = headers['x-usage'] || headers['X-Usage'];
+      if (typeof usageHeader === 'string' && usageHeader.length > 0) {
+        try {
+          const parsed = JSON.parse(usageHeader);
+          const cost = parsed?.total_cost ?? parsed?.total_cost_usd ?? parsed?.cost ?? parsed?.usd;
+          if (cost != null) {
+            const n = Number(cost);
+            if (Number.isFinite(n)) return n;
+          }
+        } catch {
+          // Try regex fallback
+          const m = usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) || usageHeader.match(/cost=([0-9.]+)/i);
+          if (m && m[1]) {
+            const n = Number(m[1]);
+            if (Number.isFinite(n)) return n;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error extracting USD cost from OpenRouter response:", error);
+    }
+    return undefined;
   }
 
   // Parse non-stream response

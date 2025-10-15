@@ -61,6 +61,19 @@ export function accessLogMiddleware(req: Request, res: Response, next: NextFunct
       }
     } catch {}
 
+    // Provider and pricing information
+    try {
+      if (log.provider) {
+        // Provider info already set by proxy layer
+      }
+      if (log.usage_source) {
+        // Usage source already set by pricing system
+      }
+      if (log.pricing_version) {
+        // Pricing version already set by pricing system
+      }
+    } catch {}
+
     log.response_time = new Date().toISOString();
     log.duration_ms = Math.round(durationMs);
     log.status_code = res.statusCode;
