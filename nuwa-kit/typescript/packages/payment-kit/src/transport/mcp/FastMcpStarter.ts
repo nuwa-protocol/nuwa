@@ -277,7 +277,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     const httpServer = await startHTTPServer({
       port,
       streamEndpoint: endpoint,
-      createServer: async _req => {
+      createServer: async (req: any) => {
         const session = new FastMCPSession({
           name: opts.serviceId || 'nuwa-mcp-server',
           version: '1.0.0',
@@ -292,17 +292,24 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
         (session as any).__sessionId = ++sessionCounter;
         return session;
       },
-      onConnect: async session => {
+      onConnect: async (session: any) => {
         sessions.push(session);
         // Register all tools to the new session via FastMCP internal handlers
         // We rely on FastMCP having already had tools added via registrar
         // Emit-like behavior is not exposed; sessions will receive handlers on creation
       },
-      onClose: async session => {
+      onClose: async (session: any) => {
         const idx = sessions.indexOf(session as any);
         if (idx >= 0) sessions.splice(idx, 1);
       },
-      onUnhandledRequest: async (req, res) => {
+      onUnhandledRequest: async (req: any, res: any) => {
+        // Handle preflight requests
+        if (req.method === "OPTIONS") {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
         try {
           const url = new URL(req.url || '', 'http://localhost');
           // Health endpoint (parity with FastMCP default)

@@ -143,12 +143,28 @@ upstream:
   command: ["npx", "@example/mcp-server"]
   env:
     API_KEY: "${API_KEY}"
+  # stderr: "inherit"  # Default: child process errors are visible (recommended for debugging)
+  # stderr: "ignore"   # Suppress child process error output
+  # stderr: "pipe"     # Capture stderr (advanced usage)
 
 # Payment configuration
 serviceId: "my-mcp-service"
 network: "test"
 defaultPricePicoUSD: "100000000"
 ```
+
+**Note**: 
+- Stdio upstream automatically inherits all environment variables from the parent process, then merges any custom environment variables specified in the `env` section. This ensures that child processes have access to system variables like `PATH`, `HOME`, etc., as well as any custom variables you specify.
+- The `stderr` option controls how child process error output is handled:
+  - `inherit` (default): Error messages from the child process are displayed in the proxy's console, making debugging easier
+  - `ignore`: Suppresses error output from the child process
+  - `pipe`: Captures stderr for advanced processing (not commonly needed)
+
+**Important**: In stdio mode, the child process uses:
+- **stdin/stdout**: For MCP JSON-RPC protocol communication (handled automatically by the SDK)
+- **stderr**: For debug output, error messages, and logging (visible in proxy console with `stderr: inherit`)
+
+Never write non-MCP content to stdout in your MCP server, as this will break protocol communication. Use `console.error()` for debug output instead of `console.log()`.
 
 Set any required environment variables:
 ```bash
