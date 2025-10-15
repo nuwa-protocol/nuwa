@@ -12,6 +12,7 @@ export function GatewayDebugPanel() {
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
   const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai'>('openrouter');
+  const [apiType, setApiType] = useState<'chat' | 'response'>('chat'); // New: API type selector
   const [isStream, setIsStream] = useState<boolean>(false);
   const [requestBody, setRequestBody] = useState(`{
     "model": "deepseek/deepseek-r1-0528:free",
@@ -22,31 +23,43 @@ export function GatewayDebugPanel() {
   }`);
 
   // Provider configurations
-  const getProviderConfig = (providerName: string) => {
+  const getProviderConfig = (providerName: string, apiType: 'chat' | 'response') => {
     switch (providerName) {
       case 'openrouter':
         return {
           defaultPath: '/api/v1/chat/completions',
           defaultModel: 'openai/gpt-4o-mini',
-          paths: ['/api/v1/chat/completions', '/api/v1/models', '/api/v1/completions']
+          paths: ['/api/v1/chat/completions', '/api/v1/models', '/api/v1/completions'],
+          supportsResponseAPI: false
         };
       case 'openai':
+        if (apiType === 'response') {
+          return {
+            defaultPath: '/v1/responses',
+            defaultModel: 'gpt-4o',
+            paths: ['/v1/responses'],
+            supportsResponseAPI: true
+          };
+        }
         return {
           defaultPath: '/v1/chat/completions',
           defaultModel: 'gpt-4o-mini',
-          paths: ['/v1/chat/completions', '/v1/models', '/v1/completions', '/v1/embeddings']
+          paths: ['/v1/chat/completions', '/v1/models', '/v1/completions', '/v1/embeddings', '/v1/responses'],
+          supportsResponseAPI: true
         };
       case 'litellm':
         return {
           defaultPath: '/chat/completions',
           defaultModel: 'gpt-4o-mini',
-          paths: ['/chat/completions', '/models', '/completions']
+          paths: ['/chat/completions', '/models', '/completions'],
+          supportsResponseAPI: false
         };
       default:
         return {
           defaultPath: '/api/v1/chat/completions',
           defaultModel: 'gpt-4o-mini',
-          paths: ['/api/v1/chat/completions']
+          paths: ['/api/v1/chat/completions'],
+          supportsResponseAPI: false
         };
     }
   };
@@ -56,30 +69,48 @@ export function GatewayDebugPanel() {
     return `/${provider}${apiPath}`;
   };
 
+  // Generate default request body based on API type
+  const getDefaultRequestBody = (model: string, apiType: 'chat' | 'response') => {
+    if (apiType === 'response') {
+      // Response API uses 'input' parameter, not 'messages'
+      return `{
+  "model": "${model}",
+  "input": "What is Nuwa AI?",
+  "tools": [
+    {
+      "type": "web_search"
+    }
+  ]
+}`;
+    } else {
+      return `{
+  "model": "${model}",
+  "messages": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello, who are you?" }
+  ]
+}`;
+    }
+  };
+
   // Handle provider change - update path and model
   const handleProviderChange = (newProvider: string) => {
     setProvider(newProvider as any);
-    const config = getProviderConfig(newProvider);
+    const config = getProviderConfig(newProvider, apiType);
     setApiPath(config.defaultPath);
     
     // Update request body with new default model
-    try {
-      const currentBody = JSON.parse(requestBody);
-      const updatedBody = {
-        ...currentBody,
-        model: config.defaultModel
-      };
-      setRequestBody(JSON.stringify(updatedBody, null, 2));
-    } catch (e) {
-      // If parsing fails, create a new default body
-      setRequestBody(`{
-    "model": "${config.defaultModel}",
-    "messages": [
-      { "role": "system", "content": "You are a helpful assistant." },
-      { "role": "user", "content": "Hello, who are you?" }
-    ]
-  }`);
-    }
+    setRequestBody(getDefaultRequestBody(config.defaultModel, apiType));
+  };
+
+  // Handle API type change - update path and body
+  const handleApiTypeChange = (newApiType: 'chat' | 'response') => {
+    setApiType(newApiType);
+    const config = getProviderConfig(provider, newApiType);
+    setApiPath(config.defaultPath);
+    
+    // Update request body based on API type
+    setRequestBody(getDefaultRequestBody(config.defaultModel, newApiType));
   };
   const [responseText, setResponseText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -453,7 +484,7 @@ export function GatewayDebugPanel() {
           onChange={e => setApiPath(e.target.value)}
           style={{ marginLeft: '8px', width: '200px' }}
         >
-          {getProviderConfig(provider).paths.map(path => (
+          {getProviderConfig(provider, apiType).paths.map(path => (
             <option key={path} value={path}>{path}</option>
           ))}
         </select>
@@ -479,6 +510,117 @@ export function GatewayDebugPanel() {
           <option value="litellm">LiteLLM</option>
         </select>
         <small style={{ marginLeft: '8px' }}>(uses /{provider}/* path routing)</small>
+      </div>
+      )}
+
+      {activeTab === 'http' && provider === 'openai' && (
+      <div className="api-type-select" style={{ marginBottom: '1rem' }}>
+        <label style={{ marginRight: '8px' }}>API Type:</label>
+        <select value={apiType} onChange={e => handleApiTypeChange(e.target.value as 'chat' | 'response')}>
+          <option value="chat">Chat Completions API</option>
+          <option value="response">Response API</option>
+        </select>
+        <small style={{ marginLeft: '8px' }}>
+          {apiType === 'response' 
+            ? '(supports built-in tools, vision, and multimodal inputs)'
+            : '(standard chat format with messages)'}
+        </small>
+        {apiType === 'response' && (
+          <div style={{ marginTop: '8px' }}>
+            <button 
+              onClick={() => setRequestBody(getDefaultRequestBody('gpt-4o', 'response'))} 
+              style={{ marginRight: '8px', fontSize: '12px' }}
+            >
+              Load Web Search Example
+            </button>
+            <button 
+              onClick={() => setRequestBody(`{
+  "model": "gpt-4o",
+  "input": "What files do I have?",
+  "tools": [
+    {
+      "type": "file_search"
+    }
+  ]
+}`)} 
+              style={{ marginRight: '8px', fontSize: '12px' }}
+            >
+              Load File Search Example
+            </button>
+            <button 
+              onClick={() => setRequestBody(`{
+  "model": "gpt-4o",
+  "input": "Calculate the factorial of 10 and show me the code",
+  "tools": [
+    {
+      "type": "code_interpreter",
+      "container": {
+        "type": "auto"
+      }
+    }
+  ]
+}`)} 
+              style={{ marginRight: '8px', fontSize: '12px' }}
+            >
+              Load Code Interpreter
+            </button>
+            <button 
+              onClick={() => setRequestBody(`{
+  "model": "gpt-4o",
+  "input": "Hello, tell me a joke"
+}`)} 
+              style={{ marginRight: '8px', fontSize: '12px' }}
+            >
+              Load Simple Example
+            </button>
+            <button 
+              onClick={() => setRequestBody(`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "What's in this image? Describe what you see."
+        },
+        {
+          "type": "input_image",
+          "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+        }
+      ]
+    }
+  ]
+}`)} 
+              style={{ marginRight: '8px', fontSize: '12px' }}
+            >
+              Load Vision Example
+            </button>
+            <button 
+              onClick={() => setRequestBody(`{
+  "model": "gpt-4o",
+  "input": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "What animal is this? What breed might it be?"
+        },
+        {
+          "type": "input_image",
+          "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg"
+        }
+      ]
+    }
+  ]
+}`)} 
+              style={{ fontSize: '12px' }}
+            >
+              Load Cat Vision
+            </button>
+          </div>
+        )}
       </div>
       )}
 
@@ -570,7 +712,7 @@ export function GatewayDebugPanel() {
 
       {payment && (
         <div style={{ marginTop: '1rem' }}>
-          <h3>Payment</h3>
+          <h3>Payment & Usage</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
@@ -591,19 +733,38 @@ export function GatewayDebugPanel() {
               </tr>
               <tr>
                 <td style={{ fontWeight: 600 }}>Cost (USD)</td>
-                <td>{formatUsdAmount(payment.costUsd)}</td>
+                <td style={{ fontSize: '16px', fontWeight: 'bold', color: payment.costUsd > 0 ? '#2e7d32' : '#d32f2f' }}>
+                  {formatUsdAmount(payment.costUsd)}
+                  {payment.costUsd === 0 && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#ff9800' }}>⚠️ Zero cost - check billing logs</span>}
+                </td>
               </tr>
+              {payment.usage && (
+                <>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Prompt Tokens</td>
+                    <td>{payment.usage.promptTokens || 0}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Completion Tokens</td>
+                    <td>{payment.usage.completionTokens || 0}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: 600 }}>Total Tokens</td>
+                    <td>{payment.usage.totalTokens || 0}</td>
+                  </tr>
+                </>
+              )}
               <tr>
                 <td style={{ fontWeight: 600 }}>Tx Ref (client)</td>
-                <td>{payment.clientTxRef}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{payment.clientTxRef}</td>
               </tr>
               <tr>
                 <td style={{ fontWeight: 600 }}>Tx Ref (service)</td>
-                <td>{payment.serviceTxRef ?? ''}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{payment.serviceTxRef ?? ''}</td>
               </tr>
               <tr>
                 <td style={{ fontWeight: 600 }}>Timestamp</td>
-                <td>{payment.timestamp}</td>
+                <td>{new Date(payment.timestamp).toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
