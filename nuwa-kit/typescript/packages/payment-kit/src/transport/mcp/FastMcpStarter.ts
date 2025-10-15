@@ -277,8 +277,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     const httpServer = await startHTTPServer({
       port,
       streamEndpoint: endpoint,
-      // Wrap createServer to ensure CORS headers are always set
-      createServer: async (req) => {
+      createServer: async (req: any) => {
         // Ensure request has Origin header so mcp-proxy sets CORS headers
         if (!req.headers.origin) {
           req.headers.origin = 'http://localhost';
@@ -298,18 +297,31 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
         (session as any).__sessionId = ++sessionCounter;
         return session;
       },
-      onConnect: async session => {
+      onConnect: async (session: any) => {
         sessions.push(session);
         // Register all tools to the new session via FastMCP internal handlers
         // We rely on FastMCP having already had tools added via registrar
         // Emit-like behavior is not exposed; sessions will receive handlers on creation
       },
-      onClose: async session => {
+      onClose: async (session: any) => {
         const idx = sessions.indexOf(session as any);
         if (idx >= 0) sessions.splice(idx, 1);
       },
-      onUnhandledRequest: async (req, res) => {
-        // Set CORS headers for all responses
+      onUnhandledRequest: async (req: any, res: any) => {
+        // Override CORS headers to be more permissive than mcp-proxy 5.9.0 defaults
+        const originalSetHeader = res.setHeader;
+        res.setHeader = function(name: string, value: any) {
+          // Override restrictive CORS headers from mcp-proxy 5.9.0
+          if (name.toLowerCase() === 'access-control-allow-headers') {
+            return originalSetHeader.call(this, name, '*');
+          }
+          if (name.toLowerCase() === 'access-control-expose-headers') {
+            return originalSetHeader.call(this, name, 'mcp-session-id');
+          }
+          return originalSetHeader.call(this, name, value);
+        };
+
+        // Set CORS headers for unhandled requests
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
