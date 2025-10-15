@@ -1,0 +1,17 @@
+# Stdio 演示配置 - 展示 stdout vs stderr
+
+# Server settings
+port: 8088
+endpoint: "/mcp"
+
+# Stdio upstream 
+upstream:
+  type: "stdio"
+  command: ["node", "./examples/stdio-demo.js"]
+  # stderr: "inherit"  # 默认值，stderr 输出会显示在代理控制台
+
+# Payment configuration (可选)
+serviceId: "stdio-demo-service"
+network: "test"
+defaultPricePicoUSD: "100000000"
+debug: true

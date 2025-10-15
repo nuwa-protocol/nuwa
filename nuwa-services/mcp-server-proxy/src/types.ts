@@ -38,6 +38,13 @@ export interface StdioUpstreamConfig {
   command: string[];
   cwd?: string;
   env?: Record<string, string>;
+  /** 
+   * Configure stderr handling for the child process.
+   * - 'inherit': stderr goes to parent process stderr (default, good for debugging)
+   * - 'ignore': suppress stderr output
+   * - 'pipe': capture stderr (not currently supported)
+   */
+  stderr?: 'inherit' | 'ignore' | 'pipe';
 }
 
 export type UpstreamConfig = HttpStreamUpstreamConfig | StdioUpstreamConfig;

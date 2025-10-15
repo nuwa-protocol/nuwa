@@ -18,15 +18,23 @@ describe('Upstream (stdio) integration', () => {
   let upstream: any;
 
   beforeAll(async () => {
-    upstream = await initUpstream('mock', {
+    // Set a test environment variable
+    process.env.TEST_INHERITED_VAR = 'inherited_value';
+    
+    upstream = await initUpstream({
       type: 'stdio',
       command: ['node', script],
       cwd: process.cwd(),
+      env: {
+        TEST_CUSTOM_VAR: 'custom_value'
+      }
     } as any);
   }, 10000);
 
   afterAll(async () => {
     await upstream.client.close();
+    // Clean up test environment variable
+    delete process.env.TEST_INHERITED_VAR;
   });
 
   it('upstream exposes capabilities', async () => {
@@ -53,6 +61,201 @@ describe('Upstream (stdio) integration', () => {
     expect(Array.isArray(result.content)).toBe(true);
     expect(result.content[0].text).toBe('hello');
   });
+}); 
+
+describe('Upstream (stdio) stderr output', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const script = path.resolve(__dirname, 'fixtures/stderr-test-mcp.js');
+
+  it('should display stderr output with inherit mode (default)', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with default stderr configuration (should be 'inherit')
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+      } as any);
+
+      // Call a tool that outputs to stderr
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'test message for stderr' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content[0].text).toBe('Processed: test message for stderr');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
+
+  it('should handle stderr configuration options', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with explicit stderr: 'inherit'
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+        stderr: 'inherit'
+      } as any);
+
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'explicit inherit test' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(result.content[0].text).toBe('Processed: explicit inherit test');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
+});
+
+describe('Upstream (stdio) environment variable inheritance', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const script = path.resolve(__dirname, 'fixtures/env-test-mcp.js');
+
+  let upstream: any;
+
+  beforeAll(async () => {
+    // Set test environment variables
+    process.env.TEST_INHERITED_VAR = 'inherited_value';
+    process.env.PATH = process.env.PATH || '/usr/bin'; // Ensure PATH exists
+    
+    upstream = await initUpstream({
+      type: 'stdio',
+      command: ['node', script],
+      cwd: process.cwd(),
+      env: {
+        TEST_CUSTOM_VAR: 'custom_value'
+      }
+    } as any);
+  }, 10000);
+
+  afterAll(async () => {
+    await upstream.client.close();
+    // Clean up test environment variables
+    delete process.env.TEST_INHERITED_VAR;
+  });
+
+  it('child process should inherit parent environment variables', async () => {
+    const result = await upstream.client.callTool({ 
+      name: 'check_env', 
+      arguments: { varName: 'TEST_INHERITED_VAR' } 
+    });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBe('TEST_INHERITED_VAR=inherited_value');
+  });
+
+  it('child process should have custom environment variables', async () => {
+    const result = await upstream.client.callTool({ 
+      name: 'check_env', 
+      arguments: { varName: 'TEST_CUSTOM_VAR' } 
+    });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBe('TEST_CUSTOM_VAR=custom_value');
+  });
+
+  it('child process should have system PATH variable', async () => {
+    const result = await upstream.client.callTool({ 
+      name: 'check_env', 
+      arguments: { varName: 'PATH' } 
+    });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toContain('PATH=');
+    expect(result.content[0].text).not.toBe('PATH not found');
+  });
+
+  it('child process should have reasonable number of environment variables', async () => {
+    const result = await upstream.client.callTool({ 
+      name: 'list_env', 
+      arguments: {} 
+    });
+    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    // Should have at least some environment variables (typically 20+ on most systems)
+    expect(result.content[0].text).toMatch(/Found \d+ environment variables/);
+    const match = result.content[0].text.match(/Found (\d+) environment variables/);
+    if (match) {
+      const count = parseInt(match[1]);
+      expect(count).toBeGreaterThan(5); // Should have more than just a few vars
+    }
+  });
+}); 
+
+describe('Upstream (stdio) stderr output', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const script = path.resolve(__dirname, 'fixtures/stderr-test-mcp.js');
+
+  it('should display stderr output with inherit mode (default)', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with default stderr configuration (should be 'inherit')
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+      } as any);
+
+      // Call a tool that outputs to stderr
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'test message for stderr' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content[0].text).toBe('Processed: test message for stderr');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
+
+  it('should handle stderr configuration options', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with explicit stderr: 'inherit'
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+        stderr: 'inherit'
+      } as any);
+
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'explicit inherit test' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(result.content[0].text).toBe('Processed: explicit inherit test');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
 });
 
 describe('Upstream (httpStream) integration', () => {
@@ -72,7 +275,7 @@ describe('Upstream (httpStream) integration', () => {
         else resolve();
       });
     });
-    upstream = await initUpstream('mock-http', {
+    upstream = await initUpstream({
       type: 'httpStream',
       url: 'http://localhost:4000/mcp',
     } as any);
@@ -106,4 +309,64 @@ describe('Upstream (httpStream) integration', () => {
     expect(Array.isArray(result.content)).toBe(true);
     expect(result.content[0].text).toBe('hello');
   });
+}); 
+
+describe('Upstream (stdio) stderr output', () => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const script = path.resolve(__dirname, 'fixtures/stderr-test-mcp.js');
+
+  it('should display stderr output with inherit mode (default)', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with default stderr configuration (should be 'inherit')
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+      } as any);
+
+      // Call a tool that outputs to stderr
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'test message for stderr' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content[0].text).toBe('Processed: test message for stderr');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
+
+  it('should handle stderr configuration options', async () => {
+    let upstream: any;
+    
+    try {
+      // Test with explicit stderr: 'inherit'
+      upstream = await initUpstream({
+        type: 'stdio',
+        command: ['node', script],
+        cwd: process.cwd(),
+        stderr: 'inherit'
+      } as any);
+
+      const result = await upstream.client.callTool({ 
+        name: 'test_stderr', 
+        arguments: { message: 'explicit inherit test' } 
+      });
+      
+      expect(result.content).toBeDefined();
+      expect(result.content[0].text).toBe('Processed: explicit inherit test');
+      
+    } finally {
+      if (upstream) {
+        await upstream.client.close();
+      }
+    }
+  }, 10000);
 }); 
