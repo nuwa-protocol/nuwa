@@ -278,11 +278,6 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       port,
       streamEndpoint: endpoint,
       createServer: async (req: any) => {
-        // Ensure request has Origin header so mcp-proxy sets CORS headers
-        if (!req.headers.origin) {
-          req.headers.origin = 'http://localhost';
-        }
-        
         const session = new FastMCPSession({
           name: opts.serviceId || 'nuwa-mcp-server',
           version: '1.0.0',
@@ -308,26 +303,6 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
         if (idx >= 0) sessions.splice(idx, 1);
       },
       onUnhandledRequest: async (req: any, res: any) => {
-        // Override CORS headers to be more permissive than mcp-proxy 5.9.0 defaults
-        const originalSetHeader = res.setHeader;
-        res.setHeader = function(name: string, value: any) {
-          // Override restrictive CORS headers from mcp-proxy 5.9.0
-          if (name.toLowerCase() === 'access-control-allow-headers') {
-            return originalSetHeader.call(this, name, '*');
-          }
-          if (name.toLowerCase() === 'access-control-expose-headers') {
-            return originalSetHeader.call(this, name, 'mcp-session-id');
-          }
-          return originalSetHeader.call(this, name, value);
-        };
-
-        // Set CORS headers for unhandled requests
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Credentials", "true");
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "*");
-        res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
-
         // Handle preflight requests
         if (req.method === "OPTIONS") {
           res.writeHead(204);

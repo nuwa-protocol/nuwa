@@ -735,4 +735,91 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     expect(second.payment!.nonce).toBeGreaterThan(first.payment!.nonce);
     console.log(`✅ Auto retry succeeded - ${formatPaymentInfo(second.payment!)}`);
   }, 120000);
+
+  // Note: This test documents the expected CORS behavior with mcp-proxy
+  // Currently using mcp-proxy@5.5.x which has permissive CORS headers (*)
+  // mcp-proxy@5.9.0+ has restrictive headers that may cause CORS issues
+  // See: https://github.com/nuwa-protocol/nuwa/issues/XXX
+  test('CORS headers are properly set', async () => {
+    if (!shouldRunE2ETests()) return;
+
+    console.log('🔍 Testing CORS headers');
+
+    // Test preflight request (OPTIONS) with Origin header
+    const preflightResponse = await fetch(serverUrl, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://test-app.nuwa.dev',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type, Mcp-Session-Id, Authorization',
+      },
+    });
+
+    console.log('📋 Preflight response status:', preflightResponse.status);
+    expect(preflightResponse.status).toBe(204);
+
+    // Check CORS headers
+    const corsHeaders: Record<string, string> = {};
+    preflightResponse.headers.forEach((value, key) => {
+      if (key.toLowerCase().startsWith('access-control')) {
+        corsHeaders[key] = value;
+        console.log(`  ${key}: ${value}`);
+      }
+    });
+
+    // Verify Access-Control-Allow-Origin
+    expect(corsHeaders['access-control-allow-origin']).toBe('https://test-app.nuwa.dev');
+    console.log('✅ Access-Control-Allow-Origin correctly set');
+
+    // Verify Access-Control-Allow-Credentials
+    expect(corsHeaders['access-control-allow-credentials']).toBe('true');
+    console.log('✅ Access-Control-Allow-Credentials correctly set');
+
+    // Verify Access-Control-Allow-Methods
+    expect(corsHeaders['access-control-allow-methods']).toContain('POST');
+    console.log('✅ Access-Control-Allow-Methods includes POST');
+
+    // Verify Access-Control-Allow-Headers is permissive
+    // mcp-proxy@5.5.x uses '*' which works well with browsers
+    expect(corsHeaders['access-control-allow-headers']).toBe('*');
+    console.log('✅ Access-Control-Allow-Headers is "*" (permissive)');
+
+    // Verify Access-Control-Expose-Headers
+    expect(corsHeaders['access-control-expose-headers']).toBe('mcp-session-id');
+    console.log('✅ Access-Control-Expose-Headers correctly set to "mcp-session-id"');
+
+    // Test actual POST request with Origin to ensure CORS works
+    const postResponse = await fetch(serverUrl, {
+      method: 'POST',
+      headers: {
+        'Origin': 'https://test-app.nuwa.dev',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+        params: {},
+      }),
+    });
+
+    console.log('📋 POST response status:', postResponse.status);
+    // Accept 400/401/402 (auth/payment errors are expected without credentials)
+    // The important thing is CORS headers are present, not the business logic result
+    expect([200, 400, 401, 402].includes(postResponse.status)).toBe(true);
+
+    // Verify CORS headers are present in actual request
+    const postCorsHeaders: Record<string, string> = {};
+    postResponse.headers.forEach((value, key) => {
+      if (key.toLowerCase().startsWith('access-control')) {
+        postCorsHeaders[key] = value;
+      }
+    });
+
+    expect(postCorsHeaders['access-control-allow-origin']).toBe('https://test-app.nuwa.dev');
+    expect(postCorsHeaders['access-control-allow-credentials']).toBe('true');
+    console.log('✅ CORS headers present in actual POST response');
+
+    console.log('🎉 CORS headers test successful!');
+  }, 60000);
 });

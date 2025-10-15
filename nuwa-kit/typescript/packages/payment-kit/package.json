@@ -120,7 +120,7 @@
     "fastmcp": "^3.5.0",
     "js-yaml": "^4.1.0",
     "lossless-json": "^4.1.1",
-    "mcp-proxy": "^5.9.0",
+    "mcp-proxy": "5.5.6",
     "on-headers": "^1.1.0",
     "path-to-regexp": "^6.3.0",
     "pg": "^8.16.3",
