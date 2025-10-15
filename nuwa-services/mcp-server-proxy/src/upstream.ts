@@ -57,7 +57,7 @@ export async function initUpstream(cfg: UpstreamConfig): Promise<Upstream> {
       ...(stdioCfg.env || {}),
     };
     
-    const inheritedEnvCount = Object.keys(process.env).filter(([_, v]) => v !== undefined).length;
+    const inheritedEnvCount = Object.entries(process.env).filter(([_, v]) => v !== undefined).length;
     const customEnvCount = Object.keys(stdioCfg.env || {}).length;
     console.log(`   Environment: ${inheritedEnvCount} inherited + ${customEnvCount} custom variables`);
     if (stdioCfg.env && Object.keys(stdioCfg.env).length > 0) {
