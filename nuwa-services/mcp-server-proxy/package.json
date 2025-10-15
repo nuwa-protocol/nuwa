@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/mcp-server-proxy",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "MCP Server Proxy with DIDAuth support for Nuwa ecosystem",
   "type": "module",
   "main": "dist/index.js",
