@@ -663,6 +663,7 @@ function initializeProviders(): void {
       allowedPaths: [
         '/v1/chat/completions',
         '/v1/completions',
+        '/v1/responses', // OpenAI Response API support
         '/v1/models', 
         '/v1/embeddings',
         '/v1/images/generations',
