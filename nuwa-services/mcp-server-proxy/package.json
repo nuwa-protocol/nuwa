@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/mcp-server-proxy",
-  "version": "0.6.3",
+  "version": "0.6.7",
   "description": "MCP Server Proxy with DIDAuth support for Nuwa ecosystem",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.3",
     "@nuwa-ai/identity-kit": "^0.6.0",
-    "@nuwa-ai/payment-kit": "^0.6.4",
+    "@nuwa-ai/payment-kit": "^0.6.7",
     "js-yaml": "^4.1.0",
     "undici": "^6.6.0",
     "zod": "^3.22.4"

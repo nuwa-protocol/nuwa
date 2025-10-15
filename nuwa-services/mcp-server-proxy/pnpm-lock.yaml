@@ -15,8 +15,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.4
-        version: 0.6.4(express@5.1.0)(typescript@5.8.3)
+        specifier: ^0.6.7
+        version: 0.6.7(express@5.1.0)(typescript@5.8.3)
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
@@ -597,8 +597,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.4':
-    resolution: {integrity: sha512-TKlGX1jcGfecBEhzunV+GMAa90HTzgF2qXTeKYY5u3piFEC9UFRN5+rI1MBkjncBnd7nDoXfokIJjQd2r7UEew==}
+  '@nuwa-ai/payment-kit@0.6.7':
+    resolution: {integrity: sha512-en+KtWojec6Hf9+tag4gPBO8+uSH+nVc92JYA8HcG0daVweQzBb3QJzMDcnz+iALOuzpedOs0C9dkq+WfXlIaQ==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1521,6 +1521,10 @@ packages:
 
   mcp-proxy@5.5.6:
     resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
+    hasBin: true
+
+  mcp-proxy@5.9.0:
+    resolution: {integrity: sha512-xonJSkuy4wmwXeykBFl0mjRMt4D0pAGCtFIfBFUz4O80VrO92ruJseIdASJO3wN6MdYHi3vbZLOQol3NsUpg4g==}
     hasBin: true
 
   media-typer@1.1.0:
@@ -2547,7 +2551,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.4(express@5.1.0)(typescript@5.8.3)':
+  '@nuwa-ai/payment-kit@0.6.7(express@5.1.0)(typescript@5.8.3)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.8.3)
@@ -3339,7 +3343,7 @@ snapshots:
       execa: 9.6.0
       file-type: 21.0.0
       fuse.js: 7.1.0
-      mcp-proxy: 5.5.6
+      mcp-proxy: 5.9.0
       strict-event-emitter-types: 2.0.0
       undici: 7.11.0
       uri-templates: 0.2.0
@@ -3631,6 +3635,8 @@ snapshots:
   math-intrinsics@1.1.0: {}
 
   mcp-proxy@5.5.6: {}
+
+  mcp-proxy@5.9.0: {}
 
   media-typer@1.1.0: {}
 
