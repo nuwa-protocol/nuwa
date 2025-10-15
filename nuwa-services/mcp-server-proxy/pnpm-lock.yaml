@@ -15,8 +15,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.8.3)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.7
-        version: 0.6.7(express@5.1.0)(typescript@5.8.3)
+        specifier: ^0.6.8
+        version: 0.6.8(express@5.1.0)(typescript@5.8.3)
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
@@ -597,8 +597,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.7':
-    resolution: {integrity: sha512-en+KtWojec6Hf9+tag4gPBO8+uSH+nVc92JYA8HcG0daVweQzBb3QJzMDcnz+iALOuzpedOs0C9dkq+WfXlIaQ==}
+  '@nuwa-ai/payment-kit@0.6.8':
+    resolution: {integrity: sha512-qcm+UXL4XSetG0Pnzd8TJ/d/z5pV31ceqspD3dDhtMFUbWWoqp6rwh5BjlgHEa851o6+LtP2T+LWPS+SY1/VGw==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1230,8 +1230,8 @@ packages:
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
-  fastmcp@3.8.2:
-    resolution: {integrity: sha512-GN8SBv2+vm+PYbckvT8ZVZvjxkkIaQhgoGp3WrJ28AlJVt1wmd8S332L7o7SfuFzyYA4kwT2ofEtYJtRlm/mcw==}
+  fastmcp@3.5.0:
+    resolution: {integrity: sha512-80OeYVFCqusrOFPNxm8uJ5G/ZaKMasygZTLvZReZ5o6iCvDBwFR/S485Is3jY0128aAaIyYx9eAgWjBUQUwoYg==}
     hasBin: true
 
   fastq@1.19.1:
@@ -2140,8 +2140,8 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  xsschema@0.3.0-beta.5:
-    resolution: {integrity: sha512-NYMPzYegZpL+zpTMswdg41+mmcyCkym38nvsZvPAHPDAOiOT8zAXrE28XvwyQDMsLuGE51IsJ+07RHYqTh4PUQ==}
+  xsschema@0.3.0-beta.3:
+    resolution: {integrity: sha512-8fKI0Kqxs7npz3ElebNCeGdS0HDuS2qL3IqHK5O53yCdh419hcr3GQillwN39TNFasHjbMLQ+DjSwpY0NONdnQ==}
     peerDependencies:
       '@valibot/to-json-schema': ^1.0.0
       arktype: ^2.1.16
@@ -2551,7 +2551,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.7(express@5.1.0)(typescript@5.8.3)':
+  '@nuwa-ai/payment-kit@0.6.8(express@5.1.0)(typescript@5.8.3)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.8.3)
@@ -2559,7 +2559,7 @@ snapshots:
       '@types/js-yaml': 4.0.9
       '@types/pg': 8.15.5
       ai: 5.0.70(zod@3.25.67)
-      fastmcp: 3.8.2
+      fastmcp: 3.5.0
       js-yaml: 4.1.0
       lossless-json: 4.2.0
       mcp-proxy: 5.5.6
@@ -3336,7 +3336,7 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fastmcp@3.8.2:
+  fastmcp@3.5.0:
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@standard-schema/spec': 1.0.0
@@ -3347,7 +3347,7 @@ snapshots:
       strict-event-emitter-types: 2.0.0
       undici: 7.11.0
       uri-templates: 0.2.0
-      xsschema: 0.3.0-beta.5(zod-to-json-schema@3.24.6(zod@3.25.67))(zod@3.25.67)
+      xsschema: 0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.67))(zod@3.25.67)
       yargs: 18.0.0
       zod: 3.25.67
       zod-to-json-schema: 3.24.6(zod@3.25.67)
@@ -4211,7 +4211,7 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  xsschema@0.3.0-beta.5(zod-to-json-schema@3.24.6(zod@3.25.67))(zod@3.25.67):
+  xsschema@0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.67))(zod@3.25.67):
     optionalDependencies:
       zod: 3.25.67
       zod-to-json-schema: 3.24.6(zod@3.25.67)
