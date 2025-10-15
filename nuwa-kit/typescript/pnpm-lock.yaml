@@ -434,8 +434,8 @@ importers:
         specifier: ^4.1.1
         version: 4.1.1
       mcp-proxy:
-        specifier: ^5.5.4
-        version: 5.5.6
+        specifier: ^5.9.0
+        version: 5.9.0
       on-headers:
         specifier: ^1.1.0
         version: 1.1.0
@@ -3497,8 +3497,8 @@ packages:
     resolution: {integrity: sha512-7FTIRIdHjZL7/sRBQ2/FiyQZDV3tJGBANJ9UV5VTiSaOOkDs8F1boY+EP4X/Blcme8eWVFjzmfx9LqdXA/ZHRQ==}
     hasBin: true
 
-  mcp-proxy@5.5.6:
-    resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
+  mcp-proxy@5.9.0:
+    resolution: {integrity: sha512-xonJSkuy4wmwXeykBFl0mjRMt4D0pAGCtFIfBFUz4O80VrO92ruJseIdASJO3wN6MdYHi3vbZLOQol3NsUpg4g==}
     hasBin: true
 
   media-typer@0.3.0:
@@ -8858,7 +8858,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  mcp-proxy@5.5.6: {}
+  mcp-proxy@5.9.0: {}
 
   media-typer@0.3.0: {}
 
