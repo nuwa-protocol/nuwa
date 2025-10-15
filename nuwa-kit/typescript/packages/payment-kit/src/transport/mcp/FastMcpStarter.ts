@@ -277,7 +277,13 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     const httpServer = await startHTTPServer({
       port,
       streamEndpoint: endpoint,
-      createServer: async _req => {
+      // Wrap createServer to ensure CORS headers are always set
+      createServer: async (req) => {
+        // Ensure request has Origin header so mcp-proxy sets CORS headers
+        if (!req.headers.origin) {
+          req.headers.origin = 'http://localhost';
+        }
+        
         const session = new FastMCPSession({
           name: opts.serviceId || 'nuwa-mcp-server',
           version: '1.0.0',
@@ -303,6 +309,20 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
         if (idx >= 0) sessions.splice(idx, 1);
       },
       onUnhandledRequest: async (req, res) => {
+        // Set CORS headers for all responses
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "*");
+        res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
+
+        // Handle preflight requests
+        if (req.method === "OPTIONS") {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
         try {
           const url = new URL(req.url || '', 'http://localhost');
           // Health endpoint (parity with FastMCP default)
