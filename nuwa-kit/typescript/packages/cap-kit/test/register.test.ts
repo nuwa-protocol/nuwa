@@ -1,15 +1,15 @@
 import { Cap, CapKit } from "../src/index";
 import { describe, it } from '@jest/globals';
 import { setupEnv } from "./setup";
-import { SignerInterface } from "@nuwa-ai/identity-kit";
+import { IdentityEnv } from "@nuwa-ai/identity-kit";
 
 describe("CapKit", () => {
   let capKit: CapKit;
-  let signer: SignerInterface;
+  let identityEnv: IdentityEnv;
   beforeAll(async () => {
-    const { capKit: a, signer: s } = await setupEnv();
+    const { capKit: a, identityEnv: s } = await setupEnv();
     capKit = a;
-    signer = s;
+    identityEnv = s;
   }, 60000)
 
   const buildCap = (did:string, name: string, disName?: string)=> {
@@ -33,18 +33,18 @@ describe("CapKit", () => {
       },
       metadata: {
         displayName: disName ?? "nuwa_test",
-        "description": "nuwa test cap nuwa test cap nuwa test cap",
-        "introduction": "nuwa test",
-        "tags": [
+        description: "nuwa test cap nuwa test cap nuwa test cap",
+        introduction: "nuwa test",
+        tags: [
           "Coding"
         ],
-        "thumbnail": "https://nuwa.dev/_next/image?url=%2Flogos%2Fbasic-logo_brandcolor.png&w=256&q=75"
+        thumbnail: "https://nuwa.dev/_next/image?url=%2Flogos%2Fbasic-logo_brandcolor.png&w=256&q=75"
       }
     } as Cap
   }
 
   it("should register a cap", async () => {
-    const did = await signer.getDid();
+    const did = await identityEnv.keyManager.getDid();
     
     const result = await capKit.registerCap(buildCap(did, 'test_cap123'));
     expect(result).toBeDefined();

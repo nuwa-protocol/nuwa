@@ -15,6 +15,7 @@ import { FastMCP, FastMCPSession } from 'fastmcp';
 import { startHTTPServer } from 'mcp-proxy';
 import { extendZodWithNuwaReserved, normalizeToZodObject } from './ToolSchema';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
+import { RouteOptions } from '../express';
 
 // Server type with explicit stop method used by tests and callers
 export type StoppableServer = Server & { stop: () => Promise<void> };
@@ -73,13 +74,13 @@ export class PaymentMcpToolRegistrar {
     name: string;
     description: string;
     handler: (params: any, context?: any) => Promise<any>;
-    pricePicoUSD: bigint;
     schema?: any;
+    options?: RouteOptions;
   }): void {
     this.ensureNotStarted();
-    const { name, description, handler, pricePicoUSD, schema } = args;
+    const { name, description, handler, schema, options } = args;
     // Register with billing (enables pricing/settlement)
-    this.kit.register(name, { pricing: pricePicoUSD }, handler);
+    this.kit.register(name, options || { pricing: 0n }, handler);
     // Register with FastMCP (expose tool) via unified kit.invoke
     const kitRef = this.kit;
     const paramsSchema = (() => {
@@ -106,7 +107,7 @@ export class PaymentMcpToolRegistrar {
     handler: (params: any, context?: any) => Promise<any>;
     schema?: any;
   }): void {
-    this.addTool({ ...args, pricePicoUSD: 0n });
+    this.addTool({ ...args, options: { pricing: 0n } });
   }
 
   paidTool(args: {
@@ -116,7 +117,7 @@ export class PaymentMcpToolRegistrar {
     handler: (params: any, context?: any) => Promise<any>;
     schema?: any;
   }): void {
-    this.addTool(args);
+    this.addTool({ ...args, options: { pricing: args.pricePicoUSD } });
   }
 
   getTools(): any[] {
@@ -199,7 +200,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     description: string;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
-    nuwa?: { pricePicoUSD?: bigint };
+    options?: RouteOptions;
   }) => void;
   freeTool: (def: {
     name: string;
@@ -435,13 +436,13 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
     description: string;
     parameters?: any;
     execute: (params: any, context?: any) => Promise<any> | any;
-    nuwa?: { pricePicoUSD?: bigint };
+    options?: RouteOptions;
   }) => {
     registrar.addTool({
       name: def.name,
       description: def.description,
       schema: def.parameters,
-      pricePicoUSD: def.nuwa?.pricePicoUSD ?? 0n,
+      options: def.options,
       handler: async (params, context) => def.execute(params, context),
     });
   };

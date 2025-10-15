@@ -244,12 +244,12 @@ importers:
       '@nuwa-ai/identity-kit':
         specifier: workspace:*
         version: link:../identity-kit
+      '@nuwa-ai/payment-kit':
+        specifier: workspace:*
+        version: link:../payment-kit
       '@roochnetwork/rooch-sdk':
         specifier: ^0.4.0
         version: 0.4.0(typescript@5.4.5)
-      ai:
-        specifier: ^5.0.41
-        version: 5.0.51(zod@3.25.67)
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
@@ -4796,12 +4796,6 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/gateway@1.0.28(zod@3.25.67)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.9(zod@3.25.67)
-      zod: 3.25.67
-
   '@ai-sdk/gateway@1.0.28(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -4821,13 +4815,6 @@ snapshots:
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
       zod: 3.25.76
-
-  '@ai-sdk/provider-utils@3.0.9(zod@3.25.67)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
-      eventsource-parser: 3.0.6
-      zod: 3.25.67
 
   '@ai-sdk/provider-utils@3.0.9(zod@3.25.76)':
     dependencies:
@@ -6743,14 +6730,6 @@ snapshots:
   acorn@8.15.0: {}
 
   agent-base@7.1.4: {}
-
-  ai@5.0.51(zod@3.25.67):
-    dependencies:
-      '@ai-sdk/gateway': 1.0.28(zod@3.25.67)
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.9(zod@3.25.67)
-      '@opentelemetry/api': 1.9.0
-      zod: 3.25.67
 
   ai@5.0.51(zod@3.25.76):
     dependencies:

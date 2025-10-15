@@ -4,7 +4,18 @@ import { Result } from "../type.js";
 
 async function queryMyFavoriteCap({ page, pageSize }: { page?: number, pageSize?: number }, context: any) {
   try {
-    const userDID = context.session.did;
+    const userDID = context.didInfo.did;
+    if (!userDID) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            code: 404,
+            error: 'user did is null',
+          } as Result)
+        }]
+      };
+    }
     const result = await queryUserFavoriteCaps(userDID, page, pageSize);
 
     if (!result.success) {
@@ -55,9 +66,9 @@ export const queryMyFavoriteCapTool = {
     page: z.number().optional().default(0).describe("Page number starting from 0"),
     pageSize: z.number().optional().default(50).describe("Number of records per page")
   }),
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true
-  },
+  // annotations: {
+  //   readOnlyHint: true,
+  //   openWorldHint: true
+  // },
   execute: queryMyFavoriteCap
 };

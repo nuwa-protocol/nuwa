@@ -19,9 +19,9 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "test": "jest --config=jest.config.json",
-    "test:coverage": "jest --config=jest.config.json --coverage",
-    "test:watch": "jest --config=jest.config.json --watch",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.json",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.json --coverage",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.json --watch",
     "clean": "rimraf dist",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
@@ -76,8 +76,8 @@
     "@noble/curves": "^1.9.1",
     "@noble/hashes": "^1.8.0",
     "@nuwa-ai/identity-kit": "workspace:*",
+    "@nuwa-ai/payment-kit": "workspace:*",
     "@roochnetwork/rooch-sdk": "^0.4.0",
-    "ai": "^5.0.41",
     "js-yaml": "^4.1.0",
     "multiformats": "^9.9.0",
     "zod": "^3.25.67"

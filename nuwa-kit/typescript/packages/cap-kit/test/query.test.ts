@@ -9,7 +9,7 @@ describe("CapKit query cap", () => {
     capKit = a;
   })
   afterAll(async () => {
-    await capKit.mcpClose()
+    await capKit?.mcpClose()
   })
 
   it("should query cap by name", async () => {

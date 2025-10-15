@@ -66,9 +66,5 @@ export const queryCapByNameTool = {
     sortBy: z.enum(['average_rating', 'downloads', 'favorites', 'rating_count', 'updated_at']).optional().describe("Sort by field (optional)"),
     sortOrder: z.enum(['asc', 'desc']).optional().default('desc').describe("Sort order: ascending or descending (default: desc)")
   }),
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true
-  },
   execute: queryCapByName
 };

@@ -4,7 +4,7 @@ import { Result } from "../type.js";
 
 async function queryCapStats({ capId }: { capId: string }, context: any) {
   try {
-    const userDID = context.session.did;
+    const userDID = context.didInfo.did;
     const result = await queryCapStatsFromSupabase(capId, userDID);
 
     if (!result.success) {

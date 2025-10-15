@@ -4,7 +4,7 @@ import { z } from "zod";
 
 async function queryCapRatingDistribution({ capId }: { capId: string }, context: any) {
   try {
-    const userDID = context.session?.did;
+    const userDID = context.didInfo.did;
 
     if (!userDID) {
       return {
@@ -81,9 +81,5 @@ export const queryCapRatingDistributionTool = {
   parameters: z.object({
     capId: z.string().describe("The ID of the cap to query rating distribution for"),
   }),
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true
-  },
   execute: queryCapRatingDistribution
 };
