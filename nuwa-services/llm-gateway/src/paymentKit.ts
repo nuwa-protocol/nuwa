@@ -1,7 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
 import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
-
 // Bridge to existing non-stream LLM handler
 import SupabaseService from './database/supabase.js';
 import OpenRouterService from './services/openrouter.js';
@@ -663,6 +662,7 @@ function initializeProviders(): void {
       allowedPaths: [
         '/v1/chat/completions',
         '/v1/completions',
+        '/v1/responses', // OpenAI Response API support
         '/v1/models', 
         '/v1/embeddings',
         '/v1/images/generations',

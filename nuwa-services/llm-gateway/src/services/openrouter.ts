@@ -127,12 +127,14 @@ class OpenRouterService implements LLMProvider {
         if (typeof data === "object" && data !== null) {
           try {
             const anyData: any = data;
-            errorMessage = anyData?.error?.message || anyData?.message || JSON.stringify(anyData);
+            errorMessage = anyData?.error?.message 
+              || anyData?.message 
+              || `Error response with status ${statusCode}`;
             code = anyData?.error?.code || anyData?.code;
             type = anyData?.error?.type || anyData?.type;
             details = anyData?.error || anyData;
-          } catch {
-            errorMessage = JSON.stringify(data);
+          } catch (e) {
+            errorMessage = `Error parsing response data: ${statusCode}`;
           }
         } else if (typeof data === "string") {
           errorMessage = data;
