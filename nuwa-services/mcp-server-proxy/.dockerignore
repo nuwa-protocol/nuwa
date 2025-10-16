@@ -7,8 +7,9 @@ pnpm-debug.log*
 
 # Build outputs (will be built in container)
 dist
-build
+build/
 *.tsbuildinfo
+# build.js - NEEDED for build script
 
 # Environment files
 .env
@@ -84,7 +85,7 @@ temp
 .prettierrc*
 jest.config.*
 vitest.config.*
-tsconfig.json
+# tsconfig.json - NEEDED for build
 
 # Deployment specific
 deployments

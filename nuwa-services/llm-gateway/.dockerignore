@@ -83,7 +83,7 @@ temp
 # Development files
 .eslintrc*
 .prettierrc*
-tsconfig.json
+# tsconfig.json - NEEDED for build
 tsconfig.test.json
 
 # LiteLLM specific
