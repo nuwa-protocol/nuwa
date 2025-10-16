@@ -1,9 +1,7 @@
-// DID 相关类型
 export interface DIDInfo {
   did: string;
 }
 
-// 用户 API Key 相关
 export interface UserApiKey {
   id: string;
   did: string;
@@ -12,7 +10,6 @@ export interface UserApiKey {
   updated_at: string;
 }
 
-// OpenRouter 请求相关
 export interface LLMRequest {
   model: string;
   messages: Message[];
@@ -22,7 +19,6 @@ export interface LLMRequest {
   [key: string]: any;
 }
 
-// OpenAI Response API 请求相关
 export interface ResponseAPIRequest {
   model: string;
   messages?: Message[];
@@ -37,7 +33,6 @@ export interface ResponseAPIRequest {
   [key: string]: any;
 }
 
-// Response API 输入内容类型
 export interface InputContent {
   type: 'text' | 'image' | 'audio';
   text?: string;
@@ -51,7 +46,6 @@ export interface InputContent {
   };
 }
 
-// Response API 工具定义
 export interface Tool {
   type: 'function' | 'web_search' | 'file_search' | 'computer_use';
   function?: {
@@ -77,7 +71,6 @@ export interface ToolChoice {
   };
 }
 
-// Response API 响应相关
 export interface ResponseAPIResponse {
   id: string;
   object: 'response';
@@ -106,30 +99,40 @@ export interface ResponseOutput {
   };
 }
 
-// Response API Usage 扩展
+// Response API Usage - OpenAI official fields
 export interface ResponseUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
   total_tokens: number;
-  // 工具调用相关的 token 使用
+  
+  input_tokens_details?: {
+    cached_tokens?: number;
+  };
+  output_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+  
+  // tool token fields(OpenAI may provide these fields)
   tool_call_tokens?: number;
-  web_search_tokens?: number;
-  file_search_tokens?: number;
-  computer_use_tokens?: number;
-  // 工具调用次数统计（用于独立计费）
+  web_search_tokens?: number; // web_search
+  file_search_tokens?: number; // file_search
+  computer_use_tokens?: number; // computer_use
+}
+
+export interface ExtendedUsage extends ResponseUsage {
   tool_calls_count?: {
     web_search?: number;
     file_search?: number;
     computer_use?: number;
     code_interpreter?: number;
   };
-  // 成本信息（如果提供商支持）
+  
   cost?: number;
-  // 分解的成本信息
+  
   cost_breakdown?: {
-    model_cost?: number;      // 模型 token 成本
-    tool_call_cost?: number;  // 工具调用成本
-    storage_cost?: number;    // 存储成本（如 file search）
+    model_cost?: number;
+    tool_call_cost?: number;
+    storage_cost?: number;
   };
 }
 
@@ -138,7 +141,49 @@ export interface Message {
   content: string;
 }
 
-// 请求日志
+export interface ToolCall {
+  id: string;
+  type: string;
+  status: 'in_progress' | 'completed' | 'failed';
+  action?: any;
+}
+
+export interface WebSearchCall extends ToolCall {
+  type: 'web_search_call';
+  action: {
+    type: 'search';
+    query: string;
+  };
+}
+
+export interface FileSearchCall extends ToolCall {
+  type: 'file_search_call';
+  queries?: string[];
+  search_results?: any;
+}
+
+export interface CodeInterpreterCall extends ToolCall {
+  type: 'code_interpreter_call';
+}
+
+export interface ComputerUseCall extends ToolCall {
+  type: 'computer_use_call';
+}
+
+export interface ToolCallCounts {
+  web_search?: number;
+  file_search?: number;
+  code_interpreter?: number;
+  computer_use?: number;
+}
+
+export type SupportedToolType = 'web_search' | 'file_search' | 'code_interpreter' | 'computer_use';
+
+export interface ToolValidationResult {
+  valid: boolean;
+  unsupportedTools: string[];
+}
+
 export interface RequestLog {
   id?: string;
   did: string;
@@ -152,41 +197,8 @@ export interface RequestLog {
   error_message?: string;
 }
 
-// API 响应类型
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
-}
-
-// OpenRouter API Key 管理相关类型
-export interface CreateApiKeyRequest {
-  name: string;
-  limit?: number;
-}
-
-export interface OpenRouterApiKeyData {
-  name: string;
-  label: string;
-  limit: number;
-  disabled: boolean;
-  created_at: string;
-  updated_at: string;
-  hash: string;
-}
-
-export interface CreateApiKeyResponse {
-  data: OpenRouterApiKeyData;
-  key: string; // 实际的 API key，仅在创建时返回
-}
-
-export interface GetApiKeyResponse {
-  data: OpenRouterApiKeyData;
-}
-
-// API Key 管理请求
-export interface CreateUserApiKeyRequest {
-  did: string;
-  name: string;
-  limit?: number;
 }

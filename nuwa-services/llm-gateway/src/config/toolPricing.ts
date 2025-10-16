@@ -6,7 +6,7 @@
  * 
  * Note: These are separate from model token costs and are charged per usage.
  */
-
+import { ToolValidationResult } from '../types/index.js';
 export interface ToolPricingConfig {
   name: string;
   description: string;
@@ -132,4 +132,42 @@ export function hasToolTokenDiscount(model: string, toolName: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Get list of supported tools for Response API
+ */
+export function getSupportedTools(): string[] {
+  return OPENAI_TOOL_PRICING.map(tool => tool.name);
+}
+
+/**
+ * Validate if all requested tools are supported
+ */
+export function validateTools(requestedTools: any[]): ToolValidationResult {
+  if (!Array.isArray(requestedTools)) {
+    return { valid: true, unsupportedTools: [] };
+  }
+
+  const supportedTools = getSupportedTools();
+  const unsupportedTools: string[] = [];
+
+  for (const tool of requestedTools) {
+    if (tool && typeof tool === 'object' && tool.type) {
+      // Skip function tools as they are custom and don't have fixed pricing
+      if (tool.type === 'function') {
+        continue;
+      }
+      
+      // Check if built-in tool is supported
+      if (!supportedTools.includes(tool.type)) {
+        unsupportedTools.push(tool.type);
+      }
+    }
+  }
+
+  return {
+    valid: unsupportedTools.length === 0,
+    unsupportedTools
+  };
 }

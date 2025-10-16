@@ -147,9 +147,19 @@ export interface ResponseUsage {
   output_tokens: number;       // Response API 使用 output_tokens
   total_tokens: number;
   
+  // 详细的 token 信息（OpenAI 新增字段）
+  input_tokens_details?: {
+    cached_tokens?: number;    // 缓存的 tokens 数量
+  };
+  output_tokens_details?: {
+    reasoning_tokens?: number; // 推理过程使用的 tokens
+  };
+  
   // 工具内容 tokens（计入 input_tokens）
   web_search_tokens?: number;
   file_search_tokens?: number;
+  tool_call_tokens?: number;
+  computer_use_tokens?: number;
   
   // 工具调用次数（独立计费）
   tool_calls_count?: {
@@ -157,6 +167,14 @@ export interface ResponseUsage {
     file_search?: number;
     code_interpreter?: number;
     computer_use?: number;
+  };
+  
+  // 成本信息（如果提供商支持）
+  cost?: number;
+  cost_breakdown?: {
+    model_cost?: number;
+    tool_call_cost?: number;
+    storage_cost?: number;
   };
 }
 ```
@@ -412,10 +430,8 @@ Usage 自动包含,无需额外参数:
 
 响应流自动包含 usage 信息:
 ```
-data: {"output":...,"usage":null}
-data: {"output":...,"usage":null}
-data: {"output":...,"usage":{"prompt_tokens":10,"completion_tokens":20,"web_search_tokens":50}}
-data: [DONE]
+event: response.completed
+data: {"type":"response.completed","response":{"usage":{"input_tokens":17008,"input_tokens_details":{"cached_tokens":0},"output_tokens":741,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":17749}}}
 ```
 
 ## 测试命令
@@ -504,6 +520,44 @@ data: {"type":"response.completed","sequence_number":77,"response":{"usage":{"in
 1. **事件标识**: 需要先检测 `event: response.completed`
 2. **嵌套结构**: usage 位于 `data.response.usage`
 3. **字段名称**: 使用 `input_tokens`/`output_tokens` 而非 `prompt_tokens`/`completion_tokens`
+
+### 真实的 Response API 响应格式
+
+基于实际的 OpenAI Response API 响应，usage 字段的完整格式如下：
+
+#### 非流式响应
+```json
+{
+  "id": "resp_0088114fb2a85e7f0068f03277492081969b8a6eb303eba34c",
+  "object": "response",
+  "status": "completed",
+  "model": "gpt-4o-2024-08-06",
+  "output": [...],
+  "usage": {
+    "input_tokens": 17142,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 638,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 17780
+  }
+}
+```
+
+#### 流式响应
+```
+event: response.completed
+data: {"type":"response.completed","sequence_number":66,"response":{"usage":{"input_tokens":17008,"input_tokens_details":{"cached_tokens":0},"output_tokens":741,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":17749}}}
+```
+
+**关键字段说明：**
+- `input_tokens`: 输入 tokens 数量（等同于 Chat Completions API 的 `prompt_tokens`）
+- `output_tokens`: 输出 tokens 数量（等同于 Chat Completions API 的 `completion_tokens`）
+- `input_tokens_details.cached_tokens`: 使用缓存的 tokens 数量
+- `output_tokens_details.reasoning_tokens`: 推理过程中使用的 tokens 数量
 
 ### 工具定价
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { pricingRegistry, UsageInfo, PricingResult } from './pricing.js';
-import { calculateToolCallCost, hasToolTokenDiscount } from '../config/toolPricing.js';
+import { calculateToolCallCost, hasToolTokenDiscount, validateTools } from '../config/toolPricing.js';
+import { ToolCallCounts, ToolValidationResult, ResponseUsage, ExtendedUsage } from '../types/index.js';
 
 /**
  * Usage policy for handling token-based billing
@@ -52,9 +53,40 @@ export class UsagePolicy {
    */
   private static extractResponseAPIUsage(usage: any): UsageInfo {
     // Response API uses different field names
-    const promptTokens = usage.input_tokens || 0;
-    const completionTokens = usage.output_tokens || 0;
+    const baseInputTokens = usage.input_tokens || 0;
+    const baseOutputTokens = usage.output_tokens || 0;
+    
+    // Extract tool-related tokens dynamically
+    let toolTokens = 0;
+    const keys = Object.keys(usage);
+    
+    for (const key of keys) {
+      // Match all *_tokens fields except the standard ones
+      if (key.endsWith('_tokens') && 
+          key !== 'input_tokens' && 
+          key !== 'output_tokens' && 
+          key !== 'total_tokens') {
+        const tokenValue = usage[key];
+        if (typeof tokenValue === 'number' && tokenValue > 0) {
+          toolTokens += tokenValue;
+          console.log(`📊 [extractResponseAPIUsage] Found tool tokens: ${key} = ${tokenValue}`);
+        }
+      }
+    }
+    
+    // Tool tokens are typically added to input tokens
+    const promptTokens = baseInputTokens + toolTokens;
+    const completionTokens = baseOutputTokens;
     const totalTokens = usage.total_tokens || (promptTokens + completionTokens);
+    
+    // Log detailed token breakdown if we have details
+    if (usage.input_tokens_details || usage.output_tokens_details) {
+      console.log('📊 [extractResponseAPIUsage] Token details:', {
+        input_tokens_details: usage.input_tokens_details,
+        output_tokens_details: usage.output_tokens_details,
+        tool_tokens: toolTokens
+      });
+    }
     
     return {
       promptTokens: promptTokens,
@@ -64,11 +96,72 @@ export class UsagePolicy {
   }
 
   /**
+   * Parse tool calls from Response API output array
+   * Returns a count of each tool type used
+   */
+  static parseToolCallsFromOutput(responseBody: any): ToolCallCounts {
+    const toolCalls: { [toolName: string]: number } = {};
+    
+    try {
+      // Check if response has output array
+      if (!responseBody?.output || !Array.isArray(responseBody.output)) {
+        return toolCalls;
+      }
+
+      console.log('🔧 [parseToolCallsFromOutput] Parsing output array with', responseBody.output.length, 'items');
+
+      // Count tool calls by type
+      for (const outputItem of responseBody.output) {
+        if (outputItem?.type && typeof outputItem.type === 'string') {
+          // Match tool call patterns: web_search_call, file_search_call, etc.
+          if (outputItem.type.endsWith('_call')) {
+            const toolType = outputItem.type.replace('_call', '');
+            toolCalls[toolType] = (toolCalls[toolType] || 0) + 1;
+            console.log(`🔧 [parseToolCallsFromOutput] Found ${toolType} call (id: ${outputItem.id})`);
+          }
+        }
+      }
+
+      console.log('🔧 [parseToolCallsFromOutput] Tool call summary:', toolCalls);
+      return toolCalls;
+    } catch (error) {
+      console.error('❌ [parseToolCallsFromOutput] Error parsing tool calls:', error);
+      return toolCalls;
+    }
+  }
+
+  /**
+   * Validate tools in request before processing
+   */
+  static validateRequestTools(requestData: any): { valid: boolean; error?: string } {
+    try {
+      if (!requestData?.tools) {
+        return { valid: true }; // No tools to validate
+      }
+
+      const validation: ToolValidationResult = validateTools(requestData.tools);
+      if (!validation.valid) {
+        const error = `Unsupported tools: ${validation.unsupportedTools.join(', ')}. Only supported tools: web_search, file_search, code_interpreter, computer_use`;
+        console.warn('⚠️ [validateRequestTools]', error);
+        return { valid: false, error };
+      }
+
+      console.log('✅ [validateRequestTools] All tools are supported');
+      return { valid: true };
+    } catch (error) {
+      console.error('❌ [validateRequestTools] Error validating tools:', error);
+      return { valid: false, error: 'Tool validation failed' };
+    }
+  }
+
+  /**
    * Calculate comprehensive cost for Response API including tool calls
+   * Now supports parsing tool calls from response body
    */
   static calculateResponseAPICost(
     model: string,
     usage: any,
+    responseBody?: any,
     providerCostUsd?: number
   ): PricingResult | null {
     // If provider already calculated total cost, use it
@@ -92,9 +185,22 @@ export class UsagePolicy {
     const modelCostResult = pricingRegistry.calculateCost(model, usageInfo);
     const modelCost = modelCostResult?.costUsd || 0;
 
-    // 2. Calculate tool call costs
+    // 2. Calculate tool call costs from output array (new approach)
     let toolCallCost = 0;
-    if (usage.tool_calls_count) {
+    if (responseBody) {
+      const toolCalls = this.parseToolCallsFromOutput(responseBody);
+      for (const [toolName, callCount] of Object.entries(toolCalls)) {
+        if (callCount > 0) {
+          const cost = calculateToolCallCost(toolName, callCount);
+          toolCallCost += cost;
+          console.log(`💰 [calculateResponseAPICost] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`);
+        }
+      }
+    }
+
+    // 3. Fallback: Calculate tool call costs from usage.tool_calls_count (legacy)
+    if (toolCallCost === 0 && usage.tool_calls_count) {
+      console.log('📊 [calculateResponseAPICost] Using legacy tool_calls_count from usage');
       for (const [toolName, callCount] of Object.entries(usage.tool_calls_count)) {
         if (typeof callCount === 'number' && callCount > 0) {
           const cost = calculateToolCallCost(toolName, callCount);
@@ -103,8 +209,10 @@ export class UsagePolicy {
       }
     }
 
-    // 3. Total cost
+    // 4. Total cost
     const totalCost = modelCost + toolCallCost;
+
+    console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
 
     return {
       costUsd: totalCost,
@@ -307,12 +415,21 @@ export class UsagePolicy {
 
   /**
    * Process non-streaming response for billing
+   * Now supports tool call cost calculation
    */
   static processNonStreamResponse(
     model: string,
     responseBody: any,
     providerCostUsd?: number
   ): PricingResult | null {
+    // Check if this is a Response API response (has output array)
+    if (responseBody?.output && Array.isArray(responseBody.output)) {
+      console.log('🔧 [processNonStreamResponse] Processing Response API response with tools');
+      return this.calculateResponseAPICost(model, responseBody.usage, responseBody, providerCostUsd);
+    }
+
+    // Fallback to standard processing for Chat Completions API
+    console.log('📊 [processNonStreamResponse] Processing Chat Completions API response');
     const usage = this.extractUsageFromResponse(responseBody);
     return this.calculateRequestCost(model, providerCostUsd, usage || undefined);
   }
@@ -320,11 +437,13 @@ export class UsagePolicy {
   /**
    * Create a stream processor for billing
    * Returns a function that processes chunks and returns final cost
+   * Now supports tool call counting from stream
    */
   static createStreamProcessor(model: string, providerCostUsd?: number) {
     let accumulatedUsage: UsageInfo | null = null;
     let extractedCost: number | undefined = undefined;
     let finalCost: PricingResult | null = null;
+    let accumulatedResponseBody: any = null; // Store final response for tool parsing
 
     console.log(`💵 [StreamProcessor] Created for model: ${model}, initial providerCost: ${providerCostUsd}`);
 
@@ -354,9 +473,31 @@ export class UsagePolicy {
             console.warn(`⚠️  [StreamProcessor] Failed to calculate cost`);
           }
         }
+
+        // Try to extract complete response body for tool parsing
+        this.tryExtractResponseBody(chunkText, (responseBody) => {
+          accumulatedResponseBody = responseBody;
+          console.log('🔧 [StreamProcessor] Captured complete response body for tool parsing');
+        });
       },
       
       getFinalCost: (): PricingResult | null => {
+        // If we have accumulated response body, recalculate with tool costs
+        if (finalCost && accumulatedResponseBody && accumulatedUsage) {
+          console.log('🔧 [StreamProcessor] Recalculating cost with tool calls from response body');
+          const enhancedCost = this.calculateResponseAPICost(
+            model,
+            { usage: accumulatedUsage },
+            accumulatedResponseBody,
+            extractedCost !== undefined ? extractedCost : providerCostUsd
+          );
+          
+          if (enhancedCost) {
+            console.log(`📤 [StreamProcessor] Returning enhanced cost with tools: $${enhancedCost.costUsd}`);
+            return enhancedCost;
+          }
+        }
+
         if (finalCost) {
           console.log(`📤 [StreamProcessor] Returning final cost: $${finalCost.costUsd}`);
         } else {
@@ -369,6 +510,42 @@ export class UsagePolicy {
         return accumulatedUsage;
       }
     };
+  }
+
+  /**
+   * Try to extract complete response body from stream chunk
+   * Calls callback when complete response is found
+   */
+  private static tryExtractResponseBody(chunkText: string, callback: (responseBody: any) => void): void {
+    try {
+      const lines = chunkText.split('\n');
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        
+        // Look for response.completed event with full response
+        if (trimmed.startsWith('event: response.completed')) {
+          const nextLineIndex = lines.indexOf(line) + 1;
+          if (nextLineIndex < lines.length) {
+            const dataLine = lines[nextLineIndex].trim();
+            if (dataLine.startsWith('data: ')) {
+              const dataStr = dataLine.slice(6);
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.response) {
+                  callback(data.response);
+                  return;
+                }
+              } catch (parseError) {
+                // Ignore parse errors for incomplete chunks
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors in stream parsing
+    }
   }
 
 }

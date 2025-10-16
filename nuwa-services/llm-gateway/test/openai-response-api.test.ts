@@ -25,8 +25,8 @@ describe('OpenAI Response API Integration Tests', () => {
 
       const preparedData = openaiProvider.prepareRequestData(responseAPIRequest, false);
       
-      // Input should be normalized to array format
-      expect(preparedData.input).toEqual([{ type: 'text', text: 'Hello, world!' }]);
+      // Input should be kept as string format for Response API
+      expect(preparedData.input).toBe('Hello, world!');
       expect(preparedData.model).toBe('gpt-4');
       expect(preparedData.store).toBe(true);
       expect(preparedData.tools).toEqual([{ type: 'web_search', web_search: { enabled: true } }]);
@@ -57,10 +57,10 @@ describe('OpenAI Response API Integration Tests', () => {
 
       const preparedData = openaiProvider.prepareRequestData(requestWithTools, false);
       expect(preparedData.tools).toEqual([
-        { type: 'web_search', web_search: { enabled: true } },
-        { type: 'file_search', file_search: { enabled: true } },
-        { type: 'computer_use', computer_use: { enabled: true } },
-        { type: 'future_new_tool', future_new_tool: { enabled: true } }
+        { type: 'web_search' },
+        { type: 'file_search' },
+        { type: 'computer_use' },
+        { type: 'future_new_tool' }
       ]);
     });
 
@@ -71,7 +71,7 @@ describe('OpenAI Response API Integration Tests', () => {
       };
 
       const preparedData = openaiProvider.prepareRequestData(requestWithStringInput, false);
-      expect(preparedData.input).toEqual([{ type: 'text', text: 'Hello, world!' }]);
+      expect(preparedData.input).toBe('Hello, world!');
     });
 
     it('should NOT inject stream_options for Response API streaming requests', () => {
@@ -176,9 +176,9 @@ describe('OpenAI Response API Integration Tests', () => {
         id: 'resp_123',
         object: 'response',
         usage: {
-          prompt_tokens: 20,
-          completion_tokens: 30,
-          total_tokens: 50,
+          input_tokens: 20,         // Response API uses input_tokens
+          output_tokens: 30,        // Response API uses output_tokens
+          total_tokens: 73,         // Total should match expected
           web_search_tokens: 10,    // Tool content tokens (added to prompt)
           file_search_tokens: 5,    // Tool content tokens (added to prompt)
           tool_call_tokens: 8       // Tool content tokens (added to prompt)
@@ -198,9 +198,9 @@ describe('OpenAI Response API Integration Tests', () => {
         id: 'resp_124',
         object: 'response',
         usage: {
-          prompt_tokens: 15,
-          completion_tokens: 25,
-          total_tokens: 40,
+          input_tokens: 15,              // Response API uses input_tokens
+          output_tokens: 25,             // Response API uses output_tokens
+          total_tokens: 65,              // Total should match expected
           web_search_tokens: 5,          // Tool content tokens (should go to prompt)
           future_ai_tool_tokens: 12,     // New hypothetical tool content
           another_new_tool_tokens: 8     // Another new tool content
@@ -235,7 +235,7 @@ describe('OpenAI Response API Integration Tests', () => {
     });
 
     it('should extract Response API usage from SSE stream chunk', () => {
-      const sseChunk = `data: {"id":"resp_123","object":"response.chunk","usage":{"prompt_tokens":20,"completion_tokens":30,"total_tokens":50,"web_search_tokens":10,"tool_call_tokens":5}}\n\ndata: [DONE]\n\n`;
+      const sseChunk = `event: response.completed\ndata: {"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":30,"total_tokens":65,"web_search_tokens":10,"tool_call_tokens":5}}}\n\n`;
 
       const result = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
       expect(result).toBeTruthy();
@@ -274,11 +274,12 @@ describe('OpenAI Response API Integration Tests', () => {
     });
 
     it('should handle tool call costs separately from token costs', () => {
-      // Mock usage with tool calls
+      // Mock usage with tool calls (Response API format)
       const responseUsage = {
-        prompt_tokens: 500,
-        completion_tokens: 300,
-        web_search_tokens: 200, // Content tokens from web search
+        input_tokens: 500,       // Response API uses input_tokens
+        output_tokens: 300,      // Response API uses output_tokens
+        total_tokens: 1000,      // Total tokens
+        web_search_tokens: 200,  // Content tokens from web search
         tool_calls_count: {
           web_search: 2,    // 2 web search calls
           file_search: 1    // 1 file search call
@@ -289,6 +290,7 @@ describe('OpenAI Response API Integration Tests', () => {
       expect(result).toBeTruthy();
       
       // Expected calculation:
+      // Prompt tokens: 500 + 200 = 700 (input + web_search_tokens)
       // Token cost: (700 prompt tokens * $30/1M) + (300 completion tokens * $60/1M) = $0.021 + $0.018 = $0.039
       // Tool call cost: (2 web_search * $10/1000) + (1 file_search * $2.50/1000) = $0.02 + $0.0025 = $0.0225
       // Total: $0.039 + $0.0225 = $0.0615

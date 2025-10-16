@@ -12,8 +12,8 @@ describe('Response API Usage Extraction', () => {
         object: 'response',
         output: { type: 'text', text: 'Hello' },
         usage: {
-          prompt_tokens: 10,
-          completion_tokens: 5,
+          input_tokens: 10,
+          output_tokens: 5,
           total_tokens: 15
         }
       };
@@ -32,8 +32,8 @@ describe('Response API Usage Extraction', () => {
         object: 'response',
         output: { type: 'text', text: 'Search result' },
         usage: {
-          prompt_tokens: 20,
-          completion_tokens: 10,
+          input_tokens: 20,
+          output_tokens: 10,
           total_tokens: 50,
           web_search_tokens: 15,
           tool_call_tokens: 5
@@ -46,6 +46,32 @@ describe('Response API Usage Extraction', () => {
       expect(usage?.promptTokens).toBe(40); // 20 + 15 + 5 (tool tokens added to prompt)
       expect(usage?.completionTokens).toBe(10);
       expect(usage?.totalTokens).toBe(50);
+    });
+
+    it('should extract usage from real OpenAI Response API format with details', () => {
+      const responseBody = {
+        id: 'resp_0088114fb2a85e7f0068f03277492081969b8a6eb303eba34c',
+        object: 'response',
+        output: { type: 'text', text: 'Real response' },
+        usage: {
+          input_tokens: 17142,
+          input_tokens_details: {
+            cached_tokens: 0
+          },
+          output_tokens: 638,
+          output_tokens_details: {
+            reasoning_tokens: 0
+          },
+          total_tokens: 17780
+        }
+      };
+
+      const usage = UsagePolicy.extractUsageFromResponse(responseBody);
+      
+      expect(usage).not.toBeNull();
+      expect(usage?.promptTokens).toBe(17142);
+      expect(usage?.completionTokens).toBe(638);
+      expect(usage?.totalTokens).toBe(17780);
     });
 
     it('should return null if no usage field', () => {
@@ -83,7 +109,7 @@ describe('Response API Usage Extraction', () => {
 
   describe('extractUsageFromStreamChunk', () => {
     it('should extract usage from Response API stream chunk', () => {
-      const chunk = `data: {"id":"resp_123","object":"response.chunk","output":{"type":"text","text":"Hi"}}\n\ndata: {"id":"resp_123","object":"response.chunk","usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\ndata: [DONE]\n\n`;
+      const chunk = `event: response.completed\ndata: {"type":"response.completed","sequence_number":66,"response":{"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}\n\n`;
 
       const result = UsagePolicy.extractUsageFromStreamChunk(chunk);
       
@@ -94,7 +120,7 @@ describe('Response API Usage Extraction', () => {
     });
 
     it('should extract usage with tool tokens from stream chunk', () => {
-      const chunk = `data: {"id":"resp_123","object":"response.chunk","usage":{"prompt_tokens":20,"completion_tokens":10,"total_tokens":50,"web_search_tokens":15,"tool_call_tokens":5}}\n\ndata: [DONE]\n\n`;
+      const chunk = `event: response.completed\ndata: {"type":"response.completed","sequence_number":66,"response":{"usage":{"input_tokens":20,"output_tokens":10,"total_tokens":50,"web_search_tokens":15,"tool_call_tokens":5}}}\n\n`;
 
       const result = UsagePolicy.extractUsageFromStreamChunk(chunk);
       
@@ -235,6 +261,141 @@ describe('Response API Usage Extraction', () => {
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(10);
       expect(usage?.completionTokens).toBe(5);
+    });
+  });
+
+  describe('Tool Call Parsing and Validation', () => {
+    describe('parseToolCallsFromOutput', () => {
+      it('should parse web search calls from output array', () => {
+        const responseBody = {
+          output: [
+            {
+              id: 'ws_123',
+              type: 'web_search_call',
+              status: 'completed',
+              action: { type: 'search', query: 'test' }
+            },
+            {
+              id: 'msg_456',
+              type: 'message',
+              content: [{ type: 'text', text: 'Result' }]
+            }
+          ]
+        };
+
+        const toolCalls = UsagePolicy.parseToolCallsFromOutput(responseBody);
+        
+        expect(toolCalls).toEqual({ web_search: 1 });
+      });
+
+      it('should parse multiple tool calls', () => {
+        const responseBody = {
+          output: [
+            { id: 'ws_1', type: 'web_search_call', status: 'completed' },
+            { id: 'ws_2', type: 'web_search_call', status: 'completed' },
+            { id: 'fs_1', type: 'file_search_call', status: 'completed' },
+            { id: 'msg_1', type: 'message', content: [] }
+          ]
+        };
+
+        const toolCalls = UsagePolicy.parseToolCallsFromOutput(responseBody);
+        
+        expect(toolCalls).toEqual({ 
+          web_search: 2,
+          file_search: 1
+        });
+      });
+
+      it('should return empty object for no tool calls', () => {
+        const responseBody = {
+          output: [
+            { id: 'msg_1', type: 'message', content: [] }
+          ]
+        };
+
+        const toolCalls = UsagePolicy.parseToolCallsFromOutput(responseBody);
+        
+        expect(toolCalls).toEqual({});
+      });
+    });
+
+    describe('validateRequestTools', () => {
+      it('should validate supported tools', () => {
+        const requestData = {
+          tools: [
+            { type: 'web_search' },
+            { type: 'file_search' },
+            { type: 'function', function: { name: 'custom' } }
+          ]
+        };
+
+        const result = UsagePolicy.validateRequestTools(requestData);
+        
+        expect(result.valid).toBe(true);
+        expect(result.error).toBeUndefined();
+      });
+
+      it('should reject unsupported tools', () => {
+        const requestData = {
+          tools: [
+            { type: 'web_search' },
+            { type: 'unsupported_tool' }
+          ]
+        };
+
+        const result = UsagePolicy.validateRequestTools(requestData);
+        
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('unsupported_tool');
+      });
+
+      it('should pass validation with no tools', () => {
+        const requestData = {};
+
+        const result = UsagePolicy.validateRequestTools(requestData);
+        
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('calculateResponseAPICost', () => {
+      it('should calculate cost with tool calls from output', () => {
+        const responseBody = {
+          output: [
+            { id: 'ws_1', type: 'web_search_call', status: 'completed' }
+          ],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150
+          }
+        };
+
+        const result = UsagePolicy.calculateResponseAPICost('gpt-4o', responseBody.usage, responseBody);
+        
+        expect(result).not.toBeNull();
+        expect(result?.costUsd).toBeGreaterThan(0);
+        expect(result?.source).toBe('gateway-pricing');
+      });
+
+      it('should prefer provider cost when available', () => {
+        const responseBody = {
+          output: [
+            { id: 'ws_1', type: 'web_search_call', status: 'completed' }
+          ],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150
+          }
+        };
+
+        const result = UsagePolicy.calculateResponseAPICost('gpt-4o', responseBody.usage, responseBody, 0.05);
+        
+        expect(result).not.toBeNull();
+        expect(result?.costUsd).toBe(0.05);
+        expect(result?.source).toBe('provider');
+      });
     });
   });
 });

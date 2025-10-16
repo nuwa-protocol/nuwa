@@ -1,7 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
 import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
-
 // Bridge to existing non-stream LLM handler
 import SupabaseService from './database/supabase.js';
 import OpenRouterService from './services/openrouter.js';
