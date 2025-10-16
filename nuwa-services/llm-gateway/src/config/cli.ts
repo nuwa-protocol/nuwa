@@ -38,7 +38,6 @@ export interface LLMGatewayConfig {
   // Other configuration
   httpReferer?: string;
   xTitle?: string;
-  apiKeyEncryptionKey?: string;
 }
 
 /**
@@ -316,7 +315,6 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.OPENAI_PRICING_VERSION) config.openaiPricingVersion = process.env.OPENAI_PRICING_VERSION;
   if (process.env.HTTP_REFERER) config.httpReferer = process.env.HTTP_REFERER;
   if (process.env.X_TITLE) config.xTitle = process.env.X_TITLE;
-  if (process.env.API_KEY_ENCRYPTION_KEY) config.apiKeyEncryptionKey = process.env.API_KEY_ENCRYPTION_KEY;
   if (process.env.ADMIN_DID) config.adminDid = process.env.ADMIN_DID.split(',').map(did => did.trim());
   if (process.env.DEBUG === 'true') config.debug = true;
   

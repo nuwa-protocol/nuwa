@@ -45,6 +45,7 @@
               "build-caps/mcp-server"
             ]
           },
+          "build-caps/llm-gateway",
           "build-caps/prompt",
           {
             "group": "UI",

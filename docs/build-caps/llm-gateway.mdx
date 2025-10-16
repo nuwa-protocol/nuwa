@@ -1,0 +1,295 @@
+---
+title: "LLM Gateway"
+description: "Deploy your own LLM Gateway to unify multiple providers with DID authentication and usage-based pricing"
+---
+
+With [Nuwa LLM Gateway](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/llm-gateway), you can unify multiple LLM providers (OpenAI, OpenRouter, LiteLLM) behind a single endpoint with DID authentication and usage-based pricing. The gateway provides provider-first routing, automatic usage tracking, and seamless payment integration.
+
+**NPM Package**: [`@nuwa-ai/llm-gateway`](https://www.npmjs.com/package/@nuwa-ai/llm-gateway) - Ready to use without building from source.
+
+<Note>
+Before you start: obtain a Service Key for your service DID. See the
+<a href="/build-caps/service-key">Service Key guide</a> and use the copied value as
+<code>SERVICE_KEY</code>.
+</Note>
+
+## Quick start
+
+<Tabs>
+<Tab title="Using NPM Package (Recommended)">
+
+<Steps>
+<Step title="Install globally">
+
+```bash
+# Install the published package
+npm install -g @nuwa-ai/llm-gateway
+
+# Or use without installation
+npx @nuwa-ai/llm-gateway --help
+```
+
+</Step>
+
+<Step title="Set environment variables">
+
+```bash
+# Required
+export SERVICE_KEY=0x...
+export OPENAI_API_KEY=sk-proj-...
+
+# Network configuration
+export ROOCH_NETWORK=test
+
+# Optional pricing configuration
+# export PRICING_MULTIPLIER=1.10  # Range 0~2, e.g. 1.10 = +10%
+# export PRICING_OVERRIDES='{"gpt-4":{"promptPerMTokUsd":25,"completionPerMTokUsd":50}}'
+```
+
+<Tip>
+Not sure where <code>SERVICE_KEY</code> comes from? Follow the
+<a href="/build-caps/service-key">Service Key guide</a> to generate it via test-id.nuwa.dev.
+</Tip>
+
+</Step>
+
+<Step title="Run the gateway">
+
+```bash
+# Start with debug logging
+llm-gateway --debug
+
+# Or specify custom port
+llm-gateway --port 3000 --debug
+
+# → serves provider-first routes like /openai/v1/chat/completions
+```
+
+</Step>
+
+<Step title="Verify the gateway">
+
+You can use the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) to verify your gateway:
+
+1. Open the demo and set gateway URL to `http://localhost:8080`
+2. Connect your wallet and authenticate with DID
+3. Send a chat request to test the integration
+
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Build from Source">
+
+<Steps>
+<Step title="Clone and build">
+
+For development or customization, you can build from source. 
+Find the full implementation in the [Nuwa Monorepo](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-services/llm-gateway).
+
+```bash
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/llm-gateway
+pnpm install
+pnpm build
+```
+</Step>
+
+<Step title="Set environment and run">
+
+Set your environment variables (same as above) and run:
+
+```bash
+export SERVICE_KEY=...
+export OPENAI_API_KEY=...
+
+pnpm run dev
+```
+
+</Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+## Provider routing
+
+The gateway uses provider-first routing for clear endpoint organization:
+
+<Tabs>
+<Tab title="OpenAI">
+
+```bash
+# Chat completions
+POST /openai/v1/chat/completions
+
+# Responses
+POST /openai/v1/responses
+
+```
+
+</Tab>
+<Tab title="OpenRouter">
+
+```bash
+# Chat completions
+POST /openrouter/api/v1/chat/completions
+
+
+```
+
+</Tab>
+<Tab title="LiteLLM">
+
+```bash
+# Chat completions
+POST /litellm/chat/completions
+
+```
+
+</Tab>
+</Tabs>
+
+## Using PaymentChannelHttpClient
+
+For programmatic access with automatic payment handling, use the PaymentChannelHttpClient from the Payment Kit:
+
+<Tabs>
+<Tab title="Installation & Setup">
+
+```bash
+npm install @nuwa-ai/payment-kit @nuwa-ai/identity-kit
+```
+
+```typescript
+import { PaymentChannelHttpClient } from '@nuwa-ai/payment-kit';
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+
+// Initialize identity environment
+const env = await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: {
+    network: 'test',
+  },
+});
+
+// Import your Service Key
+await env.keyManager.importKeyFromString('0x...');
+const signer = env.keyManager.getSigner();
+
+// Create HTTP client
+const client = new PaymentChannelHttpClient({
+  baseUrl: 'http://localhost:8080',
+  signer,
+  chainConfig: { network: 'test' },
+});
+```
+
+</Tab>
+<Tab title="Making Requests">
+
+```typescript
+// Chat completion request
+const result = await client.post('/openai/v1/chat/completions', {
+  model: 'gpt-4',
+  messages: [
+    { role: 'user', content: 'Hello, how are you?' }
+  ],
+  stream: false
+});
+
+console.log('Response:', result.data);
+console.log('Payment info:', result.payment);
+
+// Streaming request
+const handle = await client.requestWithPayment(
+  'POST', 
+  '/openai/v1/chat/completions',
+  {
+    body: JSON.stringify({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: 'Hello!' }],
+      stream: true
+    }),
+    headers: { 'Content-Type': 'application/json' }
+  }
+);
+
+// Get response immediately
+const response = await handle.response;
+const reader = response.body?.getReader();
+
+// Payment resolves when stream completes
+const payment = await handle.payment;
+console.log('Stream payment:', payment);
+```
+
+</Tab>
+<Tab title="Error Handling">
+
+```typescript
+try {
+  const result = await client.post('/openai/v1/chat/completions', {
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Hello!' }]
+  });
+  
+  if (result.payment) {
+    console.log(`Paid ${result.payment.costUsd} picoUSD for request`);
+  } else {
+    console.log('Free request (no payment required)');
+  }
+} catch (error) {
+  console.error('Request failed:', error);
+  
+  // Check if it's a payment-related error
+  if (error.code === 'INSUFFICIENT_BALANCE') {
+    console.log('Need to deposit more funds to payment channel');
+  }
+}
+```
+
+</Tab>
+</Tabs>
+
+## Pricing configuration
+
+The gateway supports flexible pricing configuration:
+
+- **Built-in pricing**: Default model pricing for OpenAI models
+- **Pricing overrides**: Custom pricing via `PRICING_OVERRIDES` environment variable
+- **Global multiplier**: Adjust all costs with `PRICING_MULTIPLIER` (range 0-2)
+
+### Usage tracking
+
+- **Automatic tracking**: All requests are logged with token counts and USD costs
+- **Streaming support**: Chat Completions automatically inject `stream_options.include_usage=true`
+- **Response API**: Usage appears in `response.completed` SSE events
+- **Access logs**: Structured JSON logs to stdout with request details
+
+### Common issues
+
+- **"SERVICE_KEY is required"**: Generate and set your service key from the Service Key guide
+- **"At least one provider API key is required"**: Configure at least one provider API key
+- **Port conflicts**: Use `--port <number>` to specify a different port
+
+
+## Relevant Docs
+
+<CardGroup cols={2}>
+  <Card title="Service Key" icon="key" href="/build-caps/service-key">
+    How to obtain and configure SERVICE_KEY
+  </Card>
+  <Card title="Payment Kit" icon="credit-card" href="/sdk/payment-kit">
+    PaymentChannelHttpClient for programmatic access
+  </Card>
+  <Card title="Service Pricing" icon="dollar-sign" href="/build-caps/service-pricing">
+    Configure pricing for your LLM Gateway
+  </Card>
+  <Card title="Revenue" icon="money-bill-wave" href="/build-caps/revenue">
+    View balances, withdraw, and audit revenue history
+  </Card>
+</CardGroup>
+
+
