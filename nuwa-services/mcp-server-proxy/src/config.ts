@@ -100,7 +100,7 @@ Usage: node server.js [options]
 Options:
   -p, --port <number>                 Server port (default: 8088)
   -e, --endpoint <string>             MCP endpoint path (default: /mcp)
-  -c, --config <path>                 Config file path (default: config.yaml)
+  -c, --config <path>                 Config file path or URL (default: config.yaml)
       --service-id <string>           Payment service ID
   -n, --network <string>              Network (local|dev|test|main)
       --rpc-url <url>                 Rooch RPC URL
@@ -122,18 +122,67 @@ Environment Variables:
 Examples:
   node server.js --port 3000 --debug
   node server.js --config ./my-config.yaml
+  node server.js --config https://example.com/configs/my-config.yaml
   node server.js --service-id my-service --network test --default-price-pico-usd 1000000000000
 `);
 }
 
+// Check if a path is a URL
+function isUrl(path: string): boolean {
+  try {
+    new URL(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Fetch remote configuration
+async function fetchRemoteConfig(url: string): Promise<string> {
+  try {
+    console.log(`📡 Fetching remote configuration from: ${url}`);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const configContent = await response.text();
+    console.log(`✅ Successfully fetched remote configuration (${configContent.length} bytes)`);
+    return configContent;
+  } catch (error) {
+    console.error(`❌ Failed to fetch remote configuration from ${url}:`, error);
+    throw error;
+  }
+}
+
 // Load configuration file with environment variable substitution
-function loadConfigFile(configPath: string): any {
-  if (!fs.existsSync(configPath)) {
-    return {};
+async function loadConfigFile(configPath: string): Promise<any> {
+  let configYaml: string;
+
+  if (isUrl(configPath)) {
+    // Load from remote URL
+    try {
+      configYaml = await fetchRemoteConfig(configPath);
+    } catch (error) {
+      console.error(`Failed to load remote config from ${configPath}:`, error);
+      process.exit(1);
+    }
+  } else {
+    // Load from local file
+    if (!fs.existsSync(configPath)) {
+      return {};
+    }
+
+    try {
+      configYaml = fs.readFileSync(configPath, "utf8");
+    } catch (error) {
+      console.error(`Error reading local config file ${configPath}:`, error);
+      process.exit(1);
+    }
   }
 
   try {
-    const configYaml = fs.readFileSync(configPath, "utf8");
     const missingVars: string[] = [];
 
     const configWithEnvVars = configYaml.replace(
@@ -163,13 +212,13 @@ function loadConfigFile(configPath: string): any {
 
     return yaml.load(configWithEnvVars) as any;
   } catch (error) {
-    console.error(`Error loading config file ${configPath}:`, error);
+    console.error(`Error parsing config file ${configPath}:`, error);
     process.exit(1);
   }
 }
 
 // Load configuration with priority: CLI args > env vars > config file > defaults
-export function loadConfig(): MinimalConfig {
+export async function loadConfig(): Promise<MinimalConfig> {
   const cliArgs = parseCliArgs();
 
   // Show help if requested
@@ -185,10 +234,10 @@ export function loadConfig(): MinimalConfig {
     path.join(__dirname, "../config.yaml");
 
   // Load config file if it exists
-  const fileConfig = loadConfigFile(configPath);
+  const fileConfig = await loadConfigFile(configPath);
 
   // If config file was explicitly specified but doesn't exist, error
-  if (cliArgs.config && !fs.existsSync(configPath)) {
+  if (cliArgs.config && !isUrl(cliArgs.config) && !fs.existsSync(configPath)) {
     console.error(`Config file not found: ${configPath}`);
     process.exit(1);
   }

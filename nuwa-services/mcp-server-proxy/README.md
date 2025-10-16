@@ -261,7 +261,7 @@ Options:
 ```bash
 PORT=8088
 ENDPOINT=/mcp
-CONFIG_PATH=./config.yaml
+CONFIG_PATH=./config.yaml  # Can be local file path or remote URL
 SERVICE_ID=my-service
 SERVICE_KEY=your-service-key
 ROOCH_NETWORK=test
@@ -269,7 +269,50 @@ DEFAULT_PRICE_PICO_USD=100000000
 DEBUG=true
 ```
 
-### 4. Local Development Examples
+### 4. Remote Configuration Support
+
+MCP Server Proxy now supports loading configuration from remote URLs, making Docker deployments much more convenient.
+
+#### Remote Configuration Examples
+
+```bash
+# Load config from remote URL
+export CONFIG_PATH=https://your-config-server.com/configs/amap-proxy.yaml
+mcp-server-proxy
+
+# Or use command line argument
+mcp-server-proxy --config https://your-config-server.com/configs/context7-proxy.yaml
+
+# Docker with remote config
+docker run -d -p 8088:8088 \
+  -e SERVICE_KEY="your_service_key" \
+  -e CONFIG_PATH="https://your-config-server.com/configs/my-proxy.yaml" \
+  --name mcp-server-proxy \
+  ghcr.io/nuwa-protocol/mcp-server-proxy:latest
+```
+
+#### Remote Configuration Benefits
+
+- **Centralized Management**: Store all proxy configurations in one place
+- **Easy Updates**: Update configurations without rebuilding Docker images
+- **Environment-specific Configs**: Use different URLs for dev/test/prod environments
+- **Version Control**: Track configuration changes through your config server
+- **Dynamic Configuration**: Update proxy behavior without container restarts
+
+#### Supported URL Schemes
+
+- `https://` - HTTPS URLs (recommended for production)
+- `http://` - HTTP URLs (for development/internal networks)
+
+#### Configuration Server Requirements
+
+Your configuration server should:
+- Serve YAML files with proper `Content-Type: text/yaml` or `text/plain` headers
+- Support HTTPS for production deployments
+- Have appropriate CORS headers if accessed from browsers
+- Implement proper authentication/authorization if needed
+
+### 5. Local Development Examples
 
 #### Using Pre-configured Instances
 
@@ -283,9 +326,8 @@ export AMAP_API_KEY=your_amap_api_key_here
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8088
 
-# Use the pre-configured amap instance (download config from repository)
-curl -o amap-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
-mcp-server-proxy --config ./amap-config.yaml
+# Use the pre-configured amap instance
+mcp-server-proxy --config https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
 ```
 
 ```bash
@@ -293,9 +335,8 @@ mcp-server-proxy --config ./amap-config.yaml
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8089
 
-# Use the pre-configured context7 instance (download config from repository)
-curl -o context7-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
-mcp-server-proxy --config ./context7-config.yaml
+# Use the pre-configured context7 instance
+mcp-server-proxy --config https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
 ```
 
 **From Source Code:**
@@ -392,53 +433,86 @@ See [deployments/QUICKSTART.md](./deployments/QUICKSTART.md) for detailed deploy
 
 ## Docker
 
-### Using Published NPM Package (Recommended)
+### Using Pre-built Images (Recommended)
 
-Create a simple Dockerfile using the published npm package:
-
-```dockerfile
-FROM node:20-alpine
-
-# Install the MCP Server Proxy globally
-RUN npm install -g @nuwa-ai/mcp-server-proxy
-
-# Create app directory
-WORKDIR /app
-
-# Copy your configuration file
-COPY config.yaml ./
-
-# Expose port
-EXPOSE 8088
-
-# Start the server
-CMD ["mcp-server-proxy", "--config", "./config.yaml"]
-```
-
-Build and run:
+Pull and run the official Docker image from GitHub Container Registry:
 
 ```bash
-# Build the image
-docker build -t my-mcp-proxy .
+# Pull the latest image
+docker pull ghcr.io/nuwa-protocol/mcp-server-proxy:latest
 
-# Run the container
-docker run -p 8088:8088 \
+# Run with environment variables
+docker run -d -p 8088:8088 \
   -e SERVICE_KEY="your_service_key" \
-  -e API_KEY="your_api_key" \
-  my-mcp-proxy
+  -e UPSTREAM_API_KEY="your_upstream_api_key" \
+  --name mcp-server-proxy \
+  ghcr.io/nuwa-protocol/mcp-server-proxy:latest
+
+# Run with mounted configuration file
+docker run -d -p 8088:8088 \
+  -v $(pwd)/config.yaml:/app/config/config.yaml \
+  -e CONFIG_PATH="/app/config/config.yaml" \
+  --name mcp-server-proxy \
+  ghcr.io/nuwa-protocol/mcp-server-proxy:latest
 ```
+
+### Available Tags
+
+- `latest` - Latest stable version from main branch
+- `v0.6.x` - Specific version tags
+- `main` - Latest development version
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SERVICE_KEY` | Service private key for DID signing | ✅ |
+| `CONFIG_PATH` | Path to configuration file | ❌ |
+| `PORT` | Server port (default: 8088) | ❌ |
+| `ENDPOINT` | MCP endpoint path (default: /mcp) | ❌ |
+| `DEBUG` | Enable debug logging | ❌ |
+| `UPSTREAM_API_KEY` | API key for upstream services | ⚠️ |
+
+### Docker Compose
+
+Use the provided `docker-compose.yml` file in the repository for easy deployment:
+
+```bash
+# Clone the repository and navigate to the service directory
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/mcp-server-proxy
+
+# Set up your environment variables
+export SERVICE_KEY="your_service_key"
+export UPSTREAM_API_KEY="your_upstream_api_key"  # If needed for your upstream service
+
+# Start the services
+docker-compose up -d
+```
+
+The `docker-compose.yml` file includes:
+- ✅ **Complete configuration** with all environment variables
+- ✅ **Health checks** for service monitoring
+- ✅ **Multiple proxy instances examples** (Amap, Context7)
+- ✅ **Flexible upstream configuration** for different services
+
+For detailed configuration options, see the [`docker-compose.yml`](./docker-compose.yml) file in the repository.
 
 ### Building from Source
 
-You can also build and run the proxy using Docker from source:
+If you need to build the image locally:
 
 ```bash
-# 1. Build the image
+# Clone the repository
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/mcp-server-proxy
+
+# Build the image
 docker build -t mcp-server-proxy .
 
-# 2. Run the container, mounting your config file and passing environment variables
-docker run -p 8088:8088 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -e API_KEY="your_secret_key" \
+# Run the container
+docker run -d -p 8088:8088 \
+  -e SERVICE_KEY="your_service_key" \
+  --name mcp-server-proxy \
   mcp-server-proxy
 ``` 
