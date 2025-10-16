@@ -93,6 +93,7 @@ The demo handles all the complex authentication and payment setup automatically!
 | `DEFAULT_ASSET_ID` | Default asset ID | ❌ |
 | `ADMIN_DID` | Admin DID (comma-separated) | ❌ |
 | `DEBUG` | Enable debug logging | ❌ |
+| `PRICING_OVERRIDES` | Custom model pricing (JSON format) | ❌ |
 
 ⚠️ At least one provider API key is required
 
@@ -120,6 +121,64 @@ OPENAI_API_KEY=sk-proj-...your_openai_key...
 PORT=8080
 DEBUG=true
 ```
+
+### Custom Model Pricing
+
+The `PRICING_OVERRIDES` environment variable allows you to customize pricing for existing models or add pricing for new models that aren't in the default configuration.
+
+#### Format
+
+```bash
+PRICING_OVERRIDES='{"model-name": {"promptPerMTokUsd": price, "completionPerMTokUsd": price}}'
+```
+
+#### Examples
+
+**Override existing model pricing:**
+```bash
+# Override GPT-4 pricing
+PRICING_OVERRIDES='{"gpt-4": {"promptPerMTokUsd": 25.0, "completionPerMTokUsd": 50.0}}'
+```
+
+**Add pricing for new models:**
+```bash
+# Add pricing for custom models
+PRICING_OVERRIDES='{"custom-model": {"promptPerMTokUsd": 10.0, "completionPerMTokUsd": 20.0}}'
+```
+
+**Multiple model overrides:**
+```bash
+# Override multiple models at once
+PRICING_OVERRIDES='{
+  "gpt-4": {"promptPerMTokUsd": 25.0, "completionPerMTokUsd": 50.0},
+  "custom-model": {"promptPerMTokUsd": 10.0, "completionPerMTokUsd": 20.0},
+  "another-model": {"promptPerMTokUsd": 5.0, "completionPerMTokUsd": 15.0}
+}'
+```
+
+#### How It Works
+
+1. **Loading Order**: Default pricing configuration is loaded first, then overrides are applied
+2. **Merge Strategy**: Overrides are merged with existing pricing using spread operator (`{...default, ...overrides}`)
+3. **New Models**: Models not in the default configuration can be added via overrides
+4. **Cost Calculation**: Both existing and new models work with the cost calculation system
+5. **Real-time Effect**: Changes take effect when the service starts (no restart needed during runtime)
+
+#### Verification
+
+You can verify your pricing overrides are working by checking the startup logs:
+
+```bash
+llm-gateway --debug
+# Look for: "📊 Applied X pricing overrides"
+```
+
+#### Use Cases
+
+- **Custom Models**: Add pricing for proprietary or fine-tuned models
+- **Cost Optimization**: Adjust pricing based on your actual costs or agreements
+- **Testing**: Use different pricing for development/testing environments
+- **Provider Differences**: Set different prices for the same model across providers
 
 ## 🌐 API Endpoints
 
