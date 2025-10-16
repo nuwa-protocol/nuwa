@@ -191,16 +191,13 @@ llm-gateway --debug
 ```bash
 # OpenAI requests
 POST /openai/v1/chat/completions
-POST /openai/v1/embeddings
-GET /openai/v1/models
+POST /openai/v1/responses
 
 # OpenRouter requests  
 POST /openrouter/api/v1/chat/completions
-GET /openrouter/api/v1/models
 
 # LiteLLM requests
 POST /litellm/chat/completions
-GET /litellm/models
 ```
 
 ### Health and Service Discovery
@@ -269,6 +266,111 @@ Options:
   --help                               Show help message
   --version                            Show version information
 ```
+
+## 🐳 Docker Deployment
+
+### Using Pre-built Images (Recommended)
+
+Pull and run the official Docker image from GitHub Container Registry:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/nuwa-protocol/llm-gateway:latest
+
+# Run with environment variables
+docker run -d -p 8080:8080 \
+  -e SERVICE_KEY="your_service_key" \
+  -e OPENAI_API_KEY="your_openai_api_key" \
+  --name llm-gateway \
+  ghcr.io/nuwa-protocol/llm-gateway:latest
+
+# Run with configuration file
+docker run -d -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config/config.json \
+  -e SERVICE_KEY="your_service_key" \
+  -e OPENAI_API_KEY="your_openai_api_key" \
+  --name llm-gateway \
+  ghcr.io/nuwa-protocol/llm-gateway:latest
+```
+
+### Available Tags
+
+- `latest` - Latest stable version from main branch
+- `v0.6.x` - Specific version tags
+- `main` - Latest development version
+
+### Docker Environment Variables
+
+All CLI environment variables are supported in Docker. Key variables:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SERVICE_KEY` | Service private key for DID signing | ✅ |
+| `OPENAI_API_KEY` | OpenAI API key | ⚠️ |
+| `OPENROUTER_API_KEY` | OpenRouter API key | ⚠️ |
+| `LITELLM_API_KEY` | LiteLLM API key | ⚠️ |
+| `PORT` | Server port (default: 8080) | ❌ |
+| `HOST` | Server host (default: 0.0.0.0) | ❌ |
+| `DEBUG` | Enable debug logging | ❌ |
+
+⚠️ At least one provider API key is required
+
+### Docker Compose
+
+Use the provided `docker-compose.yml` file in the repository for easy deployment:
+
+```bash
+# Clone the repository and navigate to the service directory
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/llm-gateway
+
+# Set up your environment variables
+export SERVICE_KEY="your_service_key"
+export OPENAI_API_KEY="your_openai_api_key"
+
+# Start the services
+docker-compose up -d
+```
+
+The `docker-compose.yml` file includes:
+- ✅ **Complete configuration** with all environment variables
+- ✅ **Health checks** for service monitoring
+- ✅ **Optional LiteLLM service** for additional provider support
+- ✅ **Production deployment examples** with resource limits
+
+For detailed configuration options, see the [`docker-compose.yml`](./docker-compose.yml) file in the repository.
+
+### Building from Source
+
+If you need to build the image locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa/nuwa-services/llm-gateway
+
+# Build the image
+docker build -t llm-gateway .
+
+# Run the container
+docker run -d -p 8080:8080 \
+  -e SERVICE_KEY="your_service_key" \
+  -e OPENAI_API_KEY="your_openai_api_key" \
+  --name llm-gateway \
+  llm-gateway
+```
+
+### Production Deployment
+
+For production environments, consider:
+
+1. **Resource Limits**: Set appropriate CPU and memory limits
+2. **Secrets Management**: Use Docker secrets or external secret management
+3. **Logging**: Configure log aggregation (e.g., ELK stack)
+4. **Monitoring**: Add health checks and monitoring
+5. **Load Balancing**: Use multiple replicas behind a load balancer
+
+See the production deployment examples in the [`docker-compose.yml`](./docker-compose.yml) file for detailed configuration.
 
 ## 🔍 Troubleshooting
 
