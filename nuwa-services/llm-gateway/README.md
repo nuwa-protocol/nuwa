@@ -94,6 +94,7 @@ The demo handles all the complex authentication and payment setup automatically!
 | `ADMIN_DID` | Admin DID (comma-separated) | ❌ |
 | `DEBUG` | Enable debug logging | ❌ |
 | `PRICING_OVERRIDES` | Custom model pricing (JSON format) | ❌ |
+| `PRICING_MULTIPLIER` | Global multiplier for final USD cost (0~2, e.g., 1.1 = +10%) | ❌ |
 
 ⚠️ At least one provider API key is required
 
@@ -120,6 +121,9 @@ SERVICE_KEY=0x...your_generated_key...
 OPENAI_API_KEY=sk-proj-...your_openai_key...
 PORT=8080
 DEBUG=true
+# Optional: globally increase/decrease final cost
+# 1.10 = +10%, 0.90 = -10%
+# PRICING_MULTIPLIER=1.10
 ```
 
 ### Custom Model Pricing
