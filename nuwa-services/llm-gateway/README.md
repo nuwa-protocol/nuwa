@@ -1,16 +1,90 @@
-# LLM Gateway
+# @nuwa-ai/llm-gateway
 
-LLM Gateway is a backend API service built with **Express + Supabase** that serves as a universal proxy gateway for OpenRouter, providing DID authentication and intelligent request forwarding services.
+LLM Gateway is a multi-provider LLM API gateway with DID authentication and payment integration. It supports OpenAI, OpenRouter, and LiteLLM providers with intelligent usage tracking and cost calculation.
 
 ## Core Features
 
-- Universal OpenRouter API proxy and path forwarding
-- DID decentralized identity authentication
-- **Automatic User Initialization**: New users are automatically created with records and API keys on first access
-- Secure API key encryption management
-- **Intelligent Usage Tracking**: Automatically records token consumption and costs for requests
-- Request logging and usage statistics
-- Support for both streaming and non-streaming responses
+- **Multi-Provider Support**: OpenAI, OpenRouter, and LiteLLM integration
+- **DID Authentication**: Decentralized identity authentication with PaymentKit integration
+- **Payment Integration**: Built-in payment channels and usage-based billing
+- **Intelligent Usage Tracking**: Automatic token consumption and cost calculation
+- **Provider-First Routing**: Clean `/provider/api/path` routing pattern
+- **Gateway Pricing**: Built-in pricing calculation with provider fallback
+- **Streaming Support**: Full streaming support with usage tracking
+- **CLI Tool**: Command-line interface for easy deployment and configuration
+
+## Installation
+
+### Global Installation (Recommended)
+
+```bash
+npm install -g @nuwa-ai/llm-gateway
+llm-gateway --help
+```
+
+### Local Installation
+
+```bash
+npm install @nuwa-ai/llm-gateway
+npx llm-gateway --help
+```
+
+## Quick Start
+
+### 1. Basic Usage
+
+```bash
+# Start with default configuration
+llm-gateway
+
+# Start with custom port
+llm-gateway --port 3000
+
+# Start with configuration file
+llm-gateway --config config.json
+
+# Start with debug logging
+llm-gateway --debug
+```
+
+### 2. Environment Configuration
+
+Create a `.env` file or set environment variables:
+
+```bash
+# Copy example configuration
+cp node_modules/@nuwa-ai/llm-gateway/examples/env.example .env
+
+# Edit configuration
+nano .env
+```
+
+### 3. Configuration File
+
+Create a `config.json` file:
+
+```json
+{
+  "port": 8080,
+  "host": "0.0.0.0",
+  "serviceId": "llm-gateway",
+  "network": "test",
+  "debug": true
+}
+```
+
+### 4. Testing Your Gateway
+
+Once your gateway is running, test it using the **Nuwa Login Demo**:
+
+1. 🚀 Start your gateway: `llm-gateway --debug`
+2. 🌐 Open [https://nuwa-login-demo.pages.dev/](https://nuwa-login-demo.pages.dev/)
+3. 🔗 Configure the demo to connect to `http://localhost:8080`
+4. 🔐 Connect your wallet and authenticate with DID
+5. 💬 Test chat completions with different providers
+6. 📊 Monitor usage and costs in real-time
+
+The demo handles all the complex authentication and payment setup automatically!
 
 ## 🆕 Usage Tracking Feature
 
@@ -88,136 +162,152 @@ Key changes vs. earlier versions:
 
 If you are upgrading, remove `idx_user_api_keys_did` and old `openrouter_key_hash`-based indices—the new schema adds composite indices.
 
-## Main API Endpoints
+## API Endpoints
 
-- `GET /` or `/api/v1/health`: Health check
-- `<METHOD> /api/v1/openrouter/*`: Universal OpenRouter proxy (requires DID authentication)
-- `GET /api/v1/usage`: Get user usage statistics (requires DID authentication)
-
-### Proxy Logic Overview
-
-- All client requests use unified path prefix `/api/v1/*`.
-- Target backend is chosen by HTTP header `X-LLM-Provider: openrouter | litellm` (case-insensitive).  
-  If the header is missing the value from `LLM_BACKEND` env (`openrouter`/`litellm`/`both`) is used.
-- Usage-tracking parameters are automatically added **only for OpenRouter** requests.
-
-## Examples
-
-### Basic Chat Completion Request (Usage Tracking automatically enabled)
+### Provider-First Routes (Recommended)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/chat/completions \
-  -H "x-did: did:example:123" \
-  -H "x-did-signature: ..." \
-  -H "x-did-timestamp: ..." \
-  -H "X-LLM-Provider: openrouter" \
+# OpenAI requests
+POST /openai/v1/chat/completions
+POST /openai/v1/embeddings
+GET /openai/v1/models
+
+# OpenRouter requests  
+POST /openrouter/api/v1/chat/completions
+GET /openrouter/api/v1/models
+
+# LiteLLM requests
+POST /litellm/chat/completions
+GET /litellm/models
+```
+
+### Legacy Routes (Backward Compatible)
+
+```bash
+# Legacy routes (redirect to OpenRouter by default)
+POST /api/v1/chat/completions
+GET /api/v1/models
+GET /api/v1/usage
+```
+
+### Health and Service Discovery
+
+```bash
+GET /                                    # Health check
+GET /.well-known/nuwa-payment/info      # Payment service discovery
+```
+
+## Testing and Examples
+
+### Using Nuwa Login Demo (Recommended)
+
+Since the LLM Gateway requires DID authentication and payment integration, direct curl requests won't work without proper authentication setup. For testing and development, we recommend using the **Nuwa Login Demo**:
+
+🔗 **[https://nuwa-login-demo.pages.dev/](https://nuwa-login-demo.pages.dev/)**
+
+This demo provides:
+- ✅ **DID Authentication**: Automatic wallet connection and DID signing
+- ✅ **Payment Integration**: Built-in payment channel management
+- ✅ **Interactive Testing**: Easy-to-use interface for testing different providers
+- ✅ **Real-time Results**: See responses and usage tracking in action
+
+### API Endpoint Examples
+
+Once your gateway is running, the demo can connect to these endpoints:
+
+#### OpenAI Provider
+```
+POST http://localhost:8080/openai/v1/chat/completions
+```
+
+#### OpenRouter Provider
+```
+POST http://localhost:8080/openrouter/api/v1/chat/completions
+```
+
+#### LiteLLM Provider
+```
+POST http://localhost:8080/litellm/chat/completions
+```
+
+### Manual Testing (Advanced)
+
+If you need to test with curl, you'll need to:
+
+1. **Set up DID Authentication**: Generate proper DIDAuthV1 headers
+2. **Configure Payment Channels**: Set up payment channels with sufficient balance
+3. **Use Payment Kit Client**: Implement proper payment channel management
+
+Example request structure (requires proper authentication):
+```bash
+curl -X POST http://localhost:8080/openai/v1/chat/completions \
+  -H "Authorization: DIDAuthV1 <signature_data>" \
+  -H "X-Payment-Channel-Data: <payment_channel_data>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "openai/gpt-3.5-turbo",
+    "model": "gpt-4",
     "messages": [
       {"role": "user", "content": "Hello! How are you?"}
     ]
   }'
 ```
 
-### Streaming Request (also supports Usage Tracking)
+> **Note**: Manual authentication setup is complex. We strongly recommend using the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) for testing and development.
+
+### Streaming Requests
+
+Streaming requests are fully supported through the Nuwa Login Demo. The demo automatically handles:
+- ✅ **Real-time Streaming**: Server-sent events with proper payment tracking
+- ✅ **Usage Monitoring**: Live token and cost updates during streaming
+- ✅ **Error Handling**: Graceful handling of connection issues
+
+## Configuration
+
+### Command Line Options
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/chat/completions \
-  -H "x-did: did:example:123" \
-  -H "x-did-signature: ..." \
-  -H "x-did-timestamp: ..." \
-  -H "X-LLM-Provider: openrouter" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "openai/gpt-3.5-turbo",
-    "messages": [
-      {"role": "user", "content": "Write a short story about AI"}
-    ],
-    "stream": true
-  }'
+llm-gateway --help
 ```
 
-### View Usage Statistics
-
-```bash
-curl -X GET http://localhost:8080/api/v1/usage \
-  -H "x-did: did:example:123" \
-  -H "x-did-signature: ..." \
-  -H "x-did-timestamp: ..."
+```
+Options:
+  -p, --port <port>                    Server port (default: 8080)
+  -h, --host <host>                    Server host (default: 0.0.0.0)
+  -c, --config <path>                  Configuration file path
+  --service-id <id>                    Service identifier for payment system
+  --service-key <key>                  Service private key for DID signing
+  --network <network>                  Rooch network (local|dev|test|main, default: test)
+  --rpc-url <url>                      Rooch RPC URL
+  --default-asset-id <id>              Default asset ID for payments
+  --default-price-pico-usd <price>     Default price in picoUSD
+  --debug                              Enable debug logging
+  --help                               Show help message
+  --version                            Show version information
 ```
 
-## 🔍 Usage Tracking Log Example
+### Environment Variables
 
-The system outputs detailed usage tracking information to the console:
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SERVICE_KEY` | Service private key for DID signing | ✅ |
+| `SUPABASE_URL` | Supabase project URL | ⚠️ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | ⚠️ |
+| `OPENAI_API_KEY` | OpenAI API key | ⚠️ |
+| `OPENROUTER_API_KEY` | OpenRouter API key | ⚠️ |
+| `LITELLM_API_KEY` | LiteLLM API key | ⚠️ |
+| `PORT` | Server port (default: 8080) | ❌ |
+| `HOST` | Server host (default: 0.0.0.0) | ❌ |
+| `ROOCH_NETWORK` | Rooch network (default: test) | ❌ |
+| `ROOCH_NODE_URL` | Rooch RPC URL | ❌ |
+| `DEFAULT_ASSET_ID` | Default asset ID | ❌ |
+| `ADMIN_DID` | Admin DID (comma-separated) | ❌ |
+| `DEBUG` | Enable debug logging | ❌ |
 
-```
-✅ Usage tracking enabled for request
-📊 Extracted usage info: {
-  input_tokens: 12,
-  output_tokens: 85,
-  total_cost: 0.000142
-}
-```
+⚠️ At least one provider API key is required
 
-Example database record:
+### Configuration File Example
 
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "did": "did:example:123",
-  "model": "openai/gpt-3.5-turbo",
-  "input_tokens": 12,
-  "output_tokens": 85,
-  "total_cost": 0.000142,
-  "status": "completed",
-  "request_time": "2024-01-20T10:30:00Z",
-  "response_time": "2024-01-20T10:30:02Z"
-}
-```
-
-## TODO
-
-- DID signature verification
-- Usage reporting and analytics features
-- Cost alerts and limitation mechanisms
-
-## Environment Variables
-
-Create a `.env` file and configure the following environment variables:
-
-```env
-# Service Configuration
-PORT=8080
-NODE_ENV=development
-HOST=0.0.0.0
-
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-# OpenRouter Configuration
-OPENROUTER_API_URL=https://openrouter.ai/
-OPENROUTER_PROVISIONING_KEY=your_openrouter_provisioning_key
-
-# API Key Encryption
-API_KEY_ENCRYPTION_KEY=your_encryption_key_change_in_production
-
-# Optional Configuration
-HTTP_REFERER=https://llm-gateway.local
-X_TITLE=LLM Gateway
-```
-
-### Key Configuration Explanations
-
-| Variable | Description |
-|----------|-------------|
-| `OPENROUTER_PROVISIONING_KEY` | Master key to create sub-keys in OpenRouter |
-| `LITELLM_MASTER_KEY` | Master key for LiteLLM proxy (only if you enable it) |
-| `LLM_BACKEND` | `openrouter` \| `litellm` \| `both` (default `both`) |
-| `API_KEY_ENCRYPTION_KEY` | AES key used to encrypt user api keys in DB (generate via `openssl rand -base64 32`) |
-| `HOST` | server bind address (default `0.0.0.0`) |
+See [`examples/config.json`](./examples/config.json) for a complete example.
 
 ## Automatic User Initialization
 
@@ -245,24 +335,61 @@ This process is completely transparent to users, requiring no manual registratio
 ### Build and Run
 
 ```bash
-# Development
-npm run dev
+# Clone the repository
+git clone https://github.com/nuwa-protocol/nuwa
+cd nuwa/nuwa-services/llm-gateway
 
-# Build for production
-npm run build
+# Install dependencies
+pnpm install
 
-# Start production server
-npm start
+# Build the project
+pnpm run build
+
+# Run in development mode
+pnpm run dev
+
+# Test CLI locally
+pnpm run cli --help
 ```
 
-### Technology Stack
+### Building from Source
+
+```bash
+# Build for production
+pnpm run build
+
+# Test the built CLI
+node dist/bin/llm-gateway.js --help
+
+# Start production server
+pnpm start
+```
+
+### Publishing to NPM
+
+```bash
+# Build and publish
+pnpm run build
+npm publish
+```
+
+## Technology Stack
 
 - **Framework**: Express.js
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: DID (Decentralized Identity)
+- **Authentication**: DID (Decentralized Identity) + PaymentKit
+- **Payment**: Rooch blockchain integration
+- **Database**: Supabase (PostgreSQL) - Optional
 - **Language**: TypeScript
-- **HTTP Client**: Axios
+- **Providers**: OpenAI, OpenRouter, LiteLLM
+
+## License
+
+Apache License 2.0 - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 
 ---
 
-Built with ❤️ using Express.js and Supabase
+Built with ❤️ by the Nuwa AI team

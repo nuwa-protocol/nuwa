@@ -1,0 +1,10 @@
+{
+  "port": 8080,
+  "host": "0.0.0.0",
+  "serviceId": "llm-gateway",
+  "network": "test",
+  "debug": true,
+  "adminDid": [
+    "did:rooch:example123"
+  ]
+}
