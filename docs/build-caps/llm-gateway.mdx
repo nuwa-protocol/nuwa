@@ -1,0 +1,133 @@
+---
+title: "LLM Gateway (Local Deployment)"
+description: "Run your own LLM Gateway locally with DID auth and usage-based pricing."
+---
+
+## Why a custom gateway?
+
+Unify multiple LLM providers (OpenAI / OpenRouter / LiteLLM) behind a single gateway with DID authentication and usage-based pricing. This makes local development and verification straightforward and consistent.
+
+<CardGroup cols={3}>
+  <Card title="Quick start" icon="rocket" href="#quick-start">Spin up your gateway in minutes.</Card>
+  <Card title="Routing & pricing" icon="route" href="#routing-pricing">Provider‑first routing and pricing config.</Card>
+  <Card title="Access log (stdout)" icon="clipboard-list" href="#access-log">Structured access logs for observability.</Card>
+</CardGroup>
+
+<Note>
+Before you start: obtain a Service Key for your service DID. See the
+<a href="/build-caps/service-key">Service Key guide</a> and export it as
+<code>SERVICE_KEY</code>.
+</Note>
+
+### Prerequisites
+
+- Node.js 18+ and pnpm 9+
+- At least one provider API key: `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `LITELLM_API_KEY`
+- Service private key `SERVICE_KEY` (generate from `https://test-id.nuwa.dev`)
+
+### Install & run {#quick-start}
+
+#### Option A: Global install
+
+```bash
+npm install -g @nuwa-ai/llm-gateway
+llm-gateway --help
+```
+
+#### Option B: Run from source
+
+For development or customization, build from source using the monorepo. Refer to the
+<a href="https://github.com/rooch-network/nuwa/tree/main/nuwa-services/llm-gateway">LLM Gateway README</a>
+for detailed steps and options.
+
+### Environment variables (minimum)
+
+```bash
+# Required
+export SERVICE_KEY=0x...
+export OPENAI_API_KEY=sk-proj-...
+
+# Network
+export ROOCH_NETWORK=test
+export ROOCH_NODE_URL=https://test-seed.rooch.network
+
+# Optional pricing
+# Range 0~2, e.g. 1.10 = +10%
+# export PRICING_MULTIPLIER=1.10
+
+# Override/add model pricing (JSON string)
+# export PRICING_OVERRIDES='{"gpt-4":{"promptPerMTokUsd":25,"completionPerMTokUsd":50}}'
+```
+
+### Start & health checks
+
+```bash
+llm-gateway --debug
+# or
+llm-gateway --port 3000 --debug
+```
+
+- Health: `GET /`
+- Service discovery: `GET /.well-known/nuwa-payment/info`
+
+### Verify (Nuwa Login Demo is recommended)
+
+1. Open `https://nuwa-login-demo.pages.dev/`
+2. Set the gateway URL to `http://localhost:8080`
+3. Connect your wallet and run a chat request
+
+> Note: The gateway enforces DID + PaymentKit. For direct curl testing, you must implement DIDAuthV1 and payment headers yourself.
+
+### Routing & pricing details {#routing-pricing}
+
+- Provider‑first routing:
+  - OpenAI: `/openai/v1/chat/completions`, `/openai/v1/embeddings`, `/openai/v1/models`
+  - OpenRouter: `/openrouter/api/v1/chat/completions`, `/openrouter/api/v1/models`
+  - LiteLLM: `/litellm/chat/completions`, `/litellm/models`
+- Chat Completions (streaming): the gateway injects `stream_options.include_usage=true`
+- Response API: do not send `stream_options`; usage appears on the `response.completed` SSE event
+- Pricing: built‑in model table + `PRICING_OVERRIDES`; `PRICING_MULTIPLIER` adjusts final USD cost
+
+### Access log (stdout) {#access-log}
+
+- Structured JSON logs with `type=access_log`, including `request_id`, `provider`, `model`, `status_code`, `upstream_*`, `total_cost_usd`, etc.
+- Sensitive headers (e.g., Authorization) are not logged
+- Works well with local tools (jq/grep) for quick inspection
+
+### Troubleshooting
+
+- "SERVICE_KEY is required": set `SERVICE_KEY` or pass `--service-key`
+- "At least one provider API key is required": set any provider key
+- Port in use: start with `--port <number>`
+- Response API error `Unknown parameter: stream_options`: remove `stream_options` (only supported on Chat Completions)
+
+### Revenue & monitoring
+
+Your LLM Gateway automatically tracks usage and generates revenue from DID-authenticated requests:
+
+- **Usage tracking**: All requests are logged with token counts and USD costs
+- **Revenue generation**: Users pay for each request through payment channels
+- **Balance monitoring**: Check your service balance and withdraw earnings
+- **Audit trail**: Complete transaction history for accounting
+
+Visit the [Revenue dashboard](https://test-app.nuwa.dev/revenue) to monitor your gateway's performance and earnings.
+
+### What's next
+
+- Docker / Kubernetes guides will be added later
+
+## Relevant Docs
+
+<CardGroup cols={3}>
+  <Card title="Service Key" icon="key" href="/build-caps/service-key">
+    How to obtain and configure SERVICE_KEY
+  </Card>
+  <Card title="Service Pricing" icon="dollar-sign" href="/build-caps/service-pricing">
+    Configure pricing for your LLM Gateway
+  </Card>
+  <Card title="Revenue" icon="money-bill-wave" href="/build-caps/revenue">
+    View balances, withdraw, and audit revenue history
+  </Card>
+</CardGroup>
+
+
