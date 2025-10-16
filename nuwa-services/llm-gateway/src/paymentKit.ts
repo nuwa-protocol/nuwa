@@ -1,8 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
 import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
-// Bridge to existing non-stream LLM handler
-import SupabaseService from './database/supabase.js';
 import OpenRouterService from './services/openrouter.js';
 import LiteLLMService from './services/litellm.js';
 import { OpenAIProvider } from './providers/openai.js';
@@ -123,7 +121,6 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
   return billing;
 }
 
-const supabaseService = new SupabaseService();
 const openrouterProvider = new OpenRouterService();
 const litellmProvider = new LiteLLMService();
 const openaiProvider = new OpenAIProvider();

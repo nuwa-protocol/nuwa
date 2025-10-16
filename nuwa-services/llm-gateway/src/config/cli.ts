@@ -31,11 +31,6 @@ export interface LLMGatewayConfig {
   litellmApiKey?: string;
   litellmBaseUrl?: string;
   
-  // Database configuration
-  supabaseUrl?: string;
-  supabaseAnonKey?: string;
-  supabaseServiceRoleKey?: string;
-  
   // Pricing configuration
   pricingOverrides?: string;
   openaiPricingVersion?: string;
@@ -181,9 +176,6 @@ Environment Variables:
   OPENAI_API_KEY                       OpenAI API key
   OPENROUTER_API_KEY                   OpenRouter API key
   LITELLM_API_KEY                      LiteLLM API key
-  SUPABASE_URL                         Supabase project URL
-  SUPABASE_ANON_KEY                    Supabase anonymous key
-  SUPABASE_SERVICE_ROLE_KEY            Supabase service role key
 
 Configuration File:
   The configuration file should be in JSON or YAML format.
@@ -197,7 +189,7 @@ Configuration File:
   }
 
 Quick Start:
-  1. Generate SERVICE_KEY
+  1. Generate SERVICE_KEY:    https://test-id.nuwa.dev
   2. Set environment:         export SERVICE_KEY=0x...
   3. Set provider API key:    export OPENAI_API_KEY=sk-proj-...
   4. Start gateway:           llm-gateway --debug
@@ -313,9 +305,6 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.OPENROUTER_BASE_URL) config.openrouterBaseUrl = process.env.OPENROUTER_BASE_URL;
   if (process.env.LITELLM_API_KEY) config.litellmApiKey = process.env.LITELLM_API_KEY;
   if (process.env.LITELLM_BASE_URL) config.litellmBaseUrl = process.env.LITELLM_BASE_URL;
-  if (process.env.SUPABASE_URL) config.supabaseUrl = process.env.SUPABASE_URL;
-  if (process.env.SUPABASE_ANON_KEY) config.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) config.supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (process.env.PRICING_OVERRIDES) config.pricingOverrides = process.env.PRICING_OVERRIDES;
   if (process.env.OPENAI_PRICING_VERSION) config.openaiPricingVersion = process.env.OPENAI_PRICING_VERSION;
   if (process.env.HTTP_REFERER) config.httpReferer = process.env.HTTP_REFERER;

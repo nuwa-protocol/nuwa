@@ -38,13 +38,6 @@ if (!process.env.LITELLM_API_KEY) {
   process.env.LITELLM_API_KEY = 'test-litellm-key';
 }
 
-if (!process.env.SUPABASE_URL) {
-  process.env.SUPABASE_URL = 'http://localhost:54321';
-}
-
-if (!process.env.SUPABASE_ANON_KEY) {
-  process.env.SUPABASE_ANON_KEY = 'test-anon-key';
-}
 
 jest.setTimeout(30000);
 
