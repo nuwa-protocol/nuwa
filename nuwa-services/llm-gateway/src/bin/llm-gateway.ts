@@ -8,10 +8,25 @@ import { startServer } from '../server.js';
  */
 async function main() {
   try {
+    console.log('🔧 Loading configuration...');
+    
     // Load configuration from CLI args, config file, and environment
     const config = loadConfig();
     
+    console.log('✅ Configuration loaded successfully');
+    console.log(`📍 Port: ${config.port}, Host: ${config.host}`);
+    console.log(`🌐 Network: ${config.network}, Debug: ${config.debug}`);
+    
+    // Check for SERVICE_KEY
+    if (!config.serviceKey) {
+      console.error('❌ SERVICE_KEY is required but not provided.');
+      console.error('💡 Set SERVICE_KEY environment variable or use --service-key option');
+      console.error('💡 Example: export SERVICE_KEY=your_private_key_here');
+      process.exit(1);
+    }
+    
     // Validate configuration
+    console.log('🔍 Validating configuration...');
     const validation = validateConfig(config);
     if (!validation.valid) {
       console.error('❌ Configuration validation failed:');
@@ -19,8 +34,10 @@ async function main() {
       process.exit(1);
     }
     
+    console.log('✅ Configuration validation passed');
+    
     // Start the server
-    console.log('🚀 Starting LLM Gateway...');
+    console.log('🚀 Starting LLM Gateway server...');
     const serverInstance = await startServer(config);
     
     // Setup graceful shutdown

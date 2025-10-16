@@ -196,11 +196,17 @@ Configuration File:
     "debug": true
   }
 
+Quick Start:
+  1. Generate SERVICE_KEY
+  2. Set environment:         export SERVICE_KEY=0x...
+  3. Set provider API key:    export OPENAI_API_KEY=sk-proj-...
+  4. Start gateway:           llm-gateway --debug
+
 Examples:
-  llm-gateway                          Start with default configuration
-  llm-gateway --port 3000              Start on port 3000
-  llm-gateway --config config.json     Start with configuration file
   llm-gateway --debug                  Start with debug logging enabled
+  llm-gateway --port 8080              Start on port 8080
+  llm-gateway --config config.json     Start with configuration file
+  llm-gateway --service-key 0x...      Start with specific SERVICE_KEY
 
 Testing:
   Use the Nuwa Login Demo for easy testing with DID authentication and payments:
@@ -224,6 +230,7 @@ export function showVersion() {
     console.log('LLM Gateway (version unknown)');
   }
 }
+
 
 /**
  * Load configuration file
@@ -270,6 +277,7 @@ export function loadConfig(): LLMGatewayConfig {
     showVersion();
     process.exit(0);
   }
+  
   
   // Start with default configuration
   const config: LLMGatewayConfig = {
@@ -351,10 +359,15 @@ export function validateConfig(config: LLMGatewayConfig): { valid: boolean; erro
     errors.push('Network must be one of: local, dev, test, main');
   }
   
+  // Validate SERVICE_KEY
+  if (!config.serviceKey) {
+    errors.push('SERVICE_KEY is required for DID authentication and payment functionality');
+  }
+  
   // Check if at least one provider API key is configured
   const hasProviderKey = config.openaiApiKey || config.openrouterApiKey || config.litellmApiKey;
   if (!hasProviderKey) {
-    console.warn('⚠️  No provider API keys configured. At least one of OPENAI_API_KEY, OPENROUTER_API_KEY, or LITELLM_API_KEY should be set.');
+    errors.push('At least one provider API key is required (OPENAI_API_KEY, OPENROUTER_API_KEY, or LITELLM_API_KEY)');
   }
   
   return {

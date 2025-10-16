@@ -78,6 +78,7 @@ export async function startServer(
   configOverride?: Partial<LLMGatewayConfig>
 ): Promise<ServerInstance> {
   try {
+    console.log('🔧 Loading environment variables...');
     // Load environment variables
     dotenv.config();
     dotenv.config({ path: ".env.local", override: true });
@@ -113,12 +114,15 @@ export async function startServer(
     // Merge with override configuration
     const config = { ...defaultConfig, ...configOverride };
     
+    console.log('🔐 Initializing VDR registry...');
     // Initialize VDR registry
     initializeVDR(config.network, config.rpcUrl);
     
+    console.log('🌐 Creating Express application...');
     // Create Express app
     const app = createApp(config);
     
+    console.log('💳 Initializing PaymentKit and registering routes...');
     // Initialize PaymentKit and register routes
     await initPaymentKitAndRegisterRoutes(app);
     

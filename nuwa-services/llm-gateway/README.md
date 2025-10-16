@@ -86,6 +86,77 @@ Once your gateway is running, test it using the **Nuwa Login Demo**:
 
 The demo handles all the complex authentication and payment setup automatically!
 
+## Troubleshooting
+
+### Gateway Exits Immediately
+
+If `llm-gateway` starts and exits immediately without errors, this is usually due to missing required environment variables. Follow these steps:
+
+#### Step 1: Generate SERVICE_KEY
+```bash
+# Generate a new SERVICE_KEY (32 random bytes as hex)
+SERVICE_KEY=0x$(openssl rand -hex 32)
+echo "Generated SERVICE_KEY: $SERVICE_KEY"
+
+# Set the SERVICE_KEY
+export SERVICE_KEY=$SERVICE_KEY
+```
+
+#### Step 2: Set Provider API Keys
+```bash
+# Set at least one provider API key
+export OPENAI_API_KEY=sk-proj-...
+# OR
+export OPENROUTER_API_KEY=sk-or-v1-...
+# OR  
+export LITELLM_API_KEY=sk-...
+```
+
+#### Step 3: Configure Database (Optional)
+```bash
+# For usage tracking (optional)
+export SUPABASE_URL=https://your-project.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+#### Step 4: Test Configuration
+```bash
+# Test with minimal configuration
+llm-gateway --debug --port 8080
+
+# If still failing, check for specific errors
+node --trace-warnings $(which llm-gateway) --debug
+```
+
+#### Quick Setup with .env File
+```bash
+# Generate SERVICE_KEY and create .env file
+SERVICE_KEY=0x$(openssl rand -hex 32)
+cat > .env << EOF
+SERVICE_KEY=$SERVICE_KEY
+OPENAI_API_KEY=sk-proj-...your_openai_key...
+PORT=8080
+DEBUG=true
+EOF
+
+# Start the gateway
+llm-gateway --debug
+```
+
+### Common Error Messages
+
+- **"SERVICE_KEY is required"**: Generate and set a SERVICE_KEY using `openssl rand -hex 32`
+- **"At least one provider API key is required"**: Set OPENAI_API_KEY, OPENROUTER_API_KEY, or LITELLM_API_KEY
+- **"Port already in use"**: Change the port with `--port <number>`
+- **"Configuration validation failed"**: Check your config file syntax
+
+### Getting Help
+
+- Use `llm-gateway --help` for command-line options
+- Generate SERVICE_KEY with `openssl rand -hex 32 | sed 's/^/0x/'`
+- Enable debug mode with `--debug` for detailed logs
+- Test with [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) once running
+
 ## 🆕 Usage Tracking Feature
 
 LLM Gateway integrates OpenRouter's Usage Accounting functionality to automatically track and record:
