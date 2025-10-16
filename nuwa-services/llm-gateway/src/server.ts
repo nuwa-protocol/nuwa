@@ -87,7 +87,7 @@ export async function startServer(
     const defaultConfig: LLMGatewayConfig = {
       port: parseInt(process.env.PORT || "8080"),
       host: process.env.HOST || "0.0.0.0",
-      network: (process.env.ROOCH_NETWORK as any) || "test",
+      network: process.env.ROOCH_NETWORK || "test",
       rpcUrl: process.env.ROOCH_NODE_URL,
       serviceId: process.env.SERVICE_ID || "llm-gateway",
       serviceKey: process.env.SERVICE_KEY,

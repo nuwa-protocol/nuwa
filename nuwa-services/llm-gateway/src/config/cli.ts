@@ -297,7 +297,14 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.HOST) config.host = process.env.HOST;
   if (process.env.SERVICE_KEY) config.serviceKey = process.env.SERVICE_KEY;
   if (process.env.ROOCH_NODE_URL) config.rpcUrl = process.env.ROOCH_NODE_URL;
-  if (process.env.ROOCH_NETWORK) config.network = process.env.ROOCH_NETWORK as any;
+  if (process.env.ROOCH_NETWORK) {
+    const allowedNetworks = ["local", "dev", "test", "main"];
+    if (allowedNetworks.includes(process.env.ROOCH_NETWORK)) {
+      config.network = process.env.ROOCH_NETWORK as "local" | "dev" | "test" | "main";
+    } else {
+      console.warn(`Invalid ROOCH_NETWORK value: ${process.env.ROOCH_NETWORK}. Using default: ${config.network}`);
+    }
+  }
   if (process.env.DEFAULT_ASSET_ID) config.defaultAssetId = process.env.DEFAULT_ASSET_ID;
   if (process.env.OPENAI_API_KEY) config.openaiApiKey = process.env.OPENAI_API_KEY;
   if (process.env.OPENAI_BASE_URL) config.openaiBaseUrl = process.env.OPENAI_BASE_URL;
