@@ -87,7 +87,7 @@ export async function startServer(
     const defaultConfig: LLMGatewayConfig = {
       port: parseInt(process.env.PORT || "8080"),
       host: process.env.HOST || "0.0.0.0",
-      network: process.env.ROOCH_NETWORK || "test",
+      network: process.env.ROOCH_NETWORK as any || "test",
       rpcUrl: process.env.ROOCH_NODE_URL,
       serviceId: process.env.SERVICE_ID || "llm-gateway",
       serviceKey: process.env.SERVICE_KEY,
@@ -105,7 +105,6 @@ export async function startServer(
       openaiPricingVersion: process.env.OPENAI_PRICING_VERSION,
       httpReferer: process.env.HTTP_REFERER,
       xTitle: process.env.X_TITLE,
-      apiKeyEncryptionKey: process.env.API_KEY_ENCRYPTION_KEY,
     };
 
     // Merge with override configuration

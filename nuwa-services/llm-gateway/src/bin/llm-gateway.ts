@@ -85,9 +85,7 @@ async function main() {
   }
 }
 
-// Handle CLI execution
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
+// Execute main function directly - this file is only used as CLI entry point
+main();
 
 export { main };

@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/llm-gateway",
-  "version": "0.6.8",
+  "version": "0.6.10",
   "description": "LLM Gateway - A backend API service for routing LLM requests through multiple providers with DID authentication and payment integration",
   "type": "module",
   "main": "dist/server.js",
