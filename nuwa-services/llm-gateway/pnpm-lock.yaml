@@ -12,8 +12,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.9.2)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.4
-        version: 0.6.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
+        specifier: ^0.6.8
+        version: 0.6.8(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)
       '@supabase/supabase-js':
         specifier: ^2.39.0
         version: 2.55.0
@@ -538,8 +538,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.4':
-    resolution: {integrity: sha512-TKlGX1jcGfecBEhzunV+GMAa90HTzgF2qXTeKYY5u3piFEC9UFRN5+rI1MBkjncBnd7nDoXfokIJjQd2r7UEew==}
+  '@nuwa-ai/payment-kit@0.6.8':
+    resolution: {integrity: sha512-qcm+UXL4XSetG0Pnzd8TJ/d/z5pV31ceqspD3dDhtMFUbWWoqp6rwh5BjlgHEa851o6+LtP2T+LWPS+SY1/VGw==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1200,8 +1200,8 @@ packages:
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
-  fastmcp@3.17.0:
-    resolution: {integrity: sha512-mNSPP/oG0qXFkPMA5TFXde8Zg5IjBvZE6QP/TMqcMpYYLTRJX1UJGDG7WyCKaPDF8JtgTWJigi1Osqo5rri+6A==}
+  fastmcp@3.5.0:
+    resolution: {integrity: sha512-80OeYVFCqusrOFPNxm8uJ5G/ZaKMasygZTLvZReZ5o6iCvDBwFR/S485Is3jY0128aAaIyYx9eAgWjBUQUwoYg==}
     hasBin: true
 
   fb-watchman@2.0.2:
@@ -1678,6 +1678,10 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  mcp-proxy@5.5.6:
+    resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
+    hasBin: true
 
   mcp-proxy@5.6.0:
     resolution: {integrity: sha512-sms4GHO/sX2d0uTdiUVOLXJMpNRc+4VZAdIRpj+DUZJovGXtXaYwF4YM1BTcQeCKEJkfwGPHoO24AQlR0TWOqA==}
@@ -2407,14 +2411,14 @@ packages:
       utf-8-validate:
         optional: true
 
-  xsschema@0.3.5:
-    resolution: {integrity: sha512-f+dcy11dTv7aBEEfTbXWnrm/1b/Ds2k4taN0TpN6KCtPAD58kyE/R1znUdrHdBnhIFexj9k+pS1fm6FgtSISrQ==}
+  xsschema@0.3.0-beta.3:
+    resolution: {integrity: sha512-8fKI0Kqxs7npz3ElebNCeGdS0HDuS2qL3IqHK5O53yCdh419hcr3GQillwN39TNFasHjbMLQ+DjSwpY0NONdnQ==}
     peerDependencies:
       '@valibot/to-json-schema': ^1.0.0
-      arktype: ^2.1.20
-      effect: ^3.16.0
-      sury: ^10.0.0
-      zod: ^3.25.0 || ^4.0.0
+      arktype: ^2.1.16
+      effect: ^3.14.5
+      sury: ^10.0.0-rc
+      zod: ^3.25.0
       zod-to-json-schema: ^3.24.5
     peerDependenciesMeta:
       '@valibot/to-json-schema':
@@ -3009,7 +3013,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.4(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
+  '@nuwa-ai/payment-kit@0.6.8(express@4.21.2)(pg@8.16.3)(typescript@5.9.2)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.9.2)
@@ -3017,10 +3021,10 @@ snapshots:
       '@types/js-yaml': 4.0.9
       '@types/pg': 8.15.5
       ai: 5.0.62(zod@3.25.76)
-      fastmcp: 3.17.0
+      fastmcp: 3.5.0
       js-yaml: 4.1.0
       lossless-json: 4.2.0
-      mcp-proxy: 5.6.0
+      mcp-proxy: 5.5.6
       on-headers: 1.1.0
       path-to-regexp: 6.3.0
       zod: 3.25.76
@@ -3854,7 +3858,7 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fastmcp@3.17.0:
+  fastmcp@3.5.0:
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.0
       '@standard-schema/spec': 1.0.0
@@ -3865,7 +3869,7 @@ snapshots:
       strict-event-emitter-types: 2.0.0
       undici: 7.16.0
       uri-templates: 0.2.0
-      xsschema: 0.3.5(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76)
+      xsschema: 0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76)
       yargs: 18.0.0
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
@@ -4516,6 +4520,8 @@ snapshots:
       tmpl: 1.0.5
 
   math-intrinsics@1.1.0: {}
+
+  mcp-proxy@5.5.6: {}
 
   mcp-proxy@5.6.0: {}
 
@@ -5183,7 +5189,7 @@ snapshots:
 
   ws@8.18.3: {}
 
-  xsschema@0.3.5(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76):
+  xsschema@0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76):
     optionalDependencies:
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)

@@ -9,6 +9,35 @@ import { ToolCallCounts, ToolValidationResult, ResponseUsage, ExtendedUsage } fr
  */
 export class UsagePolicy {
   /**
+   * Global pricing multiplier helpers
+   */
+  private static cachedMultiplier: number | null = null;
+
+  /**
+   * Read and cache PRICING_MULTIPLIER from env; clamp to [0, 100]
+   */
+  static getPricingMultiplier(): number {
+    if (this.cachedMultiplier !== null) return this.cachedMultiplier;
+    const raw = process.env.PRICING_MULTIPLIER;
+    const parsed = raw !== undefined ? Number(raw) : 1.0;
+    let value = Number.isFinite(parsed) ? parsed : 1.0;
+    if (value < 0) value = 0;
+    if (value > 2) value = 2;
+    this.cachedMultiplier = value;
+    return value;
+  }
+
+  /**
+   * Apply global multiplier to a USD cost
+   */
+  private static applyMultiplier(costUsd: number | undefined): number | undefined {
+    if (typeof costUsd !== 'number') return costUsd;
+    const m = this.getPricingMultiplier();
+    // Avoid tiny negative zeros
+    const result = costUsd * m;
+    return result;
+  }
+  /**
    * Extract usage information from non-streaming response
    * Supports both Chat Completions and Response API formats
    */
@@ -168,7 +197,7 @@ export class UsagePolicy {
     if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
       const usageInfo = this.extractUsageFromResponse({ usage });
       return {
-        costUsd: providerCostUsd,
+        costUsd: this.applyMultiplier(providerCostUsd)!,
         source: 'provider',
         model,
         usage: usageInfo || undefined,
@@ -215,7 +244,7 @@ export class UsagePolicy {
     console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
 
     return {
-      costUsd: totalCost,
+      costUsd: this.applyMultiplier(totalCost)!,
       source: 'gateway-pricing',
       pricingVersion: pricingRegistry.getVersion(),
       model,
@@ -367,7 +396,7 @@ export class UsagePolicy {
     if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
       console.log('💰 [calculateRequestCost] Using provider cost:', providerCostUsd);
       return {
-        costUsd: providerCostUsd,
+        costUsd: this.applyMultiplier(providerCostUsd)!,
         source: 'provider',
         model,
         usage,
@@ -380,7 +409,10 @@ export class UsagePolicy {
       const result = pricingRegistry.calculateCost(model, usage);
       if (result) {
         console.log(`✅ [calculateRequestCost] Calculated via gateway: $${result.costUsd}`);
-        return result;
+        return {
+          ...result,
+          costUsd: this.applyMultiplier(result.costUsd)!,
+        };
       } else {
         console.warn(`⚠️  [calculateRequestCost] Gateway pricing failed for model: ${model}`);
       }

@@ -1,29 +1,48 @@
 {
-  "name": "nuwa-llm-gateway",
-  "version": "1.0.0",
-  "description": "LLM Gateway - A backend API service for routing LLM requests through OpenRouter with DID authentication",
+  "name": "@nuwa-ai/llm-gateway",
+  "version": "0.6.8",
+  "description": "LLM Gateway - A backend API service for routing LLM requests through multiple providers with DID authentication and payment integration",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
+  "bin": {
+    "llm-gateway": "dist/bin/llm-gateway.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
+    "build": "tsc && chmod +x dist/bin/llm-gateway.js",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "cli": "tsx src/bin/llm-gateway.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "llm",
     "gateway",
+    "openai",
     "openrouter",
+    "litellm",
     "did",
-    "express"
+    "authentication",
+    "payment",
+    "blockchain",
+    "rooch",
+    "cli",
+    "proxy",
+    "api-gateway",
+    "nuwa"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.6.0",
-    "@nuwa-ai/payment-kit": "^0.6.4",
+    "@nuwa-ai/payment-kit": "^0.6.8",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
     "cors": "^2.8.5",

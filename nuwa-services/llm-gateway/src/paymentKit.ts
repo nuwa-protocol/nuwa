@@ -1,8 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
 import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
-// Bridge to existing non-stream LLM handler
-import SupabaseService from './database/supabase.js';
 import OpenRouterService from './services/openrouter.js';
 import LiteLLMService from './services/litellm.js';
 import { OpenAIProvider } from './providers/openai.js';
@@ -123,7 +121,6 @@ export async function initPaymentKitAndRegisterRoutes(app: express.Application, 
   return billing;
 }
 
-const supabaseService = new SupabaseService();
 const openrouterProvider = new OpenRouterService();
 const litellmProvider = new LiteLLMService();
 const openaiProvider = new OpenAIProvider();
@@ -445,6 +442,19 @@ async function handleNonStreamRequest(req: Request, providerName: string): Promi
   
   // Set cost in meta
   meta.upstream_cost_usd = pricingResult?.costUsd;
+  // Access log augmentation (final cost, base cost, multiplier)
+  try {
+    if ((req as any).res?.locals?.accessLog && pricingResult) {
+      const m = UsagePolicy.getPricingMultiplier();
+      const base = m > 0 ? (pricingResult.costUsd || 0) / m : (pricingResult.costUsd || 0);
+      (req as any).res.locals.accessLog.total_cost_usd = pricingResult.costUsd;
+      (req as any).res.locals.accessLog.usage_source = pricingResult.source;
+      (req as any).res.locals.accessLog.input_tokens = pricingResult.usage?.promptTokens;
+      (req as any).res.locals.accessLog.output_tokens = pricingResult.usage?.completionTokens;
+      (req as any).res.locals.accessLog.base_cost_usd = base;
+      (req as any).res.locals.accessLog.pricing_multiplier = m;
+    }
+  } catch {}
   
   return {
     status: resp.status,
@@ -585,6 +595,10 @@ async function handleStreamRequest(req: Request, res: Response, providerName: st
           (res as any).locals.accessLog.usage_source = finalCost.source;
           (res as any).locals.accessLog.input_tokens = finalCost.usage?.promptTokens;
           (res as any).locals.accessLog.output_tokens = finalCost.usage?.completionTokens;
+          const m = UsagePolicy.getPricingMultiplier();
+          const base = m > 0 ? (finalCost.costUsd || 0) / m : (finalCost.costUsd || 0);
+          (res as any).locals.accessLog.base_cost_usd = base;
+          (res as any).locals.accessLog.pricing_multiplier = m;
         }
       }
       res.end();
