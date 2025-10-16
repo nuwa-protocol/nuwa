@@ -261,7 +261,7 @@ Options:
 ```bash
 PORT=8088
 ENDPOINT=/mcp
-CONFIG_PATH=./config.yaml
+CONFIG_PATH=./config.yaml  # Can be local file path or remote URL
 SERVICE_ID=my-service
 SERVICE_KEY=your-service-key
 ROOCH_NETWORK=test
@@ -269,7 +269,50 @@ DEFAULT_PRICE_PICO_USD=100000000
 DEBUG=true
 ```
 
-### 4. Local Development Examples
+### 4. Remote Configuration Support
+
+MCP Server Proxy now supports loading configuration from remote URLs, making Docker deployments much more convenient.
+
+#### Remote Configuration Examples
+
+```bash
+# Load config from remote URL
+export CONFIG_PATH=https://your-config-server.com/configs/amap-proxy.yaml
+mcp-server-proxy
+
+# Or use command line argument
+mcp-server-proxy --config https://your-config-server.com/configs/context7-proxy.yaml
+
+# Docker with remote config
+docker run -d -p 8088:8088 \
+  -e SERVICE_KEY="your_service_key" \
+  -e CONFIG_PATH="https://your-config-server.com/configs/my-proxy.yaml" \
+  --name mcp-server-proxy \
+  ghcr.io/nuwa-protocol/mcp-server-proxy:latest
+```
+
+#### Remote Configuration Benefits
+
+- **Centralized Management**: Store all proxy configurations in one place
+- **Easy Updates**: Update configurations without rebuilding Docker images
+- **Environment-specific Configs**: Use different URLs for dev/test/prod environments
+- **Version Control**: Track configuration changes through your config server
+- **Dynamic Configuration**: Update proxy behavior without container restarts
+
+#### Supported URL Schemes
+
+- `https://` - HTTPS URLs (recommended for production)
+- `http://` - HTTP URLs (for development/internal networks)
+
+#### Configuration Server Requirements
+
+Your configuration server should:
+- Serve YAML files with proper `Content-Type: text/yaml` or `text/plain` headers
+- Support HTTPS for production deployments
+- Have appropriate CORS headers if accessed from browsers
+- Implement proper authentication/authorization if needed
+
+### 5. Local Development Examples
 
 #### Using Pre-configured Instances
 
@@ -283,9 +326,8 @@ export AMAP_API_KEY=your_amap_api_key_here
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8088
 
-# Use the pre-configured amap instance (download config from repository)
-curl -o amap-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
-mcp-server-proxy --config ./amap-config.yaml
+# Use the pre-configured amap instance
+mcp-server-proxy --config https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/amap-proxy/config.yaml
 ```
 
 ```bash
@@ -293,9 +335,8 @@ mcp-server-proxy --config ./amap-config.yaml
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8089
 
-# Use the pre-configured context7 instance (download config from repository)
-curl -o context7-config.yaml https://raw.githubusercontent.com/rooch-network/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
-mcp-server-proxy --config ./context7-config.yaml
+# Use the pre-configured context7 instance
+mcp-server-proxy --config https://raw.githubusercontent.com/nuwa-protocol/nuwa/main/nuwa-services/mcp-server-proxy/deployments/instances/context7-proxy/config.yaml
 ```
 
 **From Source Code:**

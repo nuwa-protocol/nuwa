@@ -22,7 +22,7 @@ import { z } from "zod";
 async function startServer(
   configOverride?: Partial<MinimalConfig>,
 ): Promise<{ close: () => Promise<void> }> {
-  const config = configOverride || loadConfig();
+  const config = configOverride || await loadConfig();
   let signer: any = undefined;
 
   // Try to create signer from config

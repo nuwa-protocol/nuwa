@@ -9,8 +9,9 @@ services:
       # Required: Service key for DID authentication and payment
       - SERVICE_KEY=${SERVICE_KEY}
       
-      # Optional: Configuration file path
+      # Optional: Configuration file path or URL
       # - CONFIG_PATH=/app/config/config.yaml
+      # - CONFIG_PATH=https://your-config-server.com/configs/my-proxy.yaml
       
       # Optional: Server configuration
       - PORT=8088
