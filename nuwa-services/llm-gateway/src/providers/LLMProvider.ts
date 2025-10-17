@@ -1,4 +1,6 @@
 import { AxiosResponse } from "axios";
+import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
+import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 
 /**
  * Unified interface for LLM providers
@@ -40,6 +42,22 @@ export interface LLMProvider {
    * @returns Modified request data
    */
   prepareRequestData?(data: any, isStream: boolean): any;
+
+  /**
+   * Create a usage extractor for this provider (optional)
+   * Returns a provider-specific usage extractor that can handle the provider's response formats
+   * @returns UsageExtractor instance or undefined if provider uses default extraction
+   */
+  createUsageExtractor?(): UsageExtractor;
+
+  /**
+   * Create a stream processor for this provider (optional)
+   * Returns a provider-specific stream processor for handling streaming responses
+   * @param model The model name being used
+   * @param initialCost Initial provider cost (if available)
+   * @returns StreamProcessor instance or undefined if provider uses default processing
+   */
+  createStreamProcessor?(model: string, initialCost?: number): StreamProcessor;
 }
 
 /**

@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { pricingRegistry, UsageInfo, PricingResult } from './pricing.js';
 import { calculateToolCallCost, hasToolTokenDiscount, validateTools } from '../config/toolPricing.js';
 import { ToolCallCounts, ToolValidationResult, ResponseUsage, ExtendedUsage } from '../types/index.js';
+import { UsagePolicyAdapter } from './usage/UsagePolicyAdapter.js';
+import { CostCalculator } from './usage/CostCalculator.js';
 
 /**
  * Usage policy for handling token-based billing
@@ -9,59 +11,20 @@ import { ToolCallCounts, ToolValidationResult, ResponseUsage, ExtendedUsage } fr
  */
 export class UsagePolicy {
   /**
-   * Global pricing multiplier helpers
-   */
-  private static cachedMultiplier: number | null = null;
-
-  /**
    * Read and cache PRICING_MULTIPLIER from env; clamp to [0, 100]
+   * Delegated to UsagePolicyAdapter for consistency
    */
   static getPricingMultiplier(): number {
-    if (this.cachedMultiplier !== null) return this.cachedMultiplier;
-    const raw = process.env.PRICING_MULTIPLIER;
-    const parsed = raw !== undefined ? Number(raw) : 1.0;
-    let value = Number.isFinite(parsed) ? parsed : 1.0;
-    if (value < 0) value = 0;
-    if (value > 2) value = 2;
-    this.cachedMultiplier = value;
-    return value;
+    return UsagePolicyAdapter.getPricingMultiplier();
   }
 
-  /**
-   * Apply global multiplier to a USD cost
-   */
-  private static applyMultiplier(costUsd: number | undefined): number | undefined {
-    if (typeof costUsd !== 'number') return costUsd;
-    const m = this.getPricingMultiplier();
-    // Avoid tiny negative zeros
-    const result = costUsd * m;
-    return result;
-  }
   /**
    * Extract usage information from non-streaming response
    * Supports both Chat Completions and Response API formats
+   * Delegated to UsagePolicyAdapter for provider-specific handling
    */
-  static extractUsageFromResponse(responseBody: any): UsageInfo | null {
-    try {
-      if (!responseBody || typeof responseBody !== 'object') {
-        return null;
-      }
-
-      const usage = responseBody.usage;
-      if (!usage || typeof usage !== 'object') {
-        return null;
-      }
-
-      // Check if this is a Response API response with extended usage info
-      if (this.isResponseAPIUsage(usage)) {
-        return this.extractResponseAPIUsage(usage);
-      } else {
-        return this.extractChatCompletionUsage(usage);
-      }
-    } catch (error) {
-      console.error('Error extracting usage from response:', error);
-      return null;
-    }
+  static extractUsageFromResponse(responseBody: any, providerName?: string): UsageInfo | null {
+    return UsagePolicyAdapter.extractUsageFromResponse(responseBody, providerName);
   }
 
   /**
@@ -197,7 +160,7 @@ export class UsagePolicy {
     if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
       const usageInfo = this.extractUsageFromResponse({ usage });
       return {
-        costUsd: this.applyMultiplier(providerCostUsd)!,
+        costUsd: CostCalculator.applyMultiplier(providerCostUsd)!,
         source: 'provider',
         model,
         usage: usageInfo || undefined,
@@ -244,7 +207,7 @@ export class UsagePolicy {
     console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
 
     return {
-      costUsd: this.applyMultiplier(totalCost)!,
+      costUsd: CostCalculator.applyMultiplier(totalCost)!,
       source: 'gateway-pricing',
       pricingVersion: pricingRegistry.getVersion(),
       model,
@@ -267,81 +230,10 @@ export class UsagePolicy {
    * Extract usage information and cost from streaming SSE data
    * Supports both Chat Completions and Response API streaming formats
    * Returns both token usage and cost information if available
+   * Delegated to UsagePolicyAdapter for provider-specific handling
    */
-  static extractUsageFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
-    try {
-      const lines = chunkText.split('\n');
-      
-      for (const line of lines) {
-        const trimmed = line.trim();
-        
-        // Handle Response API format: event: response.completed
-        if (trimmed.startsWith('event: response.completed')) {
-          // Look for the next data line
-          const nextLineIndex = lines.indexOf(line) + 1;
-          if (nextLineIndex < lines.length) {
-            const dataLine = lines[nextLineIndex].trim();
-            if (dataLine.startsWith('data: ')) {
-              const dataStr = dataLine.slice(6);
-              try {
-                const data = JSON.parse(dataStr);
-                // Response API: usage is at data.response.usage
-                if (data.response && data.response.usage) {
-                  console.log('📊 [UsagePolicy] Found Response API usage in stream chunk:', JSON.stringify(data.response.usage));
-                  
-                  const result: { usage: UsageInfo; cost?: number } = {
-                    usage: this.extractUsageFromStreamData(data.response.usage)
-                  };
-                  
-                  console.log('📊 [UsagePolicy] Extracted Response API usage info:', result.usage);
-                  
-                  if (typeof data.response.usage.cost === 'number') {
-                    result.cost = data.response.usage.cost;
-                    console.log('💰 [UsagePolicy] Found cost in Response API usage:', result.cost);
-                  }
-                  
-                  return result;
-                }
-              } catch (parseError) {
-                console.error('❌ [UsagePolicy] Error parsing Response API data:', parseError);
-              }
-            }
-          }
-          continue;
-        }
-        
-        // Handle Chat Completions API format: data: {...usage...}
-        if (trimmed.startsWith('data: ') && trimmed.includes('"usage"')) {
-          const dataStr = trimmed.slice(6); // Remove 'data: ' prefix
-          if (dataStr === '[DONE]') continue;
-          
-          const data = JSON.parse(dataStr);
-          // Chat Completions API: usage is at root level
-          if (data.usage) {
-            console.log('📊 [UsagePolicy] Found Chat Completions usage in stream chunk:', JSON.stringify(data.usage));
-            
-            const result: { usage: UsageInfo; cost?: number } = {
-              usage: this.extractUsageFromStreamData(data.usage)
-            };
-            
-            console.log('📊 [UsagePolicy] Extracted Chat Completions usage info:', result.usage);
-            
-            // Also extract cost if available (OpenRouter provides this)
-            if (typeof data.usage.cost === 'number') {
-              result.cost = data.usage.cost;
-              console.log('💰 [UsagePolicy] Found cost in Chat Completions usage:', result.cost);
-            }
-            
-            return result;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('❌ [UsagePolicy] Error extracting usage from stream chunk:', error);
-      console.error('Chunk text:', chunkText.slice(0, 200));
-    }
-    
-    return null;
+  static extractUsageFromStreamChunk(chunkText: string, providerName?: string): { usage: UsageInfo; cost?: number } | null {
+    return UsagePolicyAdapter.extractUsageFromStreamChunk(chunkText, providerName);
   }
 
   /**
@@ -358,91 +250,30 @@ export class UsagePolicy {
 
   /**
    * Inject stream_options.include_usage for OpenAI requests
+   * Delegated to UsagePolicyAdapter for consistency
    */
   static injectStreamUsageOption(requestData: any): any {
-    if (!requestData || typeof requestData !== 'object') {
-      return requestData;
-    }
-
-    // Only inject for streaming requests
-    if (!requestData.stream) {
-      return requestData;
-    }
-
-    return {
-      ...requestData,
-      stream_options: {
-        include_usage: true,
-        ...(requestData.stream_options || {})
-      }
-    };
+    return UsagePolicyAdapter.injectStreamUsageOption(requestData);
   }
 
   /**
    * Calculate cost for a request, preferring provider cost over gateway pricing
+   * Delegated to UsagePolicyAdapter for enhanced functionality
    */
   static calculateRequestCost(
     model: string,
     providerCostUsd?: number,
     usage?: UsageInfo
   ): PricingResult | null {
-    console.log('🧮 [calculateRequestCost] Input:', {
-      model,
-      providerCostUsd,
-      usage: usage ? `${usage.promptTokens}p + ${usage.completionTokens}c = ${usage.totalTokens}t` : 'undefined'
-    });
-
-    // Prefer provider-supplied cost if available
-    if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
-      console.log('💰 [calculateRequestCost] Using provider cost:', providerCostUsd);
-      return {
-        costUsd: this.applyMultiplier(providerCostUsd)!,
-        source: 'provider',
-        model,
-        usage,
-      };
-    }
-
-    // Fallback to gateway pricing calculation
-    if (usage && (usage.promptTokens || usage.completionTokens)) {
-      console.log('📊 [calculateRequestCost] Using gateway pricing for:', model);
-      const result = pricingRegistry.calculateCost(model, usage);
-      if (result) {
-        console.log(`✅ [calculateRequestCost] Calculated via gateway: $${result.costUsd}`);
-        return {
-          ...result,
-          costUsd: this.applyMultiplier(result.costUsd)!,
-        };
-      } else {
-        console.warn(`⚠️  [calculateRequestCost] Gateway pricing failed for model: ${model}`);
-      }
-    } else {
-      console.warn('⚠️  [calculateRequestCost] No valid usage data provided');
-    }
-
-    // No cost calculation possible
-    console.warn(`⚠️  [calculateRequestCost] Unable to calculate cost for model ${model}`);
-    return null;
+    return UsagePolicyAdapter.calculateRequestCost(model, providerCostUsd, usage);
   }
 
   /**
    * Set usage cost in response locals for PaymentKit billing
+   * Delegated to UsagePolicyAdapter for consistency
    */
   static setResponseUsage(res: Response, costUsd: number, source: string): void {
-    try {
-      const picoUsd = Math.round(Number(costUsd || 0) * 1e12);
-      (res as any).locals = (res as any).locals || {};
-      (res as any).locals.usage = picoUsd;
-      
-      // Also set in access log for tracking
-      if ((res as any).locals.accessLog) {
-        (res as any).locals.accessLog.total_cost_usd = costUsd;
-        (res as any).locals.accessLog.usage_source = source;
-        (res as any).locals.accessLog.pricing_version = pricingRegistry.getVersion();
-      }
-    } catch (error) {
-      console.error('Error setting response usage:', error);
-    }
+    UsagePolicyAdapter.setResponseUsage(res, costUsd, source);
   }
 
   /**
@@ -470,8 +301,17 @@ export class UsagePolicy {
    * Create a stream processor for billing
    * Returns a function that processes chunks and returns final cost
    * Now supports tool call counting from stream
+   * Delegated to UsagePolicyAdapter for provider-specific handling
    */
-  static createStreamProcessor(model: string, providerCostUsd?: number) {
+  static createStreamProcessor(model: string, providerCostUsd?: number, providerName?: string) {
+    return UsagePolicyAdapter.createStreamProcessor(model, providerCostUsd, providerName);
+  }
+
+  /**
+   * Legacy createStreamProcessor implementation (kept for reference)
+   * This is the original implementation that is now replaced by the adapter
+   */
+  static createStreamProcessorLegacy(model: string, providerCostUsd?: number) {
     let accumulatedUsage: UsageInfo | null = null;
     let extractedCost: number | undefined = undefined;
     let finalCost: PricingResult | null = null;

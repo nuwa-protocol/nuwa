@@ -6,6 +6,7 @@ declare const beforeAll: any;
 declare const afterAll: any;
 
 import { UsagePolicy } from '../src/billing/usagePolicy.js';
+import { CostCalculator } from '../src/billing/usage/CostCalculator.js';
 
 describe('Global pricing multiplier', () => {
   const originalEnv = process.env.PRICING_MULTIPLIER;
@@ -31,8 +32,8 @@ describe('Global pricing multiplier', () => {
     const usage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
     const result = UsagePolicy.calculateRequestCost('gpt-4', undefined, usage);
     expect(result).not.toBeNull();
-    // Pricing: 1000/1e6*30 + 500/1e6*60 = 0.00006; *1.10 = 0.000066
-    expect(result!.costUsd).toBeCloseTo(0.000066, 12);
+    // Pricing: 1000/1e6*30 + 500/1e6*60 = 0.06; *1.10 = 0.066
+    expect(result!.costUsd).toBeCloseTo(0.066, 10);
     expect(result!.source).toBe('gateway-pricing');
   });
 
@@ -54,12 +55,12 @@ describe('Global pricing multiplier', () => {
     const original = process.env.PRICING_MULTIPLIER;
     process.env.PRICING_MULTIPLIER = '10'; // will clamp to 2
     // reset cache
-    (UsagePolicy as any).cachedMultiplier = null;
+    (CostCalculator as any).cachedMultiplier = null;
     const result = UsagePolicy.calculateRequestCost('gpt-4', 1.0);
     expect(result).not.toBeNull();
     expect(result!.costUsd).toBeCloseTo(2.0, 10);
     if (original === undefined) delete process.env.PRICING_MULTIPLIER; else process.env.PRICING_MULTIPLIER = original;
-    (UsagePolicy as any).cachedMultiplier = null;
+    (CostCalculator as any).cachedMultiplier = null;
   });
 });
 

@@ -1,6 +1,10 @@
 import axios, { AxiosResponse } from "axios";
 import { LLMProvider } from "./LLMProvider.js";
 import { validateToolConfig } from "../config/responseApiTools.js";
+import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
+import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
+import { OpenAIUsageExtractor } from "../billing/usage/providers/OpenAIUsageExtractor.js";
+import { OpenAIStreamProcessor } from "../billing/usage/providers/OpenAIStreamProcessor.js";
 
 /**
  * OpenAI Provider Implementation
@@ -289,6 +293,20 @@ export class OpenAIProvider implements LLMProvider {
    */
   extractProviderUsageUsd(response: AxiosResponse): number | undefined {
     return undefined; // OpenAI doesn't provide cost in response
+  }
+
+  /**
+   * Create OpenAI-specific usage extractor
+   */
+  createUsageExtractor(): UsageExtractor {
+    return new OpenAIUsageExtractor();
+  }
+
+  /**
+   * Create OpenAI-specific stream processor
+   */
+  createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
+    return new OpenAIStreamProcessor(model, initialCost);
   }
 
   /**

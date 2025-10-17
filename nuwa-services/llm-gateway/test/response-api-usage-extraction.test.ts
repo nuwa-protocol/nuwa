@@ -257,7 +257,7 @@ describe('Response API Usage Extraction', () => {
       const usageChunk = 'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
       processor.processChunk(usageChunk);
 
-      const usage = processor.getUsage();
+      const usage = processor.getFinalUsage();
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(10);
       expect(usage?.completionTokens).toBe(5);
