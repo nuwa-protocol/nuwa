@@ -27,119 +27,21 @@ export class OpenAIProvider implements LLMProvider {
 
   /**
    * Prepare request data for OpenAI API
-   * Supports both Chat Completions and Response API
-   * Injects stream_options.include_usage for streaming requests
+   * Only injects stream_options.include_usage for streaming Chat Completions requests
+   * Caller is responsible for providing correct parameters for their target API
    */
   prepareRequestData(data: any, isStream: boolean): any {
     if (!data || typeof data !== 'object') {
       return data;
     }
 
-    // Detect if this is a Response API request by checking for Response API specific fields
-    const isResponseAPI = this.isResponseAPIRequest(data);
-
-    if (isResponseAPI) {
-      return this.prepareResponseAPIData(data, isStream);
-    } else {
-      return this.prepareChatCompletionData(data, isStream);
-    }
-  }
-
-  /**
-   * Check if the request is for Response API
-   */
-  private isResponseAPIRequest(data: any): boolean {
-    // Response API specific indicators
-    return !!(
-      data.input ||  // Response API uses 'input' instead of 'messages' in some cases
-      data.store ||  // Response API specific parameter
-      (data.tools && this.hasResponseAPITools(data.tools)) // Response API specific tools
-    );
-  }
-
-  /**
-   * Check if tools array contains Response API specific tools
-   * Uses a more flexible approach to detect built-in tools vs function tools
-   */
-  private hasResponseAPITools(tools: any[]): boolean {
-    if (!Array.isArray(tools)) {
-      return false;
-    }
+    // Only inject stream_options for streaming requests on Chat Completions API
+    // Response API automatically includes usage, so we don't inject stream_options
+    // We detect Response API by presence of 'input' field (instead of 'messages')
+    const isResponseAPI = !!data.input;
     
-    return tools.some(tool => {
-      if (!tool || typeof tool !== 'object' || !tool.type) {
-        return false;
-      }
-      
-      // Function tools are standard across both APIs
-      if (tool.type === 'function') {
-        return false;
-      }
-      
-      // Any non-function tool type indicates Response API
-      // This is more flexible than hardcoding specific tool names
-      return tool.type !== 'function';
-    });
-  }
-
-  /**
-   * Prepare data for Response API
-   * Response API does NOT support stream_options parameter
-   * Usage is automatically included in Response API responses
-   */
-  private prepareResponseAPIData(data: any, isStream: boolean): any {
-    const prepared = { ...data };
-
-    // Response API does NOT support stream_options
-    // Remove it if accidentally included
-    if (prepared.stream_options) {
-      console.warn('⚠️  stream_options is not supported in Response API, removing it');
-      delete prepared.stream_options;
-    }
-
-    // Response API does NOT support messages parameter
-    // Remove it if accidentally included (should use 'input' instead)
-    if (prepared.messages) {
-      console.warn('⚠️  messages parameter is not supported in Response API, removing it (use input instead)');
-      delete prepared.messages;
-    }
-
-    // Response API uses different parameter names
-    // Remove Chat Completions specific parameters
-    const chatCompletionParams = ['temperature', 'max_tokens'];
-    chatCompletionParams.forEach(param => {
-      if (prepared[param]) {
-        console.warn(`⚠️  ${param} parameter might not be supported in Response API, removing it`);
-        delete prepared[param];
-      }
-    });
-
-    // Transform tools format for Response API
-    if (prepared.tools && Array.isArray(prepared.tools)) {
-      prepared.tools = prepared.tools.map((tool: any) => {
-        if (tool.type === 'function' && tool.function) {
-          // Transform from Chat Completions format to Response API format
-          return {
-            type: 'function',
-            name: tool.function.name,
-            description: tool.function.description,
-            parameters: tool.function.parameters
-          };
-        }
-        return tool;
-      });
-    }
-
-    return prepared;
-  }
-
-  /**
-   * Prepare data for Chat Completions API (existing logic)
-   */
-  private prepareChatCompletionData(data: any, isStream: boolean): any {
-    // Only inject stream_options for streaming requests
-    // OpenAI API doesn't allow stream_options for non-streaming requests
-    if (isStream) {
+    if (isStream && !isResponseAPI) {
+      // Chat Completions API - inject stream_options for usage tracking
       return {
         ...data,
         stream_options: {
@@ -148,10 +50,11 @@ export class OpenAIProvider implements LLMProvider {
         }
       };
     }
+    
+    // For Response API or non-streaming requests, return data as-is
+    return { ...data };
+  }
 
-    // For non-streaming requests, return as-is
-    return data;
-  } 
 
   /**
    * Forward request to OpenAI API

@@ -83,9 +83,7 @@ pnpm test --coverage
 SKIP_INTEGRATION_TESTS=true pnpm test
 
 # Or run specific unit test files
-pnpm test basic.test.ts
-pnpm test integration.test.ts
-pnpm test pricing.test.ts
+pnpm test test/unit/basic.test.ts
 ```
 
 ### Integration Tests Only
@@ -117,12 +115,7 @@ pnpm test provider-litellm
 
 ### 1. Unit Tests
 
-Test individual modules without external dependencies:
-
-- **Basic Tests** (`basic.test.ts`): Jest configuration validation
-- **Pricing Tests** (`pricing.test.ts`): Cost calculation logic
-- **Registry Tests** (`registry-simple.test.ts`): Provider management
-- **Integration Tests** (`integration.test.ts`): Core functionality without real APIs
+Test individual modules without external dependencies.
 
 ### 2. Integration Tests
 
