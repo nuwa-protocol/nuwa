@@ -45,6 +45,14 @@ export interface ProviderTestResult {
 
 /**
  * Utilities for testing providers in isolation and integration
+ * 
+ * @deprecated This class is being phased out in favor of provider-specific test utilities.
+ * For new tests, use:
+ * - OpenAITestUtils for OpenAI provider tests
+ * - OpenRouterTestUtils for OpenRouter provider tests  
+ * - LiteLLMTestUtils for LiteLLM provider tests
+ * 
+ * Some utility methods like createTestProviderManager are still useful and may be moved to BaseTestUtils.
  */
 export class ProviderTestUtils {
   /**

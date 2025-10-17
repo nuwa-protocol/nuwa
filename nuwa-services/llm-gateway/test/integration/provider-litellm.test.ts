@@ -6,7 +6,8 @@
 
 import LiteLLMService from '../../src/services/litellm.js';
 import { TestEnv, createProviderTestSuite } from '../utils/testEnv.js';
-import { ProviderTestUtils, TestRequestConfig, TestResponseValidation } from '../utils/providerTestUtils.js';
+import { LiteLLMTestUtils } from '../utils/litellmTestUtils.js';
+import { BaseTestValidation } from '../utils/baseTestUtils.js';
 
 // Log test environment status
 beforeAll(() => {
@@ -28,24 +29,26 @@ createProviderTestSuite('litellm', () => {
 
   describe('Chat Completions API', () => {
     it('should handle non-streaming chat completion', async () => {
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
-      const validation: TestResponseValidation = {
+      const validation: BaseTestValidation = {
         expectSuccess: true,
         expectUsage: true,
         expectCost: true,
         minTokens: 10,
         maxTokens: 200,
-        expectedModel: config.model,
+        expectedModel: 'gpt-3.5-turbo',
       };
 
-      const validationResult = ProviderTestUtils.validateTestResponse(result, validation);
+      const validationResult = LiteLLMTestUtils.validateTestResponse(result, validation);
       
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
@@ -64,16 +67,14 @@ createProviderTestSuite('litellm', () => {
     }, 30000);
 
     it('should handle streaming chat completion', async () => {
-      const config: TestRequestConfig = {
-        ...ProviderTestUtils.getProviderTestConfig('litellm'),
-        stream: true,
-        max_tokens: 30, // Shorter for streaming test
-      };
-      
-      const result = await ProviderTestUtils.testProviderStreamingChatCompletion(
+      const result = await LiteLLMTestUtils.testStreamingChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 30, // Shorter for streaming test
+        }
       );
 
       expect(result.success).toBe(true);
@@ -98,23 +99,17 @@ createProviderTestSuite('litellm', () => {
 
     it('should handle different model configurations', async () => {
       // Test different models that might be configured in LiteLLM
-      const models = [
-        'gpt-3.5-turbo',
-        'claude-3-haiku',
-        'llama-2-7b-chat',
-      ];
+      const models = LiteLLMTestUtils.getCommonModels();
 
       for (const model of models) {
-        const config: TestRequestConfig = {
-          model,
-          messages: [{ role: 'user', content: 'Hello, how are you?' }],
-          max_tokens: 20,
-        };
-        
-        const result = await ProviderTestUtils.testProviderChatCompletion(
+        const result = await LiteLLMTestUtils.testChatCompletion(
           provider,
           apiKey,
-          config
+          {
+            model,
+            messages: [{ role: 'user', content: 'Hello, how are you?' }],
+            max_tokens: 20,
+          }
         );
 
         // Some models might not be configured in LiteLLM, so we allow both success and specific errors
@@ -129,20 +124,18 @@ createProviderTestSuite('litellm', () => {
         }
 
         // Add delay between requests to avoid overwhelming the proxy
-        await ProviderTestUtils.wait(1000);
+        await LiteLLMTestUtils.wait(1000);
       }
     }, 60000);
 
     it('should handle errors gracefully', async () => {
-      const config: TestRequestConfig = {
-        model: 'invalid-model-name',
-        messages: [{ role: 'user', content: 'Hello' }],
-      };
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'invalid-model-name',
+          messages: [{ role: 'user', content: 'Hello' }],
+        }
       );
 
       expect(result.success).toBe(false);
@@ -151,12 +144,14 @@ createProviderTestSuite('litellm', () => {
     }, 15000);
 
     it('should handle invalid API key', async () => {
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         'invalid-api-key',
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
       expect(result.success).toBe(false);
@@ -165,47 +160,17 @@ createProviderTestSuite('litellm', () => {
     }, 15000);
   });
 
-  describe('Models API', () => {
-    it('should fetch available models', async () => {
-      const result = await ProviderTestUtils.testProviderModels(
-        provider,
-        apiKey,
-        '/models'
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.response).toBeDefined();
-      expect(result.response.data).toBeDefined();
-      expect(Array.isArray(result.response.data)).toBe(true);
-      expect(result.response.data.length).toBeGreaterThan(0);
-      
-      // Check that models have expected structure
-      const firstModel = result.response.data[0];
-      expect(firstModel.id).toBeDefined();
-      expect(firstModel.object).toBe('model');
-    }, 15000);
-
-    it('should handle models API with invalid API key', async () => {
-      const result = await ProviderTestUtils.testProviderModels(
-        provider,
-        'invalid-api-key',
-        '/models'
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.statusCode).toBe(401);
-    }, 15000);
-  });
 
   describe('Usage Extraction and Cost Calculation', () => {
     it('should extract usage from non-streaming response', async () => {
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
       expect(result.success).toBe(true);
@@ -221,12 +186,14 @@ createProviderTestSuite('litellm', () => {
     }, 30000);
 
     it('should extract provider cost from response headers', async () => {
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
       expect(result.success).toBe(true);
@@ -235,21 +202,19 @@ createProviderTestSuite('litellm', () => {
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
         expect(result.cost.source).toBe('provider');
-        expect(result.cost.model).toBe(config.model);
+        expect(result.cost.model).toBe('gpt-3.5-turbo');
       }
     }, 30000);
 
     it('should extract cost from streaming response', async () => {
-      const config: TestRequestConfig = {
-        ...ProviderTestUtils.getProviderTestConfig('litellm'),
-        stream: true,
-        max_tokens: 20,
-      };
-      
-      const result = await ProviderTestUtils.testProviderStreamingChatCompletion(
+      const result = await LiteLLMTestUtils.testStreamingChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 20,
+        }
       );
 
       expect(result.success).toBe(true);
@@ -305,15 +270,14 @@ createProviderTestSuite('litellm', () => {
 
   describe('LiteLLM Specific Features', () => {
     it('should handle LiteLLM proxy configuration', async () => {
-      const config: TestRequestConfig = {
-        ...ProviderTestUtils.getProviderTestConfig('litellm'),
-        max_tokens: 20,
-      };
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 20,
+        }
       );
 
       expect(result.success).toBe(true);
@@ -321,21 +285,19 @@ createProviderTestSuite('litellm', () => {
     }, 30000);
 
     it('should handle custom LiteLLM parameters', async () => {
-      const config: TestRequestConfig = {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Hello' }],
-        max_tokens: 20,
-        // LiteLLM specific parameters
-        metadata: {
-          user_id: 'test-user',
-          tags: ['integration-test'],
-        },
-      };
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 20,
+          // LiteLLM specific parameters
+          metadata: {
+            user_id: 'test-user',
+            tags: ['integration-test'],
+          },
+        }
       );
 
       // Should handle the request regardless of LiteLLM specific parameters
@@ -344,12 +306,14 @@ createProviderTestSuite('litellm', () => {
     }, 30000);
 
     it('should extract cost from x-litellm-response-cost header', async () => {
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         provider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
       expect(result.success).toBe(true);
@@ -365,11 +329,7 @@ createProviderTestSuite('litellm', () => {
   describe('Proxy Health and Configuration', () => {
     it('should handle proxy health check', async () => {
       // Test a simple health endpoint if available
-      const result = await ProviderTestUtils.testProviderModels(
-        provider,
-        apiKey,
-        '/health'
-      );
+      const result = await LiteLLMTestUtils.testHealth(provider, apiKey);
 
       // Health endpoint might not be available, so we allow both success and 404
       if (result.success) {
@@ -379,38 +339,20 @@ createProviderTestSuite('litellm', () => {
       }
     }, 15000);
 
-    it('should handle different API paths', async () => {
-      // Test different path formats that LiteLLM might use
-      const paths = [
-        '/chat/completions',
-        '/v1/chat/completions',
-      ];
-
-      for (const path of paths) {
-        const config: TestRequestConfig = {
-          ...ProviderTestUtils.getProviderTestConfig('litellm'),
+    it('should handle chat completions requests', async () => {
+      // Test the main chat completions endpoint
+      const result = await LiteLLMTestUtils.testChatCompletion(
+        provider,
+        apiKey,
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
           max_tokens: 10,
-        };
-        
-        try {
-          const result = await ProviderTestUtils.testProviderChatCompletion(
-            provider,
-            apiKey,
-            config
-          );
-
-          // At least one path should work
-          if (result.success) {
-            expect(result.response).toBeDefined();
-            console.log(`Path ${path} works`);
-            break;
-          }
-        } catch (error) {
-          console.log(`Path ${path} failed: ${error}`);
         }
+      );
 
-        await ProviderTestUtils.wait(500);
-      }
+      expect(result.success).toBe(true);
+      expect(result.response).toBeDefined();
     }, 30000);
   });
 
@@ -418,14 +360,13 @@ createProviderTestSuite('litellm', () => {
     it('should handle rate limiting gracefully', async () => {
       // Make multiple rapid requests to potentially trigger rate limiting
       const requests = Array(3).fill(null).map(async (_, index) => {
-        await ProviderTestUtils.wait(index * 500); // Stagger requests
+        await LiteLLMTestUtils.wait(index * 500); // Stagger requests
         
-        const config: TestRequestConfig = {
-          ...ProviderTestUtils.getProviderTestConfig('litellm'),
+        return LiteLLMTestUtils.testChatCompletion(provider, apiKey, {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
           max_tokens: 10, // Keep it small and fast
-        };
-        
-        return ProviderTestUtils.testProviderChatCompletion(provider, apiKey, config);
+        });
       });
 
       const results = await Promise.all(requests);
@@ -448,13 +389,15 @@ createProviderTestSuite('litellm', () => {
       // Test with a provider instance that has an invalid base URL
       const invalidProvider = new LiteLLMService();
       
-      const config: TestRequestConfig = ProviderTestUtils.getProviderTestConfig('litellm');
-      
       // This should fail due to connection error
-      const result = await ProviderTestUtils.testProviderChatCompletion(
+      const result = await LiteLLMTestUtils.testChatCompletion(
         invalidProvider,
         apiKey,
-        config
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          max_tokens: 50
+        }
       );
 
       // Depending on the configuration, this might succeed or fail

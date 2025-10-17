@@ -291,4 +291,23 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils {
       };
     }
   }
+
+
+  /**
+   * Get common LiteLLM models for testing
+   */
+  static getCommonModels(): string[] {
+    return [
+      'gpt-3.5-turbo',
+      'claude-3-haiku',
+      'llama-2-7b-chat',
+    ];
+  }
+
+  /**
+   * Wait for a specified amount of time
+   */
+  static async wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 }

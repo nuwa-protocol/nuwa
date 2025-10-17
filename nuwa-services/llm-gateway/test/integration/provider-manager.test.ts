@@ -7,7 +7,6 @@ import { ProviderManager } from '../../src/core/providerManager.js';
 import { RouteHandler } from '../../src/core/routeHandler.js';
 import { AuthManager } from '../../src/core/authManager.js';
 import { TestEnv } from '../utils/testEnv.js';
-import { ProviderTestUtils } from '../utils/providerTestUtils.js';
 
 describe('ProviderManager Integration Tests', () => {
   let providerManager: ProviderManager;
@@ -186,13 +185,23 @@ describe('ProviderManager Integration Tests', () => {
 
       providerManager.initializeProviders({ skipEnvCheck: true });
 
-      const mockReq = ProviderTestUtils.createMockRequest({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Hello' }],
+      // Create mock request and response objects
+      const mockReq = {
+        body: {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: 'Hello' }],
+        },
         path: '/openai/v1/chat/completions',
-      });
+        method: 'POST',
+        headers: {},
+      } as any;
 
-      const mockRes = ProviderTestUtils.createMockResponse();
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis(),
+        send: jest.fn().mockReturnThis(),
+        setHeader: jest.fn().mockReturnThis(),
+      } as any;
 
       // This will fail because we don't have real API keys, but it should handle the request structure
       await routeHandler.handleProviderRequest(mockReq, mockRes, 'openai');
