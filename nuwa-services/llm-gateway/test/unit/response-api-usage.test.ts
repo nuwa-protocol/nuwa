@@ -2,7 +2,7 @@
  * Unit tests for Response API usage extraction and billing
  */
 
-import { UsagePolicy } from '../src/billing/usagePolicy.js';
+import { UsagePolicy } from '../../src/billing/usagePolicy.js';
 
 describe('Response API Usage Extraction', () => {
   describe('extractUsageFromResponse', () => {

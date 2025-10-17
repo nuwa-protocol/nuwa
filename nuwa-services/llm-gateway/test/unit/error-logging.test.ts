@@ -1,7 +1,7 @@
 /**
  * Test error logging improvements
  */
-import { OpenAIProvider } from '../src/providers/openai.js';
+import { OpenAIProvider } from '../../src/providers/openai.js';
 
 describe('Error Logging Improvements', () => {
   let provider: OpenAIProvider;

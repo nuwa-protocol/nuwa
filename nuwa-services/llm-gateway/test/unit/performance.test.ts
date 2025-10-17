@@ -3,8 +3,8 @@
  * Focus on core performance metrics without excessive logging
  */
 
-import { UsagePolicy } from '../src/billing/usagePolicy.js';
-import { CostCalculator } from '../src/billing/usage/CostCalculator.js';
+import { UsagePolicy } from '../../src/billing/usagePolicy.js';
+import { CostCalculator } from '../../src/billing/usage/CostCalculator.js';
 
 // Test data
 const sampleUsage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };

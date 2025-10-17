@@ -1,7 +1,7 @@
 /**
  * Test error handling with circular references
  */
-import { OpenAIProvider } from '../src/providers/openai.js';
+import { OpenAIProvider } from '../../src/providers/openai.js';
 import axios from 'axios';
 
 describe('Error Handling - Circular References', () => {
