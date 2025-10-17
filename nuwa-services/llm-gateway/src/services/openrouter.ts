@@ -5,6 +5,7 @@ import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { OpenRouterUsageExtractor } from "../billing/usage/providers/OpenRouterUsageExtractor.js";
 import { OpenRouterStreamProcessor } from "../billing/usage/providers/OpenRouterStreamProcessor.js";
+import { OPENROUTER_PATHS } from "../providers/constants.js";
 
 // Native streamToString tool function, placed outside the class
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
@@ -39,6 +40,11 @@ interface UpstreamErrorResponse {
 
 class OpenRouterService implements LLMProvider {
   private baseURL: string;
+  
+  // Define supported paths for this provider
+  readonly SUPPORTED_PATHS = [
+    OPENROUTER_PATHS.CHAT_COMPLETIONS
+  ] as const;
 
   constructor() {
     this.baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";

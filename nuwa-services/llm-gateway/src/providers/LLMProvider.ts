@@ -8,6 +8,11 @@ import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js"
  */
 export interface LLMProvider {
   /**
+   * Paths supported by this provider
+   * Must be defined by each provider implementation
+   */
+  readonly SUPPORTED_PATHS: readonly string[];
+  /**
    * Forward a request to the provider
    * @param apiKey User's API key for this provider (null if provider doesn't require API key)
    * @param path API path (e.g., '/chat/completions')
@@ -95,4 +100,46 @@ export interface ProviderResponseMeta {
   inputTokens?: number;
   outputTokens?: number;
   error?: string;
+}
+
+/**
+ * Test configuration for provider testing
+ */
+export interface ProviderTestConfig {
+  skipAuth?: boolean;
+  mockApiKey?: string;
+  mockBaseUrl?: string;
+  timeout?: number;
+}
+
+/**
+ * Extended LLMProvider interface with testing support
+ * Providers can optionally implement these methods for better testability
+ */
+export interface TestableLLMProvider extends LLMProvider {
+  /**
+   * Validate provider configuration for testing
+   * @param config Test configuration
+   * @returns Validation result with any errors
+   */
+  validateTestConfig?(config: ProviderTestConfig): { valid: boolean; errors: string[] };
+
+  /**
+   * Get provider-specific test models for integration testing
+   * @returns Array of model names that are known to work for testing
+   */
+  getTestModels?(): string[];
+
+  /**
+   * Get provider-specific test endpoints for integration testing
+   * @returns Array of endpoint paths that are safe to test
+   */
+  getTestEndpoints?(): string[];
+
+  /**
+   * Create a test instance with mock configuration
+   * @param config Test configuration
+   * @returns Test instance of the provider
+   */
+  createTestInstance?(config: ProviderTestConfig): LLMProvider;
 }

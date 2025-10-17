@@ -3,9 +3,9 @@
  * Tests the enhanced functionality for Response API vs Chat Completions API
  */
 
-import { OpenAIProvider } from '../src/providers/openai.js';
-import { UsagePolicy } from '../src/billing/usagePolicy.js';
-import { pricingRegistry } from '../src/billing/pricing.js';
+import { OpenAIProvider } from '../../src/providers/openai.js';
+import { UsagePolicy } from '../../src/billing/usagePolicy.js';
+import { pricingRegistry } from '../../src/billing/pricing.js';
 
 describe('OpenAI Response API Integration Tests', () => {
   let openaiProvider: OpenAIProvider;

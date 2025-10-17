@@ -5,6 +5,7 @@ import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { OpenAIUsageExtractor } from "../billing/usage/providers/OpenAIUsageExtractor.js";
 import { OpenAIStreamProcessor } from "../billing/usage/providers/OpenAIStreamProcessor.js";
+import { OPENAI_PATHS } from "./constants.js";
 
 /**
  * OpenAI Provider Implementation
@@ -13,9 +14,15 @@ import { OpenAIStreamProcessor } from "../billing/usage/providers/OpenAIStreamPr
  */
 export class OpenAIProvider implements LLMProvider {
   private baseURL: string;
+  
+  // Define supported paths for this provider
+  readonly SUPPORTED_PATHS = [
+    OPENAI_PATHS.CHAT_COMPLETIONS,
+    OPENAI_PATHS.RESPONSES
+  ] as const;
 
   constructor() {
-    this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com/";
+    this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com";
   }
 
   /**
@@ -90,7 +97,39 @@ export class OpenAIProvider implements LLMProvider {
       delete prepared.stream_options;
     }
 
-    // Keep input as-is (string format)
+    // Response API does NOT support messages parameter
+    // Remove it if accidentally included (should use 'input' instead)
+    if (prepared.messages) {
+      console.warn('⚠️  messages parameter is not supported in Response API, removing it (use input instead)');
+      delete prepared.messages;
+    }
+
+    // Response API uses different parameter names
+    // Remove Chat Completions specific parameters
+    const chatCompletionParams = ['temperature', 'max_tokens'];
+    chatCompletionParams.forEach(param => {
+      if (prepared[param]) {
+        console.warn(`⚠️  ${param} parameter might not be supported in Response API, removing it`);
+        delete prepared[param];
+      }
+    });
+
+    // Transform tools format for Response API
+    if (prepared.tools && Array.isArray(prepared.tools)) {
+      prepared.tools = prepared.tools.map((tool: any) => {
+        if (tool.type === 'function' && tool.function) {
+          // Transform from Chat Completions format to Response API format
+          return {
+            type: 'function',
+            name: tool.function.name,
+            description: tool.function.description,
+            parameters: tool.function.parameters
+          };
+        }
+        return tool;
+      });
+    }
+
     return prepared;
   }
 
@@ -98,7 +137,8 @@ export class OpenAIProvider implements LLMProvider {
    * Prepare data for Chat Completions API (existing logic)
    */
   private prepareChatCompletionData(data: any, isStream: boolean): any {
-    // For streaming requests, ensure usage is included
+    // Only inject stream_options for streaming requests
+    // OpenAI API doesn't allow stream_options for non-streaming requests
     if (isStream) {
       return {
         ...data,

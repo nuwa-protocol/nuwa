@@ -4,6 +4,7 @@ import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { LiteLLMUsageExtractor } from "../billing/usage/providers/LiteLLMUsageExtractor.js";
 import { LiteLLMStreamProcessor } from "../billing/usage/providers/LiteLLMStreamProcessor.js";
+import { LITELLM_PATHS } from "../providers/constants.js";
 
 /**
  * Minimal service adapter for proxying requests to a LiteLLM Proxy instance.
@@ -12,6 +13,11 @@ import { LiteLLMStreamProcessor } from "../billing/usage/providers/LiteLLMStream
  */
 class LiteLLMService implements LLMProvider {
   private baseURL: string;
+  
+  // Define supported paths for this provider
+  readonly SUPPORTED_PATHS = [
+    LITELLM_PATHS.CHAT_COMPLETIONS
+  ] as const;
 
     constructor() {
     // Base URL of the LiteLLM Proxy
