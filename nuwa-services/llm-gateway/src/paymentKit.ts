@@ -11,9 +11,9 @@ export type NonStreamHandler = (req: Request) => Promise<{ status: number; body:
 export type UsageQueryHandler = (req: Request, res: Response) => Promise<void>;
 
 // Re-export types from core modules for backward compatibility
-export { UpstreamMeta, ProxyResult } from './core/routeHandler.js';
-export { PathValidationResult } from './core/pathValidator.js';
-export { AuthConfig, AuthResult } from './core/authManager.js';
+export type { UpstreamMeta, ProxyResult } from './core/routeHandler.js';
+export type { PathValidationResult } from './core/pathValidator.js';
+export type { AuthConfig, AuthResult } from './core/authManager.js';
 
 /**
  * Gateway configuration options
