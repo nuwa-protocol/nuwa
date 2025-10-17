@@ -137,10 +137,10 @@ register:
 port: 8088
 endpoint: "/mcp"
 
-# Stdio upstream MCP server
+# Stdio upstream MCP server (Node.js)
 upstream:
   type: "stdio"
-  command: ["npx", "@example/mcp-server"]
+  command: ["npx", "-y", "@example/mcp-server"]
   env:
     API_KEY: "${API_KEY}"
   # stderr: "inherit"  # Default: child process errors are visible (recommended for debugging)
@@ -149,6 +149,26 @@ upstream:
 
 # Payment configuration
 serviceId: "my-mcp-service"
+network: "test"
+defaultPricePicoUSD: "100000000"
+```
+
+#### Example 4: With Python Stdio Upstream
+
+```yaml
+# Server settings  
+port: 8088
+endpoint: "/mcp"
+
+# Stdio upstream MCP server (Python)
+upstream:
+  type: "stdio"
+  command: ["uvx", "my-python-mcp-server"]
+  env:
+    PYTHON_API_KEY: "${PYTHON_API_KEY}"
+
+# Payment configuration
+serviceId: "my-python-mcp-service"
 network: "test"
 defaultPricePicoUSD: "100000000"
 ```
@@ -455,6 +475,22 @@ docker run -d -p 8088:8088 \
   --name mcp-server-proxy \
   ghcr.io/nuwa-protocol/mcp-server-proxy:latest
 ```
+
+#### Included Tools for Stdio Upstream
+
+The Docker image includes common tools needed for stdio upstream commands:
+
+- **Node.js & npm/npx**: For running Node.js-based MCP servers
+  ```yaml
+  command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+  ```
+
+- **Python & uv/uvx**: For running Python-based MCP servers
+  ```yaml
+  command: ["uvx", "my-python-mcp-server"]
+  ```
+
+- **System tools**: git, curl, bash for additional functionality
 
 ### Available Tags
 

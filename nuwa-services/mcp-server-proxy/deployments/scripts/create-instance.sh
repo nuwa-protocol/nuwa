@@ -72,12 +72,14 @@ EOF
 port: \${PORT}
 endpoint: "/mcp"
 
-# Stdio upstream MCP server
+# Stdio upstream MCP server (Node.js example)
 upstream:
   type: "stdio"
-  command: ["npx", "@example/mcp-server"]
+  command: ["npx", "-y", "@example/mcp-server"]
   env:
     API_KEY: "\${UPSTREAM_API_KEY}"
+  # For Python MCP servers, use:
+  # command: ["uvx", "my-python-mcp-server"]
 
 # Payment configuration
 serviceId: "$INSTANCE_NAME"

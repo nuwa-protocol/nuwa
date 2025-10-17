@@ -173,10 +173,11 @@ register:
 
 ### Stdio Upstream 示例
 
+**Node.js MCP 服务器：**
 ```yaml
 upstream:
   type: "stdio"
-  command: ["npx", "@example/mcp-server"]
+  command: ["npx", "-y", "@example/mcp-server"]
   env:
     API_KEY: "${UPSTREAM_API_KEY}"
     DEBUG: "true"
@@ -184,6 +185,21 @@ upstream:
 register:
   tools:
     - name: "local.tool"
+      pricePicoUSD: "500000000"  # 0.0005 USD
+```
+
+**Python MCP 服务器：**
+```yaml
+upstream:
+  type: "stdio"
+  command: ["uvx", "my-python-mcp-server"]
+  env:
+    PYTHON_API_KEY: "${PYTHON_API_KEY}"
+    DEBUG: "true"
+
+register:
+  tools:
+    - name: "python.tool"
       pricePicoUSD: "500000000"  # 0.0005 USD
 ```
 

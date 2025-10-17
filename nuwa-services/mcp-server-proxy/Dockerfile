@@ -1,8 +1,19 @@
 # Multi-stage build for MCP Server Proxy
 FROM node:20-alpine AS base
 
-# Install pnpm globally
+# Install system dependencies for stdio upstream commands
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    git \
+    curl \
+    bash
+
+# Install pnpm globally (for Node.js packages)
 RUN npm install -g pnpm@9.15.4
+
+# Install uv and uvx for Python packages
+RUN pip3 install --no-cache-dir uv
 
 # Set working directory
 WORKDIR /app
