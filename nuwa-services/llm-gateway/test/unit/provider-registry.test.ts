@@ -5,6 +5,7 @@
 
 import { ProviderManager } from '../../src/core/providerManager.js';
 import { OpenAIProvider } from '../../src/providers/openai.js';
+import { providerRegistry } from '../../src/providers/registry.js';
 
 describe('Provider Registry Unit Tests', () => {
   let providerManager: ProviderManager;
@@ -12,6 +13,8 @@ describe('Provider Registry Unit Tests', () => {
   beforeEach(() => {
     // Create a fresh test instance for each test
     providerManager = ProviderManager.createTestInstance();
+    // Clear the global registry to avoid test pollution
+    providerRegistry.clear();
   });
 
   describe('Provider Registration', () => {
