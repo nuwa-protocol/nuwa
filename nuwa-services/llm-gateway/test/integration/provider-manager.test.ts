@@ -13,6 +13,11 @@ describe('ProviderManager Integration Tests', () => {
 
   beforeAll(() => {
     TestEnv.logStatus();
+    
+    // Skip entire test suite if integration tests should be skipped
+    if (TestEnv.shouldSkipIntegrationTests()) {
+      console.log('Skipping ProviderManager integration tests (SKIP_INTEGRATION_TESTS=true)');
+    }
   });
 
   beforeEach(() => {
@@ -21,6 +26,12 @@ describe('ProviderManager Integration Tests', () => {
 
   describe('Provider Registration', () => {
     it('should register providers based on environment configuration', () => {
+      // Skip this test if integration tests should be skipped
+      if (TestEnv.shouldSkipIntegrationTests()) {
+        console.log('Skipping environment-based provider registration test (SKIP_INTEGRATION_TESTS=true)');
+        return;
+      }
+
       const result = providerManager.initializeProviders({ skipEnvCheck: false });
       
       expect(result).toBeDefined();
@@ -176,6 +187,11 @@ describe('ProviderManager Integration Tests', () => {
     });
 
     it('should handle mock requests correctly', async () => {
+      if (TestEnv.shouldSkipIntegrationTests()) {
+        console.log('Skipping mock request test (SKIP_INTEGRATION_TESTS=true)');
+        return;
+      }
+
       const authManager = AuthManager.createTestInstance();
       const routeHandler = RouteHandler.createTestInstance({
         providerManager,
@@ -242,6 +258,12 @@ describe('ProviderManager Integration Tests', () => {
     });
 
     it('should handle missing API keys gracefully', () => {
+      // Skip this test if integration tests should be skipped
+      if (TestEnv.shouldSkipIntegrationTests()) {
+        console.log('Skipping missing API keys test (SKIP_INTEGRATION_TESTS=true)');
+        return;
+      }
+
       // Test with real environment (some providers might be missing)
       const result = providerManager.initializeProviders({ skipEnvCheck: false });
       
