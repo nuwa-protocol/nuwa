@@ -6,9 +6,6 @@ import { RouteHandler } from './core/routeHandler.js';
 import { PathValidator } from './core/pathValidator.js';
 import type { DIDInfo } from './types/index.js';
 
-// Legacy type exports for backward compatibility
-export type NonStreamHandler = (req: Request) => Promise<{ status: number; body: any; usage?: { cost?: number } }>;
-export type UsageQueryHandler = (req: Request, res: Response) => Promise<void>;
 
 // Re-export types from core modules for backward compatibility
 export type { UpstreamMeta, ProxyResult } from './core/routeHandler.js';
@@ -24,14 +21,9 @@ export interface GatewayConfig extends AuthConfig {
 
 /**
  * Initialize PaymentKit and register routes using the new modular architecture
- * Maintains backward compatibility with the existing API
  */
 export async function initPaymentKitAndRegisterRoutes(
   app: express.Application, 
-  deps?: {
-  handleNonStreamLLM?: NonStreamHandler;
-  registerUsageHandler?: UsageQueryHandler;
-  },
   config?: GatewayConfig
 ): Promise<ExpressPaymentKit> {
   
@@ -139,22 +131,7 @@ function createProviderRouters(
     console.warn('   Check provider initialization in ProviderManager');
   }
 
-  // 1. Register Legacy routes first (highest priority)
-  const legacyHandler = (req: Request, res: Response) => {
-    // Mark as legacy route in access log
-    if ((res as any).locals?.accessLog) {
-      (res as any).locals.accessLog.is_legacy_route = true;
-    }
-    return routeHandler.handleProviderRequest(req, res, 'openrouter');
-  };
-
-  paymentKit.post('/api/v1/chat/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.chat.completions');
-  paymentKit.post('/api/v1/completions', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.completions');
-  paymentKit.get('/api/v1/models', { pricing: { type: 'FinalCost' } }, legacyHandler, 'legacy.models');
-  
-  console.log('✅ Registered legacy routes: /api/v1/*');
-
-  // 2. Register wildcard routes for each provider using correct Express path patterns
+  // Register wildcard routes for each provider using correct Express path patterns
   availableProviders.forEach((providerName, index) => {
     console.log(`📋 Registering routes for provider ${index + 1}/${availableProviders.length}: ${providerName}`);
     
@@ -177,7 +154,7 @@ function createProviderRouters(
   });
 }
 
-// Legacy exports for backward compatibility
+// Core module exports
 export { ProviderManager } from './core/providerManager.js';
 export { AuthManager } from './core/authManager.js';
 export { RouteHandler } from './core/routeHandler.js';
@@ -225,5 +202,3 @@ export function createTestGateway(config?: {
     routeHandler,
   };
 }
-
-// End of file - all functionality has been moved to the new modular architecture
