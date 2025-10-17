@@ -12,8 +12,8 @@ RUN apk add --no-cache \
 # Install pnpm globally (for Node.js packages)
 RUN npm install -g pnpm@9.15.4
 
-# Install uv and uvx for Python packages
-RUN pip3 install --no-cache-dir uv
+# Install uv and uvx for Python packages (using --break-system-packages for Alpine)
+RUN pip3 install --no-cache-dir --break-system-packages uv
 
 # Set working directory
 WORKDIR /app
