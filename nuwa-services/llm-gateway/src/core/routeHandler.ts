@@ -3,7 +3,8 @@ import { LLMProvider } from '../providers/LLMProvider.js';
 import { ProviderManager } from './providerManager.js';
 import { PathValidator, PathValidationResult } from './pathValidator.js';
 import { AuthManager } from './authManager.js';
-import { UsagePolicy } from '../billing/usagePolicy.js';
+import { CostCalculator } from '../billing/usage/CostCalculator.js';
+import { providerRegistry } from '../providers/registry.js';
 import type { DIDInfo } from '../types/index.js';
 
 /**
@@ -226,10 +227,22 @@ export class RouteHandler {
     const responseStr = JSON.stringify(responseData);
     meta.upstream_bytes = Buffer.byteLength(responseStr, 'utf8');
     
-    // Calculate cost using pricing system
+    // Calculate cost using provider-specific logic
     const model = finalRequestData?.model || 'unknown';
     const providerCostUsd = provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(resp) : undefined;
-    const pricingResult = UsagePolicy.processNonStreamResponse(model, responseData, providerCostUsd);
+    
+    // Get provider-specific usage extractor
+    const registryProvider = providerRegistry.getProvider(providerName);
+    let pricingResult = null;
+    
+    if (registryProvider?.createUsageExtractor) {
+      const extractor = registryProvider.createUsageExtractor();
+      const usage = extractor.extractFromResponseBody(responseData);
+      if (usage) {
+        pricingResult = CostCalculator.calculateRequestCost(model, providerCostUsd, usage);
+        console.log(`[RouteHandler] Used ${providerName} extractor for non-stream response`);
+      }
+    }
     
     // Set cost in meta
     meta.upstream_cost_usd = pricingResult?.costUsd;
@@ -352,22 +365,39 @@ export class RouteHandler {
       };
       meta.upstream_request_id = hdrs['x-request-id'] || (upstream as any).requestId;
 
-      // Process stream response with usage tracking
-      const streamProcessor = UsagePolicy.createStreamProcessor(
-        req.body?.model || 'unknown',
-        provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(upstream) : undefined
-      );
+      // Process stream response with provider-specific usage tracking
+      const model = req.body?.model || 'unknown';
+      const providerCostUsd = provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(upstream) : undefined;
+      
+      // Get provider-specific stream processor
+      const registryProvider = providerRegistry.getProvider(providerName);
+      let streamProcessor = null;
+      
+      if (registryProvider?.createStreamProcessor) {
+        streamProcessor = registryProvider.createStreamProcessor(model, providerCostUsd);
+        console.log(`[RouteHandler] Created ${providerName} stream processor`);
+      }
 
       let totalBytes = 0;
       upstream.data.on('data', (chunk: Buffer) => {
         const chunkStr = chunk.toString();
         totalBytes += chunk.length;
-        streamProcessor.processChunk(chunkStr);
+        
+        // Process chunk with provider-specific processor if available
+        if (streamProcessor) {
+          streamProcessor.processChunk(chunkStr);
+        }
+        
         res.write(chunk);
       });
 
       upstream.data.on('end', () => {
-        const finalCost = streamProcessor.getFinalCost();
+        let finalCost = null;
+        
+        // Get final cost from provider-specific processor if available
+        if (streamProcessor) {
+          finalCost = streamProcessor.getFinalCost();
+        }
         
         // Update meta with final metrics
         meta.upstream_bytes = totalBytes;

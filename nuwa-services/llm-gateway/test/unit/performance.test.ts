@@ -3,8 +3,9 @@
  * Focus on core performance metrics without excessive logging
  */
 
-import { UsagePolicy } from '../../src/billing/usagePolicy.js';
 import { CostCalculator } from '../../src/billing/usage/CostCalculator.js';
+import { DefaultUsageExtractor } from '../../src/billing/usage/DefaultUsageExtractor.js';
+import { DefaultStreamProcessor } from '../../src/billing/usage/DefaultStreamProcessor.js';
 
 // Test data
 const sampleUsage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
@@ -57,20 +58,21 @@ describe('Performance Tests (Simplified)', () => {
 
   test('Core operations performance benchmark', () => {
     const iterations = 1000;
+    const extractor = new DefaultUsageExtractor();
     
     // Test 1: Usage extraction
     const extractionTime = measurePerformance(() => {
-      return UsagePolicy.extractUsageFromResponse(sampleResponseBody);
+      return extractor.extractFromResponseBody(sampleResponseBody);
     }, iterations);
     
     // Test 2: Cost calculation with provider cost
     const providerCostTime = measurePerformance(() => {
-      return UsagePolicy.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+      return CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
     }, iterations);
     
     // Test 3: Cost calculation with gateway pricing
     const gatewayCostTime = measurePerformance(() => {
-      return UsagePolicy.calculateRequestCost('gpt-4', undefined, sampleUsage);
+      return CostCalculator.calculateRequestCost('gpt-4', undefined, sampleUsage);
     }, iterations);
     
     // Test 4: Multiplier application
@@ -80,7 +82,7 @@ describe('Performance Tests (Simplified)', () => {
     
     // Test 5: Stream processor creation
     const processorCreationTime = measurePerformance(() => {
-      return UsagePolicy.createStreamProcessor('gpt-4', 0.1);
+      return new DefaultStreamProcessor('gpt-4', extractor, 0.1);
     }, iterations);
     
     // Output results
@@ -101,12 +103,13 @@ describe('Performance Tests (Simplified)', () => {
 
   test('Memory usage should be reasonable', () => {
     const initialMemory = process.memoryUsage().heapUsed;
+    const extractor = new DefaultUsageExtractor();
     
     // Perform many operations
     for (let i = 0; i < 100; i++) {
-      UsagePolicy.extractUsageFromResponse(sampleResponseBody);
-      UsagePolicy.calculateRequestCost('gpt-4', 0.05, sampleUsage);
-      const processor = UsagePolicy.createStreamProcessor('gpt-4', 0.1);
+      extractor.extractFromResponseBody(sampleResponseBody);
+      CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+      const processor = new DefaultStreamProcessor('gpt-4', extractor, 0.1);
       processor.processChunk('data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n');
     }
     
@@ -127,14 +130,15 @@ describe('Performance Tests (Simplified)', () => {
   test('Concurrent operations should not degrade performance significantly', async () => {
     const concurrentCalls = 50;
     const promises: Promise<any>[] = [];
+    const extractor = new DefaultUsageExtractor();
     
     const start = process.hrtime.bigint();
     
     for (let i = 0; i < concurrentCalls; i++) {
       promises.push(
         Promise.resolve().then(() => {
-          UsagePolicy.extractUsageFromResponse(sampleResponseBody);
-          return UsagePolicy.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+          extractor.extractFromResponseBody(sampleResponseBody);
+          return CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
         })
       );
     }
