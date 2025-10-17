@@ -2,6 +2,7 @@ import { LLMProvider, ProviderConfig } from '../providers/LLMProvider.js';
 import OpenRouterService from '../services/openrouter.js';
 import LiteLLMService from '../services/litellm.js';
 import { OpenAIProvider } from '../providers/openai.js';
+import { providerRegistry } from '../providers/registry.js';
 
 /**
  * Provider configuration for initialization
@@ -20,11 +21,10 @@ interface ProviderInitConfig {
 }
 
 /**
- * Manages LLM providers registration, configuration, and access
- * Separated from PaymentKit to enable independent testing
+ * Manages LLM providers initialization and configuration
+ * Delegates storage to ProviderRegistry to avoid duplication
  */
 export class ProviderManager {
-  private providers = new Map<string, ProviderConfig>();
   private static instance: ProviderManager;
 
   private constructor() {}
@@ -168,87 +168,77 @@ export class ProviderManager {
 
   /**
    * Register a provider configuration
+   * Delegates to ProviderRegistry for actual storage
    */
   register(config: ProviderConfig): void {
-    if (this.providers.has(config.name)) {
-      console.warn(`Provider '${config.name}' is already registered. Overwriting.`);
-    }
-    
-    this.providers.set(config.name, config);
+    // Pass skipApiKeyValidation if this is a test instance (no API key required)
+    const skipApiKeyValidation = !config.apiKey && config.requiresApiKey;
+    providerRegistry.register(config, { skipApiKeyValidation });
     console.log(`📝 [ProviderManager] Registered provider: ${config.name}`);
   }
 
   /**
    * Get provider configuration by name
+   * Delegates to ProviderRegistry
    */
   get(name: string): ProviderConfig | null {
-    return this.providers.get(name) || null;
+    return providerRegistry.get(name);
   }
 
   /**
    * Check if provider exists
+   * Delegates to ProviderRegistry
    */
   has(name: string): boolean {
-    return this.providers.has(name);
+    return providerRegistry.has(name);
   }
 
   /**
    * List all registered provider names
+   * Delegates to ProviderRegistry
    */
   list(): string[] {
-    return Array.from(this.providers.keys());
+    return providerRegistry.list();
   }
 
   /**
    * Get provider instance by name
+   * Delegates to ProviderRegistry
    */
   getProvider(name: string): LLMProvider | null {
-    const config = this.providers.get(name);
-    return config ? config.instance : null;
+    return providerRegistry.getProvider(name);
   }
 
   /**
    * Get API key for a provider
-   * @param providerName Provider name
-   * @returns API key string or null if provider doesn't require API key
-   * @throws Error if provider not found or required API key not available
+   * Delegates to ProviderRegistry
    */
   getProviderApiKey(providerName: string): string | null {
-    const config = this.providers.get(providerName);
-    if (!config) {
-      throw new Error(`Provider '${providerName}' not found in registry`);
-    }
-
-    if (!config.requiresApiKey) {
-      return null;
-    }
-
-    if (!config.apiKey) {
-      throw new Error(`API key not available for provider '${providerName}'`);
-    }
-
-    return config.apiKey;
+    return providerRegistry.getProviderApiKey(providerName);
   }
 
   /**
    * Unregister a provider
+   * Delegates to ProviderRegistry
    */
   unregister(name: string): boolean {
-    return this.providers.delete(name);
+    return providerRegistry.unregister(name);
   }
 
   /**
    * Clear all providers (useful for testing)
+   * Delegates to ProviderRegistry
    */
   clear(): void {
-    this.providers.clear();
+    providerRegistry.clear();
   }
 
   /**
    * Get all provider configurations (useful for testing)
+   * Delegates to ProviderRegistry
    */
   getAllConfigs(): ProviderConfig[] {
-    return Array.from(this.providers.values());
+    return providerRegistry.getAllConfigs();
   }
 
   /**
