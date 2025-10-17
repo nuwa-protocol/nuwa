@@ -283,15 +283,15 @@ TestEnv.describeProvider('openai', () => {
 
 ### For Existing Code
 
-The main entry point (`paymentKit.ts`) maintains backward compatibility:
+The main entry point (`gateway.ts`) maintains backward compatibility:
 
 ```typescript
 // Old usage still works
-import { initPaymentKitAndRegisterRoutes } from './paymentKit.js';
+import { initPaymentKitAndRegisterRoutes } from './gateway.js';
 const paymentKit = await initPaymentKitAndRegisterRoutes(app);
 
 // New modules are also available
-import { ProviderManager, AuthManager } from './paymentKit.js';
+import { ProviderManager, AuthManager } from './gateway.js';
 ```
 
 ### For Tests
