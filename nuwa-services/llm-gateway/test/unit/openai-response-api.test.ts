@@ -3,9 +3,67 @@
  * Tests the enhanced functionality for Response API vs Chat Completions API
  */
 
-import { OpenAIProvider } from '../src/providers/openai.js';
-import { UsagePolicy } from '../src/billing/usagePolicy.js';
-import { pricingRegistry } from '../src/billing/pricing.js';
+import { OpenAIProvider } from '../../src/providers/openai.js';
+import { pricingRegistry } from '../../src/billing/pricing.js';
+import { DefaultUsageExtractor } from '../../src/billing/usage/DefaultUsageExtractor.js';
+import { calculateToolCallCost } from '../../src/config/toolPricing.js';
+import { CostCalculator } from '../../src/billing/usage/CostCalculator.js';
+
+// Helper function for Response API cost calculation
+function calculateResponseAPICost(
+  model: string,
+  usage: any,
+  responseBody?: any,
+  providerCostUsd?: number
+) {
+  // If provider already calculated total cost, use it
+  if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
+    const extractor = new DefaultUsageExtractor();
+    const usageInfo = extractor.extractResponseAPIUsage(usage);
+    return {
+      costUsd: CostCalculator.applyMultiplier(providerCostUsd)!,
+      source: 'provider',
+      model,
+      usage: usageInfo,
+    };
+  }
+
+  // Calculate costs separately for tokens and tool calls
+  const extractor = new DefaultUsageExtractor();
+  const usageInfo = extractor.extractResponseAPIUsage(usage);
+  if (!usageInfo) {
+    return null;
+  }
+
+  // 1. Calculate model token cost
+  const modelCostResult = pricingRegistry.calculateCost(model, usageInfo);
+  const modelCost = modelCostResult?.costUsd || 0;
+
+  // 2. Calculate tool call costs from usage.tool_calls_count (legacy)
+  let toolCallCost = 0;
+  if (usage.tool_calls_count) {
+    console.log('📊 [calculateResponseAPICost] Using legacy tool_calls_count from usage');
+    for (const [toolName, callCount] of Object.entries(usage.tool_calls_count)) {
+      if (typeof callCount === 'number' && callCount > 0) {
+        const cost = calculateToolCallCost(toolName, callCount);
+        toolCallCost += cost;
+      }
+    }
+  }
+
+  // 3. Total cost
+  const totalCost = modelCost + toolCallCost;
+
+  console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
+
+  return {
+    costUsd: CostCalculator.applyMultiplier(totalCost)!,
+    source: 'gateway-pricing',
+    pricingVersion: pricingRegistry.getVersion(),
+    model,
+    usage: usageInfo,
+  };
+}
 
 describe('OpenAI Response API Integration Tests', () => {
   let openaiProvider: OpenAIProvider;
@@ -185,7 +243,8 @@ describe('OpenAI Response API Integration Tests', () => {
         }
       };
 
-      const usage = UsagePolicy.extractUsageFromResponse(responseBody);
+      const extractor = new DefaultUsageExtractor();
+      const usage = extractor.extractFromResponseBody(responseBody);
       expect(usage).toEqual({
         promptTokens: 43,  // 20 + 10 + 5 + 8 (tool content tokens added to prompt)
         completionTokens: 30, // Original completion tokens unchanged
@@ -207,7 +266,8 @@ describe('OpenAI Response API Integration Tests', () => {
         }
       };
 
-      const usage = UsagePolicy.extractUsageFromResponse(responseBodyWithNewTools);
+      const extractor = new DefaultUsageExtractor();
+      const usage = extractor.extractFromResponseBody(responseBodyWithNewTools);
       expect(usage).toEqual({
         promptTokens: 40,  // 15 + 5 + 12 + 8 (tool content tokens added to prompt)
         completionTokens: 25, // Original completion tokens unchanged
@@ -226,7 +286,8 @@ describe('OpenAI Response API Integration Tests', () => {
         }
       };
 
-      const usage = UsagePolicy.extractUsageFromResponse(responseBody);
+      const extractor = new DefaultUsageExtractor();
+      const usage = extractor.extractFromResponseBody(responseBody);
       expect(usage).toEqual({
         promptTokens: 20,
         completionTokens: 30,
@@ -237,7 +298,8 @@ describe('OpenAI Response API Integration Tests', () => {
     it('should extract Response API usage from SSE stream chunk', () => {
       const sseChunk = `event: response.completed\ndata: {"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":30,"total_tokens":65,"web_search_tokens":10,"tool_call_tokens":5}}}\n\n`;
 
-      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
+      const extractor = new DefaultUsageExtractor();
+      const result = extractor.extractFromStreamChunk(sseChunk);
       expect(result).toBeTruthy();
       expect(result?.usage).toEqual({
         promptTokens: 35, // 20 + 10 + 5 (tool content tokens added to prompt)
@@ -249,7 +311,8 @@ describe('OpenAI Response API Integration Tests', () => {
     it('should extract Chat Completions usage from SSE stream chunk', () => {
       const sseChunk = `data: {"id":"chatcmpl_123","object":"chat.completion.chunk","usage":{"prompt_tokens":20,"completion_tokens":30,"total_tokens":50}}\n\ndata: [DONE]\n\n`;
 
-      const result = UsagePolicy.extractUsageFromStreamChunk(sseChunk);
+      const extractor = new DefaultUsageExtractor();
+      const result = extractor.extractFromStreamChunk(sseChunk);
       expect(result).toBeTruthy();
       expect(result?.usage).toEqual({
         promptTokens: 20,
@@ -286,7 +349,7 @@ describe('OpenAI Response API Integration Tests', () => {
         }
       };
 
-      const result = UsagePolicy.calculateResponseAPICost('gpt-4', responseUsage);
+      const result = calculateResponseAPICost('gpt-4', responseUsage);
       expect(result).toBeTruthy();
       
       // Expected calculation:
@@ -346,7 +409,8 @@ describe('OpenAI Response API Integration Tests', () => {
         }
       };
 
-      const usage = UsagePolicy.extractUsageFromResponse(chatResponse);
+      const extractor = new DefaultUsageExtractor();
+      const usage = extractor.extractFromResponseBody(chatResponse);
       expect(usage).toEqual({
         promptTokens: 5,
         completionTokens: 10,
@@ -376,7 +440,8 @@ describe('OpenAI Response API Integration Tests', () => {
         output: { type: 'text', text: 'Hello!' }
       };
 
-      const usage = UsagePolicy.extractUsageFromResponse(responseWithoutUsage);
+      const extractor = new DefaultUsageExtractor();
+      const usage = extractor.extractFromResponseBody(responseWithoutUsage);
       expect(usage).toBeNull();
     });
   });

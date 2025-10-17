@@ -6,7 +6,7 @@ import {
   initRoochVDR,
   InMemoryLRUDIDDocumentCache,
 } from "@nuwa-ai/identity-kit";
-import { initPaymentKitAndRegisterRoutes } from './paymentKit.js';
+import { initPaymentKitAndRegisterRoutes } from './gateway.js';
 import { accessLogMiddleware } from './middleware/accessLog.js';
 import type { LLMGatewayConfig } from './config/cli.js';
 

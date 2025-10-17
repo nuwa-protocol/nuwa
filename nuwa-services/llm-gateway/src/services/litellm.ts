@@ -1,5 +1,10 @@
 import axios, { AxiosResponse } from "axios";
 import { LLMProvider } from "../providers/LLMProvider.js";
+import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
+import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
+import { LiteLLMUsageExtractor } from "../billing/usage/providers/LiteLLMUsageExtractor.js";
+import { LiteLLMStreamProcessor } from "../billing/usage/providers/LiteLLMStreamProcessor.js";
+import { LITELLM_PATHS } from "../providers/constants.js";
 
 /**
  * Minimal service adapter for proxying requests to a LiteLLM Proxy instance.
@@ -8,6 +13,11 @@ import { LLMProvider } from "../providers/LLMProvider.js";
  */
 class LiteLLMService implements LLMProvider {
   private baseURL: string;
+  
+  // Define supported paths for this provider
+  readonly SUPPORTED_PATHS = [
+    LITELLM_PATHS.CHAT_COMPLETIONS
+  ] as const;
 
     constructor() {
     // Base URL of the LiteLLM Proxy
@@ -106,6 +116,20 @@ class LiteLLMService implements LLMProvider {
       return { message: "No response from LiteLLM", statusCode: 503 };
     }
     return { message: error?.message || "Unknown error", statusCode: 500 };
+  }
+
+  /**
+   * Create LiteLLM-specific usage extractor
+   */
+  createUsageExtractor(): UsageExtractor {
+    return new LiteLLMUsageExtractor();
+  }
+
+  /**
+   * Create LiteLLM-specific stream processor
+   */
+  createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
+    return new LiteLLMStreamProcessor(model, initialCost);
   }
 }
 

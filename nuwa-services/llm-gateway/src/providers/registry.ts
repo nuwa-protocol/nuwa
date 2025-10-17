@@ -18,15 +18,15 @@ export class ProviderRegistry {
   }
 
   /**
-   * Register a new provider
+   * Register a new provider or update existing one
    */
-  register(config: ProviderConfig): void {
+  register(config: ProviderConfig, options: { skipApiKeyValidation?: boolean } = {}): void {
     if (this.providers.has(config.name)) {
-      throw new Error(`Provider '${config.name}' is already registered`);
+      console.warn(`Provider '${config.name}' is already registered in global registry. Updating configuration.`);
     }
 
-    // Validate configuration
-    if (config.requiresApiKey && !config.apiKey) {
+    // Validate configuration (skip in test mode)
+    if (config.requiresApiKey && !config.apiKey && !options.skipApiKeyValidation) {
       throw new Error(`Provider '${config.name}' requires an API key but none was provided`);
     }
 
@@ -98,6 +98,13 @@ export class ProviderRegistry {
    */
   clear(): void {
     this.providers.clear();
+  }
+
+  /**
+   * Get all provider configurations (useful for testing)
+   */
+  getAllConfigs(): ProviderConfig[] {
+    return Array.from(this.providers.values());
   }
 }
 
