@@ -1,11 +1,11 @@
-import type { SignerInterface, IdentityEnv } from '@nuwa-ai/identity-kit';
+import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 import type { McpPayerOptions } from './PaymentChannelMcpClient';
-import { PaymentChannelMcpClient } from './PaymentChannelMcpClient';
 import { UniversalMcpClient } from './UniversalMcpClient';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { TransactionStore } from '../../storage';
 import type { HostChannelMappingStore } from '../http/types';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 /**
  * Enhanced options for creating UniversalMcpClient with IdentityEnv (recommended)
@@ -50,6 +50,7 @@ export interface CreateMcpClientOptions {
 
   /** Optional custom transport (e.g., PostMessage for iframe communication) */
   customTransport?: Transport;
+  streamableTransport?: StreamableHTTPClientTransport;
 
   // ===== Universal Client Options =====
 
@@ -132,6 +133,7 @@ export async function createMcpClient(
   const mcpPayerOptions: McpPayerOptions & {
     forceMode?: 'auto' | 'payment' | 'standard';
     detectionTimeout?: number;
+    streamableTransport?: StreamableHTTPClientTransport;
   } = {
     baseUrl: options.baseUrl,
     chainConfig,
@@ -144,7 +146,8 @@ export async function createMcpClient(
     transactionLog: options.transactionLog,
     mappingStore: options.mappingStore,
     customTransport: options.customTransport,
-
+    streamableTransport: options.streamableTransport,
+    
     // Universal client options
     forceMode: options.forceMode || 'auto',
     detectionTimeout: options.detectionTimeout || 5000,

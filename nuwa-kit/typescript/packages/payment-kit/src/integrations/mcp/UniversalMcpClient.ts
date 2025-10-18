@@ -16,7 +16,7 @@ import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { ZodTypeAny } from 'zod';
-import type { Tool, ToolCallOptions, ToolSet } from 'ai';
+import type { ToolCallOptions, ToolSet } from 'ai';
 import { McpToolConverter } from './McpToolConverter';
 import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
@@ -77,6 +77,7 @@ export class UniversalMcpClient {
     private options: McpPayerOptions & {
       forceMode?: 'auto' | 'payment' | 'standard';
       detectionTimeout?: number;
+      streamableTransport?: StreamableHTTPClientTransport;
     }
   ) {
     this.detector = new ServerDetector({
@@ -464,7 +465,7 @@ export class UniversalMcpClient {
     if (this.options.customTransport) {
       transport = this.options.customTransport;
     } else {
-      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl), this.options.streamableTransport);
     }
 
     const client = new McpClient({
