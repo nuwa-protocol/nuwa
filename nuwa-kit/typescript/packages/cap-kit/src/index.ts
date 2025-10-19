@@ -4,7 +4,7 @@ import * as yaml from "js-yaml";
 import { buildClient } from "./client";
 import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from "./type";
 import { IdentityEnv } from "@nuwa-ai/identity-kit";
-import { PaymentChannelMcpClient } from "@nuwa-ai/payment-kit";
+import { UniversalMcpClient } from "@nuwa-ai/payment-kit";
 
 export * from "./type";
 
@@ -13,7 +13,7 @@ export class CapKit {
 	protected contractAddress: string;
 	protected mcpUrl: string;
 	protected env: IdentityEnv;
-	protected mcpClient?: PaymentChannelMcpClient;
+	protected mcpClient?: UniversalMcpClient;
 	protected mcpTools?: any;
 
 	constructor(option: {

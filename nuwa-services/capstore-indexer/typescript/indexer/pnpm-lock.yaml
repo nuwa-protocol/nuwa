@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: file:../../../../nuwa-kit/typescript/packages/identity-kit
-        version: file:../../../../nuwa-kit/typescript/packages/identity-kit(typescript@5.4.5)
+        specifier: ^0.6.0
+        version: 0.6.0(typescript@5.4.5)
       '@nuwa-ai/payment-kit':
-        specifier: file:../../../../nuwa-kit/typescript/packages/payment-kit
-        version: file:../../../../nuwa-kit/typescript/packages/payment-kit(express@5.1.0)(typescript@5.4.5)
+        specifier: ^0.6.8
+        version: 0.6.8(express@5.1.0)(typescript@5.4.5)
       '@roochnetwork/rooch-sdk':
         specifier: 0.4.0
         version: 0.4.0(typescript@5.4.5)
@@ -513,11 +513,11 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@nuwa-ai/identity-kit@file:../../../../nuwa-kit/typescript/packages/identity-kit':
-    resolution: {directory: ../../../../nuwa-kit/typescript/packages/identity-kit, type: directory}
+  '@nuwa-ai/identity-kit@0.6.0':
+    resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@file:../../../../nuwa-kit/typescript/packages/payment-kit':
-    resolution: {directory: ../../../../nuwa-kit/typescript/packages/payment-kit, type: directory}
+  '@nuwa-ai/payment-kit@0.6.8':
+    resolution: {integrity: sha512-qcm+UXL4XSetG0Pnzd8TJ/d/z5pV31ceqspD3dDhtMFUbWWoqp6rwh5BjlgHEa851o6+LtP2T+LWPS+SY1/VGw==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -1077,6 +1077,10 @@ packages:
   fast-json-stable-stringify@2.1.0:
     resolution: {integrity: sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==}
 
+  fastmcp@3.5.0:
+    resolution: {integrity: sha512-80OeYVFCqusrOFPNxm8uJ5G/ZaKMasygZTLvZReZ5o6iCvDBwFR/S485Is3jY0128aAaIyYx9eAgWjBUQUwoYg==}
+    hasBin: true
+
   fastmcp@3.8.5:
     resolution: {integrity: sha512-4adFcRiE/hnCcBAP3vpiBBnIN0p84Zubi6ddTSITXgtDdBhFivOT6ZkhSy22R9uzSEgcVS9gmE+X3m6a3bztWA==}
     hasBin: true
@@ -1388,6 +1392,10 @@ packages:
     resolution: {integrity: sha512-dknV3cAOdxJXampGqeG56G1UWFWf+2Msmh+r7WbTBqrZXaOFiZh6TSmd3Eig2+QQ5eCkLjrdpVKyjnisUSkizA==}
     hasBin: true
 
+  mcp-proxy@5.5.6:
+    resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
+    hasBin: true
+
   mcp-proxy@5.8.1:
     resolution: {integrity: sha512-tlBekDacLg8iR6pe9k0AnOEi52zn2JLOWY3fPmbL/rhO+MRYIjEMsrBVWHD+D7vbAjR+gmZIzMUbvg3TawjafQ==}
     hasBin: true
@@ -1563,6 +1571,9 @@ packages:
   path-key@4.0.0:
     resolution: {integrity: sha512-haREypq7xkM7ErfgIyA0z+Bj4AGKlMSdlQE2jvJo6huWD1EdkKYV+G/T4nq0YEF2vgTT8kqMFKo1uHn950r4SQ==}
     engines: {node: '>=12'}
+
+  path-to-regexp@6.3.0:
+    resolution: {integrity: sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==}
 
   path-to-regexp@8.2.0:
     resolution: {integrity: sha512-TdrF7fW9Rphjq4RjrW0Kp2AW0Ahwu9sRGTkS6bvDi0SCwZlEZYmcfDbEsTz8RVk0EHIS/Vd1bv3JhG+1xZuAyQ==}
@@ -2011,6 +2022,29 @@ packages:
       utf-8-validate:
         optional: true
 
+  xsschema@0.3.0-beta.3:
+    resolution: {integrity: sha512-8fKI0Kqxs7npz3ElebNCeGdS0HDuS2qL3IqHK5O53yCdh419hcr3GQillwN39TNFasHjbMLQ+DjSwpY0NONdnQ==}
+    peerDependencies:
+      '@valibot/to-json-schema': ^1.0.0
+      arktype: ^2.1.16
+      effect: ^3.14.5
+      sury: ^10.0.0-rc
+      zod: ^3.25.0
+      zod-to-json-schema: ^3.24.5
+    peerDependenciesMeta:
+      '@valibot/to-json-schema':
+        optional: true
+      arktype:
+        optional: true
+      effect:
+        optional: true
+      sury:
+        optional: true
+      zod:
+        optional: true
+      zod-to-json-schema:
+        optional: true
+
   xsschema@0.3.0-beta.8:
     resolution: {integrity: sha512-gMNX9pyTRWMlv2N2BeFfMg0mhLbd4UM0JseCtRri5Y1KXY67kmvnfQGdY90AmmaLbxva2OWfpGHt1e9/d9NY1Q==}
     peerDependencies:
@@ -2373,7 +2407,7 @@ snapshots:
       cors: 2.8.5
       cross-spawn: 7.0.6
       eventsource: 3.0.7
-      eventsource-parser: 3.0.3
+      eventsource-parser: 3.0.6
       express: 5.1.0
       express-rate-limit: 7.5.1(express@5.1.0)
       pkce-challenge: 5.0.0
@@ -2434,7 +2468,7 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
-  '@nuwa-ai/identity-kit@file:../../../../nuwa-kit/typescript/packages/identity-kit(typescript@5.4.5)':
+  '@nuwa-ai/identity-kit@0.6.0(typescript@5.4.5)':
     dependencies:
       '@noble/curves': 1.9.2
       '@noble/hashes': 1.8.0
@@ -2444,19 +2478,20 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@file:../../../../nuwa-kit/typescript/packages/payment-kit(express@5.1.0)(typescript@5.4.5)':
+  '@nuwa-ai/payment-kit@0.6.8(express@5.1.0)(typescript@5.4.5)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.20.0
-      '@nuwa-ai/identity-kit': file:../../../../nuwa-kit/typescript/packages/identity-kit(typescript@5.4.5)
+      '@nuwa-ai/identity-kit': 0.6.0(typescript@5.4.5)
       '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.4.5)
       '@types/js-yaml': 4.0.9
       '@types/pg': 8.15.5
       ai: 5.0.68(zod@3.25.76)
-      fastmcp: 3.8.5
+      fastmcp: 3.5.0
       js-yaml: 4.1.0
       lossless-json: 4.3.0
-      mcp-proxy: 5.8.1
+      mcp-proxy: 5.5.6
       on-headers: 1.1.0
+      path-to-regexp: 6.3.0
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
     optionalDependencies:
@@ -3118,6 +3153,28 @@ snapshots:
 
   fast-json-stable-stringify@2.1.0: {}
 
+  fastmcp@3.5.0:
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.20.0
+      '@standard-schema/spec': 1.0.0
+      execa: 9.6.0
+      file-type: 21.0.0
+      fuse.js: 7.1.0
+      mcp-proxy: 5.8.1
+      strict-event-emitter-types: 2.0.0
+      undici: 7.11.0
+      uri-templates: 0.2.0
+      xsschema: 0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76)
+      yargs: 18.0.0
+      zod: 3.25.76
+      zod-to-json-schema: 3.24.6(zod@3.25.76)
+    transitivePeerDependencies:
+      - '@valibot/to-json-schema'
+      - arktype
+      - effect
+      - supports-color
+      - sury
+
   fastmcp@3.8.5:
     dependencies:
       '@modelcontextprotocol/sdk': 1.15.1
@@ -3507,6 +3564,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  mcp-proxy@5.5.6: {}
+
   mcp-proxy@5.8.1: {}
 
   media-typer@1.1.0: {}
@@ -3634,6 +3693,8 @@ snapshots:
   path-key@3.1.1: {}
 
   path-key@4.0.0: {}
+
+  path-to-regexp@6.3.0: {}
 
   path-to-regexp@8.2.0: {}
 
@@ -4094,6 +4155,11 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.18.3: {}
+
+  xsschema@0.3.0-beta.3(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76):
+    optionalDependencies:
+      zod: 3.25.76
+      zod-to-json-schema: 3.24.6(zod@3.25.76)
 
   xsschema@0.3.0-beta.8(zod-to-json-schema@3.24.6(zod@3.25.76))(zod@3.25.76):
     optionalDependencies:

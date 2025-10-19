@@ -5,7 +5,6 @@ import {
   McpPaymentKit,
   createMcpPaymentKit,
   McpPaymentKitOptions,
-  createMcpPaymentKitFromEnv,
 } from './McpPaymentKit';
 import { z } from 'zod';
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';

@@ -1,5 +1,4 @@
 import { TestEnv, createSelfDid } from "@nuwa-ai/identity-kit";
-import { } from "@nuwa-ai/payment-kit"
 import { CapKit } from "../src/index.js";
 
 const localContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625";
@@ -56,9 +55,14 @@ export const setupEnv  = async (target: 'test' | 'local' = DEFAULT_TARGET, auth:
 
   const clinet = await capKit.getMcpClient()
 
-  const deposit = await clinet.getPayerClient().getHubClient().deposit('0x3::gas_coin::RGas', BigInt(1000000000));
+  const payerClient = clinet?.getPayerClient();
+  if (!payerClient) {
+    throw new Error('PayerClient is not available - ensure the MCP server supports payment protocol');
+  }
 
-  const balance = await clinet.getPayerClient().getHubClient().getBalance();
+  const deposit = await payerClient.getHubClient().deposit('0x3::gas_coin::RGas', BigInt(1000000000));
+
+  const balance = await payerClient.getHubClient().getBalance();
 
   console.log(deposit, balance)
 
