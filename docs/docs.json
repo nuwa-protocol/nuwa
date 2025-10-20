@@ -25,6 +25,12 @@
         ]
       },
       {
+        "group": "Tutorials",
+        "pages": [
+          "tutorials/deploy-mcp-proxy-railway"
+        ]
+      },
+      {
         "group": "Development",
         "pages": [
           "build-caps/quickstart",
