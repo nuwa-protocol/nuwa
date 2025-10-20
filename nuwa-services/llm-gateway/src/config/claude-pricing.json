@@ -1,0 +1,65 @@
+{
+  "version": "2024-01",
+  "description": "Anthropic Claude model pricing configuration",
+  "lastUpdated": "2024-10-17",
+  "models": {
+    "claude-3-5-sonnet-20241022": {
+      "promptPerMTokUsd": 3.0,
+      "completionPerMTokUsd": 15.0,
+      "description": "Claude 3.5 Sonnet - Latest version with improved capabilities"
+    },
+    "claude-3-5-haiku-20241022": {
+      "promptPerMTokUsd": 1.0,
+      "completionPerMTokUsd": 5.0,
+      "description": "Claude 3.5 Haiku - Fast and efficient model"
+    },
+    "claude-3-opus-20240229": {
+      "promptPerMTokUsd": 15.0,
+      "completionPerMTokUsd": 75.0,
+      "description": "Claude 3 Opus - Most capable model for complex tasks"
+    },
+    "claude-3-sonnet-20240229": {
+      "promptPerMTokUsd": 3.0,
+      "completionPerMTokUsd": 15.0,
+      "description": "Claude 3 Sonnet - Balanced performance and speed"
+    },
+    "claude-3-haiku-20240307": {
+      "promptPerMTokUsd": 0.25,
+      "completionPerMTokUsd": 1.25,
+      "description": "Claude 3 Haiku - Fast and cost-effective model"
+    }
+  },
+  "modelFamilyPatterns": [
+    {
+      "pattern": "^claude-3-5-sonnet",
+      "baseModel": "claude-3-5-sonnet-20241022",
+      "description": "Claude 3.5 Sonnet variants - use latest pricing"
+    },
+    {
+      "pattern": "^claude-3-5-haiku",
+      "baseModel": "claude-3-5-haiku-20241022",
+      "description": "Claude 3.5 Haiku variants - use latest pricing"
+    },
+    {
+      "pattern": "^claude-3-opus",
+      "baseModel": "claude-3-opus-20240229",
+      "description": "Claude 3 Opus variants"
+    },
+    {
+      "pattern": "^claude-3-sonnet",
+      "baseModel": "claude-3-sonnet-20240229",
+      "description": "Claude 3 Sonnet variants"
+    },
+    {
+      "pattern": "^claude-3-haiku",
+      "baseModel": "claude-3-haiku-20240307",
+      "description": "Claude 3 Haiku variants"
+    }
+  ],
+  "notes": [
+    "Pricing is per 1M tokens as of October 2024",
+    "Claude models use input_tokens and output_tokens in API responses",
+    "All prices are in USD",
+    "Pattern matching allows for date-versioned model names"
+  ]
+}

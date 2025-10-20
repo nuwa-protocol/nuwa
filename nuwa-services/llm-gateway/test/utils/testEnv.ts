@@ -12,6 +12,8 @@ export interface TestEnvConfig {
   openrouterApiKey?: string;
   litellmApiKey?: string;
   litellmBaseUrl?: string;
+  anthropicApiKey?: string;
+  anthropicBaseUrl?: string;
   skipIntegrationTests?: boolean;
 }
 
@@ -45,6 +47,8 @@ export class TestEnv {
       openrouterApiKey: process.env.OPENROUTER_API_KEY,
       litellmApiKey: process.env.LITELLM_API_KEY,
       litellmBaseUrl: process.env.LITELLM_BASE_URL,
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL,
       skipIntegrationTests: process.env.SKIP_INTEGRATION_TESTS === 'true',
     };
 
@@ -88,6 +92,13 @@ export class TestEnv {
         reason: (!config.litellmApiKey || !config.litellmBaseUrl) 
           ? 'LITELLM_API_KEY or LITELLM_BASE_URL not configured' 
           : undefined,
+      },
+      {
+        name: 'claude',
+        enabled: !!config.anthropicApiKey,
+        apiKey: config.anthropicApiKey,
+        baseUrl: config.anthropicBaseUrl || 'https://api.anthropic.com',
+        reason: !config.anthropicApiKey ? 'ANTHROPIC_API_KEY not configured' : undefined,
       },
     ];
   }

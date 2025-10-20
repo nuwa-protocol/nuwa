@@ -82,7 +82,7 @@
 - 在进入业务处理前（或业务处理内）补：`did`。
 
 3) Provider 选择与模型解析（业务处理内）
-- 选路点（本仓库 `paymentKit.ts` 内已有 `resolveProvider`）：补 `provider`。
+- 选路点（本仓库 `gateway.ts` 内已有 `resolveProvider`）：补 `provider`。
 - 从请求体提取 `model` 与 `is_stream`（若未在顶层判定）。
 
 4) 用量与成本
@@ -90,7 +90,7 @@
   - OpenRouter：沿用 `parseResponse()`，读取 `body.usage.cost` 或 `x-usage` 头；填 `total_cost_usd`、`usage_source='body'|'header'`。如能拿到 tokens 也填入。
   - LiteLLM：如后续从响应头取到 `x-litellm-response-cost`（或约定），填 `total_cost_usd`，标 `usage_source='header'`。
 - 流式：
-  - 已在 `paymentKit.ts` SSE 分支解析包含 `"usage"` 的行并累计成本；在 `end`/`[DONE]` 时写回 `res.locals.usage`。
+  - 已在 `gateway.ts` SSE 分支解析包含 `"usage"` 的行并累计成本；在 `end`/`[DONE]` 时写回 `res.locals.usage`。
   - 同时在 `data` 事件中累计 `response_bytes`，在 `end/close` 时回填。
 
 5) 错误采集

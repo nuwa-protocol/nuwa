@@ -2,6 +2,7 @@ import { LLMProvider, ProviderConfig } from '../providers/LLMProvider.js';
 import OpenRouterService from '../services/openrouter.js';
 import LiteLLMService from '../services/litellm.js';
 import { OpenAIProvider } from '../providers/openai.js';
+import { ClaudeProvider } from '../providers/claude.js';
 import { providerRegistry } from '../providers/registry.js';
 
 /**
@@ -53,6 +54,7 @@ export class ProviderManager {
     const openrouterProvider = new OpenRouterService();
     const litellmProvider = new LiteLLMService();
     const openaiProvider = new OpenAIProvider();
+    const claudeProvider = new ClaudeProvider();
 
     // Provider configurations
     const providerConfigs: ProviderInitConfig[] = [
@@ -91,6 +93,18 @@ export class ProviderManager {
         requiredEnvVars: ['OPENAI_API_KEY'],
         optionalEnvVars: ['OPENAI_BASE_URL'],
         defaultCheck: () => !!process.env.OPENAI_API_KEY
+      },
+      {
+        name: 'claude',
+        instance: claudeProvider,
+        requiresApiKey: true,
+        supportsNativeUsdCost: false,
+        apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+        baseUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+        allowedPaths: [...claudeProvider.SUPPORTED_PATHS],
+        requiredEnvVars: ['ANTHROPIC_API_KEY'],
+        optionalEnvVars: ['ANTHROPIC_BASE_URL'],
+        defaultCheck: () => !!process.env.ANTHROPIC_API_KEY
       }
     ];
 

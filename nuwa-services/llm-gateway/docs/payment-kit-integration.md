@@ -99,20 +99,20 @@ async function initPaymentKit() {
 2) 将计费应用到 LLM 业务路由（非流式接口，使用 FinalCost 后记账）：
 
 ```ts
-// 假设已有 handleNonStreamLLM(req) 能返回 { status, body, usage?: { cost } }
-export function registerBillableRoutes(billing: any) {
-  // 非流式：最终成本（美元）→ picoUSD（×1e12）写入 res.locals.usage
-  billing.post(
-    '/api/v1/chat/completions',
-    { pricing: { type: 'FinalCost' } },
-    async (req, res) => {
-      const result = await handleNonStreamLLM(req);
-      const totalCostUSD = result?.usage?.cost ?? 0; // 以美元计价（数字）
-      (res as any).locals.usage = Math.round(totalCostUSD * 1e12); // USD → picoUSD
-      res.status(result.status).json(result.body);
-    },
-    'llm.chat.completions'
-  );
+// 使用新的模块化架构
+import { initPaymentKitAndRegisterRoutes, GatewayConfig } from './gateway.js';
+
+export async function registerBillableRoutes(app: express.Application) {
+  // 配置网关
+  const config: GatewayConfig = {
+    serviceId: 'llm-gateway',
+    defaultAssetId: process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
+    // ... 其他配置选项
+  };
+
+  // 初始化 PaymentKit 并注册所有路由
+  // 新架构会自动处理所有 provider 路由和计费逻辑
+  const paymentKit = await initPaymentKitAndRegisterRoutes(app, config);
 
   // 免费查询类路由（如 /usage）：需要 DID 鉴权但不计费
   billing.get('/usage', { pricing: '0', authRequired: true }, async (req, res) => {
