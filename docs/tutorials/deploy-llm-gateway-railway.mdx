@@ -1,0 +1,304 @@
+---
+title: "Deploy LLM Gateway on Railway"
+description: "Complete guide to deploying Nuwa LLM Gateway on Railway platform with DID authentication and usage-based pricing"
+---
+
+## Overview
+
+This tutorial will guide you through deploying Nuwa LLM Gateway on Railway platform, enabling your gateway to provide multi-provider LLM access with DID authentication and usage-based pricing. The LLM Gateway unifies multiple LLM providers (OpenAI, OpenRouter, LiteLLM) behind a single endpoint with automatic payment integration.
+
+## Why Railway?
+
+Railway is an ideal platform for deploying LLM Gateway:
+
+- ✅ Full support for Node.js applications and environment variables
+- ✅ Supports long connections and real-time communication
+- ✅ Simple deployment via Docker image or NPM package
+- ✅ Automatic HTTPS and domain generation
+- ✅ Flexible environment variable management
+- ✅ Built-in logging and monitoring
+
+## Prerequisites
+
+Before starting, ensure you have:
+
+1. **Railway Account**: Sign up for a [Railway](https://railway.app) account
+2. **Service Key**: Follow the [Service Key guide](/build-caps/service-key) to obtain your service key
+3. **Provider API Keys**: At least one LLM provider API key (OpenAI, OpenRouter, etc.)
+
+## Step 1: Create Empty Service on Railway
+
+1. Log in to Railway Dashboard
+2. Click "New Project"
+3. Select "Empty Service"
+4. Name your service, for example: `nuwa-llm-gateway`
+
+## Step 2: Configure Environment Variables
+
+Add the following environment variables in your Railway project's Variables page:
+
+### Required Variables
+
+<ResponseField name="SERVICE_KEY" type="string" required>
+Your service DID private key, obtained from the Service Key guide. Used for DID authentication and payment processing.
+</ResponseField>
+
+<ResponseField name="ROOCH_NETWORK" type="string" required>
+Rooch network type (test/main). Currently only test network is supported.
+Default: `test`
+</ResponseField>
+
+### LLM Provider API Keys (At least one required)
+
+<ResponseField name="OPENAI_API_KEY" type="string">
+OpenAI API key for accessing GPT models and other OpenAI services.
+Format: `sk-proj-...`
+</ResponseField>
+
+<ResponseField name="OPENROUTER_API_KEY" type="string">
+OpenRouter API key for accessing multiple model providers.
+Format: `sk-or-v1-...`
+</ResponseField>
+
+<ResponseField name="LITELLM_API_KEY" type="string">
+LiteLLM API key if using LiteLLM proxy.
+</ResponseField>
+
+### Optional Configuration Variables
+
+<ResponseField name="PORT" type="number" default="8080">
+Service port, automatically set by Railway.
+</ResponseField>
+
+<ResponseField name="PRICING_MULTIPLIER" type="string" default="1.0">
+Global pricing multiplier (range 0-2). Example: `1.10` for +10% markup.
+</ResponseField>
+
+<ResponseField name="PRICING_OVERRIDES" type="string">
+JSON string for custom model pricing. Example: `{"gpt-4":{"promptPerMTokUsd":25,"completionPerMTokUsd":50}}`
+</ResponseField>
+
+<ResponseField name="DEBUG" type="boolean" default="false">
+Enable debug logging for troubleshooting.
+</ResponseField>
+
+
+<Note>
+Environment variables are case-sensitive. Ensure you use the exact names as specified above.
+</Note>
+
+## Step 3: Deploy LLM Gateway
+
+### Method A: Using Docker Image (Recommended)
+
+<Steps>
+<Step title="Connect Docker Image">
+
+1. In the service settings page, find the "Source" section
+2. Click "Connect" or "Deploy"
+3. Select "Docker Image"
+4. Enter the image address: `ghcr.io/nuwa-protocol/llm-gateway:latest`
+5. Click "Deploy"
+
+</Step>
+
+<Step title="Monitor Deployment Process">
+
+1. Railway will automatically start pulling the image and deploying
+2. View deployment logs in Railway Dashboard
+3. Wait for deployment to complete
+4. Look for "Server started on port 8080" in the logs
+
+</Step>
+</Steps>
+
+### Method B: Using NPM Package
+
+<Steps>
+<Step title="Create Dockerfile">
+
+Create a `Dockerfile` in your project:
+
+```dockerfile
+FROM node:18-alpine
+
+# Install LLM Gateway globally
+RUN npm install -g @nuwa-ai/llm-gateway
+
+# Expose port
+EXPOSE 8080
+
+# Start the gateway
+CMD ["llm-gateway", "--port", "8080"]
+```
+
+</Step>
+
+<Step title="Deploy from Repository">
+
+1. Push your Dockerfile to a Git repository
+2. Connect the repository to Railway
+3. Railway will automatically build and deploy
+
+</Step>
+</Steps>
+
+## Step 4: Generate Public Domain
+
+After successful deployment, you need to manually generate a public domain:
+
+1. In the Railway service page, find the "Settings" tab
+2. Scroll to the "Networking" section
+3. Click the "Generate Domain" button
+4. Railway will generate a domain for you, similar to: `https://your-gateway-name.up.railway.app`
+
+<Note>
+Railway services do not automatically generate public domains by default. You need to manually generate one to access the service from outside.
+</Note>
+
+In this example, the domain is `https://nuwa-llm-gateway.up.railway.app`. You can use this domain to access your LLM Gateway.
+
+## Step 5: Verify Deployment
+
+Check the Nuwa payment service discovery endpoint:
+
+```bash
+curl https://your-gateway-name.railway.app/.well-known/nuwa-payment/info
+```
+
+Expected response:
+```json
+{
+  "version": 1,
+  "serviceId": "llm-gateway",
+  "serviceDid": "did:rooch:0x...",
+  "network": "test",
+  "defaultAssetId": "0x3::gas_coin::RGas",
+  "providers": ["openai", "openrouter"]
+}
+```
+
+### Test Provider Routes
+
+Test the provider-specific routes:
+
+```bash
+# Test OpenAI route (requires authentication)
+curl -X POST https://your-gateway-name.up.railway.app/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: DIDAuthV1 <your-auth-token>" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+<Note>
+Actual API calls require DID authentication. Use the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) or integrate with Nuwa Payment Kit for testing.
+</Note>
+
+## Step 6: Configure for Production Use
+
+### Update Your Applications
+
+Update your applications to use the Railway-deployed gateway:
+
+```typescript
+// Before (local development)
+const baseUrl = 'http://localhost:8080';
+
+// After (production)
+const baseUrl = 'https://your-gateway-name.up.railway.app';
+```
+
+### Monitor Usage and Logs
+
+1. **Railway Logs**: View real-time logs in Railway Dashboard
+2. **Usage Statistics**: Monitor request patterns and response times
+3. **Error Tracking**: Set up alerts for deployment failures or errors
+
+## Troubleshooting
+
+### Deployment Failure
+
+**Issue**: Container fails to start
+
+**Solutions**:
+1. Check Railway deployment logs for specific error messages
+2. Verify `SERVICE_KEY` environment variable is correctly set
+3. Ensure at least one provider API key is configured
+4. Check environment variable format (boolean values should be `true`/`false`, not `"true"`/`"false"`)
+
+### Cannot Access Service
+
+**Issue**: Service deployed successfully but cannot be accessed externally
+
+**Solutions**:
+1. Confirm public domain has been generated (Settings → Networking → Generate Domain)
+2. Check if service is running (look for "Server started" in logs)
+3. Verify port configuration is correct (should be 8080)
+4. Review Railway service logs for runtime errors
+
+### Provider API Errors
+
+**Issue**: LLM provider requests fail
+
+**Solutions**:
+1. Verify provider API keys are valid and have sufficient quota
+2. Check provider-specific rate limits and usage policies
+3. Ensure API keys have correct permissions for the models you're using
+4. Review gateway logs for specific provider error messages
+
+### Authentication Issues
+
+**Issue**: DID authentication fails
+
+**Solutions**:
+1. Confirm `SERVICE_KEY` is valid and properly formatted
+2. Check `ROOCH_NETWORK` matches your DID network (test/main)
+3. Verify your service DID has sufficient gas for transactions
+4. Review authentication logs for specific error details
+
+## Scaling and Optimization
+
+### Performance Optimization
+
+1. **Pricing Configuration**: Use `PRICING_MULTIPLIER` to adjust profit margins
+2. **Provider Selection**: Configure multiple providers for redundancy
+
+### Monitoring and Alerts
+
+1. **Set up Railway alerts** for deployment failures
+2. **Monitor response times** and error rates
+3. **Track usage patterns** to optimize pricing and capacity
+
+### Security Best Practices
+
+1. **Monitor access logs** for unusual patterns
+2. **Keep service keys secure** and never commit them to version control
+3. **Use environment variables** for all sensitive configuration
+
+## Next Steps
+
+After successful deployment, you can:
+
+1. **Integrate with Caps**: Use your gateway URL in Cap Studio configurations
+2. **Monitor Revenue**: Track usage and revenue through the [Revenue dashboard](/build-caps/revenue)
+3. **Optimize Pricing**: Adjust pricing based on usage patterns and market conditions
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="LLM Gateway Overview" icon="server" href="/build-caps/llm-gateway">
+    Learn about LLM Gateway concepts and local setup
+  </Card>
+  <Card title="Service Key" icon="key" href="/build-caps/service-key">
+    Obtain and configure SERVICE_KEY
+  </Card>
+  <Card title="Service Pricing" icon="dollar-sign" href="/build-caps/service-pricing">
+    Configure pricing strategies for your gateway
+  </Card>
+  <Card title="Revenue" icon="money-bill-wave" href="/build-caps/revenue">
+    View and manage service revenue
+  </Card>
+</CardGroup>

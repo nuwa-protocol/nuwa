@@ -27,6 +27,8 @@
       {
         "group": "Tutorials",
         "pages": [
+          "tutorials/llm-gateway-knowledge-service",
+          "tutorials/deploy-llm-gateway-railway",
           "tutorials/deploy-mcp-proxy-railway"
         ]
       },
