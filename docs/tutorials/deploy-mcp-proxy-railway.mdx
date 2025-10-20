@@ -13,7 +13,7 @@ Railway is an ideal platform for deploying MCP Server Proxy:
 
 - ✅ Full support for Node.js and child processes (stdio upstream)
 - ✅ Supports long connections and real-time communication
-- ✅ Simple Git or Docker image integration deployment
+- ✅ Simple deployment via Git integration or Docker image
 - ✅ Automatic HTTPS and domain generation
 - ✅ Flexible environment variable management
 
@@ -70,7 +70,7 @@ Environment variables must match the placeholders in your configuration file. Fo
 Using remote configuration files is the simplest approach, eliminating the need to manage local configuration files. Add the following environment variable:
 
 <ResponseField name="CONFIG_PATH" type="string" required>
-Context7 example: `https://raw.githubusercontent.com/nuwa-protocol/nuwa-caps/refs/heads/main/mcp-proxy-config/context7-mcp.yaml`
+Context7 example: `https://raw.githubusercontent.com/nuwa-protocol/nuwa-caps/main/mcp-proxy-config/context7-mcp.yaml`
 </ResponseField>
 
 
@@ -250,7 +250,7 @@ curl https://your-project-name.railway.app/health
 
 After successful deployment, you can:
 
-1. **Build a Cap**: Use [CapStudio](/build-caps/quickstart) to create a Cap that uses your MCP proxy
+1. **Build a Cap**: Use [Cap Studio](/build-caps/quickstart) to create a Cap that uses your MCP proxy
 2. **Monitor Revenue**: View tool call revenue through the [Revenue dashboard](/build-caps/revenue)
 3. **Optimize Pricing**: Adjust [tool pricing](/build-caps/service-pricing) based on usage
 4. **Expand Functionality**: Add more MCP tools or create custom MCP services
