@@ -13,7 +13,9 @@ You can see a working example of this approach in action: [Nuwa Protocol Helper]
 
 ### Why Choose Specialized Documentation?
 
-Through experimentation, we've found that for publicly available and well-known documents, Vector Store enhancement often doesn't outperform AI + search combinations. However, Vector Store provides significant value improvement in two scenarios:
+Through experimentation, we've found that for publicly available and well-known documents, using Vector Store with File Search often doesn't provide significant advantages over standard LLM APIs with web search enabled. This is because popular, public documentation is already well-covered in LLM training data and easily accessible through web search.
+
+However, Vector Store with File Search provides significant value improvement in two specific scenarios:
 
 1. **Private Documentation** - Internal documents that AI cannot access through public channels
 2. **New Documentation** - Latest documents not yet included or insufficiently covered in AI training data
@@ -235,7 +237,7 @@ In the Model configuration Parameters section, add the File Search tool:
   "tools": [
     {
       "type": "file_search",
-      "vector_store_ids": ["vs_xxx"],  // Replace with your Vector Store ID
+      "vector_store_ids": ["vs_your_vector_store_id"],
       "max_num_results": 10,
       "ranking_options": {
         "ranker": "auto"
@@ -244,6 +246,10 @@ In the Model configuration Parameters section, add the File Search tool:
   ]
 }
 ```
+
+<Note>
+Replace `vs_your_vector_store_id` with your actual Vector Store ID from Step 1 (format: `vs_xxx`).
+</Note>
 
 
 </Step>
