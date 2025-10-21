@@ -1,4 +1,4 @@
-import { KeyStore, StoredKey } from '@nuwa-ai/identity-kit';
+import { KeyStore, StoredKey } from '../../index';
 
 /**
  * IndexedDB implementation of KeyStore
@@ -15,6 +15,11 @@ export class IndexedDBKeyStore implements KeyStore {
       storeName?: string;
     } = {}
   ) {
+    // Runtime check for browser environment with IndexedDB
+    if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+      throw new Error('IndexedDBKeyStore is only available in browser environments with IndexedDB support');
+    }
+    
     this.dbName = options.dbName || 'nuwa_keystore';
     this.storeName = options.storeName || 'keys';
   }

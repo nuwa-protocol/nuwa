@@ -1,4 +1,4 @@
-import type { KeyType, AddKeyRequestPayloadV1, VerificationRelationship } from '@nuwa-ai/identity-kit';
+import type { KeyType, AddKeyRequestPayloadV1, VerificationRelationship } from '../../index';
 import {
   KeyManager,
   CryptoUtils,
@@ -7,7 +7,7 @@ import {
   KeyTypeInput,
   toKeyType,
   validateScopes,
-} from '@nuwa-ai/identity-kit';
+} from '../../index';
 import { LocalStorageKeyStore } from '../keystore';
 
 export interface ConnectOptions {
@@ -46,6 +46,11 @@ export class DeepLinkManager {
     keyManager?: KeyManager;
     sessionStorage?: Storage;
   } = {}) {
+    // Runtime check for browser environment
+    if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') {
+      throw new Error('DeepLinkManager is only available in browser environments');
+    }
+    
     this.keyManager = options.keyManager || new KeyManager({
       store: new LocalStorageKeyStore()
     });

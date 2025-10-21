@@ -1,4 +1,4 @@
-import { KeyStore, StoredKey } from '@nuwa-ai/identity-kit';
+import { KeyStore, StoredKey } from '../../index';
 
 /**
  * Browser LocalStorage implementation of KeyStore
@@ -7,6 +7,11 @@ export class LocalStorageKeyStore implements KeyStore {
   private readonly prefix: string;
 
   constructor(options: { prefix?: string } = {}) {
+    // Runtime check for browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      throw new Error('LocalStorageKeyStore is only available in browser environments with localStorage support');
+    }
+    
     this.prefix = options.prefix || 'nuwa_keystore_';
   }
 

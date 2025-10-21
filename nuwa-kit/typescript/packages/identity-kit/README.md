@@ -21,6 +21,13 @@
 npm install @nuwa-ai/identity-kit @roochnetwork/rooch-sdk
 ```
 
+For web applications that need browser-specific features (LocalStorage, IndexedDB, React hooks):
+
+```bash
+# The web features are included in the main package
+# Import from '@nuwa-ai/identity-kit/web' for browser functionality
+```
+
 ---
 
 ## 🚀 Quick Start
@@ -41,6 +48,39 @@ const env = await IdentityKit.bootstrap({
 
 // Step 2-A) Existing DID → load
 const kit = await env.loadDid('did:rooch:0xYourDid');
+```
+
+---
+
+## 🌐 Web Usage
+
+For browser applications, use the `/web` export path:
+
+```ts
+import { IdentityKitWeb, LocalStorageKeyStore, useIdentityKit } from '@nuwa-ai/identity-kit/web';
+
+// High-level Web API
+const sdk = await IdentityKitWeb.init({
+  appName: 'My App',
+  cadopDomain: 'https://test-id.nuwa.dev',
+  storage: 'local' // or 'indexeddb'
+});
+
+await sdk.connect();
+const signature = await sdk.sign({ operation: 'example', params: { data: 'hello' } });
+
+// React Hook (when React is available)
+function MyComponent() {
+  const { state, connect, sign } = useIdentityKit({
+    appName: 'My App'
+  });
+  
+  if (!state.isConnected) {
+    return <button onClick={connect}>Connect</button>;
+  }
+  
+  return <div>Connected as: {state.agentDid}</div>;
+}
 ```
 
 ---

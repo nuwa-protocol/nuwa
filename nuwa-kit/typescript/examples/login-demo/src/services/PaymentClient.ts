@@ -1,5 +1,5 @@
 import { DebugLogger} from '@nuwa-ai/identity-kit';
-import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+import { IdentityKitWeb } from '@nuwa-ai/identity-kit/web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
 import { type TransactionStore, UniversalMcpClient, createMcpClient } from '@nuwa-ai/payment-kit';
 

@@ -1,13 +1,39 @@
 {
   "preset": "ts-jest",
-  "testEnvironment": "node",
-  "roots": ["<rootDir>/src", "<rootDir>/test"],
-  "transform": {
-    "^.+\\.tsx?$": ["ts-jest", {
-      "tsconfig": "tsconfig.json"
-    }]
-  },
-  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "projects": [
+    {
+      "displayName": "node",
+      "testEnvironment": "node",
+      "roots": ["<rootDir>/src", "<rootDir>/test"],
+      "testMatch": [
+        "**/__tests__/**/*.ts", 
+        "**/?(*.)+(spec|test).ts"
+      ],
+      "testPathIgnorePatterns": [
+        "<rootDir>/test/web/"
+      ],
+      "transform": {
+        "^.+\\.tsx?$": ["ts-jest", {
+          "tsconfig": "tsconfig.json"
+        }]
+      }
+    },
+    {
+      "displayName": "jsdom",
+      "testEnvironment": "jsdom",
+      "roots": ["<rootDir>/test/web"],
+      "testMatch": [
+        "**/__tests__/**/*.ts", 
+        "**/?(*.)+(spec|test).ts"
+      ],
+      "transform": {
+        "^.+\\.tsx?$": ["ts-jest", {
+          "tsconfig": "tsconfig.json"
+        }]
+      },
+      "setupFilesAfterEnv": ["<rootDir>/test/setup.js"]
+    }
+  ],
   "moduleFileExtensions": ["ts", "js", "json"],
   "verbose": false,
   "collectCoverage": true,
@@ -26,7 +52,6 @@
       "statements": 0
     }
   },
-  "setupFiles": ["<rootDir>/test/setup.js"],
   "reporters": [
     ["default", {
       "summaryThreshold": 1,

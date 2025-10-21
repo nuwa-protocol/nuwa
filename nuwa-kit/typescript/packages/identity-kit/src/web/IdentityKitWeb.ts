@@ -6,7 +6,7 @@ import {
   SignedData,
   IdentityKit,
   IdentityEnv,
-} from '@nuwa-ai/identity-kit';
+} from '../index';
 import { LocalStorageKeyStore } from './keystore/LocalStorageKeyStore';
 import { IndexedDBKeyStore } from './keystore/IndexedDBKeyStore';
 import { DeepLinkManager } from './deeplink/DeepLinkManager';
@@ -49,14 +49,18 @@ export class IdentityKitWeb {
    * Initialize the IdentityKitWeb with automatic component initialization
    */
   static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
+    // Runtime check for browser environment
+    if (typeof window === 'undefined') {
+      throw new Error('IdentityKitWeb is only available in browser environments');
+    }
     const { appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
 
     // Resolve Rooch network and RPC URL
     const network = resolveNetworkFromHost(cadopDomain);
-    const rpcUrl =
-      options.roochRpcUrl ||
-      (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_ROOCH_RPC_URL : undefined);
+    const rpcUrl = options.roochRpcUrl || 
+      (typeof window !== 'undefined' && (window as any).VITE_ROOCH_RPC_URL) ||
+      undefined;
 
     // Determine KeyStore based on storage preference (defaults to LocalStorage)
     let keyStore: any | undefined;
