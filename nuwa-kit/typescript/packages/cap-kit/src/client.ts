@@ -7,7 +7,6 @@ export const buildClient = async (
 	mcpUrl: string,
 	env: IdentityEnv,
 ): Promise<UniversalMcpClient> => {
-  console.log('build mcp client')
   return createMcpClient({
     baseUrl: mcpUrl,
     env,
