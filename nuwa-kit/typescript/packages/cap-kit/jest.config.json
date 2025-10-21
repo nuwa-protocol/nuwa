@@ -28,7 +28,6 @@
       "statements": 0
     }
   },
-  "setupFiles": ["<rootDir>/test/setup.ts"],
   "reporters": [
     ["default", {
       "summaryThreshold": 1,

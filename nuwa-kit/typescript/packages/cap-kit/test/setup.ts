@@ -53,18 +53,18 @@ export const setupEnv  = async (target: 'test' | 'local' = DEFAULT_TARGET, auth:
     env: identityEnv,
   });
 
-  const clinet = await capKit.getMcpClient()
+  const client = await capKit.getMcpClient()
 
-  const payerClient = clinet?.getPayerClient();
+  await client.tools()
+
+  const payerClient = client?.getPayerClient();
   if (!payerClient) {
     throw new Error('PayerClient is not available - ensure the MCP server supports payment protocol');
   }
 
-  const deposit = await payerClient.getHubClient().deposit('0x3::gas_coin::RGas', BigInt(1000000000));
+  await payerClient.getHubClient().deposit('0x3::gas_coin::RGas', BigInt(1000000000));
 
-  const balance = await payerClient.getHubClient().getBalance();
-
-  console.log(deposit, balance)
+  await payerClient.getHubClient().getBalance();
 
   return {
     testEnv,

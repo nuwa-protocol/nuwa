@@ -79,17 +79,18 @@ export async function getService() {
       endpoint: "/mcp",
     });
 
-    // Register all tools as FREE tools
-    _mcpInstance.paidTool(uploadCapTool);
+    // Register FREE tools
     _mcpInstance.freeTool(downloadCapTool);
-    _mcpInstance.paidTool(favoriteCapTool);
     _mcpInstance.freeTool(queryCapByIDTool);
     _mcpInstance.freeTool(queryCapByNameTool);
     _mcpInstance.freeTool(queryCapStatsTool);
     _mcpInstance.freeTool(queryMyFavoriteCapTool);
-    _mcpInstance.paidTool(rateCapTool);
-    _mcpInstance.paidTool(updateEnableCapTool);
     _mcpInstance.freeTool(queryCapRatingDistributionTool);
+
+    _mcpInstance.paidTool(rateCapTool);
+    _mcpInstance.paidTool(uploadCapTool);
+    _mcpInstance.paidTool(favoriteCapTool);
+    _mcpInstance.paidTool(updateEnableCapTool);
   }
   return _mcpInstance;
 }

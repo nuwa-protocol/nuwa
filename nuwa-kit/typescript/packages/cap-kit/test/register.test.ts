@@ -1,5 +1,5 @@
 import { Cap, CapKit } from "../src/index";
-import { describe, it } from '@jest/globals';
+import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
 import { setupEnv } from "./setup";
 import { IdentityEnv } from "@nuwa-ai/identity-kit";
 
@@ -11,6 +11,10 @@ describe("CapKit", () => {
     capKit = a;
     identityEnv = s;
   }, 60000)
+  
+  afterAll(async () => {
+    await capKit?.mcpClose()
+  })
 
   const buildCap = (did:string, name: string, disName?: string)=> {
     return {

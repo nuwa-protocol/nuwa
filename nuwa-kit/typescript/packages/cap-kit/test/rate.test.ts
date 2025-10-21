@@ -1,5 +1,5 @@
 import { CapKit } from "../src/index";
-import {describe, expect, it} from '@jest/globals';
+import {afterAll, beforeAll, describe, expect, it} from '@jest/globals';
 import {setupEnv} from "./setup";
 
 describe("CapKit", () => {
@@ -7,6 +7,10 @@ describe("CapKit", () => {
   beforeAll(async () => {
     const { capKit: a } = await setupEnv();
     capKit = a;
+  })
+  
+  afterAll(async () => {
+    await capKit?.mcpClose()
   })
 
   it("should rate a cap", async () => {

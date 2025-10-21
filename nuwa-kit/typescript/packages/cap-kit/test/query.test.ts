@@ -1,5 +1,5 @@
 import {CapKit, ResultCap} from "../src/index";
-import {afterAll, describe, expect, it} from '@jest/globals';
+import {afterAll, beforeAll, describe, expect, it} from '@jest/globals';
 import {setupEnv} from "./setup";
 
 describe("CapKit query cap", () => {

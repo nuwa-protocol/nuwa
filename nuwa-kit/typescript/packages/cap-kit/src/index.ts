@@ -15,6 +15,7 @@ export class CapKit {
 	protected env: IdentityEnv;
 	protected mcpClient?: UniversalMcpClient;
 	protected mcpTools?: any;
+	protected mcpClientPromise?: Promise<UniversalMcpClient>;
 
 	constructor(option: {
 		mcpUrl: string;
@@ -35,11 +36,26 @@ export class CapKit {
 		return this.mcpTools
 	}
 
-	async getMcpClient() {
-		if (!this.mcpClient) {
-			this.mcpClient = await buildClient(this.mcpUrl, this.env)
+	async getMcpClient(): Promise<UniversalMcpClient> { 
+		if (this.mcpClient) {
+			return this.mcpClient;
 		}
-		return this.mcpClient
+		
+		if (this.mcpClientPromise) {
+			return this.mcpClientPromise;
+		}
+		
+		this.mcpClientPromise = buildClient(this.mcpUrl, this.env)
+			.then((client) => {
+				this.mcpClient = client;
+				return client;
+			})
+			.catch((error) => {
+				this.mcpClientPromise = undefined;
+				throw error;
+			});
+		
+		return this.mcpClientPromise;
 	}
 
 	async mcpClose() {
