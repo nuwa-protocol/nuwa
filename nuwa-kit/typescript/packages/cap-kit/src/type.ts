@@ -1,6 +1,6 @@
 import { z } from "zod/v3";
 
-export const CapAuthorDIDSchema = z.string().startsWith("did::");
+export const CapAuthorDIDSchema = z.string().startsWith("did:");
 export const CapIDNameSchema = z
 	.string()
 	.regex(
