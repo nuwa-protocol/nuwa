@@ -369,6 +369,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       total: registrar.getTools().length,
     } as any);
     const srv = httpServer as any as StoppableServer;
+    logger.info(`FastMCP HTTP server listening at http://localhost:${port}`);
     // Track sockets to force-close on shutdown and avoid hanging closes
     const sockets = new Set<any>();
     try {
