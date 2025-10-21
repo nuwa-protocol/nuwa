@@ -13,16 +13,26 @@ let useEffect: UseEffectHook;
 let useCallback: UseCallbackHook;
 
 // Load React hooks at runtime
-try {
-  if (typeof window !== 'undefined' && typeof require !== 'undefined') {
-    const React = require('react');
-    useState = React.useState;
-    useEffect = React.useEffect;
-    useCallback = React.useCallback;
+function loadReactHooks() {
+  try {
+    if (typeof window !== 'undefined') {
+      // Use dynamic import with proper error handling
+      const reactPromise = import('react');
+      reactPromise.then((React) => {
+        useState = React.useState;
+        useEffect = React.useEffect;
+        useCallback = React.useCallback;
+      }).catch(() => {
+        // React not available - hooks will remain undefined
+      });
+    }
+  } catch {
+    // React not available
   }
-} catch {
-  // React not available
 }
+
+// Initialize React hooks
+loadReactHooks();
 
 export interface IdentityKitState {
   isConnected: boolean;
