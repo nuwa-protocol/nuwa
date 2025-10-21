@@ -1,5 +1,5 @@
-import { createSelfDid, TestEnv } from "@nuwa-ai/identity-kit";
-import { CapKit } from "../src";
+import { TestEnv, createSelfDid } from "@nuwa-ai/identity-kit";
+import { CapKit } from "../src/index.js";
 
 const localContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625";
 const testContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625";
@@ -31,17 +31,17 @@ export const setupEnv  = async (target: 'test' | 'local' = DEFAULT_TARGET, auth:
   const roochUrl = process.env.ROOCH_NODE_URL || target === 'test' ? 'https://test-seed.rooch.network' : 'http://localhost:6767';
   const mcpUrl = process.env.MCP_URL || target === 'test' ? testMcpUrl : localMcpUrl;
   const contractAddress = process.env.CONTRACT_ADDRESS || target === 'test' ? testContractAddress : localContractAddress;
-  const env = await TestEnv.bootstrap({
+  const testEnv = await TestEnv.bootstrap({
     rpcUrl:  roochUrl,
     network: target,
     debug: false,
   });
-
-  const { signer, did } = await createSelfDid(env, {
+  
+  const { identityEnv, did } = await createSelfDid(testEnv, {
     customScopes: [`${contractAddress}::*::*`],
     secretKey: 'roochsecretkey1qylp6ehfqx4c0zw6w7jpdwxm7q3e739d9fkxq0ym6xjtt2v0lxgpvvhcqg6'
   });
-
+  
   if (target === 'test') {
     await claimTestnetGas(did.split(':')[2]);
   }
@@ -50,12 +50,25 @@ export const setupEnv  = async (target: 'test' | 'local' = DEFAULT_TARGET, auth:
     roochUrl: roochUrl,
     mcpUrl: mcpUrl,
     contractAddress: contractAddress,
-    signer,
+    env: identityEnv,
   });
 
+  const client = await capKit.getMcpClient()
+
+  await client.tools()
+
+  const payerClient = client?.getPayerClient();
+  if (!payerClient) {
+    throw new Error('PayerClient is not available - ensure the MCP server supports payment protocol');
+  }
+
+  await payerClient.getHubClient().deposit('0x3::gas_coin::RGas', BigInt(1000000000));
+
+  await payerClient.getHubClient().getBalance();
+
   return {
-    env,
-    signer,
+    testEnv,
     capKit,
+    identityEnv,
   };
 };

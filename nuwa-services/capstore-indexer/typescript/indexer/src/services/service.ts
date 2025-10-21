@@ -1,6 +1,5 @@
-import {DIDAuth, initRoochVDR, VDRRegistry} from "@nuwa-ai/identity-kit";
+import { IdentityKit, KeyManager } from "@nuwa-ai/identity-kit";
 import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "../constant.js";
-import { FastMCP } from "fastmcp";
 import { config } from "dotenv";
 import { create } from 'ipfs-http-client';
 import { uploadCapTool } from "./upload-cap.js";
@@ -13,6 +12,7 @@ import { queryMyFavoriteCapTool } from "./query-my-favorite-cap.js";
 import { rateCapTool } from "./rate-cap.js";
 import { updateEnableCapTool } from "./update-enable-cap.js";
 import { queryCapRatingDistributionTool } from "./query-cap-rating-distribution.js";
+import { createFastMcpServerFromEnv } from "@nuwa-ai/payment-kit";
 
 // Load environment variables
 config();
@@ -48,46 +48,49 @@ export let ipfsClient: any;
   }
 })();
 
-const registry = VDRRegistry.getInstance();
-initRoochVDR(TARGET, undefined, registry);
+// Initialize MCP server using payment-kit (with FREE tools only)
+let _mcpInstance: Awaited<ReturnType<typeof createFastMcpServerFromEnv>> | null = null;
 
-export const authenticateRequest = async (request: any) => {
-  // Extract authorization header
-  const header =
-    typeof request.headers?.get === "function"
-      ? request.headers.get("authorization")
-      : request.headers["authorization"] ?? request.headers["Authorization"];
+export async function getService() {
+  if (!_mcpInstance) {
+    // Initialize service key and identity environment
+    const serviceKey = process.env.SERVICE_KEY;
+    if (!serviceKey) {
+      throw new Error("SERVICE_KEY environment variable is required");
+    }
+    
+    const keyManager = await KeyManager.fromSerializedKey(serviceKey);
+    const serviceDid = await keyManager.getDid();
+    console.log('🔑 Service DID:', serviceDid);
 
-  const prefix = "DIDAuthV1 ";
-  if (!header || !header.startsWith(prefix)) {
-    throw new Response(undefined, { status: 401, statusText: "Missing DIDAuthV1 header" });
+    const env = await IdentityKit.bootstrap({
+      method: "rooch",
+      keyStore: keyManager.getStore(),
+      vdrOptions: {
+        network: TARGET === 'local' ? 'local' : 'test',
+      },
+    });
+
+    _mcpInstance = await createFastMcpServerFromEnv(env, {
+      serviceId: "nuwa-capstore-indexer",
+      adminDid: serviceDid,
+      debug: process.env.DEBUG === "true",
+      port: parseInt(process.env.PORT || "3000"),
+      endpoint: "/mcp",
+    });
+
+    // Register FREE tools
+    _mcpInstance.freeTool(downloadCapTool);
+    _mcpInstance.freeTool(queryCapByIDTool);
+    _mcpInstance.freeTool(queryCapByNameTool);
+    _mcpInstance.freeTool(queryCapStatsTool);
+    _mcpInstance.freeTool(queryMyFavoriteCapTool);
+    _mcpInstance.freeTool(queryCapRatingDistributionTool);
+
+    _mcpInstance.paidTool(rateCapTool);
+    _mcpInstance.paidTool(uploadCapTool);
+    _mcpInstance.paidTool(favoriteCapTool);
+    _mcpInstance.paidTool(updateEnableCapTool);
   }
-
-  // Verify DID authentication
-  const verify = await DIDAuth.v1.verifyAuthHeader(header, registry);
-  if (!verify.ok) {
-    const msg = (verify as { error: string }).error;
-    throw new Response(`Invalid DIDAuth: ${msg}`, { status: 403 });
-  }
-
-  // Return signer DID
-  const signerDid = verify.signedObject.signature.signer_did;
-  return { did: signerDid };
-};
-
-export const ipfsService = new FastMCP({
-  name: "nuwa-ipfs-service",
-  version: "1.0.0",
-  authenticate: authenticateRequest
-});
-
-ipfsService.addTool(uploadCapTool);
-ipfsService.addTool(downloadCapTool);
-ipfsService.addTool(favoriteCapTool);
-ipfsService.addTool(queryCapByIDTool);
-ipfsService.addTool(queryCapByNameTool);
-ipfsService.addTool(queryCapStatsTool);
-ipfsService.addTool(queryMyFavoriteCapTool);
-ipfsService.addTool(rateCapTool);
-ipfsService.addTool(updateEnableCapTool);
-ipfsService.addTool(queryCapRatingDistributionTool);
+  return _mcpInstance;
+}
