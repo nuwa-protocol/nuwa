@@ -56,5 +56,5 @@ You can find open issues suitable for new contributors by looking for the [good 
 
 
 ## 🗣️ License
-MIT — because open infrastructure should stay open.
+Apache-2.0 — because open infrastructure should stay open.
 
