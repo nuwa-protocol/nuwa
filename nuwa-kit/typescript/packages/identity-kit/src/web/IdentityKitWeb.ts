@@ -10,6 +10,12 @@ import {
 import { LocalStorageKeyStore } from './keystore/LocalStorageKeyStore';
 import { IndexedDBKeyStore } from './keystore/IndexedDBKeyStore';
 import { DeepLinkManager } from './deeplink/DeepLinkManager';
+import { 
+  IdentityKitError, 
+  IdentityKitErrorCode, 
+  createWebError,
+  wrapUnknownError 
+} from '../errors';
 
 export interface IdentityKitWebOptions {
   /** Application name, used to build key id fragment; optional */
@@ -51,7 +57,10 @@ export class IdentityKitWeb {
   static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
     // Runtime check for browser environment
     if (typeof window === 'undefined') {
-      throw new Error('IdentityKitWeb is only available in browser environments');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+        'IdentityKitWeb is only available in browser environments'
+      );
     }
     const { appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';

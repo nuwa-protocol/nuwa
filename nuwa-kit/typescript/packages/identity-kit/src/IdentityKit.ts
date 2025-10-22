@@ -15,6 +15,13 @@ import { MultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
+import { 
+  IdentityKitError, 
+  IdentityKitErrorCode, 
+  createDIDError, 
+  createVDRError,
+  wrapUnknownError 
+} from './errors';
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
@@ -40,7 +47,11 @@ export class IdentityKit {
     const method = extractMethod(did);
     const vdr = registry.getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method, did }
+      );
     }
 
     // Resolve DID to get DID Document
@@ -48,7 +59,11 @@ export class IdentityKit {
     // Maybe we should find a better way to clear the cache when we add a service or verification method
     const didDocument = await registry.resolveDID(did, { forceRefresh: true });
     if (!didDocument) {
-      throw new Error(`Failed to resolve DID ${did}`);
+      throw createDIDError(
+        IdentityKitErrorCode.DID_RESOLUTION_FAILED,
+        `Failed to resolve DID: ${did}`,
+        { did, method }
+      );
     }
 
     return new IdentityKit(didDocument, vdr, signer);
@@ -61,7 +76,11 @@ export class IdentityKit {
     const { method } = parseDid(didDocument.id);
     const vdr = VDRRegistry.getInstance().getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method, did: didDocument.id }
+      );
     }
 
     return new IdentityKit(didDocument, vdr, signer);
@@ -79,12 +98,20 @@ export class IdentityKit {
     const registry = VDRRegistry.getInstance();
     const vdr = registry.getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method }
+      );
     }
 
     const result = await registry.createDID(method, creationRequest, options);
     if (!result.success || !result.didDocument) {
-      throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
+      throw createDIDError(
+        IdentityKitErrorCode.DID_CREATION_FAILED,
+        `Failed to create DID: ${result.error || 'Unknown error'}`,
+        { method, creationRequest, result }
+      );
     }
 
     return new IdentityKit(result.didDocument, vdr, signer);

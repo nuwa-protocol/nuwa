@@ -1,5 +1,10 @@
 import { IdentityKitWeb } from '..';
 import { NIP1SignedObject } from '../../index';
+import { 
+  IdentityKitErrorCode, 
+  createWebError, 
+  createReactError 
+} from '../../errors';
 
 // React types - will be available when React is installed
 type ReactHook<T> = [T, (value: T | ((prev: T) => T)) => void];
@@ -65,11 +70,17 @@ export interface UseIdentityKitOptions {
 export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
   // Runtime checks for React and browser environment
   if (typeof window === 'undefined') {
-    throw new Error('useIdentityKit is only available in browser environments');
+    throw createWebError(
+      IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+      'useIdentityKit is only available in browser environments'
+    );
   }
   
   if (typeof useState === 'undefined' || typeof useEffect === 'undefined') {
-    throw new Error('useIdentityKit requires React to be available');
+    throw createReactError(
+      IdentityKitErrorCode.REACT_NOT_AVAILABLE,
+      'useIdentityKit requires React to be available'
+    );
   }
   const [sdk, setSdk] = useState<IdentityKitWeb | null>(null);
   const [state, setState] = useState<IdentityKitState>({
