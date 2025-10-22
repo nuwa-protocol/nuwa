@@ -1,6 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
 import { IdentityKitWeb } from '..';
-import { NIP1SignedObject } from '@nuwa-ai/identity-kit';
+import { NIP1SignedObject } from '../../index';
+
+// React types - will be available when React is installed
+type ReactHook<T> = [T, (value: T | ((prev: T) => T)) => void];
+type UseStateHook = <T>(initialValue: T) => ReactHook<T>;
+type UseEffectHook = (effect: () => void | (() => void), deps?: any[]) => void;
+type UseCallbackHook = <T extends (...args: any[]) => any>(callback: T, deps: any[]) => T;
+
+// Runtime React hooks - will be loaded dynamically
+let useState: UseStateHook;
+let useEffect: UseEffectHook;
+let useCallback: UseCallbackHook;
+
+// Load React hooks at runtime
+function loadReactHooks() {
+  try {
+    if (typeof window !== 'undefined') {
+      // Use dynamic import with proper error handling
+      const reactPromise = import('react');
+      reactPromise.then((React) => {
+        useState = React.useState;
+        useEffect = React.useEffect;
+        useCallback = React.useCallback;
+      }).catch(() => {
+        // React not available - hooks will remain undefined
+      });
+    }
+  } catch {
+    // React not available
+  }
+}
+
+// Initialize React hooks
+loadReactHooks();
 
 export interface IdentityKitState {
   isConnected: boolean;
@@ -31,6 +63,14 @@ export interface UseIdentityKitOptions {
  * React hook for Nuwa Identity Kit (Web)
  */
 export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
+  // Runtime checks for React and browser environment
+  if (typeof window === 'undefined') {
+    throw new Error('useIdentityKit is only available in browser environments');
+  }
+  
+  if (typeof useState === 'undefined' || typeof useEffect === 'undefined') {
+    throw new Error('useIdentityKit requires React to be available');
+  }
   const [sdk, setSdk] = useState<IdentityKitWeb | null>(null);
   const [state, setState] = useState<IdentityKitState>({
     isConnected: false,
@@ -57,7 +97,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
         error: null,
       });
     } else {
-      setState(prev => ({
+      setState((prev: IdentityKitState) => ({
         ...prev,
         isConnected: false,
         isConnecting: false,
@@ -80,7 +120,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
         // Check connection status
         await refreshConnection(newSdk);
       } catch (error) {
-        setState(prev => ({
+        setState((prev: IdentityKitState) => ({
           ...prev,
           error: `Failed to initialize SDK: ${error instanceof Error ? error.message : String(error)}`,
         }));
@@ -105,16 +145,16 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   // Connect action
   const connect = useCallback(async (options?: { scopes?: string[] }) => {
     if (!sdk) {
-      setState(prev => ({ ...prev, error: 'SDK not initialized' }));
+      setState((prev: IdentityKitState) => ({ ...prev, error: 'SDK not initialized' }));
       return;
     }
 
-    setState(prev => ({ ...prev, isConnecting: true, error: null }));
+    setState((prev: IdentityKitState) => ({ ...prev, isConnecting: true, error: null }));
 
     try {
       await sdk.connect(options);
       // Actual connection result will be handled via postMessage in callback
-      setState(prev => ({ ...prev, isConnecting: false }));
+      setState((prev: IdentityKitState) => ({ ...prev, isConnecting: false }));
     } catch (error) {
       setState({
         isConnected: false,

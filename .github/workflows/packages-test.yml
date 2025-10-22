@@ -24,8 +24,9 @@ jobs:
         with:
           filters: |
             identity-kit: nuwa-kit/typescript/packages/identity-kit/**
-            identity-kit-web: nuwa-kit/typescript/packages/identity-kit-web/**
             payment-kit: nuwa-kit/typescript/packages/payment-kit/**
+            cap-kit: nuwa-kit/typescript/packages/cap-kit/**
+            ui-kit: nuwa-kit/typescript/packages/ui-kit/**
 
   test:
     needs: detect-changes
@@ -70,7 +71,7 @@ jobs:
         run: |
           cd nuwa-kit/typescript
           # Build identity-kit first since other packages depend on it
-          if [[ "${{ matrix.package }}" == "payment-kit" || "${{ matrix.package }}" == "identity-kit-web" ]]; then
+          if [[ "${{ matrix.package }}" == "payment-kit" ]]; then
             pnpm --filter @nuwa-ai/identity-kit build
           fi
       
@@ -87,10 +88,12 @@ jobs:
           PACKAGE_PATH=""
           if [[ "${{ matrix.package }}" == "identity-kit" ]]; then
             PACKAGE_PATH="nuwa-kit/typescript/packages/identity-kit"
-          elif [[ "${{ matrix.package }}" == "identity-kit-web" ]]; then
-            PACKAGE_PATH="nuwa-kit/typescript/packages/identity-kit-web"
           elif [[ "${{ matrix.package }}" == "payment-kit" ]]; then
             PACKAGE_PATH="nuwa-kit/typescript/packages/payment-kit"
+          elif [[ "${{ matrix.package }}" == "cap-kit" ]]; then
+            PACKAGE_PATH="nuwa-kit/typescript/packages/cap-kit"
+          elif [[ "${{ matrix.package }}" == "ui-kit" ]]; then
+            PACKAGE_PATH="nuwa-kit/typescript/packages/ui-kit"
           fi
           
           if [[ -n "$PACKAGE_PATH" ]]; then

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
+import { IdentityKitWeb } from '@nuwa-ai/identity-kit/web';
 
 export function Callback() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
