@@ -749,7 +749,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     const preflightResponse = await fetch(serverUrl, {
       method: 'OPTIONS',
       headers: {
-        'Origin': 'https://test-app.nuwa.dev',
+        Origin: 'https://test-app.nuwa.dev',
         'Access-Control-Request-Method': 'POST',
         'Access-Control-Request-Headers': 'Content-Type, Mcp-Session-Id, Authorization',
       },
@@ -792,7 +792,7 @@ describe('MCP Payment Kit E2E (Real Blockchain + MCP Server)', () => {
     const postResponse = await fetch(serverUrl, {
       method: 'POST',
       headers: {
-        'Origin': 'https://test-app.nuwa.dev',
+        Origin: 'https://test-app.nuwa.dev',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

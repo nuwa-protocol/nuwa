@@ -289,7 +289,7 @@ describe('BillableRouter', () => {
       expect(rule1).toBeDefined();
       expect(rule1?.id).toBe('openrouter-wildcard');
 
-      // Test that /openai/v1/chat/completions matches  
+      // Test that /openai/v1/chat/completions matches
       const rule2 = router.findRule('POST', '/openai/v1/chat/completions');
       expect(rule2).toBeDefined();
       expect(rule2?.id).toBe('openai-wildcard');
@@ -321,7 +321,7 @@ describe('BillableRouter', () => {
       };
 
       const providerOptions: RouteOptions = {
-        pricing: { type: 'FinalCost' }, 
+        pricing: { type: 'FinalCost' },
         authRequired: true,
       };
 
