@@ -39,7 +39,7 @@
     "nuwa"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.6.0",
     "@nuwa-ai/payment-kit": "^0.6.8",

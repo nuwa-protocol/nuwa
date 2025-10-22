@@ -430,7 +430,7 @@ Note: Callbacks passed to `execute()` are handled locally by the SDK and are not
 
 ## License
 
-MIT
+Apache-2.0
 
 ## Contributing
 

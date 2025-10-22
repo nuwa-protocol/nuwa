@@ -46,7 +46,7 @@
     "wait-on": "^8.0.3"
   },
   "author": "Nuwa Team",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": [
     "mcp",
     "model-context-protocol",
