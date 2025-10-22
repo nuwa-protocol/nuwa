@@ -37,7 +37,7 @@ export function wrapAndFilterInBandFrames(
   const afterPayment = (controller: ReadableStreamDefaultController<Uint8Array>) => {
     try {
       sawPayment = true;
-      // Don't close the controller here - let the upstream manage the stream lifecycle
+      // Don't close the controller here - let the original readable stream from the Response manage the stream lifecycle
       // The stream should continue processing business data after payment
       log('[afterPayment] Payment processed, continuing stream');
     } catch (e) {
