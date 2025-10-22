@@ -26,7 +26,6 @@ jobs:
             identity-kit: nuwa-kit/typescript/packages/identity-kit/**
             payment-kit: nuwa-kit/typescript/packages/payment-kit/**
             cap-kit: nuwa-kit/typescript/packages/cap-kit/**
-            ui-kit: nuwa-kit/typescript/packages/ui-kit/**
 
   test:
     needs: detect-changes
@@ -89,8 +88,6 @@ jobs:
             PACKAGE_PATH="nuwa-kit/typescript/packages/payment-kit"
           elif [[ "${{ matrix.package }}" == "cap-kit" ]]; then
             PACKAGE_PATH="nuwa-kit/typescript/packages/cap-kit"
-          elif [[ "${{ matrix.package }}" == "ui-kit" ]]; then
-            PACKAGE_PATH="nuwa-kit/typescript/packages/ui-kit"
           fi
           
           if [[ -n "$PACKAGE_PATH" ]]; then
