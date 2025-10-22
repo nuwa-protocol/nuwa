@@ -67,13 +67,10 @@ jobs:
           cd nuwa-kit/typescript
           pnpm install
       
-      - name: Build dependencies
+      - name: Build workspace
         run: |
           cd nuwa-kit/typescript
-          # Build identity-kit first since other packages depend on it
-          if [[ "${{ matrix.package }}" == "payment-kit" ]]; then
-            pnpm --filter @nuwa-ai/identity-kit build
-          fi
+          pnpm build
       
       - name: Verify workspace setup
         run: |
