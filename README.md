@@ -1,4 +1,4 @@
-![nuwa ai readme banner](website/docs/public/assets/readme-bg.png)
+![nuwa ai readme banner](https://github.com/nuwa-protocol/nuwa/raw/archive-doc/website/docs/public/assets/readme-bg.png)
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nuwa-protocol/nuwa)
 
