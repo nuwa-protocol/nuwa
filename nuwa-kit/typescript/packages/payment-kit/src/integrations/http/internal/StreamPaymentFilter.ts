@@ -33,16 +33,13 @@ export function wrapAndFilterInBandFrames(
 
   let sawPayment = false;
 
-  // After payment frame is handled, proactively close the filtered stream to avoid hanging
+  // After payment frame is handled, mark payment as seen but let the stream continue
   const afterPayment = (controller: ReadableStreamDefaultController<Uint8Array>) => {
     try {
       sawPayment = true;
-      controller.close();
-      try {
-        reader.cancel();
-      } catch (e) {
-        log('[afterPayment.error]', e);
-      }
+      // Don't close the controller here - let the upstream manage the stream lifecycle
+      // The stream should continue processing business data after payment
+      log('[afterPayment] Payment processed, continuing stream');
     } catch (e) {
       log('[afterPayment.error]', e);
     }
@@ -78,6 +75,7 @@ export function wrapAndFilterInBandFrames(
           await parser.process(chunkText, controller);
         }
         await parser.flush(controller);
+        // Close the filtered stream when the original stream ends naturally
         controller.close();
         try {
           onFinish?.({ sawPayment });
@@ -115,6 +113,7 @@ export function wrapAndFilterInBandFrames(
             const { value, done } = await reader.read();
             if (done) {
               await parser.flush(controller);
+              // Close the filtered stream when the original stream ends naturally
               controller.close();
               try {
                 onFinish?.({ sawPayment });

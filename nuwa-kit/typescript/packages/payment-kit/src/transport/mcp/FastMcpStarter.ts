@@ -1,11 +1,7 @@
 // Optional convenience starter for FastMCP
 // Users can import this to quickly start an MCP server with billing enabled.
 
-import {
-  McpPaymentKit,
-  createMcpPaymentKit,
-  McpPaymentKitOptions,
-} from './McpPaymentKit';
+import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
 import { z } from 'zod';
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
@@ -304,7 +300,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       },
       onUnhandledRequest: async (req: any, res: any) => {
         // Handle preflight requests
-        if (req.method === "OPTIONS") {
+        if (req.method === 'OPTIONS') {
           res.writeHead(204);
           res.end();
           return;
