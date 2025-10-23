@@ -4,10 +4,21 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
+import {
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+  CADOPControllerCreationRequest,
+} from './types';
 import { AbstractVDR } from './abstractVDR';
 import { MultibaseCodec, DidKeyCodec } from '../multibase';
 import { DebugLogger } from '../utils/DebugLogger';
+import {
+  IdentityKitErrorCode,
+  createDIDError,
+  createVDRError,
+  createValidationError,
+} from '../errors';
 
 /**
  * KeyVDR handles did:key DIDs
@@ -77,7 +88,7 @@ export class KeyVDR extends AbstractVDR {
     try {
       const originalDocument = await this.resolve(did);
       if (!originalDocument) {
-        throw new Error(`DID ${did} not found`);
+        throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID ${did} not found`, { did });
       }
 
       // Use parent class validation methods
@@ -91,7 +102,11 @@ export class KeyVDR extends AbstractVDR {
 
       // Check for duplicate verification method ID
       if (originalDocument.verificationMethod?.some(vm => vm.id === verificationMethod.id)) {
-        throw new Error(`Verification method ${verificationMethod.id} already exists`);
+        throw createValidationError(
+          IdentityKitErrorCode.VALIDATION_FAILED,
+          `Verification method ${verificationMethod.id} already exists`,
+          { verificationMethodId: verificationMethod.id, did }
+        );
       }
 
       if (!originalDocument.verificationMethod) {
@@ -134,7 +149,7 @@ export class KeyVDR extends AbstractVDR {
     try {
       const originalDocument = await this.resolve(did);
       if (!originalDocument) {
-        throw new Error(`DID ${did} not found`);
+        throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID ${did} not found`, { did });
       }
 
       // Use parent class validation method
@@ -154,7 +169,11 @@ export class KeyVDR extends AbstractVDR {
 
       const isPrimaryKey = vmIndex === 0;
       if (isPrimaryKey) {
-        throw new Error(`Cannot remove the primary key ${keyId} from did:key document`);
+        throw createValidationError(
+          IdentityKitErrorCode.OPERATION_NOT_PERMITTED,
+          `Cannot remove the primary key ${keyId} from did:key document`,
+          { keyId, did, reason: 'Primary key cannot be removed from did:key documents' }
+        );
       }
 
       originalDocument.verificationMethod = verificationMethods.filter(vm => vm.id !== keyId);
@@ -195,7 +214,7 @@ export class KeyVDR extends AbstractVDR {
     try {
       const originalDocument = await this.resolve(did);
       if (!originalDocument) {
-        throw new Error(`DID ${did} not found`);
+        throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID ${did} not found`, { did });
       }
 
       // Use parent class validation methods
@@ -234,7 +253,7 @@ export class KeyVDR extends AbstractVDR {
     try {
       const originalDocument = await this.resolve(did);
       if (!originalDocument) {
-        throw new Error(`DID ${did} not found`);
+        throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID ${did} not found`, { did });
       }
 
       // Use parent class validation method
@@ -326,7 +345,10 @@ export class KeyVDR extends AbstractVDR {
     }
   }
 
-  async createViaCADOPWithController(request: CADOPControllerCreationRequest, _options?: any): Promise<DIDCreationResult> {
+  async createViaCADOPWithController(
+    request: CADOPControllerCreationRequest,
+    _options?: any
+  ): Promise<DIDCreationResult> {
     // For KeyVDR, we only support did:key controllers
     if (!request.controllerDid.startsWith('did:key:')) {
       return {
@@ -367,7 +389,7 @@ export class KeyVDR extends AbstractVDR {
     try {
       const originalDocument = await this.resolve(did);
       if (!originalDocument) {
-        throw new Error(`DID ${did} not found`);
+        throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID ${did} not found`, { did });
       }
 
       // Use parent class validation method
@@ -381,7 +403,11 @@ export class KeyVDR extends AbstractVDR {
       // Check if the verification method exists
       const verificationMethod = originalDocument.verificationMethod?.find(vm => vm.id === keyId);
       if (!verificationMethod) {
-        throw new Error(`Verification method ${keyId} not found`);
+        throw createValidationError(
+          IdentityKitErrorCode.KEY_NOT_FOUND,
+          `Verification method ${keyId} not found`,
+          { keyId, did }
+        );
       }
 
       // Remove relationships

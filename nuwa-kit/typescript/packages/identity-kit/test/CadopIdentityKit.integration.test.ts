@@ -1,6 +1,17 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { CadopIdentityKit, CadopServiceType, DebugLogger, KeyManager, AUTH_PROVIDERS } from '../src';
-import { TestEnv, createCadopCustodian, createDidViaCadop, createSelfDid } from '../src/testHelpers';
+import {
+  CadopIdentityKit,
+  CadopServiceType,
+  DebugLogger,
+  KeyManager,
+  AUTH_PROVIDERS,
+} from '../src';
+import {
+  TestEnv,
+  createCadopCustodian,
+  createDidViaCadop,
+  createSelfDid,
+} from '../src/testHelpers';
 import { KeyType } from '../src/types/crypto';
 import { CryptoUtils } from '../src/crypto';
 import { DidKeyCodec, MultibaseCodec } from '../src/multibase';
@@ -111,16 +122,13 @@ describe('CadopIdentityKit Integration Test', () => {
 
       // Create a did:key to act as controller
       const userDidKey = await createDidKey(KeyType.SECP256K1);
-      
-      const result = await cadopKit.createDIDWithController(
-        'rooch',
-        userDidKey 
-      );
+
+      const result = await cadopKit.createDIDWithController('rooch', userDidKey);
       console.log('result', result);
       expect(result.success).toBe(true);
       expect(result.didDocument).toBeDefined();
       expect(result.didDocument!.id).toMatch(/^did:rooch:/);
-      
+
       console.log(`Created DID with did:key controller: ${result.didDocument!.id}`);
     });
 
@@ -131,30 +139,26 @@ describe('CadopIdentityKit Integration Test', () => {
       const bitcoinKeypair = Secp256k1Keypair.generate();
       const bitcoinAddress = bitcoinKeypair.getBitcoinAddress();
       const bitcoinDid = `did:bitcoin:${bitcoinAddress.toStr()}`;
-      
+
       // Get the public key and convert to multibase format
       const bitcoinPublicKeyBytes = bitcoinKeypair.getPublicKey().toBytes();
       const bitcoinPublicKey = MultibaseCodec.encodeBase58btc(bitcoinPublicKeyBytes);
-      
+
       console.log('Generated Bitcoin keypair:');
       console.log('  DID:', bitcoinDid);
       console.log('  Address:', bitcoinAddress.toStr());
       console.log('  Public Key (hex):', Buffer.from(bitcoinPublicKeyBytes).toString('hex'));
       console.log('  Public Key (multibase):', bitcoinPublicKey);
-      
-      const result = await cadopKit.createDIDWithController(
-        'rooch',
-        bitcoinDid,
-        {
-          controllerPublicKeyMultibase: bitcoinPublicKey,
-          controllerVMType: 'EcdsaSecp256k1VerificationKey2019',
-        }
-      );
+
+      const result = await cadopKit.createDIDWithController('rooch', bitcoinDid, {
+        controllerPublicKeyMultibase: bitcoinPublicKey,
+        controllerVMType: 'EcdsaSecp256k1VerificationKey2019',
+      });
       console.log('result', result);
       expect(result.success).toBe(true);
       expect(result.didDocument).toBeDefined();
       expect(result.didDocument!.id).toMatch(/^did:rooch:/);
-      
+
       console.log(`Created DID with Bitcoin controller: ${result.didDocument!.id}`);
     });
 
@@ -168,19 +172,15 @@ describe('CadopIdentityKit Integration Test', () => {
       const publicKeyHex = '02de3d42a8c1b9f50eb2320fb3142cc0395a6104fa915829bb12342f6b60fbe45e';
       const publicKeyBytes = Buffer.from(publicKeyHex, 'hex');
       const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKeyBytes);
-      
-      const result = await cadopKit.createDIDWithController(
-        'rooch',
-        invalidDid,
-        {
-          controllerPublicKeyMultibase: publicKeyMultibase,
-          controllerVMType: 'EcdsaSecp256k1VerificationKey2019'
-        }
-      );
+
+      const result = await cadopKit.createDIDWithController('rooch', invalidDid, {
+        controllerPublicKeyMultibase: publicKeyMultibase,
+        controllerVMType: 'EcdsaSecp256k1VerificationKey2019',
+      });
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
-      
+
       console.log(`Expected error for invalid DID: ${result.error}`);
     });
 
@@ -188,22 +188,18 @@ describe('CadopIdentityKit Integration Test', () => {
       if (!shouldRunIntegrationTests()) return;
 
       const bitcoinDid = 'did:bitcoin:bc1qx8xkwejc0n64gnc9zllassmy04g2l7759ju7pt';
-      
+
       // Missing controllerPublicKeyMultibase should cause transaction failure
-      const result = await cadopKit.createDIDWithController(
-        'rooch',
-        bitcoinDid,
-        {
-          // Missing controllerPublicKeyMultibase
-          controllerVMType: 'EcdsaSecp256k1VerificationKey2019'
-        }
-      );
+      const result = await cadopKit.createDIDWithController('rooch', bitcoinDid, {
+        // Missing controllerPublicKeyMultibase
+        controllerVMType: 'EcdsaSecp256k1VerificationKey2019',
+      });
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
       // The error should be a transaction execution failure, not a client-side validation error
       expect(result.error).toMatch(/execution failed|moveabort|transaction.*failed/i);
-      
+
       console.log(`Expected transaction failure: ${result.error}`);
     });
   });

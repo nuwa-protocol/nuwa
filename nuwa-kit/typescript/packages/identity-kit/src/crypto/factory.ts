@@ -3,6 +3,7 @@ import { Ed25519Provider } from './providers/ed25519';
 import { Secp256k1Provider } from './providers/secp256k1';
 import { EcdsaR1Provider } from './providers/ecdsa_r1';
 import { KEY_TYPE, KeyType } from '../types/crypto';
+import { IdentityKitErrorCode, createCryptoError } from '../errors';
 
 export class DefaultCryptoProviderFactory implements CryptoProviderFactory {
   private providers: Map<KeyType, CryptoProvider>;
@@ -17,7 +18,11 @@ export class DefaultCryptoProviderFactory implements CryptoProviderFactory {
   createProvider(keyType: KeyType): CryptoProvider {
     const provider = this.providers.get(keyType);
     if (!provider) {
-      throw new Error(`No provider available for key type: ${keyType}`);
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_PROVIDER_NOT_FOUND,
+        `No provider available for key type: ${keyType}`,
+        { keyType, availableTypes: Array.from(this.providers.keys()) }
+      );
     }
     return provider;
   }

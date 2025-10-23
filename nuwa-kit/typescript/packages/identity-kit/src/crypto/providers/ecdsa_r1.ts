@@ -3,13 +3,18 @@ import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils';
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
 import { base64urlToBytes } from '../../utils/bytes';
+import { IdentityKitErrorCode, createCryptoError, createValidationError } from '../../errors';
 
 // Universal helper to obtain a Web Crypto implementation in both browser and Node.js environments.
 function getCrypto(): Crypto {
   if (typeof globalThis !== 'undefined' && (globalThis as any).crypto) {
     return (globalThis as any).crypto as Crypto;
   }
-  throw new Error('Web Crypto API is not available in the current runtime');
+  throw createCryptoError(
+    IdentityKitErrorCode.ENVIRONMENT_NOT_SUPPORTED,
+    'Web Crypto API is not available in the current runtime',
+    { environment: typeof globalThis, cryptoAvailable: false }
+  );
 }
 
 export class EcdsaR1Provider implements CryptoProvider {
@@ -30,7 +35,11 @@ export class EcdsaR1Provider implements CryptoProvider {
     );
 
     if (!('publicKey' in generated)) {
-      throw new Error('ECDSA P-256 generateKey did not return a key pair');
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_OPERATION_FAILED,
+        'ECDSA P-256 generateKey did not return a key pair',
+        { keyType: 'ECDSA-R1', operation: 'generateKeyPair' }
+      );
     }
     const { publicKey, privateKey } = generated;
 
@@ -48,12 +57,20 @@ export class EcdsaR1Provider implements CryptoProvider {
 
   private compressPublicKey(publicKey: Uint8Array): Uint8Array {
     if (publicKey.length !== 65) {
-      throw new Error(`Invalid public key length. Expected 65 bytes, got ${publicKey.length}`);
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        `Invalid public key length. Expected 65 bytes, got ${publicKey.length}`,
+        { expectedLength: 65, actualLength: publicKey.length, keyType: 'ECDSA-R1' }
+      );
     }
 
     // First byte is the format (0x04 for uncompressed)
     if (publicKey[0] !== 0x04) {
-      throw new Error('Invalid public key format. Expected uncompressed format (0x04)');
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        'Invalid public key format. Expected uncompressed format (0x04)',
+        { actualPrefix: publicKey[0], expectedPrefix: 0x04, keyType: 'ECDSA-R1' }
+      );
     }
 
     // Extract x and y coordinates
@@ -72,13 +89,19 @@ export class EcdsaR1Provider implements CryptoProvider {
 
   private decompressPublicKey(compressedKey: Uint8Array): Uint8Array {
     if (compressedKey.length !== 33) {
-      throw new Error(
-        `Invalid compressed public key length. Expected 33 bytes, got ${compressedKey.length}`
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        `Invalid compressed public key length. Expected 33 bytes, got ${compressedKey.length}`,
+        { expectedLength: 33, actualLength: compressedKey.length, keyType: 'ECDSA-R1' }
       );
     }
     const format = compressedKey[0];
     if (format !== 0x02 && format !== 0x03) {
-      throw new Error('Invalid compressed public key format. Expected 0x02 or 0x03');
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        'Invalid compressed public key format. Expected 0x02 or 0x03',
+        { actualPrefix: compressedKey[0], expectedPrefixes: [0x02, 0x03], keyType: 'ECDSA-R1' }
+      );
     }
     try {
       const point = p256.ProjectivePoint.fromHex(compressedKey);
@@ -93,7 +116,11 @@ export class EcdsaR1Provider implements CryptoProvider {
       return decompressed;
     } catch (err) {
       const error = err as Error;
-      throw new Error(`Failed to decompress public key: ${error.message}`);
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_OPERATION_FAILED,
+        `Failed to decompress public key: ${error.message}`,
+        { keyType: 'ECDSA-R1', operation: 'decompressPublicKey', originalError: error.message }
+      );
     }
   }
 
@@ -135,7 +162,11 @@ export class EcdsaR1Provider implements CryptoProvider {
         const sig = p256.Signature.fromDER(derSignature);
         return sig.toCompactRawBytes();
       } catch (e) {
-        throw new Error('Invalid DER signature');
+        throw createValidationError(
+          IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+          'Invalid DER signature',
+          { keyType: 'ECDSA-R1', operation: 'parseDERSignature' }
+        );
       }
     }
     // else assume already raw 64
@@ -210,7 +241,11 @@ export class EcdsaR1Provider implements CryptoProvider {
     // Export as JWK to get public key coordinates
     const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
     if (!jwk.x || !jwk.y) {
-      throw new Error('Failed to derive public key from private key');
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_KEY_DERIVATION_FAILED,
+        'Failed to derive public key from private key',
+        { keyType: 'ECDSA-R1', operation: 'derivePublicKey' }
+      );
     }
 
     // Convert base64url coordinates to raw bytes

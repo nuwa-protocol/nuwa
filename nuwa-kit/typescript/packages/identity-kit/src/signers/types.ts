@@ -54,7 +54,8 @@ export interface SignerInterface {
  * This is more reliable than instanceof when dealing with cross-module dependencies
  */
 export function isSignerInterface(obj: any): obj is SignerInterface {
-  return obj &&
+  return (
+    obj &&
     typeof obj === 'object' &&
     typeof obj.listKeyIds === 'function' &&
     typeof obj.signWithKeyId === 'function' &&
@@ -62,5 +63,6 @@ export function isSignerInterface(obj: any): obj is SignerInterface {
     typeof obj.getDid === 'function' &&
     typeof obj.getKeyInfo === 'function' &&
     // Check that it's NOT a Signer (which has different methods)
-    typeof obj.sign !== 'function';
+    typeof obj.sign !== 'function'
+  );
 }

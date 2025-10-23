@@ -1,6 +1,7 @@
 import { KeyType } from '../types/crypto';
 import { MultibaseCodec } from './base';
 import { KeyMultibaseCodec } from './key';
+import { IdentityKitErrorCode, createDIDError } from '../errors';
 
 /**
  * DID key codec implementation
@@ -26,7 +27,10 @@ export class DidKeyCodec {
    */
   static parseDidKey(didKey: string): { keyType: KeyType; publicKey: Uint8Array } {
     if (!didKey.startsWith('did:key:')) {
-      throw new Error('Invalid did:key format');
+      throw createDIDError(IdentityKitErrorCode.DID_INVALID_FORMAT, 'Invalid did:key format', {
+        didKey,
+        expectedPrefix: 'did:key:',
+      });
     }
     const multibase = didKey.substring(8);
     const { keyType, bytes } = KeyMultibaseCodec.decodeWithType(multibase);

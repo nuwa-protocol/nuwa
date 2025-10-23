@@ -3,6 +3,8 @@
  * Used across SDK layers (VDR, Signer, KeyManager, etc.)
  */
 
+import { IdentityKitErrorCode, createDIDError } from '../errors';
+
 /**
  * Parsed DID parts
  */
@@ -23,19 +25,29 @@ export interface ParsedDID {
  */
 export function parseDid(did: string): ParsedDID {
   if (!did.startsWith('did:')) {
-    throw new Error(`Invalid DID: ${did}`);
+    throw createDIDError(IdentityKitErrorCode.DID_INVALID_FORMAT, `Invalid DID: ${did}`, {
+      did,
+      reason: 'DID must start with "did:"',
+    });
   }
 
   // Strip leading `did:` and split once by ':'
   const afterPrefix = did.slice(4);
   const methodEnd = afterPrefix.indexOf(':');
   if (methodEnd === -1) {
-    throw new Error(`Invalid DID – missing method/identifier separator: ${did}`);
+    throw createDIDError(
+      IdentityKitErrorCode.DID_INVALID_FORMAT,
+      `Invalid DID – missing method/identifier separator: ${did}`,
+      { did, reason: 'Missing method/identifier separator ":"' }
+    );
   }
   const method = afterPrefix.slice(0, methodEnd);
   const idPlusFrag = afterPrefix.slice(methodEnd + 1);
   if (!method || !idPlusFrag) {
-    throw new Error(`Invalid DID: ${did}`);
+    throw createDIDError(IdentityKitErrorCode.DID_INVALID_FORMAT, `Invalid DID: ${did}`, {
+      did,
+      reason: 'Empty method or identifier',
+    });
   }
 
   const hashIdx = idPlusFrag.indexOf('#');
@@ -65,7 +77,11 @@ export function extractIdentifier(did: string): string {
 export function extractFragment(idOrDid: string): string {
   const idx = idOrDid.indexOf('#');
   if (idx === -1) {
-    throw new Error(`No fragment found in ${idOrDid}`);
+    throw createDIDError(
+      IdentityKitErrorCode.DID_INVALID_FORMAT,
+      `No fragment found in ${idOrDid}`,
+      { idOrDid, reason: 'Missing fragment separator "#"' }
+    );
   }
   return idOrDid.slice(idx + 1);
 }

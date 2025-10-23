@@ -15,12 +15,13 @@ import { MultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
-import { 
-  IdentityKitError, 
-  IdentityKitErrorCode, 
-  createDIDError, 
+import {
+  IdentityKitError,
+  IdentityKitErrorCode,
+  createDIDError,
   createVDRError,
-  wrapUnknownError 
+  createKeyManagementError,
+  wrapUnknownError,
 } from './errors';
 
 /**
@@ -182,7 +183,15 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityDelegation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityDelegation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityDelegation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityDelegation',
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     // 2. Create verification method entry
@@ -214,7 +223,16 @@ export class IdentityKit {
     );
 
     if (!published) {
-      throw new Error(`Failed to publish verification method ${keyId}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_OPERATION_FAILED,
+        `Failed to publish verification method ${keyId}`,
+        {
+          did: this.didDocument.id,
+          keyId,
+          relationships,
+          verificationMethod: verificationMethodEntry,
+        }
+      );
     }
 
     // 4. Update local state
@@ -232,7 +250,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityDelegation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityDelegation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityDelegation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityDelegation',
+          targetKeyId: keyId,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const published = await this.vdr.removeVerificationMethod(this.didDocument.id, keyId, {
@@ -331,7 +358,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityInvocation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityInvocation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityInvocation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityInvocation',
+          serviceInfo,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const serviceId = `${this.didDocument.id}#${serviceInfo.idFragment}`;
@@ -348,7 +384,16 @@ export class IdentityKit {
     });
 
     if (!published) {
-      throw new Error(`Failed to publish service ${serviceId}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_OPERATION_FAILED,
+        `Failed to publish service ${serviceId}`,
+        {
+          did: this.didDocument.id,
+          serviceId,
+          serviceInfo,
+          serviceEntry,
+        }
+      );
     }
     // Update local state
     this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
@@ -365,7 +410,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityInvocation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityInvocation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityInvocation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityInvocation',
+          serviceId,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const published = await this.vdr.removeService(this.didDocument.id, serviceId, {

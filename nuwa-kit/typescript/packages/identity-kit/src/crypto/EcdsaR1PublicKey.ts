@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { p256 } from '@noble/curves/p256';
-import { 
-  RoochAddress, 
-  PublicKey, 
-  PublicKeyInitData, 
+import {
+  RoochAddress,
+  PublicKey,
+  PublicKeyInitData,
   SIGNATURE_SCHEME_TO_FLAG,
   Address,
   Bytes,
   blake2b,
-  fromB64
+  fromB64,
 } from '@roochnetwork/rooch-sdk';
+import { IdentityKitErrorCode, createValidationError } from '../errors';
 
 const PUBLIC_KEY_SIZE = 33; // Compressed P-256 public key size
 
@@ -40,8 +41,10 @@ export class EcdsaR1PublicKey extends PublicKey<Address> {
     }
 
     if (this.data.length !== PUBLIC_KEY_SIZE) {
-      throw new Error(
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
         `Invalid public key input. Expected ${PUBLIC_KEY_SIZE} bytes, got ${this.data.length}`,
+        { expectedSize: PUBLIC_KEY_SIZE, actualSize: this.data.length, keyType: 'ECDSA-R1' }
       );
     }
   }

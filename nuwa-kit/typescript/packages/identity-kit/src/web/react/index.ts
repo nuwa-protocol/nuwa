@@ -1,1 +1,1 @@
-export * from './useIdentityKit'; 
+export * from './useIdentityKit';

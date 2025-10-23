@@ -2,6 +2,7 @@ import { VDRInterface } from './types';
 import { KeyVDR } from './keyVDR';
 import { RoochVDR } from './roochVDR';
 import { VDRRegistry } from './VDRRegistry';
+import { IdentityKitErrorCode, createVDRError } from '../errors';
 
 /**
  * Factory function to create a VDR instance based on the DID method
@@ -18,7 +19,11 @@ export function createVDR(method: string, options?: any): VDRInterface {
       return new RoochVDR(options);
     // Add additional DID methods as needed
     default:
-      throw new Error(`No built-in VDR implementation available for method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No built-in VDR implementation available for method '${method}'`,
+        { method, availableMethods: ['key', 'rooch'] }
+      );
   }
 }
 

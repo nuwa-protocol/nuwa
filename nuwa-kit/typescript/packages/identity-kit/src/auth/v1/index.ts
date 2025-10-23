@@ -6,6 +6,7 @@ import { CryptoUtils } from '../../crypto';
 import { NonceStore, defaultNonceStore } from './nonceStore';
 import { MultibaseCodec } from '../../multibase';
 import { Bytes } from '../../utils/bytes';
+import { IdentityKitErrorCode, createAuthenticationError } from '../../errors';
 
 // Authorization scheme identifier for HTTP headers
 const AUTH_SCHEME = 'DIDAuthV1';
@@ -70,13 +71,19 @@ export async function createSignature(
   const signerDid = await signer.getDid();
   if (opts.didDocument) {
     if (opts.didDocument.id !== signerDid) {
-      throw new Error(
-        `DID document ID ${opts.didDocument.id} does not match signer DID ${signerDid}`
+      throw createAuthenticationError(
+        IdentityKitErrorCode.AUTH_DID_MISMATCH,
+        `DID document ID ${opts.didDocument.id} does not match signer DID ${signerDid}`,
+        { didDocumentId: opts.didDocument.id, signerDid }
       );
     }
     const verificationMethod = opts.didDocument.verificationMethod?.find(vm => vm.id === keyId);
     if (!verificationMethod) {
-      throw new Error(`Verification method for keyId ${keyId} not found in DID document.`);
+      throw createAuthenticationError(
+        IdentityKitErrorCode.AUTH_VERIFICATION_METHOD_NOT_FOUND,
+        `Verification method for keyId ${keyId} not found in DID document.`,
+        { keyId, didDocument: opts.didDocument }
+      );
     }
   }
 

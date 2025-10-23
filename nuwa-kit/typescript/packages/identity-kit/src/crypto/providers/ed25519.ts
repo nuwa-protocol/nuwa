@@ -1,6 +1,7 @@
 import { CryptoProvider } from '../providers';
 import { KEY_TYPE, KeyType } from '../../types';
 import { base64urlToBytes } from '../../utils/bytes';
+import { IdentityKitErrorCode, createCryptoError } from '../../errors';
 
 // Universal helper to obtain a Web Crypto implementation in both browser and Node.js environments.
 // 1. In browsers (and newer versions of Node.js that expose `globalThis.crypto`) we return the global object.
@@ -13,7 +14,11 @@ function getCrypto(): Crypto {
   }
 
   // If crypto is unavailable (e.g., very old Node versions), throw a descriptive error.
-  throw new Error('Web Crypto API is not available in the current runtime');
+  throw createCryptoError(
+    IdentityKitErrorCode.ENVIRONMENT_NOT_SUPPORTED,
+    'Web Crypto API is not available in the current runtime',
+    { environment: typeof globalThis, cryptoAvailable: false }
+  );
 }
 
 export class Ed25519Provider implements CryptoProvider {
@@ -33,7 +38,11 @@ export class Ed25519Provider implements CryptoProvider {
     );
 
     if (!('publicKey' in generated)) {
-      throw new Error('Ed25519 generateKey did not return a key pair');
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_OPERATION_FAILED,
+        'Ed25519 generateKey did not return a key pair',
+        { keyType: 'Ed25519', operation: 'generateKeyPair' }
+      );
     }
     const { publicKey, privateKey } = generated;
 
@@ -117,7 +126,11 @@ export class Ed25519Provider implements CryptoProvider {
     // We'll export as JWK and extract the public key coordinates
     const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
     if (!jwk.x) {
-      throw new Error('Failed to derive public key from private key');
+      throw createCryptoError(
+        IdentityKitErrorCode.CRYPTO_KEY_DERIVATION_FAILED,
+        'Failed to derive public key from private key',
+        { keyType: 'Ed25519', operation: 'derivePublicKey' }
+      );
     }
 
     // Convert base64url public key to raw bytes

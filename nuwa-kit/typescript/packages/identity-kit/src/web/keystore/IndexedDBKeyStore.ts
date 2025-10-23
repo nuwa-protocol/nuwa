@@ -1,4 +1,5 @@
 import { KeyStore, StoredKey } from '../../index';
+import { IdentityKitErrorCode, createWebError, createStorageError } from '../../errors';
 
 /**
  * IndexedDB implementation of KeyStore
@@ -17,9 +18,13 @@ export class IndexedDBKeyStore implements KeyStore {
   ) {
     // Runtime check for browser environment with IndexedDB
     if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
-      throw new Error('IndexedDBKeyStore is only available in browser environments with IndexedDB support');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+        'IndexedDBKeyStore is only available in browser environments with IndexedDB support',
+        { environment: typeof window, indexedDBAvailable: typeof indexedDB !== 'undefined' }
+      );
     }
-    
+
     this.dbName = options.dbName || 'nuwa_keystore';
     this.storeName = options.storeName || 'keys';
   }
@@ -36,7 +41,13 @@ export class IndexedDBKeyStore implements KeyStore {
       const request = indexedDB.open(this.dbName, 1);
 
       request.onerror = () => {
-        reject(new Error('Failed to open IndexedDB'));
+        reject(
+          createStorageError(
+            IdentityKitErrorCode.STORAGE_OPERATION_FAILED,
+            'Failed to open IndexedDB',
+            { dbName: this.dbName, operation: 'open' }
+          )
+        );
       };
 
       request.onsuccess = () => {
@@ -44,7 +55,7 @@ export class IndexedDBKeyStore implements KeyStore {
         resolve(this.db);
       };
 
-      request.onupgradeneeded = (event) => {
+      request.onupgradeneeded = event => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(this.storeName)) {
           db.createObjectStore(this.storeName, { keyPath: 'keyId' });
@@ -58,7 +69,7 @@ export class IndexedDBKeyStore implements KeyStore {
    */
   async listKeyIds(): Promise<string[]> {
     const db = await this.initDB();
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(this.storeName, 'readonly');
       const store = transaction.objectStore(this.storeName);
@@ -69,7 +80,13 @@ export class IndexedDBKeyStore implements KeyStore {
       };
 
       request.onerror = () => {
-        reject(new Error('Failed to list keys'));
+        reject(
+          createStorageError(IdentityKitErrorCode.STORAGE_OPERATION_FAILED, 'Failed to list keys', {
+            dbName: this.dbName,
+            storeName: this.storeName,
+            operation: 'listKeys',
+          })
+        );
       };
     });
   }
@@ -98,7 +115,13 @@ export class IndexedDBKeyStore implements KeyStore {
       };
 
       request.onerror = () => {
-        reject(new Error(`Failed to load key: ${keyId}`));
+        reject(
+          createStorageError(
+            IdentityKitErrorCode.STORAGE_OPERATION_FAILED,
+            `Failed to load key: ${keyId}`,
+            { keyId, dbName: this.dbName, storeName: this.storeName, operation: 'load' }
+          )
+        );
       };
     });
   }
@@ -119,7 +142,13 @@ export class IndexedDBKeyStore implements KeyStore {
       };
 
       request.onerror = () => {
-        reject(new Error(`Failed to save key: ${key.keyId}`));
+        reject(
+          createStorageError(
+            IdentityKitErrorCode.STORAGE_OPERATION_FAILED,
+            `Failed to save key: ${key.keyId}`,
+            { keyId: key.keyId, dbName: this.dbName, storeName: this.storeName, operation: 'save' }
+          )
+        );
       };
     });
   }
@@ -148,9 +177,14 @@ export class IndexedDBKeyStore implements KeyStore {
       };
 
       request.onerror = () => {
-        reject(new Error(`Failed to delete key: ${keyId}`));
+        reject(
+          createStorageError(
+            IdentityKitErrorCode.STORAGE_OPERATION_FAILED,
+            `Failed to delete key: ${keyId}`,
+            { keyId, dbName: this.dbName, storeName: this.storeName, operation: 'delete' }
+          )
+        );
       };
     });
   }
-  
-} 
+}

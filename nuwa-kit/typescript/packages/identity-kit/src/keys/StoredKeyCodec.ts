@@ -2,6 +2,7 @@ import { StoredKey } from './KeyStore';
 import { MultibaseCodec } from '../multibase';
 import { CryptoUtils } from '../crypto/utils';
 import { stringToBytes, bytesToString } from '../utils/bytes';
+import { IdentityKitErrorCode, createValidationError } from '../errors';
 
 /**
  * Codec for serializing and deserializing StoredKey objects
@@ -33,7 +34,11 @@ export class StoredKeyCodec {
     // Automatically validate key consistency for security
     const isValid = await this.validateKeyConsistency(key);
     if (!isValid) {
-      throw new Error('StoredKey validation failed: private and public keys are inconsistent');
+      throw createValidationError(
+        IdentityKitErrorCode.KEY_VALIDATION_FAILED,
+        'StoredKey validation failed: private and public keys are inconsistent',
+        { keyId: key.keyId, keyType: key.keyType }
+      );
     }
 
     return key;

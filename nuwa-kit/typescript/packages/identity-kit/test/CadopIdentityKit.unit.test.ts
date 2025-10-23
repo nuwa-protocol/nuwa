@@ -13,7 +13,7 @@ describe('CadopIdentityKit Unit Tests', () => {
       // Note: ethereum support will be added when contract layer supports it
       const expectedProviders = ['webauthn', 'bitcoin', 'ethereum'];
       const actualProviders = Object.values(AUTH_PROVIDERS);
-      
+
       expectedProviders.forEach(provider => {
         expect(actualProviders).toContain(provider);
       });
@@ -24,7 +24,7 @@ describe('CadopIdentityKit Unit Tests', () => {
     it('should have consistent AUTH_PROVIDERS object structure', () => {
       expect(typeof AUTH_PROVIDERS).toBe('object');
       expect(AUTH_PROVIDERS).not.toBeNull();
-      
+
       // Check that all values are strings
       Object.values(AUTH_PROVIDERS).forEach(value => {
         expect(typeof value).toBe('string');

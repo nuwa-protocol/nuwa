@@ -1,1 +1,1 @@
-export * from './DeepLinkManager'; 
+export * from './DeepLinkManager';

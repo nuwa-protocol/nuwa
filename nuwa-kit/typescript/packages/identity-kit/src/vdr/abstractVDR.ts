@@ -4,9 +4,21 @@ import {
   VerificationRelationship,
   ServiceEndpoint,
 } from '../types/did';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest, VDRInterface } from './types';
+import {
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+  CADOPControllerCreationRequest,
+  VDRInterface,
+} from './types';
 import { parseDid } from '../utils/did';
 import { DebugLogger } from '../utils/DebugLogger';
+import {
+  IdentityKitErrorCode,
+  createDIDError,
+  createVDRError,
+  createValidationError,
+} from '../errors';
 
 // Unified logger for AbstractVDR
 const logger = DebugLogger.get('AbstractVDR');
@@ -44,9 +56,13 @@ export abstract class AbstractVDR implements VDRInterface {
    * @throws Error if the DID doesn't match this VDR's method
    */
   protected validateDIDMethod(did: string): void {
-    const { method } = parseDid(did);
-    if (method !== this.method) {
-      throw new Error(`DID ${did} is not a valid did:${this.method} identifier`);
+    const parsedDid = parseDid(did);
+    if (parsedDid.method !== this.method) {
+      throw createDIDError(
+        IdentityKitErrorCode.DID_INVALID_FORMAT,
+        `DID ${did} is not a valid did:${this.method} identifier`,
+        { did, expectedMethod: this.method, actualMethod: parsedDid.method }
+      );
     }
   }
 
@@ -58,17 +74,29 @@ export abstract class AbstractVDR implements VDRInterface {
    */
   protected validateDocument(document: DIDDocument): boolean {
     if (!document.id) {
-      throw new Error('DID document must have an id');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'DID document must have an id',
+        { document }
+      );
     }
 
     this.validateDIDMethod(document.id);
 
     if (!document['@context']) {
-      throw new Error('DID document must have a @context property');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'DID document must have a @context property',
+        { document }
+      );
     }
 
     if (!document.verificationMethod || document.verificationMethod.length === 0) {
-      throw new Error('DID document must have at least one verification method');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'DID document must have at least one verification method',
+        { document }
+      );
     }
 
     return true;
@@ -139,21 +167,36 @@ export abstract class AbstractVDR implements VDRInterface {
    * Subclasses must override this method to provide actual implementation
    */
   async create(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult> {
-    throw new Error(`create method not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `create method not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'create' }
+    );
   }
 
   /**
    * Default CADOP implementation - throws not implemented error
    */
   async createViaCADOP(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult> {
-    throw new Error(`createViaCADOP not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `createViaCADOP not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'createViaCADOP' }
+    );
   }
 
   /**
    * Default CADOP with controller implementation - throws not implemented error
    */
-  async createViaCADOPWithController(request: CADOPControllerCreationRequest, options?: any): Promise<DIDCreationResult> {
-    throw new Error(`createViaCADOPWithController not implemented for ${this.method} VDR`);
+  async createViaCADOPWithController(
+    request: CADOPControllerCreationRequest,
+    options?: any
+  ): Promise<DIDCreationResult> {
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `createViaCADOPWithController not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'createViaCADOPWithController' }
+    );
   }
 
   /**
@@ -234,7 +277,11 @@ export abstract class AbstractVDR implements VDRInterface {
     relationships?: VerificationRelationship[],
     options?: any
   ): Promise<boolean> {
-    throw new Error(`addVerificationMethod not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `addVerificationMethod not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'addVerificationMethod' }
+    );
   }
 
   /**
@@ -242,7 +289,11 @@ export abstract class AbstractVDR implements VDRInterface {
    * Default implementation that should be overridden by specific VDR implementations
    */
   async removeVerificationMethod(did: string, id: string, options?: any): Promise<boolean> {
-    throw new Error(`removeVerificationMethod not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `removeVerificationMethod not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'removeVerificationMethod' }
+    );
   }
 
   /**
@@ -250,7 +301,11 @@ export abstract class AbstractVDR implements VDRInterface {
    * Default implementation that should be overridden by specific VDR implementations
    */
   async addService(did: string, service: ServiceEndpoint, options?: any): Promise<boolean> {
-    throw new Error(`addService not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `addService not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'addService' }
+    );
   }
 
   /**
@@ -258,7 +313,11 @@ export abstract class AbstractVDR implements VDRInterface {
    * Default implementation that should be overridden by specific VDR implementations
    */
   async removeService(did: string, id: string, options?: any): Promise<boolean> {
-    throw new Error(`removeService not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `removeService not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'removeService' }
+    );
   }
 
   /**
@@ -272,7 +331,11 @@ export abstract class AbstractVDR implements VDRInterface {
     remove: VerificationRelationship[],
     options?: any
   ): Promise<boolean> {
-    throw new Error(`updateRelationships not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `updateRelationships not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'updateRelationships' }
+    );
   }
 
   /**
@@ -284,7 +347,11 @@ export abstract class AbstractVDR implements VDRInterface {
     controller: string | string[],
     options?: any
   ): Promise<boolean> {
-    throw new Error(`updateController not implemented for ${this.method} VDR`);
+    throw createVDRError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      `updateController not implemented for ${this.method} VDR`,
+      { method: this.method, operation: 'updateController' }
+    );
   }
 
   /**
@@ -307,13 +374,18 @@ export abstract class AbstractVDR implements VDRInterface {
 
     // Check if document exists
     if (!document) {
-      throw new Error(`DID document ${did} not found`);
+      throw createDIDError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+        did,
+        operation: 'validateUpdateOperation',
+      });
     }
 
     // Check permission
     if (!this.validateKeyPermission(document, keyId, requiredRelationship)) {
-      throw new Error(
-        `Key ${keyId} does not have ${requiredRelationship} permission required for this operation`
+      throw createValidationError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        `Key ${keyId} does not have ${requiredRelationship} permission required for this operation`,
+        { keyId, requiredRelationship, did }
       );
     }
 
@@ -335,26 +407,46 @@ export abstract class AbstractVDR implements VDRInterface {
   ): void {
     // Ensure ID starts with the DID
     if (!verificationMethod.id.startsWith(did)) {
-      throw new Error(`Verification method ID ${verificationMethod.id} must start with DID ${did}`);
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        `Verification method ID ${verificationMethod.id} must start with DID ${did}`,
+        { verificationMethodId: verificationMethod.id, did }
+      );
     }
 
     // Check if method already exists
     if (document.verificationMethod?.some(vm => vm.id === verificationMethod.id)) {
-      throw new Error(`Verification method ${verificationMethod.id} already exists`);
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        `Verification method ${verificationMethod.id} already exists`,
+        { verificationMethodId: verificationMethod.id, did }
+      );
     }
 
     // Validate required fields
     if (!verificationMethod.type) {
-      throw new Error('Verification method must have a type');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Verification method must have a type',
+        { verificationMethod, did }
+      );
     }
 
     if (!verificationMethod.controller) {
-      throw new Error('Verification method must have a controller');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Verification method must have a controller',
+        { verificationMethod, did }
+      );
     }
 
     // Check that at least one key material format is present
     if (!verificationMethod.publicKeyMultibase && !verificationMethod.publicKeyJwk) {
-      throw new Error('Verification method must have at least one form of public key material');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Verification method must have at least one form of public key material',
+        { verificationMethod, did }
+      );
     }
   }
 
@@ -369,21 +461,37 @@ export abstract class AbstractVDR implements VDRInterface {
   protected validateService(did: string, service: ServiceEndpoint, document: DIDDocument): void {
     // Ensure ID starts with the DID
     if (!service.id.startsWith(did)) {
-      throw new Error(`Service ID ${service.id} must start with DID ${did}`);
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        `Service ID ${service.id} must start with DID ${did}`,
+        { serviceId: service.id, did }
+      );
     }
 
     // Check if service already exists
     if (document.service?.some(s => s.id === service.id)) {
-      throw new Error(`Service ${service.id} already exists`);
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        `Service ${service.id} already exists`,
+        { serviceId: service.id, did }
+      );
     }
 
     // Validate required fields
     if (!service.type) {
-      throw new Error('Service must have a type');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Service must have a type',
+        { service, did }
+      );
     }
 
     if (!service.serviceEndpoint) {
-      throw new Error('Service must have a serviceEndpoint');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Service must have a serviceEndpoint',
+        { service, did }
+      );
     }
   }
 
