@@ -7,10 +7,15 @@ import { OPENAI_PATHS } from '../../src/providers/constants.js';
  */
 export interface OpenAIChatCompletionConfig {
   model: string;
-  messages: Array<{ role: string; content: string }>;
+  messages?: Array<{ role: string; content: string | Array<any> }>;
   stream?: boolean;
   temperature?: number;
   max_tokens?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  stop?: string | string[];
+  response_format?: { type: string };
   tools?: Array<{
     type: 'function';
     function: {

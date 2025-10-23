@@ -97,18 +97,4 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
     return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
 
-  // ========== Static Utility Methods ==========
-
-  /**
-   * Get common OpenRouter model names for testing
-   */
-  static getCommonModels(): string[] {
-    return [
-      'openai/gpt-3.5-turbo',
-      'openai/gpt-4',
-      'anthropic/claude-3-haiku',
-      'anthropic/claude-3-sonnet',
-      'meta-llama/llama-2-70b-chat',
-    ];
-  }
 }

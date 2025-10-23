@@ -205,8 +205,7 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
   getTestModels(): string[] {
     return [
       'claude-3-5-haiku-20241022',
-      'claude-3-5-sonnet-20241022',
-      'claude-3-opus-20240229'
+      'claude-sonnet-4-5-20250929',
     ];
   }
 
