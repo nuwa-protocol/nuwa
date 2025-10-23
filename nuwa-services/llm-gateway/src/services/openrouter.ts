@@ -1,6 +1,7 @@
 import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
 import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
+import { TestableLLMProvider } from "../providers/LLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { OpenRouterUsageExtractor } from "../billing/usage/providers/OpenRouterUsageExtractor.js";
@@ -38,7 +39,7 @@ interface UpstreamErrorResponse {
   details: OpenRouterErrorInfo;
 }
 
-class OpenRouterService extends BaseLLMProvider {
+class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -437,6 +438,57 @@ class OpenRouterService extends BaseLLMProvider {
    */
   createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
     return new OpenRouterStreamProcessor(model, initialCost);
+  }
+
+  /**
+   * Get test models for OpenRouter provider
+   * Implementation of TestableLLMProvider interface
+   */
+  getTestModels(): string[] {
+    return [
+      'openai/gpt-3.5-turbo',
+      'openai/gpt-4',
+      'anthropic/claude-3-haiku',
+      'anthropic/claude-3-sonnet',
+      'meta-llama/llama-2-70b-chat'
+    ];
+  }
+
+  /**
+   * Get default test options
+   * Implementation of TestableLLMProvider interface
+   */
+  getDefaultTestOptions(): Record<string, any> {
+    return {
+      model: 'openai/gpt-3.5-turbo',
+      message: 'Hello, this is a test message.',
+      maxTokens: 50,
+      temperature: 0.7
+    };
+  }
+
+  /**
+   * Create test request for the given endpoint
+   * Implementation of TestableLLMProvider interface
+   */
+  createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
+    const defaults = this.getDefaultTestOptions();
+    
+    if (endpoint === OPENROUTER_PATHS.CHAT_COMPLETIONS) {
+      // Extract normalized options and map to API parameter names
+      const { maxTokens, message, messages, ...rest } = options;
+      
+      return {
+        model: options.model || defaults.model,
+        messages: messages || [{ role: 'user', content: message || defaults.message }],
+        max_tokens: maxTokens || defaults.maxTokens,
+        temperature: options.temperature ?? defaults.temperature,
+        stream: options.stream || false,
+        ...rest  // Include any additional options
+      };
+    }
+    
+    throw new Error(`Unknown endpoint for OpenRouter service: ${endpoint}`);
   }
 }
 

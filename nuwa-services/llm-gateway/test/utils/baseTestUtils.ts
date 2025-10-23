@@ -1,4 +1,4 @@
-import { LLMProvider } from '../../src/providers/LLMProvider.js';
+import { LLMProvider, TestableLLMProvider } from '../../src/providers/LLMProvider.js';
 import { ProviderManager } from '../../src/core/providerManager.js';
 import { RouteHandler } from '../../src/core/routeHandler.js';
 import { AuthManager } from '../../src/core/authManager.js';
@@ -114,6 +114,14 @@ export abstract class BaseProviderTestUtils {
         if (validation.maxTokens && (result.usage.totalTokens || 0) > validation.maxTokens) {
           errors.push(`Expected at most ${validation.maxTokens} tokens but got ${result.usage.totalTokens}`);
         }
+
+        // Validate token consistency (integrated from Claude test utils)
+        if (result.usage.promptTokens && result.usage.completionTokens && result.usage.totalTokens) {
+          const expectedTotal = result.usage.promptTokens + result.usage.completionTokens;
+          if (result.usage.totalTokens !== expectedTotal) {
+            errors.push(`Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`);
+          }
+        }
       }
 
       // Check cost information
@@ -121,9 +129,18 @@ export abstract class BaseProviderTestUtils {
         errors.push('Expected cost information but none found');
       }
 
+      if (result.cost && result.cost.costUsd <= 0) {
+        errors.push(`Expected positive cost but got ${result.cost.costUsd}`);
+      }
+
       // Check model
       if (validation.expectedModel && result.cost?.model !== validation.expectedModel) {
         errors.push(`Expected model ${validation.expectedModel} but got ${result.cost?.model}`);
+      }
+
+      // Check response
+      if (validation.expectResponse && !result.response) {
+        errors.push('Expected response data but none found');
       }
     }
 
@@ -135,19 +152,35 @@ export abstract class BaseProviderTestUtils {
 
   /**
    * Create a mock response object for testing
+   * Note: This method is kept for backward compatibility but requires jest to be available
    */
   static createMockResponse() {
-    const res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-      setHeader: jest.fn().mockReturnThis(),
-      write: jest.fn().mockReturnThis(),
-      end: jest.fn().mockReturnThis(),
+    // Check if jest is available (for unit tests)
+    if (typeof (globalThis as any).jest !== 'undefined') {
+      const jestGlobal = (globalThis as any).jest;
+      const res = {
+        status: jestGlobal.fn().mockReturnThis(),
+        json: jestGlobal.fn().mockReturnThis(),
+        setHeader: jestGlobal.fn().mockReturnThis(),
+        write: jestGlobal.fn().mockReturnThis(),
+        end: jestGlobal.fn().mockReturnThis(),
+        locals: {},
+        headersSent: false,
+      } as any;
+
+      return res;
+    }
+    
+    // Fallback for non-jest environments
+    return {
+      status: () => ({ json: () => {}, setHeader: () => {}, write: () => {}, end: () => {} }),
+      json: () => {},
+      setHeader: () => {},
+      write: () => {},
+      end: () => {},
       locals: {},
       headersSent: false,
     } as any;
-
-    return res;
   }
 
   /**
@@ -155,6 +188,137 @@ export abstract class BaseProviderTestUtils {
    */
   static async wait(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Generic test method for non-streaming requests
+   * Works with any provider that implements TestableLLMProvider
+   * @param provider Provider instance that implements TestableLLMProvider
+   * @param apiKey API key for the provider
+   * @param endpoint API endpoint to test
+   * @param options Optional configuration to override defaults
+   * @returns Test result with usage and cost information
+   */
+  static async testNonStreamingRequest(
+    provider: TestableLLMProvider,
+    apiKey: string | null,
+    endpoint: string,
+    options?: Record<string, any>
+  ): Promise<BaseTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Use provider's method to create properly formatted request
+      const requestData = provider.createTestRequest(endpoint, options);
+      
+      // Use the high-level executeRequest API
+      const executeResult = await provider.executeRequest(
+        apiKey,
+        endpoint,
+        'POST',
+        requestData
+      );
+
+      const duration = Date.now() - startTime;
+
+      if (!executeResult.success) {
+        return {
+          success: false,
+          error: executeResult.error || 'Unknown error',
+          duration,
+          statusCode: executeResult.statusCode,
+        };
+      }
+
+      return {
+        success: true,
+        response: executeResult.response,
+        usage: executeResult.usage,
+        cost: executeResult.cost,
+        duration,
+        statusCode: executeResult.statusCode,
+        model: requestData.model,
+        rawResponse: executeResult.rawResponse,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Generic test method for streaming requests
+   * Works with any provider that implements TestableLLMProvider
+   * @param provider Provider instance that implements TestableLLMProvider
+   * @param apiKey API key for the provider
+   * @param endpoint API endpoint to test
+   * @param options Optional configuration to override defaults
+   * @returns Test result with accumulated content, usage and cost information
+   */
+  static async testStreamingRequest(
+    provider: TestableLLMProvider,
+    apiKey: string | null,
+    endpoint: string,
+    options?: Record<string, any>
+  ): Promise<BaseTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Use provider's method to create properly formatted streaming request
+      const requestData = provider.createTestRequest(endpoint, { ...options, stream: true });
+      
+      // Use PassThrough stream to capture content for testing
+      const { PassThrough } = await import('stream');
+      const captureStream = new PassThrough();
+      let accumulatedContent = '';
+
+      // Capture content as it flows through
+      captureStream.on('data', (chunk: Buffer) => {
+        accumulatedContent += chunk.toString();
+      });
+
+      // Use the high-level executeStreamRequest API
+      const result = await provider.executeStreamRequest(
+        apiKey,
+        endpoint,
+        'POST',
+        requestData,
+        captureStream  // Pass the capture stream as destination
+      );
+
+      const duration = Date.now() - startTime;
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error',
+          duration,
+          statusCode: result.statusCode,
+        };
+      }
+
+      return {
+        success: true,
+        response: { content: accumulatedContent },
+        usage: result.usage,
+        cost: result.cost,
+        duration,
+        statusCode: result.statusCode,
+        model: requestData.model,
+        rawResponse: result.rawResponse,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        duration: Date.now() - startTime,
+      };
+    }
   }
 
   /**
@@ -171,7 +335,8 @@ export abstract class BaseProviderTestUtils {
     if (provider.createUsageExtractor) {
       const extractor = provider.createUsageExtractor();
       const parsedResponse = provider.parseResponse(response);
-      usage = extractor.extractFromResponseBody(parsedResponse);
+      const extractedUsage = extractor.extractFromResponseBody(parsedResponse);
+      usage = extractedUsage || undefined;
       
       if (usage) {
         // Extract provider cost if available
@@ -189,7 +354,8 @@ export abstract class BaseProviderTestUtils {
             usage
           };
         } else {
-          cost = extractor.calculateCost(requestData.model, usage);
+          const calculatedCost = extractor.calculateCost(requestData.model, usage);
+          cost = calculatedCost || undefined;
         }
       }
     }

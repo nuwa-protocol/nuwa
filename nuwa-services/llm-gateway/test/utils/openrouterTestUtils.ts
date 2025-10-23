@@ -23,6 +23,7 @@ export interface OpenRouterChatCompletionConfig {
 
 /**
  * OpenRouter-specific test utilities
+ * Thin wrapper around BaseProviderTestUtils for OpenRouter service
  */
 export class OpenRouterTestUtils extends BaseProviderTestUtils {
   /**
@@ -57,161 +58,44 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils {
 
   /**
    * Test OpenRouter Chat Completions API
+   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
    */
   static async testChatCompletion(
     provider: OpenRouterService,
     apiKey: string | null,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const startTime = Date.now();
-    
-    try {
-      const requestData = this.createChatCompletionRequest(config);
-      
-      const response = await provider.forwardRequest(
-        apiKey,
-        OPENROUTER_PATHS.CHAT_COMPLETIONS,
-        'POST',
-        requestData,
-        requestData.stream
-      );
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
 
-      const duration = Date.now() - startTime;
-
-      if (!response) {
-        return {
-          success: false,
-          error: 'No response received',
-          duration,
-        };
-      }
-
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      // Parse response and extract usage/cost
-      const parsedResponse = provider.parseResponse(response);
-      const { usage, cost } = await this.extractUsageAndCost(provider, response, requestData);
-
-      return {
-        success: true,
-        response: parsedResponse,
-        usage,
-        cost,
-        duration,
-        statusCode: response.status,
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
+    return this.testNonStreamingRequest(provider, apiKey, OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
 
   /**
    * Test OpenRouter streaming Chat Completions
+   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
    */
   static async testStreamingChatCompletion(
     provider: OpenRouterService,
     apiKey: string | null,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const startTime = Date.now();
-    
-    try {
-      const requestData = this.createChatCompletionRequest({ ...config, stream: true });
-      
-      const response = await provider.forwardRequest(
-        apiKey,
-        OPENROUTER_PATHS.CHAT_COMPLETIONS,
-        'POST',
-        requestData,
-        true
-      );
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
 
-      const duration = Date.now() - startTime;
-
-      if (!response) {
-        return {
-          success: false,
-          error: 'No response received',
-          duration,
-        };
-      }
-
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      // Process streaming response
-      return new Promise((resolve) => {
-        let accumulatedContent = '';
-        let usage: any;
-        let cost: any;
-        let streamProcessor: any;
-
-        // Create stream processor
-        if (provider.createStreamProcessor) {
-          streamProcessor = provider.createStreamProcessor(requestData.model);
-        }
-
-        response.data.on('data', (chunk: Buffer) => {
-          const chunkStr = chunk.toString();
-          accumulatedContent += chunkStr;
-          
-          if (streamProcessor) {
-            streamProcessor.processChunk(chunkStr);
-          }
-        });
-
-        response.data.on('end', () => {
-          if (streamProcessor) {
-            usage = streamProcessor.getFinalUsage();
-            cost = streamProcessor.getFinalCost();
-          }
-
-          resolve({
-            success: true,
-            response: { content: accumulatedContent },
-            usage,
-            cost,
-            duration: Date.now() - startTime,
-            statusCode: 200,
-          });
-        });
-
-        response.data.on('error', (error: Error) => {
-          resolve({
-            success: false,
-            error: error.message,
-            duration: Date.now() - startTime,
-          });
-        });
-      });
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
+    return this.testStreamingRequest(provider, apiKey, OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
-
 
   /**
    * Test OpenRouter with routing preferences

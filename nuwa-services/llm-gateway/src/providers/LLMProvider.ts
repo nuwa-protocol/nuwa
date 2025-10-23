@@ -179,32 +179,27 @@ export interface ProviderTestConfig {
 
 /**
  * Extended LLMProvider interface with testing support
- * Providers can optionally implement these methods for better testability
+ * Providers can implement these methods for better testability
  */
 export interface TestableLLMProvider extends LLMProvider {
-  /**
-   * Validate provider configuration for testing
-   * @param config Test configuration
-   * @returns Validation result with any errors
-   */
-  validateTestConfig?(config: ProviderTestConfig): { valid: boolean; errors: string[] };
-
   /**
    * Get provider-specific test models for integration testing
    * @returns Array of model names that are known to work for testing
    */
-  getTestModels?(): string[];
+  getTestModels(): string[];
 
   /**
-   * Get provider-specific test endpoints for integration testing
-   * @returns Array of endpoint paths that are safe to test
+   * Get default test options (model, message, maxTokens, etc.)
+   * @returns Default configuration for test requests
    */
-  getTestEndpoints?(): string[];
+  getDefaultTestOptions(): Record<string, any>;
 
   /**
-   * Create a test instance with mock configuration
-   * @param config Test configuration
-   * @returns Test instance of the provider
+   * Create a test request for the given endpoint
+   * Provider knows the correct format for each endpoint
+   * @param endpoint API endpoint path
+   * @param options Optional configuration to override defaults
+   * @returns Request data ready to send to the provider
    */
-  createTestInstance?(config: ProviderTestConfig): LLMProvider;
+  createTestRequest(endpoint: string, options?: Record<string, any>): any;
 }

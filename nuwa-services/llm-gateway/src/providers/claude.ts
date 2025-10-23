@@ -1,5 +1,6 @@
 import axios, { AxiosResponse } from "axios";
 import { BaseLLMProvider } from "./BaseLLMProvider.js";
+import { TestableLLMProvider } from "./LLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { ClaudeUsageExtractor } from "../billing/usage/providers/ClaudeUsageExtractor.js";
@@ -10,7 +11,7 @@ import { CLAUDE_PATHS } from "./constants.js";
  * Claude Provider Implementation
  * Handles Anthropic Claude API requests with proper authentication and usage tracking
  */
-export class ClaudeProvider extends BaseLLMProvider {
+export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -195,6 +196,57 @@ export class ClaudeProvider extends BaseLLMProvider {
     }
 
     return { message, statusCode, details };
+  }
+
+  /**
+   * Get test models for Claude provider
+   * Implementation of TestableLLMProvider interface
+   */
+  getTestModels(): string[] {
+    return [
+      'claude-3-5-haiku-20241022',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-opus-20240229'
+    ];
+  }
+
+  /**
+   * Get default test options
+   * Implementation of TestableLLMProvider interface
+   */
+  getDefaultTestOptions(): Record<string, any> {
+    return {
+      model: 'claude-3-5-haiku-20241022',
+      message: 'Hello! Please respond with a brief greeting.',
+      maxTokens: 100,
+      temperature: 0.7
+    };
+  }
+
+  /**
+   * Create test request for the given endpoint
+   * Implementation of TestableLLMProvider interface
+   */
+  createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
+    const defaults = this.getDefaultTestOptions();
+    
+    if (endpoint === CLAUDE_PATHS.MESSAGES) {
+      // Extract normalized options and map to API parameter names
+      const { maxTokens, message, messages, ...rest } = options;
+      
+      return {
+        model: options.model || defaults.model,
+        max_tokens: maxTokens || defaults.maxTokens,
+        temperature: options.temperature ?? defaults.temperature,
+        messages: messages || [
+          { role: 'user', content: message || defaults.message }
+        ],
+        stream: options.stream || false,
+        ...rest  // Include any additional options
+      };
+    }
+    
+    throw new Error(`Unknown endpoint for Claude provider: ${endpoint}`);
   }
 }
 

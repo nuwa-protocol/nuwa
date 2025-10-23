@@ -36,6 +36,7 @@ export interface OpenAIResponseAPIConfig {
 
 /**
  * OpenAI-specific test utilities
+ * Thin wrapper around BaseProviderTestUtils for OpenAI provider
  */
 export class OpenAITestUtils extends BaseProviderTestUtils {
   /**
@@ -121,161 +122,64 @@ export class OpenAITestUtils extends BaseProviderTestUtils {
 
   /**
    * Test OpenAI Chat Completions API
+   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
    */
   static async testChatCompletion(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const startTime = Date.now();
+    // Use provider's createTestRequest to build the proper request format
+    // Then delegate to base utils for execution
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
     
-    try {
-      const requestData = this.createChatCompletionRequest(config);
-      const duration = Date.now() - startTime;
-
-      // Use the new high-level executeRequest API
-      const executeResult = await provider.executeRequest(
-        apiKey,
-        OPENAI_PATHS.CHAT_COMPLETIONS,
-        'POST',
-        requestData
-      );
-
-      if (!executeResult.success) {
-        return {
-          success: false,
-          error: executeResult.error || 'Unknown error',
-          duration,
-          statusCode: executeResult.statusCode,
-        };
-      }
-
-      return {
-        success: true,
-        response: executeResult.response,
-        usage: executeResult.usage,
-        cost: executeResult.cost,
-        duration,
-        statusCode: executeResult.statusCode,
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
+    return this.testNonStreamingRequest(provider, apiKey, OPENAI_PATHS.CHAT_COMPLETIONS, options);
   }
 
   /**
    * Test OpenAI Response API
+   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
    */
   static async testResponseAPI(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIResponseAPIConfig> = {}
   ): Promise<BaseTestResult> {
-    const startTime = Date.now();
+    const options = {
+      model: config.model,
+      input: config.input,
+      maxTokens: config.max_output_tokens,
+      ...config
+    };
     
-    try {
-      const requestData = this.createResponseAPIRequest(config);
-      const duration = Date.now() - startTime;
-
-      // Use the new high-level executeRequest API
-      const executeResult = await provider.executeRequest(
-        apiKey,
-        OPENAI_PATHS.RESPONSES,
-        'POST',
-        requestData
-      );
-
-      if (!executeResult.success) {
-        return {
-          success: false,
-          error: executeResult.error || 'Unknown error',
-          duration,
-          statusCode: executeResult.statusCode,
-        };
-      }
-
-      return {
-        success: true,
-        response: executeResult.response,
-        usage: executeResult.usage,
-        cost: executeResult.cost,
-        duration,
-        statusCode: executeResult.statusCode,
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
+    return this.testNonStreamingRequest(provider, apiKey, OPENAI_PATHS.RESPONSES, options);
   }
 
   /**
    * Test OpenAI streaming Chat Completions
+   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
    */
   static async testStreamingChatCompletion(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const startTime = Date.now();
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
     
-    try {
-      const requestData = this.createChatCompletionRequest({ ...config, stream: true });
-      
-      // Use PassThrough stream to capture content for testing
-      const { PassThrough } = await import('stream');
-      const captureStream = new PassThrough();
-      let accumulatedContent = '';
-
-      // Capture content as it flows through
-      captureStream.on('data', (chunk: Buffer) => {
-        accumulatedContent += chunk.toString();
-      });
-
-      // Use the new high-level executeStreamRequest API
-      const result = await provider.executeStreamRequest(
-        apiKey,
-        OPENAI_PATHS.CHAT_COMPLETIONS,
-        'POST',
-        requestData,
-        captureStream  // Pass the capture stream as destination
-      );
-
-      const duration = Date.now() - startTime;
-
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.error || 'Unknown error',
-          duration,
-          statusCode: result.statusCode,
-        };
-      }
-
-      return {
-        success: true,
-        response: { content: accumulatedContent },
-        usage: result.usage,
-        cost: result.cost,
-        duration,
-        statusCode: result.statusCode,
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
+    return this.testStreamingRequest(provider, apiKey, OPENAI_PATHS.CHAT_COMPLETIONS, options);
   }
-
 }
+

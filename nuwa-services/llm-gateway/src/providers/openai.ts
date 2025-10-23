@@ -1,5 +1,6 @@
 import axios, { AxiosResponse } from "axios";
 import { BaseLLMProvider } from "./BaseLLMProvider.js";
+import { TestableLLMProvider } from "./LLMProvider.js";
 import { validateToolConfig } from "../config/responseApiTools.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
@@ -12,7 +13,7 @@ import { OPENAI_PATHS } from "./constants.js";
  * Handles native OpenAI API requests without cost calculation
  * Cost calculation is done by the gateway pricing system
  */
-export class OpenAIProvider extends BaseLLMProvider {
+export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -352,5 +353,63 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
 
     return { message: errorMessage, statusCode, details };
+  }
+
+  /**
+   * Get test models for OpenAI provider
+   * Implementation of TestableLLMProvider interface
+   */
+  getTestModels(): string[] {
+    return ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o-mini', 'gpt-4o'];
+  }
+
+  /**
+   * Get default test options
+   * Implementation of TestableLLMProvider interface
+   */
+  getDefaultTestOptions(): Record<string, any> {
+    return {
+      model: 'gpt-3.5-turbo',
+      message: 'Hello, this is a test message.',
+      maxTokens: 50,
+      temperature: 0.7
+    };
+  }
+
+  /**
+   * Create test request for the given endpoint
+   * Implementation of TestableLLMProvider interface
+   */
+  createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
+    const defaults = this.getDefaultTestOptions();
+    
+    if (endpoint === OPENAI_PATHS.CHAT_COMPLETIONS) {
+      // Extract normalized options and map to API parameter names
+      const { maxTokens, message, messages, ...rest } = options;
+      
+      return {
+        model: options.model || defaults.model,
+        messages: messages || [{ role: 'user', content: message || defaults.message }],
+        max_tokens: maxTokens || defaults.maxTokens,
+        temperature: options.temperature ?? defaults.temperature,
+        stream: options.stream || false,
+        ...rest  // Include any additional options (like tools)
+      };
+    }
+    
+    if (endpoint === OPENAI_PATHS.RESPONSES) {
+      // Extract normalized options and map to API parameter names
+      const { maxTokens, message, ...rest } = options;
+      
+      return {
+        model: options.model || 'gpt-4o-mini',
+        input: options.input || message || defaults.message,
+        max_output_tokens: maxTokens || defaults.maxTokens,
+        stream: options.stream || false,
+        ...rest  // Include any additional options (like tools)
+      };
+    }
+    
+    throw new Error(`Unknown endpoint for OpenAI provider: ${endpoint}`);
   }
 }
