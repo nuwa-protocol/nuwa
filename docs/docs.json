@@ -9,71 +9,88 @@
   },
   "favicon": "./favicon.png",
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Introduction",
-        "pages": [
-          "introduction/nuwa-ai",
+        "tab": "Documentation",
+        "icon": "book-open-lines",
+        "groups": [
           {
-            "group": "Core Concepts",
+            "group": "Introduction",
             "pages": [
-              "introduction/core-concepts/capabilities",
-              "introduction/core-concepts/payment",
-              "introduction/core-concepts/identity"
+              "introduction/nuwa-ai",
+              {
+                "group": "Core Concepts",
+                "pages": [
+                  "introduction/core-concepts/capabilities",
+                  "introduction/core-concepts/payment",
+                  "introduction/core-concepts/identity"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "build-caps/quickstart",
+              {
+                "group": "Payments",
+                "pages": [
+                  "build-caps/service-key",
+                  "build-caps/service-pricing",
+                  "build-caps/revenue"
+                ]
+              },
+              "build-caps/models",
+              {
+                "group": "MCP",
+                "pages": [
+                  "build-caps/mcp",
+                  "build-caps/mcp-proxy",
+                  "build-caps/mcp-server"
+                ]
+              },
+              "build-caps/llm-gateway",
+              "build-caps/prompt",
+              {
+                "group": "UI",
+                "pages": [
+                  "build-caps/ui",
+                  "build-caps/build-ui",
+                  "build-caps/mcp-ui",
+                  "build-caps/artifact"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "SDK",
+            "pages": [
+              "sdk/index",
+              "sdk/cap-kit",
+              "sdk/payment-kit",
+              "sdk/identity-kit",
+              "sdk/ui-kit"
             ]
           }
         ]
       },
       {
-        "group": "Tutorials",
-        "pages": [
-          "tutorials/llm-gateway-knowledge-service",
-          "tutorials/deploy-llm-gateway-railway",
-          "tutorials/deploy-mcp-proxy-railway"
-        ]
-      },
-      {
-        "group": "Development",
-        "pages": [
-          "build-caps/quickstart",
+        "tab": "Guides",
+        "icon": "compass",
+        "groups": [
           {
-            "group": "Payments",
+            "group": "Examples",
             "pages": [
-              "build-caps/service-key",
-              "build-caps/service-pricing",
-              "build-caps/revenue"
+              "guides/llm-gateway-knowledge-service"
             ]
           },
-          "build-caps/models",
           {
-            "group": "MCP",
+            "group": "Deployment",
             "pages": [
-              "build-caps/mcp",
-              "build-caps/mcp-proxy",
-              "build-caps/mcp-server"
-            ]
-          },
-          "build-caps/llm-gateway",
-          "build-caps/prompt",
-          {
-            "group": "UI",
-            "pages": [
-              "build-caps/ui",
-              "build-caps/build-ui",
-              "build-caps/mcp-ui",
-              "build-caps/artifact"
+              "guides/deploy-llm-gateway-railway",
+              "guides/deploy-mcp-proxy-railway"
             ]
           }
-        ]
-      },
-      {
-        "group": "SDK",
-        "pages": [
-          "sdk/index",
-          "sdk/cap-kit",
-          "sdk/payment-kit",
-          "sdk/identity-kit",
-          "sdk/ui-kit"
         ]
       }
     ],
@@ -87,7 +104,7 @@
   "navbar": {
     "primary": {
       "type": "button",
-      "label": "Nuwa AI Beta",
+      "label": "Nuwa AI (Beta)",
       "href": "https://test-app.nuwa.dev/"
     }
   },
