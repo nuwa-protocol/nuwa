@@ -6,7 +6,7 @@
 import OpenRouterService from '../../src/services/openrouter.js';
 import { TestEnv, createProviderTestSuite } from '../utils/testEnv.js';
 import { OpenRouterTestUtils } from '../utils/openrouterTestUtils.js';
-import { BaseTestValidation } from '../utils/baseTestUtils.js';
+import { BaseTestValidation, BaseProviderTestUtils } from '../utils/baseTestUtils.js';
 
 // Log test environment status
 beforeAll(() => {
@@ -16,17 +16,17 @@ beforeAll(() => {
 createProviderTestSuite('openrouter', () => {
   let provider: OpenRouterService;
   let apiKey: string;
+  let openrouterUtils: OpenRouterTestUtils;
 
   beforeAll(() => {
     provider = new OpenRouterService();
     apiKey = TestEnv.getProviderApiKey('openrouter')!;
+    openrouterUtils = new OpenRouterTestUtils(provider, apiKey);
   });
 
   describe('Chat Completions API', () => {
     it('should handle non-streaming chat completion', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         { model: 'openai/gpt-3.5-turbo' }
       );
 
@@ -39,7 +39,7 @@ createProviderTestSuite('openrouter', () => {
         expectedModel: 'openai/gpt-3.5-turbo',
       };
 
-      const validationResult = OpenRouterTestUtils.validateTestResponse(result, validation);
+      const validationResult = openrouterUtils.validateResponse(result, validation);
       
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
@@ -58,9 +58,7 @@ createProviderTestSuite('openrouter', () => {
     }, 30000);
 
     it('should handle streaming chat completion', async () => {
-      const result = await OpenRouterTestUtils.testStreamingChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testStreamingChatCompletion(
         {
           model: 'openai/gpt-3.5-turbo',
           max_tokens: 30 // Shorter for streaming test
@@ -91,10 +89,7 @@ createProviderTestSuite('openrouter', () => {
       const models = OpenRouterTestUtils.getCommonModels().slice(0, 3); // Test first 3 models
 
       for (const model of models) {
-        const result = await OpenRouterTestUtils.testChatCompletion(
-          provider,
-          apiKey,
-          {
+        const result = await openrouterUtils.testChatCompletion({
             model,
             messages: [{ role: 'user', content: 'Hello, how are you?' }],
             max_tokens: 20,
@@ -113,14 +108,12 @@ createProviderTestSuite('openrouter', () => {
         }
 
         // Add delay between requests to avoid rate limiting
-        await OpenRouterTestUtils.wait(1000);
+        await BaseProviderTestUtils.wait(1000);
       }
     }, 60000);
 
     it('should handle errors gracefully', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         {
           model: 'definitely-invalid-model-that-does-not-exist-12345',
           messages: [{ role: 'user', content: 'Hello' }],
@@ -133,11 +126,11 @@ createProviderTestSuite('openrouter', () => {
     }, 15000);
 
     it('should handle invalid API key', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        'invalid-api-key',
-        { model: 'openai/gpt-3.5-turbo' }
-      );
+      // Test with invalid API key - create temporary instance with invalid key
+      const invalidUtils = new OpenRouterTestUtils(provider, 'invalid-api-key');
+      const result = await invalidUtils.testChatCompletion({
+        model: 'openai/gpt-3.5-turbo'
+      });
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -148,9 +141,7 @@ createProviderTestSuite('openrouter', () => {
 
   describe('Usage Extraction and Cost Calculation', () => {
     it('should extract usage from non-streaming response', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         { model: 'openai/gpt-3.5-turbo' }
       );
 
@@ -167,9 +158,7 @@ createProviderTestSuite('openrouter', () => {
     }, 30000);
 
     it('should extract provider cost from response', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         { model: 'openai/gpt-3.5-turbo' }
       );
 
@@ -185,9 +174,7 @@ createProviderTestSuite('openrouter', () => {
     }, 30000);
 
     it('should extract cost from streaming response', async () => {
-      const result = await OpenRouterTestUtils.testStreamingChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testStreamingChatCompletion(
         {
           model: 'openai/gpt-3.5-turbo',
           max_tokens: 20,
@@ -246,9 +233,7 @@ createProviderTestSuite('openrouter', () => {
   describe('OpenRouter Specific Features', () => {
     it('should handle HTTP Referer header', async () => {
       // OpenRouter requires HTTP Referer for some features
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         {
           model: 'openai/gpt-3.5-turbo',
           max_tokens: 20,
@@ -260,9 +245,7 @@ createProviderTestSuite('openrouter', () => {
     }, 30000);
 
     it('should handle model routing preferences', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletionWithRouting(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletionWithRouting(
         {
           model: 'openai/gpt-3.5-turbo',
           messages: [{ role: 'user', content: 'Hello' }],
@@ -276,9 +259,7 @@ createProviderTestSuite('openrouter', () => {
     }, 30000);
 
     it('should extract cost from x-usage header', async () => {
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         { model: 'openai/gpt-3.5-turbo' }
       );
 
@@ -296,9 +277,9 @@ createProviderTestSuite('openrouter', () => {
     it('should handle rate limiting gracefully', async () => {
       // Make multiple rapid requests to potentially trigger rate limiting
       const requests = Array(3).fill(null).map(async (_, index) => {
-        await OpenRouterTestUtils.wait(index * 500); // Stagger requests
+        await BaseProviderTestUtils.wait(index * 500); // Stagger requests
         
-        return OpenRouterTestUtils.testChatCompletion(provider, apiKey, {
+        return openrouterUtils.testChatCompletion({
           model: 'openai/gpt-3.5-turbo',
           max_tokens: 10, // Keep it small and fast
         });
@@ -322,9 +303,7 @@ createProviderTestSuite('openrouter', () => {
 
     it('should handle insufficient credits gracefully', async () => {
       // This test might fail if account has sufficient credits, which is fine
-      const result = await OpenRouterTestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openrouterUtils.testChatCompletion(
         {
           model: 'openai/gpt-4', // More expensive model
           messages: [{ role: 'user', content: 'Write a long essay about artificial intelligence.' }],

@@ -36,9 +36,77 @@ export interface OpenAIResponseAPIConfig {
 
 /**
  * OpenAI-specific test utilities
- * Thin wrapper around BaseProviderTestUtils for OpenAI provider
+ * Supports both static methods (backward compatibility) and instance methods (new design)
  */
-export class OpenAITestUtils extends BaseProviderTestUtils {
+export class OpenAITestUtils extends BaseProviderTestUtils<OpenAIProvider> {
+  /**
+   * Constructor for instance-based testing
+   * @param provider OpenAI provider instance
+   * @param apiKey API key for OpenAI
+   */
+  constructor(provider: OpenAIProvider, apiKey: string | null) {
+    super(provider, apiKey);
+  }
+
+  // ========== Instance Methods (New Design) ==========
+
+  /**
+   * Instance method: Test chat completion
+   */
+  async testChatCompletion(config: Partial<OpenAIChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
+    return this.testNonStreaming(OPENAI_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test streaming chat completion
+   */
+  async testStreamingChatCompletion(config: Partial<OpenAIChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
+    return this.testStreaming(OPENAI_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test Response API
+   */
+  async testResponseAPI(config: Partial<OpenAIResponseAPIConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      input: config.input,
+      maxTokens: config.max_output_tokens,
+      ...config
+    };
+    return this.testNonStreaming(OPENAI_PATHS.RESPONSES, options);
+  }
+
+  /**
+   * Instance method: Test streaming Response API
+   */
+  async testStreamingResponseAPI(config: Partial<OpenAIResponseAPIConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      input: config.input,
+      maxTokens: config.max_output_tokens,
+      stream: true,
+      ...config
+    };
+    return this.testStreaming(OPENAI_PATHS.RESPONSES, options);
+  }
+
+  // ========== Static Methods (Backward Compatibility) ==========
   /**
    * Create a standard Chat Completions request
    */
@@ -121,65 +189,42 @@ export class OpenAITestUtils extends BaseProviderTestUtils {
   }
 
   /**
-   * Test OpenAI Chat Completions API
-   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
+   * Static method: Test OpenAI Chat Completions API (backward compatibility)
+   * @deprecated Use instance method testChatCompletion() instead
    */
   static async testChatCompletion(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    // Use provider's createTestRequest to build the proper request format
-    // Then delegate to base utils for execution
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      ...config
-    };
-    
-    return this.testNonStreamingRequest(provider, apiKey, OPENAI_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new OpenAITestUtils(provider, apiKey);
+    return instance.testChatCompletion(config);
   }
 
   /**
-   * Test OpenAI Response API
-   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
+   * Static method: Test OpenAI Response API (backward compatibility)
+   * @deprecated Use instance method testResponseAPI() instead
    */
   static async testResponseAPI(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIResponseAPIConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      input: config.input,
-      maxTokens: config.max_output_tokens,
-      ...config
-    };
-    
-    return this.testNonStreamingRequest(provider, apiKey, OPENAI_PATHS.RESPONSES, options);
+    const instance = new OpenAITestUtils(provider, apiKey);
+    return instance.testResponseAPI(config);
   }
 
   /**
-   * Test OpenAI streaming Chat Completions
-   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
+   * Static method: Test OpenAI streaming Chat Completions (backward compatibility)
+   * @deprecated Use instance method testStreamingChatCompletion() instead
    */
   static async testStreamingChatCompletion(
     provider: OpenAIProvider,
     apiKey: string | null,
     config: Partial<OpenAIChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      stream: true,
-      ...config
-    };
-    
-    return this.testStreamingRequest(provider, apiKey, OPENAI_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new OpenAITestUtils(provider, apiKey);
+    return instance.testStreamingChatCompletion(config);
   }
 }
 

@@ -14,65 +14,95 @@ export interface ClaudeTestOptions {
   messages?: Array<{ role: string; content: string }>;
 }
 
+export interface ClaudeMessageConfig {
+  model?: string;
+  max_tokens?: number;
+  temperature?: number;
+  messages?: Array<{ role: string; content: string }>;
+  stream?: boolean;
+}
+
 /**
  * Claude-specific test utilities
- * Thin wrapper around BaseProviderTestUtils for Claude provider
+ * Supports both static methods (backward compatibility) and instance methods (new design)
  */
-export class ClaudeTestUtils extends BaseProviderTestUtils {
+export class ClaudeTestUtils extends BaseProviderTestUtils<ClaudeProvider> {
   /**
-   * Test Claude message completion (non-streaming)
-   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
+   * Constructor for instance-based testing
+   * @param provider Claude provider instance
+   * @param apiKey API key for Claude
+   */
+  constructor(provider: ClaudeProvider, apiKey: string | null) {
+    super(provider, apiKey);
+  }
+
+  // ========== Instance Methods (New Design) ==========
+
+  /**
+   * Instance method: Test message completion
+   */
+  async testMessageCompletion(config: Partial<ClaudeMessageConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
+    return this.testNonStreaming(CLAUDE_PATHS.MESSAGES, options);
+  }
+
+  /**
+   * Instance method: Test streaming message completion
+   */
+  async testStreamingMessageCompletion(config: Partial<ClaudeMessageConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
+    return this.testStreaming(CLAUDE_PATHS.MESSAGES, options);
+  }
+
+  // ========== Static Methods (Backward Compatibility) ==========
+  /**
+   * Static method: Test Claude message completion (backward compatibility)
+   * @deprecated Use instance method testMessageCompletion() instead
    */
   static async testMessageCompletion(
     provider: ClaudeProvider,
     apiKey: string,
     options: ClaudeTestOptions
   ): Promise<BaseTestResult> {
-    const testOptions = {
+    const instance = new ClaudeTestUtils(provider, apiKey);
+    const config = {
       model: options.model,
-      maxTokens: options.max_tokens,
+      max_tokens: options.max_tokens,
       temperature: options.temperature,
       messages: options.messages,
     };
-
-    return this.testNonStreamingRequest(provider, apiKey, CLAUDE_PATHS.MESSAGES, testOptions);
+    return instance.testMessageCompletion(config);
   }
 
   /**
-   * Test Claude message completion (streaming)
-   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
+   * Static method: Test Claude streaming message completion (backward compatibility)
+   * @deprecated Use instance method testStreamingMessageCompletion() instead
    */
   static async testStreamingMessageCompletion(
     provider: ClaudeProvider,
     apiKey: string,
     options: ClaudeTestOptions
   ): Promise<BaseTestResult> {
-    const testOptions = {
+    const instance = new ClaudeTestUtils(provider, apiKey);
+    const config = {
       model: options.model,
-      maxTokens: options.max_tokens,
+      max_tokens: options.max_tokens,
       temperature: options.temperature,
       messages: options.messages,
-      stream: true,
     };
-
-    return this.testStreamingRequest(provider, apiKey, CLAUDE_PATHS.MESSAGES, testOptions);
-  }
-
-  /**
-   * Create test message for Claude API
-   */
-  static createTestMessage(content: string = 'Hello! Please respond briefly.') {
-    return [{ role: 'user', content }];
-  }
-
-  /**
-   * Get default Claude test options
-   */
-  static getDefaultOptions(): ClaudeTestOptions {
-    return {
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 100,
-      temperature: 0.7
-    };
+    return instance.testStreamingMessageCompletion(config);
   }
 }

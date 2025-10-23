@@ -16,17 +16,17 @@ beforeAll(() => {
 createProviderTestSuite('openai', () => {
   let provider: OpenAIProvider;
   let apiKey: string;
+  let openaiUtils: OpenAITestUtils;
 
   beforeAll(() => {
     provider = new OpenAIProvider();
     apiKey = TestEnv.getProviderApiKey('openai')!;
+    openaiUtils = new OpenAITestUtils(provider, apiKey);
   });
 
   describe('Chat Completions API', () => {
     it('should handle non-streaming chat completion', async () => {
-      const result = await OpenAITestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testChatCompletion(
         { model: 'gpt-3.5-turbo' }
       );
 
@@ -39,7 +39,7 @@ createProviderTestSuite('openai', () => {
         expectedModel: 'gpt-3.5-turbo',
       };
 
-      const validationResult = OpenAITestUtils.validateTestResponse(result, validation);
+      const validationResult = openaiUtils.validateResponse(result, validation);
       
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
@@ -58,9 +58,7 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should handle streaming chat completion', async () => {
-      const result = await OpenAITestUtils.testStreamingChatCompletion(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testStreamingChatCompletion(
         { 
           model: 'gpt-3.5-turbo',
           max_tokens: 30 // Shorter for streaming test
@@ -82,9 +80,7 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should handle Response API requests', async () => {
-      const result = await OpenAITestUtils.testResponseAPI(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testResponseAPI(
         {
           model: 'gpt-4o-2024-08-06',
           input: 'What is artificial intelligence?',
@@ -102,9 +98,7 @@ createProviderTestSuite('openai', () => {
     }, 60000); // Response API might take longer
 
     it('should handle Response API with tools', async () => {
-      const result = await OpenAITestUtils.testResponseAPI(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testResponseAPI(
         {
           model: 'gpt-4o-2024-08-06',
           input: 'What is the weather like in San Francisco?',
@@ -129,9 +123,7 @@ createProviderTestSuite('openai', () => {
     }, 60000); // Response API might take longer
 
     it('should handle errors gracefully', async () => {
-      const result = await OpenAITestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testChatCompletion(
         {
           model: 'invalid-model-name',
           messages: [{ role: 'user', content: 'Hello' }],
@@ -144,11 +136,11 @@ createProviderTestSuite('openai', () => {
     }, 15000);
 
     it('should handle invalid API key', async () => {
-      const result = await OpenAITestUtils.testChatCompletion(
-        provider,
-        'invalid-api-key',
-        { model: 'gpt-3.5-turbo' }
-      );
+      // Test with invalid API key - create temporary instance with invalid key
+      const invalidUtils = new OpenAITestUtils(provider, 'invalid-api-key');
+      const result = await invalidUtils.testChatCompletion({
+        model: 'gpt-3.5-turbo'
+      });
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -159,9 +151,7 @@ createProviderTestSuite('openai', () => {
 
   describe('Usage Extraction', () => {
     it('should extract usage from non-streaming response', async () => {
-      const result = await OpenAITestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testChatCompletion(
         { model: 'gpt-3.5-turbo' }
       );
 
@@ -178,9 +168,7 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should calculate costs correctly', async () => {
-      const result = await OpenAITestUtils.testChatCompletion(
-        provider,
-        apiKey,
+      const result = await openaiUtils.testChatCompletion(
         { model: 'gpt-3.5-turbo' }
       );
 
@@ -260,7 +248,7 @@ createProviderTestSuite('openai', () => {
     it('should handle rate limiting gracefully', async () => {
       // Make multiple rapid requests to potentially trigger rate limiting
       const requests = Array(5).fill(null).map(() => {
-        return OpenAITestUtils.testChatCompletion(provider, apiKey, {
+        return openaiUtils.testChatCompletion({
           model: 'gpt-3.5-turbo',
           max_tokens: 10, // Keep it small and fast
         });

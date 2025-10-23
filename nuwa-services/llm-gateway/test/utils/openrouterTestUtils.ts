@@ -23,9 +23,81 @@ export interface OpenRouterChatCompletionConfig {
 
 /**
  * OpenRouter-specific test utilities
- * Thin wrapper around BaseProviderTestUtils for OpenRouter service
+ * Supports both static methods (backward compatibility) and instance methods (new design)
  */
-export class OpenRouterTestUtils extends BaseProviderTestUtils {
+export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService> {
+  /**
+   * Constructor for instance-based testing
+   * @param provider OpenRouter service instance
+   * @param apiKey API key for OpenRouter
+   */
+  constructor(provider: OpenRouterService, apiKey: string | null) {
+    super(provider, apiKey);
+  }
+
+  // ========== Instance Methods (New Design) ==========
+
+  /**
+   * Instance method: Test chat completion
+   */
+  async testChatCompletion(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
+    return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test streaming chat completion
+   */
+  async testStreamingChatCompletion(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
+    return this.testStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test chat completion with routing
+   */
+  async testChatCompletionWithRouting(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      route: 'fallback',
+      models: config.models || ['openai/gpt-3.5-turbo', 'anthropic/claude-3-haiku'],
+      ...config
+    };
+    return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test chat completion with referer
+   */
+  async testChatCompletionWithReferer(config: Partial<OpenRouterChatCompletionConfig> = {}, referer?: string): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
+    // Note: referer would be handled in headers, not in request body
+    return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  // ========== Static Methods (Backward Compatibility) ==========
   /**
    * Create a standard OpenRouter Chat Completions request
    */
@@ -57,60 +129,47 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils {
   }
 
   /**
-   * Test OpenRouter Chat Completions API
-   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
+   * Static method: Test OpenRouter Chat Completions API (backward compatibility)
+   * @deprecated Use instance method testChatCompletion() instead
    */
   static async testChatCompletion(
     provider: OpenRouterService,
     apiKey: string | null,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      ...config
-    };
-
-    return this.testNonStreamingRequest(provider, apiKey, OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new OpenRouterTestUtils(provider, apiKey);
+    return instance.testChatCompletion(config);
   }
 
   /**
-   * Test OpenRouter streaming Chat Completions
-   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
+   * Static method: Test OpenRouter streaming Chat Completions (backward compatibility)
+   * @deprecated Use instance method testStreamingChatCompletion() instead
    */
   static async testStreamingChatCompletion(
     provider: OpenRouterService,
     apiKey: string | null,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      stream: true,
-      ...config
-    };
-
-    return this.testStreamingRequest(provider, apiKey, OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new OpenRouterTestUtils(provider, apiKey);
+    return instance.testStreamingChatCompletion(config);
   }
 
   /**
-   * Test OpenRouter with routing preferences
+   * Static method: Test OpenRouter with routing preferences (backward compatibility)
+   * @deprecated Use instance method testChatCompletionWithRouting() instead
    */
   static async testChatCompletionWithRouting(
     provider: OpenRouterService,
     apiKey: string | null,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const routingConfig = this.createChatCompletionWithRoutingRequest(config);
-    return this.testChatCompletion(provider, apiKey, routingConfig);
+    const instance = new OpenRouterTestUtils(provider, apiKey);
+    return instance.testChatCompletionWithRouting(config);
   }
 
   /**
-   * Test OpenRouter with HTTP Referer header (required for some features)
+   * Static method: Test OpenRouter with HTTP Referer header (backward compatibility)
+   * @deprecated Use instance method testChatCompletionWithReferer() instead
    */
   static async testChatCompletionWithReferer(
     provider: OpenRouterService,
@@ -118,10 +177,8 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils {
     referer: string,
     config: Partial<OpenRouterChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    // This would require modifying the provider to accept custom headers
-    // For now, we'll use the standard test but note the limitation
-    console.warn('⚠️  HTTP Referer header testing requires provider modification');
-    return this.testChatCompletion(provider, apiKey, config);
+    const instance = new OpenRouterTestUtils(provider, apiKey);
+    return instance.testChatCompletionWithReferer(config, referer);
   }
 
   /**
@@ -135,13 +192,5 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils {
       'anthropic/claude-3-sonnet',
       'meta-llama/llama-2-70b-chat',
     ];
-  }
-
-  /**
-   * Create a request for testing different model providers
-   */
-  static createMultiProviderTestRequest(config: Partial<OpenRouterChatCompletionConfig> = {}): OpenRouterChatCompletionConfig[] {
-    const models = this.getCommonModels();
-    return models.map(model => this.createChatCompletionRequest({ ...config, model }));
   }
 }

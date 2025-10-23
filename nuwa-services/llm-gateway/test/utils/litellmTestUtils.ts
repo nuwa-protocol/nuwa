@@ -21,9 +21,71 @@ export interface LiteLLMChatCompletionConfig {
 
 /**
  * LiteLLM-specific test utilities
- * Thin wrapper around BaseProviderTestUtils for LiteLLM service
+ * Supports both static methods (backward compatibility) and instance methods (new design)
  */
-export class LiteLLMTestUtils extends BaseProviderTestUtils {
+export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
+  /**
+   * Constructor for instance-based testing
+   * @param provider LiteLLM service instance
+   * @param apiKey API key for LiteLLM
+   */
+  constructor(provider: LiteLLMService, apiKey: string | null) {
+    super(provider, apiKey);
+  }
+
+  // ========== Instance Methods (New Design) ==========
+
+  /**
+   * Instance method: Test chat completion
+   */
+  async testChatCompletion(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      ...config
+    };
+    return this.testNonStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test streaming chat completion
+   */
+  async testStreamingChatCompletion(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      stream: true,
+      ...config
+    };
+    return this.testStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  /**
+   * Instance method: Test chat completion with metadata
+   */
+  async testChatCompletionWithMetadata(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+    const options = {
+      model: config.model,
+      messages: config.messages,
+      maxTokens: config.max_tokens,
+      temperature: config.temperature,
+      user: config.user || 'test-user',
+      metadata: {
+        test_run: true,
+        environment: 'integration-test',
+        ...config.metadata
+      },
+      tags: config.tags || ['test', 'integration'],
+      ...config
+    };
+    return this.testNonStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
+  }
+
+  // ========== Static Methods (Backward Compatibility) ==========
   /**
    * Create a standard LiteLLM Chat Completions request
    */
@@ -55,62 +117,42 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils {
   }
 
   /**
-   * Test LiteLLM Chat Completions API
-   * Thin wrapper that uses BaseProviderTestUtils.testNonStreamingRequest
+   * Static method: Test LiteLLM Chat Completions API (backward compatibility)
+   * @deprecated Use instance method testChatCompletion() instead
    */
   static async testChatCompletion(
     provider: LiteLLMService,
     apiKey: string | null,
     config: Partial<LiteLLMChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      user: config.user,
-      metadata: config.metadata,
-      tags: config.tags,
-      ...config
-    };
-
-    return this.testNonStreamingRequest(provider, apiKey, LITELLM_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new LiteLLMTestUtils(provider, apiKey);
+    return instance.testChatCompletion(config);
   }
 
   /**
-   * Test LiteLLM streaming Chat Completions
-   * Thin wrapper that uses BaseProviderTestUtils.testStreamingRequest
+   * Static method: Test LiteLLM streaming Chat Completions (backward compatibility)
+   * @deprecated Use instance method testStreamingChatCompletion() instead
    */
   static async testStreamingChatCompletion(
     provider: LiteLLMService,
     apiKey: string | null,
     config: Partial<LiteLLMChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const options = {
-      model: config.model,
-      messages: config.messages,
-      maxTokens: config.max_tokens,
-      temperature: config.temperature,
-      user: config.user,
-      metadata: config.metadata,
-      tags: config.tags,
-      stream: true,
-      ...config
-    };
-
-    return this.testStreamingRequest(provider, apiKey, LITELLM_PATHS.CHAT_COMPLETIONS, options);
+    const instance = new LiteLLMTestUtils(provider, apiKey);
+    return instance.testStreamingChatCompletion(config);
   }
 
   /**
-   * Test LiteLLM with metadata and tags
+   * Static method: Test LiteLLM with metadata and tags (backward compatibility)
+   * @deprecated Use instance method testChatCompletionWithMetadata() instead
    */
   static async testChatCompletionWithMetadata(
     provider: LiteLLMService,
     apiKey: string | null,
     config: Partial<LiteLLMChatCompletionConfig> = {}
   ): Promise<BaseTestResult> {
-    const metadataConfig = this.createChatCompletionWithMetadataRequest(config);
-    return this.testChatCompletion(provider, apiKey, metadataConfig);
+    const instance = new LiteLLMTestUtils(provider, apiKey);
+    return instance.testChatCompletionWithMetadata(config);
   }
 
   /**
@@ -124,68 +166,5 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils {
       'claude-3-sonnet-20240229',
       'gemini-pro',
     ];
-  }
-
-  /**
-   * Create requests for testing different models through LiteLLM
-   */
-  static createMultiModelTestRequests(config: Partial<LiteLLMChatCompletionConfig> = {}): LiteLLMChatCompletionConfig[] {
-    const models = this.getCommonModels();
-    return models.map(model => this.createChatCompletionRequest({ ...config, model }));
-  }
-
-  /**
-   * Test LiteLLM health endpoint
-   */
-  static async testHealth(
-    provider: LiteLLMService,
-    apiKey: string | null
-  ): Promise<BaseTestResult> {
-    const startTime = Date.now();
-    
-    try {
-      const response = await provider.forwardRequest(apiKey, '/health', 'GET', undefined, false);
-      const duration = Date.now() - startTime;
-
-      if (!response) {
-        return {
-          success: false,
-          error: 'No response received',
-          duration,
-        };
-      }
-
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      const parsedResponse = provider.parseResponse(response);
-
-      return {
-        success: true,
-        response: parsedResponse,
-        duration,
-        statusCode: response.status,
-      };
-
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        duration: Date.now() - startTime,
-      };
-    }
-  }
- 
-  /**
-   * Wait for a specified amount of time
-   */
-  static async wait(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  } 
 }
