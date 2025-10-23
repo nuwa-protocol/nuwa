@@ -36,13 +36,20 @@ export interface PricingResult {
 }
 
 /**
- * Pricing registry with override support
+ * Pricing registry with provider-separated pricing support
  */
 export class PricingRegistry {
   private static instance: PricingRegistry;
-  private pricing: Record<string, ModelPricing> = {};
-  private modelFamilyPatterns: Array<{ pattern: RegExp; baseModel: string }> = [];
-  private version: string = 'unknown';
+  
+  // Provider-separated pricing storage
+  private providerPricing = new Map<string, {
+    models: Record<string, ModelPricing>;
+    patterns: Array<{ pattern: RegExp; baseModel: string }>;
+    version: string;
+  }>();
+  
+  // Legacy merged pricing (for backward compatibility and global overrides)
+  private globalOverrides: Record<string, ModelPricing> = {};
 
   private constructor() {
     this.loadFromConfig();
@@ -57,34 +64,43 @@ export class PricingRegistry {
   }
 
   /**
-   * Load pricing from configuration file
+   * Load pricing from configuration file (provider-separated)
    */
   private loadFromConfig(): void {
     try {
-      this.pricing = pricingConfigLoader.getModels();
-      this.modelFamilyPatterns = pricingConfigLoader.getModelFamilyPatterns();
-      this.version = pricingConfigLoader.getVersion();
+      const providerConfigs = pricingConfigLoader.getProviderConfigs();
       
-      console.log(`📊 Loaded pricing for ${Object.keys(this.pricing).length} models (version: ${this.version})`);
+      for (const [provider, config] of Object.entries(providerConfigs)) {
+        this.providerPricing.set(provider, {
+          models: config.models,
+          patterns: config.modelFamilyPatterns.map(p => ({
+            pattern: new RegExp(p.pattern),
+            baseModel: p.baseModel
+          })),
+          version: config.version
+        });
+        
+        console.log(`📊 Loaded ${Object.keys(config.models).length} models for provider: ${provider} (version: ${config.version})`);
+      }
+      
+      console.log(`📊 Total providers loaded: ${this.providerPricing.size}`);
     } catch (error) {
       console.error('Failed to load pricing configuration:', error);
       // Fallback to empty config to prevent crashes
-      this.pricing = {};
-      this.modelFamilyPatterns = [];
-      this.version = 'unknown';
+      this.providerPricing.clear();
     }
   }
 
   /**
-   * Load pricing overrides from environment variable
+   * Load pricing overrides from environment variable (global overrides)
    */
   private loadOverrides(): void {
     try {
       const overrides = process.env.PRICING_OVERRIDES;
       if (overrides) {
         const parsed = JSON.parse(overrides) as Record<string, ModelPricing>;
-        this.pricing = { ...this.pricing, ...parsed };
-        console.log(`📊 Applied ${Object.keys(parsed).length} pricing overrides`);
+        this.globalOverrides = parsed;
+        console.log(`📊 Applied ${Object.keys(parsed).length} global pricing overrides`);
       }
     } catch (error) {
       console.error('Error loading pricing overrides:', error);
@@ -92,18 +108,31 @@ export class PricingRegistry {
   }
 
   /**
-   * Get pricing for a specific model
+   * Get pricing for a specific model from a specific provider
+   * @param provider Provider name (e.g., 'openai', 'claude')
+   * @param model Model name
+   * @returns ModelPricing or null if not found
    */
-  getPricing(model: string): ModelPricing | null {
+  getProviderPricing(provider: string, model: string): ModelPricing | null {
+    // Check global overrides first
+    if (this.globalOverrides[model]) {
+      return this.globalOverrides[model];
+    }
+
+    const providerConfig = this.providerPricing.get(provider);
+    if (!providerConfig) {
+      return null;
+    }
+
     // Direct lookup
-    if (this.pricing[model]) {
-      return this.pricing[model];
+    if (providerConfig.models[model]) {
+      return providerConfig.models[model];
     }
 
     // Pattern matching for model families
-    for (const { pattern, baseModel } of this.modelFamilyPatterns) {
-      if (pattern.test(model) && this.pricing[baseModel]) {
-        return this.pricing[baseModel];
+    for (const { pattern, baseModel } of providerConfig.patterns) {
+      if (pattern.test(model) && providerConfig.models[baseModel]) {
+        return providerConfig.models[baseModel];
       }
     }
 
@@ -111,7 +140,69 @@ export class PricingRegistry {
   }
 
   /**
-   * Calculate cost based on token usage
+   * Get pricing for a specific model (legacy method - tries all providers)
+   * @deprecated Use getProviderPricing(provider, model) instead
+   */
+  getPricing(model: string): ModelPricing | null {
+    // Check global overrides first
+    if (this.globalOverrides[model]) {
+      return this.globalOverrides[model];
+    }
+
+    // Try each provider until we find a match
+    for (const [provider, config] of this.providerPricing) {
+      // Direct lookup
+      if (config.models[model]) {
+        return config.models[model];
+      }
+
+      // Pattern matching
+      for (const { pattern, baseModel } of config.patterns) {
+        if (pattern.test(model) && config.models[baseModel]) {
+          return config.models[baseModel];
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate cost based on token usage for a specific provider
+   * @param provider Provider name (e.g., 'openai', 'claude')
+   * @param model Model name
+   * @param usage Usage information
+   * @returns PricingResult or null if calculation fails
+   */
+  calculateProviderCost(provider: string, model: string, usage: UsageInfo): PricingResult | null {
+    const pricing = this.getProviderPricing(provider, model);
+    if (!pricing) {
+      return null;
+    }
+
+    const promptTokens = usage.promptTokens || 0;
+    const completionTokens = usage.completionTokens || 0;
+
+    // Calculate cost: (tokens / TOKENS_PER_MILLION) * price_per_million
+    const promptCost = (promptTokens / TOKENS_PER_MILLION) * pricing.promptPerMTokUsd;
+    const completionCost = (completionTokens / TOKENS_PER_MILLION) * pricing.completionPerMTokUsd;
+    const totalCost = promptCost + completionCost;
+
+    const providerConfig = this.providerPricing.get(provider);
+    const version = providerConfig?.version || 'unknown';
+
+    return {
+      costUsd: totalCost,
+      source: 'gateway-pricing',
+      pricingVersion: `${provider}-${version}`,
+      model,
+      usage,
+    };
+  }
+
+  /**
+   * Calculate cost based on token usage (legacy method)
+   * @deprecated Use calculateProviderCost(provider, model, usage) instead
    */
   calculateCost(model: string, usage: UsageInfo): PricingResult | null {
     const pricing = this.getPricing(model);
@@ -130,31 +221,70 @@ export class PricingRegistry {
     return {
       costUsd: totalCost,
       source: 'gateway-pricing',
-      pricingVersion: this.version,
+      pricingVersion: 'legacy',
       model,
       usage,
     };
   }
 
   /**
-   * Get current pricing version
+   * Get current pricing version for a provider
+   */
+  getProviderVersion(provider: string): string {
+    return this.providerPricing.get(provider)?.version || 'unknown';
+  }
+
+  /**
+   * Get current pricing version (legacy method)
+   * @deprecated Use getProviderVersion(provider) instead
    */
   getVersion(): string {
-    return this.version;
+    return 'merged';
   }
 
   /**
-   * List all available models
+   * List all available models for a provider
+   */
+  listProviderModels(provider: string): string[] {
+    const config = this.providerPricing.get(provider);
+    return config ? Object.keys(config.models) : [];
+  }
+
+  /**
+   * List all available models (legacy method)
+   * @deprecated Use listProviderModels(provider) instead
    */
   listModels(): string[] {
-    return Object.keys(this.pricing);
+    const allModels = new Set<string>();
+    for (const config of this.providerPricing.values()) {
+      Object.keys(config.models).forEach(model => allModels.add(model));
+    }
+    return Array.from(allModels);
   }
 
   /**
-   * Update pricing for a model (runtime override)
+   * List all registered providers
+   */
+  listProviders(): string[] {
+    return Array.from(this.providerPricing.keys());
+  }
+
+  /**
+   * Update pricing for a model in a specific provider (runtime override)
+   */
+  updateProviderPricing(provider: string, model: string, pricing: ModelPricing): void {
+    const config = this.providerPricing.get(provider);
+    if (config) {
+      config.models[model] = pricing;
+    }
+  }
+
+  /**
+   * Update pricing for a model (legacy method - global override)
+   * @deprecated Use updateProviderPricing(provider, model, pricing) instead
    */
   updatePricing(model: string, pricing: ModelPricing): void {
-    this.pricing[model] = pricing;
+    this.globalOverrides[model] = pricing;
   }
 
   /**
@@ -163,6 +293,7 @@ export class PricingRegistry {
   reload(): void {
     try {
       pricingConfigLoader.reloadConfig();
+      this.providerPricing.clear();
       this.loadFromConfig();
       this.loadOverrides();
       console.log('📊 Pricing configuration reloaded successfully');

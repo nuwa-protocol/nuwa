@@ -136,6 +136,14 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
   }
 
   /**
+   * Get the accumulated response body (alias for getAccumulatedResponse)
+   * @deprecated Use getAccumulatedResponse() instead
+   */
+  getAccumulatedResponseBody(): any | null {
+    return this.accumulatedResponseBody;
+  }
+
+  /**
    * Reset the processor state for reuse
    */
   reset(): void {

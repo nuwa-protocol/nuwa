@@ -7,6 +7,16 @@ import { UsageInfo, PricingResult, pricingRegistry } from '../../pricing.js';
  * Provider-specific extractors can extend this class
  */
 export abstract class BaseUsageExtractor implements UsageExtractor {
+  protected provider: string;
+
+  /**
+   * Constructor
+   * @param provider Provider name (e.g., 'openai', 'claude')
+   */
+  constructor(provider: string) {
+    this.provider = provider;
+  }
+
   /**
    * Extract usage information from a non-streaming response
    * Default implementation delegates to extractFromResponseBody
@@ -33,7 +43,7 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
   abstract extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null;
 
   /**
-   * Calculate cost using gateway pricing registry
+   * Calculate cost using gateway pricing registry with provider-specific pricing
    * Can be overridden by providers that have different cost calculation logic
    */
   calculateCost(model: string, usage: UsageInfo): PricingResult | null {
@@ -42,12 +52,13 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
         return null;
       }
 
-      const result = pricingRegistry.calculateCost(model, usage);
+      // Use provider-specific pricing if available
+      const result = pricingRegistry.calculateProviderCost(this.provider, model, usage);
       if (result) {
-        console.log(`[${this.constructor.name}] Calculated cost for ${model}: $${result.costUsd}`);
+        console.log(`[${this.constructor.name}] Calculated cost for ${this.provider}/${model}: $${result.costUsd}`);
         return result;
       } else {
-        console.warn(`[${this.constructor.name}] Failed to calculate cost for model: ${model}`);
+        console.warn(`[${this.constructor.name}] Failed to calculate cost for model: ${this.provider}/${model}`);
         return null;
       }
     } catch (error) {

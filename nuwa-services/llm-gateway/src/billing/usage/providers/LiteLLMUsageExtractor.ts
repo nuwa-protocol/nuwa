@@ -7,6 +7,10 @@ import { UsageInfo } from '../../pricing.js';
  * Handles LiteLLM's Chat Completions format with header-based cost information
  */
 export class LiteLLMUsageExtractor extends BaseUsageExtractor {
+  constructor() {
+    super('litellm');
+  }
+
   /**
    * Extract usage from LiteLLM response body
    * LiteLLM uses standard Chat Completions format

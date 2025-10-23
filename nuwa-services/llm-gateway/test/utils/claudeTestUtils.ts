@@ -234,14 +234,8 @@ export class ClaudeTestUtils {
       if (!result.cost) {
         errors.push('Expected cost information but none found');
       } else {
-        if (result.cost.totalUsd <= 0) {
-          errors.push(`Expected positive cost but got ${result.cost.totalUsd}`);
-        }
-        
-        // Validate cost consistency
-        const expectedTotal = result.cost.promptUsd + result.cost.completionUsd;
-        if (Math.abs(result.cost.totalUsd - expectedTotal) > 0.000001) {
-          errors.push(`Cost inconsistency: total=${result.cost.totalUsd}, sum=${expectedTotal}`);
+        if (result.cost.costUsd <= 0) {
+          errors.push(`Expected positive cost but got ${result.cost.costUsd}`);
         }
       }
     }

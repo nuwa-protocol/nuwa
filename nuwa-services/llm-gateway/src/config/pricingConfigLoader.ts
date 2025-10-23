@@ -1,5 +1,6 @@
 import { ModelPricing } from '../billing/pricing.js';
-import defaultPricingConfig from './openai-pricing.json' with { type: 'json' };
+import openaiPricingConfig from './openai-pricing.json' with { type: 'json' };
+import claudePricingConfig from './claude-pricing.json' with { type: 'json' };
 
 
 /**
@@ -45,7 +46,7 @@ export class PricingConfigLoader {
   }
 
   /**
-   * Load pricing configuration (now embedded in module)
+   * Load pricing configuration from multiple provider configs
    */
   loadConfig(): PricingConfig {
     if (this.config) {
@@ -53,15 +54,48 @@ export class PricingConfigLoader {
     }
 
     try {
-      console.log(`📊 Using embedded pricing config (${defaultPricingConfig.version})`);
-      this.config = defaultPricingConfig as PricingConfig;
+      // Load individual provider configs
+      const configs = [
+        { name: 'OpenAI', config: openaiPricingConfig as PricingConfig },
+        { name: 'Claude', config: claudePricingConfig as PricingConfig }
+      ];
+
+      // Merge all configurations
+      this.config = this.mergeConfigs(configs);
       
-      console.log(`📊 Loaded pricing config: ${this.config.version} (${Object.keys(this.config.models).length} models)`);
+      console.log(`📊 Loaded merged pricing config: ${Object.keys(this.config.models).length} models from ${configs.length} providers`);
       return this.config;
     } catch (error) {
       console.error('Error loading pricing config:', error);
       throw new Error(`Failed to load pricing configuration: ${error}`);
     }
+  }
+
+  /**
+   * Merge multiple provider configurations into a single config
+   */
+  private mergeConfigs(configs: Array<{ name: string; config: PricingConfig }>): PricingConfig {
+    const merged: PricingConfig = {
+      version: 'merged-' + new Date().toISOString().split('T')[0],
+      models: {},
+      modelFamilyPatterns: []
+    };
+
+    for (const { name, config } of configs) {
+      if (config && config.models) {
+        // Merge models
+        const modelCount = Object.keys(config.models).length;
+        Object.assign(merged.models, config.models);
+        console.log(`📊 Merged ${modelCount} models from ${name} config`);
+
+        // Merge model family patterns
+        if (config.modelFamilyPatterns) {
+          merged.modelFamilyPatterns.push(...config.modelFamilyPatterns);
+        }
+      }
+    }
+
+    return merged;
   }
 
   /**
@@ -73,7 +107,41 @@ export class PricingConfigLoader {
   }
 
   /**
-   * Get models as simple ModelPricing objects
+   * Get provider-separated configurations
+   * Returns a map of provider name to their pricing config
+   */
+  getProviderConfigs(): Record<string, PricingConfig> {
+    // Return provider-separated configs
+    return {
+      'openai': openaiPricingConfig as PricingConfig,
+      'claude': claudePricingConfig as PricingConfig
+    };
+  }
+
+  /**
+   * Get models for a specific provider
+   */
+  getProviderModels(provider: string): Record<string, ModelPricing> {
+    const configs = this.getProviderConfigs();
+    const providerConfig = configs[provider];
+    
+    if (!providerConfig) {
+      return {};
+    }
+
+    const models: Record<string, ModelPricing> = {};
+    for (const [model, pricing] of Object.entries(providerConfig.models)) {
+      models[model] = {
+        promptPerMTokUsd: pricing.promptPerMTokUsd,
+        completionPerMTokUsd: pricing.completionPerMTokUsd
+      };
+    }
+    return models;
+  }
+
+  /**
+   * Get models as simple ModelPricing objects (merged - for backward compatibility)
+   * @deprecated Use getProviderModels(provider) instead
    */
   getModels(): Record<string, ModelPricing> {
     const config = this.loadConfig();

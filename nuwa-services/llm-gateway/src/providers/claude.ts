@@ -56,11 +56,6 @@ export class ClaudeProvider implements LLMProvider {
     isStream: boolean = false
   ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01", // Required by Claude API
-      };
-
       // Add API key header (required for Claude)
       if (!apiKey) {
         return {
@@ -68,13 +63,18 @@ export class ClaudeProvider implements LLMProvider {
           status: 401
         };
       }
-      headers["x-api-key"] = apiKey;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01", // Required by Claude API
+        "Authorization": `Bearer ${apiKey}`
+      };
 
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
 
       const fullUrl = `${this.baseURL}${path}`;
-      console.log(`🔄 Forwarding ${method} request to Claude: ${fullUrl}`);
+      console.log(`🔄 Forwarding ${method} request to Claude: ${fullUrl}, data: ${JSON.stringify(finalData)}`);
 
       const response = await axios({
         method: method.toLowerCase() as any,

@@ -7,6 +7,10 @@ import { UsageInfo } from '../../pricing.js';
  * Handles Claude API response formats for both streaming and non-streaming requests
  */
 export class ClaudeUsageExtractor extends BaseUsageExtractor {
+  constructor() {
+    super('claude');
+  }
+
   /**
    * Extract usage from Claude response body
    * Claude API returns usage in a specific format
