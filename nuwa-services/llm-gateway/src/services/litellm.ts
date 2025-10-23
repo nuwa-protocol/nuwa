@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { LLMProvider } from "../providers/LLMProvider.js";
+import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { LiteLLMUsageExtractor } from "../billing/usage/providers/LiteLLMUsageExtractor.js";
@@ -11,7 +11,7 @@ import { LITELLM_PATHS } from "../providers/constants.js";
  * It mirrors the key methods used by `OpenRouterService` so the same routing
  * layer can operate on either backend.
  */
-class LiteLLMService implements LLMProvider {
+class LiteLLMService extends BaseLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -20,6 +20,7 @@ class LiteLLMService implements LLMProvider {
   ] as const;
 
     constructor() {
+    super();
     // Base URL of the LiteLLM Proxy
     this.baseURL = process.env.LITELLM_BASE_URL || "http://localhost:4000";
   }

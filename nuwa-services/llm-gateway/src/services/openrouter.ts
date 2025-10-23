@@ -1,6 +1,6 @@
 import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
-import { LLMProvider } from "../providers/LLMProvider.js";
+import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { OpenRouterUsageExtractor } from "../billing/usage/providers/OpenRouterUsageExtractor.js";
@@ -38,7 +38,7 @@ interface UpstreamErrorResponse {
   details: OpenRouterErrorInfo;
 }
 
-class OpenRouterService implements LLMProvider {
+class OpenRouterService extends BaseLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -47,6 +47,7 @@ class OpenRouterService implements LLMProvider {
   ] as const;
 
   constructor() {
+    super();
     this.baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";
   }
 

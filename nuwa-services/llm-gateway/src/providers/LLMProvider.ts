@@ -1,6 +1,37 @@
 import { AxiosResponse } from "axios";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
+import { UsageInfo, PricingResult } from "../billing/pricing.js";
+
+/**
+ * Response from non-streaming provider request
+ * Contains complete response data, usage, and cost information
+ */
+export interface ExecuteResponse {
+  success: boolean;
+  statusCode?: number;
+  response?: any;          // Parsed response body
+  usage?: UsageInfo;       // Extracted usage information
+  cost?: PricingResult;    // Calculated cost
+  error?: string;
+  details?: any;           // Raw error details
+  rawResponse?: AxiosResponse;
+}
+
+/**
+ * Response from streaming provider request
+ * Contains final statistics after stream completion
+ */
+export interface ExecuteStreamResponse {
+  success: boolean;
+  statusCode: number;      // Always present
+  totalBytes: number;      // Always present - total bytes transferred
+  usage?: UsageInfo;       // Extracted usage information (if available)
+  cost?: PricingResult;    // Calculated cost (if available)
+  error?: string;          // Error message (if failed)
+  details?: any;           // Raw error details
+  rawResponse?: AxiosResponse;
+}
 
 /**
  * Unified interface for LLM providers
@@ -63,6 +94,40 @@ export interface LLMProvider {
    * @returns StreamProcessor instance or undefined if provider uses default processing
    */
   createStreamProcessor?(model: string, initialCost?: number): StreamProcessor;
+
+  /**
+   * High-level request method for non-streaming requests
+   * Handles forward request, parsing, and usage extraction
+   * @param apiKey User's API key for this provider
+   * @param path API path (e.g., '/chat/completions')
+   * @param method HTTP method
+   * @param data Request payload
+   * @returns Complete response with usage and cost information
+   */
+  executeRequest(
+    apiKey: string | null,
+    path: string,
+    method: string,
+    data?: any
+  ): Promise<ExecuteResponse>;
+
+  /**
+   * High-level request method for streaming requests
+   * Automatically forwards stream to destination and returns final statistics
+   * @param apiKey User's API key for this provider
+   * @param path API path (e.g., '/chat/completions')
+   * @param method HTTP method
+   * @param data Request payload (required)
+   * @param destination Target stream to forward data to (required)
+   * @returns Promise that resolves with final statistics after stream completion
+   */
+  executeStreamRequest(
+    apiKey: string | null,
+    path: string,
+    method: string,
+    data: any,
+    destination: NodeJS.WritableStream
+  ): Promise<ExecuteStreamResponse>;
 }
 
 /**

@@ -131,45 +131,32 @@ export class OpenAITestUtils extends BaseProviderTestUtils {
     
     try {
       const requestData = this.createChatCompletionRequest(config);
-      
-      const response = await provider.forwardRequest(
+      const duration = Date.now() - startTime;
+
+      // Use the new high-level executeRequest API
+      const executeResult = await provider.executeRequest(
         apiKey,
         OPENAI_PATHS.CHAT_COMPLETIONS,
         'POST',
-        requestData,
-        requestData.stream
+        requestData
       );
 
-      const duration = Date.now() - startTime;
-
-      if (!response) {
+      if (!executeResult.success) {
         return {
           success: false,
-          error: 'No response received',
+          error: executeResult.error || 'Unknown error',
           duration,
+          statusCode: executeResult.statusCode,
         };
       }
-
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      // Parse response and extract usage/cost
-      const parsedResponse = provider.parseResponse(response);
-      const { usage, cost } = await this.extractUsageAndCost(provider, response, requestData);
 
       return {
         success: true,
-        response: parsedResponse,
-        usage,
-        cost,
+        response: executeResult.response,
+        usage: executeResult.usage,
+        cost: executeResult.cost,
         duration,
-        statusCode: response.status,
+        statusCode: executeResult.statusCode,
       };
 
     } catch (error) {
@@ -193,45 +180,32 @@ export class OpenAITestUtils extends BaseProviderTestUtils {
     
     try {
       const requestData = this.createResponseAPIRequest(config);
-      
-      const response = await provider.forwardRequest(
+      const duration = Date.now() - startTime;
+
+      // Use the new high-level executeRequest API
+      const executeResult = await provider.executeRequest(
         apiKey,
         OPENAI_PATHS.RESPONSES,
         'POST',
-        requestData,
-        requestData.stream
+        requestData
       );
 
-      const duration = Date.now() - startTime;
-
-      if (!response) {
+      if (!executeResult.success) {
         return {
           success: false,
-          error: 'No response received',
+          error: executeResult.error || 'Unknown error',
           duration,
+          statusCode: executeResult.statusCode,
         };
       }
-
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      // Parse response and extract usage/cost
-      const parsedResponse = provider.parseResponse(response);
-      const { usage, cost } = await this.extractUsageAndCost(provider, response, requestData);
 
       return {
         success: true,
-        response: parsedResponse,
-        usage,
-        cost,
+        response: executeResult.response,
+        usage: executeResult.usage,
+        cost: executeResult.cost,
         duration,
-        statusCode: response.status,
+        statusCode: executeResult.statusCode,
       };
 
     } catch (error) {
@@ -256,78 +230,44 @@ export class OpenAITestUtils extends BaseProviderTestUtils {
     try {
       const requestData = this.createChatCompletionRequest({ ...config, stream: true });
       
-      const response = await provider.forwardRequest(
+      // Use PassThrough stream to capture content for testing
+      const { PassThrough } = await import('stream');
+      const captureStream = new PassThrough();
+      let accumulatedContent = '';
+
+      // Capture content as it flows through
+      captureStream.on('data', (chunk: Buffer) => {
+        accumulatedContent += chunk.toString();
+      });
+
+      // Use the new high-level executeStreamRequest API
+      const result = await provider.executeStreamRequest(
         apiKey,
         OPENAI_PATHS.CHAT_COMPLETIONS,
         'POST',
         requestData,
-        true
+        captureStream  // Pass the capture stream as destination
       );
 
       const duration = Date.now() - startTime;
 
-      if (!response) {
+      if (!result.success) {
         return {
           success: false,
-          error: 'No response received',
+          error: result.error || 'Unknown error',
           duration,
+          statusCode: result.statusCode,
         };
       }
 
-      if ('error' in response) {
-        return {
-          success: false,
-          error: response.error,
-          statusCode: response.status,
-          duration,
-        };
-      }
-
-      // Process streaming response
-      return new Promise((resolve) => {
-        let accumulatedContent = '';
-        let usage: any;
-        let cost: any;
-        let streamProcessor: any;
-
-        // Create stream processor
-        if (provider.createStreamProcessor) {
-          streamProcessor = provider.createStreamProcessor(requestData.model);
-        }
-
-        response.data.on('data', (chunk: Buffer) => {
-          const chunkStr = chunk.toString();
-          accumulatedContent += chunkStr;
-          
-          if (streamProcessor) {
-            streamProcessor.processChunk(chunkStr);
-          }
-        });
-
-        response.data.on('end', () => {
-          if (streamProcessor) {
-            usage = streamProcessor.getFinalUsage();
-            cost = streamProcessor.getFinalCost();
-          }
-
-          resolve({
-            success: true,
-            response: { content: accumulatedContent },
-            usage,
-            cost,
-            duration: Date.now() - startTime,
-            statusCode: 200,
-          });
-        });
-
-        response.data.on('error', (error: Error) => {
-          resolve({
-            success: false,
-            error: error.message,
-            duration: Date.now() - startTime,
-          });
-        });
-      });
+      return {
+        success: true,
+        response: { content: accumulatedContent },
+        usage: result.usage,
+        cost: result.cost,
+        duration,
+        statusCode: result.statusCode,
+      };
 
     } catch (error) {
       return {

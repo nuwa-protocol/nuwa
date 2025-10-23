@@ -15,6 +15,8 @@ export interface BaseTestResult {
   error?: string;
   duration?: number;
   statusCode?: number;
+  model?: string;
+  rawResponse?: any;
 }
 
 /**
@@ -24,9 +26,18 @@ export interface BaseTestValidation {
   expectSuccess: boolean;
   expectUsage?: boolean;
   expectCost?: boolean;
+  expectResponse?: boolean;
   minTokens?: number;
   maxTokens?: number;
   expectedModel?: string;
+}
+
+/**
+ * Validation result interface
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
 }
 
 /**

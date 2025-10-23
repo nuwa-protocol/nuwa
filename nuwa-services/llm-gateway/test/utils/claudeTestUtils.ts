@@ -51,25 +51,29 @@ export class ClaudeTestUtils {
         };
       }
 
-      // Extract usage information
-      const usageExtractor = provider.createUsageExtractor();
-      const usage = usageExtractor.extractFromResponse(response);
-      
-      // Calculate cost
-      let cost: PricingResult | null = null;
-      if (usage) {
-        cost = usageExtractor.calculateCost(options.model, usage);
-      }
+      // Use the new high-level executeRequest API
+      const executeResult = await provider.executeRequest(
+        apiKey,
+        '/v1/messages',
+        'POST',
+        requestData
+      );
 
-      const parsedResponse = provider.parseResponse(response);
+      if (!executeResult.success) {
+        return {
+          success: false,
+          error: executeResult.error || 'Unknown error',
+          model: options.model
+        };
+      }
 
       return {
         success: true,
-        response: parsedResponse,
-        usage,
-        cost,
+        response: executeResult.response,
+        usage: executeResult.usage,
+        cost: executeResult.cost,
         model: options.model,
-        rawResponse: response
+        rawResponse: executeResult.rawResponse
       };
     } catch (error) {
       console.error('[ClaudeTestUtils] Error in testMessageCompletion:', error);
@@ -118,59 +122,58 @@ export class ClaudeTestUtils {
         };
       }
 
-      // Process streaming response
-      const streamProcessor = provider.createStreamProcessor(options.model);
+      // Use PassThrough stream to capture content for testing
+      const { PassThrough } = await import('stream');
+      const captureStream = new PassThrough();
       let accumulatedContent = '';
 
-      return new Promise((resolve) => {
-        const stream = response.data;
+      // Capture content as it flows through
+      captureStream.on('data', (chunk: Buffer) => {
+        const chunkText = chunk.toString();
         
-        stream.on('data', (chunk: Buffer) => {
-          const chunkText = chunk.toString();
-          streamProcessor.processChunk(chunkText);
-          
-          // Extract content for validation
-          const lines = chunkText.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === 'content_block_delta' && data.delta?.text) {
-                  accumulatedContent += data.delta.text;
-                }
-              } catch (e) {
-                // Ignore parsing errors for non-JSON data lines
+        // Extract content for validation (Claude-specific format)
+        const lines = chunkText.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'content_block_delta' && data.delta?.text) {
+                accumulatedContent += data.delta.text;
               }
+            } catch (e) {
+              // Ignore parsing errors for non-JSON data lines
             }
           }
-        });
-
-        stream.on('end', () => {
-          const usage = streamProcessor.getFinalUsage();
-          const cost = streamProcessor.getFinalCost();
-          const responseBody = streamProcessor.getAccumulatedResponseBody();
-
-          resolve({
-            success: true,
-            response: {
-              content: accumulatedContent,
-              ...responseBody
-            },
-            usage,
-            cost,
-            model: options.model,
-            rawResponse: response
-          });
-        });
-
-        stream.on('error', (error: Error) => {
-          resolve({
-            success: false,
-            error: error.message,
-            model: options.model
-          });
-        });
+        }
       });
+
+      // Use the new high-level executeStreamRequest API
+      const result = await provider.executeStreamRequest(
+        apiKey,
+        '/v1/messages',
+        'POST',
+        requestData,
+        captureStream  // Pass the capture stream as destination
+      );
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error',
+          model: options.model
+        };
+      }
+
+      return {
+        success: true,
+        response: {
+          content: accumulatedContent,
+        },
+        usage: result.usage,
+        cost: result.cost,
+        model: options.model,
+        rawResponse: result.rawResponse
+      };
     } catch (error) {
       console.error('[ClaudeTestUtils] Error in testStreamingMessageCompletion:', error);
       return {
@@ -214,17 +217,19 @@ export class ClaudeTestUtils {
       if (!result.usage) {
         errors.push('Expected usage information but none found');
       } else {
-        if (validation.minTokens && result.usage.totalTokens < validation.minTokens) {
+        if (validation.minTokens && result.usage.totalTokens && result.usage.totalTokens < validation.minTokens) {
           errors.push(`Expected at least ${validation.minTokens} tokens but got ${result.usage.totalTokens}`);
         }
-        if (validation.maxTokens && result.usage.totalTokens > validation.maxTokens) {
+        if (validation.maxTokens && result.usage.totalTokens && result.usage.totalTokens > validation.maxTokens) {
           errors.push(`Expected at most ${validation.maxTokens} tokens but got ${result.usage.totalTokens}`);
         }
         
         // Validate token consistency
-        const expectedTotal = result.usage.promptTokens + result.usage.completionTokens;
-        if (result.usage.totalTokens !== expectedTotal) {
-          errors.push(`Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`);
+        if (result.usage.promptTokens && result.usage.completionTokens && result.usage.totalTokens) {
+          const expectedTotal = result.usage.promptTokens + result.usage.completionTokens;
+          if (result.usage.totalTokens !== expectedTotal) {
+            errors.push(`Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`);
+          }
         }
       }
     }

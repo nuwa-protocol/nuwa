@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { LLMProvider } from "./LLMProvider.js";
+import { BaseLLMProvider } from "./BaseLLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { ClaudeUsageExtractor } from "../billing/usage/providers/ClaudeUsageExtractor.js";
@@ -10,7 +10,7 @@ import { CLAUDE_PATHS } from "./constants.js";
  * Claude Provider Implementation
  * Handles Anthropic Claude API requests with proper authentication and usage tracking
  */
-export class ClaudeProvider implements LLMProvider {
+export class ClaudeProvider extends BaseLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -19,6 +19,7 @@ export class ClaudeProvider implements LLMProvider {
   ] as const;
 
   constructor() {
+    super();
     this.baseURL = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
   }
 

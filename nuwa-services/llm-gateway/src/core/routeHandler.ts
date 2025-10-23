@@ -35,6 +35,19 @@ export interface ProxyResult {
 }
 
 /**
+ * Result of provider validation
+ */
+interface ProviderValidationResult {
+  success: boolean;
+  error?: string;
+  statusCode?: number;
+  provider?: LLMProvider;
+  apiKey?: string | null;
+  pathResult?: PathValidationResult;
+  didInfo?: DIDInfo | null;
+}
+
+/**
  * Configuration for route handling
  */
 export interface RouteHandlerConfig {
@@ -59,14 +72,106 @@ export class RouteHandler {
   }
 
   /**
+   * Validate provider request (common logic for both streaming and non-streaming)
+   */
+  private validateProviderRequest(req: Request, providerName: string): ProviderValidationResult {
+    // Validate authentication
+    if (!this.skipAuth) {
+      const authResult = this.authManager.validateDIDAuth(req);
+      if (!authResult.success) {
+        return {
+          success: false,
+          error: authResult.error || 'Unauthorized',
+          statusCode: 401
+        };
+      }
+    }
+
+    const didInfo = this.authManager.extractDIDInfo(req);
+    
+    // Get provider configuration and validate path
+    const providerConfig = this.providerManager.get(providerName);
+    if (!providerConfig) {
+      return {
+        success: false,
+        error: `Provider '${providerName}' not found`,
+        statusCode: 404
+      };
+    }
+
+    const pathResult = PathValidator.validatePath(req, providerName, providerConfig);
+    if (pathResult.error) {
+      return {
+        success: false,
+        error: pathResult.error,
+        statusCode: 400,
+        pathResult
+      };
+    }
+    
+    // Require DID authentication for all routes (both legacy and provider routes need billing)
+    if (!this.skipAuth && !didInfo?.did) {
+      return {
+        success: false,
+        error: 'Unauthorized',
+        statusCode: 401,
+        pathResult,
+        didInfo
+      };
+    }
+
+    const provider = this.providerManager.getProvider(providerName);
+    if (!provider) {
+      return {
+        success: false,
+        error: `Provider '${providerName}' not found`,
+        statusCode: 404,
+        pathResult,
+        didInfo
+      };
+    }
+
+    // Get API key from provider manager
+    let apiKey: string | null;
+    try {
+      apiKey = this.providerManager.getProviderApiKey(providerName);
+    } catch (error) {
+      console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
+      return {
+        success: false,
+        error: `Provider configuration error: ${(error as Error).message}`,
+        statusCode: 404,
+        pathResult,
+        didInfo
+      };
+    }
+
+    return {
+      success: true,
+      provider,
+      apiKey,
+      pathResult,
+      didInfo
+    };
+  }
+
+  /**
    * Handle a unified request (both streaming and non-streaming)
    */
   async handleProviderRequest(req: Request, res: Response, providerName: string): Promise<void> {
+    // Perform common validation
+    const validation = this.validateProviderRequest(req, providerName);
+    if (!validation.success) {
+      const errorResponse = { success: false, error: validation.error };
+      res.status(validation.statusCode!).json(errorResponse);
+      return;
+    }
+
     const isStream = !!(req.body && req.body.stream);
 
     if (!isStream) {
       // Non-stream request
-      const result = await this.handleNonStreamRequest(req, providerName);
+      const result = await this.handleNonStreamRequest(req, providerName, validation);
       (res as any).locals.upstream = result.meta;
       const totalCostUSD = result.usageUsd ?? 0;
       const pico = Math.round(Number(totalCostUSD) * 1e12);
@@ -82,175 +187,76 @@ export class RouteHandler {
     }
 
     // Stream request
-    await this.handleStreamRequest(req, res, providerName);
+    await this.handleStreamRequest(req, res, providerName, validation);
   }
 
   /**
    * Handle non-streaming requests for a specific provider
    */
-  async handleNonStreamRequest(req: Request, providerName: string): Promise<ProxyResult> {
-    // Validate authentication
-    if (!this.skipAuth) {
-      const authResult = this.authManager.validateDIDAuth(req);
-      if (!authResult.success) {
-        return { 
-          status: 401, 
-          error: authResult.error || 'Unauthorized', 
-          meta: {
-            upstream_name: providerName, 
-            upstream_method: req.method, 
-            upstream_path: req.path
-          } 
-        } as ProxyResult;
-      }
-    }
-
-    const didInfo = this.authManager.extractDIDInfo(req);
-    
-    // Get provider configuration and validate path
-    const providerConfig = this.providerManager.get(providerName);
-    if (!providerConfig) {
-      return { 
-        status: 404, 
-        error: `Provider '${providerName}' not found`, 
-        meta: {
-          upstream_name: providerName, 
-          upstream_method: req.method, 
-          upstream_path: req.path
-        } 
-      } as ProxyResult;
-    }
-
-    const pathResult = PathValidator.validatePath(req, providerName, providerConfig);
-    if (pathResult.error) {
-      return { 
-        status: 400, 
-        error: pathResult.error, 
-        meta: {
-          upstream_name: providerName, 
-          upstream_method: req.method, 
-          upstream_path: pathResult.path
-        } 
-      } as ProxyResult;
-    }
-
-    // Require DID authentication for all routes (both legacy and provider routes need billing)
-    if (!this.skipAuth && !didInfo?.did) {
-      return { 
-        status: 401, 
-        error: 'Unauthorized', 
-        meta: {
-          upstream_name: providerName, 
-          upstream_method: req.method, 
-          upstream_path: pathResult.path
-        } 
-      } as ProxyResult;
-    }
-
-    const provider = this.providerManager.getProvider(providerName);
-    if (!provider) {
-      return { 
-        status: 404, 
-        error: `Provider '${providerName}' not found`, 
-        meta: {
-          upstream_name: providerName, 
-          upstream_method: req.method, 
-          upstream_path: pathResult.path
-        } 
-      } as ProxyResult;
-    }
+  async handleNonStreamRequest(req: Request, providerName: string, validation: ProviderValidationResult): Promise<ProxyResult> {
+    const { provider, apiKey, pathResult } = validation;
 
     const meta: UpstreamMeta = {
       upstream_name: providerName,
       upstream_method: req.method,
-      upstream_path: pathResult.path,
+      upstream_path: pathResult!.path,
       upstream_streamed: false,
     };
 
-    // Prepare request data using provider-specific logic
-    let finalRequestData = this.getRequestData(req);
-    if (finalRequestData && provider.prepareRequestData) {
-      finalRequestData = provider.prepareRequestData(finalRequestData, false);
-    }
+    // Use the new high-level executeRequest API
+    const started = Date.now();
+    const upstreamPath = pathResult!.path;
+    const requestData = this.getRequestData(req);
+    
+    const executeResult = await provider!.executeRequest(apiKey!, upstreamPath, req.method, requestData);
+    meta.upstream_duration_ms = Date.now() - started;
 
-    // Get API key from provider manager
-    let apiKey: string | null;
-    try {
-      apiKey = this.providerManager.getProviderApiKey(providerName);
-    } catch (error) {
-      console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
+    // Handle executeRequest result
+    if (!executeResult.success) {
+      meta.upstream_status_code = executeResult.statusCode || 500;
+      const errorBody = {
+        success: false,
+        error: executeResult.error,
+        upstream_error: executeResult.details || null,
+        status_code: executeResult.statusCode || 500,
+      };
       return { 
-        status: 404, 
-        error: `Provider configuration error: ${(error as Error).message}`, 
+        status: executeResult.statusCode || 500, 
+        error: executeResult.error || 'Unknown error', 
+        body: errorBody, 
         meta 
       };
     }
 
-    const started = Date.now();
-    const upstreamPath = pathResult.path;
-    const resp: any = await provider.forwardRequest(apiKey, upstreamPath, req.method, finalRequestData, false);
-    meta.upstream_duration_ms = Date.now() - started;
-
-    if (!resp) {
-      meta.upstream_status_code = 502;
-      return { status: 502, error: 'Failed to process request', meta };
-    }
+    meta.upstream_status_code = executeResult.statusCode || 200;
     
-    if ('error' in resp) {
-      meta.upstream_status_code = resp.status || 500;
-      const errorBody = {
-        success: false,
-        error: resp.error,
-        upstream_error: (resp as any).details || null,
-        status_code: resp.status || 500,
+    // Extract useful headers for monitoring (if rawResponse is available)
+    if (executeResult.rawResponse) {
+      const hdrs = executeResult.rawResponse.headers || {};
+      meta.upstream_headers_subset = {
+        'x-usage': hdrs['x-usage'],
+        'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
+        'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
+        'x-request-id': hdrs['x-request-id'],
       };
-      return { status: resp.status || 500, error: resp.error, body: errorBody, meta };
+      
+      // Set request ID if available
+      meta.upstream_request_id = hdrs['x-request-id'] || (executeResult.rawResponse as any).requestId;
     }
-
-    meta.upstream_status_code = resp.status;
-    
-    // Extract useful headers for monitoring
-    const hdrs = (resp as any).headers || {};
-    meta.upstream_headers_subset = {
-      'x-usage': hdrs['x-usage'],
-      'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
-      'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
-      'x-request-id': hdrs['x-request-id'],
-    };
-    
-    // Set request ID if available
-    meta.upstream_request_id = hdrs['x-request-id'] || (resp as any).requestId;
-
-    const responseData = provider.parseResponse(resp);
     
     // Calculate response size
-    const responseStr = JSON.stringify(responseData);
-    meta.upstream_bytes = Buffer.byteLength(responseStr, 'utf8');
-    
-    // Calculate cost using provider-specific logic
-    const model = finalRequestData?.model || 'unknown';
-    const providerCostUsd = provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(resp) : undefined;
-    
-    // Get provider-specific usage extractor
-    const registryProvider = providerRegistry.getProvider(providerName);
-    let pricingResult = null;
-    
-    if (registryProvider?.createUsageExtractor) {
-      const extractor = registryProvider.createUsageExtractor();
-      const usage = extractor.extractFromResponseBody(responseData);
-      if (usage) {
-        pricingResult = CostCalculator.calculateRequestCost(model, providerCostUsd, usage);
-        console.log(`[RouteHandler] Used ${providerName} extractor for non-stream response`);
-      }
+    if (executeResult.response) {
+      const responseStr = JSON.stringify(executeResult.response);
+      meta.upstream_bytes = Buffer.byteLength(responseStr, 'utf8');
     }
     
-    // Set cost in meta
-    meta.upstream_cost_usd = pricingResult?.costUsd;
+    // Set cost in meta (now provided by executeRequest)
+    meta.upstream_cost_usd = executeResult.cost?.costUsd;
     
     return {
-      status: resp.status,
-      body: responseData,
-      usageUsd: pricingResult?.costUsd,
+      status: executeResult.statusCode || 200,
+      body: executeResult.response,
+      usageUsd: executeResult.cost?.costUsd,
       meta
     };
   }
@@ -258,67 +264,8 @@ export class RouteHandler {
   /**
    * Handle streaming requests for a specific provider  
    */
-  async handleStreamRequest(req: Request, res: Response, providerName: string): Promise<void> {
-    // Validate authentication
-    if (!this.skipAuth) {
-      const authResult = this.authManager.validateDIDAuth(req);
-      if (!authResult.success) {
-        res.status(401).json({ success: false, error: authResult.error || 'Unauthorized' });
-        return;
-      }
-    }
-
-    const didInfo = this.authManager.extractDIDInfo(req);
-    
-    // Get provider configuration and validate path
-    const providerConfig = this.providerManager.get(providerName);
-    if (!providerConfig) {
-      res.status(404).json({ success: false, error: `Provider '${providerName}' not found` });
-      return;
-    }
-
-    const pathResult = PathValidator.validatePath(req, providerName, providerConfig);
-    if (pathResult.error) {
-      res.status(400).json({ 
-        success: false, 
-        error: pathResult.error 
-      });
-      return;
-    }
-    
-    // Require DID authentication for all routes (both legacy and provider routes need billing)
-    if (!this.skipAuth && !didInfo?.did) {
-      res.status(401).json({ success: false, error: 'Unauthorized' });
-      return;
-    }
-
-    const provider = this.providerManager.getProvider(providerName);
-    if (!provider) {
-      res.status(404).json({ success: false, error: `Provider '${providerName}' not found` });
-      return;
-    }
-
-    // Prepare request data using provider-specific logic
-    const baseBody = this.getRequestData(req) ? { ...(req.body || {}), stream: true } : undefined;
-    let requestData: any;
-    
-    if (baseBody && provider.prepareRequestData) {
-      requestData = provider.prepareRequestData(baseBody, true);
-    } else {
-      requestData = baseBody;
-    }
-
-    let apiKey: string | null;
-    try {
-      apiKey = this.providerManager.getProviderApiKey(providerName);
-    } catch (error) {
-      console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
-      res.status(404).json({ 
-        success: false, 
-        error: `Provider configuration error: ${(error as Error).message}` 
-      });
-      return;
-    }
+  async handleStreamRequest(req: Request, res: Response, providerName: string, validation: ProviderValidationResult): Promise<void> {
+    const { provider, apiKey, pathResult } = validation;
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -328,92 +275,53 @@ export class RouteHandler {
     const meta: UpstreamMeta = {
       upstream_name: providerName,
       upstream_method: 'POST',
-      upstream_path: pathResult.path,
+      upstream_path: pathResult!.path,
       upstream_streamed: true,
     };
 
     const started = Date.now();
     try {
-      const upstreamPath = pathResult.path;
-      const upstream = await provider.forwardRequest(apiKey, upstreamPath, 'POST', requestData, true);
+      const upstreamPath = pathResult!.path;
+      // Construct data with stream: true
+      const data = { ...(req.body || {}), stream: true };
+      
+      // ⭐️ Use the new simplified executeStreamRequest API - pass res directly
+      const result = await provider!.executeStreamRequest(apiKey!, upstreamPath, 'POST', data, res);
+      
       meta.upstream_duration_ms = Date.now() - started;
 
-      if (!upstream) {
-        meta.upstream_status_code = 502;
+      if (!result.success) {
+        meta.upstream_status_code = result.statusCode;
         (res as any).locals.upstream = meta;
-        if (!res.headersSent) res.status(502).end();
+        // Stream handling is already done by executeStreamRequest, just log the error
+        console.error(`Stream request failed: ${result.error}`);
         return;
       }
 
-      if ('error' in upstream) {
-        meta.upstream_status_code = upstream.status || 500;
-        (res as any).locals.upstream = meta;
-        if (!res.headersSent) res.status(upstream.status || 500).json({ success: false, error: upstream.error });
-        return;
+      // ⭐️ Super simple - directly use returned values to update meta
+      meta.upstream_status_code = result.statusCode;
+      meta.upstream_bytes = result.totalBytes;
+      meta.upstream_cost_usd = result.cost?.costUsd;
+      
+      // Extract headers for monitoring (if rawResponse is available)
+      if (result.rawResponse) {
+        const hdrs = result.rawResponse.headers || {};
+        meta.upstream_headers_subset = {
+          'x-usage': hdrs['x-usage'],
+          'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
+          'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
+          'x-request-id': hdrs['x-request-id'],
+        };
+        meta.upstream_request_id = hdrs['x-request-id'];
       }
-
-      meta.upstream_status_code = 200;
+      
       (res as any).locals.upstream = meta;
-
-      // Extract headers for monitoring
-      const hdrs = (upstream as any).headers || {};
-      meta.upstream_headers_subset = {
-        'x-usage': hdrs['x-usage'],
-        'x-ratelimit-limit': hdrs['x-ratelimit-limit'],
-        'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
-        'x-request-id': hdrs['x-request-id'],
-      };
-      meta.upstream_request_id = hdrs['x-request-id'] || (upstream as any).requestId;
-
-      // Process stream response with provider-specific usage tracking
-      const model = req.body?.model || 'unknown';
-      const providerCostUsd = provider.extractProviderUsageUsd ? provider.extractProviderUsageUsd(upstream) : undefined;
       
-      // Get provider-specific stream processor
-      const registryProvider = providerRegistry.getProvider(providerName);
-      let streamProcessor = null;
-      
-      if (registryProvider?.createStreamProcessor) {
-        streamProcessor = registryProvider.createStreamProcessor(model, providerCostUsd);
-        console.log(`[RouteHandler] Created ${providerName} stream processor`);
+      // Set billing information
+      if (result.cost) {
+        const picoUsd = Math.round(Number(result.cost.costUsd || 0) * 1e12);
+        (res as any).locals.usage = picoUsd;
       }
-
-      let totalBytes = 0;
-      upstream.data.on('data', (chunk: Buffer) => {
-        const chunkStr = chunk.toString();
-        totalBytes += chunk.length;
-        
-        // Process chunk with provider-specific processor if available
-        if (streamProcessor) {
-          streamProcessor.processChunk(chunkStr);
-        }
-        
-        res.write(chunk);
-      });
-
-      upstream.data.on('end', () => {
-        let finalCost = null;
-        
-        // Get final cost from provider-specific processor if available
-        if (streamProcessor) {
-          finalCost = streamProcessor.getFinalCost();
-        }
-        
-        // Update meta with final metrics
-        meta.upstream_bytes = totalBytes;
-        meta.upstream_cost_usd = finalCost?.costUsd;
-        
-        if (finalCost) {
-          const picoUsd = Math.round(Number(finalCost.costUsd || 0) * 1e12);
-          (res as any).locals.usage = picoUsd;
-        }
-        res.end();
-      });
-
-      upstream.data.on('error', (error: Error) => {
-        console.error('Stream error:', error);
-        if (!res.headersSent) res.status(502).end();
-      });
 
     } catch (e: any) {
       meta.upstream_duration_ms = Date.now() - started;

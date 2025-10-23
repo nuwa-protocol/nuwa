@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { LLMProvider } from "./LLMProvider.js";
+import { BaseLLMProvider } from "./BaseLLMProvider.js";
 import { validateToolConfig } from "../config/responseApiTools.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
@@ -12,7 +12,7 @@ import { OPENAI_PATHS } from "./constants.js";
  * Handles native OpenAI API requests without cost calculation
  * Cost calculation is done by the gateway pricing system
  */
-export class OpenAIProvider implements LLMProvider {
+export class OpenAIProvider extends BaseLLMProvider {
   private baseURL: string;
   
   // Define supported paths for this provider
@@ -22,6 +22,7 @@ export class OpenAIProvider implements LLMProvider {
   ] as const;
 
   constructor() {
+    super();
     this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com";
   }
 
