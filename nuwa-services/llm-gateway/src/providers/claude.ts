@@ -89,18 +89,6 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      console.error(`❌ Error forwarding request to Claude: ${errorInfo.message}`);
-      
-      // Log detailed error information for debugging
-      if (errorInfo.details) {
-        console.error(`📋 Claude error details:`, {
-          status: errorInfo.statusCode,
-          message: errorInfo.message,
-          type: errorInfo.details?.type,
-          error_type: errorInfo.details?.error?.type
-        });
-      }
-
       return {
         error: errorInfo.message,
         status: errorInfo.statusCode,
@@ -151,52 +139,6 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
     return new ClaudeStreamProcessor(model, initialCost);
   }
 
-  /**
-   * Extract error information from axios error for Claude API
-   */
-  private async extractErrorInfo(error: any): Promise<{ message: string; statusCode: number; details?: any }> {
-    let message = "Unknown error occurred";
-    let statusCode = 500;
-    let details: any = undefined;
-
-    if (error.response) {
-      // HTTP error response from Claude API
-      statusCode = error.response.status;
-      
-      try {
-        const errorData = error.response.data;
-        
-        if (errorData && typeof errorData === 'object') {
-          // Claude API error format
-          if (errorData.error) {
-            message = errorData.error.message || errorData.error.type || 'Claude API error';
-            details = errorData.error;
-          } else if (errorData.message) {
-            message = errorData.message;
-            details = errorData;
-          } else {
-            message = `Claude API error (${statusCode})`;
-            details = errorData;
-          }
-        } else if (typeof errorData === 'string') {
-          message = errorData;
-        } else {
-          message = `Claude API error (${statusCode})`;
-        }
-      } catch (parseError) {
-        message = `Claude API error (${statusCode}) - Unable to parse error response`;
-      }
-    } else if (error.request) {
-      // Network error
-      message = "Network error - Unable to reach Claude API";
-      statusCode = 503;
-    } else {
-      // Other error
-      message = error.message || "Unknown error occurred";
-    }
-
-    return { message, statusCode, details };
-  }
 
   /**
    * Get test models for Claude provider

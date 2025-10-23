@@ -45,7 +45,7 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
     method: string = "POST",
     requestData?: any,
     isStream: boolean = false
-  ): Promise<AxiosResponse | { error: string; status?: number } | null> {
+  ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -71,8 +71,12 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
 
       return response;
     } catch (error: any) {
-      const { message, statusCode } = this.extractErrorInfo(error);
-      return { error: message, status: statusCode };
+      const errorInfo = await this.extractErrorInfo(error);
+      return { 
+        error: errorInfo.message, 
+        status: errorInfo.statusCode,
+        details: errorInfo.details 
+      };
     }
   }
 
@@ -106,19 +110,6 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
   /* ------------------------------------------------------------------
    * Helper utils                                                       
    * ------------------------------------------------------------------ */
-
-  private extractErrorInfo(error: any): { message: string; statusCode: number } {
-    if (error?.response) {
-      return {
-        message: error.response.data?.error || error.response.data?.message || error.message || "Unknown error",
-        statusCode: error.response.status || 500,
-      };
-    }
-    if (error?.request) {
-      return { message: "No response from LiteLLM", statusCode: 503 };
-    }
-    return { message: error?.message || "Unknown error", statusCode: 500 };
-  }
 
   /**
    * Create LiteLLM-specific usage extractor

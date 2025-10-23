@@ -214,12 +214,24 @@ export class RouteHandler {
     // Handle executeRequest result
     if (!executeResult.success) {
       meta.upstream_status_code = executeResult.statusCode || 500;
-      const errorBody = {
-        success: false,
-        error: executeResult.error,
-        upstream_error: executeResult.details || null,
-        status_code: executeResult.statusCode || 500,
-      };
+      
+      // Return original upstream error format for consistency with success responses
+      // If we have the original error response, use it; otherwise fall back to wrapped format
+      let errorBody: any;
+      
+      if (executeResult.details?.rawError && typeof executeResult.details.rawError === 'object') {
+        // Use the original upstream error response
+        errorBody = executeResult.details.rawError;
+      } else {
+        // Fallback to wrapped format if no original error available
+        errorBody = {
+          success: false,
+          error: executeResult.error,
+          upstream_error: executeResult.details || null,
+          status_code: executeResult.statusCode || 500,
+        };
+      }
+      
       return { 
         status: executeResult.statusCode || 500, 
         error: executeResult.error || 'Unknown error', 

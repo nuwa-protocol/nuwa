@@ -95,28 +95,6 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      console.error(`❌ Error forwarding request to OpenAI: ${errorInfo.message}`);
-      
-      // Log detailed error information for debugging
-      if (errorInfo.details) {
-        console.error(`📋 Error details:`, {
-          statusCode: errorInfo.statusCode,
-          code: errorInfo.details.code,
-          type: errorInfo.details.type,
-          statusText: errorInfo.details.statusText,
-          requestId: errorInfo.details.headers?.['x-request-id'],
-        });
-      }
-      
-      // Log request information for debugging
-      console.error(`📤 Request info:`, {
-        method,
-        path,
-        hasData: !!data,
-        dataKeys: data ? Object.keys(data) : [],
-        isStream
-      });
-      
       return { 
         error: errorInfo.message, 
         status: errorInfo.statusCode,
@@ -254,113 +232,13 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
     return new OpenAIStreamProcessor(model, initialCost);
   }
 
-  /**
-   * Extract error information from axios error
-   */
-  private async extractErrorInfo(error: any): Promise<{ message: string; statusCode: number; details?: any }> {
-    let errorMessage = "Unknown error occurred";
-    let statusCode = 500;
-    let details: any = {};
-
-    if (error.response) {
-      statusCode = error.response.status;
-      let data = error.response.data;
-      
-      // If data is a stream (happens with responseType: 'stream'), read it first
-      if (data && typeof data.on === 'function' && typeof data.read === 'function') {
-        try {
-          console.error('📖 Reading error stream...');
-          const chunks: Buffer[] = [];
-          
-          // Read all chunks from the stream
-          for await (const chunk of data) {
-            chunks.push(Buffer.from(chunk));
-          }
-          
-          const rawText = Buffer.concat(chunks).toString('utf-8');
-          console.error('📄 Raw error response:', rawText.slice(0, 500));
-          
-          // Try to parse as JSON
-          try {
-            data = JSON.parse(rawText);
-          } catch {
-            // If not JSON, use raw text
-            data = rawText;
-          }
-        } catch (streamError) {
-          console.error('❌ Failed to read error stream:', streamError);
-          data = null;
-        }
-      }
-      
-      if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
-        // Safely extract error message without JSON.stringify to avoid circular reference errors
-        errorMessage = data.error?.message 
-          || data.message 
-          || `Error response with status ${statusCode}`;
-        
-        details = {
-          code: data.error?.code || data.code,
-          type: data.error?.type || data.type,
-          param: data.error?.param || data.param, // OpenAI often includes which parameter caused the error
-          statusText: error.response.statusText,
-          headers: {
-            'x-request-id': error.response.headers['x-request-id'],
-            'openai-organization': error.response.headers['openai-organization'],
-            'openai-processing-ms': error.response.headers['openai-processing-ms'],
-          },
-          // Include full error object for detailed debugging (but safely)
-          rawError: data.error || data
-        };
-        
-        // Log the full error response for debugging (with safe extraction)
-        console.error('🔍 Full OpenAI error response:', {
-          statusCode,
-          errorCode: data.error?.code || data.code,
-          errorType: data.error?.type || data.type,
-          errorParam: data.error?.param || data.param,
-          errorMessage: errorMessage,
-          // Log first 500 chars of any additional fields
-          additionalFields: Object.keys(data.error || data).filter(k => 
-            !['message', 'code', 'type', 'param'].includes(k)
-          ).slice(0, 5)
-        });
-      } else if (typeof data === 'string') {
-        errorMessage = data;
-        details = {
-          type: 'string_response',
-          rawError: data
-        };
-      } else {
-        errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
-        details = {
-          statusText: error.response.statusText
-        };
-      }
-    } else if (error.request) {
-      errorMessage = "No response received from OpenAI";
-      statusCode = 503;
-      details = {
-        type: 'network_error',
-        message: 'Request was made but no response was received'
-      };
-    } else {
-      errorMessage = error.message || "Unknown error";
-      details = {
-        type: 'request_setup_error',
-        message: errorMessage
-      };
-    }
-
-    return { message: errorMessage, statusCode, details };
-  }
 
   /**
    * Get test models for OpenAI provider
    * Implementation of TestableLLMProvider interface
    */
   getTestModels(): string[] {
-    return ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o-mini', 'gpt-4o'];
+    return ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o-mini'];
   }
 
   /**

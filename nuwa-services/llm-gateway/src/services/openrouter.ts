@@ -1,6 +1,6 @@
 import "dotenv/config";
 import axios, { AxiosResponse } from "axios";
-import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
+import { BaseLLMProvider, ProviderErrorDetails } from "../providers/BaseLLMProvider.js";
 import { TestableLLMProvider } from "../providers/LLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
@@ -23,20 +23,14 @@ function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
 interface OpenRouterErrorInfo {
   message: string;
   statusCode: number;
-  statusText?: string;
-  code?: string;
-  type?: string;
-  headers?: Record<string, any>;
-  requestId?: string;
-  rawBody?: string;
-  details?: any;
+  details?: ProviderErrorDetails;
 }
 
 // Typed error return for forwardRequest
 interface UpstreamErrorResponse {
   error: string;
   status?: number;
-  details: OpenRouterErrorInfo;
+  details?: ProviderErrorDetails;
 }
 
 class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
@@ -53,166 +47,84 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
   }
 
   // Extract error information from axios error (handles Buffer/Stream/object) and log structured details
-  private async extractErrorInfo(error: any): Promise<OpenRouterErrorInfo> {
+  protected async extractErrorInfo(error: any): Promise<OpenRouterErrorInfo> {
     let errorMessage = "Unknown error occurred";
     let statusCode = 500;
-    let statusText: string | undefined;
-    let headers: Record<string, any> | undefined;
-    let requestId: string | undefined;
-    let rawBody: string | undefined;
-    let code: string | undefined;
-    let type: string | undefined;
-    let details: any;
+    let details: ProviderErrorDetails = {};
 
     if (error.response) {
       statusCode = error.response.status;
-      statusText = error.response.statusText;
-      headers = error.response.headers || undefined;
-      try {
-        const hdr: any = headers || {};
-        requestId =
-          hdr["x-request-id"] ||
-          hdr["x-openai-request-id"] ||
-          hdr["openrouter-request-id"] ||
-          hdr["request-id"]; 
-      } catch {}
+      const statusText = error.response.statusText;
+      const headers = error.response.headers || {};
+      
+      // Extract request ID using multiple possible header names
+      const requestId = headers["x-request-id"] ||
+        headers["x-openai-request-id"] ||
+        headers["openrouter-request-id"] ||
+        headers["request-id"];
 
       if (error.response.data) {
         let data = error.response.data;
+        let rawBody: string | undefined;
 
-        // Handle Buffer
-        if (Buffer.isBuffer(data)) {
-          try {
-            const s = data.toString("utf-8");
-            rawBody = s;
-            data = JSON.parse(s);
-          } catch (e) {
-            errorMessage = data.toString();
-            rawBody = errorMessage;
-            this.logUpstreamError({
-              statusCode,
-              statusText,
-              message: errorMessage,
-              headers,
-              requestId,
-              rawBody: rawBody?.slice(0, 2000),
-            });
-            return { message: errorMessage, statusCode, statusText, headers, requestId, rawBody };
-          }
-        }
-
-        // Handle Stream
-        if (
-          data &&
-          typeof data === "object" &&
-          typeof (data as any).pipe === "function"
-        ) {
-          try {
-            const str = await streamToString(data);
-            rawBody = str;
-            try {
-              const json = JSON.parse(str);
-              errorMessage = json?.error?.message || json?.message || str;
-              code = json?.error?.code || json?.code;
-              type = json?.error?.type || json?.type;
-              details = json?.error || json;
-            } catch {
-              errorMessage = str;
-            }
-          } catch (e) {
-            errorMessage = "Failed to read error stream";
-          }
-          this.logUpstreamError({
-            statusCode,
+        // Use base class methods for Buffer and Stream handling
+        const normalizedData = await this.normalizeErrorData(data);
+        
+        if (normalizedData && typeof normalizedData === 'object') {
+          // Extract error information from normalized data
+          const errorObj = normalizedData.error || normalizedData;
+          errorMessage = errorObj.message || normalizedData.message || `Error response with status ${statusCode}`;
+          
+          details = {
+            code: errorObj.code || normalizedData.code,
+            type: errorObj.type || normalizedData.type,
             statusText,
-            message: errorMessage,
-            code,
-            type,
-            headers,
             requestId,
-            rawBody: rawBody?.slice(0, 2000),
-          });
-          return { message: errorMessage, statusCode, statusText, code, type, headers, requestId, rawBody, details };
-        }
-
-        // Handle normal object
-        if (typeof data === "object" && data !== null) {
-          try {
-            const anyData: any = data;
-            errorMessage = anyData?.error?.message 
-              || anyData?.message 
-              || `Error response with status ${statusCode}`;
-            code = anyData?.error?.code || anyData?.code;
-            type = anyData?.error?.type || anyData?.type;
-            details = anyData?.error || anyData;
-          } catch (e) {
-            errorMessage = `Error parsing response data: ${statusCode}`;
-          }
-        } else if (typeof data === "string") {
-          errorMessage = data;
-          rawBody = data;
+            headers: this.extractRelevantHeaders(headers),
+            rawError: normalizedData
+          };
+        } else if (typeof normalizedData === 'string') {
+          errorMessage = normalizedData;
+          rawBody = normalizedData;
+          details = {
+            statusText,
+            requestId,
+            rawBody,
+            rawError: normalizedData
+          };
+        } else {
+          errorMessage = `HTTP ${statusCode}: ${statusText}`;
+          details = {
+            statusText,
+            requestId
+          };
         }
       } else {
-        errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
+        errorMessage = `HTTP ${statusCode}: ${statusText}`;
+        details = {
+          statusText,
+          requestId
+        };
       }
     } else if (error.request) {
       errorMessage = "No response received from OpenRouter";
-      statusCode = 503; // Service Unavailable
-    } else {
-      errorMessage = error.message;
-    }
-
-    this.logUpstreamError({
-      statusCode,
-      statusText,
-      message: errorMessage,
-      code,
-      type,
-      headers,
-      requestId,
-      rawBody: rawBody?.slice(0, 2000),
-    });
-
-    return { message: errorMessage, statusCode, statusText, code, type, headers, requestId, rawBody, details };
-  }
-
-  // Minimal structured logger for upstream errors
-  private logUpstreamError(info: {
-    statusCode?: number;
-    statusText?: string;
-    message: string;
-    code?: string;
-    type?: string;
-    headers?: Record<string, any>;
-    requestId?: string;
-    rawBody?: string;
-  }) {
-    try {
-      const headersSubset = info.headers
-        ? {
-            "x-request-id": (info.headers as any)["x-request-id"],
-            "x-openai-request-id": (info.headers as any)["x-openai-request-id"],
-            "openrouter-request-id": (info.headers as any)["openrouter-request-id"],
-            "x-usage": (info.headers as any)["x-usage"],
-            "x-ratelimit-limit": (info.headers as any)["x-ratelimit-limit"],
-            "x-ratelimit-remaining": (info.headers as any)["x-ratelimit-remaining"],
-            "cf-ray": (info.headers as any)["cf-ray"],
-          }
-        : undefined;
-      const payload: Record<string, any> = {
-        statusCode: info.statusCode,
-        statusText: info.statusText,
-        message: info.message,
-        code: info.code,
-        type: info.type,
-        requestId: info.requestId,
-        headers: headersSubset,
-        rawBodyPreview: info.rawBody,
+      statusCode = 503;
+      details = {
+        type: 'network_error'
       };
-      console.error("[openrouter] upstream error:", JSON.stringify(payload));
-    } catch {
-      console.error("[openrouter] upstream error:", info.message);
+    } else {
+      errorMessage = error.message || "Unknown error occurred";
+      details = {
+        type: 'request_setup_error'
+      };
     }
+
+    const errorInfo = { message: errorMessage, statusCode, details };
+    
+    // Use base class logging with OpenRouter-specific provider name
+    this.logErrorInfo(errorInfo, error, 'openrouter');
+    
+    return errorInfo;
   }
 
   /**
@@ -286,7 +198,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       }
 
       // Extract error information to return to client (attach details for higher-level logging)
-      return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo };
+      return { error: errorInfo.message, status: errorInfo.statusCode, details: errorInfo.details };
     }
   }
 
@@ -449,7 +361,6 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       'openai/gpt-3.5-turbo',
       'openai/gpt-4',
       'anthropic/claude-3-haiku',
-      'anthropic/claude-3-sonnet',
       'meta-llama/llama-2-70b-chat'
     ];
   }
