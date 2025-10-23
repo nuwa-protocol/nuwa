@@ -67,42 +67,4 @@ export class ClaudeTestUtils extends BaseProviderTestUtils<ClaudeProvider> {
     return this.testStreaming(CLAUDE_PATHS.MESSAGES, options);
   }
 
-  // ========== Static Methods (Backward Compatibility) ==========
-  /**
-   * Static method: Test Claude message completion (backward compatibility)
-   * @deprecated Use instance method testMessageCompletion() instead
-   */
-  static async testMessageCompletion(
-    provider: ClaudeProvider,
-    apiKey: string,
-    options: ClaudeTestOptions
-  ): Promise<BaseTestResult> {
-    const instance = new ClaudeTestUtils(provider, apiKey);
-    const config = {
-      model: options.model,
-      max_tokens: options.max_tokens,
-      temperature: options.temperature,
-      messages: options.messages,
-    };
-    return instance.testMessageCompletion(config);
-  }
-
-  /**
-   * Static method: Test Claude streaming message completion (backward compatibility)
-   * @deprecated Use instance method testStreamingMessageCompletion() instead
-   */
-  static async testStreamingMessageCompletion(
-    provider: ClaudeProvider,
-    apiKey: string,
-    options: ClaudeTestOptions
-  ): Promise<BaseTestResult> {
-    const instance = new ClaudeTestUtils(provider, apiKey);
-    const config = {
-      model: options.model,
-      max_tokens: options.max_tokens,
-      temperature: options.temperature,
-      messages: options.messages,
-    };
-    return instance.testStreamingMessageCompletion(config);
-  }
 }

@@ -182,35 +182,7 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
     return BaseProviderTestUtils.validateTestResponse(result, validation);
   }
 
-  // ========== Static Methods (Backward Compatibility) ==========
-
-  /**
-   * Static method: Test non-streaming request (backward compatibility)
-   * @deprecated Use instance method testNonStreaming() instead
-   */
-  static async testNonStreamingRequest(
-    provider: TestableLLMProvider,
-    apiKey: string | null,
-    endpoint: string,
-    options?: Record<string, any>
-  ): Promise<BaseTestResult> {
-    const instance = new BaseProviderTestUtils(provider, apiKey);
-    return instance.testNonStreaming(endpoint, options);
-  }
-
-  /**
-   * Static method: Test streaming request (backward compatibility)
-   * @deprecated Use instance method testStreaming() instead
-   */
-  static async testStreamingRequest(
-    provider: TestableLLMProvider,
-    apiKey: string | null,
-    endpoint: string,
-    options?: Record<string, any>
-  ): Promise<BaseTestResult> {
-    const instance = new BaseProviderTestUtils(provider, apiKey);
-    return instance.testStreaming(endpoint, options);
-  }
+  // ========== Static Utility Methods ==========
 
   /**
    * Create a test provider manager with only specified providers

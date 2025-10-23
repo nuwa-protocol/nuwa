@@ -85,75 +85,7 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
     return this.testNonStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
   }
 
-  // ========== Static Methods (Backward Compatibility) ==========
-  /**
-   * Create a standard LiteLLM Chat Completions request
-   */
-  static createChatCompletionRequest(config: Partial<LiteLLMChatCompletionConfig> = {}): LiteLLMChatCompletionConfig {
-    return {
-      model: config.model || 'gpt-3.5-turbo',
-      messages: config.messages || [{ role: 'user', content: 'Hello, this is a test message.' }],
-      stream: config.stream || false,
-      temperature: config.temperature || 0.7,
-      max_tokens: config.max_tokens || 50,
-      ...config,
-    };
-  }
-
-  /**
-   * Create a LiteLLM request with metadata and tags
-   */
-  static createChatCompletionWithMetadataRequest(config: Partial<LiteLLMChatCompletionConfig> = {}): LiteLLMChatCompletionConfig {
-    return {
-      ...this.createChatCompletionRequest(config),
-      user: config.user || 'test-user',
-      metadata: {
-        test_run: true,
-        environment: 'integration-test',
-        ...config.metadata,
-      },
-      tags: config.tags || ['test', 'integration'],
-    };
-  }
-
-  /**
-   * Static method: Test LiteLLM Chat Completions API (backward compatibility)
-   * @deprecated Use instance method testChatCompletion() instead
-   */
-  static async testChatCompletion(
-    provider: LiteLLMService,
-    apiKey: string | null,
-    config: Partial<LiteLLMChatCompletionConfig> = {}
-  ): Promise<BaseTestResult> {
-    const instance = new LiteLLMTestUtils(provider, apiKey);
-    return instance.testChatCompletion(config);
-  }
-
-  /**
-   * Static method: Test LiteLLM streaming Chat Completions (backward compatibility)
-   * @deprecated Use instance method testStreamingChatCompletion() instead
-   */
-  static async testStreamingChatCompletion(
-    provider: LiteLLMService,
-    apiKey: string | null,
-    config: Partial<LiteLLMChatCompletionConfig> = {}
-  ): Promise<BaseTestResult> {
-    const instance = new LiteLLMTestUtils(provider, apiKey);
-    return instance.testStreamingChatCompletion(config);
-  }
-
-  /**
-   * Static method: Test LiteLLM with metadata and tags (backward compatibility)
-   * @deprecated Use instance method testChatCompletionWithMetadata() instead
-   */
-  static async testChatCompletionWithMetadata(
-    provider: LiteLLMService,
-    apiKey: string | null,
-    config: Partial<LiteLLMChatCompletionConfig> = {}
-  ): Promise<BaseTestResult> {
-    const instance = new LiteLLMTestUtils(provider, apiKey);
-    return instance.testChatCompletionWithMetadata(config);
-  }
+  // ========== Static Utility Methods ==========
 
   /**
    * Get common LiteLLM model names for testing
