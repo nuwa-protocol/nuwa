@@ -91,6 +91,24 @@ export abstract class BaseLLMProvider implements LLMProvider {
   createStreamProcessor?(model: string, initialCost?: number): StreamProcessor;
 
   /**
+   * Extract request ID from response headers
+   * Supports multiple provider-specific header names
+   * @param headers Response headers object
+   * @returns Request ID string or undefined if not found
+   */
+  protected extractRequestIdFromHeaders(headers: any): string | undefined {
+    if (!headers) return undefined;
+    
+    // Check all known request ID header names
+    // Order matters: prefer standard names first
+    return headers['x-request-id'] 
+      || headers['x-openai-request-id']
+      || headers['openrouter-request-id']
+      || headers['request-id']
+      || headers['anthropic-request-id'];
+  }
+
+  /**
    * Check if data is a readable stream (Node.js stream)
    * Unified stream detection to avoid inconsistencies
    */
@@ -195,11 +213,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
       const statusText = error.response.statusText;
       const headers = error.response.headers;
       
-      // Extract request ID from common header names
-      const requestId = headers?.['x-request-id'] 
-        || headers?.['x-openai-request-id']
-        || headers?.['openrouter-request-id']
-        || headers?.['request-id'];
+      // Extract request ID using unified method
+      const requestId = this.extractRequestIdFromHeaders(headers);
       
       // Normalize data (handle Stream, Buffer, Object, String)
       let data = await this.normalizeErrorData(error.response.data);
@@ -268,6 +283,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
       'x-request-id',
       'x-openai-request-id', 
       'openrouter-request-id',
+      'request-id',
+      'anthropic-request-id',
       'x-usage',
       'x-ratelimit-limit',
       'x-ratelimit-remaining',
@@ -320,7 +337,10 @@ export abstract class BaseLLMProvider implements LLMProvider {
           success: false,
           statusCode: response.status || 500,
           error: response.error,
-          details: response.details
+          details: response.details,
+          upstreamRequestId: response.details?.requestId,
+          errorCode: response.details?.code,
+          errorType: response.details?.type
         };
       }
 
@@ -353,7 +373,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
         response: responseData,
         usage,
         cost,
-        rawResponse: response
+        rawResponse: response,
+        upstreamRequestId: this.extractRequestIdFromHeaders(response.headers)
       };
 
     } catch (error) {
@@ -403,7 +424,10 @@ export abstract class BaseLLMProvider implements LLMProvider {
           statusCode: response.status || 500,
           totalBytes: 0,
           error: response.error,
-          details: response.details
+          details: response.details,
+          upstreamRequestId: response.details?.requestId,
+          errorCode: response.details?.code,
+          errorType: response.details?.type
         };
       }
 
@@ -436,7 +460,42 @@ export abstract class BaseLLMProvider implements LLMProvider {
           const finalUsage = processor?.getFinalUsage();
           const finalCost = processor?.getFinalCost();
           
-          // End the destination stream
+          // ⭐️ CRITICAL: Set res.locals BEFORE destination.end() for PaymentKit and accessLog
+          // PaymentKit's res.on('finish') handler needs res.locals.usage to be set
+          if ('locals' in destination) {
+            (destination as any).locals = (destination as any).locals || {};
+            
+            // Set usage info for access log
+            if (finalUsage) {
+              (destination as any).locals.usageInfo = finalUsage;
+            }
+            
+            // Set cost result for access log
+            if (finalCost) {
+              (destination as any).locals.costResult = finalCost;
+              
+              // ⭐️ CRITICAL: Set billing usage for PaymentKit
+              const picoUsd = Math.round(Number(finalCost.costUsd || 0) * 1e12);
+              (destination as any).locals.usage = picoUsd;
+              console.log(`[${this.constructor.name}] Set billing usage: ${picoUsd} pico USD ($${finalCost.costUsd})`);
+            }
+            
+            // ⭐️ Update upstream meta if it exists (set by RouteHandler)
+            // This ensures accessLog can capture complete upstream information
+            if ((destination as any).locals.upstream) {
+              const upstreamRequestId = this.extractRequestIdFromHeaders(response.headers);
+              if (upstreamRequestId) {
+                (destination as any).locals.upstream.upstream_request_id = upstreamRequestId;
+              }
+              if (finalCost) {
+                (destination as any).locals.upstream.upstream_cost_usd = finalCost.costUsd;
+              }
+              (destination as any).locals.upstream.upstream_bytes = totalBytes;
+              (destination as any).locals.upstream.upstream_status_code = response.status;
+            }
+          }
+          
+          // End the destination stream (this triggers res.on('finish') which PaymentKit and accessLog listen to)
           destination.end();
           
           resolve({
@@ -445,7 +504,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
             totalBytes,
             usage: finalUsage || undefined,
             cost: finalCost || undefined,
-            rawResponse: response
+            rawResponse: response,
+            upstreamRequestId: this.extractRequestIdFromHeaders(response.headers)
           });
         });
 
@@ -467,7 +527,10 @@ export abstract class BaseLLMProvider implements LLMProvider {
         statusCode: 502,
         totalBytes: 0,
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error
+        details: error,
+        upstreamRequestId: (error as any)?.response?.headers 
+          ? this.extractRequestIdFromHeaders((error as any).response.headers)
+          : undefined
       };
     }
   }

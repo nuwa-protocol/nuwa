@@ -6,6 +6,7 @@ import { AuthManager } from './authManager.js';
 import { CostCalculator } from '../billing/usage/CostCalculator.js';
 import { providerRegistry } from '../providers/registry.js';
 import type { DIDInfo } from '../types/index.js';
+import type { UsageInfo, PricingResult } from '../billing/pricing.js';
 
 /**
  * Upstream metadata for monitoring and logging
@@ -21,6 +22,9 @@ export interface UpstreamMeta {
   upstream_streamed?: boolean;
   upstream_bytes?: number;
   upstream_cost_usd?: number;
+  // New fields for enhanced error tracking
+  error_code?: string;
+  error_type?: string;
 }
 
 /**
@@ -32,6 +36,9 @@ export interface ProxyResult {
   error?: string;
   usageUsd?: number;
   meta: UpstreamMeta;
+  // Additional fields for access log
+  usage?: UsageInfo;
+  cost?: PricingResult;
 }
 
 /**
@@ -173,6 +180,8 @@ export class RouteHandler {
       // Non-stream request
       const result = await this.handleNonStreamRequest(req, providerName, validation);
       (res as any).locals.upstream = result.meta;
+      (res as any).locals.usageInfo = result.usage;
+      (res as any).locals.costResult = result.cost;
       const totalCostUSD = result.usageUsd ?? 0;
       const pico = Math.round(Number(totalCostUSD) * 1e12);
       (res as any).locals.usage = pico;
@@ -214,6 +223,9 @@ export class RouteHandler {
     // Handle executeRequest result
     if (!executeResult.success) {
       meta.upstream_status_code = executeResult.statusCode || 500;
+      meta.error_code = executeResult.errorCode;
+      meta.error_type = executeResult.errorType;
+      meta.upstream_request_id = executeResult.upstreamRequestId;
       
       // Return original upstream error format for consistency with success responses
       // If we have the original error response, use it; otherwise fall back to wrapped format
@@ -241,6 +253,7 @@ export class RouteHandler {
     }
 
     meta.upstream_status_code = executeResult.statusCode || 200;
+    meta.upstream_request_id = executeResult.upstreamRequestId;
     
     // Extract useful headers for monitoring (if rawResponse is available)
     if (executeResult.rawResponse) {
@@ -251,9 +264,6 @@ export class RouteHandler {
         'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
         'x-request-id': hdrs['x-request-id'],
       };
-      
-      // Set request ID if available
-      meta.upstream_request_id = hdrs['x-request-id'] || (executeResult.rawResponse as any).requestId;
     }
     
     // Calculate response size
@@ -269,7 +279,9 @@ export class RouteHandler {
       status: executeResult.statusCode || 200,
       body: executeResult.response,
       usageUsd: executeResult.cost?.costUsd,
-      meta
+      meta,
+      usage: executeResult.usage,
+      cost: executeResult.cost
     };
   }
 
@@ -291,29 +303,35 @@ export class RouteHandler {
       upstream_streamed: true,
     };
 
+    // ⭐️ Set initial upstream meta early so BaseLLMProvider can update it during stream end
+    (res as any).locals.upstream = meta;
+
     const started = Date.now();
     try {
       const upstreamPath = pathResult!.path;
       // Construct data with stream: true
       const data = { ...(req.body || {}), stream: true };
       
-      // ⭐️ Use the new simplified executeStreamRequest API - pass res directly
+      // ⭐️ BaseLLMProvider will:
+      // 1. Set res.locals.usageInfo, costResult, usage before destination.end()
+      // 2. Update res.locals.upstream with request_id, cost, bytes, status
+      // 3. Trigger res.on('finish') which calls accessLog and PaymentKit middlewares
       const result = await provider!.executeStreamRequest(apiKey!, upstreamPath, 'POST', data, res);
       
       meta.upstream_duration_ms = Date.now() - started;
 
       if (!result.success) {
         meta.upstream_status_code = result.statusCode;
+        meta.error_code = result.errorCode;
+        meta.error_type = result.errorType;
+        meta.upstream_request_id = result.upstreamRequestId;
         (res as any).locals.upstream = meta;
-        // Stream handling is already done by executeStreamRequest, just log the error
         console.error(`Stream request failed: ${result.error}`);
         return;
       }
 
-      // ⭐️ Super simple - directly use returned values to update meta
-      meta.upstream_status_code = result.statusCode;
-      meta.upstream_bytes = result.totalBytes;
-      meta.upstream_cost_usd = result.cost?.costUsd;
+      // ⭐️ Update meta with additional values (most are already set by BaseLLMProvider)
+      meta.upstream_duration_ms = Date.now() - started;
       
       // Extract headers for monitoring (if rawResponse is available)
       if (result.rawResponse) {
@@ -324,16 +342,10 @@ export class RouteHandler {
           'x-ratelimit-remaining': hdrs['x-ratelimit-remaining'],
           'x-request-id': hdrs['x-request-id'],
         };
-        meta.upstream_request_id = hdrs['x-request-id'];
       }
       
-      (res as any).locals.upstream = meta;
-      
-      // Set billing information
-      if (result.cost) {
-        const picoUsd = Math.round(Number(result.cost.costUsd || 0) * 1e12);
-        (res as any).locals.usage = picoUsd;
-      }
+      // Final update to upstream meta (BaseLLMProvider already set most fields)
+      (res as any).locals.upstream = { ...meta, ...(res as any).locals.upstream };
 
     } catch (e: any) {
       meta.upstream_duration_ms = Date.now() - started;

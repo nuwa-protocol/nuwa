@@ -6,6 +6,9 @@ import { UsageInfo } from '../pricing.js';
  * Used as fallback when no provider-specific extractor is available
  */
 export class DefaultUsageExtractor extends BaseUsageExtractor {
+  constructor(provider: string = 'default') {
+    super(provider);
+  }
   /**
    * Extract usage from response body using default logic
    * Supports both Chat Completions and Response API formats

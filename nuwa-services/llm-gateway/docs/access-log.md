@@ -37,21 +37,67 @@
   - `error_message`（不含密钥/长文本）
 
 — 上游（Upstream）
-  - `upstream_name`：`openrouter` | `litellm`
+  - `upstream_name`：`openrouter` | `litellm` | `openai` | `claude`
   - `upstream_method`、`upstream_path`（转发的纯路径，如 `/chat/completions`）
   - `upstream_status_code`
   - `upstream_duration_ms`（仅上游调用耗时）
-  - `upstream_request_id`（如 `x-request-id`/`x-openai-request-id` 等）
+  - `upstream_request_id`（如 `x-request-id`/`x-openai-request-id`/`anthropic-request-id` 等，用于追踪和对账）
   - `upstream_headers_subset`：
     - 速率：`x-ratelimit-limit`、`x-ratelimit-remaining`
     - 计费：`x-usage`（OpenRouter）、`x-litellm-response-cost`（LiteLLM，若有）
   - `upstream_streamed`（是否流式）
   - `upstream_bytes`（从上游读取的字节数，流式累计）
   - `upstream_cost_usd`（若能从头/体解析出单次成本）
+  - `error_code`（Provider 错误码，如 `invalid_api_key`、`rate_limit_exceeded`）
+  - `error_type`（Provider 错误类型，如 `authentication_error`、`invalid_request_error`）
+
+— 成本对账字段
+  - `pricing_source`：`'provider' | 'gateway-pricing'`（成本来源：由 provider 直接提供还是 gateway 根据定价表计算）
+  - `pricing_version`：定价版本号（如 `'openai-v1.0.0'`、`'legacy'`），用于对账时追溯定价规则
+  - `cached_tokens`：缓存命中的 token 数（OpenAI/Claude prompt caching 功能）
 
 脱敏与体积控制：
 - 永不记录 `Authorization`、`Set-Cookie`、API Key 等敏感原文；仅记录存在性或哈希（如确需）。
 - 只保存头部子集与长度信息，不保存请求体/响应体内容。
+
+### 全链路追踪
+
+完整的请求追踪链路包含以下四个关键 ID，可实现从客户端到上游服务的完整追踪：
+
+1. **`client_tx_ref`**: 客户端事务引用
+   - 由客户端生成（通过 `X-Client-Tx-Ref` 请求头传递）
+   - 如果客户端未提供，gateway 会生成 UUID 作为占位符
+   - 用于客户端侧的请求追踪
+
+2. **`request_id`**: Gateway 请求 ID  
+   - 通常与 `client_tx_ref` 相同
+   - 回写到响应头 `X-Request-Id` 供客户端使用
+   - 用于 gateway 日志查询和关联
+
+3. **`server_tx_ref`**: PaymentKit 服务端事务引用
+   - 由 PaymentKit 生成，用于支付通道追踪
+   - 从 `res.locals.billingContext.state.serviceTxRef` 提取
+   - 用于支付对账和计费审计
+
+4. **`upstream_request_id`**: 上游 Provider 的请求 ID
+   - 由上游 provider（OpenAI/Claude/OpenRouter/LiteLLM）返回
+   - 从响应头提取（支持多种 header 格式）
+   - 用于向上游 provider 查询请求详情和排查问题
+
+**追踪链路示例**：
+```
+Client Request (client_tx_ref: cltx_abc123)
+  ↓
+Gateway Processing (request_id: cltx_abc123, server_tx_ref: svtx_def456)
+  ↓
+Upstream Provider (upstream_request_id: req_xyz789)
+```
+
+通过这四个 ID，可以：
+- **成本对账**：关联 client → gateway → upstream 的计费记录
+- **故障排查**：从客户端问题追踪到具体的 upstream 请求
+- **性能分析**：分析完整请求链路的耗时分布
+- **支付审计**：验证支付通道交易与实际 API 调用的对应关系
 
 ### 采集方式与接入点
 整体思路：在最前链路加一个轻量中间件初始化 `res.locals.accessLog`；计费/鉴权细节全部由 PaymentKit 处理并在 `res.locals.billingContext` 填充所需字段（如 `meta.clientTxRef`、`state.headerValue`、`state.serviceTxRef`、`state.cost`/`state.costUsd` 等），Access Log 只读取，不重复解析协议头；统一在 `finish/close` 时异步输出。

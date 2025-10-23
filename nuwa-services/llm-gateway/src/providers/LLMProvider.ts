@@ -16,6 +16,10 @@ export interface ExecuteResponse {
   error?: string;
   details?: any;           // Raw error details
   rawResponse?: AxiosResponse;
+  // New fields for enhanced tracing and error handling
+  upstreamRequestId?: string;  // Upstream request ID for tracing
+  errorCode?: string;           // Provider error code (e.g., 'invalid_api_key')
+  errorType?: string;           // Provider error type (e.g., 'authentication_error')
 }
 
 /**
@@ -31,6 +35,10 @@ export interface ExecuteStreamResponse {
   error?: string;          // Error message (if failed)
   details?: any;           // Raw error details
   rawResponse?: AxiosResponse;
+  // New fields for enhanced tracing and error handling
+  upstreamRequestId?: string;  // Upstream request ID for tracing
+  errorCode?: string;           // Provider error code (e.g., 'invalid_api_key')
+  errorType?: string;           // Provider error type (e.g., 'authentication_error')
 }
 
 /**

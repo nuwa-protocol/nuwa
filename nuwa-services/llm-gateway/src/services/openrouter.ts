@@ -57,11 +57,8 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       const statusText = error.response.statusText;
       const headers = error.response.headers || {};
       
-      // Extract request ID using multiple possible header names
-      const requestId = headers["x-request-id"] ||
-        headers["x-openai-request-id"] ||
-        headers["openrouter-request-id"] ||
-        headers["request-id"];
+      // Extract request ID using unified method from base class
+      const requestId = this.extractRequestIdFromHeaders(headers);
 
       if (error.response.data) {
         let data = error.response.data;
