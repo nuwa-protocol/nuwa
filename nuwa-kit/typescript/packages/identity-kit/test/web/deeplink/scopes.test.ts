@@ -8,8 +8,8 @@ Object.defineProperty(global, 'crypto', {
         arr[i] = Math.floor(Math.random() * 256);
       }
       return arr;
-    }
-  }
+    },
+  },
 });
 
 // Mock window for testing
@@ -17,42 +17,42 @@ if (typeof window === 'undefined') {
   Object.defineProperty(global, 'window', {
     value: {
       location: {
-        origin: 'http://localhost:3000'
+        origin: 'http://localhost:3000',
       },
       sessionStorage: {
         getItem: () => null,
         setItem: () => {},
-        removeItem: () => {}
-      }
-    }
+        removeItem: () => {},
+      },
+    },
   });
 }
 
 describe('DeepLinkManager Scopes Validation', () => {
   // Test scope validation logic directly without importing the full DeepLinkManager
-  
+
   function validateScopeFormat(scope: string): boolean {
     if (!scope || typeof scope !== 'string') {
       return false;
     }
-    
+
     const parts = scope.split('::');
     if (parts.length !== 3) {
       return false;
     }
-    
+
     const [address, module, func] = parts;
-    
+
     // Each part must be non-empty
     if (!address || !module || !func) {
       return false;
     }
-    
+
     // Basic address format validation (hex or wildcard)
     if (address !== '*' && !isValidAddressFormat(address)) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -61,11 +61,11 @@ describe('DeepLinkManager Scopes Validation', () => {
     if (address.startsWith('0x')) {
       return /^0x[a-fA-F0-9]+$/.test(address);
     }
-    
+
     if (address.startsWith('rooch1')) {
       return /^rooch1[a-z0-9]+$/.test(address);
     }
-    
+
     return false;
   }
 
@@ -75,7 +75,7 @@ describe('DeepLinkManager Scopes Validation', () => {
         '0x123::defi::swap',
         '*::nft::mint',
         '0xabc::gamefi::*',
-        'rooch1abc123::module::function'
+        'rooch1abc123::module::function',
       ];
 
       validScopes.forEach(scope => {
@@ -85,12 +85,12 @@ describe('DeepLinkManager Scopes Validation', () => {
 
     it('should reject invalid scope formats', () => {
       const invalidScopes = [
-        'invalid',           // Missing :: separators
-        '0x123::defi',       // Only two parts
-        '::defi::swap',      // Empty address
-        '0x123::',           // Empty module and function
-        '0x123::::swap',     // Extra separators
-        ''                   // Empty string
+        'invalid', // Missing :: separators
+        '0x123::defi', // Only two parts
+        '::defi::swap', // Empty address
+        '0x123::', // Empty module and function
+        '0x123::::swap', // Extra separators
+        '', // Empty string
       ];
 
       invalidScopes.forEach(scope => {
@@ -99,12 +99,7 @@ describe('DeepLinkManager Scopes Validation', () => {
     });
 
     it('should accept wildcard patterns', () => {
-      const wildcardScopes = [
-        '*::*::*',
-        '0x123::*::*',
-        '*::defi::*',
-        '*::*::mint'
-      ];
+      const wildcardScopes = ['*::*::*', '0x123::*::*', '*::defi::*', '*::*::mint'];
 
       wildcardScopes.forEach(scope => {
         expect(validateScopeFormat(scope)).toBe(true);
@@ -125,7 +120,7 @@ describe('DeepLinkManager Scopes Validation', () => {
   describe('validateScopes function', () => {
     function validateScopes(scopes: string[]): { valid: boolean; invalidScopes: string[] } {
       const invalidScopes = scopes.filter(scope => !validateScopeFormat(scope));
-      
+
       return {
         valid: invalidScopes.length === 0,
         invalidScopes,
@@ -152,4 +147,4 @@ describe('DeepLinkManager Scopes Validation', () => {
       expect(result.invalidScopes).toEqual([]);
     });
   });
-}); 
+});

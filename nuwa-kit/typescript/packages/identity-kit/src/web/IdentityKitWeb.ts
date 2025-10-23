@@ -10,6 +10,12 @@ import {
 import { LocalStorageKeyStore } from './keystore/LocalStorageKeyStore';
 import { IndexedDBKeyStore } from './keystore/IndexedDBKeyStore';
 import { DeepLinkManager } from './deeplink/DeepLinkManager';
+import {
+  IdentityKitError,
+  IdentityKitErrorCode,
+  createWebError,
+  wrapUnknownError,
+} from '../errors';
 
 export interface IdentityKitWebOptions {
   /** Application name, used to build key id fragment; optional */
@@ -51,14 +57,18 @@ export class IdentityKitWeb {
   static async init(options: IdentityKitWebOptions = {}): Promise<IdentityKitWeb> {
     // Runtime check for browser environment
     if (typeof window === 'undefined') {
-      throw new Error('IdentityKitWeb is only available in browser environments');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+        'IdentityKitWeb is only available in browser environments'
+      );
     }
     const { appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
 
     // Resolve Rooch network and RPC URL
     const network = resolveNetworkFromHost(cadopDomain);
-    const rpcUrl = options.roochRpcUrl || 
+    const rpcUrl =
+      options.roochRpcUrl ||
       (typeof window !== 'undefined' && (window as any).VITE_ROOCH_RPC_URL) ||
       undefined;
 
@@ -107,11 +117,13 @@ export class IdentityKitWeb {
   }): Promise<IdentityKitWeb> {
     const { keyManager, identityEnv, appName } = options;
     const cadopDomain = options.cadopDomain || 'https://test-id.nuwa.dev';
-    
+
     // Create DeepLinkManager if not provided
-    const deepLinkManager = options.deepLinkManager || new DeepLinkManager({
-      keyManager,
-    });
+    const deepLinkManager =
+      options.deepLinkManager ||
+      new DeepLinkManager({
+        keyManager,
+      });
 
     return new IdentityKitWeb(keyManager, deepLinkManager, cadopDomain, identityEnv, appName);
   }
@@ -150,7 +162,7 @@ export class IdentityKitWeb {
       idFragment,
       scopes: options?.scopes,
     });
-    
+
     // Open the URL in a new window/tab
     window.open(url, '_blank');
   }
@@ -161,7 +173,11 @@ export class IdentityKitWeb {
   async handleCallback(search: string): Promise<void> {
     const result = await this.deepLinkManager.handleCallback(search);
     if (!result.success) {
-      throw new Error(result.error || 'Unknown error during callback');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_CALLBACK_FAILED,
+        result.error || 'Unknown error during callback',
+        { result }
+      );
     }
   }
 
@@ -172,7 +188,9 @@ export class IdentityKitWeb {
   async sign(payload: Omit<SignedData, 'nonce' | 'timestamp'>): Promise<NIP1SignedObject> {
     const keyIds = await this.keyManager.listKeyIds();
     if (keyIds.length === 0) {
-      throw new Error('No keys available for signing');
+      throw createWebError(IdentityKitErrorCode.KEY_NOT_FOUND, 'No keys available for signing', {
+        operation: 'sign',
+      });
     }
 
     const keyId = keyIds[0];
@@ -280,4 +298,4 @@ function resolveNetworkFromHost(hostname: string): 'test' | 'main' {
   if (h.startsWith('test-') || h === 'test-id.nuwa.dev') return 'test';
   if (h === 'id.nuwa.dev' || h.endsWith('.id.nuwa.dev')) return 'main';
   return 'test';
-} 
+}

@@ -1,9 +1,16 @@
 import { ServiceEndpoint, DIDDocument, ServiceInfo, VerificationRelationship } from './types/did';
 import { SignerInterface } from './signers/types';
-import { CADOPCreationRequest, CADOPControllerCreationRequest, DIDCreationResult, AUTH_PROVIDERS, AuthProvider } from './vdr/types';
+import {
+  CADOPCreationRequest,
+  CADOPControllerCreationRequest,
+  DIDCreationResult,
+  AUTH_PROVIDERS,
+  AuthProvider,
+} from './vdr/types';
 import { VDRRegistry } from './vdr/VDRRegistry';
 import { IdentityKit } from './IdentityKit';
 import { DebugLogger } from './utils/DebugLogger';
+import { IdentityKitErrorCode, createDIDError, createValidationError } from './errors';
 
 /**
  * CADOP service types
@@ -75,7 +82,11 @@ export class CadopIdentityKit {
       logger.debug('extractCustodianInfo', custodianService);
       return custodianService;
     }
-    throw new Error('Custodian service not found in service document');
+    throw createDIDError(
+      IdentityKitErrorCode.DID_SERVICE_NOT_FOUND,
+      'Custodian service not found in service document',
+      { serviceDocument: this.nuwaKit.getDIDDocument(), serviceType: CadopServiceType.CUSTODIAN }
+    );
   }
 
   /**
@@ -102,7 +113,11 @@ export class CadopIdentityKit {
     const authenticationMethods =
       this.nuwaKit.findVerificationMethodsByRelationship('authentication');
     if (authenticationMethods.length === 0) {
-      throw new Error('No authentication method found in service document');
+      throw createDIDError(
+        IdentityKitErrorCode.DID_VERIFICATION_METHOD_NOT_FOUND,
+        'No authentication method found in service document',
+        { serviceDocument: this.nuwaKit.getDIDDocument(), relationship: 'authentication' }
+      );
     }
     const authenticationMethod = authenticationMethods[0];
 
@@ -119,7 +134,11 @@ export class CadopIdentityKit {
           };
 
     if (!custodianPublicKey || !custodianServiceVMType) {
-      throw new Error('Custodian service configuration not found in service document');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Custodian service configuration not found in service document',
+        { custodianPublicKey, custodianServiceVMType }
+      );
     }
 
     const creationRequest: CADOPCreationRequest = {
@@ -156,7 +175,11 @@ export class CadopIdentityKit {
     const authenticationMethods =
       this.nuwaKit.findVerificationMethodsByRelationship('authentication');
     if (authenticationMethods.length === 0) {
-      throw new Error('No authentication method found in service document');
+      throw createDIDError(
+        IdentityKitErrorCode.DID_VERIFICATION_METHOD_NOT_FOUND,
+        'No authentication method found in service document',
+        { serviceDocument: this.nuwaKit.getDIDDocument(), relationship: 'authentication' }
+      );
     }
     const authenticationMethod = authenticationMethods[0];
 
@@ -173,7 +196,11 @@ export class CadopIdentityKit {
           };
 
     if (!custodianPublicKey || !custodianServiceVMType) {
-      throw new Error('Custodian service configuration not found in service document');
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        'Custodian service configuration not found in service document',
+        { custodianPublicKey, custodianServiceVMType }
+      );
     }
 
     // Check if this is a did:key and we should use backward compatible path
@@ -223,7 +250,11 @@ export class CadopIdentityKit {
     };
 
     if (!CadopIdentityKit.validateService(serviceEndpoint, service.type as CadopServiceType)) {
-      throw new Error(`Invalid CADOP service configuration for type: ${service.type}`);
+      throw createValidationError(
+        IdentityKitErrorCode.VALIDATION_FAILED,
+        `Invalid CADOP service configuration for type: ${service.type}`,
+        { service, serviceType: service.type }
+      );
     }
     const result = await this.nuwaKit.addService(service);
     return result;
@@ -319,4 +350,8 @@ export class CadopIdentityKit {
 }
 
 // Export additional types and constants for external use
-export { AUTH_PROVIDERS, type AuthProvider, type CADOPControllerCreationRequest } from './vdr/types';
+export {
+  AUTH_PROVIDERS,
+  type AuthProvider,
+  type CADOPControllerCreationRequest,
+} from './vdr/types';

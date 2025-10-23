@@ -25,7 +25,12 @@ import {
 } from '../types/did';
 import { SignerInterface, DidAccountSigner, isSignerInterface } from '../signers';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
-import { DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
+import {
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+  CADOPControllerCreationRequest,
+} from './types';
 import { AbstractVDR } from './abstractVDR';
 import {
   convertMoveDIDDocumentToInterface,
@@ -36,6 +41,13 @@ import {
 import { DebugLogger } from '../utils/DebugLogger';
 import { parseDid, extractFragmentFromId } from '../utils/did';
 import { validateScopes, combineScopes } from '../utils/sessionScopes';
+import {
+  IdentityKitErrorCode,
+  createVDRError,
+  createValidationError,
+  createSignerError,
+  wrapUnknownError,
+} from '../errors';
 
 export interface RoochClientConfig {
   url: string;
@@ -200,7 +212,11 @@ export class RoochVDR extends AbstractVDR {
     try {
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for create operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for create operation',
+          { operation: 'create', request }
+        );
       }
 
       this.debugLog('Creating DID with request:', request);
@@ -213,7 +229,15 @@ export class RoochVDR extends AbstractVDR {
       // Validate all scopes
       const scopeValidation = validateScopes(finalScopes);
       if (!scopeValidation.valid) {
-        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+        throw createValidationError(
+          IdentityKitErrorCode.SCOPE_VALIDATION_FAILED,
+          `Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`,
+          {
+            invalidScopes: scopeValidation.invalidScopes,
+            allScopes: finalScopes,
+            operation: 'create',
+          }
+        );
       }
 
       // Always use the scopes version since we always have scopes (at minimum base scopes)
@@ -256,7 +280,11 @@ export class RoochVDR extends AbstractVDR {
         (event: EventView) => event.event_type === '0x3::did::DIDCreatedEvent'
       );
       if (!didCreatedEvent) {
-        throw new Error('DIDCreatedEvent not found');
+        throw createVDRError(
+          IdentityKitErrorCode.VDR_INVALID_RESPONSE,
+          'DIDCreatedEvent not found in transaction result',
+          { transactionResult: result, events: result.output?.events, operation: 'create' }
+        );
       }
       let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent);
 
@@ -264,7 +292,11 @@ export class RoochVDR extends AbstractVDR {
 
       let didDocument = await this.resolve(actualDID);
       if (!didDocument) {
-        throw new Error('DID document not found with DID: ' + actualDID);
+        throw createVDRError(
+          IdentityKitErrorCode.DID_RESOLUTION_FAILED,
+          `DID document not found with DID: ${actualDID}`,
+          { did: actualDID, operation: 'create' }
+        );
       }
 
       return {
@@ -296,7 +328,11 @@ export class RoochVDR extends AbstractVDR {
     try {
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No custodian signer provided for CADOP operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No custodian signer provided for CADOP operation',
+          { operation: 'createViaCADOP', request }
+        );
       }
 
       this.debugLog('Creating DID via CADOP with request:', request);
@@ -308,7 +344,15 @@ export class RoochVDR extends AbstractVDR {
       // Validate all scopes
       const scopeValidation = validateScopes(finalScopes);
       if (!scopeValidation.valid) {
-        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+        throw createValidationError(
+          IdentityKitErrorCode.SCOPE_VALIDATION_FAILED,
+          `Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`,
+          {
+            invalidScopes: scopeValidation.invalidScopes,
+            allScopes: finalScopes,
+            operation: 'createViaCADOP',
+          }
+        );
       }
 
       // Always use the scopes version since the contract will add base scopes
@@ -353,12 +397,20 @@ export class RoochVDR extends AbstractVDR {
         (event: any) => event.event_type === '0x3::did::DIDCreatedEvent'
       );
       if (!didCreatedEvent) {
-        throw new Error('DIDCreatedEvent not found');
+        throw createVDRError(
+          IdentityKitErrorCode.VDR_INVALID_RESPONSE,
+          'DIDCreatedEvent not found in transaction result',
+          { transactionResult: result, events: result.output?.events }
+        );
       }
       let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent);
       let didDocument = await this.resolve(actualDID);
       if (!didDocument) {
-        throw new Error('DID document not found with DID: ' + actualDID);
+        throw createVDRError(
+          IdentityKitErrorCode.DID_RESOLUTION_FAILED,
+          `DID document not found with DID: ${actualDID}`,
+          { did: actualDID }
+        );
       }
       return {
         success: true,
@@ -384,7 +436,11 @@ export class RoochVDR extends AbstractVDR {
     try {
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No custodian signer provided for CADOP controller operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No custodian signer provided for CADOP controller operation',
+          { operation: 'createViaCADOPWithController', request }
+        );
       }
 
       this.debugLog('Creating DID via CADOP with controller request:', request);
@@ -396,7 +452,15 @@ export class RoochVDR extends AbstractVDR {
       // Validate all scopes
       const scopeValidation = validateScopes(finalScopes);
       if (!scopeValidation.valid) {
-        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+        throw createValidationError(
+          IdentityKitErrorCode.SCOPE_VALIDATION_FAILED,
+          `Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`,
+          {
+            invalidScopes: scopeValidation.invalidScopes,
+            allScopes: finalScopes,
+            operation: 'createViaCADOPWithController',
+          }
+        );
       }
 
       // Use the new controller-based contract entry point
@@ -446,12 +510,20 @@ export class RoochVDR extends AbstractVDR {
         (event: any) => event.event_type === '0x3::did::DIDCreatedEvent'
       );
       if (!didCreatedEvent) {
-        throw new Error('DIDCreatedEvent not found');
+        throw createVDRError(
+          IdentityKitErrorCode.VDR_INVALID_RESPONSE,
+          'DIDCreatedEvent not found in transaction result',
+          { transactionResult: result, events: result.output?.events }
+        );
       }
       let actualDID = this.parseDIDCreatedEventAndGetDID(didCreatedEvent);
       let didDocument = await this.resolve(actualDID);
       if (!didDocument) {
-        throw new Error('DID document not found with DID: ' + actualDID);
+        throw createVDRError(
+          IdentityKitErrorCode.DID_RESOLUTION_FAILED,
+          `DID document not found with DID: ${actualDID}`,
+          { did: actualDID }
+        );
       }
       return {
         success: true,
@@ -485,7 +557,11 @@ export class RoochVDR extends AbstractVDR {
       // Extract address from did:rooch:address format
       const { method, identifier } = parseDid(did);
       if (method !== 'rooch') {
-        throw new Error('Invalid DID format. Expected did:rooch:address');
+        throw createVDRError(
+          IdentityKitErrorCode.DID_INVALID_FORMAT,
+          'Invalid DID format. Expected did:rooch:address',
+          { did, expectedMethod: 'rooch', actualMethod: method }
+        );
       }
 
       // Calculate Object ID from identifier
@@ -556,7 +632,11 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for addVerificationMethod operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for addVerificationMethod operation',
+          { operation: 'addVerificationMethod', did }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
@@ -564,7 +644,9 @@ export class RoochVDR extends AbstractVDR {
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       this.debugLog(`Adding verification method to DID: ${did}`);
@@ -589,7 +671,11 @@ export class RoochVDR extends AbstractVDR {
 
       // Validate verification method
       if (!verificationMethod.publicKeyMultibase) {
-        throw new Error('Verification method must have publicKeyMultibase');
+        throw createValidationError(
+          IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+          'Verification method must have publicKeyMultibase',
+          { verificationMethod, did }
+        );
       }
 
       // Convert verification relationships to u8 values
@@ -608,7 +694,15 @@ export class RoochVDR extends AbstractVDR {
         // Validate all scopes
         const scopeValidation = validateScopes(finalScopes);
         if (!scopeValidation.valid) {
-          throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+          throw createValidationError(
+            IdentityKitErrorCode.SCOPE_VALIDATION_FAILED,
+            `Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`,
+            {
+              invalidScopes: scopeValidation.invalidScopes,
+              allScopes: finalScopes,
+              operation: 'addVerificationMethod',
+            }
+          );
         }
 
         // Use the scopes version for authentication VM
@@ -691,7 +785,11 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for removeVerificationMethod operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for removeVerificationMethod operation',
+          { operation: 'removeVerificationMethod', did, id }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
@@ -699,7 +797,9 @@ export class RoochVDR extends AbstractVDR {
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       // Check if signer has capabilityDelegation permission
@@ -749,14 +849,20 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for addService operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for addService operation',
+          { operation: 'addService', did }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       this.debugLog(`Adding service to DID: ${did}`);
@@ -863,7 +969,11 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for addServiceWithProperties operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for addServiceWithProperties operation',
+          { operation: 'addServiceWithProperties', did }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
@@ -871,7 +981,9 @@ export class RoochVDR extends AbstractVDR {
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       // Check if signer has capabilityInvocation permission
@@ -931,7 +1043,11 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for removeService operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for removeService operation',
+          { operation: 'removeService', did, id }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
@@ -939,7 +1055,9 @@ export class RoochVDR extends AbstractVDR {
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       // Check if signer has capabilityInvocation permission
@@ -989,7 +1107,11 @@ export class RoochVDR extends AbstractVDR {
 
       const signer = options?.signer;
       if (!signer) {
-        throw new Error('No signer provided for updateRelationships operation');
+        throw createSignerError(
+          IdentityKitErrorCode.SIGNER_NOT_AVAILABLE,
+          'No signer provided for updateRelationships operation',
+          { operation: 'updateRelationships', did, id }
+        );
       }
 
       const didAccountSigner = await this.convertSigner(signer, options?.keyId);
@@ -997,7 +1119,9 @@ export class RoochVDR extends AbstractVDR {
       // Pre-validate permissions by resolving the DID document
       const currentDoc = await this.resolve(did);
       if (!currentDoc) {
-        throw new Error(`DID document ${did} not found`);
+        throw createVDRError(IdentityKitErrorCode.DID_NOT_FOUND, `DID document ${did} not found`, {
+          did,
+        });
       }
 
       // Check if signer has capabilityDelegation permission
@@ -1091,7 +1215,20 @@ export class RoochVDR extends AbstractVDR {
       case 'keyAgreement':
         return 4; // VERIFICATION_RELATIONSHIP_KEY_AGREEMENT
       default:
-        throw new Error(`Unknown verification relationship: ${relationship}`);
+        throw createValidationError(
+          IdentityKitErrorCode.INVALID_PARAMETER,
+          `Unknown verification relationship: ${relationship}`,
+          {
+            relationship,
+            validRelationships: [
+              'authentication',
+              'assertionMethod',
+              'keyAgreement',
+              'capabilityInvocation',
+              'capabilityDelegation',
+            ],
+          }
+        );
     }
   }
 

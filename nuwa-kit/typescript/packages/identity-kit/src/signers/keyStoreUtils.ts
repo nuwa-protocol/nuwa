@@ -2,6 +2,7 @@ import { KeyStore } from '../keys/KeyStore';
 import { KeyType } from '../types/crypto';
 import { MultibaseCodec } from '../multibase';
 import { CryptoUtils } from '../crypto';
+import { IdentityKitErrorCode, createKeyManagementError } from '../errors';
 
 /**
  * Sign data with the given KeyStore. If the KeyStore itself implements a
@@ -25,10 +26,16 @@ export async function signWithKeyStore(
 
   const key = await keyStore.load(keyId);
   if (!key) {
-    throw new Error(`Key not found: ${keyId}`);
+    throw createKeyManagementError(IdentityKitErrorCode.KEY_NOT_FOUND, `Key not found: ${keyId}`, {
+      keyId,
+    });
   }
   if (!key.privateKeyMultibase) {
-    throw new Error(`No private key available for ${keyId}`);
+    throw createKeyManagementError(
+      IdentityKitErrorCode.KEY_PRIVATE_KEY_NOT_AVAILABLE,
+      `No private key available for ${keyId}`,
+      { keyId }
+    );
   }
 
   const privateKeyBytes = MultibaseCodec.decode(key.privateKeyMultibase);

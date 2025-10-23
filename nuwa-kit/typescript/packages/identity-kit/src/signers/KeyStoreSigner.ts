@@ -2,6 +2,7 @@ import { SignerInterface } from '../signers/types';
 import { KeyType } from '../types/crypto';
 import { KeyStore } from '../keys/KeyStore';
 import { signWithKeyStore, canSignWithKeyStore, getKeyInfoFromKeyStore } from './keyStoreUtils';
+import { IdentityKitErrorCode, createKeyManagementError } from '../errors';
 
 /**
  * A unified signer adapter that works with any KeyStore implementation
@@ -55,7 +56,11 @@ export class KeyStoreSigner implements SignerInterface {
    */
   async getDid(): Promise<string> {
     if (this.did) return this.did;
-    throw new Error('DID not initialised. setDid() must be called by KeyManager.');
+    throw createKeyManagementError(
+      IdentityKitErrorCode.DID_NOT_SET,
+      'DID not initialised. setDid() must be called by KeyManager.',
+      { operation: 'getDid' }
+    );
   }
 
   /**

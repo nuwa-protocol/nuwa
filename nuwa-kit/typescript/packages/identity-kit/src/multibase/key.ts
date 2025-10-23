@@ -1,5 +1,6 @@
 import { KeyType, KEY_TYPE } from '../types/crypto';
 import { MultibaseCodec } from './base';
+import { IdentityKitErrorCode, createMultibaseError, createValidationError } from '../errors';
 
 /**
  * Key multibase codec implementation
@@ -23,8 +24,10 @@ export class KeyMultibaseCodec {
     // Validate key length
     const expectedLength = this.getExpectedKeyLength(keyType);
     if (bytes.length !== expectedLength) {
-      throw new Error(
-        `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`,
+        { keyType, expectedLength, actualLength: bytes.length }
       );
     }
 
@@ -42,7 +45,11 @@ export class KeyMultibaseCodec {
     try {
       const decoded = MultibaseCodec.decodeBase58btc(encoded);
       if (decoded.length < 2) {
-        throw new Error('Invalid key format: too short');
+        throw createMultibaseError(
+          IdentityKitErrorCode.MULTIBASE_DECODE_FAILED,
+          'Invalid key format: too short',
+          { encoded, minimumLength: 2, actualLength: decoded.length }
+        );
       }
 
       const keyType = this.extractKeyType(decoded);
@@ -51,15 +58,21 @@ export class KeyMultibaseCodec {
       // Validate key length
       const expectedLength = this.getExpectedKeyLength(keyType);
       if (bytes.length !== expectedLength) {
-        throw new Error(
-          `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`
+        throw createValidationError(
+          IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+          `Invalid key length for ${keyType}. Expected ${expectedLength} bytes, got ${bytes.length}`,
+          { keyType, expectedLength, actualLength: bytes.length }
         );
       }
 
       return { keyType, bytes };
     } catch (error) {
       if (error instanceof Error && error.message === 'Non-base58btc character') {
-        throw new Error('Invalid multibase format');
+        throw createMultibaseError(
+          IdentityKitErrorCode.MULTIBASE_DECODE_FAILED,
+          'Invalid multibase format',
+          { encoded }
+        );
       }
       throw error;
     }
@@ -74,7 +87,11 @@ export class KeyMultibaseCodec {
       case KEY_TYPE.ECDSAR1:
         return this.ECDSA_R1_PREFIX;
       default:
-        throw new Error(`Unsupported key type: ${keyType}`);
+        throw createValidationError(
+          IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+          `Unsupported key type: ${keyType}`,
+          { keyType, supportedTypes: [KEY_TYPE.ED25519, KEY_TYPE.SECP256K1, KEY_TYPE.ECDSAR1] }
+        );
     }
   }
 
@@ -93,7 +110,11 @@ export class KeyMultibaseCodec {
     } else if (prefixedBytes[0] === 0x12 && prefixedBytes[1] === 0x00) {
       return KEY_TYPE.ECDSAR1;
     }
-    throw new Error('Unknown key type prefix');
+    throw createMultibaseError(
+      IdentityKitErrorCode.MULTIBASE_DECODE_FAILED,
+      'Unknown key type prefix',
+      { prefix: Array.from(prefixedBytes.slice(0, 2)) }
+    );
   }
 
   private static extractBytes(prefixedBytes: Uint8Array): Uint8Array {
@@ -109,7 +130,11 @@ export class KeyMultibaseCodec {
       case KEY_TYPE.ECDSAR1:
         return this.ECDSA_R1_KEY_LENGTH;
       default:
-        throw new Error(`Unsupported key type: ${keyType}`);
+        throw createValidationError(
+          IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+          `Unsupported key type: ${keyType}`,
+          { keyType, supportedTypes: [KEY_TYPE.ED25519, KEY_TYPE.SECP256K1, KEY_TYPE.ECDSAR1] }
+        );
     }
   }
 }

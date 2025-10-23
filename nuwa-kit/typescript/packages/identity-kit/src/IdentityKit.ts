@@ -15,6 +15,14 @@ import { MultibaseCodec } from './multibase';
 import { extractMethod, parseDid } from './utils/did';
 import { bootstrapIdentityEnv, IdentityEnv } from './IdentityEnv';
 import { DebugLogger } from './utils/DebugLogger';
+import {
+  IdentityKitError,
+  IdentityKitErrorCode,
+  createDIDError,
+  createVDRError,
+  createKeyManagementError,
+  wrapUnknownError,
+} from './errors';
 
 /**
  * Main SDK class for implementing NIP-1 Agent Single DID Multi-Key Model
@@ -40,7 +48,11 @@ export class IdentityKit {
     const method = extractMethod(did);
     const vdr = registry.getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method, did }
+      );
     }
 
     // Resolve DID to get DID Document
@@ -48,7 +60,11 @@ export class IdentityKit {
     // Maybe we should find a better way to clear the cache when we add a service or verification method
     const didDocument = await registry.resolveDID(did, { forceRefresh: true });
     if (!didDocument) {
-      throw new Error(`Failed to resolve DID ${did}`);
+      throw createDIDError(
+        IdentityKitErrorCode.DID_RESOLUTION_FAILED,
+        `Failed to resolve DID: ${did}`,
+        { did, method }
+      );
     }
 
     return new IdentityKit(didDocument, vdr, signer);
@@ -61,7 +77,11 @@ export class IdentityKit {
     const { method } = parseDid(didDocument.id);
     const vdr = VDRRegistry.getInstance().getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method, did: didDocument.id }
+      );
     }
 
     return new IdentityKit(didDocument, vdr, signer);
@@ -79,12 +99,20 @@ export class IdentityKit {
     const registry = VDRRegistry.getInstance();
     const vdr = registry.getVDR(method);
     if (!vdr) {
-      throw new Error(`No VDR available for DID method '${method}'`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for DID method '${method}'`,
+        { method }
+      );
     }
 
     const result = await registry.createDID(method, creationRequest, options);
     if (!result.success || !result.didDocument) {
-      throw new Error(`Failed to create DID: ${result.error || 'Unknown error'}`);
+      throw createDIDError(
+        IdentityKitErrorCode.DID_CREATION_FAILED,
+        `Failed to create DID: ${result.error || 'Unknown error'}`,
+        { method, creationRequest, result }
+      );
     }
 
     return new IdentityKit(result.didDocument, vdr, signer);
@@ -155,7 +183,15 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityDelegation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityDelegation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityDelegation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityDelegation',
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     // 2. Create verification method entry
@@ -187,7 +223,16 @@ export class IdentityKit {
     );
 
     if (!published) {
-      throw new Error(`Failed to publish verification method ${keyId}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_OPERATION_FAILED,
+        `Failed to publish verification method ${keyId}`,
+        {
+          did: this.didDocument.id,
+          keyId,
+          relationships,
+          verificationMethod: verificationMethodEntry,
+        }
+      );
     }
 
     // 4. Update local state
@@ -205,7 +250,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityDelegation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityDelegation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityDelegation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityDelegation',
+          targetKeyId: keyId,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const published = await this.vdr.removeVerificationMethod(this.didDocument.id, keyId, {
@@ -304,7 +358,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityInvocation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityInvocation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityInvocation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityInvocation',
+          serviceInfo,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const serviceId = `${this.didDocument.id}#${serviceInfo.idFragment}`;
@@ -321,7 +384,16 @@ export class IdentityKit {
     });
 
     if (!published) {
-      throw new Error(`Failed to publish service ${serviceId}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_OPERATION_FAILED,
+        `Failed to publish service ${serviceId}`,
+        {
+          did: this.didDocument.id,
+          serviceId,
+          serviceInfo,
+          serviceEntry,
+        }
+      );
     }
     // Update local state
     this.didDocument = (await this.vdr.resolve(this.didDocument.id)) as DIDDocument;
@@ -338,7 +410,16 @@ export class IdentityKit {
     const signingKeyId =
       options?.keyId || (await this.findKeyWithRelationship('capabilityInvocation'));
     if (!signingKeyId) {
-      throw new Error('No key with capabilityInvocation permission available');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_PERMISSION_DENIED,
+        'No key with capabilityInvocation permission available',
+        {
+          did: this.didDocument.id,
+          requiredRelationship: 'capabilityInvocation',
+          serviceId,
+          availableKeys: await this.signer.listKeyIds(),
+        }
+      );
     }
 
     const published = await this.vdr.removeService(this.didDocument.id, serviceId, {

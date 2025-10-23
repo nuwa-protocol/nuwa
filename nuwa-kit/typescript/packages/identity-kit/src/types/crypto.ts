@@ -1,4 +1,5 @@
 import { SignatureScheme } from '@roochnetwork/rooch-sdk';
+import { IdentityKitErrorCode, createValidationError } from '../errors';
 
 // Cryptographic types and constants
 
@@ -35,7 +36,11 @@ export function toKeyType(value: string): KeyType {
   if (isKeyType(value)) {
     return value;
   }
-  throw new Error(`Invalid key type: ${value}`);
+  throw createValidationError(
+    IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+    `Invalid key type: ${value}`,
+    { value, supportedTypes: Object.values(KeyType) }
+  );
 }
 
 export function roochSignatureSchemeToKeyType(scheme: SignatureScheme): KeyType {
@@ -46,7 +51,11 @@ export function roochSignatureSchemeToKeyType(scheme: SignatureScheme): KeyType 
   } else if (scheme === 'EcdsaR1') {
     return KeyType.ECDSAR1;
   }
-  throw new Error(`Unsupported Rooch signature scheme: ${scheme}`);
+  throw createValidationError(
+    IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+    `Unsupported Rooch signature scheme: ${scheme}`,
+    { scheme, supportedSchemes: ['Secp256k1', 'ED25519', 'EcdsaR1'] }
+  );
 }
 
 export function keyTypeToRoochSignatureScheme(keyType: KeyType): SignatureScheme {
@@ -57,7 +66,11 @@ export function keyTypeToRoochSignatureScheme(keyType: KeyType): SignatureScheme
   } else if (keyType === KeyType.ECDSAR1) {
     return 'EcdsaR1';
   }
-  throw new Error(`Unsupported key type: ${keyType}`);
+  throw createValidationError(
+    IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+    `Unsupported key type: ${keyType}`,
+    { keyType, supportedTypes: Object.values(KeyType) }
+  );
 }
 
 /**

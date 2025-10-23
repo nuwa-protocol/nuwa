@@ -11,6 +11,7 @@ import {
 import { MultibaseCodec, KeyMultibaseCodec } from '../multibase';
 import { decodeRoochSercetKey, Keypair } from '@roochnetwork/rooch-sdk';
 import { getDidWithoutFragment } from '../utils/did';
+import { IdentityKitErrorCode, createKeyManagementError, createValidationError } from '../errors';
 
 /**
  * Options for initializing a KeyManager
@@ -51,7 +52,11 @@ export class KeyManager implements SignerInterface {
    */
   async generateKey(fragment?: string, keyType?: KeyType): Promise<StoredKey> {
     if (!this.did) {
-      throw new Error('DID must be set before generating keys');
+      throw createKeyManagementError(
+        IdentityKitErrorCode.DID_NOT_SET,
+        'DID must be set before generating keys',
+        { operation: 'generateKey' }
+      );
     }
 
     const type = keyType || this.defaultKeyType;
@@ -87,7 +92,11 @@ export class KeyManager implements SignerInterface {
     const didFromKey = getDidWithoutFragment(key.keyId);
 
     if (this.did && didFromKey !== this.did) {
-      throw new Error(`Key belongs to a different DID: ${didFromKey}`);
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_DID_MISMATCH,
+        `Key belongs to a different DID: ${didFromKey}`,
+        { expectedDid: this.did, actualDid: didFromKey, keyId: key.keyId }
+      );
     }
 
     if (!this.did) {
@@ -151,7 +160,11 @@ export class KeyManager implements SignerInterface {
     }
 
     // No DID found
-    throw new Error('DID not initialised. Call setDid() or import a key first.');
+    throw createKeyManagementError(
+      IdentityKitErrorCode.DID_NOT_SET,
+      'DID not initialised. Call setDid() or import a key first.',
+      { operation: 'getDidAccountSigner' }
+    );
   }
 
   /**
@@ -260,7 +273,11 @@ export class KeyManager implements SignerInterface {
     const keyId = `${did}#${fragment}`;
 
     if (await this.getKeyInfo(keyId)) {
-      throw new Error(`Key ID ${keyId} already exists in store`);
+      throw createKeyManagementError(
+        IdentityKitErrorCode.KEY_ALREADY_EXISTS,
+        `Key ID ${keyId} already exists in store`,
+        { keyId }
+      );
     }
 
     // Validate key pair consistency for security
@@ -270,7 +287,11 @@ export class KeyManager implements SignerInterface {
       type
     );
     if (!isConsistent) {
-      throw new Error('Key pair validation failed: private and public keys are inconsistent');
+      throw createValidationError(
+        IdentityKitErrorCode.KEY_VALIDATION_FAILED,
+        'Key pair validation failed: private and public keys are inconsistent',
+        { keyId, keyType: type }
+      );
     }
 
     await this.importKey({
@@ -305,7 +326,9 @@ export class KeyManager implements SignerInterface {
   async exportKeyToString(keyId: string): Promise<string> {
     const key = await this.getStoredKey(keyId);
     if (!key) {
-      throw new Error(`Key ${keyId} not found`);
+      throw createKeyManagementError(IdentityKitErrorCode.KEY_NOT_FOUND, `Key ${keyId} not found`, {
+        keyId,
+      });
     }
     return StoredKeyCodec.encode(key);
   }

@@ -1,5 +1,6 @@
 import { IdentityKitWeb } from '..';
 import { NIP1SignedObject } from '../../index';
+import { IdentityKitErrorCode, createWebError, createReactError } from '../../errors';
 
 // React types - will be available when React is installed
 type ReactHook<T> = [T, (value: T | ((prev: T) => T)) => void];
@@ -18,13 +19,15 @@ function loadReactHooks() {
     if (typeof window !== 'undefined') {
       // Use dynamic import with proper error handling
       const reactPromise = import('react');
-      reactPromise.then((React) => {
-        useState = React.useState;
-        useEffect = React.useEffect;
-        useCallback = React.useCallback;
-      }).catch(() => {
-        // React not available - hooks will remain undefined
-      });
+      reactPromise
+        .then(React => {
+          useState = React.useState;
+          useEffect = React.useEffect;
+          useCallback = React.useCallback;
+        })
+        .catch(() => {
+          // React not available - hooks will remain undefined
+        });
     }
   } catch {
     // React not available
@@ -65,11 +68,17 @@ export interface UseIdentityKitOptions {
 export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
   // Runtime checks for React and browser environment
   if (typeof window === 'undefined') {
-    throw new Error('useIdentityKit is only available in browser environments');
+    throw createWebError(
+      IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+      'useIdentityKit is only available in browser environments'
+    );
   }
-  
+
   if (typeof useState === 'undefined' || typeof useEffect === 'undefined') {
-    throw new Error('useIdentityKit requires React to be available');
+    throw createReactError(
+      IdentityKitErrorCode.REACT_NOT_AVAILABLE,
+      'useIdentityKit requires React to be available'
+    );
   }
   const [sdk, setSdk] = useState<IdentityKitWeb | null>(null);
   const [state, setState] = useState<IdentityKitState>({
@@ -143,28 +152,31 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   }, [sdk]);
 
   // Connect action
-  const connect = useCallback(async (options?: { scopes?: string[] }) => {
-    if (!sdk) {
-      setState((prev: IdentityKitState) => ({ ...prev, error: 'SDK not initialized' }));
-      return;
-    }
+  const connect = useCallback(
+    async (options?: { scopes?: string[] }) => {
+      if (!sdk) {
+        setState((prev: IdentityKitState) => ({ ...prev, error: 'SDK not initialized' }));
+        return;
+      }
 
-    setState((prev: IdentityKitState) => ({ ...prev, isConnecting: true, error: null }));
+      setState((prev: IdentityKitState) => ({ ...prev, isConnecting: true, error: null }));
 
-    try {
-      await sdk.connect(options);
-      // Actual connection result will be handled via postMessage in callback
-      setState((prev: IdentityKitState) => ({ ...prev, isConnecting: false }));
-    } catch (error) {
-      setState({
-        isConnected: false,
-        isConnecting: false,
-        agentDid: null,
-        keyId: null,
-        error: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      });
-    }
-  }, [sdk]);
+      try {
+        await sdk.connect(options);
+        // Actual connection result will be handled via postMessage in callback
+        setState((prev: IdentityKitState) => ({ ...prev, isConnecting: false }));
+      } catch (error) {
+        setState({
+          isConnected: false,
+          isConnecting: false,
+          agentDid: null,
+          keyId: null,
+          error: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [sdk]
+  );
 
   // Auto connect
   useEffect(() => {
@@ -174,21 +186,40 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   }, [sdk, options.autoConnect, state.isConnected, state.isConnecting, connect]);
 
   // Sign operation
-  const sign = useCallback(async (payload: any): Promise<NIP1SignedObject> => {
-    if (!sdk) throw new Error('SDK not initialized');
-    if (!state.isConnected) throw new Error('Not connected');
-    return sdk.sign(payload);
-  }, [sdk, state.isConnected]);
+  const sign = useCallback(
+    async (payload: any): Promise<NIP1SignedObject> => {
+      if (!sdk)
+        throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+          operation: 'sign',
+        });
+      if (!state.isConnected)
+        throw createReactError(IdentityKitErrorCode.WEB_NOT_CONNECTED, 'Not connected', {
+          operation: 'sign',
+          state,
+        });
+      return sdk.sign(payload);
+    },
+    [sdk, state.isConnected]
+  );
 
   // Verify signature
-  const verify = useCallback(async (sig: NIP1SignedObject): Promise<boolean> => {
-    if (!sdk) throw new Error('SDK not initialized');
-    return sdk.verify(sig);
-  }, [sdk]);
+  const verify = useCallback(
+    async (sig: NIP1SignedObject): Promise<boolean> => {
+      if (!sdk)
+        throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+          operation: 'verify',
+        });
+      return sdk.verify(sig);
+    },
+    [sdk]
+  );
 
   // Logout
   const logout = useCallback(async (): Promise<void> => {
-    if (!sdk) throw new Error('SDK not initialized');
+    if (!sdk)
+      throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+        operation: 'logout',
+      });
     await sdk.logout();
     setState({
       isConnected: false,
@@ -200,4 +231,4 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   }, [sdk]);
 
   return { state, connect, sign, verify, logout, sdk };
-} 
+}

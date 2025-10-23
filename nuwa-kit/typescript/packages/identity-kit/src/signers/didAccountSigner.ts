@@ -15,6 +15,7 @@ import { SignerInterface } from './types';
 import { KeyType, keyTypeToRoochSignatureScheme } from '../types/crypto';
 import { parseDid } from '../utils/did';
 import { EcdsaR1PublicKey } from '../crypto/EcdsaR1PublicKey';
+import { IdentityKitErrorCode, createSignerError, createValidationError } from '../errors';
 
 /**
  * A Rooch Signer implementation that wraps a SignerInterface.
@@ -39,7 +40,11 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     this.keyId = keyId;
     this.did = did;
     if (!this.did.startsWith('did:rooch:')) {
-      throw new Error('Signer DID must be a did:rooch DID');
+      throw createSignerError(
+        IdentityKitErrorCode.SIGNER_INVALID_DID,
+        'Signer DID must be a did:rooch DID',
+        { did: this.did, expectedMethod: 'rooch' }
+      );
     }
     const didParts = parseDid(did);
     this.didAddress = new RoochAddress(didParts.identifier);
@@ -70,13 +75,19 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     // Get keyId if not provided
     const actualKeyId = keyId || (await signer.listKeyIds())[0];
     if (!actualKeyId) {
-      throw new Error('No available keys in signer');
+      throw createSignerError(IdentityKitErrorCode.SIGNER_NO_KEYS, 'No available keys in signer', {
+        signer,
+      });
     }
 
     // Get key info
     const keyInfo = await signer.getKeyInfo(actualKeyId);
     if (!keyInfo) {
-      throw new Error(`Key info not found for keyId: ${actualKeyId}`);
+      throw createSignerError(
+        IdentityKitErrorCode.KEY_NOT_FOUND,
+        `Key info not found for keyId: ${actualKeyId}`,
+        { keyId: actualKeyId, signer }
+      );
     }
 
     const did = await signer.getDid();
@@ -111,18 +122,30 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     } else if (this.keyType === KeyType.ECDSAR1) {
       return new EcdsaR1PublicKey(this.publicKey);
     } else {
-      throw new Error(`Unsupported key type: ${this.keyType}`);
+      throw createSignerError(
+        IdentityKitErrorCode.KEY_TYPE_NOT_SUPPORTED,
+        `Unsupported key type: ${this.keyType}`,
+        { keyType: this.keyType, supportedTypes: ['Ed25519', 'Secp256k1', 'EcdsaR1'] }
+      );
     }
   }
 
   getBitcoinAddress(): BitcoinAddress {
-    throw new Error('Bitcoin address is not supported for DID account');
+    throw createSignerError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      'Bitcoin address is not supported for DID account',
+      { operation: 'getBitcoinAddress' }
+    );
   }
 
   // Implement SignerInterface
   async signWithKeyId(data: Uint8Array, keyId: string): Promise<Uint8Array> {
     if (keyId !== this.keyId) {
-      throw new Error(`Key ID mismatch. Expected ${this.keyId}, got ${keyId}`);
+      throw createValidationError(
+        IdentityKitErrorCode.KEY_ID_MISMATCH,
+        `Key ID mismatch. Expected ${this.keyId}, got ${keyId}`,
+        { expectedKeyId: this.keyId, actualKeyId: keyId }
+      );
     }
     return this.sign(data);
   }
@@ -152,7 +175,11 @@ export class DidAccountSigner extends Signer implements SignerInterface {
   private getVmFragment(): string {
     const parts = this.keyId.split('#');
     if (parts.length !== 2) {
-      throw new Error(`Invalid keyId format: ${this.keyId}. Expected format: "did:rooch:0x123#fragment"`);
+      throw createValidationError(
+        IdentityKitErrorCode.INVALID_INPUT_FORMAT,
+        `Invalid keyId format: ${this.keyId}. Expected format: "did:rooch:0x123#fragment"`,
+        { keyId: this.keyId, expectedFormat: 'did:rooch:0x123#fragment' }
+      );
     }
     return parts[1];
   }

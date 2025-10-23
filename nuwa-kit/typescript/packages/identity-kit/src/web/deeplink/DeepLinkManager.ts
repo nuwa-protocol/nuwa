@@ -9,14 +9,15 @@ import {
   validateScopes,
 } from '../../index';
 import { LocalStorageKeyStore } from '../keystore';
+import { IdentityKitErrorCode, createWebError, createValidationError } from '../../errors';
 
 export interface ConnectOptions {
   cadopDomain?: string;
-  keyType?: KeyTypeInput;          // Default: KeyType.ED25519
+  keyType?: KeyTypeInput; // Default: KeyType.ED25519
   idFragment?: string;
-  relationships?: VerificationRelationship[];  // Default: ['authentication']
-  redirectPath?: string;     // Default: '/callback'
-  agentDid?: string;         // Target Agent DID, optional
+  relationships?: VerificationRelationship[]; // Default: ['authentication']
+  redirectPath?: string; // Default: '/callback'
+  agentDid?: string; // Target Agent DID, optional
   /** Custom session key scopes (for authentication VM) */
   scopes?: string[];
 }
@@ -42,18 +43,29 @@ export class DeepLinkManager {
   private keyManager: KeyManager;
   private sessionStorage: Storage;
 
-  constructor(options: {
-    keyManager?: KeyManager;
-    sessionStorage?: Storage;
-  } = {}) {
+  constructor(
+    options: {
+      keyManager?: KeyManager;
+      sessionStorage?: Storage;
+    } = {}
+  ) {
     // Runtime check for browser environment
     if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') {
-      throw new Error('DeepLinkManager is only available in browser environments');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+        'DeepLinkManager is only available in browser environments',
+        {
+          environment: typeof window,
+          sessionStorageAvailable: typeof sessionStorage !== 'undefined',
+        }
+      );
     }
-    
-    this.keyManager = options.keyManager || new KeyManager({
-      store: new LocalStorageKeyStore()
-    });
+
+    this.keyManager =
+      options.keyManager ||
+      new KeyManager({
+        store: new LocalStorageKeyStore(),
+      });
     this.sessionStorage = options.sessionStorage || window.sessionStorage;
   }
 
@@ -67,11 +79,12 @@ export class DeepLinkManager {
     publicKeyMultibase: string;
   }> {
     const cadopDomainRaw = opts.cadopDomain || 'id.nuwa.dev';
-    const cadopDomain = cadopDomainRaw.startsWith('http://') || cadopDomainRaw.startsWith('https://')
-      ? cadopDomainRaw.replace(/\/$/, '') // trim trailing slash
-      : (/^(localhost|\d+\.\d+\.\d+\.\d+(:\d+)?)$/.test(cadopDomainRaw)
+    const cadopDomain =
+      cadopDomainRaw.startsWith('http://') || cadopDomainRaw.startsWith('https://')
+        ? cadopDomainRaw.replace(/\/$/, '') // trim trailing slash
+        : /^(localhost|\d+\.\d+\.\d+\.\d+(:\d+)?)$/.test(cadopDomainRaw)
           ? `http://${cadopDomainRaw}`
-          : `https://${cadopDomainRaw}`);
+          : `https://${cadopDomainRaw}`;
     const keyType = toKeyType((opts.keyType ?? 'Ed25519VerificationKey2020') as KeyTypeInput);
     const idFragment = opts.idFragment || `key-${Date.now()}`;
     const relationships = opts.relationships || ['authentication'];
@@ -81,25 +94,32 @@ export class DeepLinkManager {
     if (opts.scopes && opts.scopes.length > 0) {
       const scopeValidation = validateScopes(opts.scopes);
       if (!scopeValidation.valid) {
-        throw new Error(`Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`);
+        throw createValidationError(
+          IdentityKitErrorCode.SCOPE_VALIDATION_FAILED,
+          `Invalid scope format: ${scopeValidation.invalidScopes.join(', ')}`,
+          { invalidScopes: scopeValidation.invalidScopes, allScopes: opts.scopes }
+        );
       }
     }
 
     // Generate a random state to prevent CSRF
     const state = this.generateRandomState();
-    
+
     // Generate a key pair
     const { privateKey, publicKey } = await CryptoUtils.generateKeyPair(keyType);
     const privateKeyMultibase = MultibaseCodec.encodeBase58btc(privateKey);
     const publicKeyMultibase = MultibaseCodec.encodeBase58btc(publicKey);
-    
+
     // Store the private key temporarily in session storage
-    this.sessionStorage.setItem(`nuwa_temp_key_${state}`, JSON.stringify({
-      privateKeyMultibase: privateKeyMultibase,
-      publicKeyMultibase: publicKeyMultibase,
-      keyType,
-      idFragment,
-    }));
+    this.sessionStorage.setItem(
+      `nuwa_temp_key_${state}`,
+      JSON.stringify({
+        privateKeyMultibase: privateKeyMultibase,
+        publicKeyMultibase: publicKeyMultibase,
+        keyType,
+        idFragment,
+      })
+    );
 
     // Build payload per spec (versioned JSON -> Base64URL)
     const redirectUri = new URL(redirectPath, window.location.origin).toString();
@@ -157,9 +177,9 @@ export class DeepLinkManager {
     }
 
     if (!state || !agentDid || !keyId) {
-      return { 
-        success: false, 
-        error: 'Missing required parameters in callback'
+      return {
+        success: false,
+        error: 'Missing required parameters in callback',
       };
     }
 
@@ -168,13 +188,13 @@ export class DeepLinkManager {
     if (!tempKeyJson) {
       return {
         success: false,
-        error: `No matching key found for the provided state : ${state}`
+        error: `No matching key found for the provided state : ${state}`,
       };
     }
 
     try {
       const tempKey: TempKey = JSON.parse(tempKeyJson);
-      
+
       // Create a stored key object
       const storedKey: StoredKey = {
         keyId,
@@ -185,7 +205,7 @@ export class DeepLinkManager {
 
       // Save the key to the key manager
       await this.keyManager.importKey(storedKey);
-      
+
       // Clean up the temporary key
       this.sessionStorage.removeItem(`nuwa_temp_key_${state}`);
 
@@ -197,7 +217,7 @@ export class DeepLinkManager {
     } catch (e) {
       return {
         success: false,
-        error: `Failed to process callback: ${e instanceof Error ? e.message : String(e)}`
+        error: `Failed to process callback: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
   }
@@ -212,5 +232,4 @@ export class DeepLinkManager {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
   }
-  
-} 
+}

@@ -1,8 +1,15 @@
 import { DIDDocument, DIDResolver } from '../types';
 import { DIDDocumentCache } from '../cache';
-import { VDRInterface, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest, CADOPControllerCreationRequest } from './types';
+import {
+  VDRInterface,
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+  CADOPControllerCreationRequest,
+} from './types';
 
 import { InMemoryLRUDIDDocumentCache } from '../cache/InMemoryLRUDIDDocumentCache';
+import { IdentityKitErrorCode, createVDRError } from '../errors';
 
 /**
  * Global registry for VDR (Verifiable Data Registry) implementations.
@@ -53,7 +60,11 @@ export class VDRRegistry implements DIDResolver {
     const method = did.split(':')[1];
     const vdr = this.vdrs.get(method);
     if (!vdr) {
-      throw new Error(`No VDR available for method: ${method}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for method: ${method}`,
+        { method, availableMethods: Array.from(this.vdrs.keys()) }
+      );
     }
 
     // Attempt to serve from cache if allowed.
@@ -77,7 +88,11 @@ export class VDRRegistry implements DIDResolver {
   ): Promise<DIDCreationResult> {
     const vdr = this.vdrs.get(method);
     if (!vdr) {
-      throw new Error(`No VDR available for method: ${method}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for method: ${method}`,
+        { method, availableMethods: Array.from(this.vdrs.keys()) }
+      );
     }
     const result = await vdr.create(creationRequest, options);
     if (result.success && result.didDocument) {
@@ -93,7 +108,11 @@ export class VDRRegistry implements DIDResolver {
   ): Promise<DIDCreationResult> {
     const vdr = this.vdrs.get(method);
     if (!vdr) {
-      throw new Error(`No VDR available for method: ${method}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for method: ${method}`,
+        { method, availableMethods: Array.from(this.vdrs.keys()) }
+      );
     }
     const result = await vdr.createViaCADOP(creationRequest, options);
     if (result.success && result.didDocument) {
@@ -109,7 +128,11 @@ export class VDRRegistry implements DIDResolver {
   ): Promise<DIDCreationResult> {
     const vdr = this.vdrs.get(method);
     if (!vdr) {
-      throw new Error(`No VDR available for method: ${method}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for method: ${method}`,
+        { method, availableMethods: Array.from(this.vdrs.keys()) }
+      );
     }
     const result = await vdr.createViaCADOPWithController(creationRequest, options);
     if (result.success && result.didDocument) {
@@ -122,7 +145,11 @@ export class VDRRegistry implements DIDResolver {
     const method = did.split(':')[1];
     const vdr = this.vdrs.get(method);
     if (!vdr) {
-      throw new Error(`No VDR available for method: ${method}`);
+      throw createVDRError(
+        IdentityKitErrorCode.VDR_NOT_AVAILABLE,
+        `No VDR available for method: ${method}`,
+        { method, availableMethods: Array.from(this.vdrs.keys()) }
+      );
     }
 
     // If we have a positive cache entry, short-circuit the call.

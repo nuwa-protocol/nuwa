@@ -15,7 +15,7 @@ export * from './utils/bytes';
 export * from './utils/did';
 export * from './utils/sessionScopes';
 export * from './testHelpers';
+export * from './errors';
 
-// Note: Web-specific functionality (IdentityKitWeb, LocalStorageKeyStore, etc.) 
+// Note: Web-specific functionality (IdentityKitWeb, LocalStorageKeyStore, etc.)
 // is available via the '/web' export path to ensure proper browser environment detection
-

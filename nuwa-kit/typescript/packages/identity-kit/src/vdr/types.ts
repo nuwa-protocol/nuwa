@@ -138,7 +138,10 @@ export interface VDRInterface {
    * @param options Creation options
    * @returns DID creation result
    */
-  createViaCADOPWithController(request: CADOPControllerCreationRequest, options?: any): Promise<DIDCreationResult>;
+  createViaCADOPWithController(
+    request: CADOPControllerCreationRequest,
+    options?: any
+  ): Promise<DIDCreationResult>;
 
   /**
    * Add a new verification method to a DID document

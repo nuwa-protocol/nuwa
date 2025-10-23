@@ -1,3 +1,5 @@
+import { IdentityKitErrorCode, createValidationError } from '../errors';
+
 export function stringToBytes(str: string): Uint8Array {
   if (typeof TextEncoder !== 'undefined') {
     return new TextEncoder().encode(str);
@@ -6,7 +8,15 @@ export function stringToBytes(str: string): Uint8Array {
   if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
     return Uint8Array.from(Buffer.from(str, 'utf-8'));
   }
-  throw new Error('No TextEncoder or Buffer available in this environment.');
+  throw createValidationError(
+    IdentityKitErrorCode.ENVIRONMENT_NOT_SUPPORTED,
+    'No TextEncoder or Buffer available in this environment.',
+    {
+      environment: typeof globalThis,
+      textEncoderAvailable: typeof TextEncoder !== 'undefined',
+      bufferAvailable: typeof Buffer !== 'undefined',
+    }
+  );
 }
 
 export function bytesToString(bytes: Uint8Array): string {
@@ -17,7 +27,15 @@ export function bytesToString(bytes: Uint8Array): string {
   if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
     return Buffer.from(bytes).toString('utf-8');
   }
-  throw new Error('No TextDecoder or Buffer available in this environment.');
+  throw createValidationError(
+    IdentityKitErrorCode.ENVIRONMENT_NOT_SUPPORTED,
+    'No TextDecoder or Buffer available in this environment.',
+    {
+      environment: typeof globalThis,
+      textDecoderAvailable: typeof TextDecoder !== 'undefined',
+      bufferAvailable: typeof Buffer !== 'undefined',
+    }
+  );
 }
 
 export function base64urlToBytes(base64url: string): Uint8Array {

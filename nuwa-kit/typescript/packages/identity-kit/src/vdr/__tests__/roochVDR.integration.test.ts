@@ -196,7 +196,7 @@ describe('RoochVDR Integration Tests', () => {
         // but wrap it properly as a DidAccountSigner for the actual DID account
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair); // Use 'account-key' to match the DID document
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addVerificationMethod(
@@ -226,7 +226,7 @@ describe('RoochVDR Integration Tests', () => {
 
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair);
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.removeVerificationMethod(actualDID, `${actualDID}#key-2`, {
@@ -256,7 +256,7 @@ describe('RoochVDR Integration Tests', () => {
 
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair);
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addService(
@@ -287,7 +287,7 @@ describe('RoochVDR Integration Tests', () => {
 
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair);
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.addServiceWithProperties(
@@ -324,7 +324,7 @@ describe('RoochVDR Integration Tests', () => {
 
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair);
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const success = await roochVDR.removeService(actualDID, `${actualDID}#service-1`, {
@@ -357,7 +357,7 @@ describe('RoochVDR Integration Tests', () => {
 
         let signer = KeyManager.createEmpty(actualDID);
         await signer.importRoochKeyPair('account-key', keypair);
-        
+
         const didAccountSigner = await DidAccountSigner.create(signer, `${actualDID}#account-key`);
 
         const serviceAddResult = await roochVDR.addServiceWithProperties(

@@ -1,4 +1,5 @@
 import { KeyStore, StoredKey } from '../../index';
+import { IdentityKitErrorCode, createWebError } from '../../errors';
 
 /**
  * Browser LocalStorage implementation of KeyStore
@@ -9,9 +10,13 @@ export class LocalStorageKeyStore implements KeyStore {
   constructor(options: { prefix?: string } = {}) {
     // Runtime check for browser environment
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      throw new Error('LocalStorageKeyStore is only available in browser environments with localStorage support');
+      throw createWebError(
+        IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
+        'LocalStorageKeyStore is only available in browser environments with localStorage support',
+        { environment: typeof window, localStorageAvailable: typeof localStorage !== 'undefined' }
+      );
     }
-    
+
     this.prefix = options.prefix || 'nuwa_keystore_';
   }
 
@@ -75,5 +80,4 @@ export class LocalStorageKeyStore implements KeyStore {
 
     localStorage.removeItem(this.prefix + keyId);
   }
-
-} 
+}

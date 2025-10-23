@@ -2,6 +2,7 @@ import { base58btc } from 'multiformats/bases/base58';
 import { base64pad, base64, base64url, base64urlpad } from 'multiformats/bases/base64';
 import { base16 } from 'multiformats/bases/base16';
 import { bytesToString, stringToBytes } from '../utils/bytes';
+import { IdentityKitErrorCode, createMultibaseError } from '../errors';
 
 /**
  * Supported multibase names – use these with the generic `encode()` API.
@@ -40,7 +41,11 @@ export class MultibaseCodec {
   static encode(data: Uint8Array | string, base: MultibaseName): string {
     const encoder = ENCODER_MAP[base];
     if (!encoder) {
-      throw new Error(`Unsupported multibase: ${base}`);
+      throw createMultibaseError(
+        IdentityKitErrorCode.MULTIBASE_ENCODE_FAILED,
+        `Unsupported multibase: ${base}`,
+        { base, supportedBases: Object.keys(ENCODER_MAP) }
+      );
     }
     const bytes = typeof data === 'string' ? stringToBytes(data) : data;
     return encoder.encode(bytes);
@@ -196,7 +201,11 @@ export class MultibaseCodec {
       case 'U': // base64urlpad (with padding)
         return base64urlpad.decode(encoded);
       default:
-        throw new Error(`Unsupported multibase prefix: ${prefix}`);
+        throw createMultibaseError(
+          IdentityKitErrorCode.MULTIBASE_DECODE_FAILED,
+          `Unsupported multibase prefix: ${prefix}`,
+          { prefix, supportedPrefixes: ['z', 'M', 'm', 'u', 'U', 'f'] }
+        );
     }
   }
 }
