@@ -162,7 +162,17 @@ export abstract class BaseLLMProvider implements LLMProvider {
       }
     }
     
-    // Already normalized (Object or String)
+    // Handle String (try to parse as JSON)
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data);
+      } catch {
+        // If failed to parse as JSON, return the original string
+        return data;
+      }
+    }
+    
+    // Already normalized (Object)
     return data;
   }
 
@@ -221,16 +231,37 @@ export abstract class BaseLLMProvider implements LLMProvider {
       
       // Extract error information from normalized data
       if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
-        // Support common error formats: { error: { message, code, type } } or { message, code, type }
-        const errorObj = data.error || data;
-        message = errorObj.message || `Error response with status ${statusCode}`;
+        // Support multiple error formats:
+        // 1. Claude format: { type: "error", error: { type, message }, request_id }
+        // 2. OpenAI format: { error: { message, code, type } }
+        // 3. Direct format: { message, code, type }
+        
+        let errorObj = data.error || data;
+        let errorMessage = errorObj.message || `Error response with status ${statusCode}`;
+        let errorCode = errorObj.code;
+        let errorType = errorObj.type;
+        
+        // Handle Claude's nested error structure
+        if (data.type === 'error' && data.error && typeof data.error === 'object') {
+          // Claude format: { type: "error", error: { type, message }, request_id }
+          errorMessage = data.error.message || errorMessage;
+          errorType = data.error.type || errorType;
+          errorCode = data.error.code || errorCode;
+          
+          // Also extract request_id from Claude response
+          if (data.request_id && !requestId) {
+            details.requestId = data.request_id;
+          }
+        }
+        
+        message = errorMessage;
         
         details = {
-          code: errorObj.code,
-          type: errorObj.type,
+          code: errorCode,
+          type: errorType,
           param: errorObj.param,
           statusText,
-          requestId,
+          requestId: details.requestId || requestId,
           headers: this.extractRelevantHeaders(headers),
           rawError: data // Store the full normalized response for transparency
         };

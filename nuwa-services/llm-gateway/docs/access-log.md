@@ -292,9 +292,28 @@ await initPaymentKitAndRegisterRoutes(app);
 - `ACCESS_LOG_REDACT_HEADERS=Authorization,Set-Cookie`
 - `ACCESS_LOG_TO_STDOUT=true|false`（默认 `true`）
 
+### 流式错误处理
+
+**已实现**: 流式请求的错误现在通过 SSE `event: error` 格式正确传递给前端。
+
+当流式请求在 upstream provider 失败时：
+1. Gateway 会通过 SSE 格式发送错误事件：
+```
+event: error
+data: {"type":"error","error":{"message":"...","type":"...","code":"..."}}
+
+```
+2. 前端可以监听 `error` 事件来处理错误：
+```javascript
+const eventSource = new EventSource('/claude/v1/messages');
+eventSource.addEventListener('error', (event) => {
+  const errorData = JSON.parse(event.data);
+  console.error('Stream error:', errorData.error);
+});
+```
+
 ### 后续扩展（非本次范围）
 - 落库 Supabase/Postgres（新表 `access_logs`），与 `request_logs` 用 `request_id` 关联。
 - 增加批量写与失败重试；对接集中日志/可观测平台（如 Loki/ELK）。
-- 为流式错误透传定义 `event: error` SSE 帧规范，便于前端感知与排障。
 
 

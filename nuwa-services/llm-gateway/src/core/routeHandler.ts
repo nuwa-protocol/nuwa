@@ -326,7 +326,34 @@ export class RouteHandler {
         meta.error_type = result.errorType;
         meta.upstream_request_id = result.upstreamRequestId;
         (res as any).locals.upstream = meta;
-        console.error(`Stream request failed: ${result.error}`);
+        
+        // Send error event to client via SSE format
+        if (!res.writableEnded) {
+          try {
+            const errorEvent = {
+              type: 'error',
+              error: {
+                message: result.error || 'Stream request failed',
+                type: result.errorType || 'gateway_error',
+                code: result.errorCode || 'unknown_error',
+              }
+            };
+            const errorData = `event: error\ndata: ${JSON.stringify(errorEvent)}\n\n`;
+            
+            // Write error data first, then call end()
+            // PaymentKit wraps res.end() and injects payment frame BEFORE calling originalEnd(args)
+            // So we need to write() first to ensure error data comes before payment frame
+            res.write(errorData);
+            res.end();
+          } catch (writeError) {
+            console.error('[RouteHandler] Failed to send error event:', writeError);
+            if (!res.writableEnded) {
+              res.end();
+            }
+          }
+        } else {
+          console.warn('[RouteHandler] Response already ended, cannot send error event');
+        }
         return;
       }
 
