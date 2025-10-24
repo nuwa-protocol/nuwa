@@ -20,8 +20,10 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     this.model = model;
     this.usageExtractor = usageExtractor;
     this.initialProviderCost = initialProviderCost;
-    
-    console.log(`[${this.constructor.name}] Created for model: ${model}, initial cost: ${initialProviderCost}`);
+
+    console.log(
+      `[${this.constructor.name}] Created for model: ${model}, initial cost: ${initialProviderCost}`
+    );
   }
 
   /**
@@ -38,13 +40,13 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
       if (result) {
         console.log(`[${this.constructor.name}] Got usage from chunk`);
         this.accumulatedUsage = result.usage;
-        
+
         // Update extracted cost if provided in stream
         if (result.cost !== undefined) {
           this.extractedCost = result.cost;
           console.log(`[${this.constructor.name}] Updated extracted cost: ${this.extractedCost}`);
         }
-        
+
         // Calculate final cost when we have usage information
         this.calculateFinalCost();
       }
@@ -74,10 +76,14 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     }
 
     // Prefer stream-extracted cost over initial provider cost
-    const finalProviderCost = this.extractedCost !== undefined ? this.extractedCost : this.initialProviderCost;
-    
-    console.log(`[${this.constructor.name}] Calculating cost - model: ${this.model}, providerCost: ${finalProviderCost}, usage:`, this.accumulatedUsage);
-    
+    const finalProviderCost =
+      this.extractedCost !== undefined ? this.extractedCost : this.initialProviderCost;
+
+    console.log(
+      `[${this.constructor.name}] Calculating cost - model: ${this.model}, providerCost: ${finalProviderCost}, usage:`,
+      this.accumulatedUsage
+    );
+
     // Use provider cost if available, otherwise calculate using gateway pricing
     if (typeof finalProviderCost === 'number' && finalProviderCost >= 0) {
       this.finalCost = {
@@ -89,9 +95,11 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     } else {
       this.finalCost = this.usageExtractor.calculateCost(this.model, this.accumulatedUsage);
     }
-    
+
     if (this.finalCost) {
-      console.log(`[${this.constructor.name}] Final cost calculated: $${this.finalCost.costUsd} (${this.finalCost.source})`);
+      console.log(
+        `[${this.constructor.name}] Final cost calculated: $${this.finalCost.costUsd} (${this.finalCost.source})`
+      );
     } else {
       console.warn(`[${this.constructor.name}] Failed to calculate cost`);
     }

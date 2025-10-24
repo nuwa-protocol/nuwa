@@ -58,13 +58,15 @@ export class OpenAITestUtils extends BaseProviderTestUtils<OpenAIProvider> {
   /**
    * Instance method: Test chat completion
    */
-  async testChatCompletion(config: Partial<OpenAIChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testChatCompletion(
+    config: Partial<OpenAIChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
-      ...config
+      ...config,
     };
     return this.testNonStreaming(OPENAI_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -72,14 +74,16 @@ export class OpenAITestUtils extends BaseProviderTestUtils<OpenAIProvider> {
   /**
    * Instance method: Test streaming chat completion
    */
-  async testStreamingChatCompletion(config: Partial<OpenAIChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testStreamingChatCompletion(
+    config: Partial<OpenAIChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
       stream: true,
-      ...config
+      ...config,
     };
     return this.testStreaming(OPENAI_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -92,7 +96,7 @@ export class OpenAITestUtils extends BaseProviderTestUtils<OpenAIProvider> {
       model: config.model,
       input: config.input,
       maxTokens: config.max_output_tokens,
-      ...config
+      ...config,
     };
     return this.testNonStreaming(OPENAI_PATHS.RESPONSES, options);
   }
@@ -100,16 +104,16 @@ export class OpenAITestUtils extends BaseProviderTestUtils<OpenAIProvider> {
   /**
    * Instance method: Test streaming Response API
    */
-  async testStreamingResponseAPI(config: Partial<OpenAIResponseAPIConfig> = {}): Promise<BaseTestResult> {
+  async testStreamingResponseAPI(
+    config: Partial<OpenAIResponseAPIConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       input: config.input,
       maxTokens: config.max_output_tokens,
       stream: true,
-      ...config
+      ...config,
     };
     return this.testStreaming(OPENAI_PATHS.RESPONSES, options);
   }
-
 }
-

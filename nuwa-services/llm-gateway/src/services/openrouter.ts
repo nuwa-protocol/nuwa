@@ -1,22 +1,20 @@
-import "dotenv/config";
-import axios, { AxiosResponse } from "axios";
-import { BaseLLMProvider, ProviderErrorDetails } from "../providers/BaseLLMProvider.js";
-import { TestableLLMProvider } from "../providers/LLMProvider.js";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { OpenRouterUsageExtractor } from "../billing/usage/providers/OpenRouterUsageExtractor.js";
-import { OpenRouterStreamProcessor } from "../billing/usage/providers/OpenRouterStreamProcessor.js";
-import { OPENROUTER_PATHS } from "../providers/constants.js";
+import 'dotenv/config';
+import axios, { AxiosResponse } from 'axios';
+import { BaseLLMProvider, ProviderErrorDetails } from '../providers/BaseLLMProvider.js';
+import { TestableLLMProvider } from '../providers/LLMProvider.js';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { OpenRouterUsageExtractor } from '../billing/usage/providers/OpenRouterUsageExtractor.js';
+import { OpenRouterStreamProcessor } from '../billing/usage/providers/OpenRouterStreamProcessor.js';
+import { OPENROUTER_PATHS } from '../providers/constants.js';
 
 // Native streamToString tool function, placed outside the class
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    stream.on("data", (chunk) =>
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-    );
-    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-    stream.on("error", reject);
+    stream.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    stream.on('error', reject);
   });
 }
 
@@ -35,23 +33,21 @@ interface UpstreamErrorResponse {
 
 class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
-  
+
   // Provider name
   readonly providerName = 'openrouter';
-  
+
   // Define supported paths for this provider
-  readonly SUPPORTED_PATHS = [
-    OPENROUTER_PATHS.CHAT_COMPLETIONS
-  ] as const;
+  readonly SUPPORTED_PATHS = [OPENROUTER_PATHS.CHAT_COMPLETIONS] as const;
 
   constructor() {
     super();
-    this.baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";
+    this.baseURL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai';
   }
 
   // Extract error information from axios error (handles Buffer/Stream/object) and log structured details
   protected async extractErrorInfo(error: any): Promise<OpenRouterErrorInfo> {
-    let errorMessage = "Unknown error occurred";
+    let errorMessage = 'Unknown error occurred';
     let statusCode = 500;
     let details: ProviderErrorDetails = {};
 
@@ -59,7 +55,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       statusCode = error.response.status;
       const statusText = error.response.statusText;
       const headers = error.response.headers || {};
-      
+
       // Extract request ID using unified method from base class
       const requestId = this.extractRequestIdFromHeaders(headers);
 
@@ -69,19 +65,22 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
 
         // Use base class methods for Buffer and Stream handling
         const normalizedData = await this.normalizeErrorData(data);
-        
+
         if (normalizedData && typeof normalizedData === 'object') {
           // Extract error information from normalized data
           const errorObj = normalizedData.error || normalizedData;
-          errorMessage = errorObj.message || normalizedData.message || `Error response with status ${statusCode}`;
-          
+          errorMessage =
+            errorObj.message ||
+            normalizedData.message ||
+            `Error response with status ${statusCode}`;
+
           details = {
             code: errorObj.code || normalizedData.code,
             type: errorObj.type || normalizedData.type,
             statusText,
             requestId,
             headers: this.extractRelevantHeaders(headers),
-            rawError: normalizedData
+            rawError: normalizedData,
           };
         } else if (typeof normalizedData === 'string') {
           errorMessage = normalizedData;
@@ -90,40 +89,40 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
             statusText,
             requestId,
             rawBody,
-            rawError: normalizedData
+            rawError: normalizedData,
           };
         } else {
           errorMessage = `HTTP ${statusCode}: ${statusText}`;
           details = {
             statusText,
-            requestId
+            requestId,
           };
         }
       } else {
         errorMessage = `HTTP ${statusCode}: ${statusText}`;
         details = {
           statusText,
-          requestId
+          requestId,
         };
       }
     } else if (error.request) {
-      errorMessage = "No response received from OpenRouter";
+      errorMessage = 'No response received from OpenRouter';
       statusCode = 503;
       details = {
-        type: 'network_error'
+        type: 'network_error',
       };
     } else {
-      errorMessage = error.message || "Unknown error occurred";
+      errorMessage = error.message || 'Unknown error occurred';
       details = {
-        type: 'request_setup_error'
+        type: 'request_setup_error',
       };
     }
 
     const errorInfo = { message: errorMessage, statusCode, details };
-    
+
     // Use base class logging with OpenRouter-specific provider name
     this.logErrorInfo(errorInfo, error, 'openrouter');
-    
+
     return errorInfo;
   }
 
@@ -139,10 +138,10 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
     // For OpenRouter, always inject usage tracking
     return {
       ...data,
-      usage: { 
-        include: true, 
-        ...(data.usage || {}) 
-      }
+      usage: {
+        include: true,
+        ...(data.usage || {}),
+      },
     };
   }
 
@@ -150,18 +149,18 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
   async forwardRequest(
     apiKey: string | null,
     apiPath: string,
-    method: string = "POST",
+    method: string = 'POST',
     requestData?: any,
     isStream: boolean = false
   ): Promise<AxiosResponse | UpstreamErrorResponse | null> {
     try {
       const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       };
 
       // Add Authorization header only if API key is provided
       if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
       } else {
         console.warn(`No API key provided for OpenRouter request`);
       }
@@ -177,9 +176,9 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
         url: fullUrl,
         data: finalData,
         headers,
-        responseType: isStream ? "stream" : "json",
+        responseType: isStream ? 'stream' : 'json',
       });
-      
+
       try {
         const u = (response.headers || {})['x-usage'];
         if (u) console.log('[openrouter] x-usage header:', u);
@@ -188,7 +187,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      
+
       // Enhanced error logging for authentication failures
       if (errorInfo.statusCode === 401) {
         console.error(`OpenRouter authentication failed: ${errorInfo.message}`);
@@ -213,13 +212,13 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
     const sourceStream = response.data;
 
     // Set error handling
-    sourceStream.on("error", (error: Error) => {
-      console.error("Source stream error:", error);
+    sourceStream.on('error', (error: Error) => {
+      console.error('Source stream error:', error);
       onError?.(error);
     });
 
-    targetStream.on("error", (error: Error) => {
-      console.error("Target stream error:", error);
+    targetStream.on('error', (error: Error) => {
+      console.error('Target stream error:', error);
       onError?.(error);
     });
 
@@ -227,28 +226,28 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
     sourceStream.pipe(targetStream);
 
     // Listen to source stream end event
-    sourceStream.on("end", () => {
-      console.log("Source stream ended");
+    sourceStream.on('end', () => {
+      console.log('Source stream ended');
       onEnd?.();
     });
 
     // Listen to pipe end event
-    sourceStream.on("close", () => {
-      console.log("Source stream closed");
+    sourceStream.on('close', () => {
+      console.log('Source stream closed');
     });
   }
 
   /**
    * Extract USD cost from OpenRouter response
    * OpenRouter provides native USD cost in usage.cost or x-usage header
-   * 
+   *
    * NOTE: For stream responses, cost is NOT available at request initiation time.
    * Stream cost should be extracted from the final SSE chunks during stream processing.
    */
   extractProviderUsageUsd(response: AxiosResponse): number | undefined {
     try {
       const data = response.data;
-      
+
       // Check if this is a stream response (data has pipe method)
       if (data && typeof data === 'object' && typeof data.pipe === 'function') {
         // For stream responses, cost is not available at this stage
@@ -274,7 +273,9 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
           }
         } catch {
           // Try regex fallback
-          const m = usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) || usageHeader.match(/cost=([0-9.]+)/i);
+          const m =
+            usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) ||
+            usageHeader.match(/cost=([0-9.]+)/i);
           if (m && m[1]) {
             const n = Number(m[1]);
             if (Number.isFinite(n)) return n;
@@ -282,7 +283,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
         }
       }
     } catch (error) {
-      console.error("Error extracting USD cost from OpenRouter response:", error);
+      console.error('Error extracting USD cost from OpenRouter response:', error);
     }
     return undefined;
   }
@@ -294,7 +295,8 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       // Try to augment usage.cost (USD) from provider headers when not present in body
       const headers = (response.headers || {}) as Record<string, string>;
 
-      const usage = (data && typeof data === 'object' && data.usage) ? { ...data.usage } : {} as any;
+      const usage =
+        data && typeof data === 'object' && data.usage ? { ...data.usage } : ({} as any);
 
       if (usage.cost == null) {
         // Heuristics for OpenRouter usage header
@@ -304,18 +306,16 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
         if (typeof usageHeader === 'string' && usageHeader.length > 0) {
           try {
             const parsed = JSON.parse(usageHeader);
-            const raw =
-              parsed?.total_cost ??
-              parsed?.total_cost_usd ??
-              parsed?.cost ??
-              parsed?.usd;
+            const raw = parsed?.total_cost ?? parsed?.total_cost_usd ?? parsed?.cost ?? parsed?.usd;
             if (raw != null) {
               const n = Number(raw);
               if (Number.isFinite(n)) parsedCost = n;
             }
           } catch {
             // Fallback: try to extract number from a simple "key=value" string format
-            const m = usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) || usageHeader.match(/cost=([0-9.]+)/i);
+            const m =
+              usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) ||
+              usageHeader.match(/cost=([0-9.]+)/i);
             if (m && m[1]) {
               const n = Number(m[1]);
               if (Number.isFinite(n)) parsedCost = n;
@@ -333,7 +333,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       }
       return data;
     } catch (error) {
-      console.error("Error parsing OpenRouter response:", error);
+      console.error('Error parsing OpenRouter response:', error);
       return null;
     }
   }
@@ -361,7 +361,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       'openai/gpt-3.5-turbo',
       'openai/gpt-4',
       'anthropic/claude-3-haiku',
-      'meta-llama/llama-2-70b-chat'
+      'meta-llama/llama-2-70b-chat',
     ];
   }
 
@@ -374,7 +374,7 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
       model: 'openai/gpt-3.5-turbo',
       message: 'Hello, this is a test message.',
       maxTokens: 50,
-      temperature: 0.7
+      temperature: 0.7,
     };
   }
 
@@ -384,21 +384,21 @@ class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
-    
+
     if (endpoint === OPENROUTER_PATHS.CHAT_COMPLETIONS) {
       // Extract normalized options and map to API parameter names
       const { maxTokens, message, messages, ...rest } = options;
-      
+
       return {
         model: options.model || defaults.model,
         messages: messages || [{ role: 'user', content: message || defaults.message }],
         max_tokens: maxTokens || defaults.maxTokens,
         temperature: options.temperature ?? defaults.temperature,
         stream: options.stream || false,
-        ...rest  // Include any additional options
+        ...rest, // Include any additional options
       };
     }
-    
+
     throw new Error(`Unknown endpoint for OpenRouter service: ${endpoint}`);
   }
 }

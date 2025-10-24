@@ -18,7 +18,7 @@ export class LiteLLMStreamProcessor extends BaseStreamProcessor {
   protected processProviderSpecificChunk(chunkText: string): void {
     // LiteLLM uses standard Chat Completions format
     // No special processing needed beyond what the base class does
-    
+
     // Could add LiteLLM-specific logging or monitoring here if needed
     if (chunkText.includes('litellm')) {
       console.log('[LiteLLMStreamProcessor] Detected LiteLLM-specific information in chunk');

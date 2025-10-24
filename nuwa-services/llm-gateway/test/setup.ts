@@ -38,7 +38,6 @@ if (!process.env.LITELLM_API_KEY) {
   process.env.LITELLM_API_KEY = 'test-litellm-key';
 }
 
-
 jest.setTimeout(30000);
 
 process.on('unhandledRejection', (reason, promise) => {

@@ -48,11 +48,14 @@ UsagePolicy.createStreamProcessor(model, providerCost);
 ```typescript
 interface UsageExtractor {
   extractFromResponseBody(responseBody: any): UsageInfo | null;
-  extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null;
+  extractFromStreamChunk(
+    chunkText: string
+  ): { usage: UsageInfo; cost?: number } | null;
 }
 ```
 
 **可用实现**:
+
 - `DefaultUsageExtractor`: 处理标准 OpenAI 格式
 - Provider 特定实现（如果需要）
 
@@ -67,6 +70,7 @@ interface StreamProcessor {
 ```
 
 **可用实现**:
+
 - `DefaultStreamProcessor`: 通用流式处理
 - Provider 特定实现（如果需要）
 
@@ -74,7 +78,11 @@ interface StreamProcessor {
 
 ```typescript
 class CostCalculator {
-  static calculateRequestCost(model: string, providerCostUsd?: number, usage?: UsageInfo): PricingResult | null;
+  static calculateRequestCost(
+    model: string,
+    providerCostUsd?: number,
+    usage?: UsageInfo
+  ): PricingResult | null;
   static applyMultiplier(costUsd: number): number;
   static getPricingMultiplier(): number;
 }
@@ -91,11 +99,11 @@ class MyCustomProvider implements LLMProvider {
   async forwardRequest(method: string, path: string, data?: any): Promise<any> {
     // 实现请求转发逻辑
   }
-  
+
   parseResponse(response: AxiosResponse): any {
     // 实现响应解析逻辑
   }
-  
+
   extractProviderUsageUsd?(response: AxiosResponse): number | undefined {
     // 可选：从响应中提取 Provider 提供的成本
   }
@@ -114,15 +122,17 @@ class MyCustomUsageExtractor extends BaseUsageExtractor {
       return {
         promptTokens: responseBody.my_custom_usage.input_tokens,
         completionTokens: responseBody.my_custom_usage.output_tokens,
-        totalTokens: responseBody.my_custom_usage.total_tokens
+        totalTokens: responseBody.my_custom_usage.total_tokens,
       };
     }
-    
+
     // 回退到默认实现
     return super.extractFromResponseBody(responseBody);
   }
-  
-  extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
+
+  extractFromStreamChunk(
+    chunkText: string
+  ): { usage: UsageInfo; cost?: number } | null {
     // 实现自定义流式格式的解析
     // ...
   }
@@ -138,7 +148,7 @@ class MyCustomStreamProcessor extends BaseStreamProcessor {
   constructor(model: string, initialCost?: number) {
     super(model, initialCost, new MyCustomUsageExtractor());
   }
-  
+
   protected tryExtractCost(chunkText: string): number | undefined {
     // 实现自定义成本提取逻辑
     const match = chunkText.match(/cost:(\d+\.\d+)/);
@@ -152,11 +162,11 @@ class MyCustomStreamProcessor extends BaseStreamProcessor {
 ```typescript
 class MyCustomProvider implements LLMProvider {
   // ... 其他方法 ...
-  
+
   createUsageExtractor(): UsageExtractor {
     return new MyCustomUsageExtractor();
   }
-  
+
   createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
     return new MyCustomStreamProcessor(model, initialCost);
   }
@@ -178,11 +188,11 @@ const myProvider = new MyCustomProvider();
 ```typescript
 class MyProvider implements LLMProvider {
   private extractor: UsageExtractor;
-  
+
   constructor() {
     this.extractor = new MyCustomUsageExtractor();
   }
-  
+
   createUsageExtractor(): UsageExtractor {
     return this.extractor; // 重用实例
   }
@@ -194,13 +204,13 @@ class MyProvider implements LLMProvider {
 ```typescript
 class MyCustomUsageExtractor extends BaseUsageExtractor {
   private cache = new Map<string, UsageInfo>();
-  
+
   extractFromResponseBody(responseBody: any): UsageInfo | null {
     const key = JSON.stringify(responseBody.usage);
     if (this.cache.has(key)) {
       return this.cache.get(key)!;
     }
-    
+
     const result = this.doExtraction(responseBody);
     this.cache.set(key, result);
     return result;
@@ -215,7 +225,7 @@ class MyCustomUsageExtractor extends BaseUsageExtractor {
 const usageInfo: UsageInfo = {
   promptTokens: 0,
   completionTokens: 0,
-  totalTokens: 0
+  totalTokens: 0,
 };
 
 // 更新字段而不是创建新对象
@@ -248,7 +258,7 @@ class MonitoredUsageExtractor extends BaseUsageExtractor {
     const start = Date.now();
     const result = super.extractFromResponseBody(responseBody);
     const duration = Date.now() - start;
-    
+
     console.log(`Extraction took ${duration}ms`);
     return result;
   }
@@ -268,6 +278,7 @@ class MonitoredUsageExtractor extends BaseUsageExtractor {
 ### Q: 性能会受到影响吗？
 
 **A**: 不会。新架构的性能测试显示：
+
 - 使用量提取: 0.0017ms 平均耗时
 - 成本计算: 0.0024ms 平均耗时
 - 内存使用: 100次操作仅增长 0.24MB
@@ -284,6 +295,7 @@ console.log('[MyProvider] Processing response:', responseBody);
 ### Q: 可以混合使用新旧方式吗？
 
 **A**: 可以。新架构通过适配器模式确保完全兼容，你可以：
+
 - 继续使用 `UsagePolicy` 静态方法
 - 同时为新 Provider 实现新接口
 - 逐步迁移到新架构
@@ -298,7 +310,7 @@ class GoodProvider implements LLMProvider {
   createUsageExtractor(): UsageExtractor {
     return new MyUsageExtractor();
   }
-  
+
   createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
     return new MyStreamProcessor(model, initialCost);
   }
@@ -337,7 +349,7 @@ extractFromResponseBody(responseBody: any): UsageInfo | null {
 console.log('[MyProvider] Extracted usage:', {
   promptTokens: usage.promptTokens,
   completionTokens: usage.completionTokens,
-  model: this.model
+  model: this.model,
 });
 
 // ❌ 避免的做法

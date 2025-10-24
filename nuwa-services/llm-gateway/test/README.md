@@ -1,6 +1,7 @@
 # LLM Gateway Testing Guide
 
-This guide explains how to run the comprehensive test suite for the LLM Gateway, including both unit tests and integration tests with real API providers.
+This guide explains how to run the comprehensive test suite for the LLM Gateway,
+including both unit tests and integration tests with real API providers.
 
 ## Test Structure
 
@@ -124,6 +125,7 @@ Test real API interactions with actual provider endpoints:
 #### OpenAI Provider Tests (`provider-openai.test.ts`)
 
 Tests OpenAI API integration including:
+
 - Chat Completions API (non-streaming and streaming)
 - OpenAI Response API (new feature)
 - Models API
@@ -134,6 +136,7 @@ Tests OpenAI API integration including:
 #### OpenRouter Provider Tests (`provider-openrouter.test.ts`)
 
 Tests OpenRouter API integration including:
+
 - Multiple model providers (OpenAI, Anthropic, Meta)
 - Native USD cost extraction
 - Streaming and non-streaming requests
@@ -143,6 +146,7 @@ Tests OpenRouter API integration including:
 #### LiteLLM Provider Tests (`provider-litellm.test.ts`)
 
 Tests LiteLLM proxy integration including:
+
 - Proxy configuration testing
 - Multiple backend models
 - Cost extraction from headers
@@ -152,6 +156,7 @@ Tests LiteLLM proxy integration including:
 #### Provider Manager Tests (`provider-manager.test.ts`)
 
 Tests the provider management system:
+
 - Environment-based provider registration
 - Provider configuration validation
 - Integration with RouteHandler and AuthManager
@@ -257,10 +262,7 @@ Tests use Jest with TypeScript support. Key configuration:
   "testEnvironment": "node",
   "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
   "testMatch": ["**/*.test.ts"],
-  "collectCoverageFrom": [
-    "src/**/*.ts",
-    "!src/**/*.d.ts"
-  ]
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts"]
 }
 ```
 
@@ -382,12 +384,12 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - run: pnpm install
-      
+
       # Unit tests (always run)
       - run: SKIP_INTEGRATION_TESTS=true pnpm test
-      
+
       # Integration tests (only with secrets)
       - run: pnpm test
         if: ${{ secrets.OPENAI_API_KEY }}
@@ -400,7 +402,8 @@ jobs:
 
 When adding new tests:
 
-1. **Follow naming conventions**: `*.test.ts` for unit tests, `integration/*.test.ts` for integration tests
+1. **Follow naming conventions**: `*.test.ts` for unit tests,
+   `integration/*.test.ts` for integration tests
 2. **Use test utilities**: Leverage existing helpers in `test/utils/`
 3. **Handle environment**: Use `TestEnv` for conditional execution
 4. **Document requirements**: Update this README for new dependencies

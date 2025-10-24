@@ -1,31 +1,31 @@
-import { AxiosResponse } from "axios";
-import { LLMProvider, ExecuteResponse, ExecuteStreamResponse } from "./LLMProvider.js";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { UsageInfo, PricingResult } from "../billing/pricing.js";
-import { CostCalculator } from "../billing/usage/CostCalculator.js";
+import { AxiosResponse } from 'axios';
+import { LLMProvider, ExecuteResponse, ExecuteStreamResponse } from './LLMProvider.js';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { UsageInfo, PricingResult } from '../billing/pricing.js';
+import { CostCalculator } from '../billing/usage/CostCalculator.js';
 
 /**
  * Standardized error details interface for all providers
  */
 export interface ProviderErrorDetails {
   // Core error information
-  code?: string;           // Error code (e.g., 'invalid_api_key', 'rate_limit_exceeded')
-  type?: string;           // Error type (e.g., 'authentication_error', 'invalid_request_error')
-  
+  code?: string; // Error code (e.g., 'invalid_api_key', 'rate_limit_exceeded')
+  type?: string; // Error type (e.g., 'authentication_error', 'invalid_request_error')
+
   // HTTP details
-  statusText?: string;     // HTTP status text
-  
+  statusText?: string; // HTTP status text
+
   // Request identification
-  requestId?: string;      // Provider request ID for debugging
-  
+  requestId?: string; // Provider request ID for debugging
+
   // Additional context
-  headers?: Record<string, any>;  // Relevant headers
-  param?: string;          // Parameter that caused the error (OpenAI style)
-  rawBody?: string;        // Raw response body (if applicable)
-  
+  headers?: Record<string, any>; // Relevant headers
+  param?: string; // Parameter that caused the error (OpenAI style)
+  rawBody?: string; // Raw response body (if applicable)
+
   // Provider-specific raw error
-  rawError?: any;          // Original error object for detailed debugging
+  rawError?: any; // Original error object for detailed debugging
 }
 
 /**
@@ -104,14 +104,16 @@ export abstract class BaseLLMProvider implements LLMProvider {
    */
   protected extractRequestIdFromHeaders(headers: any): string | undefined {
     if (!headers) return undefined;
-    
+
     // Check all known request ID header names
     // Order matters: prefer standard names first
-    return headers['x-request-id'] 
-      || headers['x-openai-request-id']
-      || headers['openrouter-request-id']
-      || headers['request-id']
-      || headers['anthropic-request-id'];
+    return (
+      headers['x-request-id'] ||
+      headers['x-openai-request-id'] ||
+      headers['openrouter-request-id'] ||
+      headers['request-id'] ||
+      headers['anthropic-request-id']
+    );
   }
 
   /**
@@ -148,7 +150,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         return null;
       }
     }
-    
+
     // Handle Stream
     if (this.isReadableStream(data)) {
       try {
@@ -167,7 +169,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         return null;
       }
     }
-    
+
     // Handle String (try to parse as JSON)
     if (typeof data === 'string') {
       try {
@@ -177,7 +179,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         return data;
       }
     }
-    
+
     // Already normalized (Object)
     return data;
   }
@@ -186,11 +188,13 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Log structured error information for debugging and monitoring
    */
   protected logErrorInfo(errorInfo: ProviderErrorInfo, error: any, providerName?: string): void {
-    const provider = providerName || this.constructor.name.replace('Provider', '').replace('Service', '').toLowerCase();
-    
+    const provider =
+      providerName ||
+      this.constructor.name.replace('Provider', '').replace('Service', '').toLowerCase();
+
     // Log basic error information
     console.error(`❌ Error forwarding request to ${provider}: ${errorInfo.message}`);
-    
+
     // Log detailed error information if available
     if (errorInfo.details) {
       console.error(`📋 ${provider} error details:`, {
@@ -202,7 +206,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         requestId: errorInfo.details.requestId,
       });
     }
-    
+
     // Log request information for debugging (if available from axios error)
     if (error?.config) {
       console.error(`📤 Request info:`, {
@@ -219,7 +223,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Provides base implementation that can be used or overridden by providers
    */
   protected async extractErrorInfo(error: any): Promise<ProviderErrorInfo> {
-    let message = "Unknown error occurred";
+    let message = 'Unknown error occurred';
     let statusCode = 500;
     let details: ProviderErrorDetails = {};
 
@@ -228,40 +232,40 @@ export abstract class BaseLLMProvider implements LLMProvider {
       statusCode = error.response.status;
       const statusText = error.response.statusText;
       const headers = error.response.headers;
-      
+
       // Extract request ID using unified method
       const requestId = this.extractRequestIdFromHeaders(headers);
-      
+
       // Normalize data (handle Stream, Buffer, Object, String)
       let data = await this.normalizeErrorData(error.response.data);
-      
+
       // Extract error information from normalized data
       if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
         // Support multiple error formats:
         // 1. Claude format: { type: "error", error: { type, message }, request_id }
         // 2. OpenAI format: { error: { message, code, type } }
         // 3. Direct format: { message, code, type }
-        
+
         let errorObj = data.error || data;
         let errorMessage = errorObj.message || `Error response with status ${statusCode}`;
         let errorCode = errorObj.code;
         let errorType = errorObj.type;
-        
+
         // Handle Claude's nested error structure
         if (data.type === 'error' && data.error && typeof data.error === 'object') {
           // Claude format: { type: "error", error: { type, message }, request_id }
           errorMessage = data.error.message || errorMessage;
           errorType = data.error.type || errorType;
           errorCode = data.error.code || errorCode;
-          
+
           // Also extract request_id from Claude response
           if (data.request_id && !requestId) {
             details.requestId = data.request_id;
           }
         }
-        
+
         message = errorMessage;
-        
+
         details = {
           code: errorCode,
           type: errorType,
@@ -269,7 +273,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
           statusText,
           requestId: details.requestId || requestId,
           headers: this.extractRelevantHeaders(headers),
-          rawError: data // Store the full normalized response for transparency
+          rawError: data, // Store the full normalized response for transparency
         };
       } else if (typeof data === 'string') {
         message = data;
@@ -277,35 +281,35 @@ export abstract class BaseLLMProvider implements LLMProvider {
           statusText,
           requestId,
           rawBody: data,
-          rawError: data
+          rawError: data,
         };
       } else {
         message = `HTTP ${statusCode}: ${statusText}`;
         details = {
           statusText,
-          requestId
+          requestId,
         };
       }
     } else if (error.request) {
       // Network error - no response received
-      message = "Network error - Unable to reach provider";
+      message = 'Network error - Unable to reach provider';
       statusCode = 503;
       details = {
-        type: 'network_error'
+        type: 'network_error',
       };
     } else {
       // Other error (request setup, etc.)
-      message = error.message || "Unknown error occurred";
+      message = error.message || 'Unknown error occurred';
       details = {
-        type: 'request_setup_error'
+        type: 'request_setup_error',
       };
     }
 
     const errorInfo = { message, statusCode, details };
-    
+
     // Automatically log error information
     this.logErrorInfo(errorInfo, error);
-    
+
     return errorInfo;
   }
 
@@ -314,11 +318,11 @@ export abstract class BaseLLMProvider implements LLMProvider {
    */
   protected extractRelevantHeaders(headers: any): Record<string, any> | undefined {
     if (!headers) return undefined;
-    
+
     const relevant: Record<string, any> = {};
     const headerKeys = [
       'x-request-id',
-      'x-openai-request-id', 
+      'x-openai-request-id',
       'openrouter-request-id',
       'request-id',
       'anthropic-request-id',
@@ -327,15 +331,15 @@ export abstract class BaseLLMProvider implements LLMProvider {
       'x-ratelimit-remaining',
       'cf-ray',
       'openai-organization',
-      'openai-processing-ms'
+      'openai-processing-ms',
     ];
-    
+
     for (const key of headerKeys) {
       if (headers[key]) {
         relevant[key] = headers[key];
       }
     }
-    
+
     return Object.keys(relevant).length > 0 ? relevant : undefined;
   }
 
@@ -364,7 +368,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         return {
           success: false,
           statusCode: 502,
-          error: 'No response received from provider'
+          error: 'No response received from provider',
         };
       }
 
@@ -377,7 +381,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
           details: response.details,
           upstreamRequestId: response.details?.requestId,
           errorCode: response.details?.code,
-          errorType: response.details?.type
+          errorType: response.details?.type,
         };
       }
 
@@ -386,8 +390,10 @@ export abstract class BaseLLMProvider implements LLMProvider {
 
       // Extract usage and calculate cost
       const model = finalRequestData?.model || 'unknown';
-      const providerCostUsd = this.extractProviderUsageUsd ? this.extractProviderUsageUsd(response) : undefined;
-      
+      const providerCostUsd = this.extractProviderUsageUsd
+        ? this.extractProviderUsageUsd(response)
+        : undefined;
+
       let usage: UsageInfo | undefined;
       let cost: PricingResult | undefined;
 
@@ -396,9 +402,14 @@ export abstract class BaseLLMProvider implements LLMProvider {
         const extractor = this.createUsageExtractor();
         const extractedUsage = extractor.extractFromResponseBody(responseData);
         usage = extractedUsage || undefined;
-        
+
         if (usage) {
-          const calculatedCost = CostCalculator.calculateProviderRequestCost(this.providerName, model, providerCostUsd, usage);
+          const calculatedCost = CostCalculator.calculateProviderRequestCost(
+            this.providerName,
+            model,
+            providerCostUsd,
+            usage
+          );
           cost = calculatedCost || undefined;
           console.log(`[${this.constructor.name}] Extracted usage for non-stream response`);
         }
@@ -411,15 +422,14 @@ export abstract class BaseLLMProvider implements LLMProvider {
         usage,
         cost,
         rawResponse: response,
-        upstreamRequestId: this.extractRequestIdFromHeaders(response.headers)
+        upstreamRequestId: this.extractRequestIdFromHeaders(response.headers),
       };
-
     } catch (error) {
       console.error(`[${this.constructor.name}] Error in executeRequest:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error
+        details: error,
       };
     }
   }
@@ -437,9 +447,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
   ): Promise<ExecuteStreamResponse> {
     try {
       // Prepare request data using provider-specific logic
-      const finalRequestData = this.prepareRequestData 
-        ? this.prepareRequestData(data, true) 
-        : data;
+      const finalRequestData = this.prepareRequestData ? this.prepareRequestData(data, true) : data;
 
       // Forward the streaming request
       const response = await this.forwardRequest(apiKey, path, method, finalRequestData, true);
@@ -450,7 +458,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
           success: false,
           statusCode: 502,
           totalBytes: 0,
-          error: 'No response received from provider'
+          error: 'No response received from provider',
         };
       }
 
@@ -464,14 +472,18 @@ export abstract class BaseLLMProvider implements LLMProvider {
           details: response.details,
           upstreamRequestId: response.details?.requestId,
           errorCode: response.details?.code,
-          errorType: response.details?.type
+          errorType: response.details?.type,
         };
       }
 
       // Create stream processor if available
       const model = finalRequestData.model || 'unknown';
-      const providerCostUsd = this.extractProviderUsageUsd ? this.extractProviderUsageUsd(response) : undefined;
-      const processor = this.createStreamProcessor ? this.createStreamProcessor(model, providerCostUsd) : undefined;
+      const providerCostUsd = this.extractProviderUsageUsd
+        ? this.extractProviderUsageUsd(response)
+        : undefined;
+      const processor = this.createStreamProcessor
+        ? this.createStreamProcessor(model, providerCostUsd)
+        : undefined;
 
       if (processor) {
         console.log(`[${this.constructor.name}] Created stream processor for model: ${model}`);
@@ -480,15 +492,15 @@ export abstract class BaseLLMProvider implements LLMProvider {
       // Automatically forward stream to destination and wait for completion
       return new Promise((resolve, reject) => {
         let totalBytes = 0;
-        
+
         response.data.on('data', (chunk: Buffer) => {
           totalBytes += chunk.length;
-          
+
           // Automatically call processor if available
           if (processor) {
             processor.processChunk(chunk.toString());
           }
-          
+
           // Forward to destination stream
           destination.write(chunk);
         });
@@ -496,27 +508,29 @@ export abstract class BaseLLMProvider implements LLMProvider {
         response.data.on('end', () => {
           const finalUsage = processor?.getFinalUsage();
           const finalCost = processor?.getFinalCost();
-          
+
           // ⭐️ CRITICAL: Set res.locals BEFORE destination.end() for PaymentKit and accessLog
           // PaymentKit's res.on('finish') handler needs res.locals.usage to be set
           if ('locals' in destination) {
             (destination as any).locals = (destination as any).locals || {};
-            
+
             // Set usage info for access log
             if (finalUsage) {
               (destination as any).locals.usageInfo = finalUsage;
             }
-            
+
             // Set cost result for access log
             if (finalCost) {
               (destination as any).locals.costResult = finalCost;
-              
+
               // ⭐️ CRITICAL: Set billing usage for PaymentKit
               const picoUsd = Math.round(Number(finalCost.costUsd || 0) * 1e12);
               (destination as any).locals.usage = picoUsd;
-              console.log(`[${this.constructor.name}] Set billing usage: ${picoUsd} pico USD ($${finalCost.costUsd})`);
+              console.log(
+                `[${this.constructor.name}] Set billing usage: ${picoUsd} pico USD ($${finalCost.costUsd})`
+              );
             }
-            
+
             // ⭐️ Update upstream meta if it exists (set by RouteHandler)
             // This ensures accessLog can capture complete upstream information
             if ((destination as any).locals.upstream) {
@@ -531,10 +545,10 @@ export abstract class BaseLLMProvider implements LLMProvider {
               (destination as any).locals.upstream.upstream_status_code = response.status;
             }
           }
-          
+
           // End the destination stream (this triggers res.on('finish') which PaymentKit and accessLog listen to)
           destination.end();
-          
+
           resolve({
             success: true,
             statusCode: response.status,
@@ -542,7 +556,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
             usage: finalUsage || undefined,
             cost: finalCost || undefined,
             rawResponse: response,
-            upstreamRequestId: this.extractRequestIdFromHeaders(response.headers)
+            upstreamRequestId: this.extractRequestIdFromHeaders(response.headers),
           });
         });
 
@@ -556,7 +570,6 @@ export abstract class BaseLLMProvider implements LLMProvider {
           reject(error);
         });
       });
-
     } catch (error) {
       console.error(`[${this.constructor.name}] Error in executeStreamRequest:`, error);
       return {
@@ -565,9 +578,9 @@ export abstract class BaseLLMProvider implements LLMProvider {
         totalBytes: 0,
         error: error instanceof Error ? error.message : 'Unknown error',
         details: error,
-        upstreamRequestId: (error as any)?.response?.headers 
+        upstreamRequestId: (error as any)?.response?.headers
           ? this.extractRequestIdFromHeaders((error as any).response.headers)
-          : undefined
+          : undefined,
       };
     }
   }

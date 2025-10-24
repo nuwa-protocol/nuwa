@@ -19,7 +19,7 @@ export class OpenRouterStreamProcessor extends BaseStreamProcessor {
   protected processProviderSpecificChunk(chunkText: string): void {
     // OpenRouter uses standard Chat Completions format
     // No special processing needed beyond what the base class does
-    
+
     // Could add OpenRouter-specific logging or monitoring here if needed
     if (chunkText.includes('"cost"')) {
       console.log('[OpenRouterStreamProcessor] Detected cost information in chunk');

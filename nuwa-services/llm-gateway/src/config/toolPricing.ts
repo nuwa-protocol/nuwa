@@ -1,9 +1,9 @@
 /**
  * OpenAI Response API Tools Pricing Configuration
- * 
+ *
  * This file contains the official pricing information for OpenAI Response API tools.
  * Prices are based on OpenAI's official pricing as of 2024-12.
- * 
+ *
  * Note: These are separate from model token costs and are charged per usage.
  */
 import { ToolValidationResult } from '../types/index.js';
@@ -13,7 +13,7 @@ export interface ToolPricingConfig {
   pricing: {
     type: 'per_call' | 'per_session' | 'per_storage';
     rate: number; // USD
-    unit: string;  // e.g., '1000 calls', 'session', 'GB/day'
+    unit: string; // e.g., '1000 calls', 'session', 'GB/day'
   };
   // Some tools have free token allowances
   freeTokens?: {
@@ -32,22 +32,22 @@ export const OPENAI_TOOL_PRICING: ToolPricingConfig[] = [
     description: 'Web search tool calls',
     pricing: {
       type: 'per_call',
-      rate: 10.00,
-      unit: '1000 calls'
+      rate: 10.0,
+      unit: '1000 calls',
     },
     freeTokens: {
       condition: 'GPT-4o and GPT-4.1 models',
-      description: 'Search content tokens are free for GPT-4o and GPT-4.1 models'
-    }
+      description: 'Search content tokens are free for GPT-4o and GPT-4.1 models',
+    },
   },
   {
     name: 'file_search',
     description: 'File search tool calls',
     pricing: {
       type: 'per_call',
-      rate: 2.50,
-      unit: '1000 calls'
-    }
+      rate: 2.5,
+      unit: '1000 calls',
+    },
   },
   {
     name: 'computer_use',
@@ -55,8 +55,8 @@ export const OPENAI_TOOL_PRICING: ToolPricingConfig[] = [
     pricing: {
       type: 'per_session',
       rate: 0.03,
-      unit: 'session'
-    }
+      unit: 'session',
+    },
   },
   {
     name: 'code_interpreter',
@@ -64,17 +64,17 @@ export const OPENAI_TOOL_PRICING: ToolPricingConfig[] = [
     pricing: {
       type: 'per_session',
       rate: 0.03,
-      unit: 'session'
-    }
-  }
+      unit: 'session',
+    },
+  },
 ];
 
 /**
  * File search storage pricing (separate from tool calls)
  */
 export const FILE_SEARCH_STORAGE_PRICING = {
-  rate: 0.10, // USD per GB per day
-  freeAllowance: 1.0 // First 1 GB is free
+  rate: 0.1, // USD per GB per day
+  freeAllowance: 1.0, // First 1 GB is free
 };
 
 /**
@@ -98,11 +98,11 @@ export function calculateToolCallCost(toolName: string, callCount: number): numb
     case 'per_call':
       // Rate is per 1000 calls
       return (callCount / 1000) * config.pricing.rate;
-    
+
     case 'per_session':
       // Rate is per session, callCount represents session count
       return callCount * config.pricing.rate;
-    
+
     default:
       console.warn(`Unsupported pricing type: ${config.pricing.type}`);
       return 0;
@@ -158,7 +158,7 @@ export function validateTools(requestedTools: any[]): ToolValidationResult {
       if (tool.type === 'function') {
         continue;
       }
-      
+
       // Check if built-in tool is supported
       if (!supportedTools.includes(tool.type)) {
         unsupportedTools.push(tool.type);
@@ -168,6 +168,6 @@ export function validateTools(requestedTools: any[]): ToolValidationResult {
 
   return {
     valid: unsupportedTools.length === 0,
-    unsupportedTools
+    unsupportedTools,
   };
 }

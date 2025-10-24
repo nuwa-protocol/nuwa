@@ -14,6 +14,7 @@
 ### 1. 基础抽象层
 
 创建 `BaseProviderTestUtils` 提供通用功能：
+
 - 测试环境管理
 - 响应验证
 - 使用量和成本提取
@@ -24,6 +25,7 @@
 为每个 provider 创建专门的测试工具类：
 
 #### OpenAI (`OpenAITestUtils`)
+
 - `createChatCompletionRequest()` - 标准 Chat Completions 请求
 - `createResponseAPIRequest()` - Response API 专门请求
 - `createChatCompletionWithToolsRequest()` - 带工具的请求
@@ -32,6 +34,7 @@
 - `testStreamingChatCompletion()` - 流式测试
 
 #### OpenRouter (`OpenRouterTestUtils`)
+
 - `createChatCompletionRequest()` - 标准请求（使用 openai/gpt-3.5-turbo 格式）
 - `createChatCompletionWithRoutingRequest()` - 带路由偏好的请求
 - `testChatCompletionWithRouting()` - 路由测试
@@ -39,6 +42,7 @@
 - `createMultiProviderTestRequest()` - 多 provider 测试
 
 #### LiteLLM (`LiteLLMTestUtils`)
+
 - `createChatCompletionRequest()` - 标准请求
 - `createChatCompletionWithMetadataRequest()` - 带元数据的请求
 - `testChatCompletionWithMetadata()` - 元数据测试
@@ -48,7 +52,9 @@
 ## 优势
 
 ### 1. 类型安全
+
 每个 provider 有自己的配置接口：
+
 ```typescript
 // OpenAI 专门配置
 interface OpenAIChatCompletionConfig {
@@ -57,7 +63,7 @@ interface OpenAIChatCompletionConfig {
   tools?: Array<{ type: 'function'; function: {...} }>;
 }
 
-// OpenRouter 专门配置  
+// OpenRouter 专门配置
 interface OpenRouterChatCompletionConfig {
   model: string; // 使用 "openai/gpt-3.5-turbo" 格式
   route?: 'fallback';
@@ -66,6 +72,7 @@ interface OpenRouterChatCompletionConfig {
 ```
 
 ### 2. API 规范匹配
+
 每个工具类完全匹配对应 provider 的 API 规范：
 
 ```typescript
@@ -84,18 +91,24 @@ OpenRouterTestUtils.createChatCompletionRequest({
 ```
 
 ### 3. 简化的测试代码
+
 ```typescript
 // 之前：需要通用配置和复杂的参数处理
 const config = ProviderTestUtils.getProviderTestConfig('openai');
-const result = await ProviderTestUtils.testProviderChatCompletion(provider, apiKey, config);
+const result = await ProviderTestUtils.testProviderChatCompletion(
+  provider,
+  apiKey,
+  config
+);
 
 // 现在：直接使用专门的方法
 const result = await OpenAITestUtils.testChatCompletion(provider, apiKey, {
-  model: 'gpt-3.5-turbo'
+  model: 'gpt-3.5-turbo',
 });
 ```
 
 ### 4. 减少 Provider 复杂性
+
 Provider 实现不再需要复杂的参数删除和标准化逻辑：
 
 ```typescript
@@ -115,20 +128,26 @@ OpenAITestUtils.createChatCompletionRequest() // 直接创建正确格式
 ## 迁移指南
 
 ### 更新现有测试
+
 ```typescript
 // 旧方式
 import { ProviderTestUtils } from '../utils/providerTestUtils.js';
 const config = ProviderTestUtils.getProviderTestConfig('openai');
-const result = await ProviderTestUtils.testProviderChatCompletion(provider, apiKey, config);
+const result = await ProviderTestUtils.testProviderChatCompletion(
+  provider,
+  apiKey,
+  config
+);
 
 // 新方式
 import { OpenAITestUtils } from '../utils/openaiTestUtils.js';
 const result = await OpenAITestUtils.testChatCompletion(provider, apiKey, {
-  model: 'gpt-3.5-turbo'
+  model: 'gpt-3.5-turbo',
 });
 ```
 
 ### 添加新 Provider
+
 1. 创建 `{provider}TestUtils.ts` 继承 `BaseProviderTestUtils`
 2. 定义 provider 专门的配置接口
 3. 实现 provider 专门的请求创建方法
@@ -146,6 +165,7 @@ test/utils/
 ```
 
 这种重构方式确保了：
+
 - 每个 provider 的测试工具完全匹配其 API 规范
 - 减少了不必要的参数转换和删除逻辑
 - 提高了类型安全性和代码可读性

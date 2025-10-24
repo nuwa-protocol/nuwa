@@ -1,11 +1,11 @@
-import axios, { AxiosResponse } from "axios";
-import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
-import { TestableLLMProvider } from "../providers/LLMProvider.js";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { LiteLLMUsageExtractor } from "../billing/usage/providers/LiteLLMUsageExtractor.js";
-import { LiteLLMStreamProcessor } from "../billing/usage/providers/LiteLLMStreamProcessor.js";
-import { LITELLM_PATHS } from "../providers/constants.js";
+import axios, { AxiosResponse } from 'axios';
+import { BaseLLMProvider } from '../providers/BaseLLMProvider.js';
+import { TestableLLMProvider } from '../providers/LLMProvider.js';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { LiteLLMUsageExtractor } from '../billing/usage/providers/LiteLLMUsageExtractor.js';
+import { LiteLLMStreamProcessor } from '../billing/usage/providers/LiteLLMStreamProcessor.js';
+import { LITELLM_PATHS } from '../providers/constants.js';
 
 /**
  * Minimal service adapter for proxying requests to a LiteLLM Proxy instance.
@@ -14,19 +14,17 @@ import { LITELLM_PATHS } from "../providers/constants.js";
  */
 class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
-  
+
   // Provider name
   readonly providerName = 'litellm';
-  
-  // Define supported paths for this provider
-  readonly SUPPORTED_PATHS = [
-    LITELLM_PATHS.CHAT_COMPLETIONS
-  ] as const;
 
-    constructor() {
+  // Define supported paths for this provider
+  readonly SUPPORTED_PATHS = [LITELLM_PATHS.CHAT_COMPLETIONS] as const;
+
+  constructor() {
     super();
     // Base URL of the LiteLLM Proxy
-    this.baseURL = process.env.LITELLM_BASE_URL || "http://localhost:4000";
+    this.baseURL = process.env.LITELLM_BASE_URL || 'http://localhost:4000';
   }
 
   /**
@@ -45,18 +43,18 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
   async forwardRequest(
     apiKey: string | null, // Can be null if provider doesn't require API key
     apiPath: string,
-    method: string = "POST",
+    method: string = 'POST',
     requestData?: any,
     isStream: boolean = false
   ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
     try {
       const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       };
 
       // Add Authorization header only if API key is provided
       if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
       // Prepare request data using provider-specific logic
@@ -69,16 +67,16 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
         url: fullUrl,
         data: finalData,
         headers,
-        responseType: isStream ? "stream" : "json",
+        responseType: isStream ? 'stream' : 'json',
       });
 
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      return { 
-        error: errorInfo.message, 
+      return {
+        error: errorInfo.message,
         status: errorInfo.statusCode,
-        details: errorInfo.details 
+        details: errorInfo.details,
       };
     }
   }
@@ -105,13 +103,13 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
         }
       }
     } catch (error) {
-      console.error("Error extracting USD cost from LiteLLM response:", error);
+      console.error('Error extracting USD cost from LiteLLM response:', error);
     }
     return undefined;
   }
 
   /* ------------------------------------------------------------------
-   * Helper utils                                                       
+   * Helper utils
    * ------------------------------------------------------------------ */
 
   /**
@@ -138,7 +136,7 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
       'gpt-4',
       'claude-3-haiku-20240307',
       'claude-3-sonnet-20240229',
-      'gemini-pro'
+      'gemini-pro',
     ];
   }
 
@@ -151,7 +149,7 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
       model: 'gpt-3.5-turbo',
       message: 'Hello, this is a test message.',
       maxTokens: 50,
-      temperature: 0.7
+      temperature: 0.7,
     };
   }
 
@@ -161,23 +159,23 @@ class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
-    
+
     if (endpoint === LITELLM_PATHS.CHAT_COMPLETIONS) {
       // Extract normalized options and map to API parameter names
       const { maxTokens, message, messages, ...rest } = options;
-      
+
       return {
         model: options.model || defaults.model,
         messages: messages || [{ role: 'user', content: message || defaults.message }],
         max_tokens: maxTokens || defaults.maxTokens,
         temperature: options.temperature ?? defaults.temperature,
         stream: options.stream || false,
-        ...rest  // Include any additional options (like user, metadata, tags)
+        ...rest, // Include any additional options (like user, metadata, tags)
       };
     }
-    
+
     throw new Error(`Unknown endpoint for LiteLLM service: ${endpoint}`);
   }
 }
 
-export default LiteLLMService; 
+export default LiteLLMService;

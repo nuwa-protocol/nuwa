@@ -20,7 +20,7 @@ describe('Provider Registry Unit Tests', () => {
   describe('Provider Registration', () => {
     it('should register provider with API key value directly', () => {
       const provider = new OpenAIProvider();
-      
+
       providerManager.register({
         name: 'test-provider',
         instance: provider,
@@ -28,7 +28,7 @@ describe('Provider Registry Unit Tests', () => {
         supportsNativeUsdCost: false,
         apiKey: 'sk-test-12345',
         baseUrl: 'https://api.test.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       expect(providerManager.has('test-provider')).toBe(true);
@@ -39,14 +39,14 @@ describe('Provider Registry Unit Tests', () => {
     it('should list all registered providers', () => {
       const provider1 = new OpenAIProvider();
       const provider2 = new OpenAIProvider();
-      
+
       providerManager.register({
         name: 'provider-1',
         instance: provider1,
         requiresApiKey: false,
         supportsNativeUsdCost: false,
         baseUrl: 'https://api.test1.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       providerManager.register({
@@ -56,7 +56,7 @@ describe('Provider Registry Unit Tests', () => {
         supportsNativeUsdCost: false,
         apiKey: 'sk-test-key',
         baseUrl: 'https://api.test2.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       const providers = providerManager.list();
@@ -69,7 +69,7 @@ describe('Provider Registry Unit Tests', () => {
   describe('API Key Management', () => {
     it('should get cached API key from registry', () => {
       const provider = new OpenAIProvider();
-      
+
       providerManager.register({
         name: 'test-provider-2',
         instance: provider,
@@ -77,7 +77,7 @@ describe('Provider Registry Unit Tests', () => {
         supportsNativeUsdCost: false,
         apiKey: 'sk-test-67890',
         baseUrl: 'https://api.test.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       const apiKey = providerManager.getProviderApiKey('test-provider-2');
@@ -86,14 +86,14 @@ describe('Provider Registry Unit Tests', () => {
 
     it('should return null for providers that do not require API key', () => {
       const provider = new OpenAIProvider();
-      
+
       providerManager.register({
         name: 'no-key-provider',
         instance: provider,
         requiresApiKey: false,
         supportsNativeUsdCost: false,
         baseUrl: 'https://api.test.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       const apiKey = providerManager.getProviderApiKey('no-key-provider');
@@ -102,7 +102,7 @@ describe('Provider Registry Unit Tests', () => {
 
     it('should throw error when getting API key for provider that requires key but has none', () => {
       const provider = new OpenAIProvider();
-      
+
       // Register provider without API key
       providerManager.register({
         name: 'missing-key-provider',
@@ -111,7 +111,7 @@ describe('Provider Registry Unit Tests', () => {
         supportsNativeUsdCost: false,
         // apiKey not provided
         baseUrl: 'https://api.test.com',
-        allowedPaths: ['/v1/*']
+        allowedPaths: ['/v1/*'],
       });
 
       // Should throw when trying to get API key

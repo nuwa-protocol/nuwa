@@ -1,12 +1,12 @@
-import axios, { AxiosResponse } from "axios";
-import { BaseLLMProvider } from "./BaseLLMProvider.js";
-import { TestableLLMProvider } from "./LLMProvider.js";
-import { validateToolConfig } from "../config/responseApiTools.js";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { OpenAIUsageExtractor } from "../billing/usage/providers/OpenAIUsageExtractor.js";
-import { OpenAIStreamProcessor } from "../billing/usage/providers/OpenAIStreamProcessor.js";
-import { OPENAI_PATHS } from "./constants.js";
+import axios, { AxiosResponse } from 'axios';
+import { BaseLLMProvider } from './BaseLLMProvider.js';
+import { TestableLLMProvider } from './LLMProvider.js';
+import { validateToolConfig } from '../config/responseApiTools.js';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { OpenAIUsageExtractor } from '../billing/usage/providers/OpenAIUsageExtractor.js';
+import { OpenAIStreamProcessor } from '../billing/usage/providers/OpenAIStreamProcessor.js';
+import { OPENAI_PATHS } from './constants.js';
 
 /**
  * OpenAI Provider Implementation
@@ -15,19 +15,16 @@ import { OPENAI_PATHS } from "./constants.js";
  */
 export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
-  
+
   // Provider name
   readonly providerName = 'openai';
-  
+
   // Define supported paths for this provider
-  readonly SUPPORTED_PATHS = [
-    OPENAI_PATHS.CHAT_COMPLETIONS,
-    OPENAI_PATHS.RESPONSES
-  ] as const;
+  readonly SUPPORTED_PATHS = [OPENAI_PATHS.CHAT_COMPLETIONS, OPENAI_PATHS.RESPONSES] as const;
 
   constructor() {
     super();
-    this.baseURL = process.env.OPENAI_BASE_URL || "https://api.openai.com";
+    this.baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com';
   }
 
   /**
@@ -44,22 +41,21 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
     // Response API automatically includes usage, so we don't inject stream_options
     // We detect Response API by presence of 'input' field (instead of 'messages')
     const isResponseAPI = !!data.input;
-    
+
     if (isStream && !isResponseAPI) {
       // Chat Completions API - inject stream_options for usage tracking
       return {
         ...data,
         stream_options: {
           include_usage: true,
-          ...(data.stream_options || {})
-        }
+          ...(data.stream_options || {}),
+        },
       };
     }
-    
+
     // For Response API or non-streaming requests, return data as-is
     return { ...data };
   }
-
 
   /**
    * Forward request to OpenAI API
@@ -67,18 +63,18 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
   async forwardRequest(
     apiKey: string | null,
     path: string,
-    method: string = "POST",
+    method: string = 'POST',
     data?: any,
     isStream: boolean = false
   ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
     try {
       const headers: Record<string, string> = {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       };
 
       // Add Authorization header only if API key is provided
       if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
       // Prepare request data using provider-specific logic
@@ -92,16 +88,16 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
         url: fullUrl,
         data: finalData,
         headers,
-        responseType: isStream ? "stream" : "json",
+        responseType: isStream ? 'stream' : 'json',
       });
 
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
-      return { 
-        error: errorInfo.message, 
+      return {
+        error: errorInfo.message,
         status: errorInfo.statusCode,
-        details: errorInfo.details
+        details: errorInfo.details,
       };
     }
   }
@@ -114,7 +110,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
   parseResponse(response: AxiosResponse): any {
     try {
       const data = response.data;
-      
+
       // Detect Response API vs Chat Completions API by response structure
       if (this.isResponseAPIResponse(data)) {
         return this.parseResponseAPIResponse(data);
@@ -122,7 +118,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
         return this.parseChatCompletionResponse(data);
       }
     } catch (error) {
-      console.error("Error parsing OpenAI response:", error);
+      console.error('Error parsing OpenAI response:', error);
       return null;
     }
   }
@@ -132,8 +128,8 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   private isResponseAPIResponse(data: any): boolean {
     return !!(
-      data && 
-      typeof data === 'object' && 
+      data &&
+      typeof data === 'object' &&
       (data.object === 'response' || data.output || data.metadata)
     );
   }
@@ -147,15 +143,15 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
 
     if (normalized.usage) {
       const usage = normalized.usage;
-      
+
       // Keep the original usage structure for proper cost calculation
       // Don't modify tokens here - let UsagePolicy handle the cost calculation
-      
+
       // Extract tool call counts if available in the response
       if (!usage.tool_calls_count && this.hasToolCalls(data)) {
         usage.tool_calls_count = this.extractToolCallCounts(data);
       }
-      
+
       normalized.usage = usage;
     }
 
@@ -179,7 +175,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   private extractToolCallCounts(data: any): Record<string, number> {
     const counts: Record<string, number> = {};
-    
+
     // Extract from choices
     if (data.choices) {
       for (const choice of data.choices) {
@@ -192,7 +188,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
         }
       }
     }
-    
+
     // Extract from direct tool_calls array
     if (data.tool_calls) {
       for (const toolCall of data.tool_calls) {
@@ -201,7 +197,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
         }
       }
     }
-    
+
     return counts;
   }
 
@@ -235,7 +231,6 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
     return new OpenAIStreamProcessor(model, initialCost);
   }
 
-
   /**
    * Get test models for OpenAI provider
    * Implementation of TestableLLMProvider interface
@@ -253,7 +248,7 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
       model: 'gpt-3.5-turbo',
       message: 'Hello, this is a test message.',
       maxTokens: 50,
-      temperature: 0.7
+      temperature: 0.7,
     };
   }
 
@@ -263,34 +258,34 @@ export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
-    
+
     if (endpoint === OPENAI_PATHS.CHAT_COMPLETIONS) {
       // Extract normalized options and map to API parameter names
       const { maxTokens, message, messages, ...rest } = options;
-      
+
       return {
         model: options.model || defaults.model,
         messages: messages || [{ role: 'user', content: message || defaults.message }],
         max_tokens: maxTokens || defaults.maxTokens,
         temperature: options.temperature ?? defaults.temperature,
         stream: options.stream || false,
-        ...rest  // Include any additional options (like tools)
+        ...rest, // Include any additional options (like tools)
       };
     }
-    
+
     if (endpoint === OPENAI_PATHS.RESPONSES) {
       // Extract normalized options and map to API parameter names
       const { maxTokens, message, ...rest } = options;
-      
+
       return {
         model: options.model || 'gpt-4o-mini',
         input: options.input || message || defaults.message,
         max_output_tokens: maxTokens || defaults.maxTokens,
         stream: options.stream || false,
-        ...rest  // Include any additional options (like tools)
+        ...rest, // Include any additional options (like tools)
       };
     }
-    
+
     throw new Error(`Unknown endpoint for OpenAI provider: ${endpoint}`);
   }
 }

@@ -45,25 +45,31 @@ export class DefaultUsageExtractor extends BaseUsageExtractor {
   extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         // Handle Response API format: event: response.completed
         if (trimmed.startsWith('event: response.completed')) {
           const result = this.extractResponseAPIFromStream(lines, line);
           if (result) {
-            console.log('[DefaultUsageExtractor] Extracted Response API usage from stream:', result.usage);
+            console.log(
+              '[DefaultUsageExtractor] Extracted Response API usage from stream:',
+              result.usage
+            );
             return result;
           }
           continue;
         }
-        
+
         // Handle Chat Completions API format: data: {...usage...}
         if (trimmed.startsWith('data: ') && trimmed.includes('"usage"')) {
           const result = this.extractChatCompletionsFromStream(trimmed);
           if (result) {
-            console.log('[DefaultUsageExtractor] Extracted Chat Completions usage from stream:', result.usage);
+            console.log(
+              '[DefaultUsageExtractor] Extracted Chat Completions usage from stream:',
+              result.usage
+            );
             return result;
           }
         }
@@ -72,14 +78,17 @@ export class DefaultUsageExtractor extends BaseUsageExtractor {
       console.error('[DefaultUsageExtractor] Error extracting usage from stream chunk:', error);
       console.error('Chunk text:', chunkText.slice(0, 200));
     }
-    
+
     return null;
   }
 
   /**
    * Extract Response API usage from streaming data
    */
-  private extractResponseAPIFromStream(lines: string[], currentLine: string): { usage: UsageInfo; cost?: number } | null {
+  private extractResponseAPIFromStream(
+    lines: string[],
+    currentLine: string
+  ): { usage: UsageInfo; cost?: number } | null {
     // Look for the next data line
     const nextLineIndex = lines.indexOf(currentLine) + 1;
     if (nextLineIndex < lines.length) {
@@ -91,14 +100,14 @@ export class DefaultUsageExtractor extends BaseUsageExtractor {
           // Response API: usage is at data.response.usage
           if (data.response && data.response.usage) {
             const result: { usage: UsageInfo; cost?: number } = {
-              usage: this.extractUsageFromStreamData(data.response.usage)
+              usage: this.extractUsageFromStreamData(data.response.usage),
             };
-            
+
             // Check for cost information
             if (typeof data.response.usage.cost === 'number') {
               result.cost = data.response.usage.cost;
             }
-            
+
             return result;
           }
         } catch (parseError) {
@@ -112,29 +121,31 @@ export class DefaultUsageExtractor extends BaseUsageExtractor {
   /**
    * Extract Chat Completions usage from streaming data
    */
-  private extractChatCompletionsFromStream(trimmed: string): { usage: UsageInfo; cost?: number } | null {
+  private extractChatCompletionsFromStream(
+    trimmed: string
+  ): { usage: UsageInfo; cost?: number } | null {
     const dataStr = trimmed.slice(6); // Remove 'data: ' prefix
     if (dataStr === '[DONE]') return null;
-    
+
     try {
       const data = JSON.parse(dataStr);
       // Chat Completions API: usage is at root level
       if (data.usage) {
         const result: { usage: UsageInfo; cost?: number } = {
-          usage: this.extractUsageFromStreamData(data.usage)
+          usage: this.extractUsageFromStreamData(data.usage),
         };
-        
+
         // Check for cost information
         if (typeof data.usage.cost === 'number') {
           result.cost = data.usage.cost;
         }
-        
+
         return result;
       }
     } catch (parseError) {
       console.error('[DefaultUsageExtractor] Error parsing Chat Completions data:', parseError);
     }
-    
+
     return null;
   }
 }

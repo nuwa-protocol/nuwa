@@ -27,7 +27,7 @@ createProviderTestSuite('litellm', () => {
     apiKey = TestEnv.getProviderApiKey('litellm')!;
     baseUrl = TestEnv.getProviderBaseUrl('litellm')!;
     testUtils = new LiteLLMTestUtils(provider, apiKey);
-    
+
     console.log(`Testing LiteLLM at: ${baseUrl}`);
   });
 
@@ -36,7 +36,7 @@ createProviderTestSuite('litellm', () => {
       const result = await testUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       const validation: BaseTestValidation = {
@@ -49,7 +49,7 @@ createProviderTestSuite('litellm', () => {
       };
 
       const validationResult = testUtils.validateResponse(result, validation);
-      
+
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
         console.error('Test result:', result);
@@ -79,13 +79,13 @@ createProviderTestSuite('litellm', () => {
       expect(typeof result.response.content).toBe('string');
       expect(result.response.content.length).toBeGreaterThan(0);
       expect(result.duration).toBeLessThan(30000); // 30 seconds max
-      
+
       // LiteLLM should provide usage information in streaming mode
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
         expect(result.usage.completionTokens).toBeGreaterThan(0);
       }
-      
+
       // LiteLLM should provide cost information
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ createProviderTestSuite('litellm', () => {
 
     it('should support different models', async () => {
       const models = provider.getTestModels();
-      
+
       for (const model of models) {
         // Add delay between requests to avoid rate limiting
         if (models.indexOf(model) > 0) {
@@ -127,12 +127,12 @@ createProviderTestSuite('litellm', () => {
       const result = await testUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       expect(result.success).toBe(true);
       expect(result.usage).toBeDefined();
-      
+
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
         expect(result.usage.completionTokens).toBeGreaterThan(0);
@@ -150,7 +150,7 @@ createProviderTestSuite('litellm', () => {
       });
 
       expect(result.success).toBe(true);
-      
+
       // LiteLLM might provide usage information in streaming mode
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
@@ -167,11 +167,11 @@ createProviderTestSuite('litellm', () => {
       const result = await testUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       expect(result.success).toBe(true);
-      
+
       // LiteLLM provides cost information via x-litellm-response-cost header
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
@@ -188,7 +188,7 @@ createProviderTestSuite('litellm', () => {
       });
 
       expect(result.success).toBe(true);
-      
+
       // LiteLLM might provide cost information in streaming mode
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
@@ -198,37 +198,39 @@ createProviderTestSuite('litellm', () => {
 
     it('should calculate cost accuracy for different pricing tiers', async () => {
       const testModel = 'gpt-3.5-turbo';
-      const result = await testUtils.testChatCompletion({ 
+      const result = await testUtils.testChatCompletion({
         model: testModel,
         messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        max_tokens: 50
+        max_tokens: 50,
       });
-      
+
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
       expect(result.usage).toBeDefined();
-      
+
       if (result.cost && result.usage) {
         // Get pricing from configuration
         const pricing = pricingRegistry.getProviderPricing('litellm', testModel);
-        
+
         if (pricing) {
           // Calculate expected cost based on configuration pricing
-          const expectedCost = (
-            (result.usage.promptTokens * pricing.promptPerMTokUsd) +
-            (result.usage.completionTokens * pricing.completionPerMTokUsd)
-          ) / 1000000; // Convert from per-million-tokens to per-token
-          
+          const expectedCost =
+            (result.usage.promptTokens * pricing.promptPerMTokUsd +
+              result.usage.completionTokens * pricing.completionPerMTokUsd) /
+            1000000; // Convert from per-million-tokens to per-token
+
           // Allow reasonable tolerance for rounding differences
           const tolerance = 0.3; // 30% tolerance
           const actualCost = result.cost.costUsd;
           const difference = Math.abs(actualCost - expectedCost);
           const percentDifference = difference / expectedCost;
-          
+
           if (percentDifference > tolerance) {
-            console.log(`Cost difference: expected=${expectedCost}, actual=${actualCost}, diff=${percentDifference * 100}%`);
+            console.log(
+              `Cost difference: expected=${expectedCost}, actual=${actualCost}, diff=${percentDifference * 100}%`
+            );
           }
-          
+
           expect(percentDifference).toBeLessThanOrEqual(tolerance);
         }
       }
@@ -244,7 +246,7 @@ createProviderTestSuite('litellm', () => {
       };
 
       const preparedData = provider.prepareRequestData(originalData, false);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.model).toBe(originalData.model);
       expect(preparedData.messages).toEqual(originalData.messages);
@@ -259,7 +261,7 @@ createProviderTestSuite('litellm', () => {
       };
 
       const preparedData = provider.prepareRequestData(originalData, true);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.model).toBe(originalData.model);
       expect(preparedData.messages).toEqual(originalData.messages);
@@ -272,11 +274,11 @@ createProviderTestSuite('litellm', () => {
         messages: [{ role: 'user', content: 'Hello' }],
         metadata: { user_id: 'test-user' },
         tags: ['integration-test'],
-        user: 'test-user'
+        user: 'test-user',
       };
 
       const preparedData = provider.prepareRequestData(originalData, false);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.metadata).toEqual(originalData.metadata);
       expect(preparedData.tags).toEqual(originalData.tags);
@@ -318,11 +320,11 @@ createProviderTestSuite('litellm', () => {
       const result = await testUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       expect(result.success).toBe(true);
-      
+
       // LiteLLM provides cost information via x-litellm-response-cost header
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);

@@ -30,7 +30,7 @@ describe('Error Logging Improvements', () => {
       // Verify error is returned
       expect(result).toHaveProperty('error');
       expect(result).toHaveProperty('status');
-      
+
       if ('error' in result) {
         // Should have details
         expect(result).toHaveProperty('details');
@@ -39,18 +39,17 @@ describe('Error Logging Improvements', () => {
 
       // Verify enhanced logging was called
       expect(consoleErrorSpy).toHaveBeenCalled();
-      
+
       // Check that detailed error info was logged
       const errorCalls = consoleErrorSpy.mock.calls;
-      const hasDetailedLog = errorCalls.some(call => 
-        call[0].includes('Error details') || call[0].includes('Full OpenAI error response')
+      const hasDetailedLog = errorCalls.some(
+        call => call[0].includes('Error details') || call[0].includes('Full OpenAI error response')
       );
-      
+
       console.log('Number of error log calls:', errorCalls.length);
       errorCalls.forEach((call, i) => {
         console.log(`Log ${i}:`, call[0]);
       });
-
     } finally {
       consoleErrorSpy.mockRestore();
     }
@@ -66,21 +65,20 @@ describe('Error Logging Improvements', () => {
         'POST',
         {
           model: 'gpt-4',
-          messages: [{ role: 'user', content: 'test' }]
+          messages: [{ role: 'user', content: 'test' }],
         },
         false
       );
 
       // Check that request info was logged
       const errorCalls = consoleErrorSpy.mock.calls;
-      const hasRequestInfo = errorCalls.some(call => 
-        call[0].includes('Request info') || call[0].includes('📤')
+      const hasRequestInfo = errorCalls.some(
+        call => call[0].includes('Request info') || call[0].includes('📤')
       );
 
       if (hasRequestInfo) {
         console.log('✅ Request information is logged');
       }
-
     } finally {
       consoleErrorSpy.mockRestore();
     }
@@ -97,15 +95,15 @@ describe('Error Logging Improvements', () => {
         param: 'input',
         statusText: 'Bad Request',
         headers: {
-          'x-request-id': 'req_123abc'
+          'x-request-id': 'req_123abc',
         },
         rawError: {
           message: 'Invalid request parameters',
           code: 'invalid_request_error',
           type: 'invalid_request_error',
-          param: 'input'
-        }
-      }
+          param: 'input',
+        },
+      },
     };
 
     // Verify structure
@@ -120,4 +118,3 @@ describe('Error Logging Improvements', () => {
     console.log('Mock error response structure:', JSON.stringify(mockErrorResponse, null, 2));
   });
 });
-

@@ -13,7 +13,7 @@ describe('ProviderManager Integration Tests', () => {
 
   beforeAll(() => {
     TestEnv.logStatus();
-    
+
     // Skip entire test suite if integration tests should be skipped
     if (TestEnv.shouldSkipIntegrationTests()) {
       console.log('Skipping ProviderManager integration tests (SKIP_INTEGRATION_TESTS=true)');
@@ -28,12 +28,14 @@ describe('ProviderManager Integration Tests', () => {
     it('should register providers based on environment configuration', () => {
       // Skip this test if integration tests should be skipped
       if (TestEnv.shouldSkipIntegrationTests()) {
-        console.log('Skipping environment-based provider registration test (SKIP_INTEGRATION_TESTS=true)');
+        console.log(
+          'Skipping environment-based provider registration test (SKIP_INTEGRATION_TESTS=true)'
+        );
         return;
       }
 
       const result = providerManager.initializeProviders({ skipEnvCheck: false });
-      
+
       expect(result).toBeDefined();
       expect(result.registered).toBeDefined();
       expect(result.skipped).toBeDefined();
@@ -52,7 +54,7 @@ describe('ProviderManager Integration Tests', () => {
 
     it('should register all providers when skipping env check', () => {
       const result = providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       expect(result.registered).toContain('openai');
       expect(result.registered).toContain('openrouter');
       expect(result.registered).toContain('litellm');
@@ -61,7 +63,7 @@ describe('ProviderManager Integration Tests', () => {
 
     it('should handle provider configuration correctly', () => {
       providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       const openaiConfig = providerManager.get('openai');
       expect(openaiConfig).toBeDefined();
       expect(openaiConfig?.name).toBe('openai');
@@ -92,7 +94,7 @@ describe('ProviderManager Integration Tests', () => {
 
     it('should list all registered providers', () => {
       const providers = providerManager.list();
-      
+
       expect(providers).toContain('openai');
       expect(providers).toContain('openrouter');
       expect(providers).toContain('litellm');
@@ -132,32 +134,32 @@ describe('ProviderManager Integration Tests', () => {
   describe('Provider Management', () => {
     it('should allow unregistering providers', () => {
       providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       expect(providerManager.has('openai')).toBe(true);
-      
+
       const unregistered = providerManager.unregister('openai');
       expect(unregistered).toBe(true);
       expect(providerManager.has('openai')).toBe(false);
-      
+
       const unregisteredAgain = providerManager.unregister('openai');
       expect(unregisteredAgain).toBe(false);
     });
 
     it('should allow clearing all providers', () => {
       providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       expect(providerManager.list().length).toBeGreaterThan(0);
-      
+
       providerManager.clear();
       expect(providerManager.list().length).toBe(0);
     });
 
     it('should allow getting all configurations', () => {
       providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       const configs = providerManager.getAllConfigs();
       expect(configs.length).toBeGreaterThan(0);
-      
+
       const providerNames = configs.map(c => c.name);
       expect(providerNames).toContain('openai');
       expect(providerNames).toContain('openrouter');
@@ -175,10 +177,10 @@ describe('ProviderManager Integration Tests', () => {
       });
 
       expect(routeHandler).toBeDefined();
-      
+
       // Initialize providers
       providerManager.initializeProviders({ skipEnvCheck: true });
-      
+
       // Test that RouteHandler can access providers
       const openaiProvider = providerManager.getProvider('openai');
       expect(openaiProvider).toBeDefined();
@@ -233,7 +235,7 @@ describe('ProviderManager Integration Tests', () => {
       }
 
       const enabledProviders = TestEnv.getEnabledProviders();
-      
+
       if (enabledProviders.length === 0) {
         console.log('No providers enabled for testing');
         return;
@@ -241,27 +243,26 @@ describe('ProviderManager Integration Tests', () => {
 
       // Initialize with real environment
       const result = providerManager.initializeProviders({ skipEnvCheck: false });
-      
+
       for (const enabledProvider of enabledProviders) {
         expect(result.registered).toContain(enabledProvider.name);
-        
+
         const provider = providerManager.getProvider(enabledProvider.name);
         expect(provider).toBeDefined();
-        
+
         const apiKey = providerManager.getProviderApiKey(enabledProvider.name);
         expect(apiKey).toBeDefined();
-        
+
         console.log(`✅ Provider ${enabledProvider.name} is properly configured`);
       }
     });
-
   });
 
   describe('Singleton Behavior', () => {
     it('should maintain singleton instance', () => {
       const instance1 = ProviderManager.getInstance();
       const instance2 = ProviderManager.getInstance();
-      
+
       expect(instance1).toBe(instance2);
     });
 
@@ -269,7 +270,7 @@ describe('ProviderManager Integration Tests', () => {
       const testInstance1 = ProviderManager.createTestInstance();
       const testInstance2 = ProviderManager.createTestInstance();
       const singletonInstance = ProviderManager.getInstance();
-      
+
       expect(testInstance1).not.toBe(testInstance2);
       expect(testInstance1).not.toBe(singletonInstance);
       expect(testInstance2).not.toBe(singletonInstance);

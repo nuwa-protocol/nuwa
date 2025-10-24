@@ -34,7 +34,7 @@
       "description": "Claude Haiku 4.5 - Latest fast and efficient model"
     },
     "claude-3-5-haiku-20241022": {
-      "promptPerMTokUsd": 0.80,
+      "promptPerMTokUsd": 0.8,
       "completionPerMTokUsd": 4.0,
       "description": "Claude 3.5 Haiku - Fast and efficient model"
     },

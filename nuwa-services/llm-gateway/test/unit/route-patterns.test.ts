@@ -12,7 +12,7 @@ describe('Route Patterns Unit Tests', () => {
         '/openrouter/api/v1/chat/completions',
         '/litellm/api/v1/chat/completions',
         '/openai/v1/embeddings',
-        '/claude/v1/messages'
+        '/claude/v1/messages',
       ];
 
       // In a real Express app, these would be handled by the router
@@ -30,18 +30,18 @@ describe('Route Patterns Unit Tests', () => {
         {
           route: '/openai/v1/chat/completions',
           expectedProvider: 'openai',
-          expectedPath: '/v1/chat/completions'
+          expectedPath: '/v1/chat/completions',
         },
         {
           route: '/openrouter/api/v1/models',
           expectedProvider: 'openrouter',
-          expectedPath: '/api/v1/models'
+          expectedPath: '/api/v1/models',
         },
         {
           route: '/claude/v1/messages',
           expectedProvider: 'claude',
-          expectedPath: '/v1/messages'
-        }
+          expectedPath: '/v1/messages',
+        },
       ];
 
       testCases.forEach(({ route, expectedProvider, expectedPath }) => {

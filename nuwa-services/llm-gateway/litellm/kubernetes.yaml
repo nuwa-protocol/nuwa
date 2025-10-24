@@ -26,25 +26,25 @@ spec:
         app: litellm
     spec:
       containers:
-      - name: litellm
-        image: ghcr.io/berriai/litellm:main-latest
-        args:
-        - "--config"
-        - "/app/config.yaml"
-        - "--detailed_debug"
-        ports:
-        - containerPort: 4000
-        envFrom:
-        - secretRef:
-            name: litellm-env
-        volumeMounts:
-        - name: config-volume
-          mountPath: /app/config.yaml
-          subPath: config.yaml
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-latest
+          args:
+            - '--config'
+            - '/app/config.yaml'
+            - '--detailed_debug'
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - secretRef:
+                name: litellm-env
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config.yaml
+              subPath: config.yaml
       volumes:
-      - name: config-volume
-        configMap:
-          name: litellm-config
+        - name: config-volume
+          configMap:
+            name: litellm-config
 ---
 apiVersion: v1
 kind: Service
@@ -56,10 +56,10 @@ spec:
   selector:
     app: litellm
   ports:
-  - port: 4000
-    targetPort: 4000
-    protocol: TCP
-    name: http
+    - port: 4000
+      targetPort: 4000
+      protocol: TCP
+      name: http
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -67,21 +67,21 @@ metadata:
   name: litellm-ingress
   namespace: nuwa
   annotations:
-    kubernetes.io/ingress.global-static-ip-name: "litellm-ingress-static-ip" 
-    kubernetes.io/ingress.class: "gce"
-    networking.gke.io/managed-certificates: "litellm-cert"
+    kubernetes.io/ingress.global-static-ip-name: 'litellm-ingress-static-ip'
+    kubernetes.io/ingress.class: 'gce'
+    networking.gke.io/managed-certificates: 'litellm-cert'
 spec:
   rules:
-  - host: litellm.nuwa.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: litellm-service
-            port: 
-              number: 4000
+    - host: litellm.nuwa.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: litellm-service
+                port:
+                  number: 4000
 ---
 apiVersion: networking.gke.io/v1
 kind: ManagedCertificate
@@ -90,4 +90,4 @@ metadata:
   namespace: nuwa
 spec:
   domains:
-  - litellm.nuwa.dev
+    - litellm.nuwa.dev

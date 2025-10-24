@@ -51,8 +51,10 @@ export class CostCalculator {
       provider,
       model,
       providerCostUsd,
-      usage: usage ? `${usage.promptTokens}p + ${usage.completionTokens}c = ${usage.totalTokens}t` : 'undefined',
-      toolCalls: toolCalls ? Object.keys(toolCalls).length + ' tools' : 'none'
+      usage: usage
+        ? `${usage.promptTokens}p + ${usage.completionTokens}c = ${usage.totalTokens}t`
+        : 'undefined',
+      toolCalls: toolCalls ? Object.keys(toolCalls).length + ' tools' : 'none',
     });
 
     // Prefer provider-supplied cost if available
@@ -69,7 +71,7 @@ export class CostCalculator {
     // Fallback to gateway pricing calculation with provider-specific pricing
     if (usage && (usage.promptTokens || usage.completionTokens)) {
       console.log(`📊 [CostCalculator] Using gateway pricing for: ${provider}/${model}`);
-      
+
       // 1. Calculate model token cost using provider-specific pricing
       const modelCostResult = pricingRegistry.calculateProviderCost(provider, model, usage);
       const modelCost = modelCostResult?.costUsd || 0;
@@ -81,7 +83,9 @@ export class CostCalculator {
           if (typeof callCount === 'number' && callCount > 0) {
             const cost = calculateToolCallCost(toolName, callCount);
             toolCallCost += cost;
-            console.log(`💰 [CostCalculator] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`);
+            console.log(
+              `💰 [CostCalculator] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`
+            );
           }
         }
       }
@@ -90,7 +94,9 @@ export class CostCalculator {
       const totalCost = modelCost + toolCallCost;
 
       if (modelCostResult) {
-        console.log(`💰 [CostCalculator] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
+        console.log(
+          `💰 [CostCalculator] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`
+        );
         const finalCost = this.applyMultiplier(totalCost);
         if (finalCost !== undefined) {
           return {
@@ -147,7 +153,7 @@ export class CostCalculator {
 
     // Calculate tool call costs
     let toolCallCost = 0;
-    
+
     // 1. Priority: Use pre-extracted tool_calls_count from usage object
     //    (e.g., OpenAI Provider sets this during response preparation)
     if (usage.tool_calls_count) {
@@ -176,7 +182,9 @@ export class CostCalculator {
     // Total cost
     const totalCost = modelCost + toolCallCost;
 
-    console.log(`💰 [CostCalculator] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
+    console.log(
+      `💰 [CostCalculator] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`
+    );
 
     return {
       costUsd: this.applyMultiplier(totalCost)!,
@@ -211,27 +219,29 @@ export class CostCalculator {
   private static extractResponseAPIUsage(usage: any): UsageInfo {
     const baseInputTokens = usage.input_tokens || 0;
     const baseOutputTokens = usage.output_tokens || 0;
-    
+
     // Extract tool-related tokens dynamically
     let toolTokens = 0;
     const keys = Object.keys(usage);
-    
+
     for (const key of keys) {
-      if (key.endsWith('_tokens') && 
-          key !== 'input_tokens' && 
-          key !== 'output_tokens' && 
-          key !== 'total_tokens') {
+      if (
+        key.endsWith('_tokens') &&
+        key !== 'input_tokens' &&
+        key !== 'output_tokens' &&
+        key !== 'total_tokens'
+      ) {
         const tokenValue = usage[key];
         if (typeof tokenValue === 'number' && tokenValue > 0) {
           toolTokens += tokenValue;
         }
       }
     }
-    
+
     const promptTokens = baseInputTokens + toolTokens;
     const completionTokens = baseOutputTokens;
-    const totalTokens = usage.total_tokens || (promptTokens + completionTokens);
-    
+    const totalTokens = usage.total_tokens || promptTokens + completionTokens;
+
     return {
       promptTokens,
       completionTokens,
@@ -246,7 +256,8 @@ export class CostCalculator {
     return {
       promptTokens: usage.prompt_tokens || 0,
       completionTokens: usage.completion_tokens || 0,
-      totalTokens: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+      totalTokens:
+        usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
     };
   }
 
@@ -255,7 +266,7 @@ export class CostCalculator {
    */
   private static parseToolCallsFromOutput(responseBody: any): ToolCallCounts {
     const toolCalls: ToolCallCounts = {};
-    
+
     try {
       // Check if response has output array
       if (!responseBody?.output || !Array.isArray(responseBody.output)) {
@@ -266,7 +277,7 @@ export class CostCalculator {
       for (const outputItem of responseBody.output) {
         if (outputItem && typeof outputItem === 'object' && outputItem.type) {
           const toolType = outputItem.type;
-          
+
           // Skip text outputs, only count actual tool calls
           if (toolType !== 'text' && toolType !== 'message') {
             const currentCount = (toolCalls as any)[toolType] || 0;
@@ -278,7 +289,7 @@ export class CostCalculator {
     } catch (error) {
       console.error('❌ [CostCalculator] Error parsing tool calls from output:', error);
     }
-    
+
     return toolCalls;
   }
 }

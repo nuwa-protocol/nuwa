@@ -40,13 +40,15 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
   /**
    * Instance method: Test chat completion
    */
-  async testChatCompletion(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testChatCompletion(
+    config: Partial<OpenRouterChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
-      ...config
+      ...config,
     };
     return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -54,14 +56,16 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
   /**
    * Instance method: Test streaming chat completion
    */
-  async testStreamingChatCompletion(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testStreamingChatCompletion(
+    config: Partial<OpenRouterChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
       stream: true,
-      ...config
+      ...config,
     };
     return this.testStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -69,7 +73,9 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
   /**
    * Instance method: Test chat completion with routing
    */
-  async testChatCompletionWithRouting(config: Partial<OpenRouterChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testChatCompletionWithRouting(
+    config: Partial<OpenRouterChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
@@ -77,7 +83,7 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
       temperature: config.temperature,
       route: 'fallback',
       models: config.models || ['openai/gpt-3.5-turbo', 'anthropic/claude-3-haiku'],
-      ...config
+      ...config,
     };
     return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -85,16 +91,18 @@ export class OpenRouterTestUtils extends BaseProviderTestUtils<OpenRouterService
   /**
    * Instance method: Test chat completion with referer
    */
-  async testChatCompletionWithReferer(config: Partial<OpenRouterChatCompletionConfig> = {}, referer?: string): Promise<BaseTestResult> {
+  async testChatCompletionWithReferer(
+    config: Partial<OpenRouterChatCompletionConfig> = {},
+    referer?: string
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
-      ...config
+      ...config,
     };
     // Note: referer would be handled in headers, not in request body
     return this.testNonStreaming(OPENROUTER_PATHS.CHAT_COMPLETIONS, options);
   }
-
 }

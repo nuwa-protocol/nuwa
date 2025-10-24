@@ -2,7 +2,8 @@
 
 ## 问题描述
 
-在流式（streaming）模式下，当后端 provider（如 Claude API）返回错误时，错误信息无法正确传递给前端客户端。客户端只能看到连接中断，但不知道具体的错误原因。
+在流式（streaming）模式下，当后端 provider（如 Claude
+API）返回错误时，错误信息无法正确传递给前端客户端。客户端只能看到连接中断，但不知道具体的错误原因。
 
 ### 问题场景
 
@@ -16,20 +17,23 @@ Client → Gateway (SSE headers sent) → Provider returns 400 error
 
 ```json
 {
-  "status_code": 200,                    // 客户端看到的状态码
-  "upstream_status_code": 400,          // 上游实际返回的错误
-  "content-type": "text/event-stream",   // 响应类型
-  "error_type": "<nil>",                 // 错误类型为空
-  "response body": ""                    // 响应体为空
+  "status_code": 200, // 客户端看到的状态码
+  "upstream_status_code": 400, // 上游实际返回的错误
+  "content-type": "text/event-stream", // 响应类型
+  "error_type": "<nil>", // 错误类型为空
+  "response body": "" // 响应体为空
 }
 ```
 
 ## 根本原因
 
-1. **过早发送 SSE 响应头**：在 `routeHandler.ts` 中，SSE 响应头在调用 provider 之前就已经发送
-2. **错误未传递**：当 `executeStreamRequest` 返回 `result.success === false` 时，错误信息没有正确写入响应流
+1. **过早发送 SSE 响应头**：在 `routeHandler.ts`
+   中，SSE 响应头在调用 provider 之前就已经发送
+2. **错误未传递**：当 `executeStreamRequest` 返回 `result.success === false`
+   时，错误信息没有正确写入响应流
 3. **HTTP 状态码限制**：一旦 SSE 响应头发送（`res.headersSent === true`），就无法再改变 HTTP 状态码
-4. **错误信息提取失败**：Claude API 使用嵌套的错误格式，`BaseLLMProvider.extractErrorInfo` 没有正确处理
+4. **错误信息提取失败**：Claude
+   API 使用嵌套的错误格式，`BaseLLMProvider.extractErrorInfo` 没有正确处理
 
 ### Claude API 错误格式
 
@@ -45,10 +49,12 @@ Client → Gateway (SSE headers sent) → Provider returns 400 error
 ```
 
 之前的代码只从 `data.error` 中提取 `type` 和 `code`，导致：
+
 - `errorType`: `'error'` (外层的 type)
 - `errorCode`: `undefined` (外层没有 code)
 
 正确应该从 `data.error.error` 中提取：
+
 - `errorType`: `'invalid_request_error'`
 - `errorCode`: (如果有的话)
 - `errorMessage`: `'system: text content blocks must be non-empty'`
@@ -64,7 +70,7 @@ Client → Gateway (SSE headers sent) → Provider returns 400 error
 ```typescript
 protected async normalizeErrorData(data: any): Promise<any> {
   // ... Buffer 和 Stream 处理 ...
-  
+
   // Handle String (try to parse as JSON)
   if (typeof data === 'string') {
     try {
@@ -73,7 +79,7 @@ protected async normalizeErrorData(data: any): Promise<any> {
       return data; // Return as-is if not valid JSON
     }
   }
-  
+
   // Already normalized (Object)
   return data;
 }
@@ -90,27 +96,28 @@ if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
   // 1. Claude format: { type: "error", error: { type, message }, request_id }
   // 2. OpenAI format: { error: { message, code, type } }
   // 3. Direct format: { message, code, type }
-  
+
   let errorObj = data.error || data;
-  let errorMessage = errorObj.message || `Error response with status ${statusCode}`;
+  let errorMessage =
+    errorObj.message || `Error response with status ${statusCode}`;
   let errorCode = errorObj.code;
   let errorType = errorObj.type;
-  
+
   // Handle Claude's nested error structure
   if (data.type === 'error' && data.error && typeof data.error === 'object') {
     // Claude format: { type: "error", error: { type, message }, request_id }
     errorMessage = data.error.message || errorMessage;
     errorType = data.error.type || errorType;
     errorCode = data.error.code || errorCode;
-    
+
     // Also extract request_id from Claude response
     if (data.request_id && !requestId) {
       details.requestId = data.request_id;
     }
   }
-  
+
   message = errorMessage;
-  
+
   details = {
     code: errorCode,
     type: errorType,
@@ -118,7 +125,7 @@ if (data && typeof data === 'object' && !Buffer.isBuffer(data)) {
     statusText,
     requestId: details.requestId || requestId,
     headers: this.extractRelevantHeaders(headers),
-    rawError: data
+    rawError: data,
   };
 }
 ```
@@ -136,9 +143,9 @@ if ('error' in response) {
     details: response.details,
     errorCode: response.details?.code,
     errorType: response.details?.type,
-    requestId: response.details?.requestId
+    requestId: response.details?.requestId,
   });
-  
+
   return {
     success: false,
     statusCode: response.status || 500,
@@ -147,7 +154,7 @@ if ('error' in response) {
     details: response.details,
     upstreamRequestId: response.details?.requestId,
     errorCode: response.details?.code,
-    errorType: response.details?.type
+    errorType: response.details?.type,
   };
 }
 ```
@@ -168,9 +175,9 @@ if (!result.success) {
     statusCode: result.statusCode,
     upstreamRequestId: result.upstreamRequestId,
     responseWritableEnded: res.writableEnded,
-    responseHeadersSent: res.headersSent
+    responseHeadersSent: res.headersSent,
   });
-  
+
   // 通过 SSE format 发送错误事件给客户端
   if (!res.writableEnded) {
     try {
@@ -180,10 +187,10 @@ if (!result.success) {
           message: result.error || 'Stream request failed',
           type: result.errorType || 'gateway_error',
           code: result.errorCode || 'unknown_error',
-        }
+        },
       };
       const errorData = `event: error\ndata: ${JSON.stringify(errorEvent)}\n\n`;
-      
+
       // ⚠️ 关键：使用 res.end(data) 而不是 res.write() + res.end()
       // PaymentKit 包装了 res.end()，分开调用会导致数据丢失
       res.end(errorData);
@@ -194,7 +201,9 @@ if (!result.success) {
       }
     }
   } else {
-    console.warn('[RouteHandler] Response already ended, cannot send error event');
+    console.warn(
+      '[RouteHandler] Response already ended, cannot send error event'
+    );
   }
   return;
 }
@@ -202,7 +211,8 @@ if (!result.success) {
 
 **重要说明：为什么使用 `res.write()` + `res.end()` 而不是 `res.end(data)`？**
 
-PaymentKit 中间件包装了 `res.end()` 方法来处理计费和 RAV 持久化。其封装逻辑如下：
+PaymentKit 中间件包装了 `res.end()`
+方法来处理计费和 RAV 持久化。其封装逻辑如下：
 
 ```typescript
 // PaymentKit 的 res.end() 包装 (ExpressPaymentKit.ts)
@@ -210,10 +220,10 @@ const originalEnd = res.end.bind(res);
 res.end = (...args) => {
   // 1. 执行计费结算
   const settled = processor.settle(billingContext, units);
-  
+
   // 2. 写入 payment frame (SSE格式)
   res.write(`data: {"nuwa_payment_header": "..."}\n\n`);
-  
+
   // 3. 调用原始的 end()
   return originalEnd(...args);
 };
@@ -222,6 +232,7 @@ res.end = (...args) => {
 **问题分析**：
 
 当我们调用 `res.end(errorData)` 时：
+
 1. PaymentKit 拦截调用
 2. 先执行 `res.write(paymentFrame)` - payment header 被写入
 3. 然后执行 `originalEnd(errorData)` - 错误数据被写入
@@ -231,18 +242,23 @@ res.end = (...args) => {
 **解决方案**：
 
 使用 `res.write(errorData)` + `res.end()` 的方式：
+
 1. 我们先调用 `res.write(errorData)` - 错误数据被写入
 2. 然后调用 `res.end()`
-3. PaymentKit 拦截 `end()`，执行 `res.write(paymentFrame)` - payment frame 被写入
+3. PaymentKit 拦截 `end()`，执行 `res.write(paymentFrame)` - payment
+   frame 被写入
 4. 最后执行 `originalEnd()`
 
 **结果**：错误数据出现在 payment frame 之前，顺序正确。
 
-这个问题通过集成测试得到了验证（见 `test/integration/stream-error-output.test.ts`）：
+这个问题通过集成测试得到了验证（见
+`test/integration/stream-error-output.test.ts`）：
+
 - ✅ 没有 PaymentKit：`res.end(data)` 正常工作
 - ❌ 有 PaymentKit + `res.end(data)`：payment frame 在错误数据前面
 - ✅ 有 PaymentKit + `res.write()` + `res.end()`：顺序正确
-```
+
+````
 
 ## 调试步骤
 
@@ -251,7 +267,7 @@ res.end = (...args) => {
 ```bash
 cd nuwa-services/llm-gateway
 pnpm run dev  # 或 pnpm start
-```
+````
 
 ### 2. 重新测试错误场景
 
@@ -297,7 +313,7 @@ data: {"type":"error","error":{"message":"...","type":"...","code":"..."}}
 ```typescript
 if (!result.success) {
   // ... 记录错误信息到 meta ...
-  
+
   // 通过 SSE format 发送错误事件给客户端
   if (!res.writableEnded) {
     try {
@@ -307,7 +323,7 @@ if (!result.success) {
           message: result.error || 'Stream request failed',
           type: result.errorType || 'gateway_error',
           code: result.errorCode || 'unknown_error',
-        }
+        },
       };
       res.write(`event: error\n`);
       res.write(`data: ${JSON.stringify(errorEvent)}\n\n`);
@@ -315,7 +331,7 @@ if (!result.success) {
       console.error('Failed to write error event:', writeError);
     }
   }
-  
+
   // 结束响应
   if (!res.writableEnded) {
     res.end();
@@ -342,7 +358,7 @@ data: {"type":"error","error":{"message":"system: text content blocks must be no
 const eventSource = new EventSource('/claude/v1/messages');
 
 // 监听错误事件
-eventSource.addEventListener('error', (event) => {
+eventSource.addEventListener('error', event => {
   const errorData = JSON.parse(event.data);
   console.error('Stream error:', errorData.error);
   // 显示错误给用户
@@ -350,7 +366,7 @@ eventSource.addEventListener('error', (event) => {
 });
 
 // 监听数据事件
-eventSource.addEventListener('message', (event) => {
+eventSource.addEventListener('message', event => {
   // 处理正常的流式数据
   const data = JSON.parse(event.data);
   handleStreamData(data);
@@ -370,8 +386,8 @@ const response = await fetch('/claude/v1/messages', {
     model: 'claude-3-5-haiku-20241022',
     max_tokens: 1024,
     messages: [{ role: 'user', content: 'Hello' }],
-    stream: true
-  })
+    stream: true,
+  }),
 });
 
 const reader = response.body.getReader();
@@ -380,10 +396,10 @@ const decoder = new TextDecoder();
 while (true) {
   const { done, value } = await reader.read();
   if (done) break;
-  
+
   const chunk = decoder.decode(value);
   const lines = chunk.split('\n');
-  
+
   for (const line of lines) {
     if (line.startsWith('event: error')) {
       // 下一行是错误数据
@@ -465,4 +481,3 @@ curl -X POST http://localhost:8080/openai/v1/chat/completions \
 2. **错误统计**：收集和分析流式错误的统计数据
 3. **告警系统**：当错误率超过阈值时触发告警
 4. **前端 SDK**：提供封装好的客户端库，简化错误处理
-

@@ -12,14 +12,18 @@ import { ToolCallCounts, ToolValidationResult } from '../../src/types/index.js';
 // Helper functions to replace UsagePolicy methods
 function parseToolCallsFromOutput(responseBody: any): ToolCallCounts {
   const toolCalls: { [toolName: string]: number } = {};
-  
+
   try {
     // Check if response has output array
     if (!responseBody?.output || !Array.isArray(responseBody.output)) {
       return toolCalls;
     }
 
-    console.log('🔧 [parseToolCallsFromOutput] Parsing output array with', responseBody.output.length, 'items');
+    console.log(
+      '🔧 [parseToolCallsFromOutput] Parsing output array with',
+      responseBody.output.length,
+      'items'
+    );
 
     // Count tool calls by type
     for (const outputItem of responseBody.output) {
@@ -28,7 +32,9 @@ function parseToolCallsFromOutput(responseBody: any): ToolCallCounts {
         if (outputItem.type.endsWith('_call')) {
           const toolType = outputItem.type.replace('_call', '');
           toolCalls[toolType] = (toolCalls[toolType] || 0) + 1;
-          console.log(`🔧 [parseToolCallsFromOutput] Found ${toolType} call (id: ${outputItem.id})`);
+          console.log(
+            `🔧 [parseToolCallsFromOutput] Found ${toolType} call (id: ${outputItem.id})`
+          );
         }
       }
     }
@@ -99,7 +105,9 @@ function calculateResponseAPICost(
       if (callCount > 0) {
         const cost = calculateToolCallCost(toolName, callCount);
         toolCallCost += cost;
-        console.log(`💰 [calculateResponseAPICost] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`);
+        console.log(
+          `💰 [calculateResponseAPICost] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`
+        );
       }
     }
   }
@@ -118,7 +126,9 @@ function calculateResponseAPICost(
   // 4. Total cost
   const totalCost = modelCost + toolCallCost;
 
-  console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
+  console.log(
+    `💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`
+  );
 
   return {
     costUsd: CostCalculator.applyMultiplier(totalCost)!,
@@ -139,13 +149,13 @@ describe('Response API Usage Extraction', () => {
         usage: {
           input_tokens: 10,
           output_tokens: 5,
-          total_tokens: 15
-        }
+          total_tokens: 15,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
-      
+
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(10);
       expect(usage?.completionTokens).toBe(5);
@@ -162,13 +172,13 @@ describe('Response API Usage Extraction', () => {
           output_tokens: 10,
           total_tokens: 50,
           web_search_tokens: 15,
-          tool_call_tokens: 5
-        }
+          tool_call_tokens: 5,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
-      
+
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(40); // 20 + 15 + 5 (tool tokens added to prompt)
       expect(usage?.completionTokens).toBe(10);
@@ -183,19 +193,19 @@ describe('Response API Usage Extraction', () => {
         usage: {
           input_tokens: 17142,
           input_tokens_details: {
-            cached_tokens: 0
+            cached_tokens: 0,
           },
           output_tokens: 638,
           output_tokens_details: {
-            reasoning_tokens: 0
+            reasoning_tokens: 0,
           },
-          total_tokens: 17780
-        }
+          total_tokens: 17780,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
-      
+
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(17142);
       expect(usage?.completionTokens).toBe(638);
@@ -206,12 +216,12 @@ describe('Response API Usage Extraction', () => {
       const responseBody = {
         id: 'resp_123',
         object: 'response',
-        output: { type: 'text', text: 'Hello' }
+        output: { type: 'text', text: 'Hello' },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
-      
+
       expect(usage).toBeNull();
     });
 
@@ -223,13 +233,13 @@ describe('Response API Usage Extraction', () => {
         usage: {
           prompt_tokens: 8,
           completion_tokens: 3,
-          total_tokens: 11
-        }
+          total_tokens: 11,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
-      
+
       expect(usage).not.toBeNull();
       expect(usage?.promptTokens).toBe(8);
       expect(usage?.completionTokens).toBe(3);
@@ -243,7 +253,7 @@ describe('Response API Usage Extraction', () => {
 
       const extractor = new DefaultUsageExtractor();
       const result = extractor.extractFromStreamChunk(chunk);
-      
+
       expect(result).not.toBeNull();
       expect(result?.usage.promptTokens).toBe(10);
       expect(result?.usage.completionTokens).toBe(5);
@@ -255,7 +265,7 @@ describe('Response API Usage Extraction', () => {
 
       const extractor = new DefaultUsageExtractor();
       const result = extractor.extractFromStreamChunk(chunk);
-      
+
       expect(result).not.toBeNull();
       expect(result?.usage.promptTokens).toBe(40); // 20 + 15 + 5
       expect(result?.usage.completionTokens).toBe(10);
@@ -267,7 +277,7 @@ describe('Response API Usage Extraction', () => {
 
       const extractor = new DefaultUsageExtractor();
       const result = extractor.extractFromStreamChunk(chunk);
-      
+
       expect(result).not.toBeNull();
       expect(result?.cost).toBe(0.000375);
     });
@@ -277,7 +287,7 @@ describe('Response API Usage Extraction', () => {
 
       const extractor = new DefaultUsageExtractor();
       const result = extractor.extractFromStreamChunk(chunk);
-      
+
       expect(result).toBeNull();
     });
 
@@ -286,7 +296,7 @@ describe('Response API Usage Extraction', () => {
 
       const extractor = new DefaultUsageExtractor();
       const result = extractor.extractFromStreamChunk(chunk);
-      
+
       expect(result).not.toBeNull();
       expect(result?.usage.promptTokens).toBe(8);
       expect(result?.usage.completionTokens).toBe(3);
@@ -298,11 +308,11 @@ describe('Response API Usage Extraction', () => {
       const usage = {
         promptTokens: 10,
         completionTokens: 5,
-        totalTokens: 15
+        totalTokens: 15,
       };
 
       const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', 0.001, usage);
-      
+
       expect(result).not.toBeNull();
       expect(result?.costUsd).toBe(0.001);
       expect(result?.source).toBe('provider');
@@ -312,19 +322,29 @@ describe('Response API Usage Extraction', () => {
       const usage = {
         promptTokens: 1000,
         completionTokens: 500,
-        totalTokens: 1500
+        totalTokens: 1500,
       };
 
-      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, usage);
-      
+      const result = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4o',
+        undefined,
+        usage
+      );
+
       expect(result).not.toBeNull();
       expect(result?.costUsd).toBeGreaterThan(0);
       expect(result?.source).toBe('gateway-pricing');
     });
 
     it('should return null if no usage and no provider cost', () => {
-      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, undefined);
-      
+      const result = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4o',
+        undefined,
+        undefined
+      );
+
       expect(result).toBeNull();
     });
 
@@ -332,11 +352,16 @@ describe('Response API Usage Extraction', () => {
       const usage = {
         promptTokens: 0,
         completionTokens: 0,
-        totalTokens: 0
+        totalTokens: 0,
       };
 
-      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, usage);
-      
+      const result = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4o',
+        undefined,
+        usage
+      );
+
       expect(result).toBeNull();
     });
   });
@@ -351,7 +376,8 @@ describe('Response API Usage Extraction', () => {
       expect(processor.getFinalCost()).toBeNull();
 
       // Process chunk with usage
-      const usageChunk = 'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
+      const usageChunk =
+        'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
       processor.processChunk(usageChunk);
 
       const finalCost = processor.getFinalCost();
@@ -365,7 +391,8 @@ describe('Response API Usage Extraction', () => {
       const extractor = new DefaultUsageExtractor('openai');
       const processor = new DefaultStreamProcessor('gpt-4o', extractor, providerCost);
 
-      const usageChunk = 'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
+      const usageChunk =
+        'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
       processor.processChunk(usageChunk);
 
       const finalCost = processor.getFinalCost();
@@ -393,7 +420,8 @@ describe('Response API Usage Extraction', () => {
       const extractor = new DefaultUsageExtractor();
       const processor = new DefaultStreamProcessor('gpt-4o', extractor, undefined);
 
-      const usageChunk = 'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
+      const usageChunk =
+        'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';
       processor.processChunk(usageChunk);
 
       const usage = processor.getFinalUsage();
@@ -412,18 +440,18 @@ describe('Response API Usage Extraction', () => {
               id: 'ws_123',
               type: 'web_search_call',
               status: 'completed',
-              action: { type: 'search', query: 'test' }
+              action: { type: 'search', query: 'test' },
             },
             {
               id: 'msg_456',
               type: 'message',
-              content: [{ type: 'text', text: 'Result' }]
-            }
-          ]
+              content: [{ type: 'text', text: 'Result' }],
+            },
+          ],
         };
 
         const toolCalls = parseToolCallsFromOutput(responseBody);
-        
+
         expect(toolCalls).toEqual({ web_search: 1 });
       });
 
@@ -433,27 +461,25 @@ describe('Response API Usage Extraction', () => {
             { id: 'ws_1', type: 'web_search_call', status: 'completed' },
             { id: 'ws_2', type: 'web_search_call', status: 'completed' },
             { id: 'fs_1', type: 'file_search_call', status: 'completed' },
-            { id: 'msg_1', type: 'message', content: [] }
-          ]
+            { id: 'msg_1', type: 'message', content: [] },
+          ],
         };
 
         const toolCalls = parseToolCallsFromOutput(responseBody);
-        
-        expect(toolCalls).toEqual({ 
+
+        expect(toolCalls).toEqual({
           web_search: 2,
-          file_search: 1
+          file_search: 1,
         });
       });
 
       it('should return empty object for no tool calls', () => {
         const responseBody = {
-          output: [
-            { id: 'msg_1', type: 'message', content: [] }
-          ]
+          output: [{ id: 'msg_1', type: 'message', content: [] }],
         };
 
         const toolCalls = parseToolCallsFromOutput(responseBody);
-        
+
         expect(toolCalls).toEqual({});
       });
     });
@@ -464,26 +490,23 @@ describe('Response API Usage Extraction', () => {
           tools: [
             { type: 'web_search' },
             { type: 'file_search' },
-            { type: 'function', function: { name: 'custom' } }
-          ]
+            { type: 'function', function: { name: 'custom' } },
+          ],
         };
 
         const result = validateRequestTools(requestData);
-        
+
         expect(result.valid).toBe(true);
         expect(result.error).toBeUndefined();
       });
 
       it('should reject unsupported tools', () => {
         const requestData = {
-          tools: [
-            { type: 'web_search' },
-            { type: 'unsupported_tool' }
-          ]
+          tools: [{ type: 'web_search' }, { type: 'unsupported_tool' }],
         };
 
         const result = validateRequestTools(requestData);
-        
+
         expect(result.valid).toBe(false);
         expect(result.error).toContain('unsupported_tool');
       });
@@ -492,7 +515,7 @@ describe('Response API Usage Extraction', () => {
         const requestData = {};
 
         const result = validateRequestTools(requestData);
-        
+
         expect(result.valid).toBe(true);
       });
     });
@@ -500,18 +523,16 @@ describe('Response API Usage Extraction', () => {
     describe('calculateResponseAPICost', () => {
       it('should calculate cost with tool calls from output', () => {
         const responseBody = {
-          output: [
-            { id: 'ws_1', type: 'web_search_call', status: 'completed' }
-          ],
+          output: [{ id: 'ws_1', type: 'web_search_call', status: 'completed' }],
           usage: {
             input_tokens: 100,
             output_tokens: 50,
-            total_tokens: 150
-          }
+            total_tokens: 150,
+          },
         };
 
         const result = calculateResponseAPICost('gpt-4o', responseBody.usage, responseBody);
-        
+
         expect(result).not.toBeNull();
         expect(result?.costUsd).toBeGreaterThan(0);
         expect(result?.source).toBe('gateway-pricing');
@@ -519,18 +540,16 @@ describe('Response API Usage Extraction', () => {
 
       it('should prefer provider cost when available', () => {
         const responseBody = {
-          output: [
-            { id: 'ws_1', type: 'web_search_call', status: 'completed' }
-          ],
+          output: [{ id: 'ws_1', type: 'web_search_call', status: 'completed' }],
           usage: {
             input_tokens: 100,
             output_tokens: 50,
-            total_tokens: 150
-          }
+            total_tokens: 150,
+          },
         };
 
         const result = calculateResponseAPICost('gpt-4o', responseBody.usage, responseBody, 0.05);
-        
+
         expect(result).not.toBeNull();
         expect(result?.costUsd).toBe(0.05);
         expect(result?.source).toBe('provider');
@@ -538,4 +557,3 @@ describe('Response API Usage Extraction', () => {
     });
   });
 });
-

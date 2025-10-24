@@ -21,26 +21,26 @@ describe('Error Handling - Circular References', () => {
           error: {
             message: 'Test error message',
             code: 'test_error',
-            type: 'server_error'
-          }
+            type: 'server_error',
+          },
         },
         headers: {
           'x-request-id': 'test-request-id',
           'openai-organization': 'test-org',
-          'openai-processing-ms': '123'
-        }
-      }
+          'openai-processing-ms': '123',
+        },
+      },
     };
 
     // Create circular reference (simulating http.Agent)
     const agent: any = {
-      sockets: {}
+      sockets: {},
     };
     const httpMessage: any = {
-      agent: agent
+      agent: agent,
     };
     agent.sockets['api.openai.com:443'] = [httpMessage];
-    
+
     // Add circular reference to error (this would cause JSON.stringify to fail)
     mockError.response.data.circularRef = agent;
 
@@ -69,11 +69,11 @@ describe('Error Handling - Circular References', () => {
           error: {
             message: 'Invalid request',
             code: 'invalid_request',
-            type: 'invalid_request_error'
-          }
+            type: 'invalid_request_error',
+          },
         },
-        headers: {}
-      }
+        headers: {},
+      },
     };
 
     // This should not throw even if we add circular references
@@ -85,10 +85,11 @@ describe('Error Handling - Circular References', () => {
     expect(() => {
       // Simulate error extraction logic
       const data = mockError.response.data;
-      const errorMessage = data.error?.message 
-        || data.message 
-        || `Error response with status ${mockError.response.status}`;
-      
+      const errorMessage =
+        data.error?.message ||
+        data.message ||
+        `Error response with status ${mockError.response.status}`;
+
       expect(errorMessage).toBe('Invalid request');
     }).not.toThrow();
   });
@@ -99,19 +100,20 @@ describe('Error Handling - Circular References', () => {
         status: 500,
         statusText: 'Internal Server Error',
         data: 'Simple error string',
-        headers: {}
-      }
+        headers: {},
+      },
     };
 
     const data = mockError.response.data;
     let errorMessage: string;
-    
+
     if (typeof data === 'string') {
       errorMessage = data;
     } else if (data && typeof data === 'object') {
-      errorMessage = data.error?.message 
-        || data.message 
-        || `Error response with status ${mockError.response.status}`;
+      errorMessage =
+        data.error?.message ||
+        data.message ||
+        `Error response with status ${mockError.response.status}`;
     } else {
       errorMessage = `HTTP ${mockError.response.status}: ${mockError.response.statusText}`;
     }
@@ -122,12 +124,12 @@ describe('Error Handling - Circular References', () => {
   it('should handle network error without response', () => {
     const mockError: any = {
       request: {},
-      message: 'Network error'
+      message: 'Network error',
     };
 
-    const errorMessage = mockError.response 
+    const errorMessage = mockError.response
       ? 'Has response'
-      : mockError.request 
+      : mockError.request
         ? 'No response received from OpenAI'
         : mockError.message || 'Unknown error';
 
@@ -136,16 +138,15 @@ describe('Error Handling - Circular References', () => {
 
   it('should handle request setup error', () => {
     const mockError: any = {
-      message: 'Request setup failed'
+      message: 'Request setup failed',
     };
 
-    const errorMessage = mockError.response 
+    const errorMessage = mockError.response
       ? 'Has response'
-      : mockError.request 
+      : mockError.request
         ? 'No response'
         : mockError.message || 'Unknown error';
 
     expect(errorMessage).toBe('Request setup failed');
   });
 });
-

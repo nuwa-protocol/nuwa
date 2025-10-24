@@ -28,9 +28,7 @@ createProviderTestSuite('openai', () => {
 
   describe('Chat Completions API', () => {
     it('should complete non-streaming chat completion successfully', async () => {
-      const result = await openaiUtils.testChatCompletion(
-        { model: 'gpt-3.5-turbo' }
-      );
+      const result = await openaiUtils.testChatCompletion({ model: 'gpt-3.5-turbo' });
 
       const validation: BaseTestValidation = {
         expectSuccess: true,
@@ -42,7 +40,7 @@ createProviderTestSuite('openai', () => {
       };
 
       const validationResult = openaiUtils.validateResponse(result, validation);
-      
+
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
         console.error('Test result:', result);
@@ -60,12 +58,10 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should complete streaming chat completion successfully', async () => {
-      const result = await openaiUtils.testStreamingChatCompletion(
-        { 
-          model: 'gpt-3.5-turbo',
-          max_tokens: 30 // Shorter for streaming test
-        }
-      );
+      const result = await openaiUtils.testStreamingChatCompletion({
+        model: 'gpt-3.5-turbo',
+        max_tokens: 30, // Shorter for streaming test
+      });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
@@ -73,7 +69,7 @@ createProviderTestSuite('openai', () => {
       expect(typeof result.response.content).toBe('string');
       expect(result.response.content.length).toBeGreaterThan(0);
       expect(result.duration).toBeLessThan(30000); // 30 seconds max
-      
+
       // Usage information might not be available in streaming mode for all providers
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
@@ -82,13 +78,11 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should complete Response API requests successfully', async () => {
-      const result = await openaiUtils.testResponseAPI(
-        {
-          model: 'gpt-4o-2024-08-06',
-          input: 'What is artificial intelligence?',
-          max_output_tokens: 100,
-        }
-      );
+      const result = await openaiUtils.testResponseAPI({
+        model: 'gpt-4o-2024-08-06',
+        input: 'What is artificial intelligence?',
+        max_output_tokens: 100,
+      });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
@@ -100,25 +94,25 @@ createProviderTestSuite('openai', () => {
     }, 60000); // Response API might take longer
 
     it('should complete Response API with tools successfully', async () => {
-      const result = await openaiUtils.testResponseAPI(
-        {
-          model: 'gpt-4o-2024-08-06',
-          input: 'What is the weather like in San Francisco?',
-          tools: [{
+      const result = await openaiUtils.testResponseAPI({
+        model: 'gpt-4o-2024-08-06',
+        input: 'What is the weather like in San Francisco?',
+        tools: [
+          {
             type: 'function',
             name: 'get_weather',
             description: 'Get current weather information',
             parameters: {
               type: 'object',
               properties: {
-                location: { type: 'string', description: 'City name' }
+                location: { type: 'string', description: 'City name' },
               },
-              required: ['location']
-            }
-          }],
-          max_output_tokens: 50,
-        }
-      );
+              required: ['location'],
+            },
+          },
+        ],
+        max_output_tokens: 50,
+      });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
@@ -126,7 +120,7 @@ createProviderTestSuite('openai', () => {
 
     it('should support different models', async () => {
       const models = provider.getTestModels();
-      
+
       for (const model of models) {
         // Add delay between requests to avoid rate limiting
         if (models.indexOf(model) > 0) {
@@ -135,7 +129,7 @@ createProviderTestSuite('openai', () => {
 
         const result = await openaiUtils.testChatCompletion({
           model,
-          max_tokens: 20 // Keep it small to reduce costs
+          max_tokens: 20, // Keep it small to reduce costs
         });
 
         // Accept both success and known unavailability conditions
@@ -153,19 +147,15 @@ createProviderTestSuite('openai', () => {
         }
       }
     }, 120000); // Longer timeout for multiple model tests (now testing 4 models instead of 3)
-
   });
-
 
   describe('Usage Extraction', () => {
     it('should extract usage from non-streaming response', async () => {
-      const result = await openaiUtils.testChatCompletion(
-        { model: 'gpt-3.5-turbo' }
-      );
+      const result = await openaiUtils.testChatCompletion({ model: 'gpt-3.5-turbo' });
 
       expect(result.success).toBe(true);
       expect(result.usage).toBeDefined();
-      
+
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
         expect(result.usage.completionTokens).toBeGreaterThan(0);
@@ -178,11 +168,11 @@ createProviderTestSuite('openai', () => {
     it('should extract usage from streaming response when available', async () => {
       const result = await openaiUtils.testStreamingChatCompletion({
         model: 'gpt-3.5-turbo',
-        max_tokens: 30
+        max_tokens: 30,
       });
 
       expect(result.success).toBe(true);
-      
+
       // OpenAI supports usage in streaming mode with stream_options.include_usage
       if (result.usage) {
         expect(result.usage.promptTokens).toBeGreaterThan(0);
@@ -197,13 +187,11 @@ createProviderTestSuite('openai', () => {
     }, 30000);
 
     it('should calculate costs correctly', async () => {
-      const result = await openaiUtils.testChatCompletion(
-        { model: 'gpt-3.5-turbo' }
-      );
+      const result = await openaiUtils.testChatCompletion({ model: 'gpt-3.5-turbo' });
 
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
-      
+
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
         expect(result.cost.source).toBeDefined();
@@ -214,16 +202,16 @@ createProviderTestSuite('openai', () => {
 
     it('should distinguish between provider native cost and gateway pricing', async () => {
       const result = await openaiUtils.testChatCompletion({
-        model: 'gpt-3.5-turbo'
+        model: 'gpt-3.5-turbo',
       });
 
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
-      
+
       if (result.cost) {
         expect(result.cost.costUsd).toBeGreaterThan(0);
         expect(['provider', 'gateway-pricing']).toContain(result.cost.source);
-        
+
         if (result.cost.source === 'provider') {
           console.log('✅ OpenAI provides native cost information');
         } else {
@@ -237,35 +225,39 @@ createProviderTestSuite('openai', () => {
       const testModel = 'gpt-3.5-turbo';
       const result = await openaiUtils.testChatCompletion({
         model: testModel,
-        max_tokens: 50 // Fixed token count for predictable cost
+        max_tokens: 50, // Fixed token count for predictable cost
       });
 
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
       expect(result.usage).toBeDefined();
-      
+
       if (result.cost && result.usage) {
         // Get pricing from configuration
         const pricing = pricingRegistry.getProviderPricing('openai', testModel);
         expect(pricing).toBeDefined();
-        
+
         if (pricing) {
           // Calculate expected cost based on configuration pricing
-          const expectedCost = (
-            (result.usage.promptTokens * pricing.promptPerMTokUsd) +
-            (result.usage.completionTokens * pricing.completionPerMTokUsd)
-          ) / 1000000; // Convert from per-million-tokens to per-token
-          
+          const expectedCost =
+            (result.usage.promptTokens * pricing.promptPerMTokUsd +
+              result.usage.completionTokens * pricing.completionPerMTokUsd) /
+            1000000; // Convert from per-million-tokens to per-token
+
           // Allow reasonable tolerance for rounding and calculation differences
           const tolerance = 0.3; // 30% tolerance
           const expectedMinCost = expectedCost * (1 - tolerance);
           const expectedMaxCost = expectedCost * (1 + tolerance);
-          
+
           expect(result.cost.costUsd).toBeGreaterThanOrEqual(expectedMinCost);
           expect(result.cost.costUsd).toBeLessThanOrEqual(expectedMaxCost);
-          
-          console.log(`Cost calculation: $${result.cost.costUsd} for ${result.usage.totalTokens} tokens (${result.cost.source})`);
-          console.log(`Expected: $${expectedCost.toFixed(6)} (from config: $${pricing.promptPerMTokUsd}/$${pricing.completionPerMTokUsd} per 1M tokens)`);
+
+          console.log(
+            `Cost calculation: $${result.cost.costUsd} for ${result.usage.totalTokens} tokens (${result.cost.source})`
+          );
+          console.log(
+            `Expected: $${expectedCost.toFixed(6)} (from config: $${pricing.promptPerMTokUsd}/$${pricing.completionPerMTokUsd} per 1M tokens)`
+          );
         }
       }
     }, 30000);
@@ -280,11 +272,11 @@ createProviderTestSuite('openai', () => {
       };
 
       const preparedData = provider.prepareRequestData(originalData, false);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.model).toBe(originalData.model);
       expect(preparedData.messages).toEqual(originalData.messages);
-      
+
       // OpenAI only allows stream_options for streaming requests
       // For non-streaming requests, stream_options should not be present
       if (originalData.stream) {
@@ -304,7 +296,7 @@ createProviderTestSuite('openai', () => {
       };
 
       const preparedData = provider.prepareRequestData(originalData, false);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.model).toBe(originalData.model);
       expect(preparedData.input).toBe(originalData.input);
@@ -319,12 +311,12 @@ createProviderTestSuite('openai', () => {
       };
 
       const preparedData = provider.prepareRequestData(originalData, true);
-      
+
       expect(preparedData).toBeDefined();
       expect(preparedData.model).toBe(originalData.model);
       expect(preparedData.messages).toEqual(originalData.messages);
       expect(preparedData.stream).toBe(true);
-      
+
       // Should inject stream_options for usage tracking
       expect(preparedData.stream_options).toBeDefined();
       expect(preparedData.stream_options.include_usage).toBe(true);
@@ -337,7 +329,7 @@ createProviderTestSuite('openai', () => {
       // but we can verify standard headers are handled properly
       const result = await openaiUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
-        max_tokens: 20
+        max_tokens: 20,
       });
 
       expect(result.success).toBe(true);
@@ -353,22 +345,24 @@ createProviderTestSuite('openai', () => {
         top_p: 0.9,
         frequency_penalty: 0.1,
         presence_penalty: 0.1,
-        stop: ['\n']
+        stop: ['\n'],
       });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
-      console.log('✅ OpenAI-specific parameters (temperature, top_p, penalties, stop) work correctly');
+      console.log(
+        '✅ OpenAI-specific parameters (temperature, top_p, penalties, stop) work correctly'
+      );
     }, 30000);
 
     it('should extract OpenAI-specific metadata', async () => {
       const result = await openaiUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
-        max_tokens: 20
+        max_tokens: 20,
       });
 
       expect(result.success).toBe(true);
-      
+
       // Check for OpenAI-specific response metadata
       if (result.response && typeof result.response === 'object') {
         // OpenAI responses typically include finish_reason, model, etc.
@@ -404,34 +398,38 @@ createProviderTestSuite('openai', () => {
     it('should support function calling', async () => {
       const result = await openaiUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: 'What is the weather like in San Francisco?' }
-        ],
-        tools: [{
-          type: 'function',
-          function: {
-            name: 'get_weather',
-            description: 'Get current weather information for a location',
-            parameters: {
-              type: 'object',
-              properties: {
-                location: {
-                  type: 'string',
-                  description: 'The city name'
-                }
+        messages: [{ role: 'user', content: 'What is the weather like in San Francisco?' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              description: 'Get current weather information for a location',
+              parameters: {
+                type: 'object',
+                properties: {
+                  location: {
+                    type: 'string',
+                    description: 'The city name',
+                  },
+                },
+                required: ['location'],
               },
-              required: ['location']
-            }
-          }
-        }],
-        max_tokens: 100
+            },
+          },
+        ],
+        max_tokens: 100,
       });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
-      
+
       // Check if the model decided to call the function
-      if (result.response && typeof result.response === 'object' && 'tool_calls' in result.response) {
+      if (
+        result.response &&
+        typeof result.response === 'object' &&
+        'tool_calls' in result.response
+      ) {
         console.log('✅ OpenAI function calling works correctly');
       } else {
         console.log('ℹ️ Model chose not to call the function (this is normal behavior)');
@@ -440,8 +438,9 @@ createProviderTestSuite('openai', () => {
 
     it('should support vision capabilities with GPT-4V', async () => {
       // Test with a simple base64 encoded 1x1 pixel image to minimize cost
-      const smallImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGAWA0ddgAAAABJRU5ErkJggg==';
-      
+      const smallImageBase64 =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGAWA0ddgAAAABJRU5ErkJggg==';
+
       const result = await openaiUtils.testChatCompletion({
         model: 'gpt-4-vision-preview',
         messages: [
@@ -450,18 +449,18 @@ createProviderTestSuite('openai', () => {
             content: [
               {
                 type: 'text',
-                text: 'What do you see in this image?'
+                text: 'What do you see in this image?',
               },
               {
                 type: 'image_url',
                 image_url: {
-                  url: `data:image/png;base64,${smallImageBase64}`
-                }
-              }
-            ]
-          }
+                  url: `data:image/png;base64,${smallImageBase64}`,
+                },
+              },
+            ],
+          },
         ],
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       // Accept both success and model unavailability
@@ -479,18 +478,19 @@ createProviderTestSuite('openai', () => {
       const result = await openaiUtils.testChatCompletion({
         model: 'gpt-3.5-turbo',
         messages: [
-          { 
-            role: 'user', 
-            content: 'Generate a simple JSON object with a "message" field containing "Hello World"' 
-          }
+          {
+            role: 'user',
+            content:
+              'Generate a simple JSON object with a "message" field containing "Hello World"',
+          },
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 50
+        max_tokens: 50,
       });
 
       expect(result.success).toBe(true);
       expect(result.response).toBeDefined();
-      
+
       if (result.response && typeof result.response === 'object' && 'content' in result.response) {
         try {
           const parsedContent = JSON.parse(result.response.content as string);
@@ -502,5 +502,4 @@ createProviderTestSuite('openai', () => {
       }
     }, 45000);
   });
-
 });

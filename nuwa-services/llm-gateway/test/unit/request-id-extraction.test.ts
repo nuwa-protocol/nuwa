@@ -22,7 +22,7 @@ describe('Request ID Extraction', () => {
     test('should prioritize x-request-id over x-openai-request-id', () => {
       const headers = {
         'x-request-id': 'standard-id',
-        'x-openai-request-id': 'openai-id'
+        'x-openai-request-id': 'openai-id',
       };
       const requestId = (provider as any).extractRequestIdFromHeaders(headers);
       expect(requestId).toBe('standard-id');
@@ -65,7 +65,7 @@ describe('Request ID Extraction', () => {
       const headers = {
         'x-request-id': 'standard-id',
         'request-id': 'generic-id',
-        'anthropic-request-id': 'anthropic-id'
+        'anthropic-request-id': 'anthropic-id',
       };
       const requestId = (provider as any).extractRequestIdFromHeaders(headers);
       expect(requestId).toBe('standard-id');
@@ -97,7 +97,7 @@ describe('Request ID Extraction', () => {
       const headers = {
         'x-request-id': 'standard-id',
         'x-openai-request-id': 'openai-id',
-        'openrouter-request-id': 'or-id'
+        'openrouter-request-id': 'or-id',
       };
       const requestId = (service as any).extractRequestIdFromHeaders(headers);
       expect(requestId).toBe('standard-id');
@@ -128,25 +128,36 @@ describe('Request ID Extraction', () => {
     test('should follow correct priority: x-request-id > x-openai-request-id > openrouter-request-id > request-id > anthropic-request-id', () => {
       const testCases = [
         {
-          headers: { 'x-request-id': 'a', 'x-openai-request-id': 'b', 'openrouter-request-id': 'c', 'request-id': 'd', 'anthropic-request-id': 'e' },
-          expected: 'a'
+          headers: {
+            'x-request-id': 'a',
+            'x-openai-request-id': 'b',
+            'openrouter-request-id': 'c',
+            'request-id': 'd',
+            'anthropic-request-id': 'e',
+          },
+          expected: 'a',
         },
         {
-          headers: { 'x-openai-request-id': 'b', 'openrouter-request-id': 'c', 'request-id': 'd', 'anthropic-request-id': 'e' },
-          expected: 'b'
+          headers: {
+            'x-openai-request-id': 'b',
+            'openrouter-request-id': 'c',
+            'request-id': 'd',
+            'anthropic-request-id': 'e',
+          },
+          expected: 'b',
         },
         {
           headers: { 'openrouter-request-id': 'c', 'request-id': 'd', 'anthropic-request-id': 'e' },
-          expected: 'c'
+          expected: 'c',
         },
         {
           headers: { 'request-id': 'd', 'anthropic-request-id': 'e' },
-          expected: 'd'
+          expected: 'd',
         },
         {
           headers: { 'anthropic-request-id': 'e' },
-          expected: 'e'
-        }
+          expected: 'e',
+        },
       ];
 
       for (const testCase of testCases) {
@@ -186,4 +197,3 @@ describe('Request ID Extraction', () => {
     });
   });
 });
-

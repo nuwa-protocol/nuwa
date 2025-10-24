@@ -46,7 +46,7 @@ export class ProviderManager {
     skipped: string[];
   } {
     console.log('🚀 [ProviderManager] Starting provider initialization...');
-    
+
     const registeredProviders: string[] = [];
     const skippedProviders: string[] = [];
 
@@ -68,10 +68,10 @@ export class ProviderManager {
         allowedPaths: [...openrouterProvider.SUPPORTED_PATHS],
         requiredEnvVars: ['OPENROUTER_API_KEY'],
         optionalEnvVars: ['OPENROUTER_BASE_URL'],
-        defaultCheck: () => !!process.env.OPENROUTER_API_KEY
+        defaultCheck: () => !!process.env.OPENROUTER_API_KEY,
       },
       {
-        name: 'litellm', 
+        name: 'litellm',
         instance: litellmProvider,
         requiresApiKey: true,
         supportsNativeUsdCost: true,
@@ -80,7 +80,7 @@ export class ProviderManager {
         allowedPaths: [...litellmProvider.SUPPORTED_PATHS],
         requiredEnvVars: ['LITELLM_BASE_URL', 'LITELLM_API_KEY'],
         optionalEnvVars: [],
-        defaultCheck: () => !!process.env.LITELLM_BASE_URL && !!process.env.LITELLM_API_KEY
+        defaultCheck: () => !!process.env.LITELLM_BASE_URL && !!process.env.LITELLM_API_KEY,
       },
       {
         name: 'openai',
@@ -92,7 +92,7 @@ export class ProviderManager {
         allowedPaths: [...openaiProvider.SUPPORTED_PATHS],
         requiredEnvVars: ['OPENAI_API_KEY'],
         optionalEnvVars: ['OPENAI_BASE_URL'],
-        defaultCheck: () => !!process.env.OPENAI_API_KEY
+        defaultCheck: () => !!process.env.OPENAI_API_KEY,
       },
       {
         name: 'claude',
@@ -104,28 +104,33 @@ export class ProviderManager {
         allowedPaths: [...claudeProvider.SUPPORTED_PATHS],
         requiredEnvVars: ['ANTHROPIC_API_KEY'],
         optionalEnvVars: ['ANTHROPIC_BASE_URL'],
-        defaultCheck: () => !!process.env.ANTHROPIC_API_KEY
-      }
+        defaultCheck: () => !!process.env.ANTHROPIC_API_KEY,
+      },
     ];
 
     for (const config of providerConfigs) {
       // Check if provider should be registered
       const missingRequired = config.requiredEnvVars.filter(envVar => !process.env[envVar]);
-      const shouldRegister = options.skipEnvCheck || (missingRequired.length === 0 && config.defaultCheck());
+      const shouldRegister =
+        options.skipEnvCheck || (missingRequired.length === 0 && config.defaultCheck());
 
       if (shouldRegister) {
         // Resolve API key if required
         let apiKey: string | undefined;
         if (config.requiresApiKey && !options.skipEnvCheck) {
           if (!config.apiKeyEnvVar) {
-            console.error(`Provider ${config.name} requires API key but apiKeyEnvVar not specified. Skipping registration.`);
+            console.error(
+              `Provider ${config.name} requires API key but apiKeyEnvVar not specified. Skipping registration.`
+            );
             skippedProviders.push(`${config.name} (missing apiKeyEnvVar configuration)`);
             continue;
           }
-          
+
           apiKey = process.env[config.apiKeyEnvVar];
           if (!apiKey) {
-            console.error(`API key not found for provider ${config.name}: Environment variable '${config.apiKeyEnvVar}' is not set`);
+            console.error(
+              `API key not found for provider ${config.name}: Environment variable '${config.apiKeyEnvVar}' is not set`
+            );
             skippedProviders.push(`${config.name} (missing ${config.apiKeyEnvVar})`);
             continue;
           }
@@ -141,9 +146,9 @@ export class ProviderManager {
           allowedPaths: config.allowedPaths,
         });
         registeredProviders.push(config.name);
-        
+
         console.log(`✅ [ProviderManager] Registered ${config.name}`);
-        
+
         // Log configuration status for each provider
         if (!options.skipEnvCheck) {
           const configStatus = [];
@@ -155,7 +160,7 @@ export class ProviderManager {
             if (process.env[envVar]) configStatus.push(`${envVar}: custom`);
             else configStatus.push(`${envVar}: default`);
           });
-          
+
           if (configStatus.length > 0) {
             console.log(`   ${config.name}: ${configStatus.join(', ')}`);
           }
@@ -167,7 +172,7 @@ export class ProviderManager {
 
     // Log results
     console.log('🔌 Registered providers:', registeredProviders.join(', '));
-    
+
     if (skippedProviders.length > 0 && !options.skipEnvCheck) {
       console.log('⏭️  Skipped providers:', skippedProviders.join(', '));
       console.log('💡 Configure required environment variables to enable these providers');

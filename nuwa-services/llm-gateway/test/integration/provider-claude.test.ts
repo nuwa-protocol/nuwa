@@ -28,9 +28,10 @@ createProviderTestSuite('claude', () => {
 
   describe('Chat Completions API', () => {
     it('should handle non-streaming message completion', async () => {
-      const result = await claudeUtils.testMessageCompletion(
-        { model: 'claude-3-5-haiku-20241022', max_tokens: 50 }
-      );
+      const result = await claudeUtils.testMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+      });
 
       const validation: BaseTestValidation = {
         expectSuccess: true,
@@ -42,7 +43,7 @@ createProviderTestSuite('claude', () => {
       };
 
       const validationResult = claudeUtils.validateResponse(result, validation);
-      
+
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
         console.error('Test result:', result);
@@ -53,9 +54,10 @@ createProviderTestSuite('claude', () => {
     }, 30000);
 
     it('should handle streaming message completion', async () => {
-      const result = await claudeUtils.testStreamingMessageCompletion(
-        { model: 'claude-3-5-haiku-20241022', max_tokens: 30 }
-      );
+      const result = await claudeUtils.testStreamingMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 30,
+      });
 
       const validation: BaseTestValidation = {
         expectSuccess: true,
@@ -67,7 +69,7 @@ createProviderTestSuite('claude', () => {
       };
 
       const validationResult = claudeUtils.validateResponse(result, validation);
-      
+
       if (!validationResult.valid) {
         console.error('Validation errors:', validationResult.errors);
         console.error('Test result:', result);
@@ -79,18 +81,18 @@ createProviderTestSuite('claude', () => {
 
     it('should support different models', async () => {
       const models = provider.getTestModels();
-      
+
       for (const model of models) {
         // Add delay between requests to avoid rate limiting
         if (models.indexOf(model) > 0) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        const result = await claudeUtils.testMessageCompletion({ 
-          model, 
-          max_tokens: 30 
+        const result = await claudeUtils.testMessageCompletion({
+          model,
+          max_tokens: 30,
         });
-        
+
         // Accept both success and known unavailability conditions
         if (result.success) {
           expect(result.cost?.model).toBe(model);
@@ -105,9 +107,10 @@ createProviderTestSuite('claude', () => {
 
   describe('Usage Extraction', () => {
     it('should extract usage from non-streaming responses', async () => {
-      const result = await claudeUtils.testMessageCompletion(
-        { model: 'claude-3-5-haiku-20241022', max_tokens: 50 }
-      );
+      const result = await claudeUtils.testMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+      });
 
       expect(result.success).toBe(true);
       expect(result.usage).toBeDefined();
@@ -119,9 +122,10 @@ createProviderTestSuite('claude', () => {
     }, 30000);
 
     it('should extract usage from streaming responses', async () => {
-      const result = await claudeUtils.testStreamingMessageCompletion(
-        { model: 'claude-3-5-haiku-20241022', max_tokens: 50 }
-      );
+      const result = await claudeUtils.testStreamingMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+      });
 
       expect(result.success).toBe(true);
       expect(result.usage).toBeDefined();
@@ -136,9 +140,7 @@ createProviderTestSuite('claude', () => {
   describe('Cost Calculation', () => {
     it('should calculate gateway pricing fallback', async () => {
       const model = 'claude-3-5-haiku-20241022';
-      const result = await claudeUtils.testMessageCompletion(
-        { model, max_tokens: 50 }
-      );
+      const result = await claudeUtils.testMessageCompletion({ model, max_tokens: 50 });
 
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
@@ -149,37 +151,37 @@ createProviderTestSuite('claude', () => {
 
     it('should calculate cost accuracy for different pricing tiers', async () => {
       const testModel = 'claude-3-5-haiku-20241022';
-      const result = await claudeUtils.testMessageCompletion({ 
-        model: testModel, 
-        max_tokens: 50 
+      const result = await claudeUtils.testMessageCompletion({
+        model: testModel,
+        max_tokens: 50,
       });
-      
+
       expect(result.success).toBe(true);
       expect(result.cost).toBeDefined();
       expect(result.usage).toBeDefined();
-      
+
       if (result.cost && result.usage) {
         // Get pricing from configuration
         const pricing = pricingRegistry.getProviderPricing('claude', testModel);
         expect(pricing).toBeDefined();
-        
+
         if (pricing) {
           // Calculate expected cost based on configuration pricing
-          const expectedCost = (
-            (result.usage.promptTokens! * pricing.promptPerMTokUsd) +
-            (result.usage.completionTokens! * pricing.completionPerMTokUsd)
-          ) / 1000000; // Convert from per-million-tokens to per-token
-          
+          const expectedCost =
+            (result.usage.promptTokens! * pricing.promptPerMTokUsd +
+              result.usage.completionTokens! * pricing.completionPerMTokUsd) /
+            1000000; // Convert from per-million-tokens to per-token
+
           // Allow reasonable tolerance for rounding differences
           const tolerance = 0.3; // 30% tolerance
           const costDifference = Math.abs(result.cost.costUsd - expectedCost);
           const relativeError = costDifference / expectedCost;
-          
+
           console.log(`💰 Cost comparison for ${testModel}:`);
           console.log(`   Expected: $${expectedCost.toFixed(6)}`);
           console.log(`   Actual: $${result.cost.costUsd.toFixed(6)}`);
           console.log(`   Relative error: ${(relativeError * 100).toFixed(2)}%`);
-          
+
           expect(relativeError).toBeLessThan(tolerance);
         }
       }
@@ -188,26 +190,22 @@ createProviderTestSuite('claude', () => {
 
   describe('Request Preparation', () => {
     it('should prepare non-streaming requests correctly', async () => {
-      const result = await claudeUtils.testMessageCompletion(
-        { 
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 50,
-          temperature: 0.7
-        }
-      );
+      const result = await claudeUtils.testMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+        temperature: 0.7,
+      });
 
       expect(result.success).toBe(true);
       expect(result.cost?.model).toBe('claude-3-5-haiku-20241022');
     }, 30000);
 
     it('should prepare streaming requests correctly', async () => {
-      const result = await claudeUtils.testStreamingMessageCompletion(
-        { 
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 50,
-          temperature: 0.7
-        }
-      );
+      const result = await claudeUtils.testStreamingMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+        temperature: 0.7,
+      });
 
       expect(result.success).toBe(true);
       expect(result.cost?.model).toBe('claude-3-5-haiku-20241022');
@@ -216,12 +214,10 @@ createProviderTestSuite('claude', () => {
 
   describe('Provider-Specific Features', () => {
     it('should handle max_tokens parameter correctly', async () => {
-      const result = await claudeUtils.testMessageCompletion(
-        { 
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 20
-        }
-      );
+      const result = await claudeUtils.testMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 20,
+      });
 
       expect(result.success).toBe(true);
       if (result.usage) {
@@ -233,9 +229,10 @@ createProviderTestSuite('claude', () => {
     it('should handle anthropic-version header correctly', async () => {
       // This is tested implicitly in all other tests
       // Claude API requires anthropic-version header
-      const result = await claudeUtils.testMessageCompletion(
-        { model: 'claude-3-5-haiku-20241022', max_tokens: 50 }
-      );
+      const result = await claudeUtils.testMessageCompletion({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 50,
+      });
 
       expect(result.success).toBe(true);
     }, 30000);
@@ -244,9 +241,7 @@ createProviderTestSuite('claude', () => {
       const result = await claudeUtils.testMessageCompletion({
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 50,
-        messages: [
-          { role: 'user', content: 'What is the capital of France?' }
-        ]
+        messages: [{ role: 'user', content: 'What is the capital of France?' }],
       });
 
       expect(result.success).toBe(true);

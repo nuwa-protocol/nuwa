@@ -54,7 +54,9 @@ function calculateResponseAPICost(
   // 3. Total cost
   const totalCost = modelCost + toolCallCost;
 
-  console.log(`💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
+  console.log(
+    `💰 [calculateResponseAPICost] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`
+  );
 
   return {
     costUsd: CostCalculator.applyMultiplier(totalCost)!,
@@ -78,11 +80,11 @@ describe('OpenAI Response API Integration Tests', () => {
         model: 'gpt-4',
         input: 'Hello, world!',
         tools: [{ type: 'web_search', web_search: { enabled: true } }],
-        store: true
+        store: true,
       };
 
       const preparedData = openaiProvider.prepareRequestData(responseAPIRequest, false);
-      
+
       // Input should be kept as string format for Response API
       expect(preparedData.input).toBe('Hello, world!');
       expect(preparedData.model).toBe('gpt-4');
@@ -94,7 +96,7 @@ describe('OpenAI Response API Integration Tests', () => {
       const chatRequest = {
         model: 'gpt-4',
         messages: [{ role: 'user', content: 'Hello, world!' }],
-        temperature: 0.7
+        temperature: 0.7,
       };
 
       const preparedData = openaiProvider.prepareRequestData(chatRequest, false);
@@ -109,8 +111,8 @@ describe('OpenAI Response API Integration Tests', () => {
           { type: 'web_search' },
           { type: 'file_search' },
           { type: 'computer_use' },
-          { type: 'future_new_tool' } // Test with a hypothetical new tool
-        ]
+          { type: 'future_new_tool' }, // Test with a hypothetical new tool
+        ],
       };
 
       const preparedData = openaiProvider.prepareRequestData(requestWithTools, false);
@@ -118,14 +120,14 @@ describe('OpenAI Response API Integration Tests', () => {
         { type: 'web_search' },
         { type: 'file_search' },
         { type: 'computer_use' },
-        { type: 'future_new_tool' }
+        { type: 'future_new_tool' },
       ]);
     });
 
     it('should normalize Response API input correctly', () => {
       const requestWithStringInput = {
         model: 'gpt-4',
-        input: 'Hello, world!'
+        input: 'Hello, world!',
       };
 
       const preparedData = openaiProvider.prepareRequestData(requestWithStringInput, false);
@@ -137,25 +139,25 @@ describe('OpenAI Response API Integration Tests', () => {
         model: 'gpt-4',
         input: 'Hello, world!',
         stream: true,
-        tools: [{ type: 'web_search' }]
+        tools: [{ type: 'web_search' }],
       };
 
       const preparedData = openaiProvider.prepareRequestData(streamingRequest, true);
       // Response API does NOT support stream_options
       expect(preparedData.stream_options).toBeUndefined();
     });
-    
+
     it('should inject stream_options for Chat Completions API streaming requests', () => {
       const streamingRequest = {
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: 'Hello' }],
-        stream: true
+        stream: true,
       };
 
       const preparedData = openaiProvider.prepareRequestData(streamingRequest, true);
       // Chat Completions API DOES support stream_options
       expect(preparedData.stream_options).toEqual({
-        include_usage: true
+        include_usage: true,
       });
     });
   });
@@ -170,27 +172,27 @@ describe('OpenAI Response API Integration Tests', () => {
           model: 'gpt-4',
           output: {
             type: 'text',
-            text: 'Hello! How can I help you today?'
+            text: 'Hello! How can I help you today?',
           },
           usage: {
             prompt_tokens: 10,
             completion_tokens: 15,
             total_tokens: 25,
             web_search_tokens: 5,
-            tool_call_tokens: 3
-          }
-        }
+            tool_call_tokens: 3,
+          },
+        },
       };
 
       const parsed = openaiProvider.parseResponse(responseAPIResponse as any);
-      
+
       // Should preserve original usage structure for proper cost calculation
       expect(parsed.usage).toEqual({
         prompt_tokens: 10,
         completion_tokens: 15,
         total_tokens: 25,
         web_search_tokens: 5,
-        tool_call_tokens: 3
+        tool_call_tokens: 3,
       });
     });
 
@@ -201,29 +203,31 @@ describe('OpenAI Response API Integration Tests', () => {
           object: 'chat.completion',
           created: 1234567890,
           model: 'gpt-4',
-          choices: [{
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: 'Hello! How can I help you today?'
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content: 'Hello! How can I help you today?',
+              },
+              finish_reason: 'stop',
             },
-            finish_reason: 'stop'
-          }],
+          ],
           usage: {
             prompt_tokens: 10,
             completion_tokens: 15,
-            total_tokens: 25
-          }
-        }
+            total_tokens: 25,
+          },
+        },
       };
 
       const parsed = openaiProvider.parseResponse(chatResponse as any);
-      
+
       // Should keep usage as-is for chat completions
       expect(parsed.usage).toEqual({
         prompt_tokens: 10,
         completion_tokens: 15,
-        total_tokens: 25
+        total_tokens: 25,
       });
     });
   });
@@ -234,21 +238,21 @@ describe('OpenAI Response API Integration Tests', () => {
         id: 'resp_123',
         object: 'response',
         usage: {
-          input_tokens: 20,         // Response API uses input_tokens
-          output_tokens: 30,        // Response API uses output_tokens
-          total_tokens: 73,         // Total should match expected
-          web_search_tokens: 10,    // Tool content tokens (added to prompt)
-          file_search_tokens: 5,    // Tool content tokens (added to prompt)
-          tool_call_tokens: 8       // Tool content tokens (added to prompt)
-        }
+          input_tokens: 20, // Response API uses input_tokens
+          output_tokens: 30, // Response API uses output_tokens
+          total_tokens: 73, // Total should match expected
+          web_search_tokens: 10, // Tool content tokens (added to prompt)
+          file_search_tokens: 5, // Tool content tokens (added to prompt)
+          tool_call_tokens: 8, // Tool content tokens (added to prompt)
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBody);
       expect(usage).toEqual({
-        promptTokens: 43,  // 20 + 10 + 5 + 8 (tool content tokens added to prompt)
+        promptTokens: 43, // 20 + 10 + 5 + 8 (tool content tokens added to prompt)
         completionTokens: 30, // Original completion tokens unchanged
-        totalTokens: 73    // 43 + 30
+        totalTokens: 73, // 43 + 30
       });
     });
 
@@ -257,21 +261,21 @@ describe('OpenAI Response API Integration Tests', () => {
         id: 'resp_124',
         object: 'response',
         usage: {
-          input_tokens: 15,              // Response API uses input_tokens
-          output_tokens: 25,             // Response API uses output_tokens
-          total_tokens: 65,              // Total should match expected
-          web_search_tokens: 5,          // Tool content tokens (should go to prompt)
-          future_ai_tool_tokens: 12,     // New hypothetical tool content
-          another_new_tool_tokens: 8     // Another new tool content
-        }
+          input_tokens: 15, // Response API uses input_tokens
+          output_tokens: 25, // Response API uses output_tokens
+          total_tokens: 65, // Total should match expected
+          web_search_tokens: 5, // Tool content tokens (should go to prompt)
+          future_ai_tool_tokens: 12, // New hypothetical tool content
+          another_new_tool_tokens: 8, // Another new tool content
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
       const usage = extractor.extractFromResponseBody(responseBodyWithNewTools);
       expect(usage).toEqual({
-        promptTokens: 40,  // 15 + 5 + 12 + 8 (tool content tokens added to prompt)
+        promptTokens: 40, // 15 + 5 + 12 + 8 (tool content tokens added to prompt)
         completionTokens: 25, // Original completion tokens unchanged
-        totalTokens: 65   // 40 + 25
+        totalTokens: 65, // 40 + 25
       });
     });
 
@@ -282,8 +286,8 @@ describe('OpenAI Response API Integration Tests', () => {
         usage: {
           prompt_tokens: 20,
           completion_tokens: 30,
-          total_tokens: 50
-        }
+          total_tokens: 50,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
@@ -291,7 +295,7 @@ describe('OpenAI Response API Integration Tests', () => {
       expect(usage).toEqual({
         promptTokens: 20,
         completionTokens: 30,
-        totalTokens: 50
+        totalTokens: 50,
       });
     });
 
@@ -304,7 +308,7 @@ describe('OpenAI Response API Integration Tests', () => {
       expect(result?.usage).toEqual({
         promptTokens: 35, // 20 + 10 + 5 (tool content tokens added to prompt)
         completionTokens: 30, // Original completion tokens unchanged
-        totalTokens: 65 // 35 + 30
+        totalTokens: 65, // 35 + 30
       });
     });
 
@@ -317,7 +321,7 @@ describe('OpenAI Response API Integration Tests', () => {
       expect(result?.usage).toEqual({
         promptTokens: 20,
         completionTokens: 30,
-        totalTokens: 50
+        totalTokens: 50,
       });
     });
   });
@@ -327,31 +331,31 @@ describe('OpenAI Response API Integration Tests', () => {
       const usage = {
         promptTokens: 1000,
         completionTokens: 500, // No tool tokens mixed in
-        totalTokens: 1500
+        totalTokens: 1500,
       };
 
       const result = pricingRegistry.calculateProviderCost('openai', 'gpt-4', usage);
       expect(result).toBeTruthy();
-      expect(result?.costUsd).toBeCloseTo(0.060); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
+      expect(result?.costUsd).toBeCloseTo(0.06); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
       expect(result?.source).toBe('gateway-pricing');
     });
 
     it('should handle tool call costs separately from token costs', () => {
       // Mock usage with tool calls (Response API format)
       const responseUsage = {
-        input_tokens: 500,       // Response API uses input_tokens
-        output_tokens: 300,      // Response API uses output_tokens
-        total_tokens: 1000,      // Total tokens
-        web_search_tokens: 200,  // Content tokens from web search
+        input_tokens: 500, // Response API uses input_tokens
+        output_tokens: 300, // Response API uses output_tokens
+        total_tokens: 1000, // Total tokens
+        web_search_tokens: 200, // Content tokens from web search
         tool_calls_count: {
-          web_search: 2,    // 2 web search calls
-          file_search: 1    // 1 file search call
-        }
+          web_search: 2, // 2 web search calls
+          file_search: 1, // 1 file search call
+        },
       };
 
       const result = calculateResponseAPICost('gpt-4', responseUsage);
       expect(result).toBeTruthy();
-      
+
       // Expected calculation:
       // Prompt tokens: 500 + 200 = 700 (input + web_search_tokens)
       // Token cost: (700 prompt tokens * $30/1M) + (300 completion tokens * $60/1M) = $0.021 + $0.018 = $0.039
@@ -366,16 +370,20 @@ describe('OpenAI Response API Integration Tests', () => {
       const responseAPIUsage = {
         promptTokens: 700, // 500 original + 200 tool content tokens
         completionTokens: 300, // Original completion tokens only
-        totalTokens: 1000
+        totalTokens: 1000,
       };
 
       const chatAPIUsage = {
         promptTokens: 700, // Same total prompt tokens for comparison
         completionTokens: 300, // Same completion tokens
-        totalTokens: 1000
+        totalTokens: 1000,
       };
 
-      const responseResult = pricingRegistry.calculateProviderCost('openai', 'gpt-4o', responseAPIUsage);
+      const responseResult = pricingRegistry.calculateProviderCost(
+        'openai',
+        'gpt-4o',
+        responseAPIUsage
+      );
       const chatResult = pricingRegistry.calculateProviderCost('openai', 'gpt-4o', chatAPIUsage);
 
       // Should produce same cost calculation for token portion
@@ -388,7 +396,7 @@ describe('OpenAI Response API Integration Tests', () => {
       const chatRequest = {
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: 'Hello' }],
-        stream: true
+        stream: true,
       };
 
       // Should still work with existing chat completions logic
@@ -405,8 +413,8 @@ describe('OpenAI Response API Integration Tests', () => {
         usage: {
           prompt_tokens: 5,
           completion_tokens: 10,
-          total_tokens: 15
-        }
+          total_tokens: 15,
+        },
       };
 
       const extractor = new DefaultUsageExtractor();
@@ -414,7 +422,7 @@ describe('OpenAI Response API Integration Tests', () => {
       expect(usage).toEqual({
         promptTokens: 5,
         completionTokens: 10,
-        totalTokens: 15
+        totalTokens: 15,
       });
     });
   });
@@ -424,7 +432,7 @@ describe('OpenAI Response API Integration Tests', () => {
       const malformedData = {
         model: 'gpt-4',
         input: null,
-        tools: 'invalid'
+        tools: 'invalid',
       };
 
       // Should not throw an error
@@ -437,7 +445,7 @@ describe('OpenAI Response API Integration Tests', () => {
       const responseWithoutUsage = {
         id: 'resp_123',
         object: 'response',
-        output: { type: 'text', text: 'Hello!' }
+        output: { type: 'text', text: 'Hello!' },
       };
 
       const extractor = new DefaultUsageExtractor();

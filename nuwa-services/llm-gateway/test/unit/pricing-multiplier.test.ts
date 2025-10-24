@@ -30,7 +30,12 @@ describe('Global Pricing Multiplier Unit Tests', () => {
   describe('Gateway Cost Multiplier', () => {
     it('should apply multiplier to gateway-calculated token cost (non-stream)', () => {
       const usage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
-      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, usage);
+      const result = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4',
+        undefined,
+        usage
+      );
       expect(result).not.toBeNull();
       // Pricing: 1000/1e6*30 + 500/1e6*60 = 0.06; *1.10 = 0.066
       expect(result!.costUsd).toBeCloseTo(0.066, 10);
@@ -47,7 +52,8 @@ describe('Global Pricing Multiplier Unit Tests', () => {
       const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 1.0);
       expect(result).not.toBeNull();
       expect(result!.costUsd).toBeCloseTo(2.0, 10);
-      if (original === undefined) delete process.env.PRICING_MULTIPLIER; else process.env.PRICING_MULTIPLIER = original;
+      if (original === undefined) delete process.env.PRICING_MULTIPLIER;
+      else process.env.PRICING_MULTIPLIER = original;
       (CostCalculator as any).cachedMultiplier = null;
     });
   });

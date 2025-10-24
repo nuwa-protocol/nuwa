@@ -1,6 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { IdentityKit, DebugLogger } from '@nuwa-ai/identity-kit';
-import { createExpressPaymentKitFromEnv, type ExpressPaymentKit } from '@nuwa-ai/payment-kit/express';
+import {
+  createExpressPaymentKitFromEnv,
+  type ExpressPaymentKit,
+} from '@nuwa-ai/payment-kit/express';
 import type { DIDInfo } from '../types/index.js';
 
 /**
@@ -70,13 +73,16 @@ export class AuthManager {
     // Create PaymentKit instance
     this.paymentKit = await createExpressPaymentKitFromEnv(this.identityEnv as any, {
       serviceId: config.serviceId || 'llm-gateway',
-      defaultAssetId: config.defaultAssetId || process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
+      defaultAssetId:
+        config.defaultAssetId || process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
       defaultPricePicoUSD: config.defaultPricePicoUSD || '0',
       adminDid: config.adminDid || process.env.ADMIN_DID?.split(',') || [],
-      debug: config.debug ?? (process.env.DEBUG === 'true'),
+      debug: config.debug ?? process.env.DEBUG === 'true',
       claim: {
-        minClaimAmount: config.claim?.minClaimAmount || BigInt(process.env.MIN_CLAIM_AMOUNT || '100000000'),
-        maxConcurrentClaims: config.claim?.maxConcurrentClaims || Number(process.env.MAX_CONCURRENT_CLAIMS || '5'),
+        minClaimAmount:
+          config.claim?.minClaimAmount || BigInt(process.env.MIN_CLAIM_AMOUNT || '100000000'),
+        maxConcurrentClaims:
+          config.claim?.maxConcurrentClaims || Number(process.env.MAX_CONCURRENT_CLAIMS || '5'),
         maxRetries: config.claim?.maxRetries || Number(process.env.MAX_RETRIES || '3'),
         retryDelayMs: config.claim?.retryDelayMs || Number(process.env.RETRY_DELAY_MS || '60000'),
         requireHubBalance: config.claim?.requireHubBalance ?? true,
@@ -122,17 +128,17 @@ export class AuthManager {
    */
   validateDIDAuth(req: Request): AuthResult {
     const didInfo = this.extractDIDInfo(req);
-    
+
     if (!didInfo?.did) {
       return {
         success: false,
-        error: 'Unauthorized: No DID found in request'
+        error: 'Unauthorized: No DID found in request',
       };
     }
 
     return {
       success: true,
-      didInfo
+      didInfo,
     };
   }
 
@@ -153,7 +159,7 @@ export class AuthManager {
       if (!authResult.success) {
         return res.status(401).json({
           success: false,
-          error: authResult.error
+          error: authResult.error,
         });
       }
 
@@ -180,8 +186,9 @@ export class AuthManager {
       throw new Error('AuthManager not initialized. Call initialize() first.');
     }
 
-    return this.paymentKit.get('/providers/status', 
-      { pricing: '0', authRequired: false }, 
+    return this.paymentKit.get(
+      '/providers/status',
+      { pricing: '0', authRequired: false },
       async (req: Request, res: Response) => {
         const status = getProviderStatus();
         res.json({
@@ -189,10 +196,10 @@ export class AuthManager {
           data: {
             ...status,
             registrationTime: new Date().toISOString(),
-            note: 'New route structure: /{provider}/v1/* or /{provider}/api/v1/* (e.g., /openai/v1/chat/completions, /openrouter/api/v1/chat/completions)'
-          }
+            note: 'New route structure: /{provider}/v1/* or /{provider}/api/v1/* (e.g., /openai/v1/chat/completions, /openrouter/api/v1/chat/completions)',
+          },
         });
-      }, 
+      },
       'providers.status'
     );
   }

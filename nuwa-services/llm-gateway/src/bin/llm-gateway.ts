@@ -9,14 +9,14 @@ import { startServer } from '../server.js';
 async function main() {
   try {
     console.log('🔧 Loading configuration...');
-    
+
     // Load configuration from CLI args, config file, and environment
     const config = loadConfig();
-    
+
     console.log('✅ Configuration loaded successfully');
     console.log(`📍 Port: ${config.port}, Host: ${config.host}`);
     console.log(`🌐 Network: ${config.network}, Debug: ${config.debug}`);
-    
+
     // Check for SERVICE_KEY
     if (!config.serviceKey) {
       console.error('❌ SERVICE_KEY is required but not provided.');
@@ -24,7 +24,7 @@ async function main() {
       console.error('💡 Example: export SERVICE_KEY=your_private_key_here');
       process.exit(1);
     }
-    
+
     // Validate configuration
     console.log('🔍 Validating configuration...');
     const validation = validateConfig(config);
@@ -33,13 +33,13 @@ async function main() {
       validation.errors.forEach(error => console.error(`   • ${error}`));
       process.exit(1);
     }
-    
+
     console.log('✅ Configuration validation passed');
-    
+
     // Start the server
     console.log('🚀 Starting LLM Gateway server...');
     const serverInstance = await startServer(config);
-    
+
     // Setup graceful shutdown
     const shutdown = async (signal: string) => {
       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
@@ -56,31 +56,32 @@ async function main() {
     process.on('SIGINT', () => shutdown('SIGINT'));
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGHUP', () => shutdown('SIGHUP'));
-    
+
     // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
       console.error('❌ Uncaught Exception:', error);
       shutdown('uncaughtException');
     });
-    
+
     process.on('unhandledRejection', (reason, promise) => {
       console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
       shutdown('unhandledRejection');
     });
-    
   } catch (error) {
     console.error('❌ Failed to start LLM Gateway:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('EADDRINUSE')) {
         console.error('💡 The port is already in use. Try a different port with --port <number>');
       } else if (error.message.includes('EACCES')) {
         console.error('💡 Permission denied. Try running with sudo or use a port > 1024');
       } else if (error.message.includes('SERVICE_KEY')) {
-        console.error('💡 SERVICE_KEY is required. Set it via environment variable or --service-key');
+        console.error(
+          '💡 SERVICE_KEY is required. Set it via environment variable or --service-key'
+        );
       }
     }
-    
+
     process.exit(1);
   }
 }

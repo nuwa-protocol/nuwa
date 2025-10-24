@@ -1,8 +1,10 @@
 ## 在 LLM Gateway 集成 @nuwa-ai/payment-kit（路径依赖版）
 
-本文档给出在 `nuwa-services/llm-gateway` 中集成 `@nuwa-ai/payment-kit` 的最小可行方案（MVP）。先以“基于路径的依赖”进行集成，评审通过后再落地代码与灰度切换。
+本文档给出在 `nuwa-services/llm-gateway` 中集成 `@nuwa-ai/payment-kit`
+的最小可行方案（MVP）。先以“基于路径的依赖”进行集成，评审通过后再落地代码与灰度切换。
 
-> 约定：本文用中文说明，代码与标识使用英文。项目内统一使用 pnpm 进行安装与构建 [[memory:5553005]]。
+> 约定：本文用中文说明，代码与标识使用英文。项目内统一使用 pnpm 进行安装与构建
+> [[memory:5553005]]。
 
 ---
 
@@ -55,9 +57,10 @@ pnpm -C nuwa-services/llm-gateway build
 
 ### 3. 服务端集成方式（推荐）
 
-采用 `ExpressPaymentKit`（服务端收款方）对业务路由进行“计费注册”。流程与 `nuwa-kit/typescript/examples/payment-kit-integration/src/server.ts` 一致：
+采用 `ExpressPaymentKit`（服务端收款方）对业务路由进行“计费注册”。流程与
+`nuwa-kit/typescript/examples/payment-kit-integration/src/server.ts` 一致：
 
-1) 初始化 PaymentKit（从 IdentityEnv）：
+1. 初始化 PaymentKit（从 IdentityEnv）：
 
 ```ts
 import express from 'express';
@@ -96,7 +99,7 @@ async function initPaymentKit() {
 }
 ```
 
-2) 将计费应用到 LLM 业务路由（非流式接口，使用 FinalCost 后记账）：
+2. 将计费应用到 LLM 业务路由（非流式接口，使用 FinalCost 后记账）：
 
 ```ts
 // 使用新的模块化架构
@@ -115,24 +118,38 @@ export async function registerBillableRoutes(app: express.Application) {
   const paymentKit = await initPaymentKitAndRegisterRoutes(app, config);
 
   // 免费查询类路由（如 /usage）：需要 DID 鉴权但不计费
-  billing.get('/usage', { pricing: '0', authRequired: true }, async (req, res) => {
-    const data = await getUsageForDid(req);
-    res.json({ success: true, data });
-  }, 'usage.get');
+  billing.get(
+    '/usage',
+    { pricing: '0', authRequired: true },
+    async (req, res) => {
+      const data = await getUsageForDid(req);
+      res.json({ success: true, data });
+    },
+    'usage.get'
+  );
 }
 ```
 
 > 说明：
-> - `FinalCost` 策略期望传入的是 picoUSD（整数）。如果上游返回美元成本（浮点数/数字），需乘以 `1e12`。
-> - 对接入 `billing.*` 的付费路由，PaymentKit 内部会执行 DIDAuthV1 鉴权，无需再叠加项目内已有的 DID 中间件。
+>
+> - `FinalCost`
+>   策略期望传入的是 picoUSD（整数）。如果上游返回美元成本（浮点数/数字），需乘以
+>   `1e12`。
+> - 对接入 `billing.*`
+>   的付费路由，PaymentKit 内部会执行 DIDAuthV1 鉴权，无需再叠加项目内已有的 DID 中间件。
 
-3) 在 `src/index.ts` 中先 `await initPaymentKit()`，再 `registerBillableRoutes(billing)`，最后保留历史路由用于灰度（见第 5 节）。
+3. 在 `src/index.ts` 中先 `await initPaymentKit()`，再
+   `registerBillableRoutes(billing)`，最后保留历史路由用于灰度（见第 5 节）。
 
 ---
 
 ### 4. 关于流式响应的计费
 
-与 OpenRouter 保持一致，流式与非流式共用同一路径 `/api/v1/chat/completions`，通过请求体中的 `stream: true` 开关启用流式（SSE）。在流式分支中，使用 `FinalCost` 的延迟结算，网关在流结束时将 `usage.cost`（USD）转换为 picoUSD 写入 `res.locals.usage`，由 `ExpressPaymentKit` 完成结算与 In-band 支付帧注入（`nuwa_payment_header`）。
+与 OpenRouter 保持一致，流式与非流式共用同一路径
+`/api/v1/chat/completions`，通过请求体中的 `stream: true`
+开关启用流式（SSE）。在流式分支中，使用 `FinalCost` 的延迟结算，网关在流结束时将
+`usage.cost`（USD）转换为 picoUSD 写入 `res.locals.usage`，由
+`ExpressPaymentKit` 完成结算与 In-band 支付帧注入（`nuwa_payment_header`）。
 
 ---
 
@@ -156,7 +173,7 @@ export async function registerBillableRoutes(app: express.Application) {
 
 ### 7. 验证流程（本地）
 
-1) 构建 kit 与网关：
+1. 构建 kit 与网关：
 
 ```bash
 pnpm -C nuwa-kit/typescript/packages/payment-kit build
@@ -164,10 +181,11 @@ pnpm -C nuwa-services/llm-gateway build
 pnpm -C nuwa-services/llm-gateway dev
 ```
 
-2) 准备 payer 资金与通道（可用示例 CLI 或自写脚本）：
+2. 准备 payer 资金与通道（可用示例 CLI 或自写脚本）：
    - 调用 `discoverService` → `openChannel` → `depositToHub`（如需）
 
-3) 使用 `PaymentChannelHttpClient` 发起到 `POST /api/v1/chat/completions` 的非流式请求：
+3. 使用 `PaymentChannelHttpClient` 发起到 `POST /api/v1/chat/completions`
+   的非流式请求：
    - 检查响应头 `X-Payment-Channel-Data`
    - 检查服务端 RAV 持久化（若启用 SQL 后端）与自动/手动 claim 结果
 
@@ -187,5 +205,3 @@ pnpm -C nuwa-services/llm-gateway dev
 - `nuwa-kit/typescript/examples/payment-kit-integration/src/server.ts`
 - `@nuwa-ai/payment-kit` `ExpressPaymentKit` 与 `HttpBillingMiddleware`
 - `/.well-known/nuwa-payment/info` 服务发现约定
-
-
