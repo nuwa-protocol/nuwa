@@ -34,12 +34,8 @@ export class PathValidator {
     
     let extractedPath: string;
     
-    // For legacy routes (/api/v1/*), keep the full path
-    if (fullPath.startsWith('/api/v1/')) {
-      extractedPath = fullPath;
-    }
     // Primary method: manual extraction for provider routes (/:provider/$path)
-    else if (fullPath.startsWith(`/${providerName}/`)) {
+    if (fullPath.startsWith(`/${providerName}/`)) {
       const expectedPrefix = `/${providerName}`;
       const remainingPath = fullPath.substring(expectedPrefix.length);
       extractedPath = remainingPath.startsWith('/') ? remainingPath : '/' + remainingPath;

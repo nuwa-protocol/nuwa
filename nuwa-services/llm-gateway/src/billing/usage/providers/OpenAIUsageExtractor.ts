@@ -7,6 +7,10 @@ import { UsageInfo } from '../../pricing.js';
  * Handles both Chat Completions and Response API formats
  */
 export class OpenAIUsageExtractor extends BaseUsageExtractor {
+  constructor() {
+    super('openai');
+  }
+
   /**
    * Extract usage from OpenAI response body
    * Supports both Chat Completions and Response API formats

@@ -30,6 +30,8 @@ export interface LLMGatewayConfig {
   openrouterBaseUrl?: string;
   litellmApiKey?: string;
   litellmBaseUrl?: string;
+  anthropicApiKey?: string;
+  anthropicBaseUrl?: string;
   
   // Pricing configuration
   pricingOverrides?: string;
@@ -175,6 +177,7 @@ Environment Variables:
   OPENAI_API_KEY                       OpenAI API key
   OPENROUTER_API_KEY                   OpenRouter API key
   LITELLM_API_KEY                      LiteLLM API key
+  ANTHROPIC_API_KEY                    Anthropic Claude API key
 
 Configuration File:
   The configuration file should be in JSON or YAML format.
@@ -311,6 +314,8 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.OPENROUTER_BASE_URL) config.openrouterBaseUrl = process.env.OPENROUTER_BASE_URL;
   if (process.env.LITELLM_API_KEY) config.litellmApiKey = process.env.LITELLM_API_KEY;
   if (process.env.LITELLM_BASE_URL) config.litellmBaseUrl = process.env.LITELLM_BASE_URL;
+  if (process.env.ANTHROPIC_API_KEY) config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  if (process.env.ANTHROPIC_BASE_URL) config.anthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
   if (process.env.PRICING_OVERRIDES) config.pricingOverrides = process.env.PRICING_OVERRIDES;
   if (process.env.OPENAI_PRICING_VERSION) config.openaiPricingVersion = process.env.OPENAI_PRICING_VERSION;
   if (process.env.HTTP_REFERER) config.httpReferer = process.env.HTTP_REFERER;
@@ -359,9 +364,9 @@ export function validateConfig(config: LLMGatewayConfig): { valid: boolean; erro
   }
   
   // Check if at least one provider API key is configured
-  const hasProviderKey = config.openaiApiKey || config.openrouterApiKey || config.litellmApiKey;
+  const hasProviderKey = config.openaiApiKey || config.openrouterApiKey || config.litellmApiKey || config.anthropicApiKey;
   if (!hasProviderKey) {
-    errors.push('At least one provider API key is required (OPENAI_API_KEY, OPENROUTER_API_KEY, or LITELLM_API_KEY)');
+    errors.push('At least one provider API key is required (OPENAI_API_KEY, OPENROUTER_API_KEY, LITELLM_API_KEY, or ANTHROPIC_API_KEY)');
   }
   
   return {

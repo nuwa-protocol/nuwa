@@ -1,10 +1,10 @@
 # @nuwa-ai/llm-gateway
 
-LLM Gateway is a multi-provider LLM API gateway with DID authentication and payment integration. It supports OpenAI, OpenRouter, and LiteLLM providers with intelligent usage tracking and cost calculation.
+LLM Gateway is a multi-provider LLM API gateway with DID authentication and payment integration. It supports OpenAI, OpenRouter, LiteLLM, and Anthropic Claude providers with intelligent usage tracking and cost calculation.
 
 ## ✨ Core Features
 
-- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, and LiteLLM integration
+- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, and Anthropic Claude integration
 - **🔐 DID Authentication**: Decentralized identity authentication with PaymentKit integration  
 - **💳 Payment Integration**: Built-in payment channels and usage-based billing
 - **📊 Intelligent Usage Tracking**: Automatic token consumption and cost calculation
@@ -48,6 +48,8 @@ export OPENAI_API_KEY=sk-proj-...
 export OPENROUTER_API_KEY=sk-or-v1-...
 # OR  
 export LITELLM_API_KEY=sk-...
+# OR
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### 3. Start the Gateway
@@ -86,6 +88,7 @@ The demo handles all the complex authentication and payment setup automatically!
 | `OPENAI_API_KEY` | OpenAI API key | ⚠️ |
 | `OPENROUTER_API_KEY` | OpenRouter API key | ⚠️ |
 | `LITELLM_API_KEY` | LiteLLM API key | ⚠️ |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key | ⚠️ |
 | `PORT` | Server port (default: 8080) | ❌ |
 | `HOST` | Server host (default: 0.0.0.0) | ❌ |
 | `ROOCH_NETWORK` | Rooch network (default: test) | ❌ |
@@ -243,6 +246,21 @@ curl -X POST http://localhost:8080/openai/v1/chat/completions \
   }'
 ```
 
+**Claude API Example:**
+```bash
+curl -X POST http://localhost:8080/claude/v1/messages \
+  -H "Authorization: DIDAuthV1 <signature_data>" \
+  -H "X-Payment-Channel-Data: <payment_channel_data>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-3-5-sonnet-20241022",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello! How are you?"}
+    ]
+  }'
+```
+
 > **Note**: Manual authentication setup is complex. We strongly recommend using the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) for testing and development.
 
 ## 🛠️ CLI Options
@@ -379,7 +397,7 @@ See the production deployment examples in the [`docker-compose.yml`](./docker-co
 If `llm-gateway` starts and exits immediately without errors, this is usually due to missing required environment variables:
 
 1. **Missing SERVICE_KEY**: Generate from https://test-id.nuwa.dev and set `export SERVICE_KEY=0x...`
-2. **Missing Provider API Keys**: Set at least one: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or `LITELLM_API_KEY`
+2. **Missing Provider API Keys**: Set at least one: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `LITELLM_API_KEY`, or `ANTHROPIC_API_KEY`
 3. **Port Already in Use**: Change the port with `--port <number>`
 
 ### Common Error Messages

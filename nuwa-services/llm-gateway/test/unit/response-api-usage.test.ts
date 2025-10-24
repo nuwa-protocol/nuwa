@@ -88,7 +88,7 @@ function calculateResponseAPICost(
   }
 
   // 1. Calculate model token cost
-  const modelCostResult = pricingRegistry.calculateCost(model, usageInfo);
+  const modelCostResult = pricingRegistry.calculateProviderCost('openai', model, usageInfo);
   const modelCost = modelCostResult?.costUsd || 0;
 
   // 2. Calculate tool call costs from output array
@@ -123,7 +123,7 @@ function calculateResponseAPICost(
   return {
     costUsd: CostCalculator.applyMultiplier(totalCost)!,
     source: 'gateway-pricing',
-    pricingVersion: pricingRegistry.getVersion(),
+    pricingVersion: pricingRegistry.getProviderVersion('openai'),
     model,
     usage: usageInfo,
   };
@@ -301,7 +301,7 @@ describe('Response API Usage Extraction', () => {
         totalTokens: 15
       };
 
-      const result = CostCalculator.calculateRequestCost('gpt-4o', 0.001, usage);
+      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', 0.001, usage);
       
       expect(result).not.toBeNull();
       expect(result?.costUsd).toBe(0.001);
@@ -315,7 +315,7 @@ describe('Response API Usage Extraction', () => {
         totalTokens: 1500
       };
 
-      const result = CostCalculator.calculateRequestCost('gpt-4o', undefined, usage);
+      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, usage);
       
       expect(result).not.toBeNull();
       expect(result?.costUsd).toBeGreaterThan(0);
@@ -323,7 +323,7 @@ describe('Response API Usage Extraction', () => {
     });
 
     it('should return null if no usage and no provider cost', () => {
-      const result = CostCalculator.calculateRequestCost('gpt-4o', undefined, undefined);
+      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, undefined);
       
       expect(result).toBeNull();
     });
@@ -335,7 +335,7 @@ describe('Response API Usage Extraction', () => {
         totalTokens: 0
       };
 
-      const result = CostCalculator.calculateRequestCost('gpt-4o', undefined, usage);
+      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4o', undefined, usage);
       
       expect(result).toBeNull();
     });
@@ -343,7 +343,7 @@ describe('Response API Usage Extraction', () => {
 
   describe('StreamProcessor', () => {
     it('should accumulate usage from chunks and calculate final cost', () => {
-      const extractor = new DefaultUsageExtractor();
+      const extractor = new DefaultUsageExtractor('openai');
       const processor = new DefaultStreamProcessor('gpt-4o', extractor, undefined);
 
       // Process chunk without usage
@@ -362,7 +362,7 @@ describe('Response API Usage Extraction', () => {
 
     it('should use provider cost from initial setup', () => {
       const providerCost = 0.001;
-      const extractor = new DefaultUsageExtractor();
+      const extractor = new DefaultUsageExtractor('openai');
       const processor = new DefaultStreamProcessor('gpt-4o', extractor, providerCost);
 
       const usageChunk = 'data: {"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n';

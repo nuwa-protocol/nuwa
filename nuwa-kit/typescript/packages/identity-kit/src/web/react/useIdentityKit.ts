@@ -1,41 +1,10 @@
 import { IdentityKitWeb } from '..';
 import { NIP1SignedObject } from '../../index';
-import { IdentityKitErrorCode, createWebError, createReactError } from '../../errors';
+import { IdentityKitErrorCode, createWebError } from '../../errors';
 
-// React types - will be available when React is installed
-type ReactHook<T> = [T, (value: T | ((prev: T) => T)) => void];
-type UseStateHook = <T>(initialValue: T) => ReactHook<T>;
-type UseEffectHook = (effect: () => void | (() => void), deps?: any[]) => void;
-type UseCallbackHook = <T extends (...args: any[]) => any>(callback: T, deps: any[]) => T;
-
-// Runtime React hooks - will be loaded dynamically
-let useState: UseStateHook;
-let useEffect: UseEffectHook;
-let useCallback: UseCallbackHook;
-
-// Load React hooks at runtime
-function loadReactHooks() {
-  try {
-    if (typeof window !== 'undefined') {
-      // Use dynamic import with proper error handling
-      const reactPromise = import('react');
-      reactPromise
-        .then(React => {
-          useState = React.useState;
-          useEffect = React.useEffect;
-          useCallback = React.useCallback;
-        })
-        .catch(() => {
-          // React not available - hooks will remain undefined
-        });
-    }
-  } catch {
-    // React not available
-  }
-}
-
-// Initialize React hooks
-loadReactHooks();
+// Import React hooks directly - the bundler will handle this as an external dependency
+// Since React is a peerDependency, the consuming application will provide it
+import { useState, useEffect, useCallback } from 'react';
 
 export interface IdentityKitState {
   isConnected: boolean;
@@ -66,7 +35,7 @@ export interface UseIdentityKitOptions {
  * React hook for Nuwa Identity Kit (Web)
  */
 export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKitHook {
-  // Runtime checks for React and browser environment
+  // Runtime checks for browser environment
   if (typeof window === 'undefined') {
     throw createWebError(
       IdentityKitErrorCode.WEB_BROWSER_NOT_SUPPORTED,
@@ -74,12 +43,6 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
     );
   }
 
-  if (typeof useState === 'undefined' || typeof useEffect === 'undefined') {
-    throw createReactError(
-      IdentityKitErrorCode.REACT_NOT_AVAILABLE,
-      'useIdentityKit requires React to be available'
-    );
-  }
   const [sdk, setSdk] = useState<IdentityKitWeb | null>(null);
   const [state, setState] = useState<IdentityKitState>({
     isConnected: false,
@@ -189,11 +152,11 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   const sign = useCallback(
     async (payload: any): Promise<NIP1SignedObject> => {
       if (!sdk)
-        throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+        throw createWebError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
           operation: 'sign',
         });
       if (!state.isConnected)
-        throw createReactError(IdentityKitErrorCode.WEB_NOT_CONNECTED, 'Not connected', {
+        throw createWebError(IdentityKitErrorCode.WEB_NOT_CONNECTED, 'Not connected', {
           operation: 'sign',
           state,
         });
@@ -206,7 +169,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   const verify = useCallback(
     async (sig: NIP1SignedObject): Promise<boolean> => {
       if (!sdk)
-        throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+        throw createWebError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
           operation: 'verify',
         });
       return sdk.verify(sig);
@@ -217,7 +180,7 @@ export function useIdentityKit(options: UseIdentityKitOptions = {}): IdentityKit
   // Logout
   const logout = useCallback(async (): Promise<void> => {
     if (!sdk)
-      throw createReactError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
+      throw createWebError(IdentityKitErrorCode.INITIALIZATION_FAILED, 'SDK not initialized', {
         operation: 'logout',
       });
     await sdk.logout();

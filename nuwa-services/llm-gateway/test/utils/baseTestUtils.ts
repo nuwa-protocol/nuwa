@@ -1,4 +1,4 @@
-import { LLMProvider } from '../../src/providers/LLMProvider.js';
+import { LLMProvider, TestableLLMProvider } from '../../src/providers/LLMProvider.js';
 import { ProviderManager } from '../../src/core/providerManager.js';
 import { RouteHandler } from '../../src/core/routeHandler.js';
 import { AuthManager } from '../../src/core/authManager.js';
@@ -15,6 +15,8 @@ export interface BaseTestResult {
   error?: string;
   duration?: number;
   statusCode?: number;
+  model?: string;
+  rawResponse?: any;
 }
 
 /**
@@ -24,15 +26,164 @@ export interface BaseTestValidation {
   expectSuccess: boolean;
   expectUsage?: boolean;
   expectCost?: boolean;
+  expectResponse?: boolean;
   minTokens?: number;
   maxTokens?: number;
   expectedModel?: string;
 }
 
 /**
- * Base utilities for provider testing
+ * Validation result interface
  */
-export abstract class BaseProviderTestUtils {
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/**
+ * Base utilities for provider testing
+ * Supports both static methods (for backward compatibility) and instance methods (new design)
+ */
+export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMProvider> {
+  /**
+   * Constructor for instance-based testing
+   * @param provider The provider instance to test
+   * @param apiKey API key for the provider
+   */
+  constructor(
+    protected readonly provider: T,
+    protected readonly apiKey: string | null
+  ) {}
+
+  /**
+   * Instance method: Test non-streaming request
+   * Uses the provider and apiKey from constructor
+   */
+  async testNonStreaming(
+    endpoint: string,
+    options?: Record<string, any>
+  ): Promise<BaseTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Use provider's method to create properly formatted request
+      const requestData = this.provider.createTestRequest(endpoint, options);
+      
+      // Use the high-level executeRequest API
+      const executeResult = await this.provider.executeRequest(
+        this.apiKey,
+        endpoint,
+        'POST',
+        requestData
+      );
+
+      const duration = Date.now() - startTime;
+
+      if (!executeResult.success) {
+        return {
+          success: false,
+          error: executeResult.error || 'Unknown error',
+          duration,
+          statusCode: executeResult.statusCode,
+        };
+      }
+
+      return {
+        success: true,
+        response: executeResult.response,
+        usage: executeResult.usage,
+        cost: executeResult.cost,
+        duration,
+        statusCode: executeResult.statusCode,
+        model: requestData.model,
+        rawResponse: executeResult.rawResponse,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Instance method: Test streaming request
+   * Uses the provider and apiKey from constructor
+   */
+  async testStreaming(
+    endpoint: string,
+    options?: Record<string, any>
+  ): Promise<BaseTestResult> {
+    const startTime = Date.now();
+    
+    try {
+      // Use provider's method to create properly formatted streaming request
+      const requestData = this.provider.createTestRequest(endpoint, { ...options, stream: true });
+      
+      // Use PassThrough stream to capture content for testing
+      const { PassThrough } = await import('stream');
+      const captureStream = new PassThrough();
+      let accumulatedContent = '';
+
+      // Capture content as it flows through
+      captureStream.on('data', (chunk: Buffer) => {
+        accumulatedContent += chunk.toString();
+      });
+
+      // Use the high-level executeStreamRequest API
+      const result = await this.provider.executeStreamRequest(
+        this.apiKey,
+        endpoint,
+        'POST',
+        requestData,
+        captureStream  // Pass the capture stream as destination
+      );
+
+      const duration = Date.now() - startTime;
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error',
+          duration,
+          statusCode: result.statusCode,
+        };
+      }
+
+      return {
+        success: true,
+        response: { content: accumulatedContent },
+        usage: result.usage,
+        cost: result.cost,
+        duration,
+        statusCode: result.statusCode,
+        model: requestData.model,
+        rawResponse: result.rawResponse,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Instance method: Validate test response
+   */
+  validateResponse(
+    result: BaseTestResult,
+    validation: BaseTestValidation
+  ): ValidationResult {
+    return BaseProviderTestUtils.validateTestResponse(result, validation);
+  }
+
+  // ========== Static Utility Methods ==========
+
   /**
    * Create a test provider manager with only specified providers
    */
@@ -103,6 +254,14 @@ export abstract class BaseProviderTestUtils {
         if (validation.maxTokens && (result.usage.totalTokens || 0) > validation.maxTokens) {
           errors.push(`Expected at most ${validation.maxTokens} tokens but got ${result.usage.totalTokens}`);
         }
+
+        // Validate token consistency (integrated from Claude test utils)
+        if (result.usage.promptTokens && result.usage.completionTokens && result.usage.totalTokens) {
+          const expectedTotal = result.usage.promptTokens + result.usage.completionTokens;
+          if (result.usage.totalTokens !== expectedTotal) {
+            errors.push(`Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`);
+          }
+        }
       }
 
       // Check cost information
@@ -110,9 +269,18 @@ export abstract class BaseProviderTestUtils {
         errors.push('Expected cost information but none found');
       }
 
+      if (result.cost && result.cost.costUsd <= 0) {
+        errors.push(`Expected positive cost but got ${result.cost.costUsd}`);
+      }
+
       // Check model
       if (validation.expectedModel && result.cost?.model !== validation.expectedModel) {
         errors.push(`Expected model ${validation.expectedModel} but got ${result.cost?.model}`);
+      }
+
+      // Check response
+      if (validation.expectResponse && !result.response) {
+        errors.push('Expected response data but none found');
       }
     }
 
@@ -123,66 +291,10 @@ export abstract class BaseProviderTestUtils {
   }
 
   /**
-   * Create a mock response object for testing
-   */
-  static createMockResponse() {
-    const res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-      setHeader: jest.fn().mockReturnThis(),
-      write: jest.fn().mockReturnThis(),
-      end: jest.fn().mockReturnThis(),
-      locals: {},
-      headersSent: false,
-    } as any;
-
-    return res;
-  }
-
-  /**
    * Wait for a specified amount of time (useful for rate limiting in tests)
    */
   static async wait(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Extract usage and cost from provider response
-   */
-  protected static async extractUsageAndCost(
-    provider: LLMProvider,
-    response: any,
-    requestData: any
-  ): Promise<{ usage?: UsageInfo; cost?: PricingResult }> {
-    let usage: UsageInfo | undefined;
-    let cost: PricingResult | undefined;
-    
-    if (provider.createUsageExtractor) {
-      const extractor = provider.createUsageExtractor();
-      const parsedResponse = provider.parseResponse(response);
-      usage = extractor.extractFromResponseBody(parsedResponse);
-      
-      if (usage) {
-        // Extract provider cost if available
-        let providerCost: number | undefined;
-        if (provider.extractProviderUsageUsd) {
-          providerCost = provider.extractProviderUsageUsd(response);
-        }
-        
-        // Calculate cost with provider cost preference
-        if (providerCost !== undefined) {
-          cost = {
-            costUsd: providerCost,
-            source: 'provider' as const,
-            model: requestData.model,
-            usage
-          };
-        } else {
-          cost = extractor.calculateCost(requestData.model, usage);
-        }
-      }
-    }
-
-    return { usage, cost };
-  }
 }

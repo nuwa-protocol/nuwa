@@ -1,5 +1,6 @@
 import axios, { AxiosResponse } from "axios";
-import { LLMProvider } from "../providers/LLMProvider.js";
+import { BaseLLMProvider } from "../providers/BaseLLMProvider.js";
+import { TestableLLMProvider } from "../providers/LLMProvider.js";
 import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
 import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
 import { LiteLLMUsageExtractor } from "../billing/usage/providers/LiteLLMUsageExtractor.js";
@@ -11,8 +12,11 @@ import { LITELLM_PATHS } from "../providers/constants.js";
  * It mirrors the key methods used by `OpenRouterService` so the same routing
  * layer can operate on either backend.
  */
-class LiteLLMService implements LLMProvider {
+class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
+  
+  // Provider name
+  readonly providerName = 'litellm';
   
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
@@ -20,6 +24,7 @@ class LiteLLMService implements LLMProvider {
   ] as const;
 
     constructor() {
+    super();
     // Base URL of the LiteLLM Proxy
     this.baseURL = process.env.LITELLM_BASE_URL || "http://localhost:4000";
   }
@@ -43,7 +48,7 @@ class LiteLLMService implements LLMProvider {
     method: string = "POST",
     requestData?: any,
     isStream: boolean = false
-  ): Promise<AxiosResponse | { error: string; status?: number } | null> {
+  ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -69,8 +74,12 @@ class LiteLLMService implements LLMProvider {
 
       return response;
     } catch (error: any) {
-      const { message, statusCode } = this.extractErrorInfo(error);
-      return { error: message, status: statusCode };
+      const errorInfo = await this.extractErrorInfo(error);
+      return { 
+        error: errorInfo.message, 
+        status: errorInfo.statusCode,
+        details: errorInfo.details 
+      };
     }
   }
 
@@ -105,19 +114,6 @@ class LiteLLMService implements LLMProvider {
    * Helper utils                                                       
    * ------------------------------------------------------------------ */
 
-  private extractErrorInfo(error: any): { message: string; statusCode: number } {
-    if (error?.response) {
-      return {
-        message: error.response.data?.error || error.response.data?.message || error.message || "Unknown error",
-        statusCode: error.response.status || 500,
-      };
-    }
-    if (error?.request) {
-      return { message: "No response from LiteLLM", statusCode: 503 };
-    }
-    return { message: error?.message || "Unknown error", statusCode: 500 };
-  }
-
   /**
    * Create LiteLLM-specific usage extractor
    */
@@ -130,6 +126,57 @@ class LiteLLMService implements LLMProvider {
    */
   createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
     return new LiteLLMStreamProcessor(model, initialCost);
+  }
+
+  /**
+   * Get test models for LiteLLM provider
+   * Implementation of TestableLLMProvider interface
+   */
+  getTestModels(): string[] {
+    return [
+      'gpt-3.5-turbo',
+      'gpt-4',
+      'claude-3-haiku-20240307',
+      'claude-3-sonnet-20240229',
+      'gemini-pro'
+    ];
+  }
+
+  /**
+   * Get default test options
+   * Implementation of TestableLLMProvider interface
+   */
+  getDefaultTestOptions(): Record<string, any> {
+    return {
+      model: 'gpt-3.5-turbo',
+      message: 'Hello, this is a test message.',
+      maxTokens: 50,
+      temperature: 0.7
+    };
+  }
+
+  /**
+   * Create test request for the given endpoint
+   * Implementation of TestableLLMProvider interface
+   */
+  createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
+    const defaults = this.getDefaultTestOptions();
+    
+    if (endpoint === LITELLM_PATHS.CHAT_COMPLETIONS) {
+      // Extract normalized options and map to API parameter names
+      const { maxTokens, message, messages, ...rest } = options;
+      
+      return {
+        model: options.model || defaults.model,
+        messages: messages || [{ role: 'user', content: message || defaults.message }],
+        max_tokens: maxTokens || defaults.maxTokens,
+        temperature: options.temperature ?? defaults.temperature,
+        stream: options.stream || false,
+        ...rest  // Include any additional options (like user, metadata, tags)
+      };
+    }
+    
+    throw new Error(`Unknown endpoint for LiteLLM service: ${endpoint}`);
   }
 }
 

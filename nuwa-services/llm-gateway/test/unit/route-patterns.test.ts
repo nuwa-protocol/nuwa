@@ -6,28 +6,21 @@
 describe('Route Patterns Unit Tests', () => {
   describe('Provider Route Matching', () => {
     it('should validate provider route patterns', () => {
-      // Test that our route patterns would match correctly
+      // Test the new provider-first route format: /:provider/*
       const providerRoutes = [
-        '/api/v1/openai/chat/completions',
-        '/api/v1/openrouter/chat/completions',
-        '/api/v1/litellm/chat/completions',
-        '/api/v1/openai/embeddings',
-        '/api/v1/openrouter/models'
+        '/openai/v1/chat/completions',
+        '/openrouter/api/v1/chat/completions',
+        '/litellm/api/v1/chat/completions',
+        '/openai/v1/embeddings',
+        '/claude/v1/messages'
       ];
 
       // In a real Express app, these would be handled by the router
       providerRoutes.forEach(route => {
-        const match = route.match(/^\/api\/v1\/([^\/]+)\/(.*)/);
+        const match = route.match(/^\/([^\/]+)\/(.*)/);
         expect(match).toBeTruthy();
-        expect(match![1]).toMatch(/^(openai|openrouter|litellm)$/);
+        expect(match![1]).toMatch(/^(openai|openrouter|litellm|claude)$/);
       });
-    });
-
-    it('should validate legacy route patterns', () => {
-      const legacyRoute = '/api/v1/chat/completions';
-
-      const legacyMatch = legacyRoute.match(/^\/api\/v1\/chat\/completions$/);
-      expect(legacyMatch).toBeTruthy();
     });
   });
 
@@ -35,24 +28,24 @@ describe('Route Patterns Unit Tests', () => {
     it('should extract provider and path from routes', () => {
       const testCases = [
         {
-          route: '/api/v1/openai/chat/completions',
+          route: '/openai/v1/chat/completions',
           expectedProvider: 'openai',
-          expectedPath: 'chat/completions'
+          expectedPath: '/v1/chat/completions'
         },
         {
-          route: '/api/v1/openrouter/models',
+          route: '/openrouter/api/v1/models',
           expectedProvider: 'openrouter',
-          expectedPath: 'models'
+          expectedPath: '/api/v1/models'
         },
         {
-          route: '/api/v1/litellm/chat/completions',
-          expectedProvider: 'litellm',
-          expectedPath: 'chat/completions'
+          route: '/claude/v1/messages',
+          expectedProvider: 'claude',
+          expectedPath: '/v1/messages'
         }
       ];
 
       testCases.forEach(({ route, expectedProvider, expectedPath }) => {
-        const match = route.match(/^\/api\/v1\/([^\/]+)\/(.*)/);
+        const match = route.match(/^\/([^\/]+)(\/.*)/);
         expect(match).toBeTruthy();
         expect(match![1]).toBe(expectedProvider);
         expect(match![2]).toBe(expectedPath);

@@ -7,6 +7,10 @@ import { UsageInfo } from '../../pricing.js';
  * Handles OpenRouter's Chat Completions format with native USD cost support
  */
 export class OpenRouterUsageExtractor extends BaseUsageExtractor {
+  constructor() {
+    super('openrouter');
+  }
+
   /**
    * Extract usage from OpenRouter response body
    * OpenRouter uses Chat Completions format with additional cost information
