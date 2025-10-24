@@ -27,10 +27,10 @@ export class OpenAIStreamProcessor extends BaseStreamProcessor {
   protected tryExtractResponseBody(chunkText: string): void {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         // Look for Response API completion event
         if (trimmed.startsWith('event: response.completed')) {
           const nextLineIndex = lines.indexOf(line) + 1;
@@ -51,7 +51,7 @@ export class OpenAIStreamProcessor extends BaseStreamProcessor {
             }
           }
         }
-        
+
         // For Chat Completions, we could also accumulate the final response
         // but it's typically not needed for cost calculation
       }

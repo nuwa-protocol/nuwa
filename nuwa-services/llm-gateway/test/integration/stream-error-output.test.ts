@@ -31,7 +31,7 @@ describe('Stream Error Output Integration Test', () => {
     const routeHandler = new RouteHandler({
       providerManager,
       authManager,
-      skipAuth: true
+      skipAuth: true,
     });
 
     // Register Claude provider with mocked API key
@@ -43,7 +43,7 @@ describe('Stream Error Output Integration Test', () => {
       supportsNativeUsdCost: false,
       apiKey: 'test-key',
       baseUrl: 'https://api.anthropic.com',
-      allowedPaths: ['/v1/messages']
+      allowedPaths: ['/v1/messages'],
     });
 
     // Save original forwardRequest for restoration
@@ -64,15 +64,15 @@ describe('Stream Error Output Integration Test', () => {
 
   it('should send error event in SSE format for stream requests', async () => {
     // Mock forwardRequest to return error
-    ClaudeProvider.prototype.forwardRequest = async function() {
+    ClaudeProvider.prototype.forwardRequest = async function () {
       return {
         error: 'system: text content blocks must be non-empty',
         status: 400,
         details: {
           type: 'invalid_request_error',
           code: 'invalid_request',
-          requestId: 'req_test_123'
-        }
+          requestId: 'req_test_123',
+        },
       };
     };
 
@@ -82,7 +82,7 @@ describe('Stream Error Output Integration Test', () => {
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 1024,
         messages: [{ role: 'user', content: '' }],
-        stream: true
+        stream: true,
       })
       .expect(200)
       .expect('Content-Type', /text\/event-stream/);
@@ -95,7 +95,7 @@ describe('Stream Error Output Integration Test', () => {
     // Verify SSE error event was sent
     expect(response.text).toContain('event: error');
     expect(response.text).toContain('data: ');
-    
+
     // Parse the error data
     const lines = response.text.split('\n');
     let errorData: any = null;
@@ -118,25 +118,25 @@ describe('Stream Error Output Integration Test', () => {
 
   it('should handle JSON string with trailing text', async () => {
     // Mock forwardRequest to return error with trailing text (like from airouter)
-    ClaudeProvider.prototype.forwardRequest = async function() {
+    ClaudeProvider.prototype.forwardRequest = async function () {
       const errorJson = JSON.stringify({
         type: 'error',
         error: {
           type: 'invalid_request_error',
-          message: 'system: text content blocks must be non-empty'
+          message: 'system: text content blocks must be non-empty',
         },
-        request_id: 'req_123'
+        request_id: 'req_123',
       });
       const trailingText = '（traceid: xxx） (request id: yyy)';
-      
+
       return {
         error: errorJson + trailingText,
         status: 400,
         details: {
           code: undefined,
           type: '<nil>',
-          requestId: undefined
-        }
+          requestId: undefined,
+        },
       };
     };
 
@@ -146,14 +146,14 @@ describe('Stream Error Output Integration Test', () => {
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 1024,
         messages: [{ role: 'user', content: '' }],
-        stream: true
+        stream: true,
       })
       .expect(200);
 
     console.log('🧪 Response with trailing text:', response.text);
 
     expect(response.text).toContain('event: error');
-    
+
     // Even if parsing fails, error should still be sent
     const lines = response.text.split('\n');
     let hasError = false;
@@ -164,22 +164,22 @@ describe('Stream Error Output Integration Test', () => {
         break;
       }
     }
-    
+
     expect(hasError).toBe(true);
   });
 
   it('should send error event immediately without waiting for stream end', async () => {
     const startTime = Date.now();
-    
+
     // Mock forwardRequest to return error
-    ClaudeProvider.prototype.forwardRequest = async function() {
+    ClaudeProvider.prototype.forwardRequest = async function () {
       return {
         error: 'Test error',
         status: 400,
         details: {
           type: 'test_error',
-          code: 'test_code'
-        }
+          code: 'test_code',
+        },
       };
     };
 
@@ -189,7 +189,7 @@ describe('Stream Error Output Integration Test', () => {
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 1024,
         messages: [{ role: 'user', content: 'test' }],
-        stream: true
+        stream: true,
       })
       .expect(200);
 
@@ -204,22 +204,22 @@ describe('Stream Error Output Integration Test', () => {
 
   it('should work with successful stream (baseline test)', async () => {
     // Mock forwardRequest to return successful stream
-    ClaudeProvider.prototype.forwardRequest = async function() {
+    ClaudeProvider.prototype.forwardRequest = async function () {
       const { Readable } = await import('stream');
-      
+
       const mockStream = new Readable({
         read() {
           // Send some SSE data
           this.push('event: message\n');
           this.push('data: {"type":"content_block_delta","delta":{"text":"Hello"}}\n\n');
           this.push(null); // End stream
-        }
+        },
       });
 
       return {
         status: 200,
         headers: {},
-        data: mockStream
+        data: mockStream,
       };
     };
 
@@ -229,7 +229,7 @@ describe('Stream Error Output Integration Test', () => {
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 1024,
         messages: [{ role: 'user', content: 'Hello' }],
-        stream: true
+        stream: true,
       })
       .expect(200);
 
@@ -239,4 +239,3 @@ describe('Stream Error Output Integration Test', () => {
     expect(response.text).toContain('Hello');
   });
 });
-

@@ -27,7 +27,7 @@ export class ClaudeUsageExtractor extends BaseUsageExtractor {
       }
 
       console.log('[ClaudeUsageExtractor] Extracting Claude usage from response body');
-      
+
       // Claude API uses input_tokens and output_tokens
       const promptTokens = usage.input_tokens || 0;
       const completionTokens = usage.output_tokens || 0;
@@ -36,7 +36,7 @@ export class ClaudeUsageExtractor extends BaseUsageExtractor {
       const result: UsageInfo = {
         promptTokens,
         completionTokens,
-        totalTokens
+        totalTokens,
       };
 
       console.log('[ClaudeUsageExtractor] Extracted usage:', result);
@@ -54,14 +54,14 @@ export class ClaudeUsageExtractor extends BaseUsageExtractor {
   extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
+
         // Look for Claude-specific events
         if (line.startsWith('event: ')) {
           const eventType = line.slice(7).trim();
-          
+
           // Check for events that contain usage information
           if (eventType === 'message_start' || eventType === 'message_delta') {
             // Look for the next data line
@@ -78,14 +78,17 @@ export class ClaudeUsageExtractor extends BaseUsageExtractor {
                     return { usage };
                   }
                 } catch (parseError) {
-                  console.error(`[ClaudeUsageExtractor] Error parsing ${eventType} data:`, parseError);
+                  console.error(
+                    `[ClaudeUsageExtractor] Error parsing ${eventType} data:`,
+                    parseError
+                  );
                 }
               }
             }
           }
         }
       }
-      
+
       return null;
     } catch (error) {
       console.error('[ClaudeUsageExtractor] Error extracting usage from stream chunk:', error);
@@ -134,14 +137,17 @@ export class ClaudeUsageExtractor extends BaseUsageExtractor {
           return {
             promptTokens,
             completionTokens,
-            totalTokens
+            totalTokens,
           };
         }
       }
 
       return null;
     } catch (error) {
-      console.error(`[ClaudeUsageExtractor] Error extracting usage from ${eventType} event data:`, error);
+      console.error(
+        `[ClaudeUsageExtractor] Error extracting usage from ${eventType} event data:`,
+        error
+      );
       return null;
     }
   }

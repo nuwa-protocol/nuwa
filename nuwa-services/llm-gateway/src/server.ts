@@ -1,11 +1,7 @@
-import * as dotenv from "dotenv";
-import express, { Request, Response } from "express";
-import cors from "cors";
-import {
-  VDRRegistry,
-  initRoochVDR,
-  InMemoryLRUDIDDocumentCache,
-} from "@nuwa-ai/identity-kit";
+import * as dotenv from 'dotenv';
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import { VDRRegistry, initRoochVDR, InMemoryLRUDIDDocumentCache } from '@nuwa-ai/identity-kit';
 import { initPaymentKitAndRegisterRoutes, ProviderManager } from './gateway.js';
 import { accessLogMiddleware } from './middleware/accessLog.js';
 import type { LLMGatewayConfig } from './config/cli.js';
@@ -25,10 +21,10 @@ export interface ServerInstance {
 function initializeVDR(network: string = 'test', rpcUrl?: string): void {
   const registry = VDRRegistry.getInstance();
   registry.setCache(new InMemoryLRUDIDDocumentCache(2000));
-  
+
   // Initialize Rooch VDR with network and optional RPC URL
   initRoochVDR(network as any, rpcUrl, registry);
-  
+
   console.log(`🔐 VDR initialized with Rooch network: ${network}${rpcUrl ? ` (${rpcUrl})` : ''}`);
 }
 
@@ -37,28 +33,28 @@ function initializeVDR(network: string = 'test', rpcUrl?: string): void {
  */
 function createApp(config: LLMGatewayConfig): express.Application {
   const app = express();
-  
+
   // CORS configuration
   app.use(
     cors({
-      origin: true, 
+      origin: true,
       credentials: true,
     })
   );
 
   // Body parsing middleware
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true }));
 
   // Access Log middleware (must be before PaymentKit routes)
   app.use(accessLogMiddleware);
 
   // Health check endpoint
-  app.get("/", (req: Request, res: Response) => {
+  app.get('/', (req: Request, res: Response) => {
     res.json({
-      service: "Nuwa LLM Gateway",
-      version: "1.0.0",
-      status: "running",
+      service: 'Nuwa LLM Gateway',
+      version: '1.0.0',
+      status: 'running',
       timestamp: new Date().toISOString(),
       config: {
         network: config.network,
@@ -81,18 +77,18 @@ export async function startServer(
     console.log('🔧 Loading environment variables...');
     // Load environment variables
     dotenv.config();
-    dotenv.config({ path: ".env.local", override: true });
-    
+    dotenv.config({ path: '.env.local', override: true });
+
     // Default configuration
     const defaultConfig: LLMGatewayConfig = {
-      port: parseInt(process.env.PORT || "8080"),
-      host: process.env.HOST || "0.0.0.0",
-      network: process.env.ROOCH_NETWORK as any || "test",
+      port: parseInt(process.env.PORT || '8080'),
+      host: process.env.HOST || '0.0.0.0',
+      network: (process.env.ROOCH_NETWORK as any) || 'test',
       rpcUrl: process.env.ROOCH_NODE_URL,
-      serviceId: process.env.SERVICE_ID || "llm-gateway",
+      serviceId: process.env.SERVICE_ID || 'llm-gateway',
       serviceKey: process.env.SERVICE_KEY,
-      defaultAssetId: process.env.DEFAULT_ASSET_ID || "0x3::gas_coin::RGas",
-      defaultPricePicoUSD: process.env.DEFAULT_PRICE_PICO_USD || "0",
+      defaultAssetId: process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
+      defaultPricePicoUSD: process.env.DEFAULT_PRICE_PICO_USD || '0',
       debug: process.env.DEBUG === 'true',
       adminDid: process.env.ADMIN_DID?.split(',').map(did => did.trim()),
       openaiApiKey: process.env.OPENAI_API_KEY,
@@ -109,30 +105,30 @@ export async function startServer(
 
     // Merge with override configuration
     const config = { ...defaultConfig, ...configOverride };
-    
+
     console.log('🔐 Initializing VDR registry...');
     // Initialize VDR registry
     initializeVDR(config.network, config.rpcUrl);
-    
+
     console.log('🌐 Creating Express application...');
     // Create Express app
     const app = createApp(config);
-    
+
     console.log('💳 Initializing PaymentKit and registering routes...');
     // Initialize PaymentKit and register routes
     await initPaymentKitAndRegisterRoutes(app);
-    
+
     console.log(`🚀 Starting LLM Gateway server...`);
     console.log(`📍 Host: ${config.host}`);
     console.log(`🔌 Port: ${config.port}`);
     console.log(`🌐 Network: ${config.network}`);
     console.log(`🔧 Service ID: ${config.serviceId}`);
     console.log(`🐛 Debug: ${config.debug ? 'enabled' : 'disabled'}`);
-    
+
     // Get registered providers from ProviderManager
     const providerManager = ProviderManager.getInstance();
     const registeredProviders = providerManager.list();
-    
+
     if (registeredProviders.length > 0) {
       console.log(`🤖 Registered providers: ${registeredProviders.join(', ')}`);
     } else {
@@ -142,7 +138,7 @@ export async function startServer(
     return new Promise((resolve, reject) => {
       const server = app.listen(config.port, config.host, () => {
         console.log(`✅ LLM Gateway server is running on http://${config.host}:${config.port}`);
-        
+
         const serverInstance: ServerInstance = {
           app,
           server,
@@ -151,28 +147,27 @@ export async function startServer(
               console.log('🛑 Shutting down server...');
               server.close((err?: Error) => {
                 if (err) {
-                  console.error("❌ Error during shutdown:", err);
+                  console.error('❌ Error during shutdown:', err);
                   closeReject(err);
                 } else {
-                  console.log("✅ Server closed successfully");
+                  console.log('✅ Server closed successfully');
                   closeResolve();
                 }
               });
             });
-          }
+          },
         };
-        
+
         resolve(serverInstance);
       });
-      
+
       server.on('error', (err: Error) => {
-        console.error("❌ Server error:", err);
+        console.error('❌ Server error:', err);
         reject(err);
       });
     });
-    
   } catch (error) {
-    console.error("❌ Error starting server:", error);
+    console.error('❌ Error starting server:', error);
     throw error;
   }
 }
@@ -189,16 +184,15 @@ export async function main() {
         await serverInstance.close();
         process.exit(0);
       } catch (error) {
-        console.error("❌ Error during shutdown:", error);
+        console.error('❌ Error during shutdown:', error);
         process.exit(1);
       }
     };
 
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
-    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }

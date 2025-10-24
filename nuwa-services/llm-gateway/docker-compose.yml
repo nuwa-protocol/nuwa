@@ -4,46 +4,52 @@ services:
   llm-gateway:
     image: ghcr.io/nuwa-protocol/llm-gateway:latest
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
       # Required: Service key for DID authentication and payment
       - SERVICE_KEY=${SERVICE_KEY}
-      
+
       # Required: At least one provider API key
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - LITELLM_API_KEY=${LITELLM_API_KEY}
-      
+
       # Optional: Server configuration
       - PORT=8080
       - HOST=0.0.0.0
       - DEBUG=false
-      
+
       # Optional: Payment and blockchain configuration
       - ROOCH_NETWORK=test
       #- ROOCH_NODE_URL=https://test-seed.rooch.network:443
       # - ADMIN_DID=did:rooch:0x...
-      
+
       # Optional: Provider base URLs (if using custom endpoints)
       # - OPENAI_BASE_URL=https://api.openai.com
       # - OPENROUTER_BASE_URL=https://openrouter.ai
       # - LITELLM_BASE_URL=http://litellm:4000
-      
+
       # Optional: Pricing configuration
       # - PRICING_MULTIPLIER=1.0
       # - PRICING_OVERRIDES={"gpt-4": {"promptPerMTokUsd": 25.0, "completionPerMTokUsd": 50.0}}
-      
+
     volumes:
       # Optional: Mount configuration file
       # - ./config.json:/app/config/config.json:ro
-      
+
       # Optional: Mount logs directory
       # - ./logs:/app/logs
-      
+
     restart: unless-stopped
-    
+
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:8080/', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -68,7 +74,6 @@ services:
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
-
 # Example: Production deployment with resource limits
 # services:
 #   llm-gateway:

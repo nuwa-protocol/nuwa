@@ -17,36 +17,20 @@ describe('Model Pricing Validation', () => {
   describe('PricingRegistry.isModelSupported', () => {
     it('should return true for providers with native USD cost', () => {
       // OpenRouter supports native USD cost
-      const result = pricingRegistry.isModelSupported(
-        'openrouter',
-        'any-model-name',
-        true
-      );
+      const result = pricingRegistry.isModelSupported('openrouter', 'any-model-name', true);
       expect(result).toBe(true);
 
       // LiteLLM also supports native USD cost
-      const result2 = pricingRegistry.isModelSupported(
-        'litellm',
-        'another-model',
-        true
-      );
+      const result2 = pricingRegistry.isModelSupported('litellm', 'another-model', true);
       expect(result2).toBe(true);
     });
 
     it('should return true for configured OpenAI models', () => {
       // Test with known OpenAI models
-      const gpt4Result = pricingRegistry.isModelSupported(
-        'openai',
-        'gpt-4',
-        false
-      );
+      const gpt4Result = pricingRegistry.isModelSupported('openai', 'gpt-4', false);
       expect(gpt4Result).toBe(true);
 
-      const gpt35Result = pricingRegistry.isModelSupported(
-        'openai',
-        'gpt-3.5-turbo',
-        false
-      );
+      const gpt35Result = pricingRegistry.isModelSupported('openai', 'gpt-3.5-turbo', false);
       expect(gpt35Result).toBe(true);
     });
 
@@ -69,28 +53,16 @@ describe('Model Pricing Validation', () => {
 
     it('should return false for unconfigured models without native USD cost', () => {
       // Test with non-existent model for OpenAI
-      const result = pricingRegistry.isModelSupported(
-        'openai',
-        'unknown-model-xyz',
-        false
-      );
+      const result = pricingRegistry.isModelSupported('openai', 'unknown-model-xyz', false);
       expect(result).toBe(false);
 
       // Test with non-existent model for Claude
-      const claudeResult = pricingRegistry.isModelSupported(
-        'claude',
-        'fake-claude-model',
-        false
-      );
+      const claudeResult = pricingRegistry.isModelSupported('claude', 'fake-claude-model', false);
       expect(claudeResult).toBe(false);
     });
 
     it('should handle empty model name', () => {
-      const result = pricingRegistry.isModelSupported(
-        'openai',
-        '',
-        false
-      );
+      const result = pricingRegistry.isModelSupported('openai', '', false);
       // Empty model name won't be found in pricing config
       expect(result).toBe(false);
     });
@@ -105,11 +77,11 @@ describe('Model Pricing Validation', () => {
       // Create test instances with skipAuth enabled
       providerManager = ProviderManager.getInstance();
       authManager = AuthManager.createTestInstance();
-      
+
       routeHandler = new RouteHandler({
         providerManager,
         authManager,
-        skipAuth: true
+        skipAuth: true,
       });
     });
 
@@ -118,17 +90,17 @@ describe('Model Pricing Validation', () => {
       const req = {
         body: {
           model: 'unknown-model-xyz',
-          messages: [{ role: 'user', content: 'test' }]
+          messages: [{ role: 'user', content: 'test' }],
         },
         method: 'POST',
-        path: '/v1/chat/completions'
+        path: '/v1/chat/completions',
       } as Request;
 
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
         setHeader: jest.fn(),
-        locals: {} // Initialize locals property
+        locals: {}, // Initialize locals property
       } as unknown as Response;
 
       // Initialize providers
@@ -137,7 +109,7 @@ describe('Model Pricing Validation', () => {
       // Test with OpenAI (doesn't support native USD cost)
       if (providerManager.has('openai')) {
         await routeHandler.handleProviderRequest(req, res, 'openai');
-        
+
         // Should return 400 error
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith(
@@ -145,8 +117,8 @@ describe('Model Pricing Validation', () => {
             error: expect.objectContaining({
               message: expect.stringContaining('not supported'),
               type: 'invalid_request_error',
-              code: 'model_not_supported'
-            })
+              code: 'model_not_supported',
+            }),
           })
         );
       }
@@ -157,18 +129,18 @@ describe('Model Pricing Validation', () => {
       const req = {
         body: {
           model: 'any-random-model',
-          messages: [{ role: 'user', content: 'test' }]
+          messages: [{ role: 'user', content: 'test' }],
         },
         method: 'POST',
         path: '/api/v1/chat/completions',
-        headers: {}
+        headers: {},
       } as Request;
 
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
         setHeader: jest.fn(),
-        locals: {}
+        locals: {},
       } as unknown as Response;
 
       // Initialize providers
@@ -178,7 +150,7 @@ describe('Model Pricing Validation', () => {
       // This should NOT be rejected due to missing pricing config
       // Note: The actual request will fail due to missing API key or network,
       // but it should NOT fail at the pricing validation stage
-      
+
       // We can't easily test the full flow without mocking network calls,
       // but we can verify the pricing validation logic directly
       const providerConfig = providerManager.get('openrouter');
@@ -196,17 +168,17 @@ describe('Model Pricing Validation', () => {
       // Mock request without model field
       const req = {
         body: {
-          messages: [{ role: 'user', content: 'test' }]
+          messages: [{ role: 'user', content: 'test' }],
         },
         method: 'POST',
-        path: '/v1/chat/completions'
+        path: '/v1/chat/completions',
       } as Request;
 
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
         setHeader: jest.fn(),
-        locals: {} // Initialize locals property
+        locals: {}, // Initialize locals property
       } as unknown as Response;
 
       // Initialize providers
@@ -215,7 +187,7 @@ describe('Model Pricing Validation', () => {
       // Test with OpenAI
       if (providerManager.has('openai')) {
         await routeHandler.handleProviderRequest(req, res, 'openai');
-        
+
         // Should return 400 error
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith(
@@ -223,8 +195,8 @@ describe('Model Pricing Validation', () => {
             error: expect.objectContaining({
               message: expect.stringContaining('Model not specified'),
               type: 'invalid_request_error',
-              code: 'model_not_supported'
-            })
+              code: 'model_not_supported',
+            }),
           })
         );
       }
@@ -236,10 +208,10 @@ describe('Model Pricing Validation', () => {
         body: {
           model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: 'test' }],
-          stream: true
+          stream: true,
         },
         method: 'POST',
-        path: '/v1/chat/completions'
+        path: '/v1/chat/completions',
       } as Request;
 
       const res = {
@@ -249,7 +221,7 @@ describe('Model Pricing Validation', () => {
         write: jest.fn(),
         end: jest.fn(),
         on: jest.fn(),
-        locals: {}
+        locals: {},
       } as unknown as Response;
 
       // Initialize providers
@@ -259,7 +231,7 @@ describe('Model Pricing Validation', () => {
       // We verify this by checking that 400 with model_not_supported is NOT called
       if (providerManager.has('openai')) {
         await routeHandler.handleProviderRequest(req, res, 'openai');
-        
+
         // If pricing validation failed, status would be called with 400
         // and json would be called with model_not_supported error
         // Since we're testing with a valid model, this should not happen
@@ -275,4 +247,3 @@ describe('Model Pricing Validation', () => {
     });
   });
 });
-

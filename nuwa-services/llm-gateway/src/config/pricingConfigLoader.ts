@@ -2,7 +2,6 @@ import { ModelPricing } from '../billing/pricing.js';
 import openaiPricingConfig from './openai-pricing.json' with { type: 'json' };
 import claudePricingConfig from './claude-pricing.json' with { type: 'json' };
 
-
 /**
  * Extended model pricing with description
  */
@@ -35,8 +34,7 @@ export class PricingConfigLoader {
   private static instance: PricingConfigLoader;
   private config: PricingConfig | null = null;
 
-  private constructor() {
-  }
+  private constructor() {}
 
   static getInstance(): PricingConfigLoader {
     if (!PricingConfigLoader.instance) {
@@ -57,13 +55,15 @@ export class PricingConfigLoader {
       // Load individual provider configs
       const configs = [
         { name: 'OpenAI', config: openaiPricingConfig as PricingConfig },
-        { name: 'Claude', config: claudePricingConfig as PricingConfig }
+        { name: 'Claude', config: claudePricingConfig as PricingConfig },
       ];
 
       // Merge all configurations
       this.config = this.mergeConfigs(configs);
-      
-      console.log(`📊 Loaded merged pricing config: ${Object.keys(this.config.models).length} models from ${configs.length} providers`);
+
+      console.log(
+        `📊 Loaded merged pricing config: ${Object.keys(this.config.models).length} models from ${configs.length} providers`
+      );
       return this.config;
     } catch (error) {
       console.error('Error loading pricing config:', error);
@@ -78,7 +78,7 @@ export class PricingConfigLoader {
     const merged: PricingConfig = {
       version: 'merged-' + new Date().toISOString().split('T')[0],
       models: {},
-      modelFamilyPatterns: []
+      modelFamilyPatterns: [],
     };
 
     for (const { name, config } of configs) {
@@ -113,8 +113,8 @@ export class PricingConfigLoader {
   getProviderConfigs(): Record<string, PricingConfig> {
     // Return provider-separated configs
     return {
-      'openai': openaiPricingConfig as PricingConfig,
-      'claude': claudePricingConfig as PricingConfig
+      openai: openaiPricingConfig as PricingConfig,
+      claude: claudePricingConfig as PricingConfig,
     };
   }
 
@@ -124,7 +124,7 @@ export class PricingConfigLoader {
   getProviderModels(provider: string): Record<string, ModelPricing> {
     const configs = this.getProviderConfigs();
     const providerConfig = configs[provider];
-    
+
     if (!providerConfig) {
       return {};
     }
@@ -133,7 +133,7 @@ export class PricingConfigLoader {
     for (const [model, pricing] of Object.entries(providerConfig.models)) {
       models[model] = {
         promptPerMTokUsd: pricing.promptPerMTokUsd,
-        completionPerMTokUsd: pricing.completionPerMTokUsd
+        completionPerMTokUsd: pricing.completionPerMTokUsd,
       };
     }
     return models;
@@ -169,8 +169,10 @@ export class PricingConfigLoader {
 
       // Validate models
       for (const [modelName, model] of Object.entries(config.models)) {
-        if (typeof model.promptPerMTokUsd !== 'number' || 
-            typeof model.completionPerMTokUsd !== 'number') {
+        if (
+          typeof model.promptPerMTokUsd !== 'number' ||
+          typeof model.completionPerMTokUsd !== 'number'
+        ) {
           console.error(`Invalid pricing for model ${modelName}`);
           return false;
         }
@@ -182,13 +184,13 @@ export class PricingConfigLoader {
           console.error(`Invalid model family pattern:`, pattern);
           return false;
         }
-        
+
         // Check if baseModel exists in models
         if (!config.models[pattern.baseModel]) {
           console.error(`Base model ${pattern.baseModel} not found in models`);
           return false;
         }
-        
+
         // Test if pattern is valid regex
         try {
           new RegExp(pattern.pattern);

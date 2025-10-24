@@ -6,7 +6,6 @@ import { RouteHandler } from './core/routeHandler.js';
 import { PathValidator } from './core/pathValidator.js';
 import type { DIDInfo } from './types/index.js';
 
-
 // Re-export types from core modules for backward compatibility
 export type { UpstreamMeta, ProxyResult } from './core/routeHandler.js';
 export type { PathValidationResult } from './core/pathValidator.js';
@@ -23,21 +22,20 @@ export interface GatewayConfig extends AuthConfig {
  * Initialize PaymentKit and register routes using the new modular architecture
  */
 export async function initPaymentKitAndRegisterRoutes(
-  app: express.Application, 
+  app: express.Application,
   config?: GatewayConfig
 ): Promise<ExpressPaymentKit> {
-  
   // Initialize core managers
   const providerManager = ProviderManager.getInstance();
   const authManager = new AuthManager();
-  
+
   // Initialize authentication and PaymentKit
   const authConfig: AuthConfig = {
     serviceId: config?.serviceId || 'llm-gateway',
     defaultAssetId: config?.defaultAssetId || process.env.DEFAULT_ASSET_ID || '0x3::gas_coin::RGas',
     defaultPricePicoUSD: config?.defaultPricePicoUSD || '0',
     adminDid: config?.adminDid || process.env.ADMIN_DID?.split(',') || [],
-    debug: config?.debug ?? (process.env.DEBUG === 'true'),
+    debug: config?.debug ?? process.env.DEBUG === 'true',
     claim: config?.claim || {
       minClaimAmount: BigInt(process.env.MIN_CLAIM_AMOUNT || '100000000'),
       maxConcurrentClaims: Number(process.env.MAX_CONCURRENT_CLAIMS || '5'),
@@ -72,7 +70,7 @@ export async function initPaymentKitAndRegisterRoutes(
 
   // Register PaymentKit routes
   authManager.registerRoutes(app);
-  
+
   return paymentKit;
 }
 
@@ -82,32 +80,32 @@ export async function initPaymentKitAndRegisterRoutes(
 function getProviderStatus(providerManager: ProviderManager) {
   const providers = providerManager.list().map(name => {
     const config = providerManager.get(name)!;
-      return {
-        name,
-        requiresApiKey: config.requiresApiKey,
-        supportsNativeUsdCost: config.supportsNativeUsdCost,
-        status: 'registered'
-      };
-    });
-
-    const envStatus = {
-      // Only show relevant environment variables
-      OPENROUTER_BASE_URL: !!process.env.OPENROUTER_BASE_URL,
-      LITELLM_BASE_URL: !!process.env.LITELLM_BASE_URL,
-      OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
-      PRICING_OVERRIDES: !!process.env.PRICING_OVERRIDES,
+    return {
+      name,
+      requiresApiKey: config.requiresApiKey,
+      supportsNativeUsdCost: config.supportsNativeUsdCost,
+      status: 'registered',
     };
+  });
 
-    // Show which providers are available vs configured
-    const allProviders = ['openrouter', 'openai', 'litellm'];
+  const envStatus = {
+    // Only show relevant environment variables
+    OPENROUTER_BASE_URL: !!process.env.OPENROUTER_BASE_URL,
+    LITELLM_BASE_URL: !!process.env.LITELLM_BASE_URL,
+    OPENAI_BASE_URL: !!process.env.OPENAI_BASE_URL,
+    PRICING_OVERRIDES: !!process.env.PRICING_OVERRIDES,
+  };
+
+  // Show which providers are available vs configured
+  const allProviders = ['openrouter', 'openai', 'litellm'];
   const availableProviders = providerManager.list();
-    const unavailableProviders = allProviders.filter(p => !availableProviders.includes(p));
+  const unavailableProviders = allProviders.filter(p => !availableProviders.includes(p));
 
   return {
-        registered: providers,
-        available: availableProviders,
-        unavailable: unavailableProviders,
-        environment: envStatus,
+    registered: providers,
+    available: availableProviders,
+    unavailable: unavailableProviders,
+    environment: envStatus,
   };
 }
 
@@ -115,8 +113,8 @@ function getProviderStatus(providerManager: ProviderManager) {
  * Create provider routers using the new modular architecture
  */
 function createProviderRouters(
-  paymentKit: ExpressPaymentKit, 
-  routeHandler: RouteHandler, 
+  paymentKit: ExpressPaymentKit,
+  routeHandler: RouteHandler,
   providerManager: ProviderManager
 ): void {
   // Get all registered providers
@@ -133,20 +131,32 @@ function createProviderRouters(
 
   // Register wildcard routes for each provider using correct Express path patterns
   availableProviders.forEach((providerName, index) => {
-    console.log(`📋 Registering routes for provider ${index + 1}/${availableProviders.length}: ${providerName}`);
-    
+    console.log(
+      `📋 Registering routes for provider ${index + 1}/${availableProviders.length}: ${providerName}`
+    );
+
     const providerHandler = (req: Request, res: Response) => {
       return routeHandler.handleProviderRequest(req, res, providerName);
     };
-    
+
     // Use RegExp directly to avoid path-to-regexp interpretation issues
     const pathPattern = new RegExp(`^\\/${providerName}\\/(.*)$`);
-    
+
     try {
       // Register using native ExpressPaymentKit methods
-      paymentKit.post(pathPattern, { pricing: { type: 'FinalCost' } }, providerHandler, `${providerName}.post.wildcard`);
-      paymentKit.get(pathPattern, { pricing: { type: 'FinalCost' } }, providerHandler, `${providerName}.get.wildcard`);
-      
+      paymentKit.post(
+        pathPattern,
+        { pricing: { type: 'FinalCost' } },
+        providerHandler,
+        `${providerName}.post.wildcard`
+      );
+      paymentKit.get(
+        pathPattern,
+        { pricing: { type: 'FinalCost' } },
+        providerHandler,
+        `${providerName}.get.wildcard`
+      );
+
       console.log(`   ✅ Successfully registered routes for ${providerName}`);
     } catch (error) {
       console.error(`   ❌ Failed to register routes for ${providerName}:`, error);
@@ -164,38 +174,35 @@ export { PathValidator } from './core/pathValidator.js';
  * Create a test instance of the gateway for testing purposes
  * This allows testing without PaymentKit integration
  */
-export function createTestGateway(config?: {
-  skipAuth?: boolean;
-  enabledProviders?: string[];
-}): {
+export function createTestGateway(config?: { skipAuth?: boolean; enabledProviders?: string[] }): {
   providerManager: ProviderManager;
   authManager: AuthManager;
   routeHandler: RouteHandler;
 } {
   const providerManager = ProviderManager.createTestInstance();
   const authManager = AuthManager.createTestInstance();
-  
+
   // Initialize providers for testing
-  providerManager.initializeProviders({ 
-    skipEnvCheck: true 
+  providerManager.initializeProviders({
+    skipEnvCheck: true,
   });
-  
+
   // Filter to enabled providers if specified
   if (config?.enabledProviders) {
     const allProviders = providerManager.list();
     allProviders.forEach(providerName => {
       if (!config.enabledProviders!.includes(providerName)) {
         providerManager.unregister(providerName);
-    }
-  });
-}
+      }
+    });
+  }
 
   const routeHandler = new RouteHandler({
     providerManager,
     authManager,
     skipAuth: config?.skipAuth ?? true,
   });
-  
+
   return {
     providerManager,
     authManager,

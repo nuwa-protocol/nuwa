@@ -47,7 +47,7 @@ export class ClaudeTestUtils extends BaseProviderTestUtils<ClaudeProvider> {
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
-      ...config
+      ...config,
     };
     return this.testNonStreaming(CLAUDE_PATHS.MESSAGES, options);
   }
@@ -55,16 +55,17 @@ export class ClaudeTestUtils extends BaseProviderTestUtils<ClaudeProvider> {
   /**
    * Instance method: Test streaming message completion
    */
-  async testStreamingMessageCompletion(config: Partial<ClaudeMessageConfig> = {}): Promise<BaseTestResult> {
+  async testStreamingMessageCompletion(
+    config: Partial<ClaudeMessageConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
       stream: true,
-      ...config
+      ...config,
     };
     return this.testStreaming(CLAUDE_PATHS.MESSAGES, options);
   }
-
 }

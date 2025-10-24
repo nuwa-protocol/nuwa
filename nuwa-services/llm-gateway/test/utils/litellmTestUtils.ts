@@ -1,4 +1,4 @@
-import LiteLLMService from '../../src/services/litellm.js';
+import LiteLLMService from '../../src/providers/litellm.js';
 import { BaseProviderTestUtils, BaseTestResult } from './baseTestUtils.js';
 import { LITELLM_PATHS } from '../../src/providers/constants.js';
 
@@ -38,13 +38,15 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
   /**
    * Instance method: Test chat completion
    */
-  async testChatCompletion(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testChatCompletion(
+    config: Partial<LiteLLMChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
-      ...config
+      ...config,
     };
     return this.testNonStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -52,14 +54,16 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
   /**
    * Instance method: Test streaming chat completion
    */
-  async testStreamingChatCompletion(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testStreamingChatCompletion(
+    config: Partial<LiteLLMChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
       maxTokens: config.max_tokens,
       temperature: config.temperature,
       stream: true,
-      ...config
+      ...config,
     };
     return this.testStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -67,7 +71,9 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
   /**
    * Instance method: Test chat completion with metadata
    */
-  async testChatCompletionWithMetadata(config: Partial<LiteLLMChatCompletionConfig> = {}): Promise<BaseTestResult> {
+  async testChatCompletionWithMetadata(
+    config: Partial<LiteLLMChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
     const options = {
       model: config.model,
       messages: config.messages,
@@ -77,10 +83,10 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
       metadata: {
         test_run: true,
         environment: 'integration-test',
-        ...config.metadata
+        ...config.metadata,
       },
       tags: config.tags || ['test', 'integration'],
-      ...config
+      ...config,
     };
     return this.testNonStreaming(LITELLM_PATHS.CHAT_COMPLETIONS, options);
   }
@@ -98,5 +104,5 @@ export class LiteLLMTestUtils extends BaseProviderTestUtils<LiteLLMService> {
       'claude-3-sonnet-20240229',
       'gemini-pro',
     ];
-  } 
+  }
 }

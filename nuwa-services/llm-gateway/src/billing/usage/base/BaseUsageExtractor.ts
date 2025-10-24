@@ -55,10 +55,12 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
       // Use provider-specific pricing
       const result = pricingRegistry.calculateProviderCost(this.provider, model, usage);
       if (result) {
-        console.log(`[${this.constructor.name}] Calculated cost for ${this.provider}/${model}: $${result.costUsd}`);
+        console.log(
+          `[${this.constructor.name}] Calculated cost for ${this.provider}/${model}: $${result.costUsd}`
+        );
         return result;
       }
-      
+
       // No pricing found for this provider/model combination
       console.warn(`[${this.constructor.name}] No pricing found for ${this.provider}/${model}`);
       return null;
@@ -94,17 +96,19 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
   protected extractResponseAPIUsage(usage: any): UsageInfo {
     const baseInputTokens = usage.input_tokens || 0;
     const baseOutputTokens = usage.output_tokens || 0;
-    
+
     // Extract tool-related tokens dynamically
     let toolTokens = 0;
     const keys = Object.keys(usage);
-    
+
     for (const key of keys) {
       // Match all *_tokens fields except the standard ones
-      if (key.endsWith('_tokens') && 
-          key !== 'input_tokens' && 
-          key !== 'output_tokens' && 
-          key !== 'total_tokens') {
+      if (
+        key.endsWith('_tokens') &&
+        key !== 'input_tokens' &&
+        key !== 'output_tokens' &&
+        key !== 'total_tokens'
+      ) {
         const tokenValue = usage[key];
         if (typeof tokenValue === 'number' && tokenValue > 0) {
           toolTokens += tokenValue;
@@ -112,12 +116,12 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
         }
       }
     }
-    
+
     // Tool tokens are typically added to input tokens
     const promptTokens = baseInputTokens + toolTokens;
     const completionTokens = baseOutputTokens;
-    const totalTokens = usage.total_tokens || (promptTokens + completionTokens);
-    
+    const totalTokens = usage.total_tokens || promptTokens + completionTokens;
+
     return {
       promptTokens,
       completionTokens,
@@ -132,7 +136,8 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
     return {
       promptTokens: usage.prompt_tokens || 0,
       completionTokens: usage.completion_tokens || 0,
-      totalTokens: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+      totalTokens:
+        usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
     };
   }
 

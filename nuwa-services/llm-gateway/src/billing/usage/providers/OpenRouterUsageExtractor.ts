@@ -41,31 +41,37 @@ export class OpenRouterUsageExtractor extends BaseUsageExtractor {
   extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         // Handle Chat Completions API format: data: {...usage...}
         if (trimmed.startsWith('data: ') && trimmed.includes('"usage"')) {
           const dataStr = trimmed.slice(6); // Remove 'data: ' prefix
           if (dataStr === '[DONE]') continue;
-          
+
           try {
             const data = JSON.parse(dataStr);
             // Chat Completions API: usage is at root level
             if (data.usage) {
-              console.log('[OpenRouterUsageExtractor] Found OpenRouter usage in stream chunk:', JSON.stringify(data.usage));
-              
+              console.log(
+                '[OpenRouterUsageExtractor] Found OpenRouter usage in stream chunk:',
+                JSON.stringify(data.usage)
+              );
+
               const result: { usage: UsageInfo; cost?: number } = {
-                usage: this.extractChatCompletionUsage(data.usage)
+                usage: this.extractChatCompletionUsage(data.usage),
               };
-              
+
               // OpenRouter provides native USD cost in usage.cost
               if (typeof data.usage.cost === 'number') {
                 result.cost = data.usage.cost;
-                console.log('[OpenRouterUsageExtractor] Found cost in OpenRouter usage:', result.cost);
+                console.log(
+                  '[OpenRouterUsageExtractor] Found cost in OpenRouter usage:',
+                  result.cost
+                );
               }
-              
+
               return result;
             }
           } catch (parseError) {
@@ -77,7 +83,7 @@ export class OpenRouterUsageExtractor extends BaseUsageExtractor {
       console.error('[OpenRouterUsageExtractor] Error extracting usage from stream chunk:', error);
       console.error('Chunk text:', chunkText.slice(0, 200));
     }
-    
+
     return null;
   }
 
@@ -88,7 +94,7 @@ export class OpenRouterUsageExtractor extends BaseUsageExtractor {
   extractProviderCost(response: AxiosResponse): number | undefined {
     try {
       const data = response.data;
-      
+
       // Check if this is a stream response (data has pipe method)
       if (data && typeof data === 'object' && typeof data.pipe === 'function') {
         // For stream responses, cost is not available at this stage
@@ -118,7 +124,9 @@ export class OpenRouterUsageExtractor extends BaseUsageExtractor {
           }
         } catch {
           // Try regex fallback
-          const m = usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) || usageHeader.match(/cost=([0-9.]+)/i);
+          const m =
+            usageHeader.match(/total[_-]?cost[_usd]*=([0-9.]+)/i) ||
+            usageHeader.match(/cost=([0-9.]+)/i);
           if (m && m[1]) {
             const n = Number(m[1]);
             if (Number.isFinite(n)) {
@@ -129,7 +137,10 @@ export class OpenRouterUsageExtractor extends BaseUsageExtractor {
         }
       }
     } catch (error) {
-      console.error('[OpenRouterUsageExtractor] Error extracting USD cost from OpenRouter response:', error);
+      console.error(
+        '[OpenRouterUsageExtractor] Error extracting USD cost from OpenRouter response:',
+        error
+      );
     }
     return undefined;
   }

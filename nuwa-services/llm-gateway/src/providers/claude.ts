@@ -1,11 +1,11 @@
-import axios, { AxiosResponse } from "axios";
-import { BaseLLMProvider } from "./BaseLLMProvider.js";
-import { TestableLLMProvider } from "./LLMProvider.js";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { ClaudeUsageExtractor } from "../billing/usage/providers/ClaudeUsageExtractor.js";
-import { ClaudeStreamProcessor } from "../billing/usage/providers/ClaudeStreamProcessor.js";
-import { CLAUDE_PATHS } from "./constants.js";
+import axios, { AxiosResponse } from 'axios';
+import { BaseLLMProvider } from './BaseLLMProvider.js';
+import { TestableLLMProvider } from './LLMProvider.js';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { ClaudeUsageExtractor } from '../billing/usage/providers/ClaudeUsageExtractor.js';
+import { ClaudeStreamProcessor } from '../billing/usage/providers/ClaudeStreamProcessor.js';
+import { CLAUDE_PATHS } from './constants.js';
 
 /**
  * Claude Provider Implementation
@@ -13,18 +13,16 @@ import { CLAUDE_PATHS } from "./constants.js";
  */
 export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
-  
+
   // Provider name
   readonly providerName = 'claude';
-  
+
   // Define supported paths for this provider
-  readonly SUPPORTED_PATHS = [
-    CLAUDE_PATHS.MESSAGES
-  ] as const;
+  readonly SUPPORTED_PATHS = [CLAUDE_PATHS.MESSAGES] as const;
 
   constructor() {
     super();
-    this.baseURL = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
+    this.baseURL = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
   }
 
   /**
@@ -56,7 +54,7 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
   async forwardRequest(
     apiKey: string | null,
     path: string,
-    method: string = "POST",
+    method: string = 'POST',
     data?: any,
     isStream: boolean = false
   ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
@@ -64,29 +62,31 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
       // Add API key header (required for Claude)
       if (!apiKey) {
         return {
-          error: "API key is required for Claude provider",
-          status: 401
+          error: 'API key is required for Claude provider',
+          status: 401,
         };
       }
 
       const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01", // Required by Claude API
-        "Authorization": `Bearer ${apiKey}`
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01', // Required by Claude API
+        Authorization: `Bearer ${apiKey}`,
       };
 
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
 
       const fullUrl = `${this.baseURL}${path}`;
-      console.log(`🔄 Forwarding ${method} request to Claude: ${fullUrl}, data: ${JSON.stringify(finalData)}`);
+      console.log(
+        `🔄 Forwarding ${method} request to Claude: ${fullUrl}, data: ${JSON.stringify(finalData)}`
+      );
 
       const response = await axios({
         method: method.toLowerCase() as any,
         url: fullUrl,
         data: finalData,
         headers,
-        responseType: isStream ? "stream" : "json",
+        responseType: isStream ? 'stream' : 'json',
       });
 
       return response;
@@ -95,7 +95,7 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
       return {
         error: errorInfo.message,
         status: errorInfo.statusCode,
-        details: errorInfo.details
+        details: errorInfo.details,
       };
     }
   }
@@ -106,12 +106,12 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
   parseResponse(response: AxiosResponse): any {
     try {
       const data = response.data;
-      
+
       // Claude API returns response in a specific format
       // Basic parsing - detailed usage extraction is handled by ClaudeUsageExtractor
       return {
         ...data,
-        provider: 'claude'
+        provider: 'claude',
       };
     } catch (error) {
       console.error('❌ Error parsing Claude response:', error);
@@ -142,16 +142,12 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
     return new ClaudeStreamProcessor(model, initialCost);
   }
 
-
   /**
    * Get test models for Claude provider
    * Implementation of TestableLLMProvider interface
    */
   getTestModels(): string[] {
-    return [
-      'claude-3-5-haiku-20241022',
-      'claude-sonnet-4-5-20250929',
-    ];
+    return ['claude-3-5-haiku-20241022', 'claude-sonnet-4-5-20250929'];
   }
 
   /**
@@ -163,7 +159,7 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
       model: 'claude-3-5-haiku-20241022',
       message: 'Hello! Please respond with a brief greeting.',
       maxTokens: 100,
-      temperature: 0.7
+      temperature: 0.7,
     };
   }
 
@@ -173,23 +169,21 @@ export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
-    
+
     if (endpoint === CLAUDE_PATHS.MESSAGES) {
       // Extract normalized options and map to API parameter names
       const { maxTokens, message, messages, ...rest } = options;
-      
+
       return {
         model: options.model || defaults.model,
         max_tokens: maxTokens || defaults.maxTokens,
         temperature: options.temperature ?? defaults.temperature,
-        messages: messages || [
-          { role: 'user', content: message || defaults.message }
-        ],
+        messages: messages || [{ role: 'user', content: message || defaults.message }],
         stream: options.stream || false,
-        ...rest  // Include any additional options
+        ...rest, // Include any additional options
       };
     }
-    
+
     throw new Error(`Unknown endpoint for Claude provider: ${endpoint}`);
   }
 }

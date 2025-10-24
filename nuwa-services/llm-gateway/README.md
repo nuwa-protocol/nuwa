@@ -1,13 +1,18 @@
 # @nuwa-ai/llm-gateway
 
-LLM Gateway is a multi-provider LLM API gateway with DID authentication and payment integration. It supports OpenAI, OpenRouter, LiteLLM, and Anthropic Claude providers with intelligent usage tracking and cost calculation.
+LLM Gateway is a multi-provider LLM API gateway with DID authentication and
+payment integration. It supports OpenAI, OpenRouter, LiteLLM, and Anthropic
+Claude providers with intelligent usage tracking and cost calculation.
 
 ## ✨ Core Features
 
-- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, and Anthropic Claude integration
-- **🔐 DID Authentication**: Decentralized identity authentication with PaymentKit integration  
+- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, and Anthropic
+  Claude integration
+- **🔐 DID Authentication**: Decentralized identity authentication with
+  PaymentKit integration
 - **💳 Payment Integration**: Built-in payment channels and usage-based billing
-- **📊 Intelligent Usage Tracking**: Automatic token consumption and cost calculation
+- **📊 Intelligent Usage Tracking**: Automatic token consumption and cost
+  calculation
 - **🚀 Provider-First Routing**: Clean `/provider/api/path` routing pattern
 - **💰 Gateway Pricing**: Built-in pricing calculation with provider fallback
 - **⚡ Streaming Support**: Full streaming support with usage tracking
@@ -46,7 +51,7 @@ export SERVICE_KEY=0x...your_generated_key...
 export OPENAI_API_KEY=sk-proj-...
 # OR
 export OPENROUTER_API_KEY=sk-or-v1-...
-# OR  
+# OR
 export LITELLM_API_KEY=sk-...
 # OR
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -70,7 +75,8 @@ llm-gateway --config config.json --debug
 Use the **Nuwa Login Demo** for easy testing:
 
 1. 🚀 Start your gateway: `llm-gateway --debug`
-2. 🌐 Open [https://nuwa-login-demo.pages.dev/](https://nuwa-login-demo.pages.dev/)
+2. 🌐 Open
+   [https://nuwa-login-demo.pages.dev/](https://nuwa-login-demo.pages.dev/)
 3. 🔗 Configure the demo to connect to `http://localhost:8080`
 4. 🔐 Connect your wallet and authenticate with DID
 5. 💬 Test chat completions with different providers
@@ -82,22 +88,22 @@ The demo handles all the complex authentication and payment setup automatically!
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SERVICE_KEY` | Service private key for DID signing | ✅ |
-| `OPENAI_API_KEY` | OpenAI API key | ⚠️ |
-| `OPENROUTER_API_KEY` | OpenRouter API key | ⚠️ |
-| `LITELLM_API_KEY` | LiteLLM API key | ⚠️ |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key | ⚠️ |
-| `PORT` | Server port (default: 8080) | ❌ |
-| `HOST` | Server host (default: 0.0.0.0) | ❌ |
-| `ROOCH_NETWORK` | Rooch network (default: test) | ❌ |
-| `ROOCH_NODE_URL` | Rooch RPC URL | ❌ |
-| `DEFAULT_ASSET_ID` | Default asset ID | ❌ |
-| `ADMIN_DID` | Admin DID (comma-separated) | ❌ |
-| `DEBUG` | Enable debug logging | ❌ |
-| `PRICING_OVERRIDES` | Custom model pricing (JSON format) | ❌ |
-| `PRICING_MULTIPLIER` | Global multiplier for final USD cost (0~2, e.g., 1.1 = +10%) | ❌ |
+| Variable             | Description                                                  | Required |
+| -------------------- | ------------------------------------------------------------ | -------- |
+| `SERVICE_KEY`        | Service private key for DID signing                          | ✅       |
+| `OPENAI_API_KEY`     | OpenAI API key                                               | ⚠️       |
+| `OPENROUTER_API_KEY` | OpenRouter API key                                           | ⚠️       |
+| `LITELLM_API_KEY`    | LiteLLM API key                                              | ⚠️       |
+| `ANTHROPIC_API_KEY`  | Anthropic Claude API key                                     | ⚠️       |
+| `PORT`               | Server port (default: 8080)                                  | ❌       |
+| `HOST`               | Server host (default: 0.0.0.0)                               | ❌       |
+| `ROOCH_NETWORK`      | Rooch network (default: test)                                | ❌       |
+| `ROOCH_NODE_URL`     | Rooch RPC URL                                                | ❌       |
+| `DEFAULT_ASSET_ID`   | Default asset ID                                             | ❌       |
+| `ADMIN_DID`          | Admin DID (comma-separated)                                  | ❌       |
+| `DEBUG`              | Enable debug logging                                         | ❌       |
+| `PRICING_OVERRIDES`  | Custom model pricing (JSON format)                           | ❌       |
+| `PRICING_MULTIPLIER` | Global multiplier for final USD cost (0~2, e.g., 1.1 = +10%) | ❌       |
 
 ⚠️ At least one provider API key is required
 
@@ -131,7 +137,9 @@ DEBUG=true
 
 ### Custom Model Pricing
 
-The `PRICING_OVERRIDES` environment variable allows you to customize pricing for existing models or add pricing for new models that aren't in the default configuration.
+The `PRICING_OVERRIDES` environment variable allows you to customize pricing for
+existing models or add pricing for new models that aren't in the default
+configuration.
 
 #### Format
 
@@ -142,18 +150,21 @@ PRICING_OVERRIDES='{"model-name": {"promptPerMTokUsd": price, "completionPerMTok
 #### Examples
 
 **Override existing model pricing:**
+
 ```bash
 # Override GPT-4 pricing
 PRICING_OVERRIDES='{"gpt-4": {"promptPerMTokUsd": 25.0, "completionPerMTokUsd": 50.0}}'
 ```
 
 **Add pricing for new models:**
+
 ```bash
 # Add pricing for custom models
 PRICING_OVERRIDES='{"custom-model": {"promptPerMTokUsd": 10.0, "completionPerMTokUsd": 20.0}}'
 ```
 
 **Multiple model overrides:**
+
 ```bash
 # Override multiple models at once
 PRICING_OVERRIDES='{
@@ -165,11 +176,16 @@ PRICING_OVERRIDES='{
 
 #### How It Works
 
-1. **Loading Order**: Default pricing configuration is loaded first, then overrides are applied
-2. **Merge Strategy**: Overrides are merged with existing pricing using spread operator (`{...default, ...overrides}`)
-3. **New Models**: Models not in the default configuration can be added via overrides
-4. **Cost Calculation**: Both existing and new models work with the cost calculation system
-5. **Real-time Effect**: Changes take effect when the service starts (no restart needed during runtime)
+1. **Loading Order**: Default pricing configuration is loaded first, then
+   overrides are applied
+2. **Merge Strategy**: Overrides are merged with existing pricing using spread
+   operator (`{...default, ...overrides}`)
+3. **New Models**: Models not in the default configuration can be added via
+   overrides
+4. **Cost Calculation**: Both existing and new models work with the cost
+   calculation system
+5. **Real-time Effect**: Changes take effect when the service starts (no restart
+   needed during runtime)
 
 #### Verification
 
@@ -185,7 +201,8 @@ llm-gateway --debug
 - **Custom Models**: Add pricing for proprietary or fine-tuned models
 - **Cost Optimization**: Adjust pricing based on your actual costs or agreements
 - **Testing**: Use different pricing for development/testing environments
-- **Provider Differences**: Set different prices for the same model across providers
+- **Provider Differences**: Set different prices for the same model across
+  providers
 
 ## 🌐 API Endpoints
 
@@ -196,7 +213,7 @@ llm-gateway --debug
 POST /openai/v1/chat/completions
 POST /openai/v1/responses
 
-# OpenRouter requests  
+# OpenRouter requests
 POST /openrouter/api/v1/chat/completions
 
 # LiteLLM requests
@@ -214,14 +231,18 @@ GET /.well-known/nuwa-payment/info      # Payment service discovery
 
 ### Using Nuwa Login Demo (Recommended)
 
-Since the LLM Gateway requires DID authentication and payment integration, direct curl requests won't work without proper authentication setup. For testing and development, we recommend using the **Nuwa Login Demo**:
+Since the LLM Gateway requires DID authentication and payment integration,
+direct curl requests won't work without proper authentication setup. For testing
+and development, we recommend using the **Nuwa Login Demo**:
 
 🔗 **[https://nuwa-login-demo.pages.dev/](https://nuwa-login-demo.pages.dev/)**
 
 This demo provides:
+
 - ✅ **DID Authentication**: Automatic wallet connection and DID signing
 - ✅ **Payment Integration**: Built-in payment channel management
-- ✅ **Interactive Testing**: Easy-to-use interface for testing different providers
+- ✅ **Interactive Testing**: Easy-to-use interface for testing different
+  providers
 - ✅ **Real-time Results**: See responses and usage tracking in action
 
 ### Manual Testing (Advanced)
@@ -229,10 +250,12 @@ This demo provides:
 If you need to test with curl, you'll need to:
 
 1. **Set up DID Authentication**: Generate proper DIDAuthV1 headers
-2. **Configure Payment Channels**: Set up payment channels with sufficient balance
+2. **Configure Payment Channels**: Set up payment channels with sufficient
+   balance
 3. **Use Payment Kit Client**: Implement proper payment channel management
 
 Example request structure (requires proper authentication):
+
 ```bash
 curl -X POST http://localhost:8080/openai/v1/chat/completions \
   -H "Authorization: DIDAuthV1 <signature_data>" \
@@ -247,6 +270,7 @@ curl -X POST http://localhost:8080/openai/v1/chat/completions \
 ```
 
 **Claude API Example:**
+
 ```bash
 curl -X POST http://localhost:8080/claude/v1/messages \
   -H "Authorization: DIDAuthV1 <signature_data>" \
@@ -261,7 +285,9 @@ curl -X POST http://localhost:8080/claude/v1/messages \
   }'
 ```
 
-> **Note**: Manual authentication setup is complex. We strongly recommend using the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) for testing and development.
+> **Note**: Manual authentication setup is complex. We strongly recommend using
+> the [Nuwa Login Demo](https://nuwa-login-demo.pages.dev/) for testing and
+> development.
 
 ## 🛠️ CLI Options
 
@@ -321,21 +347,22 @@ docker run -d -p 8080:8080 \
 
 All CLI environment variables are supported in Docker. Key variables:
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SERVICE_KEY` | Service private key for DID signing | ✅ |
-| `OPENAI_API_KEY` | OpenAI API key | ⚠️ |
-| `OPENROUTER_API_KEY` | OpenRouter API key | ⚠️ |
-| `LITELLM_API_KEY` | LiteLLM API key | ⚠️ |
-| `PORT` | Server port (default: 8080) | ❌ |
-| `HOST` | Server host (default: 0.0.0.0) | ❌ |
-| `DEBUG` | Enable debug logging | ❌ |
+| Variable             | Description                         | Required |
+| -------------------- | ----------------------------------- | -------- |
+| `SERVICE_KEY`        | Service private key for DID signing | ✅       |
+| `OPENAI_API_KEY`     | OpenAI API key                      | ⚠️       |
+| `OPENROUTER_API_KEY` | OpenRouter API key                  | ⚠️       |
+| `LITELLM_API_KEY`    | LiteLLM API key                     | ⚠️       |
+| `PORT`               | Server port (default: 8080)         | ❌       |
+| `HOST`               | Server host (default: 0.0.0.0)      | ❌       |
+| `DEBUG`              | Enable debug logging                | ❌       |
 
 ⚠️ At least one provider API key is required
 
 ### Docker Compose
 
-Use the provided `docker-compose.yml` file in the repository for easy deployment:
+Use the provided `docker-compose.yml` file in the repository for easy
+deployment:
 
 ```bash
 # Clone the repository and navigate to the service directory
@@ -351,12 +378,14 @@ docker-compose up -d
 ```
 
 The `docker-compose.yml` file includes:
+
 - ✅ **Complete configuration** with all environment variables
 - ✅ **Health checks** for service monitoring
 - ✅ **Optional LiteLLM service** for additional provider support
 - ✅ **Production deployment examples** with resource limits
 
-For detailed configuration options, see the [`docker-compose.yml`](./docker-compose.yml) file in the repository.
+For detailed configuration options, see the
+[`docker-compose.yml`](./docker-compose.yml) file in the repository.
 
 ### Building from Source
 
@@ -388,22 +417,27 @@ For production environments, consider:
 4. **Monitoring**: Add health checks and monitoring
 5. **Load Balancing**: Use multiple replicas behind a load balancer
 
-See the production deployment examples in the [`docker-compose.yml`](./docker-compose.yml) file for detailed configuration.
+See the production deployment examples in the
+[`docker-compose.yml`](./docker-compose.yml) file for detailed configuration.
 
 ## 🔍 Troubleshooting
 
 ### Gateway Exits Immediately
 
-If `llm-gateway` starts and exits immediately without errors, this is usually due to missing required environment variables:
+If `llm-gateway` starts and exits immediately without errors, this is usually
+due to missing required environment variables:
 
-1. **Missing SERVICE_KEY**: Generate from https://test-id.nuwa.dev and set `export SERVICE_KEY=0x...`
-2. **Missing Provider API Keys**: Set at least one: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `LITELLM_API_KEY`, or `ANTHROPIC_API_KEY`
+1. **Missing SERVICE_KEY**: Generate from https://test-id.nuwa.dev and set
+   `export SERVICE_KEY=0x...`
+2. **Missing Provider API Keys**: Set at least one: `OPENAI_API_KEY`,
+   `OPENROUTER_API_KEY`, `LITELLM_API_KEY`, or `ANTHROPIC_API_KEY`
 3. **Port Already in Use**: Change the port with `--port <number>`
 
 ### Common Error Messages
 
 - **"SERVICE_KEY is required"**: Generate and set a SERVICE_KEY
-- **"At least one provider API key is required"**: Set at least one provider API key
+- **"At least one provider API key is required"**: Set at least one provider API
+  key
 - **"Port already in use"**: Change the port with `--port <number>`
 - **"Configuration validation failed"**: Check your config file syntax
 
@@ -424,42 +458,52 @@ If `llm-gateway` starts and exits immediately without errors, this is usually du
 
 ### Streaming and Non-Streaming Support
 
-- **Non-streaming requests**: Directly extracts usage information from response body
-- **Streaming requests**: Intelligently parses usage data from SSE streams (typically in the last chunk)
+- **Non-streaming requests**: Directly extracts usage information from response
+  body
+- **Streaming requests**: Intelligently parses usage data from SSE streams
+  (typically in the last chunk)
 
 ### Transparent Operation
 
-- Users require no additional configuration; the system automatically enables usage tracking
-- Completely transparent to existing API calls, does not affect original functionality
-- Automatically handles OpenRouter's credits to USD conversion (1 credit = $0.000001)
+- Users require no additional configuration; the system automatically enables
+  usage tracking
+- Completely transparent to existing API calls, does not affect original
+  functionality
+- Automatically handles OpenRouter's credits to USD conversion (1 credit =
+  $0.000001)
 
 ## 🏗️ Architecture
 
 ### Modular Design
 
-LLM Gateway features a **modular, provider-first architecture** that ensures scalability, maintainability, and performance:
+LLM Gateway features a **modular, provider-first architecture** that ensures
+scalability, maintainability, and performance:
 
-- **🔌 Provider Abstraction**: Each LLM provider (OpenAI, OpenRouter, LiteLLM) has dedicated usage extractors and stream processors
-- **⚡ High Performance**: Microsecond-level response times (0.0017ms for usage extraction, 0.0024ms for cost calculation)
-- **🧩 Pluggable Components**: Easy to add new providers by implementing standard interfaces
+- **🔌 Provider Abstraction**: Each LLM provider (OpenAI, OpenRouter, LiteLLM)
+  has dedicated usage extractors and stream processors
+- **⚡ High Performance**: Microsecond-level response times (0.0017ms for usage
+  extraction, 0.0024ms for cost calculation)
+- **🧩 Pluggable Components**: Easy to add new providers by implementing
+  standard interfaces
 - **🔒 Error Isolation**: Provider-specific errors don't affect other providers
 - **📈 Scalable**: Designed to handle high-concurrency scenarios efficiently
 
 ### Key Components
 
 1. **UsageExtractor**: Handles provider-specific usage data extraction
-2. **StreamProcessor**: Manages real-time streaming response processing  
+2. **StreamProcessor**: Manages real-time streaming response processing
 3. **CostCalculator**: Unified cost calculation with provider fallback
 4. **Provider Interface**: Standardized interface for all LLM providers
 
 ### Performance Characteristics
 
 - **Usage Extraction**: 0.0017ms average
-- **Cost Calculation**: 0.0024ms average  
+- **Cost Calculation**: 0.0024ms average
 - **Memory Efficiency**: Only 0.24MB increase per 100 operations
 - **Concurrent Processing**: 0.0082ms average for 50 concurrent operations
 
 For detailed architecture information, see:
+
 - 📖 [Architecture Documentation](docs/ARCHITECTURE.md)
 - 🚀 [Migration Guide](docs/MIGRATION_GUIDE.md)
 
@@ -519,14 +563,14 @@ llm-gateway/
 
 ## 🎯 Feature Comparison
 
-| Feature          | Traditional Approach      | LLM Gateway               |
-| ---------------- | ------------------------- | ------------------------- |
-| Usage Tracking   | Manual configuration      | ✅ Automatic enablement   |
-| Streaming        | Complex parsing logic     | ✅ Intelligent handling   |
-| Cost Calculation | Manual credits conversion | ✅ Auto USD conversion    |
-| Authentication   | Custom implementation     | ✅ DID-based auth         |
-| Payment          | External billing system   | ✅ Built-in payment kit   |
-| Multi-Provider   | Multiple integrations     | ✅ Unified interface      |
+| Feature          | Traditional Approach      | LLM Gateway             |
+| ---------------- | ------------------------- | ----------------------- |
+| Usage Tracking   | Manual configuration      | ✅ Automatic enablement |
+| Streaming        | Complex parsing logic     | ✅ Intelligent handling |
+| Cost Calculation | Manual credits conversion | ✅ Auto USD conversion  |
+| Authentication   | Custom implementation     | ✅ DID-based auth       |
+| Payment          | External billing system   | ✅ Built-in payment kit |
+| Multi-Provider   | Multiple integrations     | ✅ Unified interface    |
 
 ## 📄 License
 
@@ -534,7 +578,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
+Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md)
+guide.
 
 ---
 

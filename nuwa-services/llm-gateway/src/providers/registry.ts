@@ -22,7 +22,9 @@ export class ProviderRegistry {
    */
   register(config: ProviderConfig, options: { skipApiKeyValidation?: boolean } = {}): void {
     if (this.providers.has(config.name)) {
-      console.warn(`Provider '${config.name}' is already registered in global registry. Updating configuration.`);
+      console.warn(
+        `Provider '${config.name}' is already registered in global registry. Updating configuration.`
+      );
     }
 
     // Validate configuration (skip in test mode)
@@ -80,7 +82,9 @@ export class ProviderRegistry {
 
     // At this point, API key should be cached during registration
     if (!config.apiKey) {
-      throw new Error(`API key not available for provider '${name}' - this should not happen if registration was successful`);
+      throw new Error(
+        `API key not available for provider '${name}' - this should not happen if registration was successful`
+      );
     }
 
     return config.apiKey;

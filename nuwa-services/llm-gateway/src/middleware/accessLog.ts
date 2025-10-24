@@ -151,8 +151,6 @@ export function accessLogMiddleware(req: Request, res: Response, next: NextFunct
   const autoFinalize = () => finalizeAccessLog(req, res, start);
   res.on('finish', autoFinalize);
   res.on('close', autoFinalize);
-  
+
   next();
 }
-
-

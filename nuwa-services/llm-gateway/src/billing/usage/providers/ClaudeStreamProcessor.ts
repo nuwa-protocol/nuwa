@@ -33,13 +33,13 @@ export class ClaudeStreamProcessor extends BaseStreamProcessor {
   private accumulateClaudeUsage(chunkText: string): void {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
+
         if (line.startsWith('event: ')) {
           const eventType = line.slice(7).trim();
-          
+
           // Process events that contain usage information
           if (eventType === 'message_start' || eventType === 'message_delta') {
             const nextLineIndex = i + 1;
@@ -51,7 +51,10 @@ export class ClaudeStreamProcessor extends BaseStreamProcessor {
                   const data = JSON.parse(dataStr);
                   this.processClaudeUsageEvent(data, eventType);
                 } catch (parseError) {
-                  console.error(`[ClaudeStreamProcessor] Error parsing ${eventType} data:`, parseError);
+                  console.error(
+                    `[ClaudeStreamProcessor] Error parsing ${eventType} data:`,
+                    parseError
+                  );
                 }
               }
             }
@@ -93,7 +96,7 @@ export class ClaudeStreamProcessor extends BaseStreamProcessor {
         if (typeof usage.input_tokens === 'number') {
           this.cumulativeInputTokens = Math.max(this.cumulativeInputTokens, usage.input_tokens);
         }
-        
+
         if (typeof usage.output_tokens === 'number') {
           // For output tokens, we accumulate since they come in deltas
           this.cumulativeOutputTokens = Math.max(this.cumulativeOutputTokens, usage.output_tokens);
@@ -112,11 +115,11 @@ export class ClaudeStreamProcessor extends BaseStreamProcessor {
    */
   private updateAccumulatedUsage(): void {
     const totalTokens = this.cumulativeInputTokens + this.cumulativeOutputTokens;
-    
+
     this.accumulatedUsage = {
       promptTokens: this.cumulativeInputTokens,
       completionTokens: this.cumulativeOutputTokens,
-      totalTokens: totalTokens
+      totalTokens: totalTokens,
     };
 
     console.log('[ClaudeStreamProcessor] Updated accumulated usage:', this.accumulatedUsage);
@@ -130,7 +133,7 @@ export class ClaudeStreamProcessor extends BaseStreamProcessor {
     if (this.cumulativeInputTokens > 0 || this.cumulativeOutputTokens > 0) {
       this.updateAccumulatedUsage();
     }
-    
+
     return this.accumulatedUsage;
   }
 

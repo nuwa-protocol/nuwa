@@ -1,6 +1,7 @@
 # Provider Integration Guide
 
-A comprehensive guide for integrating new LLM providers into the Nuwa LLM Gateway.
+A comprehensive guide for integrating new LLM providers into the Nuwa LLM
+Gateway.
 
 ## Table of Contents
 
@@ -19,9 +20,12 @@ A comprehensive guide for integrating new LLM providers into the Nuwa LLM Gatewa
 
 ### Architecture Introduction
 
-The Nuwa LLM Gateway uses a modular, provider-first architecture that enables seamless integration of multiple LLM providers. The system is built around several key abstractions:
+The Nuwa LLM Gateway uses a modular, provider-first architecture that enables
+seamless integration of multiple LLM providers. The system is built around
+several key abstractions:
 
-- **Provider Abstraction**: Each LLM provider implements a standardized interface
+- **Provider Abstraction**: Each LLM provider implements a standardized
+  interface
 - **Usage Extraction**: Automated token counting and cost calculation
 - **Stream Processing**: Real-time processing of streaming responses
 - **Pricing Registry**: Centralized pricing configuration and calculation
@@ -30,7 +34,9 @@ The Nuwa LLM Gateway uses a modular, provider-first architecture that enables se
 ### Core Concepts
 
 #### Provider (`LLMProvider`)
+
 The main interface that all providers must implement. It defines methods for:
+
 - Request forwarding (`forwardRequest`)
 - Response parsing (`parseResponse`)
 - Request preparation (`prepareRequestData`)
@@ -38,19 +44,25 @@ The main interface that all providers must implement. It defines methods for:
 - Stream processing (`createStreamProcessor`)
 
 #### UsageExtractor
+
 Handles provider-specific usage data extraction from responses:
+
 - Non-streaming responses: `extractFromResponseBody()`
 - Streaming responses: `extractFromStreamChunk()`
 - Provider cost extraction: `extractProviderCost()`
 
 #### StreamProcessor
+
 Manages real-time processing of streaming responses:
+
 - Chunk processing: `processChunk()`
 - Final cost calculation: `getFinalCost()`
 - Usage aggregation: `getFinalUsage()`
 
 #### PricingRegistry
+
 Centralized pricing configuration system:
+
 - Provider-specific pricing: `getProviderPricing()`
 - Cost calculation: `calculateCost()`
 - Pricing overrides and multipliers
@@ -80,17 +92,20 @@ Centralized pricing configuration system:
 ## Prerequisites
 
 ### Environment Setup
+
 - Node.js 18+ with TypeScript support
 - pnpm package manager
 - Git for version control
 
 ### Required Development Tools
+
 - TypeScript compiler
 - ESLint for code quality
 - Jest for testing
 - Your preferred IDE with TypeScript support
 
 ### Recommended Background Knowledge
+
 - **TypeScript**: Advanced features like generics, interfaces, and decorators
 - **Express.js**: Middleware patterns and request/response handling
 - **Server-Sent Events (SSE)**: Streaming response formats and parsing
@@ -101,7 +116,8 @@ Centralized pricing configuration system:
 
 ### Step 1: Define Provider Class
 
-Create your provider class by extending `BaseLLMProvider` and implementing `TestableLLMProvider`.
+Create your provider class by extending `BaseLLMProvider` and implementing
+`TestableLLMProvider`.
 
 **File**: `src/providers/myprovider.ts`
 
@@ -117,7 +133,7 @@ import { MYPROVIDER_PATHS } from './constants.js';
 
 export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
-  
+
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     MYPROVIDER_PATHS.CHAT_COMPLETIONS,
@@ -126,7 +142,8 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
 
   constructor() {
     super();
-    this.baseURL = process.env.MYPROVIDER_BASE_URL || 'https://api.myprovider.com';
+    this.baseURL =
+      process.env.MYPROVIDER_BASE_URL || 'https://api.myprovider.com';
   }
 
   /**
@@ -135,16 +152,16 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
    */
   prepareRequestData(data: any, isStream: boolean): any {
     const prepared = { ...data };
-    
+
     // Add provider-specific parameters
     if (isStream) {
       prepared.stream = true;
       // Add streaming-specific options
     }
-    
+
     // Remove unsupported parameters
     delete prepared.unsupported_param;
-    
+
     return prepared;
   }
 
@@ -154,23 +171,24 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
   async forwardRequest(
     apiKey: string | null,
     path: string,
-    method: string = "POST",
+    method: string = 'POST',
     data?: any,
     isStream: boolean = false
-  ): Promise<AxiosResponse | { error: string; status?: number; details?: any } | null> {
-    
+  ): Promise<
+    AxiosResponse | { error: string; status?: number; details?: any } | null
+  > {
     if (!apiKey) {
       return {
-        error: "API key is required for MyProvider",
-        status: 401
+        error: 'API key is required for MyProvider',
+        status: 401,
       };
     }
 
     const url = `${this.baseURL}${path}`;
     const headers = {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'Nuwa-LLM-Gateway/1.0'
+      'User-Agent': 'Nuwa-LLM-Gateway/1.0',
     };
 
     try {
@@ -178,11 +196,11 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
     } catch (error) {
       const errorInfo = await this.extractErrorInfo(error);
       this.logErrorInfo(errorInfo, error, 'MyProvider');
-      
+
       return {
         error: errorInfo.message,
         status: errorInfo.statusCode,
-        details: errorInfo.details
+        details: errorInfo.details,
       };
     }
   }
@@ -192,7 +210,7 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
    */
   parseResponse(response: AxiosResponse): any {
     const data = response.data;
-    
+
     // Handle provider-specific response format
     if (data && typeof data === 'object') {
       return {
@@ -200,7 +218,7 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
         // Add any provider-specific transformations
       };
     }
-    
+
     return data;
   }
 
@@ -214,13 +232,13 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
       const cost = parseFloat(costHeader);
       return isNaN(cost) ? undefined : cost;
     }
-    
+
     // Check response body for cost information
     const responseData = response.data;
     if (responseData?.billing?.cost_usd) {
       return parseFloat(responseData.billing.cost_usd);
     }
-    
+
     return undefined;
   }
 
@@ -243,31 +261,29 @@ export class MyProvider extends BaseLLMProvider implements TestableLLMProvider {
     return [
       'myprovider-gpt-4',
       'myprovider-gpt-3.5-turbo',
-      'myprovider-claude-3'
+      'myprovider-claude-3',
     ];
   }
 
   getDefaultTestOptions(): Record<string, any> {
     return {
       model: 'myprovider-gpt-3.5-turbo',
-      messages: [
-        { role: 'user', content: 'Hello! How are you?' }
-      ],
+      messages: [{ role: 'user', content: 'Hello! How are you?' }],
       max_tokens: 100,
-      temperature: 0.7
+      temperature: 0.7,
     };
   }
 
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
-    
+
     switch (endpoint) {
       case MYPROVIDER_PATHS.CHAT_COMPLETIONS:
         return {
           ...defaults,
-          ...options
+          ...options,
         };
-      
+
       default:
         throw new Error(`Unsupported test endpoint: ${endpoint}`);
     }
@@ -311,49 +327,56 @@ export class MyProviderUsageExtractor extends BaseUsageExtractor {
     return {
       promptTokens: usage.input_tokens || usage.prompt_tokens || 0,
       completionTokens: usage.output_tokens || usage.completion_tokens || 0,
-      totalTokens: usage.total_tokens || 
-        (usage.input_tokens || 0) + (usage.output_tokens || 0)
+      totalTokens:
+        usage.total_tokens ||
+        (usage.input_tokens || 0) + (usage.output_tokens || 0),
     };
   }
 
   /**
    * Extract usage from streaming SSE chunk
    */
-  extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
+  extractFromStreamChunk(
+    chunkText: string
+  ): { usage: UsageInfo; cost?: number } | null {
     try {
       // Parse SSE format: "data: {...}"
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const dataStr = line.slice(6).trim();
-          
+
           if (dataStr === '[DONE]') {
             continue;
           }
-          
+
           const data = JSON.parse(dataStr);
-          
+
           // Check for usage information in the chunk
           if (data.usage) {
             const usage: UsageInfo = {
               promptTokens: data.usage.input_tokens || 0,
               completionTokens: data.usage.output_tokens || 0,
-              totalTokens: data.usage.total_tokens || 0
+              totalTokens: data.usage.total_tokens || 0,
             };
-            
+
             // Extract cost if available
-            const cost = data.billing?.cost_usd ? 
-              parseFloat(data.billing.cost_usd) : undefined;
-            
+            const cost = data.billing?.cost_usd
+              ? parseFloat(data.billing.cost_usd)
+              : undefined;
+
             return { usage, cost };
           }
         }
       }
     } catch (error) {
-      console.warn('[MyProviderUsageExtractor] Failed to parse stream chunk:', error);
+      console.warn(
+        '[MyProviderUsageExtractor] Failed to parse stream chunk:',
+        error
+      );
     }
-    
+
     return null;
   }
 
@@ -366,7 +389,7 @@ export class MyProviderUsageExtractor extends BaseUsageExtractor {
       const cost = parseFloat(costHeader);
       return isNaN(cost) ? undefined : cost;
     }
-    
+
     return undefined;
   }
 }
@@ -394,23 +417,24 @@ export class MyProviderStreamProcessor extends BaseStreamProcessor {
     // Handle MyProvider's specific streaming format
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const dataStr = line.slice(6).trim();
-          
+
           if (dataStr === '[DONE]') {
             // Finalize processing when stream ends
             this.calculateFinalCost();
             return;
           }
-          
+
           const data = JSON.parse(dataStr);
-          
+
           // Handle provider-specific events
           if (data.type === 'myprovider_usage') {
             // Process usage information
-            const extractedUsage = this.usageExtractor.extractFromStreamChunk(line);
+            const extractedUsage =
+              this.usageExtractor.extractFromStreamChunk(line);
             if (extractedUsage) {
               this.accumulatedUsage = extractedUsage.usage;
               if (extractedUsage.cost !== undefined) {
@@ -421,7 +445,10 @@ export class MyProviderStreamProcessor extends BaseStreamProcessor {
         }
       }
     } catch (error) {
-      console.warn('[MyProviderStreamProcessor] Failed to process chunk:', error);
+      console.warn(
+        '[MyProviderStreamProcessor] Failed to process chunk:',
+        error
+      );
     }
   }
 
@@ -432,26 +459,29 @@ export class MyProviderStreamProcessor extends BaseStreamProcessor {
     // Accumulate response data for final processing
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const dataStr = line.slice(6).trim();
-          
+
           if (dataStr !== '[DONE]') {
             const data = JSON.parse(dataStr);
-            
+
             // Accumulate response body
             if (!this.accumulatedResponseBody) {
               this.accumulatedResponseBody = {};
             }
-            
+
             // Merge data into accumulated response
             Object.assign(this.accumulatedResponseBody, data);
           }
         }
       }
     } catch (error) {
-      console.warn('[MyProviderStreamProcessor] Failed to extract response body:', error);
+      console.warn(
+        '[MyProviderStreamProcessor] Failed to extract response body:',
+        error
+      );
     }
   }
 }
@@ -472,7 +502,8 @@ export const MYPROVIDER_PATHS = {
 } as const;
 
 // Add to type helpers
-export type MyProviderPath = typeof MYPROVIDER_PATHS[keyof typeof MYPROVIDER_PATHS];
+export type MyProviderPath =
+  (typeof MYPROVIDER_PATHS)[keyof typeof MYPROVIDER_PATHS];
 
 // Update ALL_SUPPORTED_PATHS
 export const ALL_SUPPORTED_PATHS = [
@@ -549,8 +580,8 @@ const providerConfigs: ProviderInitConfig[] = [
     allowedPaths: Object.values(MYPROVIDER_PATHS),
     requiredEnvVars: ['MYPROVIDER_API_KEY'],
     optionalEnvVars: ['MYPROVIDER_BASE_URL'],
-    defaultCheck: () => !!process.env.MYPROVIDER_API_KEY
-  }
+    defaultCheck: () => !!process.env.MYPROVIDER_API_KEY,
+  },
 ];
 ```
 
@@ -582,7 +613,6 @@ export interface MyProviderChatCompletionConfig {
 }
 
 export class MyProviderTestUtils extends BaseProviderTestUtils<MyProvider> {
-  
   constructor(provider: MyProvider, apiKey: string | null) {
     super(provider, apiKey);
   }
@@ -590,32 +620,41 @@ export class MyProviderTestUtils extends BaseProviderTestUtils<MyProvider> {
   /**
    * Test chat completion with MyProvider
    */
-  async testChatCompletion(config: Partial<MyProviderChatCompletionConfig> = {}): Promise<BaseTestResult> {
-    const requestData = this.provider.createTestRequest(MYPROVIDER_PATHS.CHAT_COMPLETIONS, {
-      model: 'myprovider-gpt-3.5-turbo',
-      messages: [
-        { role: 'user', content: 'Hello! How are you?' }
-      ],
-      max_tokens: 100,
-      ...config
-    });
+  async testChatCompletion(
+    config: Partial<MyProviderChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
+    const requestData = this.provider.createTestRequest(
+      MYPROVIDER_PATHS.CHAT_COMPLETIONS,
+      {
+        model: 'myprovider-gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Hello! How are you?' }],
+        max_tokens: 100,
+        ...config,
+      }
+    );
 
-    return this.testNonStreaming(MYPROVIDER_PATHS.CHAT_COMPLETIONS, requestData);
+    return this.testNonStreaming(
+      MYPROVIDER_PATHS.CHAT_COMPLETIONS,
+      requestData
+    );
   }
 
   /**
    * Test streaming chat completion
    */
-  async testStreamingChatCompletion(config: Partial<MyProviderChatCompletionConfig> = {}): Promise<BaseTestResult> {
-    const requestData = this.provider.createTestRequest(MYPROVIDER_PATHS.CHAT_COMPLETIONS, {
-      model: 'myprovider-gpt-3.5-turbo',
-      messages: [
-        { role: 'user', content: 'Hello! How are you?' }
-      ],
-      max_tokens: 100,
-      stream: true,
-      ...config
-    });
+  async testStreamingChatCompletion(
+    config: Partial<MyProviderChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
+    const requestData = this.provider.createTestRequest(
+      MYPROVIDER_PATHS.CHAT_COMPLETIONS,
+      {
+        model: 'myprovider-gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Hello! How are you?' }],
+        max_tokens: 100,
+        stream: true,
+        ...config,
+      }
+    );
 
     return this.testStreaming(MYPROVIDER_PATHS.CHAT_COMPLETIONS, requestData);
   }
@@ -623,22 +662,33 @@ export class MyProviderTestUtils extends BaseProviderTestUtils<MyProvider> {
   /**
    * Test with provider-specific features
    */
-  async testWithProviderFeatures(config: Partial<MyProviderChatCompletionConfig> = {}): Promise<BaseTestResult> {
-    const requestData = this.provider.createTestRequest(MYPROVIDER_PATHS.CHAT_COMPLETIONS, {
-      model: 'myprovider-gpt-4',
-      messages: [
-        { role: 'user', content: 'Explain quantum computing in simple terms.' }
-      ],
-      max_tokens: 200,
-      custom_param: 'test_value',
-      provider_options: {
-        timeout: 30000,
-        retry_count: 3
-      },
-      ...config
-    });
+  async testWithProviderFeatures(
+    config: Partial<MyProviderChatCompletionConfig> = {}
+  ): Promise<BaseTestResult> {
+    const requestData = this.provider.createTestRequest(
+      MYPROVIDER_PATHS.CHAT_COMPLETIONS,
+      {
+        model: 'myprovider-gpt-4',
+        messages: [
+          {
+            role: 'user',
+            content: 'Explain quantum computing in simple terms.',
+          },
+        ],
+        max_tokens: 200,
+        custom_param: 'test_value',
+        provider_options: {
+          timeout: 30000,
+          retry_count: 3,
+        },
+        ...config,
+      }
+    );
 
-    return this.testNonStreaming(MYPROVIDER_PATHS.CHAT_COMPLETIONS, requestData);
+    return this.testNonStreaming(
+      MYPROVIDER_PATHS.CHAT_COMPLETIONS,
+      requestData
+    );
   }
 
   /**
@@ -648,7 +698,7 @@ export class MyProviderTestUtils extends BaseProviderTestUtils<MyProvider> {
     return [
       'myprovider-gpt-4',
       'myprovider-gpt-3.5-turbo',
-      'myprovider-claude-3'
+      'myprovider-claude-3',
     ];
   }
 }
@@ -679,10 +729,8 @@ createProviderTestSuite('myprovider', () => {
     test('should handle non-streaming chat completion', async () => {
       const result = await testUtils.testChatCompletion({
         model: 'myprovider-gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: 'Say "Hello World"' }
-        ],
-        max_tokens: 50
+        messages: [{ role: 'user', content: 'Say "Hello World"' }],
+        max_tokens: 50,
       });
 
       const validation = testUtils.validateResponse(result, {
@@ -691,7 +739,7 @@ createProviderTestSuite('myprovider', () => {
         expectCost: true,
         expectResponse: true,
         minTokens: 1,
-        maxTokens: 100
+        maxTokens: 100,
       });
 
       expect(validation.valid).toBe(true);
@@ -708,10 +756,8 @@ createProviderTestSuite('myprovider', () => {
     test('should handle streaming chat completion', async () => {
       const result = await testUtils.testStreamingChatCompletion({
         model: 'myprovider-gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: 'Count from 1 to 5' }
-        ],
-        max_tokens: 50
+        messages: [{ role: 'user', content: 'Count from 1 to 5' }],
+        max_tokens: 50,
       });
 
       const validation = testUtils.validateResponse(result, {
@@ -719,7 +765,7 @@ createProviderTestSuite('myprovider', () => {
         expectUsage: true,
         expectCost: true,
         minTokens: 5,
-        maxTokens: 100
+        maxTokens: 100,
       });
 
       expect(validation.valid).toBe(true);
@@ -733,8 +779,8 @@ createProviderTestSuite('myprovider', () => {
         model: 'myprovider-gpt-4',
         custom_param: 'integration_test',
         provider_options: {
-          timeout: 30000
-        }
+          timeout: 30000,
+        },
       });
 
       expect(result.success).toBe(true);
@@ -744,10 +790,13 @@ createProviderTestSuite('myprovider', () => {
 
   describe('Error Handling', () => {
     test('should handle invalid API key', async () => {
-      const invalidTestUtils = new MyProviderTestUtils(MyProvider, 'invalid-key');
-      
+      const invalidTestUtils = new MyProviderTestUtils(
+        MyProvider,
+        'invalid-key'
+      );
+
       const result = await invalidTestUtils.testChatCompletion();
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toContain('authentication');
       expect(result.statusCode).toBe(401);
@@ -755,19 +804,22 @@ createProviderTestSuite('myprovider', () => {
 
     test('should handle invalid model', async () => {
       const result = await testUtils.testChatCompletion({
-        model: 'non-existent-model'
+        model: 'non-existent-model',
       });
-      
+
       expect(result.success).toBe(false);
       expect(result.statusCode).toBeGreaterThanOrEqual(400);
     });
 
     test('should handle malformed request', async () => {
-      const result = await testUtils.testNonStreaming('/api/v1/chat/completions', {
-        // Missing required fields
-        messages: []
-      });
-      
+      const result = await testUtils.testNonStreaming(
+        '/api/v1/chat/completions',
+        {
+          // Missing required fields
+          messages: [],
+        }
+      );
+
       expect(result.success).toBe(false);
       expect(result.statusCode).toBeGreaterThanOrEqual(400);
     });
@@ -777,9 +829,7 @@ createProviderTestSuite('myprovider', () => {
     test('should extract usage from response body', async () => {
       const result = await testUtils.testChatCompletion({
         model: 'myprovider-gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: 'What is 2+2?' }
-        ]
+        messages: [{ role: 'user', content: 'What is 2+2?' }],
       });
 
       expect(result.success).toBe(true);
@@ -791,7 +841,7 @@ createProviderTestSuite('myprovider', () => {
 
     test('should calculate costs correctly', async () => {
       const result = await testUtils.testChatCompletion({
-        model: 'myprovider-gpt-3.5-turbo'
+        model: 'myprovider-gpt-3.5-turbo',
       });
 
       expect(result.success).toBe(true);
@@ -803,10 +853,8 @@ createProviderTestSuite('myprovider', () => {
     test('should handle streaming usage extraction', async () => {
       const result = await testUtils.testStreamingChatCompletion({
         model: 'myprovider-gpt-3.5-turbo',
-        messages: [
-          { role: 'user', content: 'Write a short poem about AI' }
-        ],
-        max_tokens: 100
+        messages: [{ role: 'user', content: 'Write a short poem about AI' }],
+        max_tokens: 100,
       });
 
       expect(result.success).toBe(true);
@@ -818,14 +866,12 @@ createProviderTestSuite('myprovider', () => {
 
   describe('Model Support', () => {
     const models = MyProviderTestUtils.getCommonModels();
-    
-    test.each(models)('should work with model %s', async (model) => {
+
+    test.each(models)('should work with model %s', async model => {
       const result = await testUtils.testChatCompletion({
         model,
-        messages: [
-          { role: 'user', content: 'Hello' }
-        ],
-        max_tokens: 20
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 20,
       });
 
       expect(result.success).toBe(true);
@@ -864,7 +910,7 @@ static getConfig(): TestEnvConfig {
 // In getProviderConfigs() method, add:
 static getProviderConfigs(): ProviderTestConfig[] {
   const config = TestEnv.getConfig();
-  
+
   return [
     // ... existing providers
     {
@@ -887,7 +933,8 @@ Add your provider to the supported providers list:
 ```markdown
 ## ✨ Core Features
 
-- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, Anthropic Claude, and MyProvider integration
+- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, Anthropic Claude,
+  and MyProvider integration
 ```
 
 ### Update Environment Variables
@@ -915,13 +962,13 @@ export interface LLMGatewayConfig {
 // In loadConfig() function, add:
 export function loadConfig(): LLMGatewayConfig {
   // ... existing code
-  
+
   const config: LLMGatewayConfig = {
     // ... existing properties
     myproviderApiKey: process.env.MYPROVIDER_API_KEY,
     myproviderBaseUrl: process.env.MYPROVIDER_BASE_URL,
   };
-  
+
   return config;
 }
 
@@ -946,7 +993,7 @@ protected async extractErrorInfo(error: any): Promise<ProviderErrorInfo> {
   // Handle MyProvider-specific error formats
   if (error.response?.data?.error) {
     const errorData = error.response.data.error;
-    
+
     return {
       message: errorData.message || 'MyProvider API error',
       statusCode: error.response.status || 500,
@@ -959,7 +1006,7 @@ protected async extractErrorInfo(error: any): Promise<ProviderErrorInfo> {
       }
     };
   }
-  
+
   // Fallback to base error handling
   return super.extractErrorInfo(error);
 }
@@ -971,8 +1018,8 @@ Implement request ID extraction for tracing:
 
 ```typescript
 protected extractRequestIdFromHeaders(headers: any): string | undefined {
-  return headers['x-myprovider-request-id'] || 
-         headers['x-request-id'] || 
+  return headers['x-myprovider-request-id'] ||
+         headers['x-request-id'] ||
          headers['request-id'];
 }
 ```
@@ -1013,7 +1060,7 @@ The system follows this priority for cost calculation:
 // In your provider
 extractProviderUsageUsd(response: AxiosResponse): number | undefined {
   // Return actual USD cost from provider
-  return response.headers['x-cost-usd'] ? 
+  return response.headers['x-cost-usd'] ?
     parseFloat(response.headers['x-cost-usd']) : undefined;
 }
 ```
@@ -1047,6 +1094,7 @@ TestEnv.describeProvider('myprovider', () => {
 **Problem**: Provider registration fails with "API key not found"
 
 **Solution**:
+
 ```bash
 # Check environment variable
 echo $MYPROVIDER_API_KEY
@@ -1060,11 +1108,12 @@ echo $MYPROVIDER_API_KEY
 **Problem**: Usage extraction returns null for streaming responses
 
 **Solution**:
+
 ```typescript
 // Debug streaming chunks
 protected processProviderSpecificChunk(chunkText: string): void {
   console.log('Raw chunk:', chunkText); // Add debugging
-  
+
   // Check for different SSE formats
   const lines = chunkText.split('\n');
   for (const line of lines) {
@@ -1082,6 +1131,7 @@ protected processProviderSpecificChunk(chunkText: string): void {
 **Problem**: No usage information extracted from responses
 
 **Solutions**:
+
 1. Check response format in `extractFromResponseBody()`
 2. Verify field names match provider's API
 3. Add logging to see actual response structure
@@ -1089,10 +1139,10 @@ protected processProviderSpecificChunk(chunkText: string): void {
 ```typescript
 extractFromResponseBody(responseBody: any): UsageInfo | null {
   console.log('Response body:', JSON.stringify(responseBody, null, 2));
-  
+
   // Check multiple possible field names
-  const usage = responseBody.usage || 
-                responseBody.token_usage || 
+  const usage = responseBody.usage ||
+                responseBody.token_usage ||
                 responseBody.billing?.usage;
 }
 ```
@@ -1102,6 +1152,7 @@ extractFromResponseBody(responseBody: any): UsageInfo | null {
 **Problem**: Cost calculation fails with "No pricing found for model"
 
 **Solutions**:
+
 1. Verify pricing file exists in `src/config/`
 2. Check model names match exactly
 3. Add model family patterns for variations
@@ -1122,6 +1173,7 @@ extractFromResponseBody(responseBody: any): UsageInfo | null {
 **Problem**: Tests are skipped or fail to run
 
 **Solutions**:
+
 1. Set environment variables in test environment
 2. Use `.env.test` file for test-specific configuration
 3. Check `TestEnv.getProviderConfigs()` output
@@ -1139,24 +1191,30 @@ pnpm test:integration -- --testNamePattern="myprovider"
 Use this checklist to ensure complete provider integration:
 
 ### Implementation Files
+
 - [ ] `src/providers/myprovider.ts` - Main provider implementation
-- [ ] `src/billing/usage/providers/MyProviderUsageExtractor.ts` - Usage extraction (if needed)
-- [ ] `src/billing/usage/providers/MyProviderStreamProcessor.ts` - Stream processing (if needed)
+- [ ] `src/billing/usage/providers/MyProviderUsageExtractor.ts` - Usage
+      extraction (if needed)
+- [ ] `src/billing/usage/providers/MyProviderStreamProcessor.ts` - Stream
+      processing (if needed)
 - [ ] `src/providers/constants.ts` - Path constants added
 - [ ] `src/config/myprovider-pricing.json` - Pricing configuration
 - [ ] `src/core/providerManager.ts` - Provider registration
 
 ### Testing Files
+
 - [ ] `test/utils/myproviderTestUtils.ts` - Test utilities
 - [ ] `test/integration/provider-myprovider.test.ts` - Integration tests
 - [ ] `test/utils/testEnv.ts` - Test environment configuration
 
 ### Documentation Updates
+
 - [ ] `README.md` - Provider support documentation
 - [ ] `examples/env.example` - Environment variable examples
 - [ ] `src/config/cli.ts` - CLI parameter support
 
 ### Verification Steps
+
 - [ ] Provider registers successfully on startup
 - [ ] Non-streaming requests work correctly
 - [ ] Streaming requests work correctly
@@ -1167,10 +1225,12 @@ Use this checklist to ensure complete provider integration:
 - [ ] Tests are skipped without API key
 
 ### Environment Variables
+
 - [ ] `MYPROVIDER_API_KEY` - Required for provider access
 - [ ] `MYPROVIDER_BASE_URL` - Optional base URL override
 
 ### Testing Commands
+
 ```bash
 # Run all tests
 pnpm test
@@ -1267,12 +1327,12 @@ For providers requiring special authentication:
 async forwardRequest(apiKey: string | null, path: string, method: string, data?: any): Promise<AxiosResponse | ErrorResponse | null> {
   // Custom authentication logic
   const authHeaders = await this.generateCustomAuth(apiKey, data);
-  
+
   const headers = {
     ...authHeaders,
     'Content-Type': 'application/json'
   };
-  
+
   // Continue with request...
 }
 
@@ -1293,11 +1353,11 @@ extractProviderCost(response: AxiosResponse): number | undefined {
   // Extract rate limit information
   const remaining = response.headers['x-ratelimit-remaining'];
   const resetTime = response.headers['x-ratelimit-reset'];
-  
+
   if (remaining && parseInt(remaining) < 10) {
     console.warn(`MyProvider rate limit low: ${remaining} requests remaining`);
   }
-  
+
   return this.extractCostFromResponse(response);
 }
 ```
@@ -1314,14 +1374,14 @@ async forwardRequest(apiKey: string | null, path: string, method: string, data?:
   if (method === 'GET' || this.isCacheable(data)) {
     const cacheKey = this.generateCacheKey(path, data);
     const cached = this.responseCache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < 60000) { // 1 minute cache
       return cached.response;
     }
   }
-  
+
   const response = await this.executeRequest(apiKey, path, method, data);
-  
+
   // Cache successful responses
   if (response && 'status' in response && response.status === 200) {
     const cacheKey = this.generateCacheKey(path, data);
@@ -1330,7 +1390,7 @@ async forwardRequest(apiKey: string | null, path: string, method: string, data?:
       timestamp: Date.now()
     });
   }
-  
+
   return response;
 }
 ```
@@ -1345,11 +1405,11 @@ getTestModels(): string[] {
     // Text generation models
     'myprovider-gpt-4',
     'myprovider-gpt-3.5-turbo',
-    
+
     // Code generation models
     'myprovider-codex',
     'myprovider-code-davinci',
-    
+
     // Specialized models
     'myprovider-embedding-v1',
     'myprovider-moderation-v1'
@@ -1358,7 +1418,7 @@ getTestModels(): string[] {
 
 createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
   const model = options.model || 'myprovider-gpt-3.5-turbo';
-  
+
   // Adjust request based on model type
   if (model.includes('embedding')) {
     return this.createEmbeddingRequest(options);
@@ -1377,7 +1437,7 @@ Support unique provider capabilities:
 ```typescript
 prepareRequestData(data: any, isStream: boolean): any {
   const prepared = { ...data };
-  
+
   // Add MyProvider-specific features
   if (data.enable_custom_feature) {
     prepared.custom_settings = {
@@ -1385,12 +1445,12 @@ prepareRequestData(data: any, isStream: boolean): any {
       optimization: true
     };
   }
-  
+
   // Handle provider-specific tools
   if (data.tools) {
     prepared.tools = this.transformToolsForProvider(data.tools);
   }
-  
+
   return prepared;
 }
 
@@ -1414,4 +1474,8 @@ private transformToolsForProvider(tools: any[]): any[] {
 
 ---
 
-This guide provides a comprehensive foundation for integrating new providers into the Nuwa LLM Gateway. Follow the steps systematically, and refer to existing provider implementations for additional guidance. The modular architecture ensures that new providers can be added with minimal impact on existing functionality while maintaining high code quality and test coverage.
+This guide provides a comprehensive foundation for integrating new providers
+into the Nuwa LLM Gateway. Follow the steps systematically, and refer to
+existing provider implementations for additional guidance. The modular
+architecture ensures that new providers can be added with minimal impact on
+existing functionality while maintaining high code quality and test coverage.

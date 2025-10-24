@@ -87,8 +87,8 @@ For developers wanting to extend the gateway with new providers, see the [Migrat
 **Enhanced Components:**
 - `src/providers/LLMProvider.ts` - Extended with new optional methods
 - `src/services/openai.ts` - Implements new provider interface
-- `src/services/openrouter.ts` - Implements new provider interface  
-- `src/services/litellm.ts` - Implements new provider interface
+- `src/providers/openrouter.ts` - Implements new provider interface  
+- `src/providers/litellm.ts` - Implements new provider interface
 
 **Removed Duplications:**
 - Eliminated multiple `getPricingMultiplier` implementations

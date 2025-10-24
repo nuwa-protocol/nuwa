@@ -35,12 +35,12 @@ describe('Pricing System Unit Tests', () => {
       const usage = {
         promptTokens: 1000,
         completionTokens: 500,
-        totalTokens: 1500
+        totalTokens: 1500,
       };
 
       const result = pricingRegistry.calculateProviderCost('openai', 'gpt-4', usage);
       expect(result).toBeTruthy();
-      expect(result?.costUsd).toBeCloseTo(0.060); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
+      expect(result?.costUsd).toBeCloseTo(0.06); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
       expect(result?.source).toBe('gateway-pricing');
     });
   });
@@ -90,11 +90,11 @@ describe('Pricing System Unit Tests', () => {
     it('should support pricing overrides via updateProviderPricing', () => {
       // Test pricing override functionality
       const originalGpt4Pricing = pricingRegistry.getProviderPricing('openai', 'gpt-4');
-      
+
       // Simulate environment override
       pricingRegistry.updateProviderPricing('openai', 'gpt-4-test', {
         promptPerMTokUsd: 25.0,
-        completionPerMTokUsd: 50.0
+        completionPerMTokUsd: 50.0,
       });
 
       const overriddenPricing = pricingRegistry.getProviderPricing('openai', 'gpt-4-test');

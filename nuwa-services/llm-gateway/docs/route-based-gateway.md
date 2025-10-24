@@ -2,7 +2,9 @@
 
 ## Overview
 
-The LLM Gateway uses a Provider-first routing pattern, supporting multiple LLM providers with gateway-side pricing calculation. This provides better performance, scalability, and architectural clarity.
+The LLM Gateway uses a Provider-first routing pattern, supporting multiple LLM
+providers with gateway-side pricing calculation. This provides better
+performance, scalability, and architectural clarity.
 
 ## New Route Structure
 
@@ -16,7 +18,7 @@ POST /openai/api/v1/chat/completions
 POST /openai/api/v1/embeddings
 GET /openai/api/v1/models
 
-# OpenRouter requests  
+# OpenRouter requests
 POST /openrouter/api/v1/chat/completions
 POST /openrouter/api/v1/models
 GET /openrouter/api/v1/models
@@ -34,44 +36,54 @@ The original routes redirect to OpenRouter for backward compatibility:
 ```bash
 # Legacy routes (redirect to OpenRouter)
 POST /api/v1/chat/completions
-POST /api/v1/completions  
+POST /api/v1/completions
 GET /api/v1/models
 ```
 
 ## Benefits of Provider-first Routing
 
 ### Performance Improvements
-- **First-layer routing**: Requests are routed to the correct provider at the first routing layer
+
+- **First-layer routing**: Requests are routed to the correct provider at the
+  first routing layer
 - **Reduced latency**: No need to parse route parameters or headers
 - **Better caching**: Simpler routing rules are more cache-friendly
 
 ### Architectural Benefits
-- **Microservice ready**: Each provider can be deployed as an independent service
+
+- **Microservice ready**: Each provider can be deployed as an independent
+  service
 - **Independent versioning**: Each provider can have its own API version
-- **Load balancer friendly**: Easy to route different providers to different backend services
+- **Load balancer friendly**: Easy to route different providers to different
+  backend services
 
 ### Developer Experience
+
 - **Clear endpoints**: Provider is explicit in the URL
 - **No headers needed**: No need for `X-LLM-Provider` headers
 - **RESTful design**: Provider as a top-level resource
 
 ## Provider Features
 
-| Provider | API Key Source | Native USD Cost | Gateway Pricing |
-|----------|----------------|-----------------|-----------------|
-| OpenAI | Environment Variable | ❌ | ✅ |
-| OpenRouter | Environment Variable | ✅ | Fallback |
-| LiteLLM | Environment Variable | ✅ | Fallback |
+| Provider   | API Key Source       | Native USD Cost | Gateway Pricing |
+| ---------- | -------------------- | --------------- | --------------- |
+| OpenAI     | Environment Variable | ❌              | ✅              |
+| OpenRouter | Environment Variable | ✅              | Fallback        |
+| LiteLLM    | Environment Variable | ✅              | Fallback        |
 
 ## API Key Management
 
 ### Global Environment Variable Strategy
 
-All providers now use global environment variable API keys for simplified operations:
+All providers now use global environment variable API keys for simplified
+operations:
 
-1. **OpenAI**: Uses `OPENAI_API_KEY` environment variable (shared across all users)
-2. **OpenRouter**: Uses `OPENROUTER_API_KEY` environment variable (shared across all users)
-3. **LiteLLM**: Uses `LITELLM_API_KEY` environment variable (shared across all users)
+1. **OpenAI**: Uses `OPENAI_API_KEY` environment variable (shared across all
+   users)
+2. **OpenRouter**: Uses `OPENROUTER_API_KEY` environment variable (shared across
+   all users)
+3. **LiteLLM**: Uses `LITELLM_API_KEY` environment variable (shared across all
+   users)
 
 ### Benefits of Global API Key Management
 
@@ -85,11 +97,15 @@ All providers now use global environment variable API keys for simplified operat
 
 The gateway calculates USD costs for requests using:
 
-- **OpenAI**: Built-in pricing table with current OpenAI rates, calculated from token usage
-- **OpenRouter**: Native cost from response (preferred) or gateway calculation (fallback)
-- **LiteLLM**: Native cost from headers (preferred) or gateway calculation (fallback)
+- **OpenAI**: Built-in pricing table with current OpenAI rates, calculated from
+  token usage
+- **OpenRouter**: Native cost from response (preferred) or gateway calculation
+  (fallback)
+- **LiteLLM**: Native cost from headers (preferred) or gateway calculation
+  (fallback)
 
 Configuration options:
+
 - Token usage from response (`prompt_tokens`, `completion_tokens`)
 - Environment variable overrides via `PRICING_OVERRIDES`
 
@@ -134,7 +150,8 @@ Providers are registered based on environment configuration:
 
 - **OpenAI**: Only registered if `OPENAI_API_KEY` is configured
 - **OpenRouter**: Only registered if `OPENROUTER_API_KEY` is configured
-- **LiteLLM**: Only registered if both `LITELLM_BASE_URL` and `LITELLM_API_KEY` are configured
+- **LiteLLM**: Only registered if both `LITELLM_BASE_URL` and `LITELLM_API_KEY`
+  are configured
 
 ### Removed Environment Variables
 
@@ -224,11 +241,12 @@ Enhanced access logs include:
 
 ### For Operators
 
-1. **Obtain API Keys**: 
+1. **Obtain API Keys**:
    - Get API keys from each provider (OpenAI, OpenRouter, LiteLLM)
    - Configure environment variables for each provider you want to use
 
 2. **Update Environment Configuration**:
+
    ```env
    # Required for each provider
    OPENAI_API_KEY=sk-proj-your-openai-key
@@ -249,12 +267,13 @@ Enhanced access logs include:
 
 ## Default Pricing (USD per 1M tokens)
 
-| Model | Prompt | Completion |
-|-------|--------|------------|
-| gpt-4 | $30.00 | $60.00 |
-| gpt-4-turbo | $10.00 | $30.00 |
-| gpt-4o | $5.00 | $15.00 |
-| gpt-4o-mini | $0.15 | $0.60 |
-| gpt-3.5-turbo | $0.50 | $1.50 |
+| Model         | Prompt | Completion |
+| ------------- | ------ | ---------- |
+| gpt-4         | $30.00 | $60.00     |
+| gpt-4-turbo   | $10.00 | $30.00     |
+| gpt-4o        | $5.00  | $15.00     |
+| gpt-4o-mini   | $0.15  | $0.60      |
+| gpt-3.5-turbo | $0.50  | $1.50      |
 
-*Pricing is based on OpenAI's published rates and may be overridden via configuration.*
+_Pricing is based on OpenAI's published rates and may be overridden via
+configuration._

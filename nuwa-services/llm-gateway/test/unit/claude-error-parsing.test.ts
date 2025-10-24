@@ -18,9 +18,9 @@ describe('Claude Error Parsing', () => {
         type: 'error',
         error: {
           type: 'invalid_request_error',
-          message: 'system: text content blocks must be non-empty'
+          message: 'system: text content blocks must be non-empty',
         },
-        request_id: 'req_123'
+        request_id: 'req_123',
       });
 
       // Access protected method for testing
@@ -31,7 +31,7 @@ describe('Claude Error Parsing', () => {
       expect(result.error.type).toBe('invalid_request_error');
       expect(result.error.message).toBe('system: text content blocks must be non-empty');
       expect(result.request_id).toBe('req_123');
-    }); 
+    });
 
     it('should return string as-is if not valid JSON', async () => {
       const invalidJson = 'Not a JSON string';
@@ -46,8 +46,8 @@ describe('Claude Error Parsing', () => {
         type: 'error',
         error: {
           type: 'invalid_request_error',
-          message: 'test error'
-        }
+          message: 'test error',
+        },
       };
 
       const result = await (provider as any).normalizeErrorData(obj);
@@ -67,11 +67,11 @@ describe('Claude Error Parsing', () => {
             type: 'error',
             error: {
               type: 'invalid_request_error',
-              message: 'system: text content blocks must be non-empty'
+              message: 'system: text content blocks must be non-empty',
             },
-            request_id: 'req_123'
-          }
-        }
+            request_id: 'req_123',
+          },
+        },
       };
 
       const result = await (provider as any).extractErrorInfo(mockError);
@@ -94,11 +94,11 @@ describe('Claude Error Parsing', () => {
             type: 'error',
             error: {
               type: 'invalid_request_error',
-              message: 'system: text content blocks must be non-empty'
+              message: 'system: text content blocks must be non-empty',
             },
-            request_id: 'req_123'
-          })
-        }
+            request_id: 'req_123',
+          }),
+        },
       };
 
       const result = await (provider as any).extractErrorInfo(mockError);
@@ -117,8 +117,8 @@ describe('Claude Error Parsing', () => {
           status: 400,
           statusText: 'Bad Request',
           headers: {},
-          data: '{"type":"error","error":{"type":"invalid_request_error","message":"system: text content blocks must be non-empty"},"request_id":"req_123"}（traceid: xxx） (request id: yyy)'
-        }
+          data: '{"type":"error","error":{"type":"invalid_request_error","message":"system: text content blocks must be non-empty"},"request_id":"req_123"}（traceid: xxx） (request id: yyy)',
+        },
       };
 
       const result = await (provider as any).extractErrorInfo(mockError);
@@ -127,7 +127,7 @@ describe('Claude Error Parsing', () => {
 
       // If this fails, we need to strip trailing text before parsing
       expect(result.statusCode).toBe(400);
-      
+
       // Log what we actually got for debugging
       console.log('   message:', result.message);
       console.log('   type:', result.details?.type);
@@ -147,11 +147,11 @@ describe('Claude Error Parsing', () => {
             type: 'error',
             error: {
               type: 'invalid_request_error',
-              message: 'system: text content blocks must be non-empty'
+              message: 'system: text content blocks must be non-empty',
             },
-            request_id: 'req_123'
-          })
-        }
+            request_id: 'req_123',
+          }),
+        },
       };
 
       // Simulate the error extraction that happens in forwardRequest catch block
@@ -160,7 +160,7 @@ describe('Claude Error Parsing', () => {
       console.log('🧪 Final error response:', {
         error: errorInfo.message,
         status: errorInfo.statusCode,
-        details: errorInfo.details
+        details: errorInfo.details,
       });
 
       expect(errorInfo.details?.type).toBe('invalid_request_error');
@@ -168,4 +168,3 @@ describe('Claude Error Parsing', () => {
     });
   });
 });
-

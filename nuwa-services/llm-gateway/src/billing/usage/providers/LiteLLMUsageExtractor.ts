@@ -41,31 +41,34 @@ export class LiteLLMUsageExtractor extends BaseUsageExtractor {
   extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
     try {
       const lines = chunkText.split('\n');
-      
+
       for (const line of lines) {
         const trimmed = line.trim();
-        
+
         // Handle Chat Completions API format: data: {...usage...}
         if (trimmed.startsWith('data: ') && trimmed.includes('"usage"')) {
           const dataStr = trimmed.slice(6); // Remove 'data: ' prefix
           if (dataStr === '[DONE]') continue;
-          
+
           try {
             const data = JSON.parse(dataStr);
             // Chat Completions API: usage is at root level
             if (data.usage) {
-              console.log('[LiteLLMUsageExtractor] Found LiteLLM usage in stream chunk:', JSON.stringify(data.usage));
-              
+              console.log(
+                '[LiteLLMUsageExtractor] Found LiteLLM usage in stream chunk:',
+                JSON.stringify(data.usage)
+              );
+
               const result: { usage: UsageInfo; cost?: number } = {
-                usage: this.extractChatCompletionUsage(data.usage)
+                usage: this.extractChatCompletionUsage(data.usage),
               };
-              
+
               // LiteLLM might provide cost in usage object (though typically in headers)
               if (typeof data.usage.cost === 'number') {
                 result.cost = data.usage.cost;
                 console.log('[LiteLLMUsageExtractor] Found cost in LiteLLM usage:', result.cost);
               }
-              
+
               return result;
             }
           } catch (parseError) {
@@ -77,7 +80,7 @@ export class LiteLLMUsageExtractor extends BaseUsageExtractor {
       console.error('[LiteLLMUsageExtractor] Error extracting usage from stream chunk:', error);
       console.error('Chunk text:', chunkText.slice(0, 200));
     }
-    
+
     return null;
   }
 
@@ -92,11 +95,14 @@ export class LiteLLMUsageExtractor extends BaseUsageExtractor {
       if (typeof costHeader === 'string') {
         const cost = Number(costHeader);
         if (Number.isFinite(cost)) {
-          console.log('[LiteLLMUsageExtractor] Found cost in x-litellm-response-cost header:', cost);
+          console.log(
+            '[LiteLLMUsageExtractor] Found cost in x-litellm-response-cost header:',
+            cost
+          );
           return cost;
         }
       }
-      
+
       // Also check for other possible LiteLLM cost headers
       const altCostHeader = headers['x-litellm-cost'] || headers['litellm-cost'];
       if (typeof altCostHeader === 'string') {
@@ -107,7 +113,10 @@ export class LiteLLMUsageExtractor extends BaseUsageExtractor {
         }
       }
     } catch (error) {
-      console.error('[LiteLLMUsageExtractor] Error extracting USD cost from LiteLLM response:', error);
+      console.error(
+        '[LiteLLMUsageExtractor] Error extracting USD cost from LiteLLM response:',
+        error
+      );
     }
     return undefined;
   }

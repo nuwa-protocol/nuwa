@@ -40,14 +40,17 @@ export interface PricingResult {
  */
 export class PricingRegistry {
   private static instance: PricingRegistry;
-  
+
   // Provider-separated pricing storage
-  private providerPricing = new Map<string, {
-    models: Record<string, ModelPricing>;
-    patterns: Array<{ pattern: RegExp; baseModel: string }>;
-    version: string;
-  }>();
-  
+  private providerPricing = new Map<
+    string,
+    {
+      models: Record<string, ModelPricing>;
+      patterns: Array<{ pattern: RegExp; baseModel: string }>;
+      version: string;
+    }
+  >();
+
   // Global overrides (applied across all providers)
   private globalOverrides: Record<string, ModelPricing> = {};
 
@@ -69,20 +72,22 @@ export class PricingRegistry {
   private loadFromConfig(): void {
     try {
       const providerConfigs = pricingConfigLoader.getProviderConfigs();
-      
+
       for (const [provider, config] of Object.entries(providerConfigs)) {
         this.providerPricing.set(provider, {
           models: config.models,
           patterns: config.modelFamilyPatterns.map(p => ({
             pattern: new RegExp(p.pattern),
-            baseModel: p.baseModel
+            baseModel: p.baseModel,
           })),
-          version: config.version
+          version: config.version,
         });
-        
-        console.log(`📊 Loaded ${Object.keys(config.models).length} models for provider: ${provider} (version: ${config.version})`);
+
+        console.log(
+          `📊 Loaded ${Object.keys(config.models).length} models for provider: ${provider} (version: ${config.version})`
+        );
       }
-      
+
       console.log(`📊 Total providers loaded: ${this.providerPricing.size}`);
     } catch (error) {
       console.error('Failed to load pricing configuration:', error);
@@ -184,7 +189,7 @@ export class PricingRegistry {
     if (supportsNativeUsdCost) {
       return true;
     }
-    
+
     // For other providers, model must exist in pricing config
     const pricing = this.getProviderPricing(provider, model);
     return pricing !== null;

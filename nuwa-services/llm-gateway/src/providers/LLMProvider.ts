@@ -1,7 +1,7 @@
-import { AxiosResponse } from "axios";
-import { UsageExtractor } from "../billing/usage/interfaces/UsageExtractor.js";
-import { StreamProcessor } from "../billing/usage/interfaces/StreamProcessor.js";
-import { UsageInfo, PricingResult } from "../billing/pricing.js";
+import { AxiosResponse } from 'axios';
+import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
+import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
+import { UsageInfo, PricingResult } from '../billing/pricing.js';
 
 /**
  * Response from non-streaming provider request
@@ -10,16 +10,16 @@ import { UsageInfo, PricingResult } from "../billing/pricing.js";
 export interface ExecuteResponse {
   success: boolean;
   statusCode?: number;
-  response?: any;          // Parsed response body
-  usage?: UsageInfo;       // Extracted usage information
-  cost?: PricingResult;    // Calculated cost
+  response?: any; // Parsed response body
+  usage?: UsageInfo; // Extracted usage information
+  cost?: PricingResult; // Calculated cost
   error?: string;
-  details?: any;           // Raw error details
+  details?: any; // Raw error details
   rawResponse?: AxiosResponse;
   // New fields for enhanced tracing and error handling
-  upstreamRequestId?: string;  // Upstream request ID for tracing
-  errorCode?: string;           // Provider error code (e.g., 'invalid_api_key')
-  errorType?: string;           // Provider error type (e.g., 'authentication_error')
+  upstreamRequestId?: string; // Upstream request ID for tracing
+  errorCode?: string; // Provider error code (e.g., 'invalid_api_key')
+  errorType?: string; // Provider error type (e.g., 'authentication_error')
 }
 
 /**
@@ -28,17 +28,17 @@ export interface ExecuteResponse {
  */
 export interface ExecuteStreamResponse {
   success: boolean;
-  statusCode: number;      // Always present
-  totalBytes: number;      // Always present - total bytes transferred
-  usage?: UsageInfo;       // Extracted usage information (if available)
-  cost?: PricingResult;    // Calculated cost (if available)
-  error?: string;          // Error message (if failed)
-  details?: any;           // Raw error details
+  statusCode: number; // Always present
+  totalBytes: number; // Always present - total bytes transferred
+  usage?: UsageInfo; // Extracted usage information (if available)
+  cost?: PricingResult; // Calculated cost (if available)
+  error?: string; // Error message (if failed)
+  details?: any; // Raw error details
   rawResponse?: AxiosResponse;
   // New fields for enhanced tracing and error handling
-  upstreamRequestId?: string;  // Upstream request ID for tracing
-  errorCode?: string;           // Provider error code (e.g., 'invalid_api_key')
-  errorType?: string;           // Provider error type (e.g., 'authentication_error')
+  upstreamRequestId?: string; // Upstream request ID for tracing
+  errorCode?: string; // Provider error code (e.g., 'invalid_api_key')
+  errorType?: string; // Provider error type (e.g., 'authentication_error')
 }
 
 /**

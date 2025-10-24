@@ -37,7 +37,8 @@ To add a new model, update the `models` section in `openai-pricing.json`:
 
 ### Adding Model Variants
 
-To add support for model variants (e.g., `gpt-4-0314`, `gpt-4-0613`), add a pattern:
+To add support for model variants (e.g., `gpt-4-0314`, `gpt-4-0613`), add a
+pattern:
 
 ```json
 {
@@ -80,7 +81,7 @@ const pricing = pricingRegistry.getProviderPricing('openai', 'gpt-4');
 // Calculate cost with provider-specific pricing
 const cost = pricingRegistry.calculateProviderCost('openai', 'gpt-4', {
   promptTokens: 1000,
-  completionTokens: 500
+  completionTokens: 500,
 });
 
 // Get provider version
@@ -139,7 +140,7 @@ To add support for Anthropic's Claude models, create `claude-pricing.json`:
     },
     {
       "pattern": "^claude-3-sonnet",
-      "baseModel": "claude-3-sonnet", 
+      "baseModel": "claude-3-sonnet",
       "description": "Claude 3 Sonnet variants"
     }
   ]

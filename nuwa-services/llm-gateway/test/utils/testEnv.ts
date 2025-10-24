@@ -68,7 +68,7 @@ export class TestEnv {
    */
   static getProviderConfigs(): ProviderTestConfig[] {
     const config = this.getConfig();
-    
+
     return [
       {
         name: 'openai',
@@ -89,9 +89,10 @@ export class TestEnv {
         enabled: !!config.litellmApiKey && !!config.litellmBaseUrl,
         apiKey: config.litellmApiKey,
         baseUrl: config.litellmBaseUrl,
-        reason: (!config.litellmApiKey || !config.litellmBaseUrl) 
-          ? 'LITELLM_API_KEY or LITELLM_BASE_URL not configured' 
-          : undefined,
+        reason:
+          !config.litellmApiKey || !config.litellmBaseUrl
+            ? 'LITELLM_API_KEY or LITELLM_BASE_URL not configured'
+            : undefined,
       },
       {
         name: 'claude',
@@ -146,11 +147,17 @@ export class TestEnv {
    */
   static describeProvider(providerName: string, testFn: () => void): void {
     const provider = this.getProviderConfigs().find(p => p.name === providerName);
-    
+
     if (this.shouldSkipIntegrationTests()) {
-      describe.skip(`${providerName} Provider Integration Tests (SKIP_INTEGRATION_TESTS=true)`, testFn);
+      describe.skip(
+        `${providerName} Provider Integration Tests (SKIP_INTEGRATION_TESTS=true)`,
+        testFn
+      );
     } else if (!provider?.enabled) {
-      describe.skip(`${providerName} Provider Integration Tests (${provider?.reason || 'disabled'})`, testFn);
+      describe.skip(
+        `${providerName} Provider Integration Tests (${provider?.reason || 'disabled'})`,
+        testFn
+      );
     } else {
       describe(`${providerName} Provider Integration Tests`, testFn);
     }
@@ -159,9 +166,13 @@ export class TestEnv {
   /**
    * Create a Jest test that conditionally skips based on provider availability
    */
-  static testProvider(providerName: string, testName: string, testFn: () => void | Promise<void>): void {
+  static testProvider(
+    providerName: string,
+    testName: string,
+    testFn: () => void | Promise<void>
+  ): void {
     const provider = this.getProviderConfigs().find(p => p.name === providerName);
-    
+
     if (this.shouldSkipIntegrationTests()) {
       it.skip(`${testName} (SKIP_INTEGRATION_TESTS=true)`, testFn);
     } else if (!provider?.enabled) {
@@ -177,18 +188,20 @@ export class TestEnv {
   static logStatus(): void {
     console.log('\n🧪 Test Environment Status:');
     console.log(`   Skip Integration Tests: ${this.shouldSkipIntegrationTests()}`);
-    
+
     const enabled = this.getEnabledProviders();
     const disabled = this.getDisabledProviders();
-    
+
     if (enabled.length > 0) {
       console.log(`   Enabled Providers: ${enabled.map(p => p.name).join(', ')}`);
     }
-    
+
     if (disabled.length > 0) {
-      console.log(`   Disabled Providers: ${disabled.map(p => `${p.name} (${p.reason})`).join(', ')}`);
+      console.log(
+        `   Disabled Providers: ${disabled.map(p => `${p.name} (${p.reason})`).join(', ')}`
+      );
     }
-    
+
     console.log('');
   }
 
@@ -202,9 +215,11 @@ export class TestEnv {
     // Check for common issues
     if (!config.skipIntegrationTests) {
       const enabledProviders = this.getEnabledProviders();
-      
+
       if (enabledProviders.length === 0) {
-        errors.push('No providers are enabled for testing. Set API keys or SKIP_INTEGRATION_TESTS=true');
+        errors.push(
+          'No providers are enabled for testing. Set API keys or SKIP_INTEGRATION_TESTS=true'
+        );
       }
 
       // Validate LiteLLM specific requirements
@@ -216,7 +231,7 @@ export class TestEnv {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -238,6 +253,10 @@ export function createProviderTestSuite(providerName: string, testFn: () => void
 /**
  * Helper function to create a test that respects environment configuration
  */
-export function createProviderTest(providerName: string, testName: string, testFn: () => void | Promise<void>): void {
+export function createProviderTest(
+  providerName: string,
+  testName: string,
+  testFn: () => void | Promise<void>
+): void {
   TestEnv.testProvider(providerName, testName, testFn);
 }

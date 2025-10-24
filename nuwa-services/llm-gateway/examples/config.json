@@ -4,7 +4,5 @@
   "serviceId": "llm-gateway",
   "network": "test",
   "debug": true,
-  "adminDid": [
-    "did:rooch:example123"
-  ]
+  "adminDid": ["did:rooch:example123"]
 }

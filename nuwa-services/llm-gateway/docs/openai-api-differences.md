@@ -11,26 +11,27 @@ OpenAI 提供了两个主要的对话 API,它们有不同的参数和用途。
 ### 1. Chat Completions API (`/v1/chat/completions`)
 
 #### 特点
+
 - 传统的对话接口
 - 使用 `messages` 数组作为输入
 - 只支持 `function` 类型的工具调用
 - 支持 `stream_options` 参数
 
 #### 示例请求
+
 ```json
 {
   "model": "gpt-4o-mini",
-  "messages": [
-    {"role": "user", "content": "Hello"}
-  ],
+  "messages": [{ "role": "user", "content": "Hello" }],
   "stream": true,
   "stream_options": {
-    "include_usage": true  // ✅ 支持此参数
+    "include_usage": true // ✅ 支持此参数
   }
 }
 ```
 
 #### 工具调用
+
 ```json
 {
   "model": "gpt-4o-mini",
@@ -51,6 +52,7 @@ OpenAI 提供了两个主要的对话 API,它们有不同的参数和用途。
 ### 2. Response API (`/v1/responses`)
 
 #### 特点
+
 - 新一代 API,支持更多内置工具
 - 使用 `input` 字符串作为输入 (**不是** `messages` 数组)
 - 支持内置工具: `web_search`, `file_search`, `computer_use` 等
@@ -59,20 +61,22 @@ OpenAI 提供了两个主要的对话 API,它们有不同的参数和用途。
 - 工具格式更简洁
 
 #### 示例请求
+
 ```json
 {
   "model": "gpt-4o",
-  "input": "What is the weather in SF?",  // 使用 input 字符串
-  "stream": true,  // ❌ 不要添加 stream_options!
+  "input": "What is the weather in SF?", // 使用 input 字符串
+  "stream": true, // ❌ 不要添加 stream_options!
   "tools": [
     {
-      "type": "web_search"  // 简洁的工具格式
+      "type": "web_search" // 简洁的工具格式
     }
   ]
 }
 ```
 
 #### 工具调用
+
 ```json
 {
   "model": "gpt-4o",
@@ -98,16 +102,16 @@ OpenAI 提供了两个主要的对话 API,它们有不同的参数和用途。
 
 ## 主要差异对比
 
-| 特性 | Chat Completions API | Response API |
-|------|---------------------|--------------|
-| **Endpoint** | `/v1/chat/completions` | `/v1/responses` |
-| **输入参数** | `messages` (数组) | `input` (字符串) |
-| **工具格式** | `{"type":"function","function":{...}}` | `{"type":"web_search"}` (简洁) |
-| **stream_options** | ✅ 支持 | ❌ 不支持 |
-| **Usage 信息** | 需要 `stream_options.include_usage` | ✅ 自动包含 |
-| **Function Tools** | ✅ 支持 | ✅ 支持 |
-| **Built-in Tools** | ❌ 不支持 | ✅ 支持 (web_search, file_search, etc.) |
-| **工具定价** | 只计算 token | Token + 工具调用费用 |
+| 特性               | Chat Completions API                   | Response API                            |
+| ------------------ | -------------------------------------- | --------------------------------------- |
+| **Endpoint**       | `/v1/chat/completions`                 | `/v1/responses`                         |
+| **输入参数**       | `messages` (数组)                      | `input` (字符串)                        |
+| **工具格式**       | `{"type":"function","function":{...}}` | `{"type":"web_search"}` (简洁)          |
+| **stream_options** | ✅ 支持                                | ❌ 不支持                               |
+| **Usage 信息**     | 需要 `stream_options.include_usage`    | ✅ 自动包含                             |
+| **Function Tools** | ✅ 支持                                | ✅ 支持                                 |
+| **Built-in Tools** | ❌ 不支持                              | ✅ 支持 (web_search, file_search, etc.) |
+| **工具定价**       | 只计算 token                           | Token + 工具调用费用                    |
 
 ## Response API 工具定价架构
 
@@ -121,12 +125,12 @@ Response API 采用**混合计费模式**，与传统的纯 token 计费不同�
 
 ### 官方工具定价表
 
-| 工具类型 | 计费方式 | 费率 | 备注 |
-|---------|---------|------|------|
-| `web_search` | 按调用次数 | $10.00 / 1,000 次调用 | GPT-4o/4.1 内容 tokens 免费 |
-| `file_search` | 按调用次数 | $2.50 / 1,000 次调用 | 首个 1GB 存储免费 |
-| `code_interpreter` | 按会话 | $0.03 / 会话 | Jupyter 环境执行 |
-| `computer_use` | 按会话 | $0.03 / 会话 | 计算机操作 |
+| 工具类型           | 计费方式   | 费率                  | 备注                        |
+| ------------------ | ---------- | --------------------- | --------------------------- |
+| `web_search`       | 按调用次数 | $10.00 / 1,000 次调用 | GPT-4o/4.1 内容 tokens 免费 |
+| `file_search`      | 按调用次数 | $2.50 / 1,000 次调用  | 首个 1GB 存储免费           |
+| `code_interpreter` | 按会话     | $0.03 / 会话          | Jupyter 环境执行            |
+| `computer_use`     | 按会话     | $0.03 / 会话          | 计算机操作                  |
 
 ### 成本计算示例
 
@@ -143,24 +147,24 @@ Token 成本: (700 input * $2.50/1M) + (300 output * $10.00/1M) = $4.75
 ```typescript
 // 扩展的 Usage 类型定义
 export interface ResponseUsage {
-  input_tokens: number;        // Response API 使用 input_tokens
-  output_tokens: number;       // Response API 使用 output_tokens
+  input_tokens: number; // Response API 使用 input_tokens
+  output_tokens: number; // Response API 使用 output_tokens
   total_tokens: number;
-  
+
   // 详细的 token 信息（OpenAI 新增字段）
   input_tokens_details?: {
-    cached_tokens?: number;    // 缓存的 tokens 数量
+    cached_tokens?: number; // 缓存的 tokens 数量
   };
   output_tokens_details?: {
     reasoning_tokens?: number; // 推理过程使用的 tokens
   };
-  
+
   // 工具内容 tokens（计入 input_tokens）
   web_search_tokens?: number;
   file_search_tokens?: number;
   tool_call_tokens?: number;
   computer_use_tokens?: number;
-  
+
   // 工具调用次数（独立计费）
   tool_calls_count?: {
     web_search?: number;
@@ -168,7 +172,7 @@ export interface ResponseUsage {
     code_interpreter?: number;
     computer_use?: number;
   };
-  
+
   // 成本信息（如果提供商支持）
   cost?: number;
   cost_breakdown?: {
@@ -207,12 +211,12 @@ private hasResponseAPITools(tools: any[]): boolean {
 private static extractResponseAPIUsage(usage: any): UsageInfo {
   let toolTokens = 0;
   const keys = Object.keys(usage);
-  
+
   for (const key of keys) {
     // 匹配所有以 '_tokens' 结尾且非标准字段的键
-    if (key.endsWith('_tokens') && 
-        key !== 'input_tokens' && 
-        key !== 'output_tokens' && 
+    if (key.endsWith('_tokens') &&
+        key !== 'input_tokens' &&
+        key !== 'output_tokens' &&
         key !== 'total_tokens') {
       const tokenValue = usage[key];
       if (typeof tokenValue === 'number' && tokenValue > 0) {
@@ -220,7 +224,7 @@ private static extractResponseAPIUsage(usage: any): UsageInfo {
       }
     }
   }
-  
+
   return {
     promptTokens: (usage.input_tokens || 0) + toolTokens,
     completionTokens: usage.output_tokens || 0,
@@ -232,6 +236,7 @@ private static extractResponseAPIUsage(usage: any): UsageInfo {
 #### 3. 零维护成本的新工具支持
 
 当 OpenAI 添加新工具（如 `future_ai_tool`）时：
+
 - ✅ **自动检测**：识别为 Response API 工具
 - ✅ **自动计费**：工具内容 tokens 自动包含在成本计算中
 - ✅ **向后兼容**：不影响现有功能
@@ -249,7 +254,7 @@ private isResponseAPIRequest(data: any): boolean {
 }
 
 private hasResponseAPITools(tools: any[]): boolean {
-  return tools.some(tool => 
+  return tools.some(tool =>
     tool.type && tool.type !== 'function'  // 非 function 类型表示 Response API
   );
 }
@@ -258,6 +263,7 @@ private hasResponseAPITools(tools: any[]): boolean {
 ### 参数准备
 
 #### Chat Completions API
+
 ```typescript
 private prepareChatCompletionData(data: any, isStream: boolean): any {
   if (isStream) {
@@ -274,21 +280,22 @@ private prepareChatCompletionData(data: any, isStream: boolean): any {
 ```
 
 #### Response API
+
 ```typescript
 private prepareResponseAPIData(data: any, isStream: boolean): any {
   const prepared = { ...data };
-  
+
   // ❌ Response API 不支持 stream_options
   if (prepared.stream_options) {
     console.warn('⚠️  stream_options is not supported in Response API, removing it');
     delete prepared.stream_options;
   }
-  
+
   // 规范化工具配置
   if (prepared.tools) {
     prepared.tools = this.normalizeResponseAPITools(prepared.tools);
   }
-  
+
   return prepared;
 }
 ```
@@ -298,18 +305,21 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ### 错误 1: 在 Response API 中使用 stream_options
 
 **错误请求**:
+
 ```json
 {
   "model": "gpt-4o",
   "input": "test",
   "stream": true,
-  "stream_options": {  // ❌ Response API 不支持
+  "stream_options": {
+    // ❌ Response API 不支持
     "include_usage": true
   }
 }
 ```
 
 **错误响应**:
+
 ```json
 {
   "error": {
@@ -327,13 +337,14 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 {
   "model": "gpt-4o",
   "input": "test",
-  "stream": true  // ✅ 正确
+  "stream": true // ✅ 正确
 }
 ```
 
 ### 错误 2: 在 Chat Completions API 中使用内置工具
 
 **错误请求**:
+
 ```json
 {
   "model": "gpt-4o-mini",
@@ -354,6 +365,7 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ### 错误 3: Response API 缺少 input
 
 **错误请求**:
+
 ```json
 {
   "model": "gpt-4o",
@@ -362,6 +374,7 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ```
 
 **错误响应**:
+
 ```json
 {
   "error": {
@@ -386,12 +399,14 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ## 使用建议
 
 ### 何时使用 Chat Completions API
+
 - ✅ 只需要基本的对话功能
 - ✅ 使用自定义 function 工具
 - ✅ 需要精确控制 usage 统计
 - ✅ 已有的集成代码
 
 ### 何时使用 Response API
+
 - ✅ 需要使用内置工具 (web_search, file_search, etc.)
 - ✅ 需要更高级的 AI 功能
 - ✅ 需要 computer_use 或 code_interpreter
@@ -402,6 +417,7 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ### Chat Completions API (流式)
 
 需要在请求中添加 `stream_options`:
+
 ```json
 {
   "stream": true,
@@ -412,6 +428,7 @@ private prepareResponseAPIData(data: any, isStream: boolean): any {
 ```
 
 响应流的最后一个 chunk 包含 usage:
+
 ```
 data: {"choices":[...],"usage":null}
 data: {"choices":[...],"usage":null}
@@ -422,13 +439,15 @@ data: [DONE]
 ### Response API (流式)
 
 Usage 自动包含,无需额外参数:
+
 ```json
 {
-  "stream": true  // 就这么简单
+  "stream": true // 就这么简单
 }
 ```
 
 响应流自动包含 usage 信息:
+
 ```
 event: response.completed
 data: {"type":"response.completed","response":{"usage":{"input_tokens":17008,"input_tokens_details":{"cached_tokens":0},"output_tokens":741,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":17749}}}
@@ -437,6 +456,7 @@ data: {"type":"response.completed","response":{"usage":{"input_tokens":17008,"in
 ## 测试命令
 
 ### Chat Completions API
+
 ```bash
 curl -X POST http://localhost:3000/openai/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -450,6 +470,7 @@ curl -X POST http://localhost:3000/openai/v1/chat/completions \
 ```
 
 ### Response API
+
 ```bash
 curl -X POST http://localhost:3000/openai/v1/responses \
   -H "Content-Type: application/json" \
@@ -474,26 +495,31 @@ curl -X POST http://localhost:3000/openai/v1/responses \
 ## 架构优势总结
 
 ### 1. 准确的成本计算
+
 - ✅ 分离 token 成本和工具调用成本
 - ✅ 符合 OpenAI 官方定价模式
 - ✅ 支持特殊优惠政策（如 GPT-4o 免费 tokens）
 
 ### 2. 动态扩展性
+
 - ✅ 自动支持新的工具类型，无需代码修改
 - ✅ 基于模式匹配，而非硬编码工具名称
 - ✅ 灵活的工具配置验证
 
 ### 3. 完整的向后兼容
+
 - ✅ Chat Completions API 逻辑完全不变
 - ✅ 现有计费流程保持稳定
 - ✅ 平滑的迁移路径
 
 ### 4. 透明的成本分解
+
 - ✅ 详细的成本分解信息
 - ✅ 便于调试和优化
 - ✅ 支持精细化的计费管理
 
 ### 5. 零维护成本
+
 - ✅ 新工具自动支持
 - ✅ 可观测性：自动检测和报告新工具
 - ✅ 统一计费逻辑适用于所有工具类型
@@ -517,15 +543,18 @@ data: {"type":"response.completed","sequence_number":77,"response":{"usage":{"in
 ```
 
 关键差异：
+
 1. **事件标识**: 需要先检测 `event: response.completed`
 2. **嵌套结构**: usage 位于 `data.response.usage`
-3. **字段名称**: 使用 `input_tokens`/`output_tokens` 而非 `prompt_tokens`/`completion_tokens`
+3. **字段名称**: 使用 `input_tokens`/`output_tokens` 而非
+   `prompt_tokens`/`completion_tokens`
 
 ### 真实的 Response API 响应格式
 
 基于实际的 OpenAI Response API 响应，usage 字段的完整格式如下：
 
 #### 非流式响应
+
 ```json
 {
   "id": "resp_0088114fb2a85e7f0068f03277492081969b8a6eb303eba34c",
@@ -548,27 +577,33 @@ data: {"type":"response.completed","sequence_number":77,"response":{"usage":{"in
 ```
 
 #### 流式响应
+
 ```
 event: response.completed
 data: {"type":"response.completed","sequence_number":66,"response":{"usage":{"input_tokens":17008,"input_tokens_details":{"cached_tokens":0},"output_tokens":741,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":17749}}}
 ```
 
 **关键字段说明：**
-- `input_tokens`: 输入 tokens 数量（等同于 Chat Completions API 的 `prompt_tokens`）
-- `output_tokens`: 输出 tokens 数量（等同于 Chat Completions API 的 `completion_tokens`）
+
+- `input_tokens`: 输入 tokens 数量（等同于 Chat Completions API 的
+  `prompt_tokens`）
+- `output_tokens`: 输出 tokens 数量（等同于 Chat Completions API 的
+  `completion_tokens`）
 - `input_tokens_details.cached_tokens`: 使用缓存的 tokens 数量
 - `output_tokens_details.reasoning_tokens`: 推理过程中使用的 tokens 数量
 
 ### 工具定价
 
-Response API 支持内置工具（web_search, file_search, code_interpreter），这些工具调用可能产生额外费用。工具定价信息存储在 `src/config/toolPricing.ts` 中。
+Response API 支持内置工具（web_search, file_search,
+code_interpreter），这些工具调用可能产生额外费用。工具定价信息存储在
+`src/config/toolPricing.ts` 中。
 
 ### 调试
 
 如果遇到计费问题，可以检查以下日志：
+
 - 📊 Usage 提取和解析日志
-- 💰 成本计算日志  
+- 💰 成本计算日志
 - 💵 计费流程日志
 
 详细的调试信息会在 `usagePolicy.ts` 中输出。
-

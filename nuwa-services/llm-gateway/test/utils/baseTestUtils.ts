@@ -59,16 +59,13 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
    * Instance method: Test non-streaming request
    * Uses the provider and apiKey from constructor
    */
-  async testNonStreaming(
-    endpoint: string,
-    options?: Record<string, any>
-  ): Promise<BaseTestResult> {
+  async testNonStreaming(endpoint: string, options?: Record<string, any>): Promise<BaseTestResult> {
     const startTime = Date.now();
-    
+
     try {
       // Use provider's method to create properly formatted request
       const requestData = this.provider.createTestRequest(endpoint, options);
-      
+
       // Use the high-level executeRequest API
       const executeResult = await this.provider.executeRequest(
         this.apiKey,
@@ -98,7 +95,6 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
         model: requestData.model,
         rawResponse: executeResult.rawResponse,
       };
-
     } catch (error) {
       return {
         success: false,
@@ -112,16 +108,13 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
    * Instance method: Test streaming request
    * Uses the provider and apiKey from constructor
    */
-  async testStreaming(
-    endpoint: string,
-    options?: Record<string, any>
-  ): Promise<BaseTestResult> {
+  async testStreaming(endpoint: string, options?: Record<string, any>): Promise<BaseTestResult> {
     const startTime = Date.now();
-    
+
     try {
       // Use provider's method to create properly formatted streaming request
       const requestData = this.provider.createTestRequest(endpoint, { ...options, stream: true });
-      
+
       // Use PassThrough stream to capture content for testing
       const { PassThrough } = await import('stream');
       const captureStream = new PassThrough();
@@ -138,7 +131,7 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
         endpoint,
         'POST',
         requestData,
-        captureStream  // Pass the capture stream as destination
+        captureStream // Pass the capture stream as destination
       );
 
       const duration = Date.now() - startTime;
@@ -162,7 +155,6 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
         model: requestData.model,
         rawResponse: result.rawResponse,
       };
-
     } catch (error) {
       return {
         success: false,
@@ -175,10 +167,7 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
   /**
    * Instance method: Validate test response
    */
-  validateResponse(
-    result: BaseTestResult,
-    validation: BaseTestValidation
-  ): ValidationResult {
+  validateResponse(result: BaseTestResult, validation: BaseTestValidation): ValidationResult {
     return BaseProviderTestUtils.validateTestResponse(result, validation);
   }
 
@@ -189,10 +178,10 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
    */
   static createTestProviderManager(enabledProviders: string[] = []): ProviderManager {
     const manager = ProviderManager.createTestInstance();
-    
+
     // Initialize with skip env check to avoid requiring real API keys for unit tests
     const result = manager.initializeProviders({ skipEnvCheck: true });
-    
+
     // If specific providers are requested, filter to only those
     if (enabledProviders.length > 0) {
       const allProviders = manager.list();
@@ -202,20 +191,22 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
         }
       });
     }
-    
+
     return manager;
   }
 
   /**
    * Create a test route handler for isolated testing
    */
-  static createTestRouteHandler(options: {
-    enabledProviders?: string[];
-    skipAuth?: boolean;
-  } = {}): RouteHandler {
+  static createTestRouteHandler(
+    options: {
+      enabledProviders?: string[];
+      skipAuth?: boolean;
+    } = {}
+  ): RouteHandler {
     const providerManager = this.createTestProviderManager(options.enabledProviders);
     const authManager = AuthManager.createTestInstance();
-    
+
     return RouteHandler.createTestInstance({
       providerManager,
       authManager,
@@ -248,18 +239,28 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
 
       if (result.usage) {
         if (validation.minTokens && (result.usage.totalTokens || 0) < validation.minTokens) {
-          errors.push(`Expected at least ${validation.minTokens} tokens but got ${result.usage.totalTokens}`);
+          errors.push(
+            `Expected at least ${validation.minTokens} tokens but got ${result.usage.totalTokens}`
+          );
         }
 
         if (validation.maxTokens && (result.usage.totalTokens || 0) > validation.maxTokens) {
-          errors.push(`Expected at most ${validation.maxTokens} tokens but got ${result.usage.totalTokens}`);
+          errors.push(
+            `Expected at most ${validation.maxTokens} tokens but got ${result.usage.totalTokens}`
+          );
         }
 
         // Validate token consistency (integrated from Claude test utils)
-        if (result.usage.promptTokens && result.usage.completionTokens && result.usage.totalTokens) {
+        if (
+          result.usage.promptTokens &&
+          result.usage.completionTokens &&
+          result.usage.totalTokens
+        ) {
           const expectedTotal = result.usage.promptTokens + result.usage.completionTokens;
           if (result.usage.totalTokens !== expectedTotal) {
-            errors.push(`Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`);
+            errors.push(
+              `Token count inconsistency: total=${result.usage.totalTokens}, sum=${expectedTotal}`
+            );
           }
         }
       }
@@ -296,5 +297,4 @@ export class BaseProviderTestUtils<T extends TestableLLMProvider = TestableLLMPr
   static async wait(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-
 }

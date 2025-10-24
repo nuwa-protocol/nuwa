@@ -10,20 +10,35 @@ describe('Cost Calculation Unit Tests', () => {
   describe('CostCalculator', () => {
     it('should calculate request costs with provider preference', () => {
       const usage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
-      
+
       // Test provider cost preference
-      const resultWithProvider = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 0.05, usage);
+      const resultWithProvider = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4',
+        0.05,
+        usage
+      );
       expect(resultWithProvider?.costUsd).toBe(0.05);
       expect(resultWithProvider?.source).toBe('provider');
 
       // Test gateway pricing fallback
-      const resultWithoutProvider = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, usage);
+      const resultWithoutProvider = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4',
+        undefined,
+        usage
+      );
       expect(resultWithoutProvider?.costUsd).toBeCloseTo(0.06);
       expect(resultWithoutProvider?.source).toBe('gateway-pricing');
     });
 
     it('should return null for invalid usage', () => {
-      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, undefined);
+      const result = CostCalculator.calculateProviderRequestCost(
+        'openai',
+        'gpt-4',
+        undefined,
+        undefined
+      );
       expect(result).toBeNull();
     });
   });
@@ -38,8 +53,8 @@ describe('Cost Calculation Unit Tests', () => {
         usage: {
           prompt_tokens: 10,
           completion_tokens: 5,
-          total_tokens: 15
-        }
+          total_tokens: 15,
+        },
       };
 
       const usage = extractor.extractFromResponseBody(responseBody);

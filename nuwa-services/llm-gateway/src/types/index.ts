@@ -104,14 +104,14 @@ export interface ResponseUsage {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  
+
   input_tokens_details?: {
     cached_tokens?: number;
   };
   output_tokens_details?: {
     reasoning_tokens?: number;
   };
-  
+
   // tool token fields(OpenAI may provide these fields)
   tool_call_tokens?: number;
   web_search_tokens?: number; // web_search
@@ -126,9 +126,9 @@ export interface ExtendedUsage extends ResponseUsage {
     computer_use?: number;
     code_interpreter?: number;
   };
-  
+
   cost?: number;
-  
+
   cost_breakdown?: {
     model_cost?: number;
     tool_call_cost?: number;
@@ -137,7 +137,7 @@ export interface ExtendedUsage extends ResponseUsage {
 }
 
 export interface Message {
-  role: "system" | "user" | "assistant";
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -193,7 +193,7 @@ export interface RequestLog {
   total_cost?: number;
   request_time: string;
   response_time?: string;
-  status: "pending" | "completed" | "failed";
+  status: 'pending' | 'completed' | 'failed';
   error_message?: string;
 }
 

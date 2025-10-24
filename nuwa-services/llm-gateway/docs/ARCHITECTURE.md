@@ -2,7 +2,8 @@
 
 ## 概述
 
-LLM Gateway 是一个统一的 LLM 服务代理，支持多个 LLM 提供商（OpenAI、OpenRouter、LiteLLM 等）。本文档描述了重构后的新架构，特别是使用量提取和成本计算系统的设计。
+LLM
+Gateway 是一个统一的 LLM 服务代理，支持多个 LLM 提供商（OpenAI、OpenRouter、LiteLLM 等）。本文档描述了重构后的新架构，特别是使用量提取和成本计算系统的设计。
 
 ## 架构原则
 
@@ -21,7 +22,9 @@ LLM Gateway 是一个统一的 LLM 服务代理，支持多个 LLM 提供商（O
 // src/billing/usage/interfaces/UsageExtractor.ts
 interface UsageExtractor {
   extractFromResponseBody(responseBody: any): UsageInfo | null;
-  extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null;
+  extractFromStreamChunk(
+    chunkText: string
+  ): { usage: UsageInfo; cost?: number } | null;
 }
 ```
 
@@ -37,7 +40,8 @@ abstract class BaseUsageExtractor implements UsageExtractor {
 
 #### Provider 特定实现
 
-- **DefaultUsageExtractor**: 处理标准 OpenAI 格式（Chat Completions 和 Response API）
+- **DefaultUsageExtractor**: 处理标准 OpenAI 格式（Chat Completions 和 Response
+  API）
 - **OpenRouterUsageExtractor**: 处理 OpenRouter 特有格式
 - **LiteLLMUsageExtractor**: 处理 LiteLLM 特有格式
 
@@ -69,7 +73,11 @@ abstract class BaseStreamProcessor implements StreamProcessor {
 ```typescript
 // src/billing/usage/CostCalculator.ts
 class CostCalculator {
-  static calculateRequestCost(model: string, providerCostUsd?: number, usage?: UsageInfo): PricingResult | null;
+  static calculateRequestCost(
+    model: string,
+    providerCostUsd?: number,
+    usage?: UsageInfo
+  ): PricingResult | null;
   static applyMultiplier(costUsd: number): number;
   static getPricingMultiplier(): number;
 }
@@ -81,7 +89,7 @@ class CostCalculator {
 // src/providers/LLMProvider.ts
 interface LLMProvider {
   // 现有方法...
-  
+
   // 新增可选方法
   createUsageExtractor?(): UsageExtractor;
   createStreamProcessor?(model: string, initialCost?: number): StreamProcessor;
@@ -129,7 +137,7 @@ Request → Provider → Stream → StreamProcessor → Accumulated Usage → Fi
 ### OpenAI Provider
 
 - **支持格式**: Chat Completions API, Response API
-- **特殊处理**: 
+- **特殊处理**:
   - Response API 的 `input_tokens`/`output_tokens` 格式
   - 动态工具调用 token 提取
   - Stream options 注入
@@ -158,11 +166,11 @@ Request → Provider → Stream → StreamProcessor → Accumulated Usage → Fi
 ```typescript
 class MyCustomProvider implements LLMProvider {
   // 实现必需方法...
-  
+
   createUsageExtractor(): UsageExtractor {
     return new MyCustomUsageExtractor();
   }
-  
+
   createStreamProcessor(model: string, initialCost?: number): StreamProcessor {
     return new MyCustomStreamProcessor(model, initialCost);
   }
@@ -185,7 +193,7 @@ class MyCustomUsageExtractor extends BaseUsageExtractor {
 ### 基准测试结果
 
 - **使用量提取**: 0.0017ms 平均耗时
-- **Provider 成本计算**: 0.0024ms 平均耗时  
+- **Provider 成本计算**: 0.0024ms 平均耗时
 - **Gateway 成本计算**: 0.0064ms 平均耗时
 - **Stream Processor 创建**: 0.0022ms 平均耗时
 - **内存使用**: 100次操作仅增长 0.24MB
@@ -241,6 +249,7 @@ class MyCustomUsageExtractor extends BaseUsageExtractor {
 ### 适配器模式
 
 通过 `UsagePolicyAdapter` 确保：
+
 - 现有代码无需修改
 - 测试用例继续通过
 - 渐进式迁移到新架构
@@ -289,6 +298,6 @@ class MyCustomUsageExtractor extends BaseUsageExtractor {
 ✅ **可扩展性**: 新增 provider 成本大幅降低  
 ✅ **错误隔离**: Provider 特定错误不影响其他 provider  
 ✅ **性能保证**: 保持甚至提升了原有性能  
-✅ **向后兼容**: 现有 API 和测试完全不受影响  
+✅ **向后兼容**: 现有 API 和测试完全不受影响
 
 这个新架构为 LLM Gateway 的未来发展奠定了坚实的基础。

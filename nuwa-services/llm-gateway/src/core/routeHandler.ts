@@ -90,20 +90,20 @@ export class RouteHandler {
         return {
           success: false,
           error: authResult.error || 'Unauthorized',
-          statusCode: 401
+          statusCode: 401,
         };
       }
     }
 
     const didInfo = this.authManager.extractDIDInfo(req);
-    
+
     // Get provider configuration and validate path
     const providerConfig = this.providerManager.get(providerName);
     if (!providerConfig) {
       return {
         success: false,
         error: `Provider '${providerName}' not found`,
-        statusCode: 404
+        statusCode: 404,
       };
     }
 
@@ -113,10 +113,10 @@ export class RouteHandler {
         success: false,
         error: pathResult.error,
         statusCode: 400,
-        pathResult
+        pathResult,
       };
     }
-    
+
     // Require DID authentication for all routes (both legacy and provider routes need billing)
     if (!this.skipAuth && !didInfo?.did) {
       return {
@@ -124,7 +124,7 @@ export class RouteHandler {
         error: 'Unauthorized',
         statusCode: 401,
         pathResult,
-        didInfo
+        didInfo,
       };
     }
 
@@ -135,7 +135,7 @@ export class RouteHandler {
         error: `Provider '${providerName}' not found`,
         statusCode: 404,
         pathResult,
-        didInfo
+        didInfo,
       };
     }
 
@@ -144,13 +144,15 @@ export class RouteHandler {
     try {
       apiKey = this.providerManager.getProviderApiKey(providerName);
     } catch (error) {
-      console.error(`Failed to get API key for provider '${providerName}': ${(error as Error).message}`);
+      console.error(
+        `Failed to get API key for provider '${providerName}': ${(error as Error).message}`
+      );
       return {
         success: false,
         error: `Provider configuration error: ${(error as Error).message}`,
         statusCode: 404,
         pathResult,
-        didInfo
+        didInfo,
       };
     }
 
@@ -159,7 +161,7 @@ export class RouteHandler {
       provider,
       apiKey,
       pathResult,
-      didInfo
+      didInfo,
     };
   }
 
@@ -189,7 +191,7 @@ export class RouteHandler {
     if (!isSupported) {
       return {
         valid: false,
-        error: `Model '${model}' is not supported. Please check available models.`
+        error: `Model '${model}' is not supported. Please check available models.`,
       };
     }
 
@@ -219,7 +221,7 @@ export class RouteHandler {
       const totalCostUSD = result.usageUsd ?? 0;
       const pico = Math.round(Number(totalCostUSD) * 1e12);
       (res as any).locals.usage = pico;
-      
+
       if (result.error) {
         const errorResponse = result.body || { success: false, error: result.error };
         res.status(result.status).json(errorResponse);
@@ -236,7 +238,11 @@ export class RouteHandler {
   /**
    * Handle non-streaming requests for a specific provider
    */
-  async handleNonStreamRequest(req: Request, providerName: string, validation: ProviderValidationResult): Promise<ProxyResult> {
+  async handleNonStreamRequest(
+    req: Request,
+    providerName: string,
+    validation: ProviderValidationResult
+  ): Promise<ProxyResult> {
     const { provider, apiKey, pathResult } = validation;
 
     const meta: UpstreamMeta = {
@@ -249,17 +255,17 @@ export class RouteHandler {
     // Extract model from request for pricing validation
     const requestData = this.getRequestData(req);
     const model = requestData?.model;
-    
+
     // Get provider config to check if it supports native USD cost
     const providerConfig = this.providerManager.get(providerName);
-    
+
     // Validate model pricing before making upstream request
     const pricingValidation = this.validateModelPricing(
       providerName,
       model,
       providerConfig?.supportsNativeUsdCost || false
     );
-    
+
     if (!pricingValidation.valid) {
       return {
         status: 400,
@@ -268,18 +274,23 @@ export class RouteHandler {
           error: {
             message: pricingValidation.error,
             type: 'invalid_request_error',
-            code: 'model_not_supported'
-          }
+            code: 'model_not_supported',
+          },
         },
-        meta
+        meta,
       };
     }
 
     // Use the new high-level executeRequest API
     const started = Date.now();
     const upstreamPath = pathResult!.path;
-    
-    const executeResult = await provider!.executeRequest(apiKey!, upstreamPath, req.method, requestData);
+
+    const executeResult = await provider!.executeRequest(
+      apiKey!,
+      upstreamPath,
+      req.method,
+      requestData
+    );
     meta.upstream_duration_ms = Date.now() - started;
 
     // Handle executeRequest result
@@ -288,11 +299,11 @@ export class RouteHandler {
       meta.error_code = executeResult.errorCode;
       meta.error_type = executeResult.errorType;
       meta.upstream_request_id = executeResult.upstreamRequestId;
-      
+
       // Return original upstream error format for consistency with success responses
       // If we have the original error response, use it; otherwise fall back to wrapped format
       let errorBody: any;
-      
+
       if (executeResult.details?.rawError && typeof executeResult.details.rawError === 'object') {
         // Use the original upstream error response
         errorBody = executeResult.details.rawError;
@@ -305,18 +316,18 @@ export class RouteHandler {
           status_code: executeResult.statusCode || 500,
         };
       }
-      
-      return { 
-        status: executeResult.statusCode || 500, 
-        error: executeResult.error || 'Unknown error', 
-        body: errorBody, 
-        meta 
+
+      return {
+        status: executeResult.statusCode || 500,
+        error: executeResult.error || 'Unknown error',
+        body: errorBody,
+        meta,
       };
     }
 
     meta.upstream_status_code = executeResult.statusCode || 200;
     meta.upstream_request_id = executeResult.upstreamRequestId;
-    
+
     // Extract useful headers for monitoring (if rawResponse is available)
     if (executeResult.rawResponse) {
       const hdrs = executeResult.rawResponse.headers || {};
@@ -327,53 +338,58 @@ export class RouteHandler {
         'x-request-id': hdrs['x-request-id'],
       };
     }
-    
+
     // Calculate response size
     if (executeResult.response) {
       const responseStr = JSON.stringify(executeResult.response);
       meta.upstream_bytes = Buffer.byteLength(responseStr, 'utf8');
     }
-    
+
     // Set cost in meta (now provided by executeRequest)
     meta.upstream_cost_usd = executeResult.cost?.costUsd;
-    
+
     return {
       status: executeResult.statusCode || 200,
       body: executeResult.response,
       usageUsd: executeResult.cost?.costUsd,
       meta,
       usage: executeResult.usage,
-      cost: executeResult.cost
+      cost: executeResult.cost,
     };
   }
 
   /**
-   * Handle streaming requests for a specific provider  
+   * Handle streaming requests for a specific provider
    */
-  async handleStreamRequest(req: Request, res: Response, providerName: string, validation: ProviderValidationResult): Promise<void> {
+  async handleStreamRequest(
+    req: Request,
+    res: Response,
+    providerName: string,
+    validation: ProviderValidationResult
+  ): Promise<void> {
     const { provider, apiKey, pathResult } = validation;
 
     // Extract model from request for pricing validation
     const requestData = this.getRequestData(req);
     const model = requestData?.model;
-    
+
     // Get provider config to check if it supports native USD cost
     const providerConfig = this.providerManager.get(providerName);
-    
+
     // Validate model pricing before making upstream request
     const pricingValidation = this.validateModelPricing(
       providerName,
       model,
       providerConfig?.supportsNativeUsdCost || false
     );
-    
+
     if (!pricingValidation.valid) {
       res.status(400).json({
         error: {
           message: pricingValidation.error,
           type: 'invalid_request_error',
-          code: 'model_not_supported'
-        }
+          code: 'model_not_supported',
+        },
       });
       return;
     }
@@ -398,13 +414,13 @@ export class RouteHandler {
       const upstreamPath = pathResult!.path;
       // Construct data with stream: true
       const data = { ...(req.body || {}), stream: true };
-      
+
       // ⭐️ BaseLLMProvider will:
       // 1. Set res.locals.usageInfo, costResult, usage before destination.end()
       // 2. Update res.locals.upstream with request_id, cost, bytes, status
       // 3. Trigger res.on('finish') which calls accessLog and PaymentKit middlewares
       const result = await provider!.executeStreamRequest(apiKey!, upstreamPath, 'POST', data, res);
-      
+
       meta.upstream_duration_ms = Date.now() - started;
 
       if (!result.success) {
@@ -413,7 +429,7 @@ export class RouteHandler {
         meta.error_type = result.errorType;
         meta.upstream_request_id = result.upstreamRequestId;
         (res as any).locals.upstream = meta;
-        
+
         // Send error event to client via SSE format
         if (!res.writableEnded) {
           try {
@@ -423,10 +439,10 @@ export class RouteHandler {
                 message: result.error || 'Stream request failed',
                 type: result.errorType || 'gateway_error',
                 code: result.errorCode || 'unknown_error',
-              }
+              },
             };
             const errorData = `event: error\ndata: ${JSON.stringify(errorEvent)}\n\n`;
-            
+
             // Write error data first, then call end()
             // PaymentKit wraps res.end() and injects payment frame BEFORE calling originalEnd(args)
             // So we need to write() first to ensure error data comes before payment frame
@@ -446,7 +462,7 @@ export class RouteHandler {
 
       // ⭐️ Update meta with additional values (most are already set by BaseLLMProvider)
       meta.upstream_duration_ms = Date.now() - started;
-      
+
       // Extract headers for monitoring (if rawResponse is available)
       if (result.rawResponse) {
         const hdrs = result.rawResponse.headers || {};
@@ -457,10 +473,9 @@ export class RouteHandler {
           'x-request-id': hdrs['x-request-id'],
         };
       }
-      
+
       // Final update to upstream meta (BaseLLMProvider already set most fields)
       (res as any).locals.upstream = { ...meta, ...(res as any).locals.upstream };
-
     } catch (e: any) {
       meta.upstream_duration_ms = Date.now() - started;
       meta.upstream_status_code = 500;
