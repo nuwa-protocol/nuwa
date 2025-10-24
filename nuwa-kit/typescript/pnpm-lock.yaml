@@ -226,9 +226,6 @@ importers:
 
   packages/cap-kit:
     dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.13.1
-        version: 1.13.1
       '@noble/curves':
         specifier: ^1.9.1
         version: 1.9.1
