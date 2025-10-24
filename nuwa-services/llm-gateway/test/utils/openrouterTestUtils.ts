@@ -1,4 +1,4 @@
-import OpenRouterService from '../../src/services/openrouter.js';
+import OpenRouterService from '../../src/providers/openrouter.js';
 import { BaseProviderTestUtils, BaseTestResult } from './baseTestUtils.js';
 import { OPENROUTER_PATHS } from '../../src/providers/constants.js';
 

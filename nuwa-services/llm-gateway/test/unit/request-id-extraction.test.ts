@@ -1,7 +1,7 @@
 import { OpenAIProvider } from '../../src/providers/openai.js';
 import { ClaudeProvider } from '../../src/providers/claude.js';
-import OpenRouterService from '../../src/services/openrouter.js';
-import LiteLLMService from '../../src/services/litellm.js';
+import OpenRouterService from '../../src/providers/openrouter.js';
+import LiteLLMService from '../../src/providers/litellm.js';
 
 describe('Request ID Extraction', () => {
   describe('OpenAI Provider', () => {

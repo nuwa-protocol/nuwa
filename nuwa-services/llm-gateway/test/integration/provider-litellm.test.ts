@@ -5,7 +5,7 @@
  * Note: Requires a running LiteLLM proxy server
  */
 
-import LiteLLMService from '../../src/services/litellm.js';
+import LiteLLMService from '../../src/providers/litellm.js';
 import { TestEnv, createProviderTestSuite } from '../utils/testEnv.js';
 import { LiteLLMTestUtils } from '../utils/litellmTestUtils.js';
 import { BaseTestValidation, BaseProviderTestUtils } from '../utils/baseTestUtils.js';

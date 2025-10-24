@@ -1,6 +1,6 @@
 import { LLMProvider, ProviderConfig } from '../providers/LLMProvider.js';
-import OpenRouterService from '../services/openrouter.js';
-import LiteLLMService from '../services/litellm.js';
+import OpenRouterService from '../providers/openrouter.js';
+import LiteLLMService from '../providers/litellm.js';
 import { OpenAIProvider } from '../providers/openai.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { providerRegistry } from '../providers/registry.js';

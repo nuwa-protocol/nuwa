@@ -4,7 +4,7 @@
  * Focus: Successful scenarios only
  */
 
-import OpenRouterService from '../../src/services/openrouter.js';
+import OpenRouterService from '../../src/providers/openrouter.js';
 import { TestEnv, createProviderTestSuite } from '../utils/testEnv.js';
 import { OpenRouterTestUtils } from '../utils/openrouterTestUtils.js';
 import { BaseTestValidation, BaseProviderTestUtils } from '../utils/baseTestUtils.js';

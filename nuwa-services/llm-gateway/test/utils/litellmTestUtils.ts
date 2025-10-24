@@ -1,4 +1,4 @@
-import LiteLLMService from '../../src/services/litellm.js';
+import LiteLLMService from '../../src/providers/litellm.js';
 import { BaseProviderTestUtils, BaseTestResult } from './baseTestUtils.js';
 import { LITELLM_PATHS } from '../../src/providers/constants.js';
 
