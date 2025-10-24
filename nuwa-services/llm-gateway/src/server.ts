@@ -6,7 +6,7 @@ import {
   initRoochVDR,
   InMemoryLRUDIDDocumentCache,
 } from "@nuwa-ai/identity-kit";
-import { initPaymentKitAndRegisterRoutes } from './gateway.js';
+import { initPaymentKitAndRegisterRoutes, ProviderManager } from './gateway.js';
 import { accessLogMiddleware } from './middleware/accessLog.js';
 import type { LLMGatewayConfig } from './config/cli.js';
 
@@ -129,16 +129,14 @@ export async function startServer(
     console.log(`🔧 Service ID: ${config.serviceId}`);
     console.log(`🐛 Debug: ${config.debug ? 'enabled' : 'disabled'}`);
     
-    // Check provider configuration
-    const providers = [];
-    if (config.openaiApiKey) providers.push('OpenAI');
-    if (config.openrouterApiKey) providers.push('OpenRouter');
-    if (config.litellmApiKey) providers.push('LiteLLM');
+    // Get registered providers from ProviderManager
+    const providerManager = ProviderManager.getInstance();
+    const registeredProviders = providerManager.list();
     
-    if (providers.length > 0) {
-      console.log(`🤖 Configured providers: ${providers.join(', ')}`);
+    if (registeredProviders.length > 0) {
+      console.log(`🤖 Registered providers: ${registeredProviders.join(', ')}`);
     } else {
-      console.warn('⚠️  No provider API keys configured. Please set at least one provider API key.');
+      console.warn('⚠️  No providers registered. Please check your environment configuration.');
     }
 
     return new Promise((resolve, reject) => {
