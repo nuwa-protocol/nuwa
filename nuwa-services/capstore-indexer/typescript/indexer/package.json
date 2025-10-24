@@ -23,7 +23,6 @@
     "ipfs-http-client": "^58.0.1",
     "multiformats": "^13.3.7",
     "@roochnetwork/rooch-sdk": "0.4.0",
-    "fastmcp": "^3.8.5",
     "js-yaml": "^4.1.0"
   },
   "engines": {
