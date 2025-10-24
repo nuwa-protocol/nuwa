@@ -173,6 +173,24 @@ export class PricingRegistry {
   }
 
   /**
+   * Check if a model is supported for billing
+   * @param provider Provider name
+   * @param model Model name
+   * @param supportsNativeUsdCost Whether provider supports native USD cost
+   * @returns true if model can be billed, false otherwise
+   */
+  isModelSupported(provider: string, model: string, supportsNativeUsdCost: boolean): boolean {
+    // Providers with native USD cost don't need pricing config
+    if (supportsNativeUsdCost) {
+      return true;
+    }
+    
+    // For other providers, model must exist in pricing config
+    const pricing = this.getProviderPricing(provider, model);
+    return pricing !== null;
+  }
+
+  /**
    * Get current pricing version for a provider
    */
   getProviderVersion(provider: string): string {

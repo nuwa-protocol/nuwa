@@ -4,6 +4,7 @@ import { ProviderManager } from './providerManager.js';
 import { PathValidator, PathValidationResult } from './pathValidator.js';
 import { AuthManager } from './authManager.js';
 import { CostCalculator } from '../billing/usage/CostCalculator.js';
+import { PricingRegistry } from '../billing/pricing.js';
 import { providerRegistry } from '../providers/registry.js';
 import type { DIDInfo } from '../types/index.js';
 import type { UsageInfo, PricingResult } from '../billing/pricing.js';
@@ -163,6 +164,39 @@ export class RouteHandler {
   }
 
   /**
+   * Validate if a model is supported for billing
+   * @param providerName Provider name
+   * @param model Model name from request
+   * @param supportsNativeUsdCost Whether provider supports native USD cost
+   * @returns Validation result with error message if invalid
+   */
+  private validateModelPricing(
+    providerName: string,
+    model: string | undefined,
+    supportsNativeUsdCost: boolean
+  ): { valid: boolean; error?: string } {
+    if (!model) {
+      return { valid: false, error: 'Model not specified in request' };
+    }
+
+    const pricingRegistry = PricingRegistry.getInstance();
+    const isSupported = pricingRegistry.isModelSupported(
+      providerName,
+      model,
+      supportsNativeUsdCost
+    );
+
+    if (!isSupported) {
+      return {
+        valid: false,
+        error: `Model '${model}' is not supported. Please check available models.`
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
    * Handle a unified request (both streaming and non-streaming)
    */
   async handleProviderRequest(req: Request, res: Response, providerName: string): Promise<void> {
@@ -212,10 +246,38 @@ export class RouteHandler {
       upstream_streamed: false,
     };
 
+    // Extract model from request for pricing validation
+    const requestData = this.getRequestData(req);
+    const model = requestData?.model;
+    
+    // Get provider config to check if it supports native USD cost
+    const providerConfig = this.providerManager.get(providerName);
+    
+    // Validate model pricing before making upstream request
+    const pricingValidation = this.validateModelPricing(
+      providerName,
+      model,
+      providerConfig?.supportsNativeUsdCost || false
+    );
+    
+    if (!pricingValidation.valid) {
+      return {
+        status: 400,
+        error: pricingValidation.error!,
+        body: {
+          error: {
+            message: pricingValidation.error,
+            type: 'invalid_request_error',
+            code: 'model_not_supported'
+          }
+        },
+        meta
+      };
+    }
+
     // Use the new high-level executeRequest API
     const started = Date.now();
     const upstreamPath = pathResult!.path;
-    const requestData = this.getRequestData(req);
     
     const executeResult = await provider!.executeRequest(apiKey!, upstreamPath, req.method, requestData);
     meta.upstream_duration_ms = Date.now() - started;
@@ -290,6 +352,31 @@ export class RouteHandler {
    */
   async handleStreamRequest(req: Request, res: Response, providerName: string, validation: ProviderValidationResult): Promise<void> {
     const { provider, apiKey, pathResult } = validation;
+
+    // Extract model from request for pricing validation
+    const requestData = this.getRequestData(req);
+    const model = requestData?.model;
+    
+    // Get provider config to check if it supports native USD cost
+    const providerConfig = this.providerManager.get(providerName);
+    
+    // Validate model pricing before making upstream request
+    const pricingValidation = this.validateModelPricing(
+      providerName,
+      model,
+      providerConfig?.supportsNativeUsdCost || false
+    );
+    
+    if (!pricingValidation.valid) {
+      res.status(400).json({
+        error: {
+          message: pricingValidation.error,
+          type: 'invalid_request_error',
+          code: 'model_not_supported'
+        }
+      });
+      return;
+    }
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
