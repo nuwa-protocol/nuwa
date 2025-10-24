@@ -12,8 +12,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.4.5)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.8
-        version: 0.6.8(express@5.1.0)(typescript@5.4.5)
+        specifier: ^0.6.9
+        version: 0.6.9(express@5.1.0)(typescript@5.4.5)
       '@roochnetwork/rooch-sdk':
         specifier: 0.4.0
         version: 0.4.0(typescript@5.4.5)
@@ -509,8 +509,8 @@ packages:
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
-  '@nuwa-ai/payment-kit@0.6.8':
-    resolution: {integrity: sha512-qcm+UXL4XSetG0Pnzd8TJ/d/z5pV31ceqspD3dDhtMFUbWWoqp6rwh5BjlgHEa851o6+LtP2T+LWPS+SY1/VGw==}
+  '@nuwa-ai/payment-kit@0.6.9':
+    resolution: {integrity: sha512-eaotyE2WWOa/8xYZduX1C4EqKWOKXUAditodfTphzqpmWVqG84tOZ7Otyx4batqZzsdVWEXK/QQsTNi49uMu5g==}
     peerDependencies:
       express: '>=4'
       pg: '>=8'
@@ -2419,7 +2419,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@nuwa-ai/payment-kit@0.6.8(express@5.1.0)(typescript@5.4.5)':
+  '@nuwa-ai/payment-kit@0.6.9(express@5.1.0)(typescript@5.4.5)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.20.0
       '@nuwa-ai/identity-kit': 0.6.0(typescript@5.4.5)
@@ -3019,7 +3019,7 @@ snapshots:
 
   eventsource@3.0.7:
     dependencies:
-      eventsource-parser: 3.0.3
+      eventsource-parser: 3.0.6
 
   execa@8.0.1:
     dependencies:
