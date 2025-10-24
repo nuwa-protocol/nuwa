@@ -36,6 +36,9 @@ interface UpstreamErrorResponse {
 class OpenRouterService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
+  // Provider name
+  readonly providerName = 'openrouter';
+  
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     OPENROUTER_PATHS.CHAT_COMPLETIONS

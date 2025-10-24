@@ -140,24 +140,6 @@ export class PricingConfigLoader {
   }
 
   /**
-   * Get models as simple ModelPricing objects (merged - for backward compatibility)
-   * @deprecated Use getProviderModels(provider) instead
-   */
-  getModels(): Record<string, ModelPricing> {
-    const config = this.loadConfig();
-    const models: Record<string, ModelPricing> = {};
-    
-    for (const [modelName, modelConfig] of Object.entries(config.models)) {
-      models[modelName] = {
-        promptPerMTokUsd: modelConfig.promptPerMTokUsd,
-        completionPerMTokUsd: modelConfig.completionPerMTokUsd,
-      };
-    }
-    
-    return models;
-  }
-
-  /**
    * Get model family patterns as RegExp objects
    */
   getModelFamilyPatterns(): Array<{ pattern: RegExp; baseModel: string }> {

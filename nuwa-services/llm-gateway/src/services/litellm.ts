@@ -15,6 +15,9 @@ import { LITELLM_PATHS } from "../providers/constants.js";
 class LiteLLMService extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
+  // Provider name
+  readonly providerName = 'litellm';
+  
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     LITELLM_PATHS.CHAT_COMPLETIONS

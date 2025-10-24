@@ -12,18 +12,18 @@ describe('Cost Calculation Unit Tests', () => {
       const usage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
       
       // Test provider cost preference
-      const resultWithProvider = CostCalculator.calculateRequestCost('gpt-4', 0.05, usage);
+      const resultWithProvider = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 0.05, usage);
       expect(resultWithProvider?.costUsd).toBe(0.05);
       expect(resultWithProvider?.source).toBe('provider');
 
       // Test gateway pricing fallback
-      const resultWithoutProvider = CostCalculator.calculateRequestCost('gpt-4', undefined, usage);
+      const resultWithoutProvider = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, usage);
       expect(resultWithoutProvider?.costUsd).toBeCloseTo(0.06);
       expect(resultWithoutProvider?.source).toBe('gateway-pricing');
     });
 
     it('should return null for invalid usage', () => {
-      const result = CostCalculator.calculateRequestCost('gpt-4', undefined, undefined);
+      const result = CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, undefined);
       expect(result).toBeNull();
     });
   });

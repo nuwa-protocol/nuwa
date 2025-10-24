@@ -36,7 +36,7 @@ function calculateResponseAPICost(
   }
 
   // 1. Calculate model token cost
-  const modelCostResult = pricingRegistry.calculateCost(model, usageInfo);
+  const modelCostResult = pricingRegistry.calculateProviderCost('openai', model, usageInfo);
   const modelCost = modelCostResult?.costUsd || 0;
 
   // 2. Calculate tool call costs from usage.tool_calls_count (legacy)
@@ -59,7 +59,7 @@ function calculateResponseAPICost(
   return {
     costUsd: CostCalculator.applyMultiplier(totalCost)!,
     source: 'gateway-pricing',
-    pricingVersion: pricingRegistry.getVersion(),
+    pricingVersion: pricingRegistry.getProviderVersion('openai'),
     model,
     usage: usageInfo,
   };
@@ -330,7 +330,7 @@ describe('OpenAI Response API Integration Tests', () => {
         totalTokens: 1500
       };
 
-      const result = pricingRegistry.calculateCost('gpt-4', usage);
+      const result = pricingRegistry.calculateProviderCost('openai', 'gpt-4', usage);
       expect(result).toBeTruthy();
       expect(result?.costUsd).toBeCloseTo(0.060); // (1000/1M * 30) + (500/1M * 60) = 0.03 + 0.03 = 0.06
       expect(result?.source).toBe('gateway-pricing');
@@ -375,8 +375,8 @@ describe('OpenAI Response API Integration Tests', () => {
         totalTokens: 1000
       };
 
-      const responseResult = pricingRegistry.calculateCost('gpt-4o', responseAPIUsage);
-      const chatResult = pricingRegistry.calculateCost('gpt-4o', chatAPIUsage);
+      const responseResult = pricingRegistry.calculateProviderCost('openai', 'gpt-4o', responseAPIUsage);
+      const chatResult = pricingRegistry.calculateProviderCost('openai', 'gpt-4o', chatAPIUsage);
 
       // Should produce same cost calculation for token portion
       expect(responseResult?.costUsd).toBeCloseTo(chatResult?.costUsd || 0);

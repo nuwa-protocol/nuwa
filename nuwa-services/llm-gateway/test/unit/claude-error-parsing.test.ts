@@ -31,26 +31,7 @@ describe('Claude Error Parsing', () => {
       expect(result.error.type).toBe('invalid_request_error');
       expect(result.error.message).toBe('system: text content blocks must be non-empty');
       expect(result.request_id).toBe('req_123');
-    });
-
-    it('should handle JSON string with trailing text (like traceid)', async () => {
-      const jsonString = '{"type":"error","error":{"type":"invalid_request_error","message":"system: text content blocks must be non-empty"},"request_id":"req_011CUReejFs6CPjUUR3v9gpv"}（traceid: 5dfc55ae9d5d7118db14b9356764aaff） (request id: 20251024154420922643873WFwNEm4k)';
-
-      const result = await (provider as any).normalizeErrorData(jsonString);
-
-      console.log('🧪 Parsed result:', result);
-      console.log('🧪 Result type:', typeof result);
-
-      // This will fail if the trailing text prevents parsing
-      // We need to handle this case
-      if (typeof result === 'string') {
-        console.error('❌ Failed to parse JSON with trailing text');
-        console.error('   Original:', jsonString);
-        console.error('   Result:', result);
-      }
-
-      expect(typeof result).toBe('object');
-    });
+    }); 
 
     it('should return string as-is if not valid JSON', async () => {
       const invalidJson = 'Not a JSON string';

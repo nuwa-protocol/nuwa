@@ -14,6 +14,9 @@ import { CLAUDE_PATHS } from "./constants.js";
 export class ClaudeProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
+  // Provider name
+  readonly providerName = 'claude';
+  
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     CLAUDE_PATHS.MESSAGES

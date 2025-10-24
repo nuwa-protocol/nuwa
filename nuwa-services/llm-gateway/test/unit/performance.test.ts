@@ -67,12 +67,12 @@ describe('Performance Tests (Simplified)', () => {
     
     // Test 2: Cost calculation with provider cost
     const providerCostTime = measurePerformance(() => {
-      return CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+      return CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 0.05, sampleUsage);
     }, iterations);
     
     // Test 3: Cost calculation with gateway pricing
     const gatewayCostTime = measurePerformance(() => {
-      return CostCalculator.calculateRequestCost('gpt-4', undefined, sampleUsage);
+      return CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', undefined, sampleUsage);
     }, iterations);
     
     // Test 4: Multiplier application
@@ -108,7 +108,7 @@ describe('Performance Tests (Simplified)', () => {
     // Perform many operations
     for (let i = 0; i < 100; i++) {
       extractor.extractFromResponseBody(sampleResponseBody);
-      CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+      CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 0.05, sampleUsage);
       const processor = new DefaultStreamProcessor('gpt-4', extractor, 0.1);
       processor.processChunk('data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n');
     }
@@ -138,7 +138,7 @@ describe('Performance Tests (Simplified)', () => {
       promises.push(
         Promise.resolve().then(() => {
           extractor.extractFromResponseBody(sampleResponseBody);
-          return CostCalculator.calculateRequestCost('gpt-4', 0.05, sampleUsage);
+          return CostCalculator.calculateProviderRequestCost('openai', 'gpt-4', 0.05, sampleUsage);
         })
       );
     }

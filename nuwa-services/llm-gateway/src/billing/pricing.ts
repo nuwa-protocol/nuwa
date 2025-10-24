@@ -48,7 +48,7 @@ export class PricingRegistry {
     version: string;
   }>();
   
-  // Legacy merged pricing (for backward compatibility and global overrides)
+  // Global overrides (applied across all providers)
   private globalOverrides: Record<string, ModelPricing> = {};
 
   private constructor() {
@@ -140,34 +140,6 @@ export class PricingRegistry {
   }
 
   /**
-   * Get pricing for a specific model (legacy method - tries all providers)
-   * @deprecated Use getProviderPricing(provider, model) instead
-   */
-  getPricing(model: string): ModelPricing | null {
-    // Check global overrides first
-    if (this.globalOverrides[model]) {
-      return this.globalOverrides[model];
-    }
-
-    // Try each provider until we find a match
-    for (const [provider, config] of this.providerPricing) {
-      // Direct lookup
-      if (config.models[model]) {
-        return config.models[model];
-      }
-
-      // Pattern matching
-      for (const { pattern, baseModel } of config.patterns) {
-        if (pattern.test(model) && config.models[baseModel]) {
-          return config.models[baseModel];
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
    * Calculate cost based on token usage for a specific provider
    * @param provider Provider name (e.g., 'openai', 'claude')
    * @param model Model name
@@ -201,45 +173,10 @@ export class PricingRegistry {
   }
 
   /**
-   * Calculate cost based on token usage (legacy method)
-   * @deprecated Use calculateProviderCost(provider, model, usage) instead
-   */
-  calculateCost(model: string, usage: UsageInfo): PricingResult | null {
-    const pricing = this.getPricing(model);
-    if (!pricing) {
-      return null;
-    }
-
-    const promptTokens = usage.promptTokens || 0;
-    const completionTokens = usage.completionTokens || 0;
-
-    // Calculate cost: (tokens / TOKENS_PER_MILLION) * price_per_million
-    const promptCost = (promptTokens / TOKENS_PER_MILLION) * pricing.promptPerMTokUsd;
-    const completionCost = (completionTokens / TOKENS_PER_MILLION) * pricing.completionPerMTokUsd;
-    const totalCost = promptCost + completionCost;
-
-    return {
-      costUsd: totalCost,
-      source: 'gateway-pricing',
-      pricingVersion: 'legacy',
-      model,
-      usage,
-    };
-  }
-
-  /**
    * Get current pricing version for a provider
    */
   getProviderVersion(provider: string): string {
     return this.providerPricing.get(provider)?.version || 'unknown';
-  }
-
-  /**
-   * Get current pricing version (legacy method)
-   * @deprecated Use getProviderVersion(provider) instead
-   */
-  getVersion(): string {
-    return 'merged';
   }
 
   /**
@@ -248,18 +185,6 @@ export class PricingRegistry {
   listProviderModels(provider: string): string[] {
     const config = this.providerPricing.get(provider);
     return config ? Object.keys(config.models) : [];
-  }
-
-  /**
-   * List all available models (legacy method)
-   * @deprecated Use listProviderModels(provider) instead
-   */
-  listModels(): string[] {
-    const allModels = new Set<string>();
-    for (const config of this.providerPricing.values()) {
-      Object.keys(config.models).forEach(model => allModels.add(model));
-    }
-    return Array.from(allModels);
   }
 
   /**
@@ -277,14 +202,6 @@ export class PricingRegistry {
     if (config) {
       config.models[model] = pricing;
     }
-  }
-
-  /**
-   * Update pricing for a model (legacy method - global override)
-   * @deprecated Use updateProviderPricing(provider, model, pricing) instead
-   */
-  updatePricing(model: string, pricing: ModelPricing): void {
-    this.globalOverrides[model] = pricing;
   }
 
   /**

@@ -43,6 +43,12 @@ export interface ProviderErrorInfo {
  */
 export abstract class BaseLLMProvider implements LLMProvider {
   /**
+   * Provider name identifier (e.g., 'openai', 'claude', 'openrouter')
+   * Must be implemented by each provider
+   */
+  abstract readonly providerName: string;
+
+  /**
    * Paths supported by this provider
    * Must be implemented by each provider
    */
@@ -392,7 +398,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         usage = extractedUsage || undefined;
         
         if (usage) {
-          const calculatedCost = CostCalculator.calculateRequestCost(model, providerCostUsd, usage);
+          const calculatedCost = CostCalculator.calculateProviderRequestCost(this.providerName, model, providerCostUsd, usage);
           cost = calculatedCost || undefined;
           console.log(`[${this.constructor.name}] Extracted usage for non-stream response`);
         }

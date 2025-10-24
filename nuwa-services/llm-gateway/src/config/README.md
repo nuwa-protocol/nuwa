@@ -74,14 +74,20 @@ PRICING_OVERRIDES='{"gpt-4": {"promptPerMTokUsd": 25.0, "completionPerMTokUsd": 
 ```typescript
 import { pricingRegistry } from '../billing/pricing.js';
 
-// Get pricing for a model
-const pricing = pricingRegistry.getPricing('gpt-4');
+// Get pricing for a specific provider's model
+const pricing = pricingRegistry.getProviderPricing('openai', 'gpt-4');
 
-// Calculate cost
-const cost = pricingRegistry.calculateCost('gpt-4', {
+// Calculate cost with provider-specific pricing
+const cost = pricingRegistry.calculateProviderCost('openai', 'gpt-4', {
   promptTokens: 1000,
   completionTokens: 500
 });
+
+// Get provider version
+const version = pricingRegistry.getProviderVersion('openai');
+
+// List all models for a provider
+const models = pricingRegistry.listProviderModels('openai');
 
 // Hot reload configuration
 pricingRegistry.reload();

@@ -52,22 +52,16 @@ export abstract class BaseUsageExtractor implements UsageExtractor {
         return null;
       }
 
-      // Try provider-specific pricing first
-      let result = pricingRegistry.calculateProviderCost(this.provider, model, usage);
+      // Use provider-specific pricing
+      const result = pricingRegistry.calculateProviderCost(this.provider, model, usage);
       if (result) {
         console.log(`[${this.constructor.name}] Calculated cost for ${this.provider}/${model}: $${result.costUsd}`);
         return result;
       }
-
-      // Fallback to general pricing if provider-specific pricing fails
-      result = pricingRegistry.calculateCost(model, usage);
-      if (result) {
-        console.log(`[${this.constructor.name}] Calculated cost for ${model} using general pricing: $${result.costUsd}`);
-        return result;
-      } else {
-        console.warn(`[${this.constructor.name}] Failed to calculate cost for model: ${this.provider}/${model}`);
-        return null;
-      }
+      
+      // No pricing found for this provider/model combination
+      console.warn(`[${this.constructor.name}] No pricing found for ${this.provider}/${model}`);
+      return null;
     } catch (error) {
       console.error(`[${this.constructor.name}] Error calculating cost:`, error);
       return null;

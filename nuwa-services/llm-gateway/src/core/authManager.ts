@@ -189,7 +189,7 @@ export class AuthManager {
           data: {
             ...status,
             registrationTime: new Date().toISOString(),
-            note: 'New route structure: /{provider}/api/v1/* (e.g., /openai/api/v1/chat/completions)'
+            note: 'New route structure: /{provider}/v1/* or /{provider}/api/v1/* (e.g., /openai/v1/chat/completions, /openrouter/api/v1/chat/completions)'
           }
         });
       }, 

@@ -16,6 +16,9 @@ import { OPENAI_PATHS } from "./constants.js";
 export class OpenAIProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
   
+  // Provider name
+  readonly providerName = 'openai';
+  
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     OPENAI_PATHS.CHAT_COMPLETIONS,

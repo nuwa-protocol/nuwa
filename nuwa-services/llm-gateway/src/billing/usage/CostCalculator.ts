@@ -112,82 +112,10 @@ export class CostCalculator {
   }
 
   /**
-   * Calculate cost for a request, preferring provider cost over gateway pricing
-   * @deprecated Use calculateProviderRequestCost(provider, model, ...) instead for provider-specific pricing
-   */
-  static calculateRequestCost(
-    model: string,
-    providerCostUsd?: number,
-    usage?: UsageInfo,
-    toolCalls?: ToolCallCounts
-  ): PricingResult | null {
-    console.log('🧮 [CostCalculator] Input:', {
-      model,
-      providerCostUsd,
-      usage: usage ? `${usage.promptTokens}p + ${usage.completionTokens}c = ${usage.totalTokens}t` : 'undefined',
-      toolCalls: toolCalls ? Object.keys(toolCalls).length + ' tools' : 'none'
-    });
-
-    // Prefer provider-supplied cost if available
-    if (typeof providerCostUsd === 'number' && providerCostUsd >= 0) {
-      console.log('💰 [CostCalculator] Using provider cost:', providerCostUsd);
-      return {
-        costUsd: this.applyMultiplier(providerCostUsd)!,
-        source: 'provider',
-        model,
-        usage,
-      };
-    }
-
-    // Fallback to gateway pricing calculation
-    if (usage && (usage.promptTokens || usage.completionTokens)) {
-      console.log('📊 [CostCalculator] Using gateway pricing for:', model);
-      
-      // 1. Calculate model token cost
-      const modelCostResult = pricingRegistry.calculateCost(model, usage);
-      const modelCost = modelCostResult?.costUsd || 0;
-
-      // 2. Calculate tool call costs
-      let toolCallCost = 0;
-      if (toolCalls) {
-        for (const [toolName, callCount] of Object.entries(toolCalls)) {
-          if (typeof callCount === 'number' && callCount > 0) {
-            const cost = calculateToolCallCost(toolName, callCount);
-            toolCallCost += cost;
-            console.log(`💰 [CostCalculator] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`);
-          }
-        }
-      }
-
-      // 3. Total cost
-      const totalCost = modelCost + toolCallCost;
-
-      if (modelCostResult) {
-        console.log(`💰 [CostCalculator] Cost breakdown - Model: $${modelCost.toFixed(6)}, Tools: $${toolCallCost.toFixed(6)}, Total: $${totalCost.toFixed(6)}`);
-        const finalCost = this.applyMultiplier(totalCost);
-        if (finalCost !== undefined) {
-          return {
-            ...modelCostResult,
-            costUsd: finalCost,
-            usage,
-          };
-        }
-      } else {
-        console.warn(`⚠️  [CostCalculator] Gateway pricing failed for model: ${model}`);
-      }
-    } else {
-      console.warn('⚠️  [CostCalculator] No valid usage data provided');
-    }
-
-    // No cost calculation possible
-    console.warn(`⚠️  [CostCalculator] Unable to calculate cost for model ${model}`);
-    return null;
-  }
-
-  /**
    * Calculate cost specifically for Response API with tool call support
    */
   static calculateResponseAPICost(
+    provider: string,
     model: string,
     usage: any,
     responseBody?: any,
@@ -214,14 +142,17 @@ export class CostCalculator {
     }
 
     // Calculate model token cost
-    const modelCostResult = pricingRegistry.calculateCost(model, usageInfo);
+    const modelCostResult = pricingRegistry.calculateProviderCost(provider, model, usageInfo);
     const modelCost = modelCostResult?.costUsd || 0;
 
-    // Calculate tool call costs from response body
+    // Calculate tool call costs
     let toolCallCost = 0;
-    if (responseBody) {
-      const toolCalls = this.parseToolCallsFromOutput(responseBody);
-      for (const [toolName, callCount] of Object.entries(toolCalls)) {
+    
+    // 1. Priority: Use pre-extracted tool_calls_count from usage object
+    //    (e.g., OpenAI Provider sets this during response preparation)
+    if (usage.tool_calls_count) {
+      console.log('📊 [CostCalculator] Using pre-extracted tool_calls_count from usage');
+      for (const [toolName, callCount] of Object.entries(usage.tool_calls_count)) {
         if (typeof callCount === 'number' && callCount > 0) {
           const cost = calculateToolCallCost(toolName, callCount);
           toolCallCost += cost;
@@ -229,14 +160,15 @@ export class CostCalculator {
         }
       }
     }
-
-    // Fallback: Calculate tool call costs from usage.tool_calls_count (legacy)
-    if (toolCallCost === 0 && usage.tool_calls_count) {
-      console.log('📊 [CostCalculator] Using legacy tool_calls_count from usage');
-      for (const [toolName, callCount] of Object.entries(usage.tool_calls_count)) {
+    // 2. Fallback: Parse tool calls from response body if not pre-extracted
+    else if (responseBody) {
+      console.log('📊 [CostCalculator] Parsing tool calls from response body (fallback)');
+      const toolCalls = this.parseToolCallsFromOutput(responseBody);
+      for (const [toolName, callCount] of Object.entries(toolCalls)) {
         if (typeof callCount === 'number' && callCount > 0) {
           const cost = calculateToolCallCost(toolName, callCount);
           toolCallCost += cost;
+          console.log(`💰 [CostCalculator] ${toolName}: ${callCount} calls = $${cost.toFixed(6)}`);
         }
       }
     }
@@ -249,7 +181,7 @@ export class CostCalculator {
     return {
       costUsd: this.applyMultiplier(totalCost)!,
       source: 'gateway-pricing',
-      pricingVersion: pricingRegistry.getVersion(),
+      pricingVersion: pricingRegistry.getProviderVersion(provider),
       model,
       usage: usageInfo,
     };
