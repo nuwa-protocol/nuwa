@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/cap-kit",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "caps",
   "type": "module",
   "main": "./dist/index.cjs",

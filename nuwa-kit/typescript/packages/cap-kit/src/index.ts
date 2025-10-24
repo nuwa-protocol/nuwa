@@ -30,7 +30,6 @@ export class CapKit {
 	}
 
 	async getTools() {
-		console.log('getTools')
 		if (!this.mcpTools) {
 			this.mcpTools = await (await this.getMcpClient()).tools();
 			console.log(this.mcpTools)
@@ -40,12 +39,10 @@ export class CapKit {
 
 	async getMcpClient(): Promise<UniversalMcpClient> { 
 		if (this.mcpClient) {
-			console.log('get mcpClient', this.mcpClient)
 			return this.mcpClient;
 		}
 		
 		while (this.isInitializing) {
-			console.log('waiting for initialization to complete')
 			await new Promise(resolve => setTimeout(resolve, 50));
 			if (this.mcpClient) {
 				return this.mcpClient;
@@ -54,10 +51,8 @@ export class CapKit {
 		
 		this.isInitializing = true;
 		try {
-			console.log('build client', this.mcpUrl, this.env)
 			const client = await buildClient(this.mcpUrl, this.env);
 			this.mcpClient = client;
-			console.log('build client done', client)
 			return client;
 		} catch (error) {
 			console.error('Failed to initialize MCP client:', error);
