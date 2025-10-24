@@ -11,7 +11,7 @@ export function GatewayDebugPanel() {
   const [mcpUrl, setMcpUrlState] = useState(getMcpUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
-  const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai'>('openrouter');
+  const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai' | 'claude'>('openrouter');
   const [apiType, setApiType] = useState<'chat' | 'response'>('chat'); // New: API type selector
   const [isStream, setIsStream] = useState<boolean>(false);
   const [requestBody, setRequestBody] = useState(`{
@@ -54,6 +54,13 @@ export function GatewayDebugPanel() {
           paths: ['/chat/completions', '/models', '/completions'],
           supportsResponseAPI: false
         };
+      case 'claude':
+        return {
+          defaultPath: '/v1/messages',
+          defaultModel: 'claude-3-5-haiku-20241022',
+          paths: ['/v1/messages'],
+          supportsResponseAPI: false
+        };
       default:
         return {
           defaultPath: '/api/v1/chat/completions',
@@ -83,13 +90,26 @@ export function GatewayDebugPanel() {
   ]
 }`;
     } else {
-      return `{
+      // Check if this is a Claude model
+      const isClaudeModel = model.startsWith('claude-');
+      
+      if (isClaudeModel) {
+        return `{
+  "model": "${model}",
+  "max_tokens": 1024,
+  "messages": [
+    { "role": "user", "content": "Hello! Please tell me about yourself." }
+  ]
+}`;
+      } else {
+        return `{
   "model": "${model}",
   "messages": [
     { "role": "system", "content": "You are a helpful assistant." },
     { "role": "user", "content": "Hello, who are you?" }
   ]
 }`;
+      }
     }
   };
 
@@ -508,6 +528,7 @@ export function GatewayDebugPanel() {
           <option value="openrouter">OpenRouter</option>
           <option value="openai">OpenAI</option>
           <option value="litellm">LiteLLM</option>
+          <option value="claude">Claude</option>
         </select>
         <small style={{ marginLeft: '8px' }}>(uses /{provider}/* path routing)</small>
       </div>

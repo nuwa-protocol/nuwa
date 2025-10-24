@@ -9,6 +9,7 @@ This is a demo application showcasing third-party login integration with Nuwa Ag
 - Sign challenges using authorized keys
 - Persistent key storage in browser localStorage
 - Gateway & MCP debug panel with unified transaction history
+- Support for multiple LLM providers: OpenRouter, OpenAI, LiteLLM, and Claude
 
 ## Prerequisites
 
@@ -51,12 +52,39 @@ npm run build
 npm run preview
 ```
 
+## Gateway Debug Panel
+
+The demo includes a comprehensive Gateway Debug Panel for testing LLM Gateway functionality:
+
+### Supported Providers
+
+- **OpenRouter**: Access to multiple models through OpenRouter API
+- **OpenAI**: Direct OpenAI API access with Chat Completions and Response API support
+- **LiteLLM**: Unified interface to multiple LLM providers
+- **Claude**: Anthropic Claude models (claude-3-5-haiku-20241022, etc.)
+
+### Features
+
+- Provider-specific routing (`/{provider}/*` paths)
+- Automatic request body generation with provider-appropriate defaults
+- Real-time transaction history and cost tracking
+- Support for both streaming and non-streaming requests
+- MCP (Model Context Protocol) server integration
+
+### Claude-Specific Features
+
+- Uses Claude's `/v1/messages` endpoint
+- Automatically includes required `max_tokens` parameter
+- Optimized message format (no system messages required)
+- Default model: `claude-3-5-haiku-20241022`
+
 ## Tech Stack
 
 - React
 - TypeScript
 - Vite
 - @nuwa-ai/identity-kit
+- @nuwa-ai/payment-kit
 
 ## Integration Steps
 
