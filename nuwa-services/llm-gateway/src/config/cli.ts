@@ -32,6 +32,8 @@ export interface LLMGatewayConfig {
   litellmBaseUrl?: string;
   anthropicApiKey?: string;
   anthropicBaseUrl?: string;
+  googleApiKey?: string;
+  googleBaseUrl?: string;
 
   // Pricing configuration
   pricingOverrides?: string;
@@ -178,6 +180,7 @@ Environment Variables:
   OPENROUTER_API_KEY                   OpenRouter API key
   LITELLM_API_KEY                      LiteLLM API key
   ANTHROPIC_API_KEY                    Anthropic Claude API key
+  GOOGLE_API_KEY                       Google Gemini API key
 
 Configuration File:
   The configuration file should be in JSON or YAML format.
@@ -316,6 +319,10 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.OPENROUTER_BASE_URL) config.openrouterBaseUrl = process.env.OPENROUTER_BASE_URL;
   if (process.env.LITELLM_API_KEY) config.litellmApiKey = process.env.LITELLM_API_KEY;
   if (process.env.LITELLM_BASE_URL) config.litellmBaseUrl = process.env.LITELLM_BASE_URL;
+  if (process.env.ANTHROPIC_API_KEY) config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  if (process.env.ANTHROPIC_BASE_URL) config.anthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
+  if (process.env.GOOGLE_API_KEY) config.googleApiKey = process.env.GOOGLE_API_KEY;
+  if (process.env.GOOGLE_BASE_URL) config.googleBaseUrl = process.env.GOOGLE_BASE_URL;
   if (process.env.ANTHROPIC_API_KEY) config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   if (process.env.ANTHROPIC_BASE_URL) config.anthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
   if (process.env.PRICING_OVERRIDES) config.pricingOverrides = process.env.PRICING_OVERRIDES;
