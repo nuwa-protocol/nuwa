@@ -1,0 +1,99 @@
+{
+  "version": "2025-10",
+  "description": "Google Gemini model pricing configuration",
+  "lastUpdated": "2025-10-26",
+  "models": {
+    "gemini-2.0-flash-exp": {
+      "promptPerMTokUsd": 0.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Gemini 2.0 Flash Experimental - Free during preview"
+    },
+    "gemini-1.5-pro": {
+      "promptPerMTokUsd": 1.25,
+      "completionPerMTokUsd": 5.0,
+      "description": "Gemini 1.5 Pro - Advanced reasoning and multimodal capabilities"
+    },
+    "gemini-1.5-pro-002": {
+      "promptPerMTokUsd": 1.25,
+      "completionPerMTokUsd": 5.0,
+      "description": "Gemini 1.5 Pro 002 - Latest stable version"
+    },
+    "gemini-1.5-flash": {
+      "promptPerMTokUsd": 0.075,
+      "completionPerMTokUsd": 0.30,
+      "description": "Gemini 1.5 Flash - Fast and efficient model"
+    },
+    "gemini-1.5-flash-002": {
+      "promptPerMTokUsd": 0.075,
+      "completionPerMTokUsd": 0.30,
+      "description": "Gemini 1.5 Flash 002 - Latest stable version"
+    },
+    "gemini-1.5-flash-8b": {
+      "promptPerMTokUsd": 0.0375,
+      "completionPerMTokUsd": 0.15,
+      "description": "Gemini 1.5 Flash 8B - Smaller, faster variant"
+    },
+    "gemini-pro": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "Gemini Pro - Legacy model, use 1.5 Pro for better performance"
+    },
+    "gemini-pro-vision": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "Gemini Pro Vision - Legacy multimodal model"
+    }
+  },
+  "modelFamilyPatterns": [
+    {
+      "pattern": "^gemini-2\\.0-flash",
+      "baseModel": "gemini-2.0-flash-exp",
+      "description": "Gemini 2.0 Flash variants - experimental models"
+    },
+    {
+      "pattern": "^gemini-1\\.5-pro-002",
+      "baseModel": "gemini-1.5-pro-002",
+      "description": "Gemini 1.5 Pro 002 variants"
+    },
+    {
+      "pattern": "^gemini-1\\.5-pro",
+      "baseModel": "gemini-1.5-pro",
+      "description": "Gemini 1.5 Pro variants"
+    },
+    {
+      "pattern": "^gemini-1\\.5-flash-8b",
+      "baseModel": "gemini-1.5-flash-8b",
+      "description": "Gemini 1.5 Flash 8B variants"
+    },
+    {
+      "pattern": "^gemini-1\\.5-flash-002",
+      "baseModel": "gemini-1.5-flash-002",
+      "description": "Gemini 1.5 Flash 002 variants"
+    },
+    {
+      "pattern": "^gemini-1\\.5-flash",
+      "baseModel": "gemini-1.5-flash",
+      "description": "Gemini 1.5 Flash variants"
+    },
+    {
+      "pattern": "^gemini-pro-vision",
+      "baseModel": "gemini-pro-vision",
+      "description": "Gemini Pro Vision variants - legacy"
+    },
+    {
+      "pattern": "^gemini-pro",
+      "baseModel": "gemini-pro",
+      "description": "Gemini Pro variants - legacy"
+    }
+  ],
+  "notes": [
+    "Pricing is per 1M tokens as of October 2025",
+    "Google Gemini API uses promptTokenCount and candidatesTokenCount in responses",
+    "All prices are in USD",
+    "Pattern matching allows for date-versioned model names",
+    "Gemini 2.0 Flash is currently free during experimental phase",
+    "Gemini 1.5 models offer better performance than legacy Gemini Pro",
+    "Pricing for prompts up to 128K tokens, longer prompts may have different pricing",
+    "Multimodal inputs (images, audio, video) may incur additional token costs"
+  ]
+}

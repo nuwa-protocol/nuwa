@@ -20,11 +20,18 @@ export const CLAUDE_PATHS = {
   MESSAGES: '/v1/messages',
 } as const;
 
+export const GOOGLE_PATHS = {
+  GENERATE_CONTENT: '/models/{model}:generateContent',
+  STREAM_GENERATE_CONTENT: '/models/{model}:streamGenerateContent',
+  MODELS: '/models',
+} as const;
+
 // Type helpers for better type safety
 export type OpenAIPath = (typeof OPENAI_PATHS)[keyof typeof OPENAI_PATHS];
 export type OpenRouterPath = (typeof OPENROUTER_PATHS)[keyof typeof OPENROUTER_PATHS];
 export type LiteLLMPath = (typeof LITELLM_PATHS)[keyof typeof LITELLM_PATHS];
 export type ClaudePath = (typeof CLAUDE_PATHS)[keyof typeof CLAUDE_PATHS];
+export type GooglePath = (typeof GOOGLE_PATHS)[keyof typeof GOOGLE_PATHS];
 
 // All supported paths (for validation)
 export const ALL_SUPPORTED_PATHS = [
@@ -32,4 +39,5 @@ export const ALL_SUPPORTED_PATHS = [
   ...Object.values(OPENROUTER_PATHS),
   ...Object.values(LITELLM_PATHS),
   ...Object.values(CLAUDE_PATHS),
+  ...Object.values(GOOGLE_PATHS),
 ] as const;
