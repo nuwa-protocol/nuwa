@@ -323,8 +323,6 @@ export function loadConfig(): LLMGatewayConfig {
   if (process.env.ANTHROPIC_BASE_URL) config.anthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
   if (process.env.GOOGLE_API_KEY) config.googleApiKey = process.env.GOOGLE_API_KEY;
   if (process.env.GOOGLE_BASE_URL) config.googleBaseUrl = process.env.GOOGLE_BASE_URL;
-  if (process.env.ANTHROPIC_API_KEY) config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-  if (process.env.ANTHROPIC_BASE_URL) config.anthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
   if (process.env.PRICING_OVERRIDES) config.pricingOverrides = process.env.PRICING_OVERRIDES;
   if (process.env.OPENAI_PRICING_VERSION)
     config.openaiPricingVersion = process.env.OPENAI_PRICING_VERSION;
@@ -380,10 +378,11 @@ export function validateConfig(config: LLMGatewayConfig): { valid: boolean; erro
     config.openaiApiKey ||
     config.openrouterApiKey ||
     config.litellmApiKey ||
-    config.anthropicApiKey;
+    config.anthropicApiKey ||
+    config.googleApiKey;
   if (!hasProviderKey) {
     errors.push(
-      'At least one provider API key is required (OPENAI_API_KEY, OPENROUTER_API_KEY, LITELLM_API_KEY, or ANTHROPIC_API_KEY)'
+      'At least one provider API key is required (OPENAI_API_KEY, OPENROUTER_API_KEY, LITELLM_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY)'
     );
   }
 
