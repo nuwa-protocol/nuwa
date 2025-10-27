@@ -1,0 +1,154 @@
+---
+title: "@nuwa-ai/x402 SDK"
+description: "Helpers for paid MCP endpoints and x402-gated HTTP proxies."
+---
+
+Nuwa's `@nuwa-ai/x402` package layers AI-friendly ergonomics on top of the upstream [`coinbase/x402`](https://github.com/coinbase/x402) reference implementation. It keeps your focus on business logic while handling payment requirements, facilitator calls, and settlement bookkeeping for both MCP tools and standard HTTP/gRPC gateways.
+
+## Modules at a glance
+
+| Import | Purpose |
+| --- | --- |
+| `@nuwa-ai/x402/mcp` | `createPaidMcpHandler` bootstraps a paid MCP server from an initializer callback—ideal for Next.js App Router, Vercel Edge, or any `fetch`-compatible runtime. |
+| `@nuwa-ai/x402/llm` | `X402LlmPayments` & `createPaymentPlugin` guard HTTP endpoints by enforcing `X-PAYMENT`, verifying receipts, and appending `X-PAYMENT-RESPONSE` metadata. |
+| Types | Shared types such as `FacilitatorConfig`, `PaymentRequirements`, and `RouteConfig` mirror the latest x402 schemas for strongly typed facilitators. |
+
+Every helper runs the same x402 facilitator flow, so you can swap Coinbase CDP for a self-hosted verifier as long as it exposes `/verify`, `/settle`, `/supported`, and (optionally) `/list`.
+
+## Installation
+
+```bash
+pnpm add @nuwa-ai/x402
+```
+
+Bring `@coinbase/x402`, `viem`, and `zod` if you need facilitator utilities, key derivation, or schema validation:
+
+```bash
+pnpm add @coinbase/x402 viem zod
+```
+
+The SDK targets Node 18+ (Node 20 recommended) and assumes you can settle to a funded Base wallet. Default network is `base-sepolia`; set `NETWORK=base` in production.
+
+## Example: paid MCP tool
+
+Next.js App Router example—mirrors the tutorial in [`xnuwa/x402-mcp.mdx`](./x402-mcp):
+
+```ts
+import { facilitator } from "@coinbase/x402";
+import { privateKeyToAccount } from "viem/accounts";
+import z from "zod";
+import {
+  createPaidMcpHandler,
+  type FacilitatorConfig,
+} from "@nuwa-ai/x402/mcp";
+
+const handler = createPaidMcpHandler(
+  (server) => {
+    server.paidTool(
+      "generate_report",
+      "Summarize a topic after payment clears.",
+      { price: 0.002 }, // USD
+      { topic: z.string() },
+      {},
+      async ({ topic }) => ({
+        content: [{ type: "text", text: `Report for ${topic} (paid).` }],
+      }),
+    );
+  },
+  {
+    serverInfo: { name: "nextjs-paid-mcp", version: "0.1.0" },
+  },
+  {
+    recipient: privateKeyToAccount(
+      process.env.SERVICE_PRIVATE_KEY as `0x${string}`,
+    ).address,
+    network: process.env.NETWORK === "base" ? "base" : "base-sepolia",
+    facilitator: facilitator as unknown as FacilitatorConfig,
+  },
+);
+
+export const GET = handler;
+export const POST = handler;
+```
+
+- Declare tools in the initializer callback; use `server.paidTool` for paid methods and `server.tool` for free ones.
+- Incoming calls lacking `_meta["x402/payment"]` receive a `402` response that echoes the `accepts` requirements you configured.
+- After verification and settlement, a successful response includes `_meta["x402/payment-response"]` so clients can reconcile spend.
+
+## Example: LLM proxy with receipts
+
+Edge-friendly handler that forwards paid calls to OpenRouter:
+
+```ts
+import { facilitator } from "@coinbase/x402";
+import { privateKeyToAccount } from "viem/accounts";
+import { X402LlmPayments } from "@nuwa-ai/x402/llm";
+import type { FacilitatorConfig } from "@nuwa-ai/x402/mcp";
+
+const payments = new X402LlmPayments({
+  facilitator: facilitator as unknown as FacilitatorConfig,
+});
+
+export async function POST(request: Request) {
+  const seller = privateKeyToAccount(
+    process.env.SERVICE_PRIVATE_KEY as `0x${string}`,
+  );
+
+  return payments.gateWithX402Payment(
+    request,
+    {
+      price: 0.01, // USD
+      network: process.env.NETWORK === "base" ? "base" : "base-sepolia",
+      payTo: seller.address,
+      config: {
+        description: "OpenRouter proxy",
+        mimeType: "application/json",
+      },
+    },
+    async () => {
+      return fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        },
+        body: await request.text(),
+      });
+    },
+    {
+      onSettle: ({ settlement }) => {
+        if (settlement?.success) {
+          console.info("Settled OpenRouter proxy call", settlement.transaction);
+        }
+      },
+    },
+  );
+}
+```
+
+`gateWithX402Payment` validates the `X-PAYMENT` header, forwards the request once paid, and appends an `X-PAYMENT-RESPONSE` header containing the settlement transaction hash. Use the optional `onSettle` hook to report usage.
+
+## Facilitator configuration
+
+Both modules accept a `FacilitatorConfig` with `url` and `createAuthHeaders()` that returns per-endpoint headers for `/verify`, `/settle`, `/supported`, and optionally `/list`. Coinbase's `@coinbase/x402` package already exposes a ready-to-use implementation (`facilitator`). If you roll your own verifier, implement the same shape.
+
+## Environment variables
+
+| Variable | Description |
+| --- | --- |
+| `SERVICE_PRIVATE_KEY` | 32-byte EVM key used to derive the `payTo` address for settlements. Server-side only. |
+| `NETWORK` | `base-sepolia` (default) or `base`. |
+| `ALLOWED_ORIGIN` | Optional CORS allow-list origin when exposing endpoints to browsers. |
+| `CDP_API_KEY_ID` / `CDP_API_KEY_SECRET` / `CDP_WALLET_SECRET` | Required when using Coinbase CDP as your facilitator. |
+| `OPENROUTER_API_KEY` | Needed if you proxy OpenRouter in the LLM example. |
+
+<Note>
+  On mainnet, fund the derived address with USDC and monitor balances. The helpers settle before returning, so insufficient facilitator credit or wallet funds will keep the endpoint in a 402 challenge loop.
+</Note>
+
+## Roadmap & support
+
+- Tracking x402 v2 (`upto` scheme) for usage-based billing.
+- Additional facilitator adapters and dynamic pricing utilities.
+
+Follow [`nuwa-protocol/nuwa-x402`](https://github.com/nuwa-protocol/nuwa-x402) for changelog updates and examples.

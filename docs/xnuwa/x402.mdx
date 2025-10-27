@@ -1,0 +1,39 @@
+---
+title: "What is x402?"
+description: "Learn how the x402 payments protocol activates HTTP 402 for instant, web-native crypto payments."
+---
+
+x402 is an open, HTTP-native payment standard maintained by the Coinbase Developer Platform. It activates the long-dormant `402 Payment Required` status so any API, website, or agent can charge small crypto-denominated fees without building custom billing flows.   
+The V1 specification focuses on flat-rate micropayments using the **`X-PAYMENT`** header and a standard JSON schema for negotiating payment requirements between clients, resource servers, and facilitators.
+
+## Why x402 matters
+
+- **Open standard, no rent seeking:** The protocol is stewarded in the open, and implementations (client, server, facilitator) can be built by anyone. [(coinbase/x402)](https://github.com/coinbase/x402)
+- **HTTP-native integration:** Payments ride on ordinary HTTP requests and responses—no extra sign-in, OAuth, or signature exchanges. [(x402.org)](https://x402.org)
+- **Chain & asset agnostic:** Any `(scheme, network)` pair can be registered so you can settle on Base, L2s, or other chains that meet the spec.
+- **Trust-minimized settlement:** Resource servers never take custody of user funds; a facilitator verifies receipts on-chain and can optionally settle on the server’s behalf.
+- **Agent-friendly micropayments:** Fees can be as low as $0.001 with ~2 second settlement, enabling AI agents and bots to pay per-request.
+
+## Core roles in the ecosystem
+
+| Role | Responsibility |
+| --- | --- |
+| **Client** | Requests a protected resource and composes `X-PAYMENT` payloads. |
+| **Resource server** | Exposes the API/content and responds with `402` when payment is required. |
+| **Facilitator server** | Optional third party that verifies and settles payments so the resource server does not need direct chain access. |
+
+## Schemes & networks
+
+- **Schemes** describe *how* value is moved. The first shipping scheme is `exact`, which transfers a fixed amount (e.g., “pay $0.01 for this request”). Future schemes like `upto` add metered usage.
+- **Networks** scope those schemes to a blockchain implementation (for example, `exact` on Base differs from `exact` on Solana). Clients, facilitators, and servers must explicitly agree on the `(scheme, network)` pair.
+
+> x402 is built to be extensible: see [`specs/schemes`](https://github.com/coinbase/x402/tree/main/specs/schemes) for latest proposals, and [`ROADMAP.md`](https://github.com/coinbase/x402/blob/main/ROADMAP.md) for upcoming protocol milestones.
+
+## Developer resources
+
+- [x402.org — official intro and ecosystem tracker](https://x402.org)
+- [coinbase/x402 — reference TypeScript implementation](https://github.com/coinbase/x402)
+- [x402 PDF one-pager](https://www.x402.org/x402.pdf)
+- [x402 ecosystem submissions](https://x402.org/ecosystem)
+
+Stay up to date by watching the coinbase/x402 repository; the spec and tooling are evolving quickly as more facilitators and payment schemes come online.
