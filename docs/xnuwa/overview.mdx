@@ -1,0 +1,38 @@
+---
+title: "xNUWA"
+description: "Explore the xNUWA client for using x402-enabled AI services."
+---
+
+xNUWA is Nuwa's x402-native AI client that demonstrates how users and autonomous agents can browse, pay for, and run AI Caps with nothing more than an on-device wallet. The app lives at [xnuwa.app](https://xnuwa.app) and is open-sourced at [`nuwa-protocol/xnuwa.app`](https://github.com/nuwa-protocol/xnuwa.app).
+
+> **Caps** bundle a prompt, model (or remote API), optional MCP tools, and a UI surface. xNUWA renders these caps, handles payment auth, and records usage so builders can monetize instantly. Learn more about [Caps](/introduction/core-concepts/capabilities).
+
+
+<Tip>xNUWA is currently in alpha. For developers, xNUWA is the fastest way to feel the x402 flow from the client perspective—use it to test your own paid MCP, validate facilitator compatibility, and demo the experience to end users. .</Tip>
+
+## Key Features
+
+- **Self-custodied identity:** Users authenticate with an EVM address. Keys are stored client-side (IndexedDB) and decrypted only when signing with a PIN or passkey.
+- **Seamless x402 checkout:** Every paid MCP call or LLM request goes through x402 receipts. The client handles the `X-PAYMENT` negotiation flow automatically.
+- **Offline-friendly data model:** Zustand + Dexie keep chat history, wallet metadata, and cap configs available even without a persistent backend.
+- **Registry integration:** Ships with a community `cap-registry/` for publishing reusable capabilities that comply with the Nuwa Cap schema.
+
+## How payments work inside xNUWA
+
+1. The MCP or LLM endpoint replies with `402 Payment Required` plus the x402 `paymentRequirements` payload.
+2. xNUWA selects a supported scheme/network (default: `exact` on `base-sepolia`) and builds the `X-PAYMENT` header, signing the transaction via the embedded wallet.
+3. The client resends the request with `X-PAYMENT`; the endpoint verifies/settles (often via Coinbase facilitator) and responds with `X-PAYMENT-RESPONSE` for observability.
+4. Receipts are persisted locally so users can audit spend and quickly replay flows without reconfiguration.
+
+<Note>
+  You can connect xNUWA to mainnet by switching the default network to `base` once your service wallet is funded with USDC.
+</Note>
+
+## Best practices for builders
+
+- **Bundle demos:** Include a demo cap and sample MCP configs so new users can verify payments quickly.
+- **Respect privacy:** Keep sensitive data in encrypted Zustand stores and avoid exporting private keys.
+- **Document caps:** Maintain markdown docs inside `cap-registry/` and link back to your repos via the `metadata` block.
+- **Monitor receipts:** Surface `X-PAYMENT-RESPONSE` details in your cap UI so developers can debug facilitator or settlement issues fast.
+
+

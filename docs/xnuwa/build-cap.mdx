@@ -1,0 +1,58 @@
+---
+title: "Build and Submit a Cap"
+description: "Use Cap Studio locally, export a Cap YAML manifest, and contribute it to the registry."
+---
+
+
+## Flow overview
+
+1. [Clone and run the xNUWA repo.](#1-clone-and-run-the-xnuwa-repo)
+2. [Build and Test Cap](#2-build-and-test-your-cap)
+3. [Export the Cap YAML](#3-add-the-manifest-to-cap-registry)
+4. [Make a PR to Submit Demo.](#4-submit-a-pull-request)
+
+## 1. Clone & bootstrap the workspace
+
+```bash
+git clone https://github.com/nuwa-protocol/xnuwa.app.git
+cd xnuwa.app
+pnpm install
+pnpm dev
+```
+
+This launches the Nuwa Client (including Cap Studio) at `http://localhost:5173`. Create your wallet with a PIN (with) a passkey.
+
+<Tip>
+  We have a built-in demo with a paid mcp and a paid LLM. you can find the open source code in the [`nuwa-x402` repo](https://github.com/nuwa-protocol/nuwa-x402).
+</Tip>
+
+## 2. Build and test your Cap
+- In the sidebar, go to **Settings -> System -> Enable Developer Mode**, your sidebar will now have a new **Cap Studio** entrance.
+- Create a new Cap with **Cap Studio → New Cap** button, or use the **Import YAML option** to load the demo cap yaml file from the `cap-registry` folder
+- Configure the Cap with the form based editor, you can set the Prompt, Model, MCP servers and UI. Find the relevant information in the [Nuwa AI](../build-caps/quickstart) docs.
+- You can test your paid MCP with the **MCP Debug Tool** in the Cap Studio.
+- Use **Test Cap** to test your cap.
+
+
+## 3. Add Cap YAML to `cap-registry/`
+
+When you are satisfied with your Cap, click menu and **Export YAML** to export the Cap YAML file into the `cap-registry` folder in the project root. And restart the dev server.
+
+The xNUWA is configure to auto load Cap files from the `cap-registry` folder. You can find your new caps by switching caps in the prompt input.
+
+## 4. Submit a pull request
+
+If you want others to try your cap via our hosted [xNUWA app](https://xnuwa.app), you can make a PR to submit your cap to our repo.
+
+Create a feature branch and commit your Cap:
+
+```bash
+git checkout -b feat/add-my-first-cap
+git add cap-registry/my_first_cap.yaml
+git commit -m "Add My First Cap to registry"
+git push origin feat/add-my-first-cap
+```
+
+Then give us a summary on what you wanna show with your cap in your PR. The github bot will check your Cap Schema. We will merge your PR asap.
+
+

@@ -1,0 +1,153 @@
+---
+title: "MCP with x402"
+description: "Protect Next.js-hosted MCP tools with x402 receipts."
+---
+
+x402 lets you meter MCP tools exactly like HTTP APIs. This guide walks through wiring the Nuwa `@nuwa-ai/x402` SDK into a Next.js App Router project, verifying the full payment handshake locally, and pointing you to production guardrails. The finished code matches the `docs/example` Next.js sample that ships in this repo.
+
+## Prerequisites
+
+- Node.js 18+ (20 LTS recommended)
+- `pnpm` 9+
+- An existing or new Next.js App Router project
+- A funded Base wallet (use Base Sepolia while testing)
+- Facilitator access (`/verify`, `/settle`, `/list`, `/supported`)—Coinbase CDP works out of the box
+
+<Tip>
+  Need a facilitator quickly? The [`nuwa-protocol/nuwa-x402`](https://github.com/nuwa-protocol/nuwa-x402) repo exposes CDP-compatible endpoints via Docker so you can self-host locally.
+</Tip>
+
+## 1. Install dependencies
+
+From your Next.js project root:
+
+```bash
+pnpm add @nuwa-ai/x402 @coinbase/x402 viem zod
+```
+
+`@nuwa-ai/x402` bundles the MCP runtime (`mcp-handler`) and schema helpers. We add `@coinbase/x402` for the default facilitator client, `viem` for EVM key utilities, and `zod` to type-check tool inputs.
+
+## 2. Configure environment secrets
+
+Create `.env.local` (Next.js loads this automatically):
+
+```bash
+SERVICE_PRIVATE_KEY=0x...        # 32-byte hex key used to derive the payTo address
+NETWORK=base-sepolia             # Switch to "base" in production
+CDP_API_KEY_ID=...               # Optional, only required for Coinbase facilitator
+CDP_API_KEY_SECRET=...
+CDP_WALLET_SECRET=...
+ALLOWED_ORIGIN=http://localhost:3000 # Optional CORS origin for browser clients
+```
+
+Never use a hot mainnet key in development. Fund the derived address with a small amount of USDC on the selected network.
+
+## 3. Parse env vars once
+
+Add `src/lib/env.ts` to validate configuration:
+
+```ts
+import { z } from "zod";
+
+const envSchema = z.object({
+  SERVICE_PRIVATE_KEY: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte 0x-prefixed hex string"),
+  NETWORK: z.enum(["base", "base-sepolia"]).default("base-sepolia"),
+  ALLOWED_ORIGIN: z.string().url().optional(),
+});
+
+type Env = z.infer<typeof envSchema>;
+
+let cachedEnv: Env | null = null;
+
+export function getEnv(): Env {
+  if (!cachedEnv) {
+    const parsed = envSchema.safeParse(process.env);
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+        .join("; ");
+      throw new Error(`Invalid environment configuration: ${issues}`);
+    }
+    cachedEnv = parsed.data;
+  }
+  return cachedEnv;
+}
+```
+
+Caching prevents re-validating on every request while staying type-safe.
+
+## 4. Create the paid MCP route
+
+In `src/app/mcp/route.ts`, wire the handler into the App Router:
+
+```ts
+import { facilitator } from "@coinbase/x402";
+import { privateKeyToAccount } from "viem/accounts";
+import z from "zod";
+import {
+  createPaidMcpHandler,
+  type FacilitatorConfig,
+} from "@nuwa-ai/x402/mcp";
+import { getEnv } from "@/lib/env";
+
+const handler = createPaidMcpHandler(
+  (server) => {
+    server.paidTool(
+      "generate_report",
+      "Summarize a topic after payment clears.",
+      { price: 0.002 }, // USD
+      { topic: z.string() },
+      {},
+      async ({ topic }) => {
+        return {
+          content: [{ type: "text", text: `Report for ${topic} (paid).` }],
+        };
+      },
+    );
+
+    server.tool(
+      "ping",
+      "Health check without payment.",
+      { message: z.string().default("pong") },
+      async ({ message }) => {
+        return { content: [{ type: "text", text: message }] };
+      },
+    );
+  },
+  {
+    serverInfo: { name: "nextjs-paid-mcp", version: "0.1.0" },
+  },
+  (() => {
+    const env = getEnv();
+    const seller = privateKeyToAccount(env.SERVICE_PRIVATE_KEY as `0x${string}`);
+    return {
+      recipient: seller.address,
+      network: env.NETWORK,
+      facilitator: facilitator as unknown as FacilitatorConfig,
+    };
+  })(),
+);
+
+export const GET = handler;
+export const POST = handler;
+```
+
+Key details:
+
+- `createPaidMcpHandler` takes an initializer callback. Inside it you declare tools with `server.paidTool`. The helper injects payment checks before your business logic runs.
+- `_meta["x402/payment"]` is inspected automatically. Unpaid calls receive a `402` response describing the `accepts` requirements. Paid calls are verified, then settled, and your response gains `_meta["x402/payment-response"]`.
+- Adding a plain `server.tool` keeps free functionality alongside paid tools.
+
+<Tip>
+  If you need browser access, add `OPTIONS` handling plus CORS headers—see `docs/example/src/lib/cors.ts` for a drop-in helper. You will need this if you wanna test it with xNUWA.
+</Tip>
+
+## 5. Run and test locally
+
+```bash
+pnpm dev
+```
+
+You can try your mcp with xNUWA app, in the Cap Studio you will find the [MCP Debug Tool](https://xnuwa.app/cap-studio/mcp).
