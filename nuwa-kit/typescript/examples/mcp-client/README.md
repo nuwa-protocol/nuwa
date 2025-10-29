@@ -4,7 +4,7 @@ A minimal script that connects to the *MCP Server Example* via **httpStream** us
 
 The script demonstrates:
 
-* Building a `DIDAuthV1` header for every JSON-RPC request (NIP-10)
+* Building a `DIDAuthV1` header for every JSON-RPC request (NIP-7)
 * Using `StreamableHTTPClientTransport` (bidirectional HTTP streaming)
 * Listing remote tools and calling the `echo` tool
 

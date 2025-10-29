@@ -1,7 +1,7 @@
 # MCP Server Proxy – Design Document
 
 ## 1. Motivation
-Nuwa 生态中的部分 MCP 服务（**Model Capability Providers**）尚未完成基于 **NIP-10 DIDAuthV1** 的身份认证改造，导致无法直接被其它 Nuwa 应用（客户端、Agent、服务等）安全地调用。
+Nuwa 生态中的部分 MCP 服务（**Model Capability Providers**）尚未完成基于 **NIP-7 DIDAuthV1** 的身份认证改造，导致无法直接被其它 Nuwa 应用（客户端、Agent、服务等）安全地调用。
 
 为解决过渡期的兼容性问题，设计 **MCP Server Proxy**，在代理层完成身份验证、计费与协议转换，使得：
 
@@ -175,7 +175,7 @@ pnpm start
 | 语言 | **TypeScript 5.x** | 类型安全、与 `fastmcp` / `identity-kit` 等 Nuwa 包零摩擦 |
 | Web 框架 | **Fastify** | 高性能、插件生态（SSE、rate-limit）、链式生命周期钩子方便集成 Auth/计费 |
 | MCP 协议库 | `@modelcontextprotocol/sdk` | 官方 SDK，负责解析/构造 MCP 报文，可直接调用上游 MCP |
-| DIDAuth | `@nuwa-ai/identity-kit` | Nuwa 官方库，支持 NIP-10 DIDAuthV1 验证 |
+| DIDAuth | `@nuwa-ai/identity-kit` | Nuwa 官方库，支持 NIP-7 DIDAuthV1 验证 |
 | HTTP 客户端 | **undici** | `fetch` API 的 Node.js 实现，性能优异 |
 | SSE 插件 | `fastify-sse-v2` | 快速构建 `text/event-stream` 响应 |
 | 进程管理 | **pm2** / **docker** / **k8s** | 支持热重载、日志收集、水平扩容 |

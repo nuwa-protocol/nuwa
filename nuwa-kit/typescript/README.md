@@ -5,10 +5,9 @@ This package provides the official TypeScript/JavaScript SDK for the Nuwa Protoc
 ## Features
 
 *   Identity Management (NIP-1, NIP-2, NIP-3)
-*   State Synchronization (NIP-6, NIP-8)
-*   Capability Handling (NIP-7)
-*   Payment Channel Interaction (NIP-4, NIP-5, NIP-11)
-*   Service Gateway Communication (NIP-9, NIP-10)
+*   Capability Handling (NIP-5)
+*   Payment Channel Interaction (NIP-4)
+*   Service Gateway Communication (NIP-6, NIP-7)
 *   Core utilities and type definitions.
 
 ## Structure (Monorepo - pnpm)
