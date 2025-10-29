@@ -1,9 +1,9 @@
 import axios from "axios";
 import yaml from "js-yaml";
 import {queryLastRegisterEventCursor,
-   queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor} from './supabase.js';
+   queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor} from '../supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
-import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "./constant.js";
+import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "../constant.js";
 
 /**
  * Fetches and parses YAML content from IPFS using the provided CID

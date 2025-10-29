@@ -1,18 +1,19 @@
 import { IdentityKit, KeyManager } from "@nuwa-ai/identity-kit";
-import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "../constant.js";
+import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "./constant.js";
 import { config } from "dotenv";
 import { create } from 'ipfs-http-client';
-import { uploadCapTool } from "./upload-cap.js";
-import { downloadCapTool } from "./download-cap.js";
-import { favoriteCapTool } from "./favorite-cap.js";
-import { queryCapByIDTool } from "./query-cap-by-id.js";
-import { queryCapByNameTool } from "./query-cap-by-name.js";
-import { queryCapStatsTool } from "./query-cap-stas.js";
-import { queryMyFavoriteCapTool } from "./query-my-favorite-cap.js";
-import { rateCapTool } from "./rate-cap.js";
-import { updateEnableCapTool } from "./update-enable-cap.js";
-import { queryCapRatingDistributionTool } from "./query-cap-rating-distribution.js";
+import { uploadCapTool } from "./mcp/upload-cap.js";
+import { downloadCapTool } from "./mcp/download-cap.js";
+import { favoriteCapTool } from "./mcp/favorite-cap.js";
+import { queryCapByIDTool } from "./mcp/query-cap-by-id.js";
+import { queryCapByNameTool } from "./mcp/query-cap-by-name.js";
+import { queryCapStatsTool } from "./mcp/query-cap-stas.js";
+import { queryMyFavoriteCapTool } from "./mcp/query-my-favorite-cap.js";
+import { rateCapTool } from "./mcp/rate-cap.js";
+import { updateEnableCapTool } from "./mcp/update-enable-cap.js";
+import { queryCapRatingDistributionTool } from "./mcp/query-cap-rating-distribution.js";
 import { createFastMcpServerFromEnv } from "@nuwa-ai/payment-kit";
+import { handleApiRoutes } from "./restful-api/index.js";
 
 // Load environment variables
 config();
@@ -77,6 +78,7 @@ export async function getService() {
       debug: process.env.DEBUG === "true",
       port: parseInt(process.env.PORT || "3000"),
       endpoint: "/mcp",
+      customRouteHandler: handleApiRoutes,
     });
 
     // Register FREE tools

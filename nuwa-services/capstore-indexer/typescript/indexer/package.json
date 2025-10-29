@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@nuwa-ai/identity-kit": "^0.6.0",
-    "@nuwa-ai/payment-kit": "^0.6.9",
+    "@nuwa-ai/payment-kit": "link:../../../../nuwa-kit/typescript/packages/payment-kit",
     "@supabase/supabase-js": "^2.50.5",
     "axios": "^1.10.0",
     "dotenv": "^17.0.0",

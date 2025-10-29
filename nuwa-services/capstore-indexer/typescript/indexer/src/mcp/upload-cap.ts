@@ -1,6 +1,6 @@
 import z from "zod";
 import { Readable } from 'node:stream';
-import { ipfsClient } from "./service.js";
+import { ipfsClient } from "../service.js";
 import { CID } from 'multiformats/cid';
 import { Result } from "../type.js";
 
