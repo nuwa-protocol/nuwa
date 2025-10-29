@@ -1,6 +1,6 @@
 # MCP Server Example (TypeScript)
 
-A minimal FastMCP server protected by **NIP-10 DIDAuthV1**.  
+A minimal FastMCP server protected by **NIP-7 DIDAuthV1**.  
 The server exposes a single `echo` tool and listens on **httpStream** port `8080`.
 
 ## Quick Start
