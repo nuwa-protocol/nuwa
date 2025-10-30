@@ -3,7 +3,7 @@ import { IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET } from "./constant.js"
 import { config } from "dotenv";
 import { create } from 'ipfs-http-client';
 // import { uploadCapTool } from "./mcp/upload-cap.js";
-import { downloadCapTool } from "./mcp/download-cap.js";
+import { downloadCapTool } from "./mcp/download-cap-v2.js";
 import { favoriteCapTool } from "./mcp/favorite-cap.js";
 import { queryCapByIDTool } from "./mcp/query-cap-by-id.js";
 import { queryCapByNameTool } from "./mcp/query-cap-by-name.js";

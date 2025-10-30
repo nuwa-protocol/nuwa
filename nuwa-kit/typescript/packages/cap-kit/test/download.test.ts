@@ -14,17 +14,12 @@ describe("CapKit", () => {
   })
 
   it("download cap by id", async () => {
-    const caps = await capKit.queryByName()
+    const caps = await capKit.queryByName("test_cap123")
 
-    const result = await capKit.downloadByCID(
-      caps.data?.items[0].cid || ''
-    )
-
-    const result1 = await capKit.downloadByID(
+    const result = await capKit.downloadByID(
       caps.data?.items[0].id || ''
     )
 
     expect(result).toBeDefined();
-    expect(result1).toBeDefined();
   }, 150000);
 });

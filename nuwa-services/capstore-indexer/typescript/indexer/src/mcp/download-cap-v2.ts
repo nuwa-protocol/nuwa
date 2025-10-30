@@ -2,7 +2,7 @@ import z from "zod";
 import { Result } from "../type.js";
 import { downloadFromSupabase } from "../supabase.js";
 
-async function downloadCap(id: string, context: any) {
+async function downloadCap({id}: {id: string}, context: any) {
   try {
     const capRaw = await downloadFromSupabase(id);
 
@@ -26,7 +26,7 @@ async function downloadCap(id: string, context: any) {
           code: 200,
           data: {
             id,
-            rawData: capRaw,
+            rawData: capRaw.data.raw_data,
             timestamp: new Date().toISOString()
           }
         } as Result)
@@ -47,11 +47,9 @@ async function downloadCap(id: string, context: any) {
 
 export const downloadCapTool = {
   name: "downloadCap",
-  description: "Download a cap from IPFS using its CID",
+  description: "Download a cap",
   parameters: z.object({
-    cid: z.string().describe("Content Identifier (CID) of the file"),
-    dataFormat: z.enum(['base64', 'utf8']).optional().default('utf8')
-      .describe("Output format for file data")
+    id: z.string().describe("cap id"),
   }),
   execute: downloadCap
 };

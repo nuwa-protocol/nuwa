@@ -1,4 +1,5 @@
 import { Cap, Page, Result } from "./type";
+import * as yaml from "js-yaml";
 
 export interface DownloadCaps {
   successful: { [id: string]: Cap },
@@ -51,8 +52,11 @@ export class CapKitRestful {
 
   async downloadCap(capId: string): Promise<Cap> {
     const response = await fetch(`${this.apiUrl}/cap/download/${capId}`);
+
     const result =  await response.json();
-    return JSON.parse(result)
+    const utf8 = new TextDecoder().decode(Uint8Array.from(atob(result.data.raw_data), c => c.charCodeAt(0)))
+
+    return yaml.load(utf8) as Cap;
   }
 
   async downloadCaps(cpdIds: string[]): Promise<DownloadCaps> {
@@ -63,6 +67,19 @@ export class CapKitRestful {
       },
       body: JSON.stringify({ ids: cpdIds }),
     });
-    return await response.json();
+
+    const result =  await response.json();
+    const successful = result.data.successful
+    const formatSuccessful: { [id: string]: Cap } = {};
+    for (const [id, value] of Object.entries(successful)) {
+      const utf8 = new TextDecoder().decode(Uint8Array.from(atob(value as string), c => c.charCodeAt(0)))
+      const cap = yaml.load(utf8) as Cap;
+      formatSuccessful[id] = cap;
+    }
+
+    return {
+      ...result.data,
+      successful: formatSuccessful,
+    }
   }
 }

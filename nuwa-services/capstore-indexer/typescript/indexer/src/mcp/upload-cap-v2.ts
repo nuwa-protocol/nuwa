@@ -36,7 +36,7 @@ async function uploadCap(input: { cap: string }, context: any) {
 }
 
 export const uploadCapTool = {
-  name: "uploadCapV2",
+  name: "uploadCap",
   description: "Upload a cap to supabase",
   parameters: z.object({
     cap: z.string().describe("Base64 encoded file data"),

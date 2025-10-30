@@ -1,4 +1,4 @@
-import { DidAccountSigner, type SignerInterface } from "@nuwa-ai/identity-kit";
+// import { DidAccountSigner, type SignerInterface } from "@nuwa-ai/identity-kit";
 import { Args, RoochClient, Transaction } from "@roochnetwork/rooch-sdk";
 import * as yaml from "js-yaml";
 import { buildClient } from "./client";
@@ -443,17 +443,17 @@ export class CapKitMcp {
     }
   }
 
-  async downloadByID(id: string, format?: "base64" | "utf8"): Promise<Cap> {
-    const result = await this.queryByID({ id: id });
+  // async downloadByID(id: string, format?: "base64" | "utf8"): Promise<Cap> {
+  //   const result = await this.queryByID({ id: id });
+  //
+  //   if (result.code === 200) {
+  //     return this.downloadByCID(result.data!.cid, format);
+  //   } else {
+  //     throw new Error("Invalid Cap ID");
+  //   }
+  // }
 
-    if (result.code === 200) {
-      return this.downloadByCID(result.data!.cid, format);
-    } else {
-      throw new Error("Invalid Cap ID");
-    }
-  }
-
-  async downloadByCID(cid: string, format?: "base64" | "utf8"): Promise<Cap> {
+  async downloadByID(id: string): Promise<Cap> {
     try {
       // Get tools from MCP server
       const tools = await this.getTools()
@@ -466,8 +466,7 @@ export class CapKitMcp {
       // Download file from IPFS
       const result = await downloadCap.execute(
         {
-          cid: cid,
-          dataFormat: format,
+          id: id,
         },
         {
           toolCallId: "download-cap",
@@ -486,38 +485,40 @@ export class CapKitMcp {
           `Download failed: ${downloadResult.error || "Unknown error"}`,
         );
       }
+      const data = downloadResult.data.rawData
+      const utf8 = new TextDecoder().decode(Uint8Array.from(atob(data), c => c.charCodeAt(0)))
 
-      return yaml.load(downloadResult.data.fileData) as Cap;
+      return yaml.load(utf8) as Cap;
     } catch (e) {
       throw e
     }
   }
 
+  // async registerCap(cap: Cap) {
+  //   // len > 6 && len < 20, only contain a-z, A-Z, 0-9, _
+  //   if (!/^[a-zA-Z0-9_]{6,20}$/.test(cap.idName)) {
+  //     throw new Error(
+  //       "Name must be between 6 and 20 characters and only contain a-z, A-Z, 0-9, _",
+  //     );
+  //   }
+  //
+  //   // 1. Create ACP (Agent Capability Package) file
+  //   const acpContent = yaml.dump(cap);
+  //
+  //   // 2. Upload ACP file to IPFS using nuwa-cap-store MCP
+  //   const cid = await this.uploadToIPFS(cap.id, acpContent);
+  //
+  //   // 3. Call Move contract to register the capability
+  //   const result = await this.registerOnChain(cap.idName, cid, this.env.keyManager);
+  //
+  //   if (result.execution_info.status.type !== "executed") {
+  //     throw new Error("unknown error");
+  //   }
+  //
+  //   return cid;
+  // }
+
   async registerCap(cap: Cap) {
-    // len > 6 && len < 20, only contain a-z, A-Z, 0-9, _
-    if (!/^[a-zA-Z0-9_]{6,20}$/.test(cap.idName)) {
-      throw new Error(
-        "Name must be between 6 and 20 characters and only contain a-z, A-Z, 0-9, _",
-      );
-    }
-
-    // 1. Create ACP (Agent Capability Package) file
-    const acpContent = yaml.dump(cap);
-
-    // 2. Upload ACP file to IPFS using nuwa-cap-store MCP
-    const cid = await this.uploadToIPFS(cap.id, acpContent);
-
-    // 3. Call Move contract to register the capability
-    const result = await this.registerOnChain(cap.idName, cid, this.env.keyManager);
-
-    if (result.execution_info.status.type !== "executed") {
-      throw new Error("unknown error");
-    }
-
-    return cid;
-  }
-
-  async registerCapV2(cap: Cap) {
     // len > 6 && len < 20, only contain a-z, A-Z, 0-9, _
     if (!/^[a-zA-Z0-9_]{6,20}$/.test(cap.idName)) {
       throw new Error(
@@ -533,14 +534,14 @@ export class CapKitMcp {
     const rawData = btoa(String.fromCharCode(...bytes));
 
     const tools = await this.getTools()
-    const uploadCap = tools.uploadCapV2;
+    const uploadCap = tools.uploadCap;
 
     const result = await uploadCap.execute(
       {
         cap: rawData,
       },
       {
-        toolCallId: "upload-capv2",
+        toolCallId: "upload-cap",
         messages: [],
       },
     );
@@ -552,7 +553,7 @@ export class CapKitMcp {
     const uploadResult = JSON.parse((result.content as any)[0].text);
     const uploadData = uploadResult.data;
 
-    if (uploadResult.code !== 200 || !uploadData.ipfsCid) {
+    if (uploadResult.code !== 200) {
       throw new Error(
         `Upload cap failed: ${uploadResult.error || "Unknown error"}`,
       );
@@ -561,74 +562,74 @@ export class CapKitMcp {
     return cap.id
   }
 
-  private async uploadToIPFS(
-    name: string,
-    content: string,
-  ): Promise<string> {
-
-    try {
-      // Get tools from MCP server
-      const tools = await this.getTools()
-      const uploadCap = tools.uploadCap;
-
-      if (!uploadCap) {
-        throw new Error("uploadCap tool not available on MCP server");
-      }
-
-      // Convert content to base64 (UTF-8 safe)
-      const encoder = new TextEncoder();
-      const bytes = encoder.encode(content);
-      const fileData = btoa(String.fromCharCode(...bytes));
-      const fileName = `${name}.cap.yaml`;
-
-      // Upload file to IPFS
-      const result = await uploadCap.execute(
-        {
-          fileName,
-          fileData,
-        },
-        {
-          toolCallId: "upload-cap",
-          messages: [],
-        },
-      );
-
-      if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
-      }
-
-      const uploadResult = JSON.parse((result.content as any)[0].text);
-      const uploadData = uploadResult.data;
-
-      if (uploadResult.code !== 200 || !uploadData.ipfsCid) {
-        throw new Error(
-          `Upload cap failed: ${uploadResult.error || "Unknown error"}`,
-        );
-      }
-
-      return uploadData.ipfsCid;
-    } catch (e) {
-      throw e
-    }
-  }
-
-  private async registerOnChain(
-    name: string,
-    cid: string,
-    signer: SignerInterface,
-  ) {
-    const chainSigner = await DidAccountSigner.create(signer);
-    const transaction = new Transaction();
-    transaction.callFunction({
-      target: `${this.contractAddress}::acp_registry::register`,
-      typeArgs: [],
-      args: [Args.string(name), Args.string(cid)],
-      maxGas: 500000000,
-    });
-
-    return await this.roochClient.signAndExecuteTransaction({
-      transaction,
-      signer: chainSigner,
-    });
-  }
+  // private async uploadToIPFS(
+  //   name: string,
+  //   content: string,
+  // ): Promise<string> {
+  //
+  //   try {
+  //     // Get tools from MCP server
+  //     const tools = await this.getTools()
+  //     const uploadCap = tools.uploadCap;
+  //
+  //     if (!uploadCap) {
+  //       throw new Error("uploadCap tool not available on MCP server");
+  //     }
+  //
+  //     // Convert content to base64 (UTF-8 safe)
+  //     const encoder = new TextEncoder();
+  //     const bytes = encoder.encode(content);
+  //     const fileData = btoa(String.fromCharCode(...bytes));
+  //     const fileName = `${name}.cap.yaml`;
+  //
+  //     // Upload file to IPFS
+  //     const result = await uploadCap.execute(
+  //       {
+  //         fileName,
+  //         fileData,
+  //       },
+  //       {
+  //         toolCallId: "upload-cap",
+  //         messages: [],
+  //       },
+  //     );
+  //
+  //     if (result.isError) {
+  //       throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+  //     }
+  //
+  //     const uploadResult = JSON.parse((result.content as any)[0].text);
+  //     const uploadData = uploadResult.data;
+  //
+  //     if (uploadResult.code !== 200 || !uploadData.ipfsCid) {
+  //       throw new Error(
+  //         `Upload cap failed: ${uploadResult.error || "Unknown error"}`,
+  //       );
+  //     }
+  //
+  //     return uploadData.ipfsCid;
+  //   } catch (e) {
+  //     throw e
+  //   }
+  // }
+  //
+  // private async registerOnChain(
+  //   name: string,
+  //   cid: string,
+  //   signer: SignerInterface,
+  // ) {
+  //   const chainSigner = await DidAccountSigner.create(signer);
+  //   const transaction = new Transaction();
+  //   transaction.callFunction({
+  //     target: `${this.contractAddress}::acp_registry::register`,
+  //     typeArgs: [],
+  //     args: [Args.string(name), Args.string(cid)],
+  //     maxGas: 500000000,
+  //   });
+  //
+  //   return await this.roochClient.signAndExecuteTransaction({
+  //     transaction,
+  //     signer: chainSigner,
+  //   });
+  // }
 }

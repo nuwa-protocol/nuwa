@@ -79,7 +79,7 @@ export async function handleDownloadCaps(
 
     results.forEach((result) => {
       if (result.success && result.data) {
-        successfulDownloads[result.id] = result.data;
+        successfulDownloads[result.id] = result.data.raw_data;
       } else {
         failedDownloads[result.id] = result.error || 'Download failed';
       }

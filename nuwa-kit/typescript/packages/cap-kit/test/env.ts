@@ -1,5 +1,6 @@
 import { TestEnv, createSelfDid } from "@nuwa-ai/identity-kit";
 import { CapKitMcp } from "../src/index.js";
+import { Secp256k1Keypair } from "@roochnetwork/rooch-sdk";
 
 const localContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625";
 const testContractAddress = "0xeb1deb6f1190f86cd4e05a82cfa5775a8a5929da49fac3ab8f5bf23e9181e625";
@@ -36,6 +37,9 @@ export async function setupEnv(target: 'test' | 'local' = DEFAULT_TARGET, auth: 
     network: target,
     debug: false,
   });
+
+  const s = Secp256k1Keypair.fromSecretKey("roochsecretkey1qylp6ehfqx4c0zw6w7jpdwxm7q3e739d9fkxq0ym6xjtt2v0lxgpvvhcqg6")
+  const addr = s.getRoochAddress()
 
   const { identityEnv, did } = await createSelfDid(testEnv, {
     customScopes: [`${contractAddress}::*::*`],

@@ -50,7 +50,7 @@ describe("CapKit", () => {
   it("should register a cap v2", async () => {
     const did = await identityEnv.keyManager.getDid();
 
-    const result = await capKit.registerCapV2(buildCap(did, 'test_cap123'));
+    const result = await capKit.registerCap(buildCap(did, 'test_cap123'));
     expect(result).toBeDefined();
 
     await new Promise(resolve => setTimeout(resolve, 10000));
@@ -61,7 +61,7 @@ describe("CapKit", () => {
     expect(result2).toBeDefined();
 
     await new Promise(resolve => setTimeout(resolve, 10000));
-    const download2 = await capKit.downloadByCID(result2 || '');
+    const download2 = await capKit.downloadByID(result2 || '');
     expect(download2).toBeDefined();
 
     const result3 = await capKit.queryByName('test_cap');
