@@ -1,5 +1,5 @@
 import z from "zod";
-import { ipfsClient } from "./service.js";
+import { ipfsClient } from "../service.js";
 import { Result } from "../type.js";
 import { incrementCapDownloads, queryFromSupabase } from "../supabase.js";
 

@@ -7,7 +7,7 @@ CREATE TABLE cap_sync_state (
 CREATE TABLE cap_data (
   name TEXT NOT NULL,
   id TEXT NOT NULL,
-  cid TEXT NOT NULL,
+  cid TEXT NULL,
   display_name TEXT NOT NULL,
   tags JSONB DEFAULT '[]'::jsonb,
   description TEXT NOT NULL,
@@ -20,6 +20,12 @@ CREATE TABLE cap_data (
   timestamp TIMESTAMPTZ DEFAULT NOW(),
   version INT NOT NULL DEFAULT 0,
   PRIMARY KEY (id)
+);
+
+CREATE TABLE cap_raw_data (
+  id TEXT NOT NULL PRIMARY KEY,
+  raw_data TEXT NOT NULL,
+  FOREIGN KEY (id) REFERENCES cap_data(id) ON DELETE CASCADE
 );
 
 -- Create index on cid for faster queries

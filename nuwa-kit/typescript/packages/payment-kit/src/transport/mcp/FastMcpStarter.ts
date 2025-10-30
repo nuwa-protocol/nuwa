@@ -23,6 +23,7 @@ export interface FastMcpServerOptions extends McpPaymentKitOptions {
     enabled?: boolean;
     path?: `/${string}`; // default: '/.well-known/nuwa-payment/info'
   };
+  customRouteHandler?: (req: any, res: any) => Promise<boolean> | boolean;
 }
 
 /**
@@ -350,6 +351,15 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
             }
             return;
           }
+
+          // Try custom route handler first
+          if (opts.customRouteHandler) {
+            const handled = await opts.customRouteHandler(req, res);
+            if (handled) {
+              return;
+            }
+          }
+          
           res.writeHead(404).end();
         } catch (e) {
           try {

@@ -1,9 +1,11 @@
 import axios from "axios";
 import yaml from "js-yaml";
-import {queryLastRegisterEventCursor,
-   queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor} from './supabase.js';
+import {
+  queryLastRegisterEventCursor,
+  queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor
+} from '../supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
-import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "./constant.js";
+import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "../constant.js";
 
 /**
  * Fetches and parses YAML content from IPFS using the provided CID
@@ -15,8 +17,8 @@ export async function fetchAndParseYaml(cid: string): Promise<any> {
   try {
     // Use IPFS API endpoint to retrieve content
     const url = `${IPFS_GATEWAY}/api/v0/cat?arg=${cid}`;
-    
-    const response = await axios.post(url, null, { 
+
+    const response = await axios.post(url, null, {
       timeout: 10000,
       responseType: 'text',
       responseEncoding: 'utf8'
@@ -44,7 +46,7 @@ export async function syncCap(cid: string): Promise<any> {
   try {
     const yamlData = await fetchAndParseYaml(cid);
     await saveCapToSupabase(yamlData, cid, 0);
-  } catch(e: any) {
+  } catch (e: any) {
     throw new Error(`Failed to sync CapStore: ${(e as Error).message}`);
   }
 }
@@ -58,7 +60,7 @@ export async function syncCap(cid: string): Promise<any> {
  */
 export async function processRoochRegisterEvent() {
   try {
-    const client = new RoochClient({url: ROOCH_NODE_URL});
+    const client = new RoochClient({ url: ROOCH_NODE_URL });
     const lastCursor = await queryLastRegisterEventCursor();
     const events = await client.queryEvents({
       filter: {
@@ -78,11 +80,11 @@ export async function processRoochRegisterEvent() {
     for (const event of events.data) {
       const data = (event.decoded_event_data as any)?.value as any;
       if (typeof data.cid !== 'string') {
-          throw new Error('Event data does not contain a valid CID string');
+        throw new Error('Event data does not contain a valid CID string');
       }
       const cid = data.cid;
       const id = data.cap_uri;
-      
+
       console.log(`Processing event with CID: ${cid}, CAP ID: ${id}`);
 
       try {
@@ -92,7 +94,7 @@ export async function processRoochRegisterEvent() {
         processedEvents.push(cid);
         console.log(`dirty data ${cid} `, e.message)
       }
-      
+
       processedEvents.push(cid);
       console.log(`Successfully processed CID: ${cid}`);
     }
@@ -124,7 +126,7 @@ export async function processRoochRegisterEvent() {
  */
 export async function processRoochUpdateEvent() {
   try {
-    const client = new RoochClient({url: ROOCH_NODE_URL});
+    const client = new RoochClient({ url: ROOCH_NODE_URL });
     const lastCursor = await queryLastUpdateCursor();
     const events = await client.queryEvents({
       filter: {
@@ -144,13 +146,13 @@ export async function processRoochUpdateEvent() {
     for (const event of events.data) {
       const data = (event.decoded_event_data as any)?.value as any;
       if (typeof data.cid !== 'string') {
-          throw new Error('Event data does not contain a valid CID string');
+        throw new Error('Event data does not contain a valid CID string');
       }
       const cid = data.cid;
       const version = data.version as number;
-      
+
       console.log(`Processing update event with CID: ${cid}, CAP ID: ${data.cap_uri}, Version: ${version}`);
-      
+
       try {
         const yamlData = await fetchAndParseYaml(cid);
         await saveCapToSupabase(yamlData, cid, version);
@@ -158,14 +160,14 @@ export async function processRoochUpdateEvent() {
         processedEvents.push(cid);
         console.log(`dirty data ${cid} `, e.message)
       }
-      
+
       processedEvents.push(cid);
       console.log(`Successfully processed update CID: ${cid}`);
     }
 
     // Only update cursor if all events were processed successfully
     if (events.data.length > 0 && events.next_cursor) {
-      console.log('update-next',events.next_cursor)
+      console.log('update-next', events.next_cursor)
       await saveUpdateEventCursor(events.next_cursor);
       console.log(`Updated update cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`);
     } else if (events.data.length > 0) {

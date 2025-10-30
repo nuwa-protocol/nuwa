@@ -3,7 +3,28 @@
   "compilerOptions": {
     "rootDir": ".",
     "module": "ESNext",
-    "types": ["jest", "node"]
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "types": [
+      "jest",
+      "node"
+    ],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "outDir": "./dist",
+    "lib": [
+      "ES2020",
+      "DOM"
+    ]
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
 }

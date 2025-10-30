@@ -1,9 +1,9 @@
-import {CapKit, ResultCap} from "../src/index";
-import {afterAll, beforeAll, describe, expect, it} from '@jest/globals';
-import {setupEnv} from "./setup";
+import { CapKitMcp, ResultCap } from "../src/index.js";
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { setupEnv } from "./env.js";
 
 describe("CapKit query cap", () => {
-  let capKit: CapKit;
+  let capKit: CapKitMcp;
   beforeAll(async () => {
     const { capKit: a } = await setupEnv();
     capKit = a;
@@ -46,10 +46,10 @@ describe("CapKit query cap", () => {
     const all = await capKit.queryByName()
 
     const cap = all.data?.items[0]
-    const result = await capKit.queryByID({cid: cap?.cid})
+    const result = await capKit.queryByID({ cid: cap?.cid })
     expect(result.code).toBe(200);
 
-    const result1 = await capKit.queryByID({id: cap?.id})
+    const result1 = await capKit.queryByID({ id: cap?.id })
     expect(result1.code).toBe(200);
   }, 150000);
 
@@ -75,7 +75,7 @@ describe("CapKit query cap", () => {
 
     const all: ResultCap[] = []
     const pageSize = 50
-    let page= 0
+    let page = 0
     let totalItems = 0
     const pageData: Map<number, ResultCap[]> = new Map()
 
@@ -108,25 +108,25 @@ describe("CapKit query cap", () => {
     console.log('=== Data Difference Analysis ===');
     console.log(`all.length: ${all.length}`);
     console.log(`checkAll.size: ${checkAll.size}`);
-    
+
     const allIds = all.map(item => item.id);
     const uniqueIds = new Set(allIds);
     console.log(`Number of unique IDs in all: ${uniqueIds.size}`);
     console.log(`Are there duplicate IDs in all: ${allIds.length !== uniqueIds.size}`);
-    
+
     if (allIds.length !== uniqueIds.size) {
       const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
       console.log(`Duplicate IDs: ${[...new Set(duplicateIds)]}`);
     }
-    
+
     const allInCheckAll = all.every(item => checkAll.has(item.id));
-    const checkAllInAll = Array.from(checkAll.values()).every(item => 
+    const checkAllInAll = Array.from(checkAll.values()).every(item =>
       all.some(allItem => allItem.id === item.id)
     );
-    
+
     console.log(`All items in all are in checkAll: ${allInCheckAll}`);
     console.log(`All items in checkAll are in all: ${checkAllInAll}`);
-    
+
     let contentMismatch = false;
     for (const item of all) {
       const checkAllItem = checkAll.get(item.id);

@@ -1,10 +1,10 @@
-import { setupRoochEventListener } from './event-handle.js';
-import { getService } from './services/service.js';
+// import { setupRoochEventListener } from './indexer/index.js';
+import { getService } from './service.js';
 
 // -----------------------------------------------------------------------------
 // Event Listener Initialization
 // -----------------------------------------------------------------------------
-setupRoochEventListener();
+// setupRoochEventListener();
 
 // -----------------------------------------------------------------------------
 // Start Service

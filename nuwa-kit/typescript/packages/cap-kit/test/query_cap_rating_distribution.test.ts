@@ -1,9 +1,9 @@
-import { CapKit } from "../src/index";
+import { CapKitMcp } from "../src/index";
 import {describe, expect, it, beforeAll, afterAll} from '@jest/globals';
-import {setupEnv} from "./setup";
+import {setupEnv} from "./env";
 
 describe("CapKit", () => {
-  let capKit: CapKit;
+  let capKit: CapKitMcp;
   beforeAll(async () => {
     const { capKit: a } = await setupEnv();
     capKit = a;
@@ -19,9 +19,9 @@ describe("CapKit", () => {
     })
 
     const cap = all.data?.items[0]
-    const result = await capKit.favorite(cap?.id || '', 'add')
+    const result = await capKit.install(cap?.id || '', 'add')
     expect(result.code).toBe(200);
-    const isFavorite = await capKit.favorite(cap?.id || '', 'isFavorite')
+    const isFavorite = await capKit.install(cap?.id || '', 'isInstall')
     expect(isFavorite.code).toBe(200);
     expect(isFavorite.data).toEqual(true)
 

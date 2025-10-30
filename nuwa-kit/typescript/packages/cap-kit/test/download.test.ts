@@ -1,9 +1,9 @@
-import { CapKit } from "../src/index";
+import { CapKitMcp } from "../src/index.js";
 import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
-import {setupEnv} from "./setup";
+import {setupEnv} from "./env";
 
 describe("CapKit", () => {
-  let capKit: CapKit;
+  let capKit: CapKitMcp;
   beforeAll(async () => {
     const { capKit: a } = await setupEnv();
     capKit = a;
@@ -14,17 +14,12 @@ describe("CapKit", () => {
   })
 
   it("download cap by id", async () => {
-    const caps = await capKit.queryByName()
+    const caps = await capKit.queryByName("test_cap123")
 
-    const result = await capKit.downloadByCID(
-      caps.data?.items[0].cid || ''
-    )
-
-    const result1 = await capKit.downloadByID(
+    const result = await capKit.downloadByID(
       caps.data?.items[0].id || ''
     )
 
     expect(result).toBeDefined();
-    expect(result1).toBeDefined();
   }, 150000);
 });
