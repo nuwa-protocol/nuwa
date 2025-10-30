@@ -76,10 +76,9 @@ export async function handleApiRoutes(
       return true;
     }
 
-    // Route: GET /api/caps/installed/:did
-    if (req.method === 'GET' && pathname.match(/^\/api\/caps\/installed\/[^\/]+$/)) {
-      const id = pathname.split('/').pop();
-      await handleQueryUserFavoriteCaps(req, res, id);
+    // Route: GET /api/caps/installed/
+    if (req.method === 'GET' && pathname === '/api/caps/installed') {
+      await handleQueryUserFavoriteCaps(req, res);
       return true;
     }
 

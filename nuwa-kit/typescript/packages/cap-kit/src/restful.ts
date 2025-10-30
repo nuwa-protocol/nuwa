@@ -1,4 +1,4 @@
-import { Cap, Page, Result } from "./type";
+import { Cap, Page, Result, ResultCap } from "./type";
 import * as yaml from "js-yaml";
 
 export interface DownloadCaps {
@@ -18,12 +18,17 @@ export class CapKitRestful {
     this.apiUrl = apiUrl;
   }
 
+  async queryCap(capId: string): Promise<Result<ResultCap>> {
+    const response = await fetch(`${this.apiUrl}/cap/${capId}`);
+    return await response.json();
+  }
+
   async queryCaps(name?: string,
     tags?: string[],
     page?: number,
     pageSize?: number,
     sortBy?: 'average_rating' | 'downloads' | 'favorites' | 'rating_count' | 'updated_at',
-    sortOrder?: 'asc' | 'desc'): Promise<Result<Page<Cap>>> {
+    sortOrder?: 'asc' | 'desc'): Promise<Result<Page<ResultCap>>> {
     const params = new URLSearchParams();
 
     if (name) params.append('name', name);
@@ -40,13 +45,15 @@ export class CapKitRestful {
     return await response.json();
   }
 
-  async queryUserInstalledCaps(did: string): Promise<Result<Page<Cap>>> {
-    const response = await fetch(`${this.apiUrl}/caps/installed/${did}`);
-    return await response.json();
-  }
+  async queryUserInstalledCaps(did: string, page?: number, pageSize?: number): Promise<Result<Page<ResultCap>>> {
+    const params = new URLSearchParams();
 
-  async queryCap(capId: string): Promise<Cap> {
-    const response = await fetch(`${this.apiUrl}/cap/${capId}`);
+    if (did) params.append('did', did);
+    if (page !== undefined) params.append('page', page.toString());
+    if (pageSize !== undefined) params.append('pageSize', pageSize.toString());
+
+    const url = `${this.apiUrl}/caps/installed?${params.toString()}`;
+    const response = await fetch(url);
     return await response.json();
   }
 
@@ -59,13 +66,24 @@ export class CapKitRestful {
     return yaml.load(utf8) as Cap;
   }
 
-  async downloadCaps(cpdIds: string[]): Promise<DownloadCaps> {
+  async downloadCaps(capIDs: string[]): Promise<DownloadCaps> {
+    if (capIDs.length === 0) {
+      return {
+        successful: {},
+        failed: {},
+        summary: {
+          successful: 0,
+          failed: 0,
+          total: 0
+        }
+      }
+    }
     const response = await fetch(`${this.apiUrl}/caps/download`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ids: cpdIds }),
+      body: JSON.stringify({ ids: capIDs }),
     });
 
     const result =  await response.json();

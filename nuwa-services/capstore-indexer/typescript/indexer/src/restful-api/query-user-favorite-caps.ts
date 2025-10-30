@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { queryFromSupabase, queryUserFavoriteCaps } from '../supabase.js';
-import { sendJson } from './utils.js';
+import {parseQueryParams, sendJson} from './utils.js';
 
 /**
  * GET /api/caps/did
@@ -9,10 +9,15 @@ import { sendJson } from './utils.js';
 export async function handleQueryUserFavoriteCaps(
   req: IncomingMessage,
   res: ServerResponse,
-  did: string,
 ): Promise<void> {
   try {
-    const result = await queryUserFavoriteCaps(did);
+    const params = parseQueryParams(req.url || '');
+
+    // Extract query parameters
+    const did = params.did as string | undefined;
+    const page = params.page ? parseInt(params.page as string, 10) : 0;
+    const pageSize = params.pageSize ? parseInt(params.pageSize as string, 10) : 50;
+    const result = await queryUserFavoriteCaps(did, page, pageSize);
 
     if (!result.success || !result.items || result.items.length === 0) {
       sendJson(res, 404, {
@@ -23,8 +28,11 @@ export async function handleQueryUserFavoriteCaps(
     }
 
     sendJson(res, 200, {
-      code: 200,
-      data: result.items[0],
+      totalItems: result.totalItems,
+      page,
+      pageSize,
+      totalPages: Math.ceil(result.totalItems / pageSize),
+      items: result.items
     });
   } catch (error) {
     sendJson(res, 500, {
