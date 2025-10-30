@@ -1,9 +1,9 @@
-import { CapKit } from "../src/index";
+import { CapKitMcp } from "../src/index.js";
 import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
-import {setupEnv} from "./setup";
+import {setupEnv} from "./env";
 
 describe("CapKit", () => {
-  let capKit: CapKit;
+  let capKit: CapKitMcp;
   beforeAll(async () => {
     const { capKit: a } = await setupEnv();
     capKit = a;

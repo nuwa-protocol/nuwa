@@ -63,7 +63,7 @@ npm run test:e2e
 
 - `HttpPaymentKit.e2e.test.ts` - Main E2E test suite
 - `server/index.ts` - Billing server implementation
-- `jest.setup.ts` - Jest setup configuration
+- `jest.env.ts` - Jest setup configuration
 - `jest.env.ts` - Environment setup
 
 ### Test Scenarios

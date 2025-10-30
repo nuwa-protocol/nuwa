@@ -16,7 +16,7 @@ test/
 │   ├── testEnv.ts        # Environment configuration
 │   └── providerTestUtils.ts  # Provider testing helpers
 ├── *.test.ts             # Unit tests
-└── setup.ts              # Test setup configuration
+└── env.ts              # Test setup configuration
 ```
 
 ## Environment Configuration
@@ -260,13 +260,13 @@ Tests use Jest with TypeScript support. Key configuration:
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/test/env.ts"],
   "testMatch": ["**/*.test.ts"],
   "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts"]
 }
 ```
 
-### Test Setup (`test/setup.ts`)
+### Test Setup (`test/env.ts`)
 
 Global test configuration:
 

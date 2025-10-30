@@ -49,7 +49,7 @@ nuwa-services/capstore-indexer/typescript/indexer/
 │           └── ...
 │
 ├── tests/                           # 测试文件
-│   ├── setup.ts
+│   ├── env.ts
 │   └── supabase.test.ts
 │
 ├── API.md                           # 📖 API 使用文档

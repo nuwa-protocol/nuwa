@@ -1,8 +1,8 @@
 import { IdentityKit, KeyManager } from "@nuwa-ai/identity-kit";
-import {IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET} from "./constant.js";
+import { IPFS_NODE, IPFS_NODE_PORT, IPFS_NODE_URL, TARGET } from "./constant.js";
 import { config } from "dotenv";
 import { create } from 'ipfs-http-client';
-import { uploadCapTool } from "./mcp/upload-cap.js";
+// import { uploadCapTool } from "./mcp/upload-cap.js";
 import { downloadCapTool } from "./mcp/download-cap.js";
 import { favoriteCapTool } from "./mcp/favorite-cap.js";
 import { queryCapByIDTool } from "./mcp/query-cap-by-id.js";
@@ -14,6 +14,7 @@ import { updateEnableCapTool } from "./mcp/update-enable-cap.js";
 import { queryCapRatingDistributionTool } from "./mcp/query-cap-rating-distribution.js";
 import { createFastMcpServerFromEnv } from "@nuwa-ai/payment-kit";
 import { handleApiRoutes } from "./restful-api/index.js";
+import { uploadCapTool } from "./mcp/upload-cap-v2.js";
 
 // Load environment variables
 config();
@@ -59,7 +60,7 @@ export async function getService() {
     if (!serviceKey) {
       throw new Error("SERVICE_KEY environment variable is required");
     }
-    
+
     const keyManager = await KeyManager.fromSerializedKey(serviceKey);
     const serviceDid = await keyManager.getDid();
     console.log('🔑 Service DID:', serviceDid);
@@ -90,6 +91,7 @@ export async function getService() {
     _mcpInstance.freeTool(queryCapRatingDistributionTool);
 
     _mcpInstance.paidTool(rateCapTool);
+    // _mcpInstance.paidTool(uploadCapTool);
     _mcpInstance.paidTool(uploadCapTool);
     _mcpInstance.paidTool(favoriteCapTool);
     _mcpInstance.paidTool(updateEnableCapTool);

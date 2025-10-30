@@ -1,20 +1,44 @@
 {
-  "preset": "ts-jest",
+  "preset": "ts-jest/presets/default-esm",
   "testEnvironment": "node",
-  "extensionsToTreatAsEsm": [".ts"],
-  "roots": ["<rootDir>/src", "<rootDir>/test"],
+  "setupFilesAfterEnv": [
+    "<rootDir>/jest.setup.js"
+  ],
+  "extensionsToTreatAsEsm": [
+    ".ts"
+  ],
+  "roots": [
+    "<rootDir>/src",
+    "<rootDir>/test"
+  ],
   "transform": {
-    "^.+\\.tsx?$": ["ts-jest", {
-      "tsconfig": "tsconfig.test.json",
-      "useESM": true
-    }]
+    "^.+\\.tsx?$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.test.json",
+        "useESM": true
+      }
+    ]
   },
-  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
-  "moduleFileExtensions": ["ts", "js", "json"],
+  "testMatch": [
+    "**/__tests__/**/*.ts",
+    "**/?(*.)+(spec|test).ts"
+  ],
+  "moduleFileExtensions": [
+    "ts",
+    "tsx",
+    "js",
+    "jsx",
+    "json",
+    "node"
+  ],
+  "testTimeout": 30000,
   "verbose": true,
   "collectCoverage": true,
   "coverageDirectory": "coverage",
-  "coverageReporters": ["text-summary"],
+  "coverageReporters": [
+    "text-summary"
+  ],
   "collectCoverageFrom": [
     "src/**/*.ts",
     "!src/**/types.ts",
@@ -29,10 +53,13 @@
     }
   },
   "reporters": [
-    ["default", {
-      "summaryThreshold": 1,
-      "verbose": false
-    }]
+    [
+      "default",
+      {
+        "summaryThreshold": 1,
+        "verbose": false
+      }
+    ]
   ],
   "maxConcurrency": 1,
   "maxWorkers": 1,
@@ -41,6 +68,6 @@
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(fastmcp|@modelcontextprotocol|mcp-proxy)/)"
+    "node_modules/(?!(fastmcp|@modelcontextprotocol|mcp-proxy|@nuwa-ai|@roochnetwork)/)"
   ]
 }

@@ -1,20 +1,21 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { queryFromSupabase } from '../supabase.js';
+import { downloadFromSupabase, queryCapStats as queryCapStatsFromSupabase } from '../supabase.js';
 import { sendJson } from './utils.js';
 
 /**
- * GET /api/caps/cid/:cid
- * Query cap by CID (Content Identifier)
+ * GET /api/cap/download/:id
+ * Download Cap by ID
  */
-export async function handleQueryCapByCid(
+export async function handleDownloadCap(
   req: IncomingMessage,
   res: ServerResponse,
-  cid: string
+  capId: string
 ): Promise<void> {
   try {
-    const result = await queryFromSupabase(null, null, cid);
+    // RESTful API doesn't require user authentication for stats
+    const result = await downloadFromSupabase(capId);
 
-    if (!result.success || !result.items || result.items.length === 0) {
+    if (!result.success) {
       sendJson(res, 404, {
         code: 404,
         error: result.error || 'No matching records found',
@@ -24,7 +25,7 @@ export async function handleQueryCapByCid(
 
     sendJson(res, 200, {
       code: 200,
-      data: result.items[0],
+      data: result.data,
     });
   } catch (error) {
     sendJson(res, 500, {
@@ -33,4 +34,3 @@ export async function handleQueryCapByCid(
     });
   }
 }
-
