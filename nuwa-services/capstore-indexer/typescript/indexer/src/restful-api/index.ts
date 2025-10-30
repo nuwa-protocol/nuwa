@@ -5,7 +5,7 @@ import { handleQueryCapById } from './query-cap-by-id.js';
 import { handleQueryCapStats } from './query-cap-stats.js';
 import { handleDownloadCap } from './download-cap.js';
 import { handleDownloadCaps } from './download-caps.js';
-import {handleQueryUserFavoriteCaps} from "./query-user-favorite-caps";
+import { handleQueryUserFavoriteCaps } from "./query-user-favorite-caps.js";
 
 /**
  * Main RESTful API route handler
