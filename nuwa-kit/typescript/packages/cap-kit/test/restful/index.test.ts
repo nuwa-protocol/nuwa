@@ -1,16 +1,12 @@
 import { CapKitMcp, CapKitRestful } from "../../src";
-import { setupEnv } from "../env";
+import { setupEnv, DEFAULT_TARGET } from "../env";
 import { describe, expect, it, beforeAll, afterAll } from '@jest/globals';
 
 describe("CapKit", () => {
   let capKitRestful: CapKitRestful;
   let capKitMcp: CapKitMcp;
   beforeAll(async () => {
-    capKitRestful = new CapKitRestful('http://localhost:3000/api');
-  })
-
-  afterAll(async () => {
-    await capKitMcp?.mcpClose()
+    capKitRestful = new CapKitRestful(DEFAULT_TARGET !== 'test' ? 'https://nuwa-test.up.railway.app/api' : 'http://localhost:3000/api');
   })
 
   it("query caps", async () => {
@@ -48,6 +44,9 @@ describe("CapKit", () => {
   })
 
   it("download caps", async () => {
+    const result1 = await capKitRestful.downloadCaps([])
+    expect(result1).toBeDefined()
+
     const caps = await capKitRestful.queryCaps("test_cap123")
     const result = await capKitRestful.downloadCaps(caps.data!.items.map((cap: any) => cap.id))
     expect(result).toBeDefined()
