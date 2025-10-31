@@ -1,0 +1,144 @@
+---
+title: "Register with ERC8004"
+description: "Build and test your Agent in xNUWA, then register it on-chain via ERC8004 for discovery."
+---
+
+
+## Flow overview
+
+1. [Clone and run the xNUWA repo.](#1-clone-and-run-the-xnuwa-repo)
+2. [Build and test your Agent](#2-build-and-test-your-agent)
+3. [Register with ERC8004](#3-register-with-erc8004)
+4. [(Optional) Submit a PR for the hosted list](#4-optional-submit-a-pull-request)
+
+## 1. Clone & bootstrap the workspace
+
+```bash
+git clone https://github.com/nuwa-protocol/xnuwa.app.git
+cd xnuwa.app
+pnpm install
+pnpm dev
+```
+
+This launches the Nuwa Client (including Agent Studio) at `http://localhost:5173`. Create your wallet with a PIN or a passkey.
+
+<Tip>
+  We have a built-in demo with a paid mcp and a paid LLM. you can find the open source code in the [`nuwa-x402` repo](https://github.com/nuwa-protocol/nuwa-x402).
+</Tip>
+
+## 2. Build and test your Agent
+- In the sidebar, go to **Settings -> System -> Enable Developer Mode**, your sidebar will now have a new **Agent Studio** entrance.
+- Create a new Agent with **Agent Studio → New Agent** button, or use the **Import JSON option** to load the demo agent json file from the `agent-registry` folder
+- Configure the Agent with the form based editor: set the Prompt, Model, MCP servers and UI. Find the relevant information in the [Nuwa AI](../build-caps/quickstart) docs.
+- You can test your paid MCP with the **MCP Debug Tool** in the Agent Studio.
+- Use **Test** to try your agent end-to-end.
+
+
+## 3. Register with ERC8004
+
+When you are satisfied with your Agent, export the JSON and register it on-chain using the Nuwa ERC8004 implementation. This makes your agent discoverable by any compatible client.
+
+- ERC8004 repo: https://github.com/nuwa-protocol/nuwa-8004/tree/main
+- Typical input: the Agent Registration URI (an `ipfs://...` CID or a GitHub Gist raw https URL).
+
+You can still keep a copy in `agent-registry/` during development—xNUWA auto-loads files from that folder for quick iteration.
+
+### Register in 3 steps
+
+1) Create the registration file in Agent Studio.
+   - Build and test your Agent, then use Agent Studio to export the Agent Registration JSON.
+
+2) Upload the file and get a link.
+   - IPFS (recommended): upload and copy the resulting `ipfs://<cid>`.
+   - GitHub Gist: create a Gist and copy the raw file URL.
+
+3) Register it on-chain via your registry contract.
+   - In your blockchain explorer (e.g., BaseScan/Blockscout), open the ERC8004 registry contract and find the `register` function.
+   - Paste the hosted JSON link as the `tokenURI` parameter and send the transaction.
+
+## 4. (Optional) Submit a pull request
+
+If you want others to try your Agent via our hosted [xNUWA app](https://xnuwa.app), you can make a PR to add your example to our repo (useful for tutorials and featured demos).
+
+Create a feature branch and commit your Agent:
+
+```bash
+git checkout -b feat/add-my-first-agent
+git add agent-registry/my_first_agent.json
+git commit -m "Add My First Agent to registry"
+git push origin feat/add-my-first-agent
+```
+
+Then give us a summary of your Agent (and its ERC8004 registration, if applicable) in your PR. Our bot will validate the Agent registration JSON. We will review and merge asap.
+
+### Agent Registration JSON (standard)
+
+Agents register with a single JSON file. YAML is no longer supported. Use the following structure:
+
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "your-agent",
+  "description": "Agent Description",
+  "image": "https://example.com/profile_image.png",
+  "endpoints": [
+    {
+      "name": "prompt",
+      "endpoint": "https://your-agent.com/prompt",
+      "version": "v0.1.0"
+    },
+    {
+      "name": "x402-LLM",
+      "endpoint": "https://llm.your-agent.com/mcp",
+      "gateway": "",
+      "modelId": "",
+      "providerId": "",
+      "contextLength": 128000,
+      "supportedInputs": [
+        "text",
+        "image",
+        "file",
+        "audio"
+      ],
+      "parameters": {
+        "temperature": 0.5,
+        "max_tokens": 1000,
+        "top_p": 1,
+        "frequency_penalty": 0,
+        "presence_penalty": 0
+      }
+    },
+    {
+      "name": "x402-MCP",
+      "endpoint": "https://mcp.your-agent.com/mcp",
+      "serverName": ""
+    },
+    {
+      "name": "Artifact",
+      "endpoint": "https://artifact.your-agent.com/mcp"
+    },
+    {
+      "name": "metadata",
+      "displayName": "",
+      "homepage": "",
+      "repository": "",
+      "suggestions": [
+        "suggestion1",
+        "suggestion2",
+        "suggestion3"
+      ]
+    }
+  ],
+  "registrations": [
+    {
+      "agentId": "*",
+      "agentRegistry": "eip155:1:{YOUR_AGENT_REGISTRY_ADDRESS}"
+    }
+  ],
+  "supportedTrust": [
+    "reputation",
+    "crypto-economic",
+    "tee-attestation"
+  ]
+}
+```
