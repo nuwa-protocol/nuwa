@@ -96,20 +96,26 @@
             "group": "Introduction",
             "pages": [
               "xnuwa/overview",
-              "xnuwa/x402"
+              "xnuwa/x402",
+              "xnuwa/erc8004"
             ]
           },
           {
             "group": "Build",
             "pages": [
-              "xnuwa/x402-mcp",
-              "xnuwa/build-cap"
+              "xnuwa/x402-mcp"
             ]
           },
           {
             "group": "SDK",
             "pages": [
               "xnuwa/sdk"
+            ],
+            "anchors": [
+              {
+                "anchor": "Nuwa-8004",
+                "href": "https://github.com/nuwa-protocol/nuwa-8004/tree/main"
+              }
             ]
           }
         ]

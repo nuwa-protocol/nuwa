@@ -1,0 +1,127 @@
+---
+title: "ERC8004 Integration"
+description: "How xNUWA uses ERC8004 for on-chain registration and discovery of AI agents."
+---
+
+## Overview
+
+xNUWA integrates with ERC8004 to discover and load agents that are registered on-chain. ERC8004 defines a standard registry interface that links an on-chain owner to off-chain service metadata (like endpoints and content identifiers). This lets clients resolve agents permissionlessly and verify provenance.
+
+## How It Works In xNUWA
+
+- Discovery: xNUWA can resolve ERC8004 records to fetch agent metadata, complementing the local `agent-registry/` during development.
+- Provenance: Because entries are owned on-chain, users can verify who published an agent before running it.
+- Payments: ERC8004 covers registration and discovery; payments continue to use x402 receipts. Your MCP tools or HTTP gateways still advertise x402 `paymentRequirements` and settle normally.
+
+## Register Your Agent
+
+Use the Nuwa ERC8004 reference implementation to register agents on-chain:
+
+- Repo: https://github.com/nuwa-protocol/nuwa-8004/tree/main
+
+Typical flow (high level):
+
+1. Prepare your Agent Registration JSON and host it to obtain a URI (ipfs://... preferred, or a Gist raw https URL). Keep the URI and your service endpoint ready.
+2. Use the ERC8004 contract/SDK to create or update your registry entry, pointing to your content and owner address.
+3. Verify the entry on-chain, then test discovery in xNUWA.
+
+<Tip>
+  During development, keep your Agent JSON in `agent-registry/` for quick iteration. When you are ready for wider discovery, register via ERC8004.
+</Tip>
+
+### End-to-end steps (deploy → publish → register)
+
+1. Deploy a registry using `nuwa-8004` and note the contract address.
+2. Open the contract on the appropriate blockchain explorer (BaseScan/Blockscout for your network) and switch to the Write tab.
+3. Prepare your Agent Registration JSON (see structure below), upload it to IPFS (preferred) or GitHub Gist, and copy the resulting URI.
+4. Call the registry `register` function and provide the hosted JSON link as the token URI; submit the transaction.
+5. To make xNUWA auto-discover your registry by default, submit a PR to the `xnuwa.app` repo updating the `8004-registries.config.json` file(s) with your network and registry address.
+
+### Nuwa Agent Registration JSON Schema (standard)
+
+Nuwa-Compatible Agents follows the official [ERC-8004 registration standard](https://eips.ethereum.org/EIPS/eip-8004). register with a single JSON file. YAML is no longer supported. Use the following structure:
+
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "your-agent",
+  "description": "Agent Description",
+  "image": "https://example.com/profile_image.png",
+  "endpoints": [
+    {
+      "name": "prompt",
+      "endpoint": "https://your-agent.com/prompt",
+      "version": "v0.1.0"
+    },
+    {
+      "name": "x402-LLM",
+      "endpoint": "https://llm.your-agent.com/mcp",
+      "gateway": "",
+      "modelId": "",
+      "providerId": "",
+      "contextLength": 128000,
+      "supportedInputs": [
+        "text",
+        "image",
+        "file",
+        "audio"
+      ],
+      "parameters": {
+        "temperature": 0.5,
+        "max_tokens": 1000,
+        "top_p": 1,
+        "frequency_penalty": 0,
+        "presence_penalty": 0
+      }
+    },
+    {
+      "name": "x402-MCP",
+      "endpoint": "https://mcp.your-agent.com/mcp",
+      "serverName": ""
+    },
+    {
+      "name": "Artifact",
+      "endpoint": "https://artifact.your-agent.com/mcp"
+    },
+    {
+      "name": "metadata",
+      "displayName": "",
+      "homepage": "",
+      "repository": "",
+      "suggestions": [
+        "suggestion1",
+        "suggestion2",
+        "suggestion3"
+      ]
+    }
+  ],
+  "registrations": [
+    {
+      "agentId": "*",
+      "agentRegistry": "eip155:1:{YOUR_AGENT_REGISTRY_ADDRESS}"
+    }
+  ],
+  "supportedTrust": [
+    "reputation",
+    "crypto-economic",
+    "tee-attestation"
+  ]
+}
+```
+
+## Troubleshooting
+
+- If an agent fails to load from ERC8004, confirm the registration URI (IPFS/Gist) is accessible and the metadata schema matches the current Agent registration format.
+- Ensure the registry you publish to is supported by your target network (e.g., Base / Base Sepolia) and that xNUWA is pointed at the same network.
+- Payments are unaffected by registry status—verify your x402 flow independently using the paid MCP/HTTP examples.
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="Nuwa ERC8004 Reference" icon="code" href="https://github.com/nuwa-protocol/nuwa-8004/tree/main">
+    Reference implementation for ERC8004 registry
+  </Card>
+  <Card title="x402 SDK" icon="code" href="/xnuwa/sdk">
+    SDK for paid endpoints and x402-gated HTTP proxies
+  </Card>
+</CardGroup>
