@@ -1,0 +1,19 @@
+{
+  "models": {
+    "gemini-1.5-pro": {
+      "prompt": 0.000125,
+      "completion": 0.000375,
+      "unit": "1k tokens"
+    },
+    "gemini-1.5-flash": {
+      "prompt": 0.00003,
+      "completion": 0.00015,
+      "unit": "1k tokens"
+    },
+    "gemini-pro": {
+      "prompt": 0.000125,
+      "completion": 0.000125,
+      "unit": "1k tokens"
+    }
+  }
+}
