@@ -28,11 +28,14 @@ export async function handleQueryUserFavoriteCaps(
     }
 
     sendJson(res, 200, {
-      totalItems: result.totalItems,
-      page,
-      pageSize,
-      totalPages: Math.ceil(result.totalItems / pageSize),
-      items: result.items
+      code: 200,
+      data: {
+        totalItems: result.totalItems,
+        page,
+        pageSize,
+        totalPages: Math.ceil(result.totalItems / pageSize),
+        items: result.items
+      }
     });
   } catch (error) {
     sendJson(res, 500, {
