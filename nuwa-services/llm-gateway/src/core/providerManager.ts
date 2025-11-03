@@ -3,6 +3,7 @@ import OpenRouterService from '../providers/openrouter.js';
 import LiteLLMService from '../providers/litellm.js';
 import { OpenAIProvider } from '../providers/openai.js';
 import { ClaudeProvider } from '../providers/claude.js';
+import { GoogleProvider } from '../providers/google.js';
 import { providerRegistry } from '../providers/registry.js';
 
 /**
@@ -55,6 +56,7 @@ export class ProviderManager {
     const litellmProvider = new LiteLLMService();
     const openaiProvider = new OpenAIProvider();
     const claudeProvider = new ClaudeProvider();
+    const googleProvider = new GoogleProvider();
 
     // Provider configurations
     const providerConfigs: ProviderInitConfig[] = [
@@ -105,6 +107,20 @@ export class ProviderManager {
         requiredEnvVars: ['ANTHROPIC_API_KEY'],
         optionalEnvVars: ['ANTHROPIC_BASE_URL'],
         defaultCheck: () => !!process.env.ANTHROPIC_API_KEY,
+      },
+      {
+        name: 'google',
+        instance: googleProvider,
+        requiresApiKey: true,
+        supportsNativeUsdCost: false,
+        apiKeyEnvVar: 'GOOGLE_API_KEY',
+        baseUrl:
+          process.env.GOOGLE_BASE_URL ||
+          'https://generativelanguage.googleapis.com/v1beta',
+        allowedPaths: [...googleProvider.SUPPORTED_PATHS],
+        requiredEnvVars: ['GOOGLE_API_KEY'],
+        optionalEnvVars: ['GOOGLE_BASE_URL'],
+        defaultCheck: () => !!process.env.GOOGLE_API_KEY,
       },
     ];
 

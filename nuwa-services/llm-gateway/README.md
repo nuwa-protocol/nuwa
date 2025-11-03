@@ -1,13 +1,13 @@
 # @nuwa-ai/llm-gateway
 
 LLM Gateway is a multi-provider LLM API gateway with DID authentication and
-payment integration. It supports OpenAI, OpenRouter, LiteLLM, and Anthropic
-Claude providers with intelligent usage tracking and cost calculation.
+payment integration. It supports OpenAI, OpenRouter, LiteLLM, Anthropic
+Claude, and Google Gemini providers with intelligent usage tracking and cost calculation.
 
 ## ✨ Core Features
 
-- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, and Anthropic
-  Claude integration
+- **🔗 Multi-Provider Support**: OpenAI, OpenRouter, LiteLLM, Anthropic
+  Claude, and Google Gemini integration
 - **🔐 DID Authentication**: Decentralized identity authentication with
   PaymentKit integration
 - **💳 Payment Integration**: Built-in payment channels and usage-based billing
@@ -17,6 +17,7 @@ Claude providers with intelligent usage tracking and cost calculation.
 - **💰 Gateway Pricing**: Built-in pricing calculation with provider fallback
 - **⚡ Streaming Support**: Full streaming support with usage tracking
 - **🛠️ CLI Tool**: Command-line interface for easy deployment and configuration
+- **🎨 Multimodal Support**: Vision capabilities with Google Gemini
 
 ## 📦 Installation
 
@@ -55,6 +56,8 @@ export OPENROUTER_API_KEY=sk-or-v1-...
 export LITELLM_API_KEY=sk-...
 # OR
 export ANTHROPIC_API_KEY=sk-ant-...
+# OR
+export GOOGLE_API_KEY=AIza...
 ```
 
 ### 3. Start the Gateway
@@ -95,6 +98,7 @@ The demo handles all the complex authentication and payment setup automatically!
 | `OPENROUTER_API_KEY` | OpenRouter API key                                           | ⚠️       |
 | `LITELLM_API_KEY`    | LiteLLM API key                                              | ⚠️       |
 | `ANTHROPIC_API_KEY`  | Anthropic Claude API key                                     | ⚠️       |
+| `GOOGLE_API_KEY`     | Google Gemini API key                                        | ⚠️       |
 | `PORT`               | Server port (default: 8080)                                  | ❌       |
 | `HOST`               | Server host (default: 0.0.0.0)                               | ❌       |
 | `ROOCH_NETWORK`      | Rooch network (default: test)                                | ❌       |
