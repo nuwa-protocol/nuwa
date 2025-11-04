@@ -11,6 +11,7 @@ export const OPENAI_PATHS = {
 // 添加Google Gemini路径常量
 export const GEMINI_PATHS = {
   CHAT_COMPLETIONS: '/v1/models/{model}:generateContent',
+  STREAM_CHAT_COMPLETIONS: '/v1/models/{model}:streamGenerateContent'
 } as const;
 
 export const OPENROUTER_PATHS = {

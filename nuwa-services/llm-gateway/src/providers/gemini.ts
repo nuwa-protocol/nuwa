@@ -20,7 +20,10 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   readonly providerName = 'gemini';
 
   // Define supported paths for this provider
-  readonly SUPPORTED_PATHS = [GEMINI_PATHS.CHAT_COMPLETIONS] as const;
+  readonly SUPPORTED_PATHS = [
+    GEMINI_PATHS.CHAT_COMPLETIONS,
+    GEMINI_PATHS.STREAM_CHAT_COMPLETIONS
+  ] as const;
 
   constructor() {
     super();
