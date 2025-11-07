@@ -38,24 +38,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       return data;
     }
 
-    // Convert OpenAI-style messages to Gemini format
-    if (data.messages && Array.isArray(data.messages)) {
-      const contents = data.messages.map((msg: any) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      }));
-
-      return {
-        contents,
-        generationConfig: {
-          maxOutputTokens: data.max_tokens,
-          temperature: data.temperature,
-          topP: data.top_p
-        },
-        stream: isStream
-      };
-    }
-
     return { ...data };
   }
 
@@ -83,8 +65,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
 
-      console.log(`🔄 Forwarding ${method} request to Google Gemini: ${fullUrl}`);
-
       const response = await axios({
         method: method.toLowerCase() as any,
         url: fullUrl,
@@ -92,7 +72,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
         headers,
         responseType: isStream ? 'stream' : 'json',
       });
-
+      console.log(`✅ Received response from Google Gemini: ${JSON.stringify(response.data)}`);
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
@@ -114,33 +94,13 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
         return data;
       }
 
-      // Convert Gemini format to OpenAI-like format for consistency
-      if (data.candidates && Array.isArray(data.candidates)) {
-        const content = data.candidates[0]?.content?.parts[0]?.text || '';
-        return {
-          id: data.id || `gemini-${Date.now()}`,
-          object: 'chat.completion',
-          created: Date.now() / 1000 | 0,
-          model: response.config.url.match(/models\/([^:]+)/)?.[1] || 'gemini-1.5-pro',
-          choices: [{
-            index: 0,
-            message: {
-              role: 'assistant',
-              content
-            },
-            finish_reason: data.candidates[0]?.finishReason || 'stop'
-          }],
-          usage: data.usage_metadata ? {
-            prompt_tokens: data.usage_metadata.promptTokenCount,
-            completion_tokens: data.usage_metadata.candidatesTokenCount,
-            total_tokens: data.usage_metadata.totalTokenCount
-          } : undefined
+      return {
+        ...data,
+        provider:'gemini'
         };
-      }
-
-      return data;
-    } catch (error) {
+      } catch (error) {
       console.error('[GeminiProvider] Error parsing response:', error);
+      // Return original data on error (similar to OpenAI)
       return response.data;
     }
   }

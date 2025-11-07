@@ -354,7 +354,6 @@ export abstract class BaseLLMProvider implements LLMProvider {
     data?: any
   ): Promise<ExecuteResponse> {
     try {
-      // Prepare request data using provider-specific logic
       let finalRequestData = data;
       if (finalRequestData && this.prepareRequestData) {
         finalRequestData = this.prepareRequestData(finalRequestData, false);

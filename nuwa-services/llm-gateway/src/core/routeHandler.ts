@@ -251,7 +251,6 @@ export class RouteHandler {
       upstream_path: pathResult!.path,
       upstream_streamed: false,
     };
-
     // Extract model from request for pricing validation
     const requestData = this.getRequestData(req);
     const model = requestData?.model;
