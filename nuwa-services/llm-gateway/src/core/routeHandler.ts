@@ -211,8 +211,6 @@ export class RouteHandler {
       return;
     }
 
-    // 使用统一的流式判断方法
-    // 修复：正确访问validation对象中的provider和pathResult属性
     const isStream = this.extractStream(req, validation.provider!, validation.pathResult!.path);
 
     if (!isStream) {
@@ -287,8 +285,6 @@ export class RouteHandler {
     const started = Date.now();
     const upstreamPath = pathResult!.path;
 
-    // Ensure request data includes the extracted model for Gemini path formatting
-    // 修复：确保URL参数中的model信息被传递到请求数据中
     const requestData = this.getRequestData(req);
     let finalRequestData = requestData;
 
@@ -426,10 +422,8 @@ export class RouteHandler {
     const started = Date.now();
     try {
       const upstreamPath = pathResult!.path;
-      // 使用统一的流式判断方法，不再硬编码stream: true
       const data = { ...(req.body || {}) };
 
-      // ⭐️ 关键修复：将提取的模型名称添加到请求数据中
       if (model) {
         data.model = model;
       }
