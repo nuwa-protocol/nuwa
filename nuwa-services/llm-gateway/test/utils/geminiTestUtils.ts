@@ -39,8 +39,11 @@ export class GeminiTestUtils extends BaseProviderTestUtils<GeminiProvider> {
       temperature: config.temperature,
       ...config,
     };
-    // 获取格式化后的端点路径
-    const endpoint = this.provider.createTestRequest(GEMINI_PATHS.CHAT_COMPLETIONS, options).endpoint || GEMINI_PATHS.CHAT_COMPLETIONS;
+
+    // Build the endpoint with model name
+    const model = options.model || 'gemini-2.0-flash-exp';
+    const endpoint = GEMINI_PATHS.CHAT_COMPLETIONS.replace('{model}', model);
+
     return this.testNonStreaming(endpoint, options);
   }
 
@@ -58,8 +61,11 @@ export class GeminiTestUtils extends BaseProviderTestUtils<GeminiProvider> {
       stream: true,
       ...config,
     };
-    // 获取格式化后的端点路径
-    const endpoint = this.provider.createTestRequest(GEMINI_PATHS.CHAT_COMPLETIONS, options).endpoint || GEMINI_PATHS.CHAT_COMPLETIONS;
+
+    // Build the streaming endpoint with model name
+    const model = options.model || 'gemini-2.0-flash-exp';
+    const endpoint = GEMINI_PATHS.STREAM_CHAT_COMPLETIONS.replace('{model}', model);
+
     return this.testStreaming(endpoint, options);
   }
 }

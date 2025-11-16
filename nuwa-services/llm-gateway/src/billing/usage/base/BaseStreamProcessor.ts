@@ -34,7 +34,7 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     try {
       // Let the provider-specific implementation handle chunk processing
       this.processProviderSpecificChunk(chunkText);
-
+      console.log(`[${this.constructor.name}] Processed chunk: ${chunkText}`);
       // Try to extract usage from the chunk
       const result = this.usageExtractor.extractFromStreamChunk(chunkText);
       if (result) {

@@ -112,18 +112,21 @@ export function GatewayDebugPanel() {
 }`;
       } else if (isGeminiModel) {
         // Gemini uses a different format with contents array
-        return `{
-  "model": "${model}",
-  "contents": [
-    {
-      "parts": [
+        return `
         {
-          "text": "Hello! Please tell me about yourself."
+            "generationConfig": {},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": "Hello! Please tell me about yourself"
+                        }
+                    ]
+                }
+            ]
         }
-      ]
-    }
-  ]
-}`;
+`;
       } else {
         return `{
   "model": "${model}",
@@ -754,7 +757,7 @@ export function GatewayDebugPanel() {
       ]
     }
   ]
-}`)} 
+}`)}
             style={{ marginRight: '8px', fontSize: '12px' }}
           >
             Load Simple Text Example

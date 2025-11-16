@@ -66,13 +66,17 @@ export function finalizeAccessLog(req: Request, res: Response, startTime: bigint
     }
   } catch {}
 
-  // Extract model from request body
-  try {
-    if (req.body && typeof req.body === 'object') {
-      log.model = req.body.model || 'unknown';
-    }
-  } catch {}
+  // Extract model with flexible extraction
+  let model = 'unknown';
 
+  // Try to extract model from request using provider-specific logic if available
+  if (req.body && typeof req.body === 'object' && req.body.model) {
+    model = req.body.model;
+  } else if (req.query && req.query.model) {
+    model = req.query.model as string;
+  }
+
+  log.model = model;
   // Extract token details if available
   try {
     const usage = (res as any).locals?.usageInfo;

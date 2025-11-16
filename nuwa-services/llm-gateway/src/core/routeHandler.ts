@@ -8,6 +8,7 @@ import { PricingRegistry } from '../billing/pricing.js';
 import { providerRegistry } from '../providers/registry.js';
 import type { DIDInfo } from '../types/index.js';
 import type { UsageInfo, PricingResult } from '../billing/pricing.js';
+import type { ModelExtractor } from '../providers/BaseLLMProvider.js';
 
 /**
  * Upstream metadata for monitoring and logging
@@ -210,7 +211,9 @@ export class RouteHandler {
       return;
     }
 
-    const isStream = !!(req.body && req.body.stream);
+    // 使用统一的流式判断方法
+    // 修复：正确访问validation对象中的provider和pathResult属性
+    const isStream = this.extractStream(req, validation.provider!, validation.pathResult!.path);
 
     if (!isStream) {
       // Non-stream request
@@ -251,9 +254,9 @@ export class RouteHandler {
       upstream_path: pathResult!.path,
       upstream_streamed: false,
     };
-    // Extract model from request for pricing validation
-    const requestData = this.getRequestData(req);
-    const model = requestData?.model;
+
+    // Extract model using new extraction method
+    const model = this.extractModel(req, provider!, pathResult!.path);
 
     // Get provider config to check if it supports native USD cost
     const providerConfig = this.providerManager.get(providerName);
@@ -284,11 +287,24 @@ export class RouteHandler {
     const started = Date.now();
     const upstreamPath = pathResult!.path;
 
+    // Ensure request data includes the extracted model for Gemini path formatting
+    // 修复：确保URL参数中的model信息被传递到请求数据中
+    const requestData = this.getRequestData(req);
+    let finalRequestData = requestData;
+
+    if (model) {
+      if (!finalRequestData) {
+        finalRequestData = { model };
+      } else if (typeof finalRequestData === 'object') {
+        finalRequestData.model = model;
+      }
+    }
+
     const executeResult = await provider!.executeRequest(
       apiKey!,
       upstreamPath,
       req.method,
-      requestData
+      finalRequestData
     );
     meta.upstream_duration_ms = Date.now() - started;
 
@@ -368,9 +384,8 @@ export class RouteHandler {
   ): Promise<void> {
     const { provider, apiKey, pathResult } = validation;
 
-    // Extract model from request for pricing validation
-    const requestData = this.getRequestData(req);
-    const model = requestData?.model;
+    // Extract model using the same extraction method as non-stream requests
+    const model = this.extractModel(req, provider!, pathResult!.path);
 
     // Get provider config to check if it supports native USD cost
     const providerConfig = this.providerManager.get(providerName);
@@ -411,8 +426,13 @@ export class RouteHandler {
     const started = Date.now();
     try {
       const upstreamPath = pathResult!.path;
-      // Construct data with stream: true
-      const data = { ...(req.body || {}), stream: true };
+      // 使用统一的流式判断方法，不再硬编码stream: true
+      const data = { ...(req.body || {}) };
+
+      // ⭐️ 关键修复：将提取的模型名称添加到请求数据中
+      if (model) {
+        data.model = model;
+      }
 
       // ⭐️ BaseLLMProvider will:
       // 1. Set res.locals.usageInfo, costResult, usage before destination.end()
@@ -482,6 +502,39 @@ export class RouteHandler {
       console.error('Error in stream proxy:', e);
       if (!res.headersSent) res.status(500).end();
     }
+  }
+
+  /**
+   * Extract model from request using provider-specific extractor
+   */
+  private extractModel(req: Request, provider: LLMProvider, path: string): string | undefined {
+    // Use provider-specific model extractor if available
+    const modelExtractor = provider.createModelExtractor?.();
+
+    if (modelExtractor) {
+      const result = modelExtractor.extractModel(req, path);
+      return result?.model;
+    }
+
+    // Fallback to default extraction logic
+    return this.getRequestData(req)?.model;
+  }
+
+  /**
+   * Extract stream flag from request using provider-specific extractor
+   */
+  private extractStream(req: Request, provider: LLMProvider, path: string): boolean {
+    // Use provider-specific stream extractor if available
+    const streamExtractor = (provider as any).createStreamExtractor?.();
+
+    if (streamExtractor) {
+      const result = streamExtractor.extractStream(req, path);
+      return result.isStream;
+    }
+
+    // Fallback to default extraction logic (from body)
+    const requestData = this.getRequestData(req);
+    return !!(requestData && requestData.stream);
   }
 
   /**

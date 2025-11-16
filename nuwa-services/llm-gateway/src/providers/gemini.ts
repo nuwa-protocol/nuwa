@@ -1,17 +1,16 @@
-// 添加axios导入
 import axios, { AxiosResponse } from 'axios';
+import { Request } from 'express';
 import { BaseLLMProvider } from './BaseLLMProvider.js';
-import { TestableLLMProvider } from './LLMProvider.js';
+import { TestableLLMProvider, StreamExtractor, StreamExtractionResult } from './LLMProvider.js';
 import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
 import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
-import { BaseUsageExtractor } from '../billing/usage/base/BaseUsageExtractor.js';
-import { BaseStreamProcessor } from '../billing/usage/base/BaseStreamProcessor.js';
+import { GeminiUsageExtractor } from '../billing/usage/providers/GeminiUsageExtractor.js';
+import { GeminiStreamProcessor } from '../billing/usage/providers/GeminiStreamProcessor.js';
 import { GEMINI_PATHS } from './constants.js';
-import { UsageInfo } from '../billing/pricing.js';
 
 /**
  * Google Gemini Provider Implementation
- * Handles requests to Google Gemini API
+ * Handles requests to Google Gemini API with OpenAI-compatible interface
  */
 export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
@@ -22,7 +21,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   // Define supported paths for this provider
   readonly SUPPORTED_PATHS = [
     GEMINI_PATHS.CHAT_COMPLETIONS,
-    GEMINI_PATHS.STREAM_CHAT_COMPLETIONS
+    GEMINI_PATHS.STREAM_CHAT_COMPLETIONS,
   ] as const;
 
   constructor() {
@@ -32,17 +31,20 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
 
   /**
    * Prepare request data for Google Gemini API
+   * Currently returns data as-is, can be extended for special handling
    */
   prepareRequestData(data: any, isStream: boolean): any {
     if (!data || typeof data !== 'object') {
       return data;
     }
 
+    // Return data as-is - Gemini doesn't require special request modifications
     return { ...data };
   }
 
   /**
    * Forward request to Google Gemini API
+   * Uses query parameter for API key authentication
    */
   async forwardRequest(
     apiKey: string | null,
@@ -56,14 +58,28 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
         'Content-Type': 'application/json',
       };
 
-      // Add API key as query parameter
+      // Gemini uses query parameter for API key authentication
       let fullUrl = `${this.baseURL}${path}`;
+      const queryParams = new URLSearchParams();
+
       if (apiKey) {
-        fullUrl = `${fullUrl}?key=${apiKey}`;
+        queryParams.append('key', apiKey);
+      }
+
+      // Add alt=sse parameter for streaming requests to enable Server-Sent Events format
+      if (isStream) {
+        queryParams.append('alt', 'sse');
+      }
+
+      const queryString = queryParams.toString();
+      if (queryString) {
+        fullUrl = `${fullUrl}?${queryString}`;
       }
 
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
+
+      console.log(`🔄 Forwarding ${method} request to Gemini: ${fullUrl.replace(/key=[^&]+/, 'key=***')}`);
 
       const response = await axios({
         method: method.toLowerCase() as any,
@@ -72,7 +88,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
         headers,
         responseType: isStream ? 'stream' : 'json',
       });
-      console.log(`✅ Received response from Google Gemini: ${JSON.stringify(response.data)}`);
+
       return response;
     } catch (error: any) {
       const errorInfo = await this.extractErrorInfo(error);
@@ -85,24 +101,28 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   }
 
   /**
-   * Parse Google Gemini response
+   * Parse response from Google Gemini API
+   * Normalizes Gemini response format to be compatible with gateway expectations
    */
   parseResponse(response: AxiosResponse): any {
     try {
       const data = response.data;
-      if (!data || typeof data !== 'object') {
-        return data;
-      }
 
-      return {
-        ...data,
-        provider:'gemini'
-        };
-      } catch (error) {
-      console.error('[GeminiProvider] Error parsing response:', error);
-      // Return original data on error (similar to OpenAI)
-      return response.data;
+      // Return data as-is - Gemini response is already well-structured
+      // The usage extractor will handle extracting usage from usageMetadata
+      return data;
+    } catch (error) {
+      console.error('Error parsing Gemini response:', error);
+      return null;
     }
+  }
+
+  /**
+   * Gemini doesn't provide native USD cost - returns undefined
+   * Gateway will calculate cost based on token usage
+   */
+  extractProviderUsageUsd(response: AxiosResponse): number | undefined {
+    return undefined; // Gemini doesn't provide cost in response
   }
 
   /**
@@ -120,133 +140,131 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   }
 
   /**
-   * Get provider-specific test models for integration testing
+   * Create Gemini-specific stream extractor
+   * Determines if request is streaming based on URL path
+   */
+  createStreamExtractor(): StreamExtractor {
+    return new GeminiStreamExtractor();
+  }
+
+  /**
+   * Get test models for Gemini provider
+   * Implementation of TestableLLMProvider interface
    */
   getTestModels(): string[] {
-    return ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+    return [
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+    ];
   }
 
   /**
    * Get default test options
+   * Implementation of TestableLLMProvider interface
    */
   getDefaultTestOptions(): Record<string, any> {
     return {
-      model: 'gemini-1.5-flash',
-      max_tokens: 100,
+      model: 'gemini-2.0-flash-exp',
+      message: 'Hello, this is a test message.',
+      maxTokens: 50,
       temperature: 0.7,
-      messages: [
-        { role: 'user', content: 'Hello, who are you?' }
-      ]
     };
   }
 
   /**
-   * Create a test request for the given endpoint
+   * Create test request for the given endpoint
+   * Implementation of TestableLLMProvider interface
+   * Converts OpenAI-style options to Gemini format
    */
-  createTestRequest(endpoint: string, options?: Record<string, any>): any {
-    const defaultOptions = this.getDefaultTestOptions();
-    const mergedOptions = { ...defaultOptions, ...options };
+  createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
+    const defaults = this.getDefaultTestOptions();
+    const model = options.model || defaults.model;
 
-    // 处理特殊的端点格式，如models/{model}:generateContent
-    let formattedEndpoint = endpoint;
-    if (formattedEndpoint.includes('{model}') && mergedOptions.model) {
-      formattedEndpoint = formattedEndpoint.replace('{model}', mergedOptions.model);
+    // Determine if this is a streaming request
+    const isStream = options.stream || false;
+
+    // Use the appropriate endpoint based on stream flag
+    let finalEndpoint = endpoint;
+    if (endpoint.includes('{model}')) {
+      finalEndpoint = endpoint.replace('{model}', model);
     }
+
+    // Convert OpenAI-style messages to Gemini contents format
+    let contents: any[];
+    if (options.contents) {
+      // Use provided contents directly
+      contents = options.contents;
+    } else if (options.messages) {
+      // Convert from OpenAI messages format
+      contents = this.convertMessagesToContents(options.messages);
+    } else {
+      // Use default message
+      const message = options.message || defaults.message;
+      contents = [
+        {
+          parts: [{ text: message }],
+        },
+      ];
+    }
+
+    // Build Gemini request
+    const request: any = {
+      contents,
+    };
+
+    // Add generation config if specified
+    if (options.maxTokens || options.temperature !== undefined) {
+      request.generationConfig = {};
+      if (options.maxTokens) {
+        request.generationConfig.maxOutputTokens = options.maxTokens;
+      }
+      if (options.temperature !== undefined) {
+        request.generationConfig.temperature = options.temperature;
+      }
+    }
+
+    return request;
+  }
+
+  /**
+   * Convert OpenAI-style messages to Gemini contents format
+   * Maps roles and content structure appropriately
+   */
+  private convertMessagesToContents(messages: any[]): any[] {
+    return messages.map((message) => ({
+      parts: [{ text: message.content || '' }],
+      role: message.role === 'assistant' ? 'model' : 'user',
+    }));
+  }
+}
+
+/**
+ * Gemini-specific stream extractor
+ * Determines if a request is streaming based on the URL path
+ *
+ * Gemini uses different endpoints for streaming vs non-streaming:
+ * - Non-streaming: /v1beta/models/{model}:generateContent
+ * - Streaming: /v1beta/models/{model}:streamGenerateContent
+ */
+class GeminiStreamExtractor implements StreamExtractor {
+  /**
+   * Extract stream information from request
+   * For Gemini, streaming is determined by the URL path:
+   * - Path contains `:streamGenerateContent` -> streaming request
+   * - Path contains `:generateContent` (without stream prefix) -> non-streaming request
+   */
+  extractStream(req: Request, path: string): StreamExtractionResult {
+    // Check if the path contains the streaming indicator
+    const isStream = path.includes(':streamGenerateContent');
 
     return {
-      ...mergedOptions,
-      endpoint: formattedEndpoint
+      isStream,
+      source: 'path', // Gemini determines streaming from path, not from request body
+      extractedData: {
+        path: path,
+        method: req.method,
+      },
     };
-  }
-}
-
-// GeminiUsageExtractor和GeminiStreamProcessor类保持不变
-/**
- * Google Gemini usage extractor
- */
-class GeminiUsageExtractor extends BaseUsageExtractor {
-  constructor() {
-    super('gemini');
-  }
-
-  extractFromResponseBody(responseBody: any): UsageInfo | null {
-    try {
-      if (!responseBody || typeof responseBody !== 'object') {
-        return null;
-      }
-
-      // Check if this is a parsed Gemini response with usage info
-      if (responseBody.usage && typeof responseBody.usage === 'object') {
-        const usage = responseBody.usage;
-        return {
-          promptTokens: usage.prompt_tokens || 0,
-          completionTokens: usage.completion_tokens || 0,
-          totalTokens: usage.total_tokens || 0
-        };
-      }
-
-      // Check if this is a raw Gemini response
-      if (responseBody.usage_metadata && typeof responseBody.usage_metadata === 'object') {
-        const usageMeta = responseBody.usage_metadata;
-        return {
-          promptTokens: usageMeta.promptTokenCount || 0,
-          completionTokens: usageMeta.candidatesTokenCount || 0,
-          totalTokens: usageMeta.totalTokenCount || 0
-        };
-      }
-
-      return null;
-    } catch (error) {
-      console.error('[GeminiUsageExtractor] Error extracting usage from response body:', error);
-      return null;
-    }
-  }
-
-  extractFromStreamChunk(chunkText: string): { usage: UsageInfo; cost?: number } | null {
-    try {
-      // Gemini streaming format parsing logic
-      // This is a simplified implementation
-      if (chunkText.includes('usage_metadata')) {
-        const match = chunkText.match(/"usage_metadata":\s*({[^}]+})/);
-        if (match && match[1]) {
-          try {
-            const usageMeta = JSON.parse(match[1]);
-            if (usageMeta.totalTokenCount) {
-              return {
-                usage: {
-                  promptTokens: usageMeta.promptTokenCount || 0,
-                  completionTokens: usageMeta.candidatesTokenCount || 0,
-                  totalTokens: usageMeta.totalTokenCount || 0
-                }
-              };
-            }
-          } catch (e) {
-            console.error('[GeminiUsageExtractor] Error parsing streaming chunk:', e);
-          }
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('[GeminiUsageExtractor] Error extracting usage from stream chunk:', error);
-      return null;
-    }
-  }
-}
-
-/**
- * Google Gemini stream processor
- */
-class GeminiStreamProcessor extends BaseStreamProcessor {
-  constructor(model: string, initialCost?: number) {
-    super(model, initialCost);
-  }
-
-  processChunk(chunk: string): void {
-    try {
-      super.processChunk(chunk);
-      // Additional Gemini-specific streaming processing can be added here
-    } catch (error) {
-      console.error('[GeminiStreamProcessor] Error processing chunk:', error);
-    }
   }
 }

@@ -1,9 +1,21 @@
 import { AxiosResponse } from 'axios';
-import { LLMProvider, ExecuteResponse, ExecuteStreamResponse } from './LLMProvider.js';
+import { Request } from 'express';
+import {
+  LLMProvider,
+  ExecuteResponse,
+  ExecuteStreamResponse,
+  ModelExtractor,
+  ModelExtractionResult,
+  StreamExtractor,
+  StreamExtractionResult,
+} from './LLMProvider.js';
 import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
 import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
 import { UsageInfo, PricingResult } from '../billing/pricing.js';
 import { CostCalculator } from '../billing/usage/CostCalculator.js';
+
+// Re-export interfaces for convenience
+export type { ModelExtractor, ModelExtractionResult, StreamExtractor, StreamExtractionResult };
 
 /**
  * Standardized error details interface for all providers
@@ -88,13 +100,22 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Create a usage extractor for this provider (optional)
    * Can be overridden by providers that have custom usage extraction logic
    */
-  createUsageExtractor?(): UsageExtractor;
+createUsageExtractor?(): UsageExtractor;
 
   /**
    * Create a stream processor for this provider (optional)
    * Can be overridden by providers that have custom stream processing logic
    */
   createStreamProcessor?(model: string, initialCost?: number): StreamProcessor;
+
+  /**
+   * Create a model extractor for this provider (optional)
+   * Default implementation returns DefaultModelExtractor (body-only)
+   * Can be overridden by providers that need custom model extraction logic
+   */
+  createModelExtractor?(): ModelExtractor {
+    return new DefaultModelExtractor();
+  }
 
   /**
    * Extract request ID from response headers
@@ -178,7 +199,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         // If failed to parse as JSON, return the original string
         return data;
       }
-    }
+}
 
     // Already normalized (Object)
     return data;
@@ -289,14 +310,14 @@ export abstract class BaseLLMProvider implements LLMProvider {
           statusText,
           requestId,
         };
-      }
+}
     } else if (error.request) {
       // Network error - no response received
       message = 'Network error - Unable to reach provider';
       statusCode = 503;
       details = {
         type: 'network_error',
-      };
+};
     } else {
       // Other error (request setup, etc.)
       message = error.message || 'Unknown error occurred';
@@ -314,7 +335,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
   }
 
   /**
-   * Extract relevant headers for debugging
+* Extract relevant headers for debugging
    */
   protected extractRelevantHeaders(headers: any): Record<string, any> | undefined {
     if (!headers) return undefined;
@@ -446,7 +467,11 @@ export abstract class BaseLLMProvider implements LLMProvider {
   ): Promise<ExecuteStreamResponse> {
     try {
       // Prepare request data using provider-specific logic
-      const finalRequestData = this.prepareRequestData ? this.prepareRequestData(data, true) : data;
+      let finalRequestData = data;
+      if (finalRequestData && this.prepareRequestData) {
+        finalRequestData = this.prepareRequestData(finalRequestData, true);
+      }
+      //const finalRequestData = this.prepareRequestData ? this.prepareRequestData(data, true) : data;
 
       // Forward the streaming request
       const response = await this.forwardRequest(apiKey, path, method, finalRequestData, true);
@@ -582,5 +607,44 @@ export abstract class BaseLLMProvider implements LLMProvider {
           : undefined,
       };
     }
+  }
+}
+
+/**
+ * Default model extractor that extracts model only from request body
+ */
+export class DefaultModelExtractor implements ModelExtractor {
+  extractModel(req: Request, path: string): ModelExtractionResult | undefined {
+    // Only extract model from request body for POST/PUT/PATCH requests
+    if (['POST', 'PUT', 'PATCH'].includes(req.method?.toUpperCase() || '') &&
+        req.body && typeof req.body === 'object' && req.body.model) {
+      return {
+        model: req.body.model,
+        source: 'body',
+        extractedData: { ...req.body }
+      };
+    }
+
+    return undefined;
+  }
+}
+
+/**
+ * Default stream extractor that extracts stream flag from request body
+ */
+export class DefaultStreamExtractor implements StreamExtractor {
+  extractStream(req: Request, path: string): StreamExtractionResult {
+    const requestData = this.getRequestData(req);
+    const isStream = !!(requestData && requestData.stream);
+
+    return {
+      isStream,
+      source: isStream ? 'body' : 'default'
+    };
+  }
+
+  private getRequestData(req: Request): any | undefined {
+    const method = req.method;
+    return ['GET', 'DELETE'].includes(method) ? undefined : req.body;
   }
 }
