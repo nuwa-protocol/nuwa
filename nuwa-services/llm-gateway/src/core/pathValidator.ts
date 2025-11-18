@@ -130,7 +130,7 @@ export class PathValidator {
         return matches;
       }
 
-      console.log(`   ❌ No match found for '${normalizedPath}' against '${normalizedAllowed}'`);
+      console.debug(`   ❌ No match found for '${normalizedPath}' against '${normalizedAllowed}'`);
       return false;
     });
   }

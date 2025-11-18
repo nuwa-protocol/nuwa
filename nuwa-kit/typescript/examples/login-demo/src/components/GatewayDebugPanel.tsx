@@ -309,7 +309,7 @@ export function GatewayDebugPanel() {
     const transform = (obj: any): any => {
       if (obj && typeof obj === 'object') {
         if (Array.isArray(obj)) {
-            return obj.map(transform);
+          return obj.map(transform);
         }
         const newObj: Record<string, any> = {};
         for (const key in obj) {
