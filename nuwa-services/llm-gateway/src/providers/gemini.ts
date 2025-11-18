@@ -277,8 +277,8 @@ class GeminiStreamExtractor implements StreamExtractor {
 
 /**
  * Gemini-specific model extractor
- * Extracts model name from URL path pattern: /v1/models/{model}:generateContent
- * or /v1/models/{model}:streamGenerateContent
+ * Prioritizes extracting model from request body (default behavior),
+ * then falls back to URL path extraction if body doesn't contain model.
  *
  * Example paths:
  * - /v1/models/gemini-2.0-flash-exp:generateContent
@@ -287,10 +287,23 @@ class GeminiStreamExtractor implements StreamExtractor {
  */
 class GeminiModelExtractor implements ModelExtractor {
   /**
-   * Extract model from Gemini path
-   * Path format: /v1/models/{model}:generateContent or /v1/models/{model}:streamGenerateContent
+   * Extract model from request
+   * Priority:
+   * 1. Request body (default implementation - allows users to override model)
+   * 2. URL path (fallback - extracts from Gemini's path pattern)
    */
   extractModel(req: Request, path: string): ModelExtractionResult | undefined {
+    // Priority 1: Extract from request body (default implementation)
+    // This allows users to explicitly specify the model in the request
+    if (req.body && typeof req.body === 'object' && req.body.model) {
+      return {
+        model: req.body.model,
+        source: 'body',
+        extractedData: { ...req.body },
+      };
+    }
+
+    // Priority 2: Fallback to URL path extraction
     // Pattern to match: /v1/models/{model}:generateContent or :streamGenerateContent
     // Matches both /v1/ and /v1beta/ prefixes
     // Note: streamGenerateContent has uppercase 'G', while generateContent has lowercase 'g'
@@ -304,15 +317,6 @@ class GeminiModelExtractor implements ModelExtractor {
           path: path,
           extractedFrom: 'gemini-url-pattern',
         },
-      };
-    }
-
-    // Fallback: try to extract from request body if path parsing fails
-    if (req.body && typeof req.body === 'object' && req.body.model) {
-      return {
-        model: req.body.model,
-        source: 'body',
-        extractedData: { ...req.body },
       };
     }
 
