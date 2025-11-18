@@ -15,6 +15,9 @@ export interface TestEnvConfig {
   anthropicApiKey?: string;
   anthropicBaseUrl?: string;
   skipIntegrationTests?: boolean;
+  // Gemini provider
+  geminiApiKey?: string;
+  geminiBaseUrl?: string;
 }
 
 /**
@@ -50,6 +53,9 @@ export class TestEnv {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL,
       skipIntegrationTests: process.env.SKIP_INTEGRATION_TESTS === 'true',
+      // Gemini
+      geminiApiKey: process.env.GEMINI_API_KEY,
+      geminiBaseUrl: process.env.GEMINI_BASE_URL,
     };
 
     return this.config;
@@ -101,6 +107,13 @@ export class TestEnv {
         baseUrl: config.anthropicBaseUrl || 'https://api.anthropic.com',
         reason: !config.anthropicApiKey ? 'ANTHROPIC_API_KEY not configured' : undefined,
       },
+      {
+        name: 'gemini',
+        enabled: !!config.geminiApiKey,
+        apiKey: config.geminiApiKey,
+        baseUrl: config.geminiBaseUrl || 'https://generativelanguage.googleapis.com',
+        reason: !config.geminiApiKey ? 'GEMINI_API_KEY not configured' : undefined,
+      },
     ];
   }
 
@@ -148,18 +161,23 @@ export class TestEnv {
   static describeProvider(providerName: string, testFn: () => void): void {
     const provider = this.getProviderConfigs().find(p => p.name === providerName);
 
+    const d = (globalThis as any).describe;
+    if (!d) {
+      return;
+    }
+
     if (this.shouldSkipIntegrationTests()) {
-      describe.skip(
+      d.skip(
         `${providerName} Provider Integration Tests (SKIP_INTEGRATION_TESTS=true)`,
         testFn
       );
     } else if (!provider?.enabled) {
-      describe.skip(
+      d.skip(
         `${providerName} Provider Integration Tests (${provider?.reason || 'disabled'})`,
         testFn
       );
     } else {
-      describe(`${providerName} Provider Integration Tests`, testFn);
+      d(`${providerName} Provider Integration Tests`, testFn);
     }
   }
 
@@ -173,12 +191,17 @@ export class TestEnv {
   ): void {
     const provider = this.getProviderConfigs().find(p => p.name === providerName);
 
+    const t = (globalThis as any).it;
+    if (!t) {
+      return;
+    }
+
     if (this.shouldSkipIntegrationTests()) {
-      it.skip(`${testName} (SKIP_INTEGRATION_TESTS=true)`, testFn);
+      t.skip(`${testName} (SKIP_INTEGRATION_TESTS=true)`, testFn);
     } else if (!provider?.enabled) {
-      it.skip(`${testName} (${provider?.reason || 'disabled'})`, testFn);
+      t.skip(`${testName} (${provider?.reason || 'disabled'})`, testFn);
     } else {
-      it(testName, testFn);
+      t(testName, testFn);
     }
   }
 

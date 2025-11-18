@@ -1,0 +1,108 @@
+{
+  "version": "2025-10",
+  "description": "Google Gemini model pricing configuration",
+  "lastUpdated": "2025-11",
+  "models": {
+    "gemini-2.0-flash": {
+      "promptPerMTokUsd": 0.15,
+      "completionPerMTokUsd": 0.60,
+      "description": "Gemini 2.0 Flash - Latest fast and efficient model"
+    },
+    "gemini-2.0-flash-exp": {
+      "promptPerMTokUsd": 0.15,
+      "completionPerMTokUsd": 0.60,
+      "description": "Gemini 2.0 Flash Experimental"
+    },
+    "gemini-2.0-flash-thinking-exp": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 1.20,
+      "description": "Gemini 2.0 Flash Thinking Experimental"
+    },
+    "gemini-2.0-pro": {
+      "promptPerMTokUsd": 1.50,
+      "completionPerMTokUsd": 6.00,
+      "description": "Gemini 2.0 Pro - Advanced reasoning model"
+    },
+    "gemini-2.0-pro-exp": {
+      "promptPerMTokUsd": 1.50,
+      "completionPerMTokUsd": 6.00,
+      "description": "Gemini 2.0 Pro Experimental"
+    },
+    "gemini-2.5-flash": {
+      "promptPerMTokUsd": 0.25,
+      "completionPerMTokUsd": 0.75,
+      "description": "Gemini 2.5 Flash - Next generation fast model"
+    },
+    "gemini-2.5-flash-exp": {
+      "promptPerMTokUsd": 0.25,
+      "completionPerMTokUsd": 0.75,
+      "description": "Gemini 2.5 Flash Experimental"
+    },
+    "gemini-2.5-pro": {
+      "promptPerMTokUsd": 2.00,
+      "completionPerMTokUsd": 8.00,
+      "description": "Gemini 2.5 Pro - Next generation advanced model"
+    },
+    "gemini-2.5-pro-exp": {
+      "promptPerMTokUsd": 2.00,
+      "completionPerMTokUsd": 8.00,
+      "description": "Gemini 2.5 Pro Experimental"
+    },
+    "gemini-1.0-pro": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "Gemini 1.0 Pro - Legacy general purpose model",
+      "deprecated": true
+    },
+    "gemini-pro": {
+      "promptPerMTokUsd": 0.5,
+      "completionPerMTokUsd": 1.5,
+      "description": "Gemini Pro - Legacy general purpose model",
+      "deprecated": true
+    }
+  },
+  "modelFamilyPatterns": [
+    {
+      "pattern": "^gemini-2\\.5-pro",
+      "baseModel": "gemini-2.5-pro",
+      "description": "Gemini 2.5 Pro variants - next generation advanced model family"
+    },
+    {
+      "pattern": "^gemini-2\\.5-flash",
+      "baseModel": "gemini-2.5-flash",
+      "description": "Gemini 2.5 Flash variants - next generation fast model family"
+    },
+    {
+      "pattern": "^gemini-2\\.0-pro",
+      "baseModel": "gemini-2.0-pro",
+      "description": "Gemini 2.0 Pro variants - advanced reasoning model family"
+    },
+    {
+      "pattern": "^gemini-2\\.0-flash",
+      "baseModel": "gemini-2.0-flash",
+      "description": "Gemini 2.0 Flash variants - latest fast model family"
+    },
+    {
+      "pattern": "^gemini-1\\.0-pro",
+      "baseModel": "gemini-1.0-pro",
+      "description": "Gemini 1.0 Pro variants - legacy model family",
+      "deprecated": true
+    },
+    {
+      "pattern": "^gemini-pro",
+      "baseModel": "gemini-pro",
+      "description": "Gemini Pro variants - legacy naming",
+      "deprecated": true
+    }
+  ],
+  "notes": [
+    "Pricing is per 1M tokens as of October 2025",
+    "Gemini models use input and output tokens in API responses",
+    "All prices are in USD",
+    "Gemini 1.5 models are deprecated and no longer supported",
+    "Gemini 2.0 and 2.5 series are the current generation models",
+    "Experimental models may have different pricing when generally available",
+    "Batch processing and other optimizations may affect final pricing",
+    "Legacy models (1.0 Pro, Pro) are marked as deprecated"
+  ]
+}

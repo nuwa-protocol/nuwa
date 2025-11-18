@@ -11,7 +11,7 @@ export function GatewayDebugPanel() {
   const [mcpUrl, setMcpUrlState] = useState(getMcpUrl());
   const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('POST');
   const [apiPath, setApiPath] = useState('/api/v1/chat/completions');
-  const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai' | 'claude'>('openrouter');
+  const [provider, setProvider] = useState<'openrouter' | 'litellm' | 'openai' | 'claude' | 'gemini'>('openrouter');
   const [apiType, setApiType] = useState<'chat' | 'response'>('chat'); // New: API type selector
   const [isStream, setIsStream] = useState<boolean>(false);
   const [requestBody, setRequestBody] = useState(`{
@@ -61,6 +61,13 @@ export function GatewayDebugPanel() {
           paths: ['/v1/messages'],
           supportsResponseAPI: false
         };
+      case 'gemini':
+        return {
+          defaultPath: '/v1/models/gemini-2.5-flash:generateContent',
+          defaultModel: 'gemini-2.5-flash',
+          paths: ['/v1/models/gemini-2.5-flash:generateContent', '/v1/models/gemini-2.0-flash:generateContent', '/v1/models/gemini-1.5-flash:generateContent'],
+          supportsResponseAPI: false
+        };
       default:
         return {
           defaultPath: '/api/v1/chat/completions',
@@ -92,6 +99,8 @@ export function GatewayDebugPanel() {
     } else {
       // Check if this is a Claude model
       const isClaudeModel = model.startsWith('claude-');
+      // Check if this is a Gemini model
+      const isGeminiModel = model.startsWith('gemini-');
       
       if (isClaudeModel) {
         return `{
@@ -101,6 +110,23 @@ export function GatewayDebugPanel() {
     { "role": "user", "content": "Hello! Please tell me about yourself." }
   ]
 }`;
+      } else if (isGeminiModel) {
+        // Gemini uses a different format with contents array
+        return `
+        {
+            "generationConfig": {},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": "Hello! Please tell me about yourself"
+                        }
+                    ]
+                }
+            ]
+        }
+`;
       } else {
         return `{
   "model": "${model}",
@@ -529,6 +555,7 @@ export function GatewayDebugPanel() {
           <option value="openai">OpenAI</option>
           <option value="litellm">LiteLLM</option>
           <option value="claude">Claude</option>
+          <option value="gemini">Gemini</option>
         </select>
         <small style={{ marginLeft: '8px' }}>(uses /{provider}/* path routing)</small>
       </div>
@@ -713,6 +740,81 @@ export function GatewayDebugPanel() {
             {loading ? 'Calling...' : 'Call Tool'}
           </button>
         </div>
+      )}
+
+      {activeTab === 'http' && provider === 'gemini' && (
+      <div className="gemini-examples" style={{ marginBottom: '1rem' }}>
+        <div style={{ marginTop: '8px' }}>
+          <button 
+            onClick={() => setRequestBody(`{
+  "model": "gemini-2.5-flash",
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Hello! Please tell me about yourself."
+        }
+      ]
+    }
+  ]
+}`)}
+            style={{ marginRight: '8px', fontSize: '12px' }}
+          >
+            Load Simple Text Example
+          </button>
+          <button 
+            onClick={() => setRequestBody(`{
+  "model": "gemini-2.5-flash",
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "What is the capital of France?"
+        }
+      ]
+    }
+  ]
+}`)} 
+            style={{ marginRight: '8px', fontSize: '12px' }}
+          >
+            Load Factual Question
+          </button>
+          <button 
+            onClick={() => setRequestBody(`{
+  "model": "gemini-2.5-flash",
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Write a short poem about artificial intelligence."
+        }
+      ]
+    }
+  ]
+}`)} 
+            style={{ marginRight: '8px', fontSize: '12px' }}
+          >
+            Load Creative Writing
+          </button>
+          <button 
+            onClick={() => setRequestBody(`{
+  "model": "gemini-2.5-flash",
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Explain quantum computing in simple terms."
+        }
+      ]
+    }
+  ]
+}`)} 
+            style={{ fontSize: '12px' }}
+          >
+            Load Technical Explanation
+          </button>
+        </div>
+      </div>
       )}
 
       {error && (

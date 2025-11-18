@@ -1,4 +1,5 @@
 import { AxiosResponse } from 'axios';
+import { Request } from 'express';
 import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
 import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
 import { UsageInfo, PricingResult } from '../billing/pricing.js';
@@ -136,6 +137,13 @@ export interface LLMProvider {
     data: any,
     destination: NodeJS.WritableStream
   ): Promise<ExecuteStreamResponse>;
+
+/**
+   * Get model extractor for this provider (optional)
+   * Returns a provider-specific model extractor that can handle the provider's request formats
+   * @returns ModelExtractor instance or undefined if provider uses default extraction
+   */
+  createModelExtractor?(): ModelExtractor;
 }
 
 /**
@@ -210,4 +218,48 @@ export interface TestableLLMProvider extends LLMProvider {
    * @returns Request data ready to send to the provider
    */
   createTestRequest(endpoint: string, options?: Record<string, any>): any;
+}
+
+/**
+ * Model extraction result
+ */
+export interface ModelExtractionResult {
+  model: string;
+  source: 'body' | 'query' | 'header' | 'path' | 'default';
+  extractedData?: any; // Additional extracted data if needed
+}
+
+/**
+ * Model extractor interface for flexible model extraction
+ */
+export interface ModelExtractor {
+  /**
+   * Extract model information from request
+   * @param req Express request object
+   * @param path API path being accessed
+   * @returns Model extraction result or undefined if model not found
+   */
+  extractModel(req: Request, path: string): ModelExtractionResult | undefined;
+}
+
+/**
+ * Stream extraction result
+ */
+export interface StreamExtractionResult {
+  isStream: boolean;
+  source: 'body' | 'path' | 'query' | 'header' | 'default';
+  extractedData?: any; // Additional extracted data if needed
+}
+
+/**
+ * Stream extractor interface for flexible stream detection
+ */
+export interface StreamExtractor {
+  /**
+   * Extract stream information from request
+   * @param req Express request object
+   * @param path API path being accessed
+   * @returns Stream extraction result
+   */
+  extractStream(req: Request, path: string): StreamExtractionResult;
 }

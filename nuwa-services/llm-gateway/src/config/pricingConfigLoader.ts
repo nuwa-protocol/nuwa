@@ -1,6 +1,7 @@
 import { ModelPricing } from '../billing/pricing.js';
 import openaiPricingConfig from './openai-pricing.json' with { type: 'json' };
 import claudePricingConfig from './claude-pricing.json' with { type: 'json' };
+import geminiPricingConfig from './gemini-pricing.json' with { type: 'json' };
 
 /**
  * Extended model pricing with description
@@ -56,6 +57,7 @@ export class PricingConfigLoader {
       const configs = [
         { name: 'OpenAI', config: openaiPricingConfig as PricingConfig },
         { name: 'Claude', config: claudePricingConfig as PricingConfig },
+        { name: 'Gemini', config: geminiPricingConfig as PricingConfig },
       ];
 
       // Merge all configurations
@@ -115,6 +117,7 @@ export class PricingConfigLoader {
     return {
       openai: openaiPricingConfig as PricingConfig,
       claude: claudePricingConfig as PricingConfig,
+      gemini: geminiPricingConfig as PricingConfig,
     };
   }
 

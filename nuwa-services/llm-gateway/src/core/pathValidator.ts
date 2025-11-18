@@ -103,13 +103,35 @@ export class PathValidator {
       // Normalize allowed path as well
       const normalizedAllowed = ('/' + allowedPath).replace(/\/+/g, '/');
 
-      // Support exact match and wildcard patterns
+      // Support exact match
+      if (normalizedPath === normalizedAllowed) {
+        return true;
+      }
+
+      // Support wildcard patterns
       if (normalizedAllowed.endsWith('*')) {
         const prefix = normalizedAllowed.slice(0, -1);
-        return normalizedPath.startsWith(prefix);
-      } else {
-        return normalizedPath === normalizedAllowed;
+        const matches = normalizedPath.startsWith(prefix);
+        return matches;
       }
+
+      // Support parameterized paths like /v1/models/{model}:streamGenerateContent
+      if (normalizedAllowed.includes('{') && normalizedAllowed.includes('}')) {
+        // Convert parameterized path to regex pattern
+        // Escape special regex characters first, but don't escape {} since we're handling them specially
+        let regexPattern = normalizedAllowed
+          .replace(/[.*+?^$()|[\]\\]/g, '\\$&') // Escape regex special chars except {}
+          .replace(/\{[^}]+\}/g, '[^/:]+'); // Replace {param} with [^/:]+ (any char except / and :)
+
+        // Create regex and test
+        const regex = new RegExp(`^${regexPattern}$`);
+        const matches = regex.test(normalizedPath);
+
+        return matches;
+      }
+
+      console.debug(`   ❌ No match found for '${normalizedPath}' against '${normalizedAllowed}'`);
+      return false;
     });
   }
 

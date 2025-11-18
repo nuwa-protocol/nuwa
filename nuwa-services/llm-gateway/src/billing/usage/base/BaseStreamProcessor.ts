@@ -20,10 +20,6 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     this.model = model;
     this.usageExtractor = usageExtractor;
     this.initialProviderCost = initialProviderCost;
-
-    console.log(
-      `[${this.constructor.name}] Created for model: ${model}, initial cost: ${initialProviderCost}`
-    );
   }
 
   /**
@@ -34,17 +30,14 @@ export abstract class BaseStreamProcessor implements StreamProcessor {
     try {
       // Let the provider-specific implementation handle chunk processing
       this.processProviderSpecificChunk(chunkText);
-
       // Try to extract usage from the chunk
       const result = this.usageExtractor.extractFromStreamChunk(chunkText);
       if (result) {
-        console.log(`[${this.constructor.name}] Got usage from chunk`);
         this.accumulatedUsage = result.usage;
 
         // Update extracted cost if provided in stream
         if (result.cost !== undefined) {
           this.extractedCost = result.cost;
-          console.log(`[${this.constructor.name}] Updated extracted cost: ${this.extractedCost}`);
         }
 
         // Calculate final cost when we have usage information
