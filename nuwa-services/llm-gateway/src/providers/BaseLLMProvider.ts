@@ -100,7 +100,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Create a usage extractor for this provider (optional)
    * Can be overridden by providers that have custom usage extraction logic
    */
-createUsageExtractor?(): UsageExtractor;
+  createUsageExtractor?(): UsageExtractor;
 
   /**
    * Create a stream processor for this provider (optional)
@@ -335,7 +335,7 @@ createUsageExtractor?(): UsageExtractor;
   }
 
   /**
-* Extract relevant headers for debugging
+   * Extract relevant headers for debugging
    */
   protected extractRelevantHeaders(headers: any): Record<string, any> | undefined {
     if (!headers) return undefined;
@@ -471,7 +471,6 @@ createUsageExtractor?(): UsageExtractor;
       if (finalRequestData && this.prepareRequestData) {
         finalRequestData = this.prepareRequestData(finalRequestData, true);
       }
-      //const finalRequestData = this.prepareRequestData ? this.prepareRequestData(data, true) : data;
 
       // Forward the streaming request
       const response = await this.forwardRequest(apiKey, path, method, finalRequestData, true);

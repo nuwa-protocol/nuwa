@@ -8,7 +8,7 @@ export const OPENAI_PATHS = {
   RESPONSES: '/v1/responses',
 } as const;
 
-// 添加Google Gemini路径常量
+// Add Google Gemini path constants
 export const GEMINI_PATHS = {
   CHAT_COMPLETIONS: '/v1/models/{model}:generateContent',
   STREAM_CHAT_COMPLETIONS: '/v1/models/{model}:streamGenerateContent'
@@ -39,5 +39,5 @@ export const ALL_SUPPORTED_PATHS = [
   ...Object.values(OPENROUTER_PATHS),
   ...Object.values(LITELLM_PATHS),
   ...Object.values(CLAUDE_PATHS),
-  ...Object.values(GEMINI_PATHS), // 添加Gemini路径
+  ...Object.values(GEMINI_PATHS), // Add Gemini paths
 ] as const;

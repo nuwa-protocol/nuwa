@@ -1,7 +1,7 @@
 {
   "version": "2025-10",
   "description": "Google Gemini model pricing configuration",
-  "lastUpdated": "2025-10-23",
+  "lastUpdated": "2025-11",
   "models": {
     "gemini-2.0-flash": {
       "promptPerMTokUsd": 0.15,
