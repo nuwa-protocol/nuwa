@@ -79,8 +79,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
 
-      console.log(`🔄 Forwarding ${method} request to Gemini: ${fullUrl.replace(/key=[^&]+/, 'key=***')}`);
-
       const response = await axios({
         method: method.toLowerCase() as any,
         url: fullUrl,
