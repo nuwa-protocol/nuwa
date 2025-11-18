@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import { Request } from 'express';
 import { BaseLLMProvider } from './BaseLLMProvider.js';
-import { TestableLLMProvider, StreamExtractor, StreamExtractionResult } from './LLMProvider.js';
+import { TestableLLMProvider, StreamExtractor, StreamExtractionResult, ModelExtractor, ModelExtractionResult } from './LLMProvider.js';
 import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
 import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
 import { GeminiUsageExtractor } from '../billing/usage/providers/GeminiUsageExtractor.js';
@@ -79,8 +79,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       // Prepare request data using provider-specific logic
       const finalData = this.prepareRequestData(data, isStream);
 
-      console.log(`🔄 Forwarding ${method} request to Gemini: ${fullUrl.replace(/key=[^&]+/, 'key=***')}`);
-
       const response = await axios({
         method: method.toLowerCase() as any,
         url: fullUrl,
@@ -145,6 +143,14 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   createStreamExtractor(): StreamExtractor {
     return new GeminiStreamExtractor();
+  }
+
+  /**
+   * Create Gemini-specific model extractor
+   * Extracts model from URL path instead of request body
+   */
+  createModelExtractor(): ModelExtractor {
+    return new GeminiModelExtractor();
   }
 
   /**
@@ -266,5 +272,54 @@ class GeminiStreamExtractor implements StreamExtractor {
         method: req.method,
       },
     };
+  }
+}
+
+/**
+ * Gemini-specific model extractor
+ * Prioritizes extracting model from request body (default behavior),
+ * then falls back to URL path extraction if body doesn't contain model.
+ *
+ * Example paths:
+ * - /v1/models/gemini-2.0-flash-exp:generateContent
+ * - /v1/models/gemini-1.5-flash:streamGenerateContent
+ * - /v1beta/models/gemini-pro:generateContent
+ */
+class GeminiModelExtractor implements ModelExtractor {
+  /**
+   * Extract model from request
+   * Priority:
+   * 1. Request body (default implementation - allows users to override model)
+   * 2. URL path (fallback - extracts from Gemini's path pattern)
+   */
+  extractModel(req: Request, path: string): ModelExtractionResult | undefined {
+    // Priority 1: Extract from request body (default implementation)
+    // This allows users to explicitly specify the model in the request
+    if (req.body && typeof req.body === 'object' && req.body.model) {
+      return {
+        model: req.body.model,
+        source: 'body',
+        extractedData: { ...req.body },
+      };
+    }
+
+    // Priority 2: Fallback to URL path extraction
+    // Pattern to match: /v1/models/{model}:generateContent or :streamGenerateContent
+    // Matches both /v1/ and /v1beta/ prefixes
+    // Note: streamGenerateContent has uppercase 'G', while generateContent has lowercase 'g'
+    const modelMatch = path.match(/\/v1(?:beta)?\/models\/([^:]+):(streamGenerateContent|generateContent)/);
+
+    if (modelMatch && modelMatch[1]) {
+      return {
+        model: modelMatch[1],
+        source: 'path',
+        extractedData: {
+          path: path,
+          extractedFrom: 'gemini-url-pattern',
+        },
+      };
+    }
+
+    return undefined;
   }
 }
