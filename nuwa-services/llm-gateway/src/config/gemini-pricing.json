@@ -1,8 +1,38 @@
 {
-  "version": "2025-10",
+  "version": "2025-11",
   "description": "Google Gemini model pricing configuration",
-  "lastUpdated": "2025-11",
+  "lastUpdated": "2025-11-19",
   "models": {
+    "gemini-3-pro-preview": {
+      "promptPerMTokUsd": 4.00,
+      "completionPerMTokUsd": 18.00,
+      "description": "Gemini 3 Pro Preview - Best model for multimodal understanding and agentic tasks (using long context pricing for safety)"
+    },
+    "gemini-2.5-pro": {
+      "promptPerMTokUsd": 2.50,
+      "completionPerMTokUsd": 15.00,
+      "description": "Gemini 2.5 Pro - State-of-the-art multipurpose model for coding and complex reasoning (using long context pricing for safety)"
+    },
+    "gemini-2.5-pro-exp": {
+      "promptPerMTokUsd": 2.50,
+      "completionPerMTokUsd": 15.00,
+      "description": "Gemini 2.5 Pro Experimental (using long context pricing for safety)"
+    },
+    "gemini-2.5-flash": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.90,
+      "description": "Gemini 2.5 Flash - Fast and efficient model (using long context pricing for safety)"
+    },
+    "gemini-2.5-flash-exp": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.90,
+      "description": "Gemini 2.5 Flash Experimental (using long context pricing for safety)"
+    },
+    "gemini-2.5-flash-lite": {
+      "promptPerMTokUsd": 0.20,
+      "completionPerMTokUsd": 0.60,
+      "description": "Gemini 2.5 Flash Lite - Lightweight and cost-efficient model (using long context pricing for safety)"
+    },
     "gemini-2.0-flash": {
       "promptPerMTokUsd": 0.15,
       "completionPerMTokUsd": 0.60,
@@ -28,26 +58,6 @@
       "completionPerMTokUsd": 6.00,
       "description": "Gemini 2.0 Pro Experimental"
     },
-    "gemini-2.5-flash": {
-      "promptPerMTokUsd": 0.25,
-      "completionPerMTokUsd": 0.75,
-      "description": "Gemini 2.5 Flash - Next generation fast model"
-    },
-    "gemini-2.5-flash-exp": {
-      "promptPerMTokUsd": 0.25,
-      "completionPerMTokUsd": 0.75,
-      "description": "Gemini 2.5 Flash Experimental"
-    },
-    "gemini-2.5-pro": {
-      "promptPerMTokUsd": 2.00,
-      "completionPerMTokUsd": 8.00,
-      "description": "Gemini 2.5 Pro - Next generation advanced model"
-    },
-    "gemini-2.5-pro-exp": {
-      "promptPerMTokUsd": 2.00,
-      "completionPerMTokUsd": 8.00,
-      "description": "Gemini 2.5 Pro Experimental"
-    },
     "gemini-1.0-pro": {
       "promptPerMTokUsd": 0.5,
       "completionPerMTokUsd": 1.5,
@@ -63,9 +73,19 @@
   },
   "modelFamilyPatterns": [
     {
+      "pattern": "^gemini-3-pro",
+      "baseModel": "gemini-3-pro-preview",
+      "description": "Gemini 3 Pro variants - best multimodal understanding and agentic model family"
+    },
+    {
       "pattern": "^gemini-2\\.5-pro",
       "baseModel": "gemini-2.5-pro",
       "description": "Gemini 2.5 Pro variants - next generation advanced model family"
+    },
+    {
+      "pattern": "^gemini-2\\.5-flash-lite",
+      "baseModel": "gemini-2.5-flash-lite",
+      "description": "Gemini 2.5 Flash Lite variants - lightweight and cost-efficient model family"
     },
     {
       "pattern": "^gemini-2\\.5-flash",
@@ -96,11 +116,16 @@
     }
   ],
   "notes": [
-    "Pricing is per 1M tokens as of October 2025",
+    "Pricing is per 1M tokens as of November 2025",
     "Gemini models use input and output tokens in API responses",
     "All prices are in USD",
+    "Gemini 3 Pro Preview is the most advanced model with best multimodal understanding",
+    "Some models have tiered pricing based on prompt length (<=200k vs >200k tokens)",
+    "Currently using long context pricing (>200k tokens) for all models as conservative estimate",
+    "Future updates may implement dynamic pricing based on actual prompt length",
+    "Gemini 2.5 series models support both standard and batch processing",
     "Gemini 1.5 models are deprecated and no longer supported",
-    "Gemini 2.0 and 2.5 series are the current generation models",
+    "Gemini 2.0, 2.5, and 3.0 series are the current generation models",
     "Experimental models may have different pricing when generally available",
     "Batch processing and other optimizations may affect final pricing",
     "Legacy models (1.0 Pro, Pro) are marked as deprecated"
