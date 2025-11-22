@@ -1,108 +1,161 @@
 {
-  "version": "2025-10",
-  "description": "Google Gemini model pricing configuration",
-  "lastUpdated": "2025-11",
+  "version": "2025-11",
+  "description": "Google Gemini model pricing configuration - Official pricing from ai.google.dev",
+  "lastUpdated": "2025-11-22",
   "models": {
-    "gemini-2.0-flash": {
-      "promptPerMTokUsd": 0.15,
-      "completionPerMTokUsd": 0.60,
-      "description": "Gemini 2.0 Flash - Latest fast and efficient model"
-    },
-    "gemini-2.0-flash-exp": {
-      "promptPerMTokUsd": 0.15,
-      "completionPerMTokUsd": 0.60,
-      "description": "Gemini 2.0 Flash Experimental"
-    },
-    "gemini-2.0-flash-thinking-exp": {
-      "promptPerMTokUsd": 0.30,
-      "completionPerMTokUsd": 1.20,
-      "description": "Gemini 2.0 Flash Thinking Experimental"
-    },
-    "gemini-2.0-pro": {
-      "promptPerMTokUsd": 1.50,
-      "completionPerMTokUsd": 6.00,
-      "description": "Gemini 2.0 Pro - Advanced reasoning model"
-    },
-    "gemini-2.0-pro-exp": {
-      "promptPerMTokUsd": 1.50,
-      "completionPerMTokUsd": 6.00,
-      "description": "Gemini 2.0 Pro Experimental"
-    },
-    "gemini-2.5-flash": {
-      "promptPerMTokUsd": 0.25,
-      "completionPerMTokUsd": 0.75,
-      "description": "Gemini 2.5 Flash - Next generation fast model"
-    },
-    "gemini-2.5-flash-exp": {
-      "promptPerMTokUsd": 0.25,
-      "completionPerMTokUsd": 0.75,
-      "description": "Gemini 2.5 Flash Experimental"
+    "gemini-3-pro-preview": {
+      "promptPerMTokUsd": 4.00,
+      "completionPerMTokUsd": 18.00,
+      "description": "Gemini 3 Pro Preview - Most advanced multimodal model (prices for prompts > 200K tokens)"
     },
     "gemini-2.5-pro": {
-      "promptPerMTokUsd": 2.00,
-      "completionPerMTokUsd": 8.00,
-      "description": "Gemini 2.5 Pro - Next generation advanced model"
+      "promptPerMTokUsd": 2.50,
+      "completionPerMTokUsd": 15.00,
+      "description": "Gemini 2.5 Pro - Advanced multi-purpose model for coding and complex reasoning (prices for prompts > 200K tokens)"
     },
-    "gemini-2.5-pro-exp": {
-      "promptPerMTokUsd": 2.00,
-      "completionPerMTokUsd": 8.00,
-      "description": "Gemini 2.5 Pro Experimental"
+    "gemini-2.5-flash": {
+      "promptPerMTokUsd": 1.00,
+      "completionPerMTokUsd": 2.50,
+      "description": "Gemini 2.5 Flash - Mixed reasoning model with 1M context and thinking budget (audio input pricing)"
     },
-    "gemini-1.0-pro": {
-      "promptPerMTokUsd": 0.5,
-      "completionPerMTokUsd": 1.5,
-      "description": "Gemini 1.0 Pro - Legacy general purpose model",
-      "deprecated": true
+    "gemini-2.5-flash-preview": {
+      "promptPerMTokUsd": 1.00,
+      "completionPerMTokUsd": 2.50,
+      "description": "Gemini 2.5 Flash Preview - Latest preview of 2.5 Flash model"
     },
-    "gemini-pro": {
-      "promptPerMTokUsd": 0.5,
-      "completionPerMTokUsd": 1.5,
-      "description": "Gemini Pro - Legacy general purpose model",
-      "deprecated": true
+    "gemini-2.5-flash-preview-09-2025": {
+      "promptPerMTokUsd": 1.00,
+      "completionPerMTokUsd": 2.50,
+      "description": "Gemini 2.5 Flash Preview (Sept 2025) - Best for high-volume tasks with thinking"
+    },
+    "gemini-2.5-flash-lite": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.5 Flash-Lite - Smallest and most cost-effective model for scale (audio input pricing)"
+    },
+    "gemini-2.5-flash-lite-preview": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.5 Flash-Lite Preview - Latest preview version"
+    },
+    "gemini-2.5-flash-lite-preview-09-2025": {
+      "promptPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.5 Flash-Lite Preview (Sept 2025) - Optimized for cost-efficiency and throughput"
+    },
+    "gemini-2.5-computer-use-preview-10-2025": {
+      "promptPerMTokUsd": 2.50,
+      "completionPerMTokUsd": 15.00,
+      "description": "Gemini 2.5 Computer Use - Optimized for browser automation agents (prices for prompts > 200K tokens)"
+    },
+    "gemini-2.0-flash": {
+      "promptPerMTokUsd": 0.70,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.0 Flash - Balanced multimodal model with 1M context, built for agentic era (audio input pricing)"
+    },
+    "gemini-2.0-flash-exp": {
+      "promptPerMTokUsd": 0.70,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.0 Flash Experimental - Latest experimental variant"
+    },
+    "gemini-2.0-flash-thinking-exp": {
+      "promptPerMTokUsd": 0.70,
+      "completionPerMTokUsd": 0.40,
+      "description": "Gemini 2.0 Flash Thinking Experimental - Extended reasoning capabilities"
+    },
+    "gemini-2.0-flash-lite": {
+      "promptPerMTokUsd": 0.075,
+      "completionPerMTokUsd": 0.30,
+      "description": "Gemini 2.0 Flash-Lite - Smallest and most cost-effective model for scale"
+    },
+    "gemini-robotics-er-1.5-preview": {
+      "promptPerMTokUsd": 1.00,
+      "completionPerMTokUsd": 2.50,
+      "description": "Gemini Robotics-ER 1.5 - Embodied reasoning for robotics (audio input pricing)"
+    },
+    "gemma-3": {
+      "promptPerMTokUsd": 0.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Gemma 3 - Open model, completely free"
+    },
+    "gemma-3n": {
+      "promptPerMTokUsd": 0.0,
+      "completionPerMTokUsd": 0.0,
+      "description": "Gemma 3n - Open model optimized for on-device performance, completely free"
     }
   },
   "modelFamilyPatterns": [
     {
+      "pattern": "^gemini-3-pro",
+      "baseModel": "gemini-3-pro-preview",
+      "description": "Gemini 3 Pro variants - most advanced multimodal model family"
+    },
+    {
       "pattern": "^gemini-2\\.5-pro",
       "baseModel": "gemini-2.5-pro",
-      "description": "Gemini 2.5 Pro variants - next generation advanced model family"
+      "description": "Gemini 2.5 Pro variants - advanced multi-purpose model family"
+    },
+    {
+      "pattern": "^gemini-2\\.5-flash-lite",
+      "baseModel": "gemini-2.5-flash-lite",
+      "description": "Gemini 2.5 Flash-Lite variants - most cost-effective model family"
     },
     {
       "pattern": "^gemini-2\\.5-flash",
       "baseModel": "gemini-2.5-flash",
-      "description": "Gemini 2.5 Flash variants - next generation fast model family"
+      "description": "Gemini 2.5 Flash variants - mixed reasoning model family"
     },
     {
-      "pattern": "^gemini-2\\.0-pro",
-      "baseModel": "gemini-2.0-pro",
-      "description": "Gemini 2.0 Pro variants - advanced reasoning model family"
+      "pattern": "^gemini-2\\.5-computer-use",
+      "baseModel": "gemini-2.5-computer-use-preview-10-2025",
+      "description": "Gemini 2.5 Computer Use variants - browser automation agents"
+    },
+    {
+      "pattern": "^gemini-2\\.0-flash-thinking",
+      "baseModel": "gemini-2.0-flash-thinking-exp",
+      "description": "Gemini 2.0 Flash Thinking variants - extended reasoning capabilities"
+    },
+    {
+      "pattern": "^gemini-2\\.0-flash-lite",
+      "baseModel": "gemini-2.0-flash-lite",
+      "description": "Gemini 2.0 Flash-Lite variants - smallest 2.0 model"
     },
     {
       "pattern": "^gemini-2\\.0-flash",
       "baseModel": "gemini-2.0-flash",
-      "description": "Gemini 2.0 Flash variants - latest fast model family"
+      "description": "Gemini 2.0 Flash variants - balanced multimodal model family"
     },
     {
-      "pattern": "^gemini-1\\.0-pro",
-      "baseModel": "gemini-1.0-pro",
-      "description": "Gemini 1.0 Pro variants - legacy model family",
-      "deprecated": true
+      "pattern": "^gemini-robotics",
+      "baseModel": "gemini-robotics-er-1.5-preview",
+      "description": "Gemini Robotics variants - embodied reasoning for robotics"
     },
     {
-      "pattern": "^gemini-pro",
-      "baseModel": "gemini-pro",
-      "description": "Gemini Pro variants - legacy naming",
-      "deprecated": true
+      "pattern": "^gemma-3n",
+      "baseModel": "gemma-3n",
+      "description": "Gemma 3n variants - open model for on-device"
+    },
+    {
+      "pattern": "^gemma-3",
+      "baseModel": "gemma-3",
+      "description": "Gemma 3 variants - open model"
     }
   ],
   "notes": [
-    "Pricing is per 1M tokens as of October 2025",
-    "Gemini models use input and output tokens in API responses",
-    "All prices are in USD",
-    "Gemini 1.5 models are deprecated and no longer supported",
-    "Gemini 2.0 and 2.5 series are the current generation models",
-    "Experimental models may have different pricing when generally available",
-    "Batch processing and other optimizations may affect final pricing",
-    "Legacy models (1.0 Pro, Pro) are marked as deprecated"
+    "Pricing from official Google AI pricing page: https://ai.google.dev/pricing (as of 2025-11-22)",
+    "All prices are in USD per 1 million tokens",
+    "Prices shown are for HIGHEST tier when tiered pricing exists (e.g., prompts > 200K tokens)",
+    "Some models have tiered pricing based on prompt length - check official docs for details",
+    "Audio input pricing is typically higher than text/image/video - prices shown use audio rates where applicable",
+    "Gemini 3 Pro: $2.00/$4.00 input, $12.00/$18.00 output (based on prompt length)",
+    "Gemini 2.5 Pro: $1.25/$2.50 input, $10.00/$15.00 output (based on prompt length)",
+    "Gemini 2.5 Flash: $0.30/$1.00 input, $2.50 output (text vs audio input)",
+    "Gemini 2.5 Flash-Lite: $0.10/$0.30 input, $0.40 output (text vs audio input)",
+    "Gemini 2.0 Flash: $0.10/$0.70 input, $0.40 output (text vs audio input)",
+    "Free tier available for many models with rate limits - see official pricing page",
+    "Context caching and grounding tools have additional charges - not reflected in these base prices",
+    "Gemma models are completely free and open source",
+    "Batch processing can reduce costs by 50% for supported models",
+    "Image generation, TTS, and other specialized variants have different pricing structures"
   ]
 }
