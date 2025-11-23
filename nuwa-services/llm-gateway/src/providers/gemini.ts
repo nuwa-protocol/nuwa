@@ -31,7 +31,9 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
 
   /**
    * Prepare request data for Google Gemini API
-   * Converts OpenAI-style tools to Gemini functionDeclarations format
+   * Supports both OpenAI and Gemini native formats
+   * - OpenAI format: converts to Gemini functionDeclarations
+   * - Gemini native format: passes through unchanged
    */
   prepareRequestData(data: any, isStream: boolean): any {
     if (!data || typeof data !== 'object') {
@@ -40,16 +42,28 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
 
     const preparedData = { ...data };
 
-    // Convert OpenAI tools format to Gemini functionDeclarations
+    // Handle tools: support both OpenAI and Gemini native formats
     if (data.tools && Array.isArray(data.tools)) {
-      preparedData.tools = this.convertToolsToGeminiFormat(data.tools);
+      // Check if tools are already in Gemini format
+      const isGeminiFormat = data.tools.some(
+        (tool) => tool.functionDeclarations !== undefined
+      );
+
+      if (isGeminiFormat) {
+        // Already in Gemini format, keep as-is
+        preparedData.tools = data.tools;
+      } else {
+        // OpenAI format, convert to Gemini
+        preparedData.tools = this.convertToolsToGeminiFormat(data.tools);
+      }
     }
 
-    // Convert tool_choice to Gemini toolConfig
+    // Convert tool_choice to Gemini toolConfig (only if tool_choice exists)
     if (data.tool_choice) {
       preparedData.toolConfig = this.convertToolChoiceToGeminiFormat(data.tool_choice);
       delete preparedData.tool_choice;
     }
+    // If toolConfig already exists (Gemini native), keep it
 
     return preparedData;
   }
