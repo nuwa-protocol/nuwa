@@ -46,7 +46,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
     if (data.tools && Array.isArray(data.tools)) {
       // Check if tools are already in Gemini format
       const isGeminiFormat = data.tools.some(
-        (tool) => tool.functionDeclarations !== undefined
+        (tool: any) => tool.functionDeclarations !== undefined
       );
 
       if (isGeminiFormat) {
@@ -243,7 +243,9 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       const part = parts[i];
       if (part.functionCall) {
         toolCalls.push({
-          id: `call_${Date.now()}_${i}`, // Generate unique ID
+          // Generate unique ID: timestamp + random string + index
+          // This prevents duplicates even if multiple calls happen in the same millisecond
+          id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${i}`,
           type: 'function',
           function: {
             name: part.functionCall.name,

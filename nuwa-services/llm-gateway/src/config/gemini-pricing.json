@@ -86,6 +86,11 @@
   },
   "modelFamilyPatterns": [
     {
+      "description": "IMPORTANT: Pattern ordering matters! More specific patterns MUST come before less specific ones.",
+      "description2": "Example: '^gemini-2\\.5-flash-lite' must be before '^gemini-2\\.5-flash' to prevent incorrect matches.",
+      "description3": "When adding new patterns, place more specific variants (with suffixes like -lite, -thinking, -exp) BEFORE their base variants."
+    },
+    {
       "pattern": "^gemini-3-pro",
       "baseModel": "gemini-3-pro-preview",
       "description": "Gemini 3 Pro variants - most advanced multimodal model family"
@@ -142,6 +147,7 @@
     }
   ],
   "notes": [
+    "⚠️  PATTERN ORDERING: modelFamilyPatterns array order is critical! More specific patterns MUST come before less specific ones to prevent incorrect matches.",
     "Pricing from official Google AI pricing page: https://ai.google.dev/pricing (as of 2025-11-22)",
     "All prices are in USD per 1 million tokens",
     "Prices shown are for HIGHEST tier when tiered pricing exists (e.g., prompts > 200K tokens)",
