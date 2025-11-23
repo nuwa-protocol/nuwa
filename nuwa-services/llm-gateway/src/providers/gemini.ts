@@ -10,7 +10,7 @@ import { GEMINI_PATHS } from './constants.js';
 
 /**
  * Google Gemini Provider Implementation
- * Handles requests to Google Gemini API with OpenAI-compatible interface
+ * Handles requests to Google Gemini API using Gemini native format
  */
 export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
@@ -31,101 +31,10 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
 
   /**
    * Prepare request data for Google Gemini API
-   * Supports both OpenAI and Gemini native formats
-   * - OpenAI format: converts to Gemini functionDeclarations
-   * - Gemini native format: passes through unchanged
+   * Expects Gemini native format only
    */
   prepareRequestData(data: any, isStream: boolean): any {
-    if (!data || typeof data !== 'object') {
-      return data;
-    }
-
-    const preparedData = { ...data };
-
-    // Handle tools: support both OpenAI and Gemini native formats
-    if (data.tools && Array.isArray(data.tools)) {
-      // Check if tools are already in Gemini format
-      const isGeminiFormat = data.tools.some(
-        (tool: any) => tool.functionDeclarations !== undefined
-      );
-
-      if (isGeminiFormat) {
-        // Already in Gemini format, keep as-is
-        preparedData.tools = data.tools;
-      } else {
-        // OpenAI format, convert to Gemini
-        preparedData.tools = this.convertToolsToGeminiFormat(data.tools);
-      }
-    }
-
-    // Convert tool_choice to Gemini toolConfig (only if tool_choice exists)
-    if (data.tool_choice) {
-      preparedData.toolConfig = this.convertToolChoiceToGeminiFormat(data.tool_choice);
-      delete preparedData.tool_choice;
-    }
-    // If toolConfig already exists (Gemini native), keep it
-
-    return preparedData;
-  }
-
-  /**
-   * Convert OpenAI tools format to Gemini functionDeclarations format
-   * OpenAI: [{ type: "function", function: { name, description, parameters } }]
-   * Gemini: [{ functionDeclarations: [{ name, description, parameters }] }]
-   */
-  private convertToolsToGeminiFormat(tools: any[]): any[] {
-    // Extract function tools only (Gemini doesn't support web_search, file_search, etc.)
-    const functionTools = tools.filter((tool) => tool.type === 'function' && tool.function);
-
-    if (functionTools.length === 0) {
-      return [];
-    }
-
-    // Convert to Gemini format
-    const functionDeclarations = functionTools.map((tool) => {
-      const func = tool.function;
-      return {
-        name: func.name,
-        description: func.description || '',
-        parameters: func.parameters || { type: 'object', properties: {} },
-      };
-    });
-
-    return [{ functionDeclarations }];
-  }
-
-  /**
-   * Convert OpenAI tool_choice to Gemini toolConfig
-   * OpenAI: "auto" | "none" | "required" | { type: "function", function: { name } }
-   * Gemini: { functionCallingConfig: { mode: "AUTO" | "NONE" | "ANY", allowedFunctionNames?: [...] } }
-   */
-  private convertToolChoiceToGeminiFormat(toolChoice: any): any {
-    if (typeof toolChoice === 'string') {
-      // Convert string values
-      switch (toolChoice.toLowerCase()) {
-        case 'auto':
-          return { functionCallingConfig: { mode: 'AUTO' } };
-        case 'none':
-          return { functionCallingConfig: { mode: 'NONE' } };
-        case 'required':
-          return { functionCallingConfig: { mode: 'ANY' } };
-        default:
-          return { functionCallingConfig: { mode: 'AUTO' } };
-      }
-    }
-
-    // Convert object format: { type: "function", function: { name } }
-    if (toolChoice.type === 'function' && toolChoice.function?.name) {
-      return {
-        functionCallingConfig: {
-          mode: 'ANY',
-          allowedFunctionNames: [toolChoice.function.name],
-        },
-      };
-    }
-
-    // Default to AUTO
-    return { functionCallingConfig: { mode: 'AUTO' } };
+    return data;
   }
 
   /**
@@ -366,7 +275,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   /**
    * Create test request for the given endpoint
    * Implementation of TestableLLMProvider interface
-   * Converts OpenAI-style options to Gemini format
+   * Uses Gemini native format
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
@@ -381,14 +290,11 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       finalEndpoint = endpoint.replace('{model}', model);
     }
 
-    // Convert OpenAI-style messages to Gemini contents format
+    // Use Gemini contents format
     let contents: any[];
     if (options.contents) {
       // Use provided contents directly
       contents = options.contents;
-    } else if (options.messages) {
-      // Convert from OpenAI messages format
-      contents = this.convertMessagesToContents(options.messages);
     } else {
       // Use default message
       const message = options.message || defaults.message;
@@ -416,17 +322,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
     }
 
     return request;
-  }
-
-  /**
-   * Convert OpenAI-style messages to Gemini contents format
-   * Maps roles and content structure appropriately
-   */
-  private convertMessagesToContents(messages: any[]): any[] {
-    return messages.map((message) => ({
-      parts: [{ text: message.content || '' }],
-      role: message.role === 'assistant' ? 'model' : 'user',
-    }));
   }
 }
 
