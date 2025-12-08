@@ -195,7 +195,7 @@ createDIDViaCADOPWithControllerAndScopes(
 
 ## 9. 影响范围（代码）
 
-- `nuwa-services/cadop-service/typescript/packages/cadop-api/`
+- `nuwa-services/cadop-service/packages/cadop-api/`
   - `src/routes/idp.ts`：新增 `/api/idp/verify-bitcoin`，扩展 challenge。
   - `src/services/IdpService.ts`：新增 Bitcoin 验证与扩展 JWT 签发。
   - `src/services/CustodianService.ts`：按 provider/控制者 DID 分流调用。

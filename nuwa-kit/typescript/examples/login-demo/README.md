@@ -96,7 +96,7 @@ To integrate "Login with Nuwa Agent" in your own application:
 4. Store the key and Agent DID
 5. Use the key for signing operations
 
-For more details, see the [Integration Guide](https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/typescript/docs/third_party_login_integration.md).
+For more details, see the [Integration Guide](https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/docs/third_party_login_integration.md).
 
 ## License
 
