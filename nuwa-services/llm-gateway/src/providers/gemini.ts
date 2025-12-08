@@ -10,7 +10,7 @@ import { GEMINI_PATHS } from './constants.js';
 
 /**
  * Google Gemini Provider Implementation
- * Handles requests to Google Gemini API with OpenAI-compatible interface
+ * Handles requests to Google Gemini API using Gemini native format
  */
 export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvider {
   private baseURL: string;
@@ -31,15 +31,10 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
 
   /**
    * Prepare request data for Google Gemini API
-   * Currently returns data as-is, can be extended for special handling
+   * Expects Gemini native format only
    */
   prepareRequestData(data: any, isStream: boolean): any {
-    if (!data || typeof data !== 'object') {
-      return data;
-    }
-
-    // Return data as-is - Gemini doesn't require special request modifications
-    return { ...data };
+    return data;
   }
 
   /**
@@ -101,18 +96,116 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   /**
    * Parse response from Google Gemini API
    * Normalizes Gemini response format to be compatible with gateway expectations
+   * Converts Gemini functionCall responses to OpenAI-compatible tool_calls format
    */
   parseResponse(response: AxiosResponse): any {
     try {
       const data = response.data;
 
-      // Return data as-is - Gemini response is already well-structured
-      // The usage extractor will handle extracting usage from usageMetadata
+      // Convert Gemini function calls to OpenAI tool_calls format if present
+      if (data.candidates && Array.isArray(data.candidates)) {
+        for (const candidate of data.candidates) {
+          if (candidate.content?.parts) {
+            const toolCalls = this.extractToolCallsFromParts(candidate.content.parts);
+
+            // If tool calls found, add them to the candidate in OpenAI format
+            if (toolCalls.length > 0) {
+              // Create a message structure compatible with OpenAI format
+              if (!candidate.message) {
+                candidate.message = {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: toolCalls,
+                };
+              } else {
+                candidate.message.tool_calls = toolCalls;
+              }
+            }
+          }
+        }
+      }
+
+      // Add tool_calls_count to usageMetadata if function calls are present
+      if (data.usageMetadata && this.hasToolCalls(data)) {
+        const toolCallCounts = this.extractToolCallCounts(data);
+        if (Object.keys(toolCallCounts).length > 0) {
+          data.usageMetadata.tool_calls_count = toolCallCounts;
+        }
+      }
+
       return data;
     } catch (error) {
       console.error('Error parsing Gemini response:', error);
       return null;
     }
+  }
+
+  /**
+   * Extract tool calls from Gemini response parts
+   * Gemini: parts[{ functionCall: { name, args } }]
+   * OpenAI: tool_calls[{ id, type, function: { name, arguments } }]
+   */
+  private extractToolCallsFromParts(parts: any[]): any[] {
+    const toolCalls: any[] = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (part.functionCall) {
+        toolCalls.push({
+          // Generate unique ID: timestamp + random string + index
+          // This prevents duplicates even if multiple calls happen in the same millisecond
+          id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${i}`,
+          type: 'function',
+          function: {
+            name: part.functionCall.name,
+            arguments: JSON.stringify(part.functionCall.args || {}),
+          },
+        });
+      }
+    }
+
+    return toolCalls;
+  }
+
+  /**
+   * Check if Gemini response contains function calls
+   */
+  private hasToolCalls(data: any): boolean {
+    if (!data.candidates || !Array.isArray(data.candidates)) {
+      return false;
+    }
+
+    return data.candidates.some((candidate: any) => {
+      if (!candidate.content?.parts) {
+        return false;
+      }
+      return candidate.content.parts.some((part: any) => !!part.functionCall);
+    });
+  }
+
+  /**
+   * Extract tool call counts from Gemini response
+   * For Gemini, all function calls are counted as 'function' type
+   * This is compatible with the gateway's cost calculation system
+   */
+  private extractToolCallCounts(data: any): Record<string, number> {
+    let functionCallCount = 0;
+
+    if (data.candidates && Array.isArray(data.candidates)) {
+      for (const candidate of data.candidates) {
+        if (candidate.content?.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.functionCall) {
+              functionCallCount++;
+            }
+          }
+        }
+      }
+    }
+
+    // Return counts in the format expected by the gateway
+    // Note: Gemini only supports function calls, not other tool types
+    return functionCallCount > 0 ? { function: functionCallCount } : {};
   }
 
   /**
@@ -159,9 +252,10 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   getTestModels(): string[] {
     return [
-      'gemini-2.0-flash-exp',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash-lite',
     ];
   }
 
@@ -171,7 +265,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
    */
   getDefaultTestOptions(): Record<string, any> {
     return {
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       message: 'Hello, this is a test message.',
       maxTokens: 50,
       temperature: 0.7,
@@ -181,7 +275,7 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
   /**
    * Create test request for the given endpoint
    * Implementation of TestableLLMProvider interface
-   * Converts OpenAI-style options to Gemini format
+   * Uses Gemini native format
    */
   createTestRequest(endpoint: string, options: Record<string, any> = {}): any {
     const defaults = this.getDefaultTestOptions();
@@ -196,14 +290,11 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
       finalEndpoint = endpoint.replace('{model}', model);
     }
 
-    // Convert OpenAI-style messages to Gemini contents format
+    // Use Gemini contents format
     let contents: any[];
     if (options.contents) {
       // Use provided contents directly
       contents = options.contents;
-    } else if (options.messages) {
-      // Convert from OpenAI messages format
-      contents = this.convertMessagesToContents(options.messages);
     } else {
       // Use default message
       const message = options.message || defaults.message;
@@ -231,17 +322,6 @@ export class GeminiProvider extends BaseLLMProvider implements TestableLLMProvid
     }
 
     return request;
-  }
-
-  /**
-   * Convert OpenAI-style messages to Gemini contents format
-   * Maps roles and content structure appropriately
-   */
-  private convertMessagesToContents(messages: any[]): any[] {
-    return messages.map((message) => ({
-      parts: [{ text: message.content || '' }],
-      role: message.role === 'assistant' ? 'model' : 'user',
-    }));
   }
 }
 
