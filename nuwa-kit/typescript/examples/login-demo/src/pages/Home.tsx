@@ -172,7 +172,7 @@ export function Home() {
           </a>{' '}
           |
           <a
-            href="https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/typescript/docs/third_party_login_integration.md"
+            href="https://github.com/rooch-network/nuwa/tree/main/nuwa-services/cadop-service/docs/third_party_login_integration.md"
             target="_blank"
             rel="noopener noreferrer"
           >

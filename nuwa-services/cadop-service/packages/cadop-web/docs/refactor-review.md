@@ -2,7 +2,7 @@
 
 > 版本：v1  日期：2025-06-24
 >
-> 本文档总结了对 `nuwa-services/cadop-service/typescript/packages/cadop-web` 代码库的最终 Review 结果，聚焦于 **"精简、去重复、模块抽取"** 三大目标，为后续 PR 及版本迭代提供指南。
+> 本文档总结了对 `nuwa-services/cadop-service/packages/cadop-web` 代码库的最终 Review 结果，聚焦于 **"精简、去重复、模块抽取"** 三大目标，为后续 PR 及版本迭代提供指南。
 
 ---
 
