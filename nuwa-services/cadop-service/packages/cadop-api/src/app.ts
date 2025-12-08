@@ -48,6 +48,9 @@ async function startApp(): Promise<Application> {
 
     const app = express();
 
+    // Trust proxy configuration for accurate client IP detection
+    app.set('trust proxy', config.trustProxy);
+
     // Security middleware
     app.use(helmet());
 

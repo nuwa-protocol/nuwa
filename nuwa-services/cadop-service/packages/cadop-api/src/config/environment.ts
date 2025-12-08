@@ -26,6 +26,9 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
 
+  // Trust Proxy
+  TRUST_PROXY: z.string().default('true'),
+
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_FORMAT: z.enum(['json', 'simple']).default('json'),
@@ -56,6 +59,8 @@ export const config = {
     windowMs: parseInt(env.RATE_LIMIT_WINDOW_MS, 10),
     maxRequests: parseInt(env.RATE_LIMIT_MAX_REQUESTS, 10),
   },
+  // Trust Proxy configuration
+  trustProxy: env.TRUST_PROXY === 'true' ? true : env.TRUST_PROXY === 'false' ? false : env.TRUST_PROXY,
   // Bitcoin configuration removed - using standard Bitcoin message signing
   logging: {
     level: env.LOG_LEVEL,
