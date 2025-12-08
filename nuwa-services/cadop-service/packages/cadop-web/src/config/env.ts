@@ -8,22 +8,26 @@
 export interface AppEnvConfig {
   roochRpcUrl: string;
   apiUrl: string;
+  isTestnet: boolean;
 }
 
 // These are the canonical endpoint values for each deployment tier.
 const PRODUCTION_CONFIG: AppEnvConfig = {
   roochRpcUrl: 'https://main-seed.rooch.network',
   apiUrl: 'https://cadop.nuwa.dev',
+  isTestnet: false,
 };
 
 const TESTNET_CONFIG: AppEnvConfig = {
   roochRpcUrl: 'https://test-seed.rooch.network',
   apiUrl: 'https://test-cadop.nuwa.dev',
+  isTestnet: true,
 };
 
 const LOCAL_CONFIG: AppEnvConfig = {
   roochRpcUrl: 'http://localhost:6767',
   apiUrl: 'http://localhost:8080',
+  isTestnet: true,
 };
 
 /**
@@ -56,7 +60,11 @@ function buildConfig(): AppEnvConfig {
 
   // If both env vars are provided, honour them directly.
   if (envRooch && envApi) {
-    return { roochRpcUrl: envRooch, apiUrl: envApi };
+    return {
+      roochRpcUrl: envRooch,
+      apiUrl: envApi,
+      isTestnet: envRooch.includes('test') || envRooch.includes('localhost'),
+    };
   }
 
   // Otherwise derive from hostname.
@@ -72,6 +80,7 @@ const CONFIG = buildConfig();
 
 export const ROOCH_RPC_URL = CONFIG.roochRpcUrl;
 export const API_URL = CONFIG.apiUrl;
+export const IS_TESTNET = CONFIG.isTestnet;
 
 // Default Asset Id for Rooch RGAS
 export const DEFAULT_ASSET_ID = '0x3::gas_coin::RGas';

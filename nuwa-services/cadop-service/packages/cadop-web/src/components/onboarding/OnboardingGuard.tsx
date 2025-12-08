@@ -3,7 +3,7 @@ import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Spinner } from '@/components/ui';
-import { ROOCH_RPC_URL } from '@/config/env';
+import { ROOCH_RPC_URL, IS_TESTNET } from '@/config/env';
 import { AuthStore, UserStore } from '@/lib/storage';
 import { ClaimGasStep } from './steps/ClaimGasStep';
 import { CreateAgentStep } from './steps/CreateAgentStep';
@@ -26,6 +26,12 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   const [loading, setLoading] = useState(false);
 
   const checkGas = useCallback(async (did: string) => {
+    // Skip gas claim on mainnet
+    if (!IS_TESTNET) {
+      setStep('done');
+      return;
+    }
+
     try {
       setLoading(true);
       const address = did.split(':')[2];
