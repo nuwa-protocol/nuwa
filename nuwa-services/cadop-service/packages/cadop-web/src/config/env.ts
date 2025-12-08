@@ -86,9 +86,7 @@ export const IS_TESTNET = CONFIG.isTestnet;
 export const DEFAULT_ASSET_ID = '0x3::gas_coin::RGas';
 
 // ---------------- RoochScan helpers ----------------
-const ROOCH_SCAN_BASE = CONFIG.roochRpcUrl.includes('test')
-  ? 'https://test.roochscan.io'
-  : 'https://roochscan.io';
+const ROOCH_SCAN_BASE = CONFIG.isTestnet ? 'https://test.roochscan.io' : 'https://roochscan.io';
 
 /**
  * Build a RoochScan account URL for given Rooch address.
