@@ -69,7 +69,8 @@ export class ServiceContainer {
       logger.info('Initializing CadopKit...');
       //TODO use KeyManager.fromSerializedKey, the serialized key is include the key fragment, and do not hardcode it here
       const keyManager = KeyManager.createEmpty(this.serviceConfig.cadopDid);
-      await keyManager.importRoochKeyPair('account-key', keypair);
+      const fragment = process.env.CADOP_KEY_FRAGMENT || 'account-key';
+      await keyManager.importRoochKeyPair(fragment, keypair);
       const cadopKit = await CadopIdentityKit.fromServiceDID(
         this.serviceConfig.cadopDid,
         keyManager
