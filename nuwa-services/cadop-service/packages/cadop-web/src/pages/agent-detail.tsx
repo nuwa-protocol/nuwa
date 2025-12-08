@@ -29,7 +29,7 @@ import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
 import { usePaymentHubClient } from '../hooks/usePaymentHubClient';
-import { DEFAULT_ASSET_ID } from '@/config/env';
+import { DEFAULT_ASSET_ID, IS_TESTNET } from '@/config/env';
 import { claimTestnetGas } from '@/lib/rooch/faucet';
 import { buildRoochScanAccountUrl } from '@/config/env';
 import { useToast } from '@/hooks/use-toast';
@@ -457,21 +457,23 @@ export function AgentDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col gap-2">
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      onClick={() => handleClaimRgas()}
-                      disabled={isClaiming || hasClaimed || !agentAddress}
-                    >
-                      <Gift className="mr-2 h-4 w-4" />
-                      {!agentAddress
-                        ? 'Invalid Address'
-                        : isClaiming
-                          ? t('agent.claiming', { defaultValue: 'Claiming...' })
-                          : hasClaimed
-                            ? t('agent.claimed', { defaultValue: 'Claimed' })
-                            : t('agent.claimRgas', { defaultValue: 'Claim RGAS' })}
-                    </Button>
+                    {IS_TESTNET && (
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={() => handleClaimRgas()}
+                        disabled={isClaiming || hasClaimed || !agentAddress}
+                      >
+                        <Gift className="mr-2 h-4 w-4" />
+                        {!agentAddress
+                          ? 'Invalid Address'
+                          : isClaiming
+                            ? t('agent.claiming', { defaultValue: 'Claiming...' })
+                            : hasClaimed
+                              ? t('agent.claimed', { defaultValue: 'Claimed' })
+                              : t('agent.claimRgas', { defaultValue: 'Claim RGAS' })}
+                      </Button>
+                    )}
                     <Button
                       className="w-full"
                       variant="outline"
