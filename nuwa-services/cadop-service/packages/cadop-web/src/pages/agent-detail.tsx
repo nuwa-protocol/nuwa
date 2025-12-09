@@ -24,7 +24,7 @@ import { ConditionalRevenueCard } from '@/components/revenue/ConditionalRevenueC
 import { ServiceManagement } from '@/components/service/ServiceManagement';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
-import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2 } from 'lucide-react';
+import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2, Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Info } from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
@@ -36,6 +36,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useHubDeposit } from '@/hooks/useHubDeposit';
 import { hasControllerAccess } from '@/lib/utils/didCompatibility';
 import { formatBigIntWithDecimals } from '@/utils/formatters';
+import {
+  TransferAccountModal,
+  TransferHubModal,
+  DepositToHubModal,
+  WithdrawFromHubModal,
+} from '@/components/transfer';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function AgentDetailPage() {
   const { t } = useTranslation();
@@ -55,6 +62,12 @@ export function AgentDetailPage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Transfer modal states
+  const [transferAccountOpen, setTransferAccountOpen] = useState(false);
+  const [transferHubOpen, setTransferHubOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const {
     balances: agentAccountBalances,
@@ -139,6 +152,14 @@ export function AgentDetailPage() {
     } finally {
       setPaymentHubRgasLoading(false);
     }
+  };
+
+  // Unified transfer success handler
+  const handleTransferSuccess = () => {
+    // Refresh all balance-related data
+    refetchAgentAccountBalances();
+    refetchPaymentHubState();
+    refetchPaymentHubRgas();
   };
 
   useEffect(() => {
@@ -283,7 +304,24 @@ export function AgentDetailPage() {
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>{t('agent.balance')}</CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <CardTitle className="flex items-center">
+                        <Wallet className="h-5 w-5 mr-2" />
+                        {t('agent.accountBalance', 'Account Balance')}
+                      </CardTitle>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              {t('agent.accountBalanceTooltip', 'This is your on-chain account balance, available for regular transfers, gas fees, and other on-chain operations.')}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -294,37 +332,84 @@ export function AgentDetailPage() {
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    {agentAccountLoading ? (
-                      <SpinnerContainer loading={true} size="small" />
-                    ) : agentAccountBalances.length > 0 ? (
-                      <div className="space-y-2">
-                        {agentAccountBalances.map((bal, idx) => (
-                          <div
-                            key={idx}
-                            className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0"
-                          >
-                            <div className="flex items-center">
-                              <span className="font-medium">{bal.symbol}</span>
-                              <span className="ml-2 text-xs text-gray-500">{bal.name}</span>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {t('agent.accountBalanceDesc', 'Available balance for transfers and transactions')}
+                      </p>
+
+                      {agentAccountLoading ? (
+                        <SpinnerContainer loading={true} size="small" />
+                      ) : agentAccountBalances.length > 0 ? (
+                        <div className="space-y-2">
+                          {agentAccountBalances.map((bal, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"
+                            >
+                              <div className="flex items-center">
+                                <span className="font-medium text-lg">{bal.symbol}</span>
+                                <span className="ml-2 text-xs text-gray-500">{bal.name}</span>
+                              </div>
+                              <span className="font-mono font-semibold">{bal.fixedBalance}</span>
                             </div>
-                            <span>{bal.fixedBalance}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : agentAccountError ? (
-                      <div className="text-center py-2">
-                        <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">{t('agent.noBalance')}</span>
-                    )}
+                          ))}
+                        </div>
+                      ) : agentAccountError ? (
+                        <div className="text-center py-2">
+                          <span className="text-red-500">{t('agent.balanceLoadFailed')}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">{t('agent.noBalance')}</span>
+                      )}
+
+                      {/* Action buttons */}
+                      {agentAccountBalances.length > 0 && (
+                        <div className="flex space-x-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setTransferAccountOpen(true)}
+                            className="flex-1"
+                          >
+                            <ArrowUpRight className="h-4 w-4 mr-2" />
+                            {t('agent.transfer', 'Transfer')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDepositOpen(true)}
+                            className="flex-1"
+                          >
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            {t('agent.depositToHub', 'Deposit to Hub')}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 
                 {/* PaymentHub Balances - moved below account balance to keep same width */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>PaymentHub</CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <CardTitle className="flex items-center">
+                        <Wallet className="h-5 w-5 mr-2" />
+                        {t('agent.paymentChannelBalance', 'Payment Channel Balance')}
+                      </CardTitle>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              {t('agent.paymentChannelBalanceTooltip', 'This is the balance dedicated to payment channels. Payment channels enable fast, low-cost micro-payments without submitting on-chain transactions each time. When channels are active, a portion of the balance is locked as collateral.')}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -338,31 +423,65 @@ export function AgentDetailPage() {
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    {paymentHubStateLoading || paymentHubRgasLoading ? (
-                      <SpinnerContainer loading={true} size="small" />
-                    ) : paymentHubStateError || paymentHubRgasError ? (
-                      <div className="text-center py-2">
-                        <span className="text-red-500">
-                          {paymentHubStateError || paymentHubRgasError}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                        <div className="flex items-center">
-                          <span className="font-medium">RGas</span>
-                          {paymentHubActiveCounts[DEFAULT_ASSET_ID] !== undefined && (
-                            <Tag variant="info" className="ml-2">
-                              {t('agent.activeChannels', { defaultValue: 'Active Channels' })}:{' '}
-                              {paymentHubActiveCounts[DEFAULT_ASSET_ID]}
-                            </Tag>
-                          )}
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {t('agent.paymentChannelBalanceDesc', 'Reserved balance for fast payment channels')}
+                      </p>
+
+                      {paymentHubStateLoading || paymentHubRgasLoading ? (
+                        <SpinnerContainer loading={true} size="small" />
+                      ) : paymentHubStateError || paymentHubRgasError ? (
+                        <div className="text-center py-2">
+                          <span className="text-red-500">
+                            {paymentHubStateError || paymentHubRgasError}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <div>{paymentHubRgasAmount}</div>
-                          <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                            <div className="flex items-center">
+                              <span className="font-medium text-lg">RGAS</span>
+                              {paymentHubActiveCounts[DEFAULT_ASSET_ID] !== undefined && (
+                                <Tag variant="info" className="ml-2">
+                                  {t('agent.activeChannels', { defaultValue: 'Active Channels' })}:{' '}
+                                  {paymentHubActiveCounts[DEFAULT_ASSET_ID]}
+                                </Tag>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-mono font-semibold">{paymentHubRgasAmount}</div>
+                              <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
+                            </div>
+                          </div>
+
+                          {/* Additional balance info could go here if needed */}
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Action buttons */}
+                      {(!paymentHubStateLoading && !paymentHubRgasLoading && !paymentHubStateError && !paymentHubRgasError) && (
+                        <div className="flex space-x-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setTransferHubOpen(true)}
+                            className="flex-1"
+                          >
+                            <ArrowUpRight className="h-4 w-4 mr-2" />
+                            {t('agent.transfer', 'Transfer')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWithdrawOpen(true)}
+                            className="flex-1"
+                          >
+                            <ArrowDownRight className="h-4 w-4 mr-2" />
+                            {t('agent.withdraw', 'Withdraw')}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -543,6 +662,42 @@ export function AgentDetailPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Transfer Modals */}
+      {did && agentAccountBalances.length > 0 && (
+        <>
+          <TransferAccountModal
+            open={transferAccountOpen}
+            onClose={() => setTransferAccountOpen(false)}
+            agentDid={did}
+            currentBalance={agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance || 0n}
+            onSuccess={handleTransferSuccess}
+          />
+
+          <DepositToHubModal
+            open={depositOpen}
+            onClose={() => setDepositOpen(false)}
+            agentDid={did}
+            currentAccountBalance={agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance || 0n}
+            currentHubBalance={0n} // We'll get this from the payment hub hook
+            onSuccess={handleTransferSuccess}
+          />
+
+          <TransferHubModal
+            open={transferHubOpen}
+            onClose={() => setTransferHubOpen(false)}
+            agentDid={did}
+            onSuccess={handleTransferSuccess}
+          />
+
+          <WithdrawFromHubModal
+            open={withdrawOpen}
+            onClose={() => setWithdrawOpen(false)}
+            agentDid={did}
+            onSuccess={handleTransferSuccess}
+          />
+        </>
+      )}
     </div>
   );
 }
