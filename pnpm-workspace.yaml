@@ -1,0 +1,10 @@
+packages:
+  # nuwa-kit packages
+  - 'nuwa-kit/typescript/packages/*'
+  # nuwa-kit examples (excluding certain packages)
+  - 'nuwa-kit/typescript/examples/*'
+  # nuwa-services
+  - 'nuwa-services/*'
+  # Exclusions
+  - '!nuwa-kit/typescript/packages/nuwa-client'
+  - '!nuwa-kit/typescript/packages/indexer'

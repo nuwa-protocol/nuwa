@@ -1,0 +1,40 @@
+{
+  "name": "nuwa-protocol",
+  "version": "1.0.0",
+  "description": "Nuwa Protocol - A decentralized DID and payment protocol",
+  "private": true,
+  "workspaces": [
+    "nuwa-kit/typescript/packages/*",
+    "nuwa-kit/typescript/examples/*",
+    "nuwa-services/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r --filter './nuwa-kit/typescript/packages/*' run build",
+    "build:examples": "pnpm -r --filter './nuwa-kit/typescript/examples/*' run build",
+    "build:services": "pnpm -r --filter './nuwa-services/*' run build",
+    "dev": "pnpm -r --parallel --filter './nuwa-kit/typescript/packages/*' run dev",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write .",
+    "changeset": "pnpm --filter nuwa-kit changeset",
+    "version-packages": "pnpm --filter nuwa-kit changeset version",
+    "release": "pnpm --filter nuwa-kit changeset publish",
+    "clean": "pnpm -r run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/cli": "^2.26.2",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0",
+  "pnpm": {
+    "overrides": {
+      "rimraf": "^5.0.10"
+    }
+  }
+}
