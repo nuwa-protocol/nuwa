@@ -1,19 +1,20 @@
 # Workspace-based build for MCP Server Proxy
-FROM node:20-alpine AS base
+FROM node:20-bookworm AS base
 
 # Install system dependencies for stdio upstream commands
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     python3 \
-    py3-pip \
+    python3-pip \
     git \
     curl \
-    bash
+    bash \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm globally (for Node.js packages)
 RUN npm install -g pnpm@9.15.4
 
-# Install uv and uvx for Python packages (using --break-system-packages for Alpine)
-RUN pip3 install --no-cache-dir --break-system-packages uv
+# Install uv and uvx for Python packages
+RUN pip3 install --no-cache-dir uv
 
 # Set working directory
 WORKDIR /app
