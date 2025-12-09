@@ -6,7 +6,8 @@
   "workspaces": [
     "nuwa-kit/typescript/packages/*",
     "nuwa-kit/typescript/examples/*",
-    "nuwa-services/*"
+    "nuwa-services/*",
+    "nuwa-services/cadop-service/packages/*"
   ],
   "scripts": {
     "build": "pnpm -r --filter './nuwa-kit/typescript/packages/*' run build",
