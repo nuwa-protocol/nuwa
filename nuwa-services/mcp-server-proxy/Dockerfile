@@ -10,11 +10,12 @@ RUN apt-get update && apt-get install -y \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv and uvx for Python packages
+# Use --break-system-packages flag for Debian 12+ (PEP 668)
+RUN pip3 install --no-cache-dir --break-system-packages uv
+
 # Install pnpm globally (for Node.js packages)
 RUN npm install -g pnpm@9.15.4
-
-# Install uv and uvx for Python packages
-RUN pip3 install --no-cache-dir uv
 
 # Set working directory
 WORKDIR /app
