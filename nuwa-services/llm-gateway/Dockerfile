@@ -1,4 +1,4 @@
-# Multi-stage build for LLM Gateway
+# Workspace-based build for LLM Gateway
 FROM node:20-alpine AS base
 
 # Install pnpm globally
@@ -7,21 +7,20 @@ RUN npm install -g pnpm@9.15.4
 # Set working directory
 WORKDIR /app
 
-# Install dependencies stage
-FROM base AS deps
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-# Install dependencies
-RUN pnpm install --frozen-lockfile --prod=false
-
-# Build stage
+# Build stage - build from workspace root
 FROM base AS builder
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-# Copy source code
+# Copy entire workspace (including built packages)
 COPY . .
-# Build the application
-RUN pnpm run build
+
+# Install workspace dependencies
+RUN npm install -g pnpm@9.15.4 && \
+    pnpm install --frozen-lockfile --prod=false
+
+# Build workspace packages first
+RUN pnpm build
+
+# Build the specific service
+RUN pnpm --filter @nuwa-ai/llm-gateway build
 
 # Production stage
 FROM base AS runner
@@ -32,12 +31,10 @@ RUN adduser --system --uid 1001 llmgateway
 # Set working directory
 WORKDIR /app
 
-# Copy built application
-COPY --from=builder --chown=llmgateway:nodejs /app/dist ./dist
-COPY --from=builder --chown=llmgateway:nodejs /app/package.json ./package.json
-
-# Install only production dependencies
-COPY --from=deps --chown=llmgateway:nodejs /app/node_modules ./node_modules
+# Copy built workspace dependencies and application
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/nuwa-services/llm-gateway/dist ./dist
+COPY --from=builder /app/nuwa-services/llm-gateway/package.json ./package.json
 
 # Create config directory for mounted configs
 RUN mkdir -p /app/config && chown llmgateway:nodejs /app/config

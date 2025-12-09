@@ -35,7 +35,10 @@ export enum McpServerType {
  * Enhanced server capabilities that extend standard MCP capabilities
  * with Nuwa payment protocol extensions
  */
-export interface EnhancedServerCapabilities extends ServerCapabilities {
+export interface EnhancedServerCapabilities extends Omit<
+  ServerCapabilities,
+  'experimental' | 'logging' | 'prompts' | 'resources' | 'tools' | 'tasks'
+> {
   /** Standard MCP capabilities */
   experimental?: Record<string, unknown>;
   logging?: Record<string, unknown>;

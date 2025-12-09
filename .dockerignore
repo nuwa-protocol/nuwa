@@ -47,15 +47,26 @@
 **/*.md
 !**/README.md
 
-# Examples and samples
+# Examples and samples (but keep examples needed for builds)
 **/examples
-**/sample
-**/demo
+!nuwa-kit/typescript/examples/*/package.json
+!nuwa-kit/typescript/examples/*/dist/**
 
 # Ignore other services/projects that are not needed
 website/
 nips/
-examples/
 contracts/
 agents/deps/
 deps/
+
+# Keep workspace files needed for Docker builds
+!nuwa-kit/typescript/packages/*/package.json
+!nuwa-kit/typescript/packages/*/dist/**
+!nuwa-kit/typescript/packages/*/src/**
+!nuwa-kit/typescript/pnpm-workspace.yaml
+!nuwa-kit/typescript/tsconfig.json
+!nuwa-services/*/package.json
+!nuwa-services/*/src/**
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+!package.json

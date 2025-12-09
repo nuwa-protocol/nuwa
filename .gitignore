@@ -75,3 +75,4 @@ pnpm-debug.log*
 .deployment-info
 **/.railway-project-id
 **/.deployment-info
+.claude

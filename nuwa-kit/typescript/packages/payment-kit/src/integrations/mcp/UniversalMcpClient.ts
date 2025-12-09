@@ -330,7 +330,16 @@ export class UniversalMcpClient {
   getStandardCapabilities(): ServerCapabilities {
     if (!this.capabilities) return {};
     const { nuwa, ...standard } = this.capabilities;
-    return standard;
+
+    // Convert to standard ServerCapabilities format
+    return {
+      experimental: standard.experimental,
+      logging: standard.logging,
+      prompts: standard.prompts,
+      resources: standard.resources,
+      tools: standard.tools,
+      ...standard,
+    } as ServerCapabilities;
   }
 
   /**

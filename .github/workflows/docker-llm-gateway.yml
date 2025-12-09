@@ -40,6 +40,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -53,11 +63,21 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Prepare for Docker build
+        run: |
+          # Install workspace dependencies from root
+          pnpm install --frozen-lockfile
+          # Build workspace packages first
+          pnpm build
+          # Create workspace context for Docker
+          echo "Workspace packages built successfully"
+
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: ./nuwa-services/llm-gateway
+          context: .
+          file: ./nuwa-services/llm-gateway/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
