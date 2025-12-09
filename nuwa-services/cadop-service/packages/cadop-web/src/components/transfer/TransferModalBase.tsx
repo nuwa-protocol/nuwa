@@ -12,17 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Space } from '@/components/ui/space';
 import {
   X,
   Info,
   AlertCircle,
   CheckCircle,
   Wallet,
-  ArrowUpRight,
-  ArrowDownRight
 } from 'lucide-react';
 import { formatAddressDisplay, PercentageHelpers } from '@/utils/addressValidation';
 
@@ -172,7 +168,10 @@ export function TransferModalBase({
     const recipientValid = showRecipientInput ? validateRecipientInput(recipient) : { valid: true };
     const amountValid = showAmountInput ? validateAmountInput(amount) : { valid: true };
 
-    if (!recipient || !amount) {
+    const needsRecipient = showRecipientInput && !recipient;
+    const needsAmount = showAmountInput && !amount;
+
+    if (needsRecipient || needsAmount) {
       setStatus('idle');
       setError(null);
       return;

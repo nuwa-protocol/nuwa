@@ -9,11 +9,17 @@ describe('PaymentHubClient', () => {
   let contract: MockContract;
   let hubClient: PaymentHubClient;
   let mockSigner: any;
+  let payerDid: string;
+  let payeeDid: string;
+  let assetId: string;
 
   beforeEach(async () => {
     const testEnv = await createTestEnvironment('hub-test');
     contract = testEnv.contract;
     mockSigner = testEnv.payerSigner;
+    payerDid = testEnv.payerDid;
+    payeeDid = testEnv.payeeDid;
+    assetId = testEnv.asset.assetId;
 
     hubClient = new PaymentHubClient({
       contract,
@@ -161,6 +167,34 @@ describe('PaymentHubClient', () => {
         requiredAmount: BigInt(1),
       });
       expect(result).toBe(false);
+    });
+  });
+
+  describe('transfer', () => {
+    beforeEach(async () => {
+      await hubClient.deposit(assetId, BigInt(1000));
+    });
+
+    it('should transfer funds between hubs', async () => {
+      const result = await hubClient.transfer(payeeDid, assetId, BigInt(400));
+
+      expect(result.txHash).toMatch(/^transfer-hub-tx-/);
+
+      const senderBalance = await contract.getHubBalance(payerDid, assetId);
+      const receiverBalance = await contract.getHubBalance(payeeDid, assetId);
+
+      expect(senderBalance).toBe(BigInt(600));
+      expect(receiverBalance).toBe(BigInt(400));
+    });
+  });
+
+  describe('getUnlockedBalance', () => {
+    it('should return unlocked balance based on contract calculation', async () => {
+      await hubClient.deposit(assetId, BigInt(1000));
+
+      const unlocked = await hubClient.getUnlockedBalance({ assetId });
+
+      expect(unlocked).toBe(BigInt(800)); // Mock returns 80% unlocked
     });
   });
 });

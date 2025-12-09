@@ -77,6 +77,7 @@ export function AgentDetailPage() {
   } = useAgentBalances(did);
   // PaymentHub balances
   const {
+    balances: paymentHubBalances,
     activeCounts: paymentHubActiveCounts,
     loading: paymentHubStateLoading,
     error: paymentHubStateError,
@@ -670,7 +671,7 @@ export function AgentDetailPage() {
             open={transferAccountOpen}
             onClose={() => setTransferAccountOpen(false)}
             agentDid={did}
-            currentBalance={agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance || 0n}
+            currentBalance={BigInt(agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance ?? 0)}
             onSuccess={handleTransferSuccess}
           />
 
@@ -678,8 +679,10 @@ export function AgentDetailPage() {
             open={depositOpen}
             onClose={() => setDepositOpen(false)}
             agentDid={did}
-            currentAccountBalance={agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance || 0n}
-            currentHubBalance={0n} // We'll get this from the payment hub hook
+            currentAccountBalance={BigInt(
+              agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance ?? 0
+            )}
+            currentHubBalance={BigInt(paymentHubBalances?.[DEFAULT_ASSET_ID] ?? 0)}
             onSuccess={handleTransferSuccess}
           />
 

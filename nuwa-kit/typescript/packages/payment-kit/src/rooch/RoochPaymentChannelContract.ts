@@ -37,11 +37,7 @@ import type {
 import type { AssetInfo, SignedSubRAV, SubRAV, ChannelInfo } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
 import {
-  DebugLogger,
-  SignerInterface,
-  DidAccountSigner,
   parseDid,
-  isSignerInterface,
 } from '@nuwa-ai/identity-kit';
 import {
   calcChannelObjectId,
@@ -101,6 +97,11 @@ const RGAS_CANONICAL_TAG: string =
  * Default contract address for Rooch payment channels
  */
 const DEFAULT_PAYMENT_CHANNEL_MODULE = '0x3::payment_channel';
+
+/**
+ * Default lock amount per channel (asset units, e.g. 1 RGAS)
+ */
+const DEFAULT_LOCK_AMOUNT_PER_CHANNEL = 1_000_000n;
 
 /**
  * Rooch implementation of the Payment Channel Contract
@@ -831,10 +832,16 @@ export class RoochPaymentChannelContract
       // Validate parameters
       const { senderDid, receiverDid, assetId, amount, signer } = params;
 
+      // Parse sender DID for method validation
+      const senderParsed = parseDid(senderDid);
+      if (senderParsed.method !== 'rooch') {
+        throw badRequest(`Invalid sender DID method: expected 'rooch', got '${senderParsed.method}'`);
+      }
+
       // Parse receiver DID and convert to address
       const receiverParsed = parseDid(receiverDid);
       if (receiverParsed.method !== 'rooch') {
-        throw new Error(
+        throw badRequest(
           `Invalid receiver DID method: expected 'rooch', got '${receiverParsed.method}'`
         );
       }
@@ -862,7 +869,7 @@ export class RoochPaymentChannelContract
 
       // Check if the transaction was successful
       if (result.execution_info.status.type !== 'executed') {
-        throw new Error(`Transfer failed: ${result.execution_info.status.type}`);
+        throw mapTxFailureToPaymentKitError('transferToHub', result.execution_info);
       }
 
       const txHash = result.execution_info.tx_hash || '';
@@ -871,7 +878,7 @@ export class RoochPaymentChannelContract
       return { txHash };
     } catch (error) {
       this.getLogger().error('Error transferring from hub to hub:', error);
-      throw error;
+      throw wrapUnknownError('transferToHub', error);
     }
   }
 
@@ -890,12 +897,9 @@ export class RoochPaymentChannelContract
       const activeChannelsCounts = await this.getActiveChannelsCounts(ownerDid);
       const activeChannelsCount = activeChannelsCounts[assetId] || 0;
 
-      // Get asset info to determine lock amount per channel
-      const assetInfo = await this.getAssetInfo(assetId);
-
       // Default lock amount per channel (in asset units)
-      // This should be configurable or fetched from contract
-      const lockAmountPerChannel = BigInt(1000000); // 1 RGAS per channel by default
+      // This should be configurable or fetched from contract in future
+      const lockAmountPerChannel = DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
 
       const lockedBalance = BigInt(activeChannelsCount) * lockAmountPerChannel;
       const unlockedBalance =

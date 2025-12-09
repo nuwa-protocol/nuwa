@@ -114,10 +114,6 @@ export function WithdrawFromHubModal({
     }
   };
 
-  const getNewAccountBalance = (withdrawAmount: bigint) => {
-    return withdrawAmount;
-  };
-
   const getNewHubBalance = (withdrawAmount: bigint) => {
     const current = BigInt(totalBalance);
     return current > withdrawAmount ? current - withdrawAmount : 0n;
