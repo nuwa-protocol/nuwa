@@ -104,6 +104,19 @@ export class DidAccountSigner extends Signer implements SignerInterface {
     return this.wrappedSigner.signWithKeyId(input, this.keyId);
   }
 
+  // Expose WebAuthn signing when the underlying signer supports it
+  async signAssertion(challenge: Bytes): Promise<AuthenticatorAssertionResponse> {
+    const maybeWebAuthn = this.wrappedSigner as any;
+    if (maybeWebAuthn && typeof maybeWebAuthn.signAssertion === 'function') {
+      return maybeWebAuthn.signAssertion(challenge);
+    }
+    throw createSignerError(
+      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
+      'Underlying signer does not support WebAuthn assertions',
+      { did: this.did, keyId: this.keyId }
+    );
+  }
+
   async signTransaction(input: Transaction): Promise<Authenticator> {
     const txHash = input.hashData();
     const vmFragment = this.getVmFragment();
