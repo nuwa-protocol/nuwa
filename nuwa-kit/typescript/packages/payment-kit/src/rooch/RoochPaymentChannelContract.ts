@@ -96,7 +96,8 @@ const RGAS_CANONICAL_TAG: string =
 /**
  * Default contract address for Rooch payment channels
  */
-const DEFAULT_PAYMENT_CHANNEL_MODULE = '0x3::payment_channel';
+const PAYMENT_CHANNEL_MODULE = 'payment_channel';
+const DEFAULT_PAYMENT_CHANNEL_ADDRESS = '0x3';
 
 /**
  * Default lock amount per channel (asset units, e.g. 1 RGAS)
@@ -114,7 +115,12 @@ export class RoochPaymentChannelContract
   implements IPaymentChannelContract
 {
   constructor(options: RoochContractOptions = {}) {
-    super(options, DEFAULT_PAYMENT_CHANNEL_MODULE, 'RoochPaymentChannelContract');
+    // contractAddress here is address only; module appended per call
+    super(
+      { ...options, contractAddress: options.contractAddress || DEFAULT_PAYMENT_CHANNEL_ADDRESS },
+      DEFAULT_PAYMENT_CHANNEL_ADDRESS,
+      'RoochPaymentChannelContract'
+    );
   }
 
   async openChannel(params: OpenChannelParams): Promise<OpenChannelResult> {
@@ -137,7 +143,7 @@ export class RoochPaymentChannelContract
       // Create transaction to open channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::open_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::open_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier)],
         maxGas: 100000000,
@@ -197,7 +203,7 @@ export class RoochPaymentChannelContract
       // Create transaction to open channel with sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::open_channel_with_sub_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::open_channel_with_sub_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
@@ -244,7 +250,7 @@ export class RoochPaymentChannelContract
       // Create transaction to authorize sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::authorize_sub_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::authorize_sub_channel_entry`,
         args: [Args.objectId(params.channelId), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
@@ -283,7 +289,7 @@ export class RoochPaymentChannelContract
       // Create transaction to claim from channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::claim_from_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::claim_from_channel_entry`,
         args: [
           Args.objectId(subRav.channelId),
           Args.string(subRav.vmIdFragment),
@@ -335,14 +341,14 @@ export class RoochPaymentChannelContract
         const serializedProofs = CloseProofsSchema.serialize(params.closeProofs).toBytes();
 
         transaction.callFunction({
-          target: `${this.getContractAddress()}::close_channel_entry`,
+          target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::close_channel_entry`,
           args: [Args.objectId(params.channelId), Args.vec('u8', serializedProofs)],
           maxGas: 100000000,
         });
       } else {
         // Force close (initiate cancellation)
         transaction.callFunction({
-          target: `${this.getContractAddress()}::initiate_cancellation_entry`,
+          target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::initiate_cancellation_entry`,
           args: [Args.objectId(params.channelId)],
           maxGas: 100000000,
         });
@@ -520,7 +526,7 @@ export class RoochPaymentChannelContract
       // Create transaction to deposit to hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::deposit_to_hub_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::deposit_to_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(ownerParsed.identifier), Args.u256(params.amount)],
         maxGas: 100000000,
@@ -565,7 +571,7 @@ export class RoochPaymentChannelContract
       // Create transaction to withdraw from hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::withdraw_from_hub_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::withdraw_from_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.u256(params.amount)],
         maxGas: 100000000,
@@ -855,7 +861,7 @@ export class RoochPaymentChannelContract
 
       // Call the payment_channel::transfer_to_hub_entry function
       tx.callFunction({
-        target: `${this.getContractAddress()}::payment_channel::transfer_to_hub_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::transfer_to_hub_entry`,
         typeArgs: [assetId],
         args: [Args.address(receiverAddress), Args.u256(amount)],
         maxGas: 100000000,

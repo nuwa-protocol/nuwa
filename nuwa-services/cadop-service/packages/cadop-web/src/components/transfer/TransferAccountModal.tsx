@@ -4,6 +4,7 @@ import { TransferModalBase } from './TransferModalBase';
 import { useAccountTransfer } from '@/hooks/useAccountTransfer';
 import { normalizeAddress, isValidDID, isValidRoochAddress } from '@/utils/addressValidation';
 import { useToast } from '@/hooks/use-toast';
+import { DEFAULT_ASSET_ID } from '@/config/env';
 
 export interface TransferAccountModalProps {
   open: boolean;
@@ -28,7 +29,8 @@ export function TransferAccountModal({
 
   const handleTransfer = async (recipient: string, amount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
-      const result = await transfer(recipient, amount, '0x3::rgas::RGAS');
+      const normalizedRecipient = normalizeAddress(recipient);
+      const result = await transfer(normalizedRecipient, amount, DEFAULT_ASSET_ID);
 
       if (result.success) {
         toast({

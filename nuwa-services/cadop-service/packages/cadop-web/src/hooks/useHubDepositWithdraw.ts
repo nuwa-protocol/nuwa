@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePaymentHubClient } from './usePaymentHubClient';
 import { usePaymentHubBalances } from './usePaymentHubBalances';
 import { DEFAULT_ASSET_ID } from '@/config/env';
@@ -11,31 +11,42 @@ export interface HubOperationResult {
 
 export function useHubDepositWithdraw(agentDid?: string | null) {
   const { hubClient } = usePaymentHubClient(agentDid || undefined);
-  const { data: balances, refetch: refetchBalances } = usePaymentHubBalances(agentDid || undefined);
+  const {
+    balances,
+    activeCounts,
+    refetch: refetchBalances,
+  } = usePaymentHubBalances(agentDid || undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalBalance, setTotalBalance] = useState<bigint>(0n);
+  const [unlockedBalance, setUnlockedBalance] = useState<bigint>(0n);
+  const [lockedBalance, setLockedBalance] = useState<bigint>(0n);
+  const [activeChannels, setActiveChannels] = useState<number>(0);
 
-  /**
-   * Get unlocked balance for withdrawal
-   * Unlocked balance = total balance - locked balance
-   */
-  const getUnlockedBalance = useCallback((): bigint => {
-    if (!balances || !balances.rgas) return 0n;
+  // Refresh derived balances when raw balances change
+  useEffect(() => {
+    const refresh = async () => {
+      if (!hubClient || !agentDid) return;
 
-    const totalBalance = BigInt(balances.rgas.balance);
-    const lockedBalance = BigInt(balances.rgas.lockedBalance || 0);
+      const total = balances?.[DEFAULT_ASSET_ID] ? BigInt(balances[DEFAULT_ASSET_ID]) : 0n;
+      const unlocked = await hubClient.getUnlockedBalance({
+        ownerDid: agentDid,
+        assetId: DEFAULT_ASSET_ID,
+      });
+      setTotalBalance(total);
+      setUnlockedBalance(unlocked);
+      setLockedBalance(total > unlocked ? total - unlocked : 0n);
+      setActiveChannels(activeCounts?.[DEFAULT_ASSET_ID] || 0);
+    };
 
-    return totalBalance > lockedBalance ? totalBalance - lockedBalance : 0n;
-  }, [balances]);
+    refresh();
+  }, [hubClient, agentDid, balances, activeCounts]);
 
   /**
    * Deposit funds from account balance to Payment Hub
    */
   const depositToHub = useCallback(
-    async (
-      amount: bigint,
-      assetId: string = DEFAULT_ASSET_ID
-    ): Promise<HubOperationResult> => {
+    async (amount: bigint, assetId: string = DEFAULT_ASSET_ID): Promise<HubOperationResult> => {
       if (!hubClient) {
         const error = 'PaymentHub client is not ready';
         setError(error);
@@ -56,10 +67,13 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
 
         // Refresh balances after successful deposit
         await refetchBalances();
+        const total = balances?.[assetId] ? BigInt(balances[assetId]) + amount : amount;
+        setTotalBalance(total);
+        // unlocked/locked will refresh via effect
 
         return { txHash: result.txHash, success: true };
-      } catch (e: any) {
-        const errorMessage = e?.message || String(e);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
         setError(errorMessage);
         return { txHash: '', success: false, error: errorMessage };
       } finally {
@@ -74,17 +88,13 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
    * Only allows withdrawal of unlocked balance
    */
   const withdrawFromHub = useCallback(
-    async (
-      amount: bigint,
-      assetId: string = DEFAULT_ASSET_ID
-    ): Promise<HubOperationResult> => {
+    async (amount: bigint, assetId: string = DEFAULT_ASSET_ID): Promise<HubOperationResult> => {
       if (!hubClient) {
         const error = 'PaymentHub client is not ready';
         setError(error);
         return { txHash: '', success: false, error };
       }
 
-      const unlockedBalance = getUnlockedBalance();
       if (amount > unlockedBalance) {
         const error = `Insufficient unlocked balance. Available: ${unlockedBalance.toString()}`;
         setError(error);
@@ -101,15 +111,15 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
         await refetchBalances();
 
         return { txHash: result.txHash, success: true };
-      } catch (e: any) {
-        const errorMessage = e?.message || String(e);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
         setError(errorMessage);
         return { txHash: '', success: false, error: errorMessage };
       } finally {
         setIsLoading(false);
       }
     },
-    [hubClient, getUnlockedBalance, refetchBalances]
+    [hubClient, unlockedBalance, refetchBalances]
   );
 
   /**
@@ -117,8 +127,6 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
    */
   const withdrawAllFromHub = useCallback(
     async (assetId: string = DEFAULT_ASSET_ID): Promise<HubOperationResult> => {
-      const unlockedBalance = getUnlockedBalance();
-
       if (unlockedBalance <= 0n) {
         const error = 'No unlocked balance available for withdrawal';
         setError(error);
@@ -127,7 +135,7 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
 
       return withdrawFromHub(unlockedBalance, assetId);
     },
-    [getUnlockedBalance, withdrawFromHub]
+    [unlockedBalance, withdrawFromHub]
   );
 
   const clearError = useCallback(() => {
@@ -142,9 +150,9 @@ export function useHubDepositWithdraw(agentDid?: string | null) {
     error,
     clearError,
     // Balance information
-    totalBalance: balances?.rgas?.balance ? BigInt(balances.rgas.balance) : 0n,
-    lockedBalance: balances?.rgas?.lockedBalance ? BigInt(balances.rgas.lockedBalance) : 0n,
-    unlockedBalance: getUnlockedBalance(),
-    activeChannels: balances?.activeCounts || 0,
+    totalBalance,
+    lockedBalance,
+    unlockedBalance,
+    activeChannels,
   };
 }

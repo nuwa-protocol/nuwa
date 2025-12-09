@@ -2,11 +2,12 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { TransferModalBase } from './TransferModalBase';
 import { useHubTransfer } from '@/hooks/useHubTransfer';
-import { normalizeAddress, didToAddress } from '@/utils/addressValidation';
+import { normalizeAddress, addressToDid } from '@/utils/addressValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DEFAULT_ASSET_ID } from '@/config/env';
 
 export interface TransferHubModalProps {
   open: boolean;
@@ -36,7 +37,12 @@ export function TransferHubModal({
 
   const handleTransfer = async (recipient: string, amount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
-      const result = await transfer(recipient, amount, '0x3::rgas::RGAS');
+      const normalizedAddress = normalizeAddress(recipient);
+      const recipientDid = recipient.startsWith('did:rooch:')
+        ? recipient
+        : addressToDid(normalizedAddress);
+
+      const result = await transfer(recipientDid, amount, DEFAULT_ASSET_ID);
 
       if (result.success) {
         toast({
@@ -72,20 +78,14 @@ export function TransferHubModal({
     }
 
     try {
-      // For hub transfers, we prefer DID format but also accept addresses
-      const isDID = trimmed.startsWith('did:rooch:');
-      const isAddress = /^0x[a-fA-F0-9]{64}$/.test(trimmed);
+      // Accept DID or rooch address (0x / rooch1), convert to DID for backend
+      const normalizedAddress = normalizeAddress(trimmed);
+      const normalizedDid = trimmed.startsWith('did:rooch:')
+        ? trimmed
+        : addressToDid(normalizedAddress);
 
-      if (!isDID && !isAddress) {
-        return {
-          valid: false,
-          error: t('transfer.invalidHubRecipientFormat', 'Invalid format. Please enter a valid DID or Rooch address')
-        };
-      }
-
-      const normalizedAddress = isDID ? didToAddress(trimmed) : trimmed;
-
-      if (normalizedAddress === agentDid) {
+      // Prevent self-transfer
+      if (normalizedDid === agentDid) {
         return { valid: false, error: t('transfer.cannotTransferToSelf', 'Cannot transfer to your own address') };
       }
 

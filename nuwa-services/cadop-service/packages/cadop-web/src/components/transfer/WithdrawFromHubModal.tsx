@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowUpCircle, Wallet, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DEFAULT_ASSET_ID } from '@/config/env';
 
 export interface WithdrawFromHubModalProps {
   open: boolean;
@@ -38,7 +39,7 @@ export function WithdrawFromHubModal({
 
   const handleWithdraw = async (_recipient: string, withdrawAmount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
-      const result = await withdrawFromHub(withdrawAmount, '0x3::rgas::RGAS');
+      const result = await withdrawFromHub(withdrawAmount, DEFAULT_ASSET_ID);
 
       if (result.success) {
         toast({
@@ -70,7 +71,7 @@ export function WithdrawFromHubModal({
     if (unlockedBalance <= 0n) return;
 
     try {
-      const result = await withdrawAllFromHub('0x3::rgas::RGAS');
+      const result = await withdrawAllFromHub(DEFAULT_ASSET_ID);
 
       if (result.success) {
         toast({
@@ -120,99 +121,7 @@ export function WithdrawFromHubModal({
   };
 
   // Extra content showing withdrawal preview and balance information
-  const extraContent = (
-    <div className="space-y-4">
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          {t('transfer.withdrawInfo', 'Withdraw funds from your Payment Hub back to your account balance. Only unlocked (non-locked) funds can be withdrawn.')}
-        </AlertDescription>
-      </Alert>
-
-      {/* Balance breakdown */}
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{t('transfer.totalHubBalance', 'Total Hub Balance')}:</span>
-            <span className="font-mono">{formatBalance(totalBalance)} RGAS</span>
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{t('transfer.lockedBalance', 'Locked Balance')}:</span>
-            <span className="font-mono text-orange-600">{formatBalance(lockedBalance)} RGAS</span>
-          </div>
-
-          <div className="flex items-center justify-between text-sm font-medium bg-green-50 p-2 rounded">
-            <span>{t('transfer.unlockedBalance', 'Available for Withdrawal')}:</span>
-            <span className="font-mono text-green-600">{formatBalance(unlockedBalance)} RGAS</span>
-          </div>
-        </div>
-
-        {activeChannels > 0 && (
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {t('transfer.lockedBalanceWarning', 'You have {{count}} active payment channels. {{amount}} RGAS is locked as collateral. Close channels to unlock these funds.', {
-                count: activeChannels,
-                amount: formatBalance(lockedBalance)
-              })}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Preview new balances if amount is entered */}
-        {amount && !isNaN(parseFloat(amount)) && parseAmountToBigInt(amount) > 0n && parseAmountToBigInt(amount) <= unlockedBalance && (
-          <div className="border rounded-lg p-3 bg-muted/30 space-y-2">
-            <div className="text-sm font-medium">{t('transfer.withdrawalPreview', 'Withdrawal Preview')}</div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-muted-foreground">{t('transfer.toAccount', 'To Account')}</div>
-                <div className="font-mono font-semibold text-green-600">
-                  +{formatBalance(parseAmountToBigInt(amount))} RGAS
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">{t('transfer.fromHub', 'From Hub')}</div>
-                <div className="font-mono font-semibold text-red-600">
-                  {formatBalance(getNewHubBalance(parseAmountToBigInt(amount)))} RGAS
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick action buttons */}
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAmount(formatBalance(unlockedBalance))}
-            disabled={unlockedBalance <= 0n || isLoading}
-            className="flex-1"
-          >
-            {t('transfer.setMaxAmount', 'Set Max')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleWithdrawAll}
-            disabled={unlockedBalance <= 0n || isLoading}
-            className="flex-1"
-          >
-            {t('transfer.withdrawAll', 'Withdraw All')}
-          </Button>
-        </div>
-
-        {activeChannels > 0 && (
-          <div className="flex items-center space-x-2">
-            <Badge variant="secondary">
-              {t('transfer.activeChannelsBadge', '{{count}} active channels', { count: activeChannels })}
-            </Badge>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const extraContent = null;
 
   return (
     <TransferModalBase
@@ -230,8 +139,8 @@ export function WithdrawFromHubModal({
       showAmountInput={true}
       amountLabel={t('transfer.withdrawAmount', 'Withdrawal Amount')}
       amountPlaceholder="0.00"
-      showBalanceInfo={false} // We'll show custom balance info in extraContent
-      showPercentageButtons={false} // Using custom buttons instead
+      showBalanceInfo={false}
+      showPercentageButtons={false}
       extraContent={extraContent}
       onTransfer={handleWithdraw}
       isLoading={isLoading}

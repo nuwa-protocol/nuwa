@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useDIDService } from './useDIDService';
-import { Transaction, Args } from '@roochnetwork/rooch-sdk';
+import { Transaction, Args, RoochClient } from '@roochnetwork/rooch-sdk';
+import { DidAccountSigner } from '@nuwa-ai/identity-kit';
+import { ROOCH_RPC_URL, DEFAULT_ASSET_ID } from '@/config/env';
 
 export interface TransferResult {
   txHash: string;
@@ -17,7 +19,7 @@ export function useAccountTransfer(agentDid?: string | null) {
     async (
       recipient: string,
       amount: bigint,
-      coinType: string = '0x3::rgas::RGAS'
+      coinType: string = DEFAULT_ASSET_ID
     ): Promise<TransferResult> => {
       if (!didService) {
         const error = 'DID service not available';
@@ -29,23 +31,29 @@ export function useAccountTransfer(agentDid?: string | null) {
       setError(null);
 
       try {
-        // Get the signer from DID service
+        // Get the signer from DID service and convert to Rooch signer
         const signer = didService.getSigner();
+        console.log('signer keys: ', await signer.listKeyIds());
+        const roochSigner = await DidAccountSigner.create(signer);
+
+        // Rooch client
+        const client = new RoochClient({ url: ROOCH_RPC_URL });
 
         // Create and configure the transaction
         const tx = new Transaction();
 
-        // Call the account_coin_store::transfer function
+        // Call the transfer::transfer_coin function
         tx.callFunction({
-          target: '0x3::account_coin_store::transfer',
+          target: '0x3::transfer::transfer_coin',
           typeArgs: [coinType],
           args: [Args.address(recipient), Args.u256(amount)],
           maxGas: 100000000, // Set appropriate gas limit
         });
 
         // Execute the transaction
-        const result = await signer.signAndExecuteTransaction({
+        const result = await client.signAndExecuteTransaction({
           transaction: tx,
+          signer: roochSigner,
         });
 
         // Check if the transaction was successful

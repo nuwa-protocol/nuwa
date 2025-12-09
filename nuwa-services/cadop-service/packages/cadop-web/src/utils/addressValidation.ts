@@ -2,24 +2,24 @@
  * Address validation and conversion utilities for Rooch addresses and DIDs
  */
 
+import {
+  isValidRoochAddress as sdkIsValidRoochAddress,
+  decodeToRoochAddressStr,
+} from '@roochnetwork/rooch-sdk';
+
 /**
- * Validates if a string is a valid Rooch address format
- * @param address - The address string to validate
- * @returns true if valid, false otherwise
+ * Validates if a string is a valid Rooch address format (0x... or bech32 rooch1...)
  */
 export function isValidRoochAddress(address: string): boolean {
-  // Rooch address format: 0x + 64 hexadecimal characters
-  return /^0x[a-fA-F0-9]{64}$/.test(address);
+  return sdkIsValidRoochAddress(address);
 }
 
 /**
  * Validates if a string is a valid DID format
- * @param did - The DID string to validate
- * @returns true if valid, false otherwise
+ * Supports hex (0x...) and bech32 (rooch1...) identifiers
  */
 export function isValidDID(did: string): boolean {
-  // DID format: did:rooch:0x... (64 hex characters after 0x)
-  return /^did:rooch:0x[a-fA-F0-9]{64}$/.test(did);
+  return /^did:rooch:(0x[a-fA-F0-9]{1,64}|rooch1[0-9a-z]+)$/.test(did);
 }
 
 /**
@@ -32,15 +32,19 @@ export function normalizeAddress(input: string): string {
   const trimmed = input.trim();
 
   if (isValidDID(trimmed)) {
-    // Extract address part from DID: did:rooch:0x1234... -> 0x1234...
-    return trimmed.split(':')[2];
+    // Extract identifier and normalize (supports hex / rooch1)
+    const identifier = trimmed.split(':')[2];
+    return decodeToRoochAddressStr(identifier);
   }
 
   if (isValidRoochAddress(trimmed)) {
-    return trimmed;
+    // decodeToRoochAddressStr handles 0x / rooch1 / bitcoin formats and returns hex 0x...
+    return decodeToRoochAddressStr(trimmed);
   }
 
-  throw new Error('Invalid address format. Expected Rooch address (0x...) or DID (did:rooch:0x...)');
+  throw new Error(
+    'Invalid address format. Expected Rooch address (0x.../rooch1...) or DID (did:rooch:0x...)'
+  );
 }
 
 /**
@@ -52,7 +56,8 @@ export function addressToDid(address: string): string {
   if (!isValidRoochAddress(address)) {
     throw new Error('Invalid Rooch address format');
   }
-  return `did:rooch:${address}`;
+  const normalized = decodeToRoochAddressStr(address);
+  return `did:rooch:${normalized}`;
 }
 
 /**
@@ -64,7 +69,8 @@ export function didToAddress(did: string): string {
   if (!isValidDID(did)) {
     throw new Error('Invalid DID format');
   }
-  return did.split(':')[2];
+  const identifier = did.split(':')[2];
+  return decodeToRoochAddressStr(identifier);
 }
 
 /**

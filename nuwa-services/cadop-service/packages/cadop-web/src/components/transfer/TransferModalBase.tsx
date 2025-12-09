@@ -1,11 +1,5 @@
 import React, { ReactNode, useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from '@/components/ui/Dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
@@ -13,14 +7,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  X,
-  Info,
-  AlertCircle,
-  CheckCircle,
-  Wallet,
-} from 'lucide-react';
-import { formatAddressDisplay, PercentageHelpers } from '@/utils/addressValidation';
+import { Info, AlertCircle, CheckCircle, Wallet } from 'lucide-react';
+import { formatAddressDisplay, PercentageHelpers, normalizeAddress } from '@/utils/addressValidation';
 
 export interface TransferModalProps {
   open: boolean;
@@ -118,17 +106,11 @@ export function TransferModalBase({
       return validateRecipient(recipient);
     }
 
-    // Default validation
     try {
-      // Try to normalize address (this will throw if invalid)
-      const normalized = recipient.trim();
-      if (/^did:rooch:0x[a-fA-F0-9]{64}$/.test(normalized) ||
-          /^0x[a-fA-F0-9]{64}$/.test(normalized)) {
-        return { valid: true };
-      }
-      return { valid: false, error: 'Invalid address format' };
-    } catch {
-      return { valid: false, error: 'Invalid address format' };
+      normalizeAddress(recipient);
+      return { valid: true };
+    } catch (e: any) {
+      return { valid: false, error: e?.message || 'Invalid address format' };
     }
   };
 
@@ -258,14 +240,7 @@ export function TransferModalBase({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            {title}
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
-          </DialogTitle>
+          <DialogTitle className="flex items-center justify-between">{title}</DialogTitle>
           {description && (
             <p className="text-sm text-muted-foreground">{description}</p>
           )}

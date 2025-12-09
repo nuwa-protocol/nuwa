@@ -139,14 +139,20 @@ export function AgentDetailPage() {
   const [paymentHubRgasError, setPaymentHubRgasError] = useState<string | null>(null);
   const [paymentHubRgasAmount, setPaymentHubRgasAmount] = useState<string>('0');
   const [paymentHubRgasUsd, setPaymentHubRgasUsd] = useState<string>('0');
+  const [paymentHubLocked, setPaymentHubLocked] = useState<string>('0');
+  const [paymentHubUnlocked, setPaymentHubUnlocked] = useState<string>('0');
 
   const refetchPaymentHubRgas = async () => {
     if (!hubClient) return;
     setPaymentHubRgasLoading(true);
     try {
       const res = await hubClient.getBalanceWithUsd({ assetId: DEFAULT_ASSET_ID });
+      const unlocked = await hubClient.getUnlockedBalance({ assetId: DEFAULT_ASSET_ID });
+      const locked = res.balance > unlocked ? res.balance - unlocked : 0n;
       setPaymentHubRgasAmount(formatBigIntWithDecimals(res.balance, 8));
       setPaymentHubRgasUsd(formatBigIntWithDecimals(res.balancePicoUSD, 12, 2));
+      setPaymentHubLocked(formatBigIntWithDecimals(locked, 8));
+      setPaymentHubUnlocked(formatBigIntWithDecimals(unlocked, 8));
       setPaymentHubRgasError(null);
     } catch (e: any) {
       setPaymentHubRgasError(e?.message || String(e));
@@ -452,6 +458,21 @@ export function AgentDetailPage() {
                             <div className="text-right">
                               <div className="font-mono font-semibold">{paymentHubRgasAmount}</div>
                               <div className="text-xs text-gray-500">${paymentHubRgasUsd}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex flex-col space-y-1 p-2 rounded border border-muted">
+                              <span className="text-muted-foreground">{t('agent.lockedBalance', 'Locked')}</span>
+                              <span className="font-mono font-semibold text-orange-600">
+                                {paymentHubLocked} RGAS
+                              </span>
+                            </div>
+                            <div className="flex flex-col space-y-1 p-2 rounded border border-muted">
+                              <span className="text-muted-foreground">{t('agent.unlockedBalance', 'Unlocked')}</span>
+                              <span className="font-mono font-semibold text-green-600">
+                                {paymentHubUnlocked} RGAS
+                              </span>
                             </div>
                           </div>
 
