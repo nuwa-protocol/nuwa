@@ -45,8 +45,11 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        working-directory: ./nuwa-services/llm-gateway
-        run: pnpm install --frozen-lockfile
+        run: |
+          # Install dependencies from root to use workspace
+          pnpm install --frozen-lockfile
+          # Ensure the specific service is properly linked
+          pnpm --filter @nuwa-ai/llm-gateway install
 
       - name: Run tests
         working-directory: ./nuwa-services/llm-gateway
