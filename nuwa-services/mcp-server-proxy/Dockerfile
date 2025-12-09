@@ -24,7 +24,8 @@ FROM base AS builder
 COPY . .
 
 # Install workspace dependencies
-RUN pnpm install --frozen-lockfile --prod=false
+RUN npm install -g pnpm@9.15.4 && \
+    pnpm install --frozen-lockfile --prod=false
 
 # Build workspace packages first
 RUN pnpm build
