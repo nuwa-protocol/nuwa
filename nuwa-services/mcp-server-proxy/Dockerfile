@@ -1,4 +1,4 @@
-# Multi-stage build for MCP Server Proxy
+# Workspace-based build for MCP Server Proxy
 FROM node:20-alpine AS base
 
 # Install system dependencies for stdio upstream commands
@@ -18,21 +18,19 @@ RUN pip3 install --no-cache-dir --break-system-packages uv
 # Set working directory
 WORKDIR /app
 
-# Install dependencies stage
-FROM base AS deps
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-# Install dependencies
+# Build stage - build from workspace root
+FROM base AS builder
+# Copy entire workspace (including built packages)
+COPY . .
+
+# Install workspace dependencies
 RUN pnpm install --frozen-lockfile --prod=false
 
-# Build stage
-FROM base AS builder
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-# Copy source code
-COPY . .
-# Build the application
-RUN pnpm run build
+# Build workspace packages first
+RUN pnpm build
+
+# Build the specific service
+RUN pnpm --filter @nuwa-ai/mcp-server-proxy build
 
 # Production stage
 FROM base AS runner
@@ -43,12 +41,10 @@ RUN adduser --system --uid 1001 mcpproxy
 # Set working directory
 WORKDIR /app
 
-# Copy built application
-COPY --from=builder --chown=mcpproxy:nodejs /app/dist ./dist
-COPY --from=builder --chown=mcpproxy:nodejs /app/package.json ./package.json
-
-# Install only production dependencies
-COPY --from=deps --chown=mcpproxy:nodejs /app/node_modules ./node_modules
+# Copy built workspace dependencies and application
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/nuwa-services/mcp-server-proxy/dist ./dist
+COPY --from=builder /app/nuwa-services/mcp-server-proxy/package.json ./package.json
 
 # Create config directory for mounted configs
 RUN mkdir -p /app/config && chown mcpproxy:nodejs /app/config
