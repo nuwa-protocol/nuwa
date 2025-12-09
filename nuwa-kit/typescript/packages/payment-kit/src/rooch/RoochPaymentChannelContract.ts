@@ -36,9 +36,7 @@ import type {
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo, SignedSubRAV, SubRAV, ChannelInfo } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
-import {
-  parseDid,
-} from '@nuwa-ai/identity-kit';
+import { parseDid } from '@nuwa-ai/identity-kit';
 import {
   calcChannelObjectId,
   normalizeAssetId,
@@ -841,7 +839,9 @@ export class RoochPaymentChannelContract
       // Parse sender DID for method validation
       const senderParsed = parseDid(senderDid);
       if (senderParsed.method !== 'rooch') {
-        throw badRequest(`Invalid sender DID method: expected 'rooch', got '${senderParsed.method}'`);
+        throw badRequest(
+          `Invalid sender DID method: expected 'rooch', got '${senderParsed.method}'`
+        );
       }
 
       // Parse receiver DID and convert to address

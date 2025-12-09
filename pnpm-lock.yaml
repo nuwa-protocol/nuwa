@@ -747,8 +747,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.7
       '@nuwa-ai/identity-kit':
-        specifier: ^0.6.0
-        version: 0.6.0(typescript@4.9.5)
+        specifier: workspace:*
+        version: link:../../../../nuwa-kit/typescript/packages/identity-kit
       '@nuwa-ai/payment-kit':
         specifier: workspace:*
         version: link:../../../../nuwa-kit/typescript/packages/payment-kit
@@ -9288,16 +9288,6 @@ snapshots:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.3.6(typescript@5.4.5)
-      multiformats: 9.9.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
-  '@nuwa-ai/identity-kit@0.6.0(typescript@4.9.5)':
-    dependencies:
-      '@noble/curves': 1.9.7
-      '@noble/hashes': 1.8.0
-      '@roochnetwork/rooch-sdk': 0.4.0(typescript@4.9.5)
       multiformats: 9.9.0
     transitivePeerDependencies:
       - supports-color
