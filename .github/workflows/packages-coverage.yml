@@ -8,7 +8,7 @@ on:
         required: true
         default: 'all'
   schedule:
-    - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight UTC
+    - cron: '0 0 * * 0' # Run weekly on Sunday at midnight UTC
 
 jobs:
   coverage:
@@ -19,27 +19,27 @@ jobs:
         package: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.package != 'all' && fromJSON(format('["{0}"]', github.event.inputs.package)) || fromJSON('["identity-kit"]') }}
         # Add other packages to the default array when they're available
         # fromJSON('["identity-kit", "package-2", "package-3"]') }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-      
+
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
           run_install: false
-      
+
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      
+
       - name: Setup pnpm cache
         uses: actions/cache@v3
         with:
@@ -47,12 +47,12 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
-      
+
       - name: Install dependencies
         run: |
           cd nuwa-kit/typescript
           pnpm install
-      
+
       - name: Generate package path
         id: package-path
         run: |
@@ -63,24 +63,24 @@ jobs:
           # elif [[ "${{ matrix.package }}" == "package-2" ]]; then
           #   PACKAGE_PATH="nuwa-kit/typescript/packages/package-2"
           fi
-          
+
           echo "path=$PACKAGE_PATH" >> $GITHUB_OUTPUT
-      
+
       - name: Build
         run: |
           cd ${{ steps.package-path.outputs.path }}
           pnpm build
-      
+
       - name: Run tests with coverage
         env:
           NODE_OPTIONS: --experimental-global-webcrypto
         run: |
           cd ${{ steps.package-path.outputs.path }}
           pnpm test:coverage
-      
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           directory: ${{ steps.package-path.outputs.path }}/coverage
           flags: ${{ matrix.package }}
-          fail_ci_if_error: false 
+          fail_ci_if_error: false
