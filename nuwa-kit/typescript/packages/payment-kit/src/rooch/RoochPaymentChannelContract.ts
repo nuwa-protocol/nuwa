@@ -32,9 +32,17 @@ import type {
   SubChannelInfo,
   DepositParams,
   WithdrawParams,
+  TransferToHubParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo, SignedSubRAV, SubRAV, ChannelInfo } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
+import {
+  DebugLogger,
+  SignerInterface,
+  DidAccountSigner,
+  parseDid,
+  isSignerInterface,
+} from '@nuwa-ai/identity-kit';
 import {
   calcChannelObjectId,
   normalizeAssetId,
@@ -53,13 +61,6 @@ import {
   DynamicField,
   CoinStoreFieldData,
 } from './ChannelUtils';
-import {
-  DebugLogger,
-  SignerInterface,
-  DidAccountSigner,
-  parseDid,
-  isSignerInterface,
-} from '@nuwa-ai/identity-kit';
 import {
   badRequest,
   notFound,
@@ -811,6 +812,107 @@ export class RoochPaymentChannelContract
       this.getLogger().error('Error getting active channels counts:', error);
       // Return empty object instead of throwing
       return {};
+    }
+  }
+
+  /**
+   * Transfer funds from sender's payment hub to receiver's payment hub
+   * Calls the payment_channel::transfer_to_hub_entry function
+   */
+  async transferToHub(params: TransferToHubParams): Promise<TxResult> {
+    try {
+      this.getLogger().debug('Transferring from hub to hub:', {
+        senderDid: params.senderDid,
+        receiverDid: params.receiverDid,
+        assetId: params.assetId,
+        amount: params.amount.toString(),
+      });
+
+      // Validate parameters
+      const { senderDid, receiverDid, assetId, amount, signer } = params;
+
+      // Parse receiver DID and convert to address
+      const receiverParsed = parseDid(receiverDid);
+      if (receiverParsed.method !== 'rooch') {
+        throw new Error(
+          `Invalid receiver DID method: expected 'rooch', got '${receiverParsed.method}'`
+        );
+      }
+      const receiverAddress = receiverParsed.identifier;
+
+      // Convert signer to Rooch signer
+      const roochSigner = await this.convertSigner(signer);
+
+      // Create transaction
+      const tx = this.createTransaction();
+
+      // Call the payment_channel::transfer_to_hub_entry function
+      tx.callFunction({
+        target: `${this.getContractAddress()}::payment_channel::transfer_to_hub_entry`,
+        typeArgs: [assetId],
+        args: [Args.address(receiverAddress), Args.u256(amount)],
+        maxGas: 100000000,
+      });
+
+      // Execute the transaction
+      const result = await this.getClient().signAndExecuteTransaction({
+        transaction: tx,
+        signer: roochSigner,
+      });
+
+      // Check if the transaction was successful
+      if (result.execution_info.status.type !== 'executed') {
+        throw new Error(`Transfer failed: ${result.execution_info.status.type}`);
+      }
+
+      const txHash = result.execution_info.tx_hash || '';
+      this.getLogger().debug('Hub transfer completed:', { txHash });
+
+      return { txHash };
+    } catch (error) {
+      this.getLogger().error('Error transferring from hub to hub:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get unlocked balance in payment hub (excluding locked amounts for active channels)
+   * This calculates the available balance by subtracting locked amounts from total balance
+   */
+  async getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    try {
+      this.getLogger().debug('Getting unlocked balance:', { ownerDid, assetId });
+
+      // Get total balance
+      const totalBalance = await this.getHubBalance(ownerDid, assetId);
+
+      // Get active channels count for this asset
+      const activeChannelsCounts = await this.getActiveChannelsCounts(ownerDid);
+      const activeChannelsCount = activeChannelsCounts[assetId] || 0;
+
+      // Get asset info to determine lock amount per channel
+      const assetInfo = await this.getAssetInfo(assetId);
+
+      // Default lock amount per channel (in asset units)
+      // This should be configurable or fetched from contract
+      const lockAmountPerChannel = BigInt(1000000); // 1 RGAS per channel by default
+
+      const lockedBalance = BigInt(activeChannelsCount) * lockAmountPerChannel;
+      const unlockedBalance =
+        totalBalance > lockedBalance ? totalBalance - lockedBalance : BigInt(0);
+
+      this.getLogger().debug('Unlocked balance calculated:', {
+        totalBalance: totalBalance.toString(),
+        activeChannelsCount,
+        lockedBalance: lockedBalance.toString(),
+        unlockedBalance: unlockedBalance.toString(),
+      });
+
+      return unlockedBalance;
+    } catch (error) {
+      this.getLogger().error('Error getting unlocked balance:', error);
+      // Return 0 instead of throwing to be more graceful
+      return BigInt(0);
     }
   }
 

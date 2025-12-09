@@ -14,6 +14,7 @@ import type {
   TxResult,
   DepositParams,
   WithdrawParams,
+  TransferToHubParams,
 } from '../contracts/IPaymentChannelContract';
 import type {
   IPaymentRevenueContract,
@@ -186,6 +187,34 @@ export class MockContract implements IPaymentChannelContract {
 
   async getAssetPrice(assetId: string): Promise<bigint> {
     return BigInt(1000000); // 1 USD in pUSD (6 decimals)
+  }
+
+  async transferToHub(params: TransferToHubParams): Promise<TxResult> {
+    // For mock implementation, just move balance from sender to receiver hub
+    const senderBalanceKey = `${params.senderDid}:${params.assetId}`;
+    const receiverBalanceKey = `${params.receiverDid}:${params.assetId}`;
+
+    const senderBalance = this.hubBalances.get(senderBalanceKey) || BigInt(0);
+
+    if (senderBalance < params.amount) {
+      throw new Error(`Insufficient hub balance: have ${senderBalance}, need ${params.amount}`);
+    }
+
+    // Transfer the balance
+    this.hubBalances.set(senderBalanceKey, senderBalance - params.amount);
+    const receiverBalance = this.hubBalances.get(receiverBalanceKey) || BigInt(0);
+    this.hubBalances.set(receiverBalanceKey, receiverBalance + params.amount);
+
+    return {
+      txHash: `transfer-hub-tx-${Date.now()}`,
+      blockHeight: BigInt(700),
+    };
+  }
+
+  async getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    // For mock implementation, return 80% of hub balance as unlocked
+    const totalBalance = await this.getHubBalance(ownerDid, assetId);
+    return (totalBalance * 8n) / 10n; // 80% unlocked
   }
 }
 

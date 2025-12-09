@@ -222,6 +222,21 @@ export interface IPaymentChannelContract {
    * @returns Record mapping asset IDs to active channel counts
    */
   getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>>;
+
+  /**
+   * Transfer funds from sender's payment hub to receiver's payment hub
+   * @param params Transfer parameters including sender DID, receiver DID, asset, amount, and signer
+   * @returns Transaction result
+   */
+  transferToHub(params: TransferToHubParams): Promise<TxResult>;
+
+  /**
+   * Get unlocked balance in payment hub (excluding locked amounts for active channels)
+   * @param ownerDid Owner DID of the hub
+   * @param assetId Asset identifier
+   * @returns Unlocked balance amount
+   */
+  getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint>;
 }
 
 // -------- PaymentHub Type Alias --------
@@ -267,6 +282,22 @@ export interface WithdrawParams {
   amount: bigint;
   /** Optional recipient address/DID (defaults to owner's account) */
   recipient?: string;
+  /** Signer for the transaction */
+  signer: SignerInterface;
+}
+
+/**
+ * Parameters for transferring funds from one payment hub to another
+ */
+export interface TransferToHubParams {
+  /** Sender DID (source hub owner) */
+  senderDid: string;
+  /** Receiver DID (destination hub owner) */
+  receiverDid: string;
+  /** Asset information */
+  assetId: string;
+  /** Amount to transfer */
+  amount: bigint;
   /** Signer for the transaction */
   signer: SignerInterface;
 }

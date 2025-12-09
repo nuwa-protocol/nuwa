@@ -359,7 +359,7 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
               return;
             }
           }
-          
+
           res.writeHead(404).end();
         } catch (e) {
           try {
