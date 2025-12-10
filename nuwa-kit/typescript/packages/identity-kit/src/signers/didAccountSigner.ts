@@ -23,6 +23,7 @@ import { IdentityKitErrorCode, createSignerError, createValidationError } from '
  * actual signing operations to the wrapped SignerInterface.
  */
 export class DidAccountSigner extends Signer implements SignerInterface {
+  private readonly __brandDidAccountSigner = true;
   private did: string;
   private keyId: string;
   private didAddress: RoochAddress;
@@ -92,7 +93,22 @@ export class DidAccountSigner extends Signer implements SignerInterface {
 
     const did = await signer.getDid();
 
-    return new DidAccountSigner(signer, did, actualKeyId, keyInfo.type, keyInfo.publicKey);
+    const didSigner = new DidAccountSigner(
+      signer,
+      did,
+      actualKeyId,
+      keyInfo.type,
+      keyInfo.publicKey
+    );
+
+    // If underlying signer supports WebAuthn, expose signAssertion so Authenticator picks WebAuthn envelope
+    const maybeWebAuthn = signer as any;
+    if (maybeWebAuthn && typeof maybeWebAuthn.signAssertion === 'function') {
+      (didSigner as any).signAssertion = (challenge: Bytes) =>
+        maybeWebAuthn.signAssertion(challenge);
+    }
+
+    return didSigner;
   }
 
   // Implement Rooch Signer interface
@@ -102,19 +118,6 @@ export class DidAccountSigner extends Signer implements SignerInterface {
 
   async sign(input: Bytes): Promise<Bytes> {
     return this.wrappedSigner.signWithKeyId(input, this.keyId);
-  }
-
-  // Expose WebAuthn signing when the underlying signer supports it
-  async signAssertion(challenge: Bytes): Promise<AuthenticatorAssertionResponse> {
-    const maybeWebAuthn = this.wrappedSigner as any;
-    if (maybeWebAuthn && typeof maybeWebAuthn.signAssertion === 'function') {
-      return maybeWebAuthn.signAssertion(challenge);
-    }
-    throw createSignerError(
-      IdentityKitErrorCode.OPERATION_NOT_SUPPORTED,
-      'Underlying signer does not support WebAuthn assertions',
-      { did: this.did, keyId: this.keyId }
-    );
   }
 
   async signTransaction(input: Transaction): Promise<Authenticator> {
@@ -200,8 +203,7 @@ export class DidAccountSigner extends Signer implements SignerInterface {
 
 /**
  * Exported function for checking DidAccountSigner instances
- * Uses safe instanceof checking within the same module
  */
 export function isDidAccountSigner(obj: any): obj is DidAccountSigner {
-  return DidAccountSigner.isDidAccountSigner(obj);
+  return Boolean(obj && obj.__brandDidAccountSigner === true);
 }
