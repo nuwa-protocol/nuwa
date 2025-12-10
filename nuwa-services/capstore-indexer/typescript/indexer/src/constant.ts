@@ -64,11 +64,18 @@ export const PACKAGE_ID =
   process.env.PACKAGE_ID ||
   DEFAULT_PACKAGE_IDS[TARGET] ||
   (() => {
+    // dev/local
     throw new Error('PACKAGE_ID is required');
   })();
 
 const roochNetworkName =
-  TARGET === 'local' ? 'localnet' : TARGET === 'main' ? 'mainnet' : 'testnet';
+  TARGET === 'local'
+    ? 'localnet'
+    : TARGET === 'main'
+    ? 'mainnet'
+    : TARGET === 'dev'
+    ? 'devnet'
+    : 'testnet';
 
 export const ROOCH_NODE_URL =
   process.env.ROOCH_NODE_URL || getRoochNodeUrl(roochNetworkName);
