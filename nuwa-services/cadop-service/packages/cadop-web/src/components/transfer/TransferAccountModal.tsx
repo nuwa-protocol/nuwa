@@ -76,14 +76,6 @@ export function TransferAccountModal({
     }
   };
 
-  const formatBalance = (balance: bigint) => {
-    const balanceNumber = Number(balance) / Math.pow(10, decimals);
-    return balanceNumber.toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: decimals
-    });
-  };
-
   return (
     <TransferModalBase
       open={open}
