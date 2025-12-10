@@ -66,12 +66,7 @@ export function TransferAccountModal({
     }
 
     try {
-      const normalized = normalizeAddress(trimmed);
-
-      if (normalized === agentDid) {
-        return { valid: false, error: t('transfer.cannotTransferToSelf', 'Cannot transfer to your own address') };
-      }
-
+      normalizeAddress(trimmed);
       return { valid: true };
     } catch {
       return {
