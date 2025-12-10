@@ -8,7 +8,7 @@ packages:
   # cadop-service sub-packages (web/shared/api)
   - 'nuwa-services/cadop-service/packages/*'
   - 'nuwa-services/llm-gateway'
-  - 'nuwa-services/mcp-server-proxy' 
+  - 'nuwa-services/mcp-server-proxy'
   # Exclusions
   - '!nuwa-services/capstore-indexer/**'
   
