@@ -4,7 +4,7 @@ ACP Registry is a contract that allows you to register Agent Capabilities (ACP) 
 
 ## Deployment
 
-```base
+```bash
 rooch move publish -p acp-registry --named-addresses acp_registry=<address>
 ```
 
