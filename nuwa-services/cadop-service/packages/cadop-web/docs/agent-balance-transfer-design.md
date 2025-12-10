@@ -14,6 +14,7 @@
 ### 1.1 背景
 
 当前 Agent Detail 页面显示两个余额：
+
 1. **Account Balance (账户余额)**: Agent 的链上账户余额，用于普通交易
 2. **Payment Hub Balance**: 专门用于状态通道的余额，支持快速微支付
 
@@ -22,7 +23,7 @@
 ### 1.2 目标
 
 1. **优化余额描述**: 让用户清楚了解两种余额的区别和用途
-2. **实现四种转账**: 
+2. **实现四种转账**:
    - 账户余额 → 其他地址账户余额
    - Payment Hub → 其他地址 Payment Hub
    - 账户余额 → Payment Hub (充值)
@@ -49,6 +50,7 @@
 **说明文字**: "Available balance for transfers and transactions"
 
 **UI 设计**:
+
 - 添加信息图标 (i) 和 Tooltip
 - Tooltip 内容：
   - 中文: "这是您的链上账户余额，可用于普通转账、支付 gas 费用等链上操作"
@@ -65,12 +67,14 @@
 **说明文字**: "Reserved balance for fast payment channels, supporting instant micro-payments"
 
 **UI 设计**:
+
 - 添加信息图标 (i) 和 Tooltip
 - Tooltip 内容：
   - 中文: "这是专用于支付通道的余额。支付通道允许快速、低成本的小额支付，无需每次都提交链上交易。当有活跃通道时，部分余额会被锁定作为保证金。"
   - 英文: "This is the balance dedicated to payment channels. Payment channels enable fast, low-cost micro-payments without submitting on-chain transactions each time. When channels are active, a portion of the balance is locked as collateral."
 
 **额外信息**:
+
 - 显示活跃通道数量: "活跃通道: X"
 - 如果有锁定余额，显示: "总余额: X (锁定: Y)"
 
@@ -79,6 +83,7 @@
 #### i18n 更新
 
 在 `src/i18n/locales/zh.json` 添加:
+
 ```json
 {
   "agent": {
@@ -97,6 +102,7 @@
 ```
 
 在 `src/i18n/locales/en.json` 添加:
+
 ```json
 {
   "agent": {
@@ -150,6 +156,7 @@
 **合约函数**: `account_coin_store::transfer<CoinType>(to: address, amount: u256)`
 
 **实现方式**:
+
 - 使用 Rooch SDK 构建交易
 - 通过 `didService.getSigner()` 获取签名器
 - 使用 `signer.signAndExecuteTransaction()` 执行交易
@@ -163,33 +170,29 @@ import { useDIDService } from './useDIDService';
 
 export function useAccountTransfer(agentDid?: string) {
   const { didService } = useDIDService(agentDid);
-  
-  const transfer = async (
-    recipient: string,
-    amount: bigint,
-    coinType: string
-  ) => {
+
+  const transfer = async (recipient: string, amount: bigint, coinType: string) => {
     if (!didService) throw new Error('DID service not available');
-    
+
     const signer = didService.getSigner();
     const tx = new Transaction();
-    
+
     tx.callFunction({
       target: '0x3::account_coin_store::transfer',
       typeArgs: [coinType],
       args: [Args.address(recipient), Args.u256(amount)],
     });
-    
+
     const result = await signer.signAndExecuteTransaction({
       transaction: tx,
     });
-    
+
     return {
       txHash: result.execution_info.tx_hash,
       success: result.execution_info.status.type === 'executed',
     };
   };
-  
+
   return { transfer };
 }
 ```
@@ -199,6 +202,7 @@ export function useAccountTransfer(agentDid?: string) {
 **按钮位置**: Account Balance 卡片底部
 
 **对话框内容**:
+
 - 标题: "转账" / "Transfer"
 - 接收地址输入框
   - 支持 Rooch 地址格式 (0x...)
@@ -213,6 +217,7 @@ export function useAccountTransfer(agentDid?: string) {
 - 确认按钮
 
 **交互流程**:
+
 1. 用户点击 "转账" 按钮
 2. 打开对话框
 3. 输入接收地址和金额
@@ -257,7 +262,7 @@ export interface TransferToHubParams {
 
 export interface IPaymentChannelContract {
   // ... 现有方法
-  
+
   /**
    * Transfer funds from sender's payment hub to receiver's payment hub
    */
@@ -270,21 +275,21 @@ export interface IPaymentChannelContract {
 ```typescript
 async transferToHub(params: TransferToHubParams): Promise<TxResult> {
   const { senderDid, receiverDid, assetId, amount, signer } = params;
-  
+
   // Convert DID to address
   const receiverAddress = this.didToAddress(receiverDid);
-  
+
   const tx = new Transaction();
   tx.callFunction({
     target: `${this.contractAddress}::payment_channel::transfer_to_hub_entry`,
     typeArgs: [assetId],
     args: [Args.address(receiverAddress), Args.u256(amount)],
   });
-  
+
   const result = await signer.signAndExecuteTransaction({
     transaction: tx,
   });
-  
+
   return {
     txHash: result.execution_info.tx_hash,
     blockHeight: BigInt(result.execution_info.block_number || 0),
@@ -304,7 +309,7 @@ async transfer(
   amount: bigint
 ): Promise<{ txHash: string }> {
   const senderDid = await this.signer.getDid();
-  
+
   const params: TransferToHubParams = {
     senderDid,
     receiverDid: recipientDid,
@@ -312,7 +317,7 @@ async transfer(
     amount,
     signer: this.signer,
   };
-  
+
   const result = await this.contract.transferToHub(params);
   return { txHash: result.txHash };
 }
@@ -333,6 +338,7 @@ async transfer(
 **按钮位置**: Payment Hub 卡片底部
 
 **对话框内容**:
+
 - 标题: "转账到 Payment Hub" / "Transfer to Payment Hub"
 - 接收地址输入框 (DID 或 Rooch 地址)
 - 金额输入框
@@ -373,33 +379,36 @@ const { hubClient } = usePaymentHubClient(agentDid);
 
 const depositToHub = async (amount: bigint, assetId: string) => {
   if (!hubClient) throw new Error('Hub client not available');
-  
+
   const ownerDid = await hubClient.signer.getDid();
   const result = await hubClient.deposit(assetId, amount, ownerDid);
-  
+
   return result;
 };
 ```
 
 #### UI 设计
 
-**按钮位置**: 
+**按钮位置**:
+
 - 选项 1: Account Balance 卡片底部 (推荐)
 - 选项 2: 在两个卡片之间添加一个向下箭头图标按钮
 - 选项 3: Payment Hub 卡片顶部
 
 **对话框内容**:
+
 - 标题: "充值到支付通道" / "Deposit to Payment Channel"
 - 金额输入框
   - 显示账户可用余额
   - 快捷选择: 25%, 50%, 75%, 100%
-- 说明文字: 
+- 说明文字:
   - 中文: "将资金从账户余额转入支付通道，用于快速支付。充值后可以开通支付通道，进行即时小额支付。"
   - 英文: "Transfer funds from account balance to payment channel for fast payments. After depositing, you can open payment channels for instant micro-payments."
 - 建议充值金额提示 (可选): "建议至少充值 X RGAS 以开通支付通道"
 - 确认按钮
 
 **交互流程**:
+
 1. 用户点击 "充值到支付通道" 按钮
 2. 打开对话框，显示当前账户余额
 3. 输入充值金额
@@ -447,10 +456,10 @@ const { activeCounts } = usePaymentHubBalances(agentDid);
 
 const withdrawFromHub = async (amount: bigint, assetId: string) => {
   if (!hubClient) throw new Error('Hub client not available');
-  
+
   // amount = 0 表示提现全部可用余额
   const result = await hubClient.withdraw(assetId, amount);
-  
+
   return result;
 };
 ```
@@ -460,6 +469,7 @@ const withdrawFromHub = async (amount: bigint, assetId: string) => {
 **按钮位置**: Payment Hub 卡片底部
 
 **对话框内容**:
+
 - 标题: "提现到账户" / "Withdraw to Account"
 - 余额信息显示:
   - 总余额: X RGAS
@@ -475,9 +485,11 @@ const withdrawFromHub = async (amount: bigint, assetId: string) => {
 - 确认按钮
 
 **特殊情况处理**:
+
 - 如果可提现余额为 0，禁用输入框和确认按钮，显示提示: "当前无可提现余额，请先关闭支付通道"
 
 **交互流程**:
+
 1. 用户点击 "提现" 按钮
 2. 打开对话框，自动计算并显示可提现余额
 3. 输入提现金额 (受可提现余额限制)
@@ -538,18 +550,19 @@ const withdrawFromHub = async (amount: bigint, assetId: string) => {
 
 ```typescript
 enum TransferStatus {
-  IDLE = 'idle',           // 初始状态
+  IDLE = 'idle', // 初始状态
   VALIDATING = 'validating', // 验证输入
   CONFIRMING = 'confirming', // 等待用户确认
-  PENDING = 'pending',     // 交易进行中
-  SUCCESS = 'success',     // 交易成功
-  FAILED = 'failed',       // 交易失败
+  PENDING = 'pending', // 交易进行中
+  SUCCESS = 'success', // 交易成功
+  FAILED = 'failed', // 交易失败
 }
 ```
 
 #### 进度显示
 
 交易执行时显示进度:
+
 1. 准备交易...
 2. 等待签名...
 3. 提交交易...
@@ -591,15 +604,15 @@ function validateAmount(
   decimals: number
 ): { valid: boolean; error?: string } {
   const amountBigInt = parseAmount(amount, decimals);
-  
+
   if (amountBigInt <= 0n) {
     return { valid: false, error: '金额必须大于 0' };
   }
-  
+
   if (amountBigInt > maxAmount) {
     return { valid: false, error: '金额超过可用余额' };
   }
-  
+
   return { valid: true };
 }
 ```
@@ -653,16 +666,16 @@ function handleTransferError(error: any, t: TFunction): string {
   if (error?.message?.includes('insufficient balance')) {
     return t('transfer.error.insufficient_balance');
   }
-  
+
   if (error?.message?.includes('user rejected')) {
     return t('transfer.error.user_rejected');
   }
-  
+
   // 网络错误
   if (error?.code === 'NETWORK_ERROR') {
     return t('transfer.error.network_error');
   }
-  
+
   // 默认错误
   return error?.message || t('transfer.error.unknown');
 }
@@ -701,18 +714,21 @@ toast({
 
 #### Step 1.1: 扩展 Payment-Kit (如果需要 Hub 转账)
 
-**文件**: 
+**文件**:
+
 - `nuwa-kit/typescript/packages/payment-kit/src/contracts/IPaymentChannelContract.ts`
 - `nuwa-kit/typescript/packages/payment-kit/src/rooch/RoochPaymentChannelContract.ts`
 - `nuwa-kit/typescript/packages/payment-kit/src/client/PaymentHubClient.ts`
 
 **任务**:
+
 1. 添加 `TransferToHubParams` 接口
 2. 在 `IPaymentChannelContract` 添加 `transferToHub` 方法签名
 3. 在 `RoochPaymentChannelContract` 实现 `transferToHub` 方法
 4. 在 `PaymentHubClient` 添加 `transfer` 便捷方法
 
 **验收标准**:
+
 - TypeScript 编译通过
 - 接口定义清晰
 - 实现符合 Rooch 合约调用规范
@@ -720,6 +736,7 @@ toast({
 #### Step 1.2: 更新 i18n
 
 **文件**:
+
 - `src/i18n/locales/zh.json`
 - `src/i18n/locales/en.json`
 
@@ -727,6 +744,7 @@ toast({
 添加所有新的翻译 key (见第二章)
 
 **验收标准**:
+
 - 中英文翻译完整
 - 没有拼写错误
 - 翻译准确达意
@@ -738,11 +756,13 @@ toast({
 **文件**: `src/hooks/useAccountTransfer.ts`
 
 **功能**:
+
 - 提供账户转账方法
 - 处理交易状态
 - 错误处理
 
 **接口**:
+
 ```typescript
 export interface UseAccountTransferResult {
   transfer: (recipient: string, amount: bigint, coinType: string) => Promise<TransferResult>;
@@ -756,11 +776,13 @@ export interface UseAccountTransferResult {
 **文件**: `src/hooks/useHubTransfer.ts`
 
 **功能**:
+
 - 提供 Hub 转账方法
 - 检查可用余额 (unlocked balance)
 - 处理交易状态
 
 **接口**:
+
 ```typescript
 export interface UseHubTransferResult {
   transfer: (recipientDid: string, amount: bigint, assetId: string) => Promise<TransferResult>;
@@ -778,6 +800,7 @@ export interface UseHubTransferResult {
 **文件**: `src/components/balance/TransferModalBase.tsx`
 
 创建可复用的基础对话框组件，包含:
+
 - 对话框框架
 - 地址输入组件
 - 金额输入组件
@@ -787,12 +810,14 @@ export interface UseHubTransferResult {
 #### Step 3.2: 创建四个具体对话框
 
 **文件**:
+
 1. `src/components/balance/TransferAccountModal.tsx`
 2. `src/components/balance/TransferHubModal.tsx`
 3. `src/components/balance/DepositToHubModal.tsx`
 4. `src/components/balance/WithdrawFromHubModal.tsx`
 
 **每个组件的属性接口**:
+
 ```typescript
 interface TransferModalProps {
   open: boolean;
@@ -811,6 +836,7 @@ interface TransferModalProps {
 **文件**: `src/pages/agent-detail.tsx`
 
 **任务**:
+
 1. 更新 Account Balance 卡片:
    - 修改标题为 "账户余额"
    - 添加说明文字
@@ -828,12 +854,14 @@ interface TransferModalProps {
 #### Step 4.2: 集成对话框组件
 
 **任务**:
+
 1. 引入四个对话框组件
 2. 添加状态管理 (控制对话框开关)
 3. 绑定按钮点击事件
 4. 处理转账成功后的刷新逻辑
 
 **代码示例**:
+
 ```typescript
 const [transferAccountOpen, setTransferAccountOpen] = useState(false);
 const [transferHubOpen, setTransferHubOpen] = useState(false);
@@ -853,6 +881,7 @@ const handleTransferSuccess = () => {
 #### Step 5.1: 功能测试
 
 测试四种转账场景:
+
 1. ✓ 账户余额转账到其他地址
 2. ✓ Hub 余额转账到其他 Hub
 3. ✓ 账户余额充值到 Hub
@@ -881,12 +910,12 @@ const handleTransferSuccess = () => {
 
 ### 6.1 合约函数参考
 
-| 功能 | 合约模块 | 函数名 | 类型参数 | 参数 |
-|------|---------|--------|---------|------|
-| 账户转账 | `account_coin_store` | `transfer` | `CoinType` | `to: address, amount: u256` |
-| Hub 转账 | `payment_channel` | `transfer_to_hub_entry` | `CoinType` | `receiver: address, amount: u256` |
-| 充值 | `payment_channel` | `deposit_to_hub_entry` | `CoinType` | `receiver: address, amount: u256` |
-| 提现 | `payment_channel` | `withdraw_from_hub_entry` | `CoinType` | `amount: u256` |
+| 功能     | 合约模块             | 函数名                    | 类型参数   | 参数                              |
+| -------- | -------------------- | ------------------------- | ---------- | --------------------------------- |
+| 账户转账 | `account_coin_store` | `transfer`                | `CoinType` | `to: address, amount: u256`       |
+| Hub 转账 | `payment_channel`    | `transfer_to_hub_entry`   | `CoinType` | `receiver: address, amount: u256` |
+| 充值     | `payment_channel`    | `deposit_to_hub_entry`    | `CoinType` | `receiver: address, amount: u256` |
+| 提现     | `payment_channel`    | `withdraw_from_hub_entry` | `CoinType` | `amount: u256`                    |
 
 ### 6.2 余额查询
 
@@ -979,21 +1008,22 @@ function formatAmount(amount: bigint, decimals: number): string {
 ### 8.1 余额缓存
 
 使用 React Query 缓存余额数据:
+
 - `staleTime`: 30 秒
 - 转账成功后立即 invalidate
 
 ### 8.2 懒加载
 
 对话框组件使用懒加载:
+
 ```typescript
-const TransferAccountModal = lazy(() => 
-  import('@/components/balance/TransferAccountModal')
-);
+const TransferAccountModal = lazy(() => import('@/components/balance/TransferAccountModal'));
 ```
 
 ### 8.3 防抖
 
 金额输入使用防抖，减少验证次数:
+
 ```typescript
 const debouncedAmount = useDebounce(amount, 300);
 ```
@@ -1034,6 +1064,7 @@ A: 账户转账和 Hub 操作通常在几秒内完成。具体时间取决于网
 ### 10.3 转账记录
 
 显示历史转账记录，包括:
+
 - 时间
 - 类型 (转账/充值/提现)
 - 金额

@@ -10,11 +10,13 @@ This directory contains example TypeScript files demonstrating how to use the Nu
 ## Setup
 
 1. **Navigate to the project root:**
+
    ```bash
    cd nuwa-kit/typescript
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pnpm install
    ```
@@ -62,6 +64,7 @@ node dist/examples/stored-key-export-import.js
 Demonstrates how to use the StoredKey export and import functionality to serialize keys for storage in environment variables or configuration files.
 
 **Features:**
+
 - Create KeyManager with DID key generation
 - Export keys to string format
 - Import keys from exported strings
@@ -70,6 +73,7 @@ Demonstrates how to use the StoredKey export and import functionality to seriali
 - Multiple key type support
 
 **Expected Output:**
+
 ```
 === StoredKey Export/Import Example ===
 
@@ -123,10 +127,11 @@ When adding new examples:
 5. Update this README with information about your new example
 
 Example structure:
+
 ```typescript
 /**
  * Example: Your Example Name
- * 
+ *
  * Brief description of what this example demonstrates
  */
 
@@ -134,9 +139,9 @@ import { KeyManager } from '../src/keys';
 
 async function main() {
   console.log('=== Your Example ===\n');
-  
+
   // Your example code here
-  
+
   console.log('=== Example completed successfully! ===');
 }
 
@@ -144,4 +149,4 @@ async function main() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(console.error);
 }
-``` 
+```

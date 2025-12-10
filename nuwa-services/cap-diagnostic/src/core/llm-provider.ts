@@ -21,9 +21,11 @@ export class LLMProvider {
 
   private initializeProvider(): void {
     const apiKey = this.config.apiKey || process.env.OPENROUTER_API_KEY;
-    
+
     if (!apiKey) {
-      throw new Error('OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable or provide apiKey in config.');
+      throw new Error(
+        'OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable or provide apiKey in config.'
+      );
     }
 
     const providerSettings: LLMProviderSettings = {
@@ -33,9 +35,9 @@ export class LLMProvider {
     };
 
     this.openrouter = createOpenRouter(providerSettings);
-    logger.info('LLM provider initialized', { 
+    logger.info('LLM provider initialized', {
       provider: 'openrouter',
-      baseURL: providerSettings.baseURL 
+      baseURL: providerSettings.baseURL,
     });
   }
 
@@ -61,12 +63,14 @@ export class LLMProvider {
   /**
    * Test if a model is accessible
    */
-  async testModel(modelId: string): Promise<{ success: boolean; error?: string; duration: number }> {
+  async testModel(
+    modelId: string
+  ): Promise<{ success: boolean; error?: string; duration: number }> {
     const startTime = Date.now();
-    
+
     try {
       const model = this.chat(modelId);
-      
+
       // Try a simple completion to test the model
       const result = await model.doGenerate({
         inputFormat: 'messages',
@@ -74,14 +78,14 @@ export class LLMProvider {
         prompt: [
           {
             role: 'user',
-            content: 'Hello, this is a test message. Please respond with "OK".'
-          }
+            content: 'Hello, this is a test message. Please respond with "OK".',
+          },
         ],
-        abortSignal: AbortSignal.timeout(this.config.timeout || 30000)
+        abortSignal: AbortSignal.timeout(this.config.timeout || 30000),
       });
 
       const duration = Date.now() - startTime;
-      
+
       if (result.text && result.text.length > 0) {
         logger.info('Model test successful', { modelId, duration });
         return { success: true, duration };
@@ -92,7 +96,7 @@ export class LLMProvider {
     } catch (error) {
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       logger.error('Model test failed', { modelId, error: errorMessage, duration });
       return { success: false, error: errorMessage, duration };
     }
@@ -112,7 +116,7 @@ export class LLMProvider {
       'anthropic/claude-3.5-sonnet',
       'anthropic/claude-3-haiku',
       'google/gemini-pro-1.5',
-      'meta-llama/llama-3.1-8b-instruct'
+      'meta-llama/llama-3.1-8b-instruct',
     ];
   }
 }

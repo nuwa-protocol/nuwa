@@ -26,16 +26,13 @@ export function TransferHubModal({
 }: TransferHubModalProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const {
-    transfer,
-    isLoading,
-    unlockedBalance,
-    totalBalance,
-    lockedBalance,
-    activeChannels,
-  } = useHubTransfer(agentDid);
+  const { transfer, isLoading, unlockedBalance, totalBalance, lockedBalance, activeChannels } =
+    useHubTransfer(agentDid);
 
-  const handleTransfer = async (recipient: string, amount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
+  const handleTransfer = async (
+    recipient: string,
+    amount: bigint
+  ): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
       const normalizedAddress = normalizeAddress(recipient);
       const recipientDid = recipient.startsWith('did:rooch:')
@@ -48,7 +45,10 @@ export function TransferHubModal({
         toast({
           variant: 'success',
           title: t('transfer.hubTransferSuccess', 'Hub Transfer Successful'),
-          description: t('transfer.hubTransferSuccessDescription', 'Successfully transferred RGAS to the recipient\'s Payment Hub'),
+          description: t(
+            'transfer.hubTransferSuccessDescription',
+            "Successfully transferred RGAS to the recipient's Payment Hub"
+          ),
         });
         onSuccess?.();
         return { txHash: result.txHash, success: true };
@@ -86,14 +86,20 @@ export function TransferHubModal({
 
       // Prevent self-transfer
       if (normalizedDid === agentDid) {
-        return { valid: false, error: t('transfer.cannotTransferToSelf', 'Cannot transfer to your own address') };
+        return {
+          valid: false,
+          error: t('transfer.cannotTransferToSelf', 'Cannot transfer to your own address'),
+        };
       }
 
       return { valid: true };
     } catch {
       return {
         valid: false,
-        error: t('transfer.invalidHubRecipientFormat', 'Invalid format. Please enter a valid DID or Rooch address')
+        error: t(
+          'transfer.invalidHubRecipientFormat',
+          'Invalid format. Please enter a valid DID or Rooch address'
+        ),
       };
     }
   };
@@ -102,15 +108,16 @@ export function TransferHubModal({
     const balanceNumber = Number(balance) / Math.pow(10, decimals);
     return balanceNumber.toLocaleString(undefined, {
       minimumFractionDigits: 0,
-      maximumFractionDigits: decimals
+      maximumFractionDigits: decimals,
     });
   };
 
-  const lockedBalanceText = activeChannels > 0
-    ? t('transfer.lockedBalanceWithChannels', 'Locked balance ({{channels}} active channels)', {
-        channels: activeChannels
-      })
-    : t('transfer.lockedBalance', 'Locked balance');
+  const lockedBalanceText =
+    activeChannels > 0
+      ? t('transfer.lockedBalanceWithChannels', 'Locked balance ({{channels}} active channels)', {
+          channels: activeChannels,
+        })
+      : t('transfer.lockedBalance', 'Locked balance');
 
   // Extra content showing balance breakdown
   const extraContent = activeChannels > 0 && (
@@ -118,13 +125,18 @@ export function TransferHubModal({
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          {t('transfer.hubTransferInfo', 'Only unlocked balance can be transferred. Locked balance is held as collateral for active payment channels.')}
+          {t(
+            'transfer.hubTransferInfo',
+            'Only unlocked balance can be transferred. Locked balance is held as collateral for active payment channels.'
+          )}
         </AlertDescription>
       </Alert>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">{t('transfer.totalBalance', 'Total Balance')}:</span>
+          <span className="text-muted-foreground">
+            {t('transfer.totalBalance', 'Total Balance')}:
+          </span>
           <span className="font-mono">{formatBalance(totalBalance)} RGAS</span>
         </div>
 
@@ -145,7 +157,9 @@ export function TransferHubModal({
       {activeChannels > 0 && (
         <div className="flex items-center space-x-2">
           <Badge variant="secondary">
-            {t('transfer.activeChannelsBadge', '{{count}} active channels', { count: activeChannels })}
+            {t('transfer.activeChannelsBadge', '{{count}} active channels', {
+              count: activeChannels,
+            })}
           </Badge>
         </div>
       )}
@@ -157,7 +171,10 @@ export function TransferHubModal({
       open={open}
       onClose={onClose}
       title={t('transfer.hubTransfer', 'Transfer Payment Hub Balance')}
-      description={t('transfer.hubTransferDescription', 'Transfer RGAS from your Payment Hub to another address\'s Payment Hub')}
+      description={t(
+        'transfer.hubTransferDescription',
+        "Transfer RGAS from your Payment Hub to another address's Payment Hub"
+      )}
       agentDid={agentDid}
       currentBalance={unlockedBalance} // Use unlocked balance as available amount
       balanceLabel={t('transfer.unlockedBalance', 'Unlocked Balance')}
@@ -166,7 +183,10 @@ export function TransferHubModal({
       maxAmount={unlockedBalance}
       showRecipientInput={true}
       recipientLabel={t('transfer.recipientDID', 'Recipient DID')}
-      recipientPlaceholder={t('transfer.recipientDIDPlaceholder', 'Enter DID (did:rooch:0x...) or Rooch address')}
+      recipientPlaceholder={t(
+        'transfer.recipientDIDPlaceholder',
+        'Enter DID (did:rooch:0x...) or Rooch address'
+      )}
       showAmountInput={true}
       amountLabel={t('transfer.amount', 'Amount')}
       amountPlaceholder="0.00"

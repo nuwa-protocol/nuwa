@@ -23,6 +23,7 @@ pnpm build && pnpm start
 ```
 
 ## 环境变量
+
 - `PORT`: 监听端口（Railway 会注入）
 - `DISCORD_APP_PUBLIC_KEY`: Discord 应用公钥（用于签名验证）
 - `FAUCET_URL`: 测试网水龙头地址（默认 `https://test-faucet.rooch.network`）
@@ -31,10 +32,12 @@ pnpm build && pnpm start
 - `HUB_DID`: Hub 账户 DID（`did:rooch:<address>`）
 
 ## 路由
+
 - `GET /health`: 健康检查
 - `POST /api/discord/interactions`: Discord 交互入口
 
 ## Railway 部署
+
 - 选择 Nixpacks 构建，自动读取 `nixpacks.toml`
 - 设置上述环境变量
-- 使用默认 Start Command：`pnpm run start` 
+- 使用默认 Start Command：`pnpm run start`

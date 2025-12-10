@@ -138,7 +138,7 @@ export interface LLMProvider {
     destination: NodeJS.WritableStream
   ): Promise<ExecuteStreamResponse>;
 
-/**
+  /**
    * Get model extractor for this provider (optional)
    * Returns a provider-specific model extractor that can handle the provider's request formats
    * @returns ModelExtractor instance or undefined if provider uses default extraction

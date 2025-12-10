@@ -167,10 +167,7 @@ export class TestEnv {
     }
 
     if (this.shouldSkipIntegrationTests()) {
-      d.skip(
-        `${providerName} Provider Integration Tests (SKIP_INTEGRATION_TESTS=true)`,
-        testFn
-      );
+      d.skip(`${providerName} Provider Integration Tests (SKIP_INTEGRATION_TESTS=true)`, testFn);
     } else if (!provider?.enabled) {
       d.skip(
         `${providerName} Provider Integration Tests (${provider?.reason || 'disabled'})`,

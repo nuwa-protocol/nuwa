@@ -11,4 +11,4 @@ process.env.NODE_ENV = 'test';
 // Mock any modules that might cause issues in test environment
 // Add any global mocks or test utilities as needed
 
-export { };
+export {};

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-export type OpenRouterChatModelId = 
+export type OpenRouterChatModelId =
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
   | 'openai/gpt-4-turbo'

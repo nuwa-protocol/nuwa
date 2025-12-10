@@ -37,7 +37,10 @@ export function WithdrawFromHubModal({
     activeChannels,
   } = useHubDepositWithdraw(agentDid);
 
-  const handleWithdraw = async (_recipient: string, withdrawAmount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
+  const handleWithdraw = async (
+    _recipient: string,
+    withdrawAmount: bigint
+  ): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
       const result = await withdrawFromHub(withdrawAmount, DEFAULT_ASSET_ID);
 
@@ -45,7 +48,10 @@ export function WithdrawFromHubModal({
         toast({
           variant: 'success',
           title: t('transfer.withdrawSuccess', 'Withdrawal Successful'),
-          description: t('transfer.withdrawSuccessDescription', 'Successfully withdrew RGAS to your account balance'),
+          description: t(
+            'transfer.withdrawSuccessDescription',
+            'Successfully withdrew RGAS to your account balance'
+          ),
         });
         onSuccess?.();
         return { txHash: result.txHash, success: true };
@@ -77,7 +83,10 @@ export function WithdrawFromHubModal({
         toast({
           variant: 'success',
           title: t('transfer.withdrawAllSuccess', 'All Funds Withdrawn'),
-          description: t('transfer.withdrawAllSuccessDescription', 'Successfully withdrew all available RGAS to your account balance'),
+          description: t(
+            'transfer.withdrawAllSuccessDescription',
+            'Successfully withdrew all available RGAS to your account balance'
+          ),
         });
         onSuccess?.();
         return { txHash: result.txHash, success: true };
@@ -103,7 +112,7 @@ export function WithdrawFromHubModal({
     const balanceNumber = Number(balance) / Math.pow(10, decimals);
     return balanceNumber.toLocaleString(undefined, {
       minimumFractionDigits: 0,
-      maximumFractionDigits: decimals
+      maximumFractionDigits: decimals,
     });
   };
 
@@ -128,7 +137,10 @@ export function WithdrawFromHubModal({
       open={open}
       onClose={onClose}
       title={t('transfer.withdrawFromHub', 'Withdraw from Payment Hub')}
-      description={t('transfer.withdrawFromHubDescription', 'Transfer RGAS from Payment Hub back to your account balance')}
+      description={t(
+        'transfer.withdrawFromHubDescription',
+        'Transfer RGAS from Payment Hub back to your account balance'
+      )}
       agentDid={agentDid}
       currentBalance={unlockedBalance} // Use unlocked balance as available amount
       balanceLabel={t('transfer.withdrawableBalance', 'Withdrawable Balance')}

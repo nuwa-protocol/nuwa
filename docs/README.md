@@ -32,10 +32,12 @@ mint dev
 Then open http://localhost:3000.
 
 Tips:
+
 - If the dev server fails to start, run `mint update` to upgrade the CLI.
 - If you see a 404 locally, ensure you are in `docs/` and that `docs.json` is valid.
 
 ### Working with AI
+
 use the `MINTLIFY.md` file as rules for your AI to write docs and avoid errors.
 
 ## Editing Content
@@ -52,17 +54,14 @@ The site is deployed via Mintlify. The Mintlify GitHub App is connected for this
 
 - Mintlify docs: https://mintlify.com/docs
 
-
-
 ### to do
-- [ ] update the mcp-server example
-    - [ ] how to obtain service key
-    - [ ] how to return an UI resource
-    - [ ] set pico USD
-    - [ ] remove prompt and resource as they are not used by the client 
-    - [ ] how to use official mcp sdk
-    - [ ] default identity kit settings
 
--[] artifact
-    - [] what is artifact
-    - 
+- [ ] update the mcp-server example
+  - [ ] how to obtain service key
+  - [ ] how to return an UI resource
+  - [ ] set pico USD
+  - [ ] remove prompt and resource as they are not used by the client
+  - [ ] how to use official mcp sdk
+  - [ ] default identity kit settings
+
+-[] artifact - [] what is artifact -

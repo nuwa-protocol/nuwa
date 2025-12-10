@@ -603,9 +603,7 @@ class PaymentCLIClient {
 
       const response = await this.adminClient.getSystemStatus();
 
-      console.log(
-        chalk.white(`  Claims Status: ${JSON.stringify(response.claims, null, 2)}`)
-      );
+      console.log(chalk.white(`  Claims Status: ${JSON.stringify(response.claims, null, 2)}`));
       console.log(
         chalk.white(`  Processing Stats: ${JSON.stringify(response.processor, null, 2)}`)
       );

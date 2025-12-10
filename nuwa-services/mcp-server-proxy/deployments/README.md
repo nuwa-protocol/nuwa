@@ -27,7 +27,7 @@
 deployments/
 ├── instances/
 │   ├── amap-proxy/           # 高德地图 MCP 代理
-│   ├── github-proxy/         # GitHub MCP 代理  
+│   ├── github-proxy/         # GitHub MCP 代理
 │   ├── context7-proxy/       # Context7 文档库代理
 │   └── custom-proxy/         # 自定义 MCP 代理
 ├── scripts/
@@ -50,6 +50,7 @@ deployments/
 ### 部署流程
 
 1. **创建新实例**：
+
    ```bash
    ./scripts/create-instance.sh my-new-proxy
    ```
@@ -58,6 +59,7 @@ deployments/
    编辑 `instances/my-new-proxy/config.yaml`
 
 3. **部署实例**：
+
    ```bash
    ./scripts/deploy.sh my-new-proxy
    ```
@@ -79,6 +81,7 @@ deployments/
 ### 实例特定变量
 
 每个实例可以有自己的：
+
 - `UPSTREAM_API_KEY` - 上游服务 API 密钥
 - `CUSTOM_CONFIG` - 自定义配置
 - `INSTANCE_NAME` - 实例名称
@@ -95,6 +98,7 @@ deployments/
 ### 自定义监控
 
 可以通过 `nuwa.health` 端点进行健康检查：
+
 ```bash
 curl https://my-proxy.railway.app/mcp -X POST \
   -H "Content-Type: application/json" \

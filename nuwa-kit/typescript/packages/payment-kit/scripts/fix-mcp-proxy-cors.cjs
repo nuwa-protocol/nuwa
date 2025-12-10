@@ -21,7 +21,7 @@ try {
   }
 
   let content = fs.readFileSync(startHTTPServerPath, 'utf8');
-  
+
   // Check if already patched
   if (content.includes('mcp-protocol-version')) {
     console.log('✅ mcp-proxy CORS headers already fixed');
@@ -29,24 +29,26 @@ try {
   }
 
   // Apply the fix
-  const oldCorsHeaders = 'res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Mcp-Session-Id, Last-Event-Id");';
-  const newCorsHeaders = 'res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, mcp-session-id, mcp-protocol-version, last-event-id");';
+  const oldCorsHeaders =
+    'res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Mcp-Session-Id, Last-Event-Id");';
+  const newCorsHeaders =
+    'res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, mcp-session-id, mcp-protocol-version, last-event-id");';
 
   if (content.includes(oldCorsHeaders)) {
     content = content.replace(oldCorsHeaders, newCorsHeaders);
-    
+
     // Also fix the Methods header to include DELETE
     content = content.replace(
       'res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");',
       'res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");'
     );
-    
+
     // Fix the Expose-Headers to use lowercase
     content = content.replace(
       'res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");',
       'res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");'
     );
-    
+
     fs.writeFileSync(startHTTPServerPath, content, 'utf8');
     console.log('✅ mcp-proxy CORS headers fixed successfully');
   } else {
@@ -57,4 +59,3 @@ try {
   // Don't fail the installation
   process.exit(0);
 }
-

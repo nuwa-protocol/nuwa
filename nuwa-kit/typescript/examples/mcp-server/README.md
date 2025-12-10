@@ -12,10 +12,10 @@ pnpm dev              # start the server with tsx (hot-reload)
 ```
 
 Now connect with any MCP client that supports httpStream.  
-Example using AI-SDK (see sibling *mcp-client* example):
+Example using AI-SDK (see sibling _mcp-client_ example):
 
 ```
 client.callTool({ name: "echo", arguments: { text: "Hello" } })
 ```
 
-The server validates the `Authorization: DIDAuthV1 …` header on every request. 
+The server validates the `Authorization: DIDAuthV1 …` header on every request.

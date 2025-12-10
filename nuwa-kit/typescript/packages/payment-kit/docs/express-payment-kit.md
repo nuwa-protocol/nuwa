@@ -283,12 +283,10 @@ NODE_ENV=production
 ### 常见问题
 
 1. **"Missing X-Payment-Channel-Data header"**
-
    - 客户端未提供支付通道信息
    - 检查客户端是否正确集成 PaymentKit
 
 2. **"DID authentication failed"**
-
    - Authorization 头格式错误或签名无效
    - 确认客户端 DID 签名逻辑
 

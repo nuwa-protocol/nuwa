@@ -5,7 +5,7 @@ import { handleQueryCapById } from './query-cap-by-id.js';
 import { handleQueryCapStats } from './query-cap-stats.js';
 import { handleDownloadCap } from './download-cap.js';
 import { handleDownloadCaps } from './download-caps.js';
-import { handleQueryUserFavoriteCaps } from "./query-user-favorite-caps.js";
+import { handleQueryUserFavoriteCaps } from './query-user-favorite-caps.js';
 
 /**
  * Main RESTful API route handler
@@ -13,10 +13,7 @@ import { handleQueryUserFavoriteCaps } from "./query-user-favorite-caps.js";
  *
  * @returns true if the request was handled, false otherwise
  */
-export async function handleApiRoutes(
-  req: IncomingMessage,
-  res: ServerResponse
-): Promise<boolean> {
+export async function handleApiRoutes(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url || '', 'http://localhost');
   const pathname = url.pathname;
 
@@ -62,7 +59,12 @@ export async function handleApiRoutes(
     }
 
     // Route: GET /api/cap/:id
-    if (req.method === 'GET' && pathname.match(/^\/api\/cap\/[^\/]+$/) && !pathname.includes('/stats') && !pathname.includes('/download')) {
+    if (
+      req.method === 'GET' &&
+      pathname.match(/^\/api\/cap\/[^\/]+$/) &&
+      !pathname.includes('/stats') &&
+      !pathname.includes('/download')
+    ) {
       const id = pathname.split('/').pop();
       if (id) {
         await handleQueryCapById(req, res, id);

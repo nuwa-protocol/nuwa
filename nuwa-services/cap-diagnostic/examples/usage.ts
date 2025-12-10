@@ -2,7 +2,7 @@
 
 /**
  * Example usage of the CAP Diagnostic Tool
- * 
+ *
  * This example demonstrates how to use the diagnostic tool programmatically
  * to test CAP configurations.
  */
@@ -26,7 +26,8 @@ const exampleCap: Cap = {
   },
   core: {
     prompt: {
-      value: 'You are a helpful assistant. You can help users with various tasks. Your location is {{user_geo}}.',
+      value:
+        'You are a helpful assistant. You can help users with various tasks. Your location is {{user_geo}}.',
     },
     model: {
       id: 'openai/gpt-4o-mini',
@@ -55,11 +56,7 @@ const config: DiagnosticConfig = {
     retries: 3,
   },
   diagnostic: {
-    testMessages: [
-      'Hello, can you help me?',
-      'What can you do?',
-      'Test your capabilities',
-    ],
+    testMessages: ['Hello, can you help me?', 'What can you do?', 'Test your capabilities'],
     maxSteps: 3,
     maxRetries: 2,
   },
@@ -116,7 +113,6 @@ async function runDiagnosticExample() {
         console.log(`    Details:`, test.details);
       }
     });
-
   } catch (error) {
     logger.error('Diagnostic example failed', { error });
     console.error('Error:', error);
@@ -130,7 +126,7 @@ async function runComponentExample() {
     // Example 1: Using CapResolver directly
     logger.info('Testing CapResolver');
     const resolver = new CapResolver(exampleCap, config);
-    
+
     const resolvedConfig = await resolver.getResolvedConfig();
     console.log('\n=== Resolved Configuration ===');
     console.log('Prompt length:', resolvedConfig.prompt.length);
@@ -142,7 +138,7 @@ async function runComponentExample() {
     // Example 2: Testing MCP Manager
     logger.info('Testing MCP Manager');
     const mcpManager = MCPManager.getInstance();
-    
+
     // Test individual MCP server
     const mcpTest = await mcpManager.testMCPServer('http://localhost:3001/mcp');
     console.log('\n=== MCP Server Test ===');
@@ -158,7 +154,7 @@ async function runComponentExample() {
     // Example 3: Testing LLM Provider
     logger.info('Testing LLM Provider');
     const llmProvider = new LLMProvider(config.llm);
-    
+
     const modelTest = await llmProvider.testModel('openai/gpt-4o-mini');
     console.log('\n=== LLM Model Test ===');
     console.log('Success:', modelTest.success);
@@ -166,7 +162,6 @@ async function runComponentExample() {
     if (modelTest.error) {
       console.log('Error:', modelTest.error);
     }
-
   } catch (error) {
     logger.error('Component example failed', { error });
     console.error('Error:', error);
@@ -176,7 +171,7 @@ async function runComponentExample() {
 // Main execution
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.includes('--component')) {
     await runComponentExample();
   } else {

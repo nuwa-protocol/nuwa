@@ -1,2 +1,2 @@
-general_settings: 
-  alerting: ["slack"]
+general_settings:
+  alerting: ['slack']

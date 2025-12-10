@@ -1,24 +1,23 @@
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { ServerCapabilities } from "@modelcontextprotocol/sdk/types.js";
-import { UpstreamConfig, AuthConfig, Upstream } from "./types.js";
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import { UpstreamConfig, AuthConfig, Upstream } from './types.js';
 
 function buildHeaders(auth?: AuthConfig): Record<string, string> {
   const headers: Record<string, string> = {};
   if (!auth) return headers;
 
   switch (auth.scheme) {
-    case "header":
+    case 'header':
       headers[auth.header] = auth.value;
       break;
-    case "basic":
-      headers["Authorization"] =
-        "Basic " +
-        Buffer.from(`${auth.username}:${auth.password}`).toString("base64");
+    case 'basic':
+      headers['Authorization'] =
+        'Basic ' + Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
       break;
-    case "bearer":
-      headers["Authorization"] = `Bearer ${auth.token}`;
+    case 'bearer':
+      headers['Authorization'] = `Bearer ${auth.token}`;
       break;
   }
   return headers;
@@ -28,25 +27,23 @@ export async function initUpstream(cfg: UpstreamConfig): Promise<Upstream> {
   console.log(`🔗 Initializing upstream with type: ${cfg.type}`);
 
   let transport: any;
-  if (cfg.type === "httpStream" || cfg.type === "http") {
-    const authInfo = cfg.auth
-      ? `${cfg.auth.scheme} authentication`
-      : "no authentication";
+  if (cfg.type === 'httpStream' || cfg.type === 'http') {
+    const authInfo = cfg.auth ? `${cfg.auth.scheme} authentication` : 'no authentication';
     console.log(`   URL: ${cfg.url}`);
     console.log(`   Auth: ${authInfo}`);
     const headers = buildHeaders(cfg.auth);
-    console.log(`   Headers: ${Object.keys(headers).join(", ")}`);
+    console.log(`   Headers: ${Object.keys(headers).join(', ')}`);
     transport = new StreamableHTTPClientTransport(new URL(cfg.url), {
       requestInit: { headers },
     } as any);
   } else {
     // cfg here is StdioUpstreamConfig
     const stdioCfg = cfg as any; // type cast for clarity
-    console.log(`   Command: ${stdioCfg.command.join(" ")}`);
+    console.log(`   Command: ${stdioCfg.command.join(' ')}`);
     if (stdioCfg.cwd) {
       console.log(`   Working Directory: ${stdioCfg.cwd}`);
     }
-    
+
     // Merge parent process environment with custom environment variables
     const mergedEnv = {
       ...Object.fromEntries(
@@ -56,17 +53,23 @@ export async function initUpstream(cfg: UpstreamConfig): Promise<Upstream> {
       ),
       ...(stdioCfg.env || {}),
     };
-    
-    const inheritedEnvCount = Object.entries(process.env).filter(([_, v]) => v !== undefined).length;
+
+    const inheritedEnvCount = Object.entries(process.env).filter(
+      ([_, v]) => v !== undefined
+    ).length;
     const customEnvCount = Object.keys(stdioCfg.env || {}).length;
-    console.log(`   Environment: ${inheritedEnvCount} inherited + ${customEnvCount} custom variables`);
+    console.log(
+      `   Environment: ${inheritedEnvCount} inherited + ${customEnvCount} custom variables`
+    );
     if (stdioCfg.env && Object.keys(stdioCfg.env).length > 0) {
-      console.log(`   Custom Variables: ${Object.keys(stdioCfg.env).join(", ")}`);
+      console.log(`   Custom Variables: ${Object.keys(stdioCfg.env).join(', ')}`);
     }
 
     // Configure stderr handling
     const stderrConfig = stdioCfg.stderr || 'inherit';
-    console.log(`   Stderr: ${stderrConfig} (child process errors will ${stderrConfig === 'inherit' ? 'be visible' : stderrConfig === 'ignore' ? 'be suppressed' : 'be captured'})`);
+    console.log(
+      `   Stderr: ${stderrConfig} (child process errors will ${stderrConfig === 'inherit' ? 'be visible' : stderrConfig === 'ignore' ? 'be suppressed' : 'be captured'})`
+    );
 
     transport = new StdioClientTransport({
       command: stdioCfg.command[0],
@@ -77,10 +80,7 @@ export async function initUpstream(cfg: UpstreamConfig): Promise<Upstream> {
     });
   }
 
-  const client: any = new Client(
-    { name: "mcp-proxy-client", version: "0.1.0" },
-    {},
-  );
+  const client: any = new Client({ name: 'mcp-proxy-client', version: '0.1.0' }, {});
 
   try {
     await client.connect(transport);
@@ -93,12 +93,9 @@ export async function initUpstream(cfg: UpstreamConfig): Promise<Upstream> {
   // Fetch capabilities after connect using getServerCapabilities
   let capabilities: ServerCapabilities = {};
   try {
-    if (typeof client.getServerCapabilities === "function") {
+    if (typeof client.getServerCapabilities === 'function') {
       capabilities = await client.getServerCapabilities();
-      console.log(
-        `📋 Retrieved capabilities from upstream:`,
-        Object.keys(capabilities),
-      );
+      console.log(`📋 Retrieved capabilities from upstream:`, Object.keys(capabilities));
     }
   } catch (e) {
     console.warn(`⚠️  Upstream getServerCapabilities failed:`, e);

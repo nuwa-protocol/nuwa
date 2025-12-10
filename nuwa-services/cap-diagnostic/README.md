@@ -77,11 +77,7 @@ Create a `config.json` file or use environment variables:
     "retries": 3
   },
   "diagnostic": {
-    "testMessages": [
-      "Hello, can you help me?",
-      "What can you do?",
-      "Test your capabilities"
-    ]
+    "testMessages": ["Hello, can you help me?", "What can you do?", "Test your capabilities"]
   }
 }
 ```

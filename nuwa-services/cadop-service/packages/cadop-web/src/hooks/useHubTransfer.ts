@@ -16,9 +16,7 @@ export function useHubTransfer(agentDid?: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [unlockedBalance, setUnlockedBalance] = useState<bigint>(0n);
 
-  const totalBalance = balances?.[DEFAULT_ASSET_ID]
-    ? BigInt(balances[DEFAULT_ASSET_ID])
-    : 0n;
+  const totalBalance = balances?.[DEFAULT_ASSET_ID] ? BigInt(balances[DEFAULT_ASSET_ID]) : 0n;
 
   useEffect(() => {
     const refreshUnlockedBalance = async () => {

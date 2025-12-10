@@ -151,7 +151,6 @@ This document describes the target protocol behavior. To align existing code saf
 ### 7.1 Phase 1 – Non-breaking cleanup (no behavior change, tests must stay green)
 
 - Client (`PaymentChannelHttpClient.ts`)
-
   - Extract helpers without changing logic:
     - `shouldAttachRav(state, options)` – wraps current decision (pendingSubRAV or legacy handshake path).
     - `buildSignedSubRavIfNeeded()` – encapsulates “sign pending” vs “build-and-sign handshake (nonce=0)” branches.
@@ -164,7 +163,6 @@ This document describes the target protocol behavior. To align existing code saf
   - Do not introduce automatic `/recovery` calls here.
 
 - Processor (`PaymentProcessor.ts`)
-
   - Consolidate duplicated code paths, keep behavior unchanged:
     - Extract `buildFollowUpUnsigned(priorSignedSubRav, cost)` and let both `generateSubRAV` / `generateSubRAVSync` reuse it.
     - Extract `verifyAndProcessSignedSubRAV(signedSubRAV)` to unify handshake/regular verification, keep stats and branches.
@@ -178,7 +176,6 @@ This document describes the target protocol behavior. To align existing code saf
 ### 7.2 Phase 2 – Protocol alignment (implement the behavior in this spec)
 
 - Client
-
   - Remove legacy handshake emission and related state.
     - Delete `isHandshakeComplete` from `HttpClientState` and `PersistedHttpClientState`.
     - Requests carry RAV only when `pendingSubRAV` exists; never send `nonce=0` handshakes.
@@ -186,7 +183,6 @@ This document describes the target protocol behavior. To align existing code saf
   - Recovery is only used when local state is missing but the deterministic channel exists on-chain.
 
 - Server
-
   - Paid (pre-flight) routes: even when `cost=0`, return the next unsigned proposal.
   - Free routes: if a pending exists but the request lacks the matching signature, use DIDAuth fallback to locate the sub-channel and respond `402`.
   - Remove handshake-specific metrics/branches in `PaymentProcessor`.

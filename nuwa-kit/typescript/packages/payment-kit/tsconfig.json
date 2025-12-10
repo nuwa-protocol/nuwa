@@ -19,9 +19,7 @@
       "@nuwa-ai/identity-kit/testHelpers": ["../identity-kit/src/testHelpers/index.ts"]
     }
   },
-  "include": [
-    "src/**/*"
-  ],
+  "include": ["src/**/*"],
   "exclude": [
     "dist",
     "node_modules",
@@ -30,4 +28,4 @@
     "**/*.test.ts",
     "**/*.e2e.test.ts"
   ]
-} 
+}

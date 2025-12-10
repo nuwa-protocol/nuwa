@@ -17,7 +17,6 @@
 ### 2. 总体架构
 
 - Server 侧（MCP）：
-
   - `McpPaymentKit`（类比 `ExpressPaymentKit`）：提供「声明计费规则 + 注册内置/业务处理器 + DID 鉴权 + 计费编排 + 结果注入」的一体化封装；
   - `McpBillingMiddleware`：协议适配层，负责从 MCP 请求中提取/写回支付元数据，调用通用 `PaymentProcessor` 完成「验证→计价→发券→持久化」；
   - 编解码复用：使用现有 `HttpPaymentCodec` 作为统一编解码；在 MCP 层用轻量 codecAdapter 将 params/result 与 headerValue（字符串）互转；
@@ -116,7 +115,6 @@ const ToolParamsSchema = z
 #### 4.1 关键组件
 
 - `McpPaymentKit`：
-
   - 负责：
     - 构造 `PaymentChannelPayeeClient`、`RateProvider`、`HubBalanceService`、`ClaimTriggerService`；
     - 创建「可计费路由器」并注册内置/业务方法；
@@ -124,7 +122,6 @@ const ToolParamsSchema = z
   - 对标 `ExpressPaymentKit`：初始化、内置 handler 注册、默认资产/价格、adminDid 管控等均保持一致；
 
 - `McpBillingMiddleware`：
-
   - 输入：MCP 调用上下文 `{ method: string; params: McpPaymentRequestParams }`；
   - 输出：
     - 非流式：在 `result.__nuwa_payment` 写入结算数据；
@@ -280,7 +277,6 @@ export interface PaymentCodec {
 ```
 
 - 引入「协议中间件基类」以复用框架逻辑：
-
   - 现有 `HttpBillingMiddleware` 与未来 `McpBillingMiddleware` 共享「构建 `BillingContext` → `PaymentProcessor` → 写回载体」的主流程；
   - 提取通用流程到 `AbstractBillingMiddleware`（协议无关），各协议实现只需：
     - `extractPaymentData()`、`injectSettlement()`、`isStreaming()`、`writeInBandFrame()`。

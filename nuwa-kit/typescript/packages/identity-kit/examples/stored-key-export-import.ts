@@ -1,6 +1,6 @@
 /**
  * Example: StoredKey Export/Import Usage
- * 
+ *
  * This example demonstrates how to use the StoredKey export and import functionality
  * to serialize keys for storage in environment variables or configuration files.
  */
@@ -38,11 +38,13 @@ async function main() {
   // 5. Verify functionality by signing with both KeyManagers
   console.log('5. Verifying functionality with signing test...');
   const testData = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
-  
+
   const originalSignature = await keyManager.signWithKeyId(testData, keyId);
   const importedSignature = await newKeyManager.signWithKeyId(testData, keyId);
-  
-  const signaturesMatch = originalSignature.every((byte, index) => byte === importedSignature[index]);
+
+  const signaturesMatch = originalSignature.every(
+    (byte, index) => byte === importedSignature[index]
+  );
   console.log(`   Original signature: ${Array.from(originalSignature).slice(0, 8).join(', ')}...`);
   console.log(`   Imported signature: ${Array.from(importedSignature).slice(0, 8).join(', ')}...`);
   console.log(`   ✓ Signatures match: ${signaturesMatch}\n`);
@@ -53,8 +55,10 @@ async function main() {
   if (storedKey) {
     const directEncoded = StoredKeyCodec.encode(storedKey);
     const directDecoded = await StoredKeyCodec.decode(directEncoded);
-    
-    console.log(`   Direct encode/decode successful: ${JSON.stringify(directDecoded.keyId) === JSON.stringify(storedKey.keyId)}`);
+
+    console.log(
+      `   Direct encode/decode successful: ${JSON.stringify(directDecoded.keyId) === JSON.stringify(storedKey.keyId)}`
+    );
     console.log(`   Key type preserved: ${directDecoded.keyType === storedKey.keyType}`);
   }
 
@@ -62,16 +66,16 @@ async function main() {
   console.log('\n7. Multiple key types example...');
   const secp256k1Key = await keyManager.generateKey('secp256k1-key', KeyType.SECP256K1);
   const secp256k1Exported = await keyManager.exportKeyToString(secp256k1Key.keyId);
-  
+
   console.log(`   SECP256K1 key exported: ${secp256k1Exported.substring(0, 30)}...`);
   console.log(`   Different from Ed25519: ${secp256k1Exported !== exportedKeyString}`);
 
   // 8. Environment variable loading simulation
   console.log('\n8. Simulating application startup with environment variable...');
-  
+
   // Simulate process.env.STORED_KEY
   const mockEnvStoredKey = exportedKeyString;
-  
+
   async function loadKeyManagerFromEnv(): Promise<KeyManager> {
     const serialized = mockEnvStoredKey; // In real app: process.env.STORED_KEY
     if (!serialized) {
@@ -79,10 +83,10 @@ async function main() {
     }
     return KeyManager.fromSerializedKey(serialized);
   }
-  
+
   const envKeyManager = await loadKeyManagerFromEnv();
   console.log('   ✓ Successfully loaded KeyManager from simulated environment variable');
-  console.log(`   ✓ Can access key: ${await envKeyManager.getStoredKey(keyId) !== null}`);
+  console.log(`   ✓ Can access key: ${(await envKeyManager.getStoredKey(keyId)) !== null}`);
 
   console.log('\n=== Example completed successfully! ===');
 }
@@ -103,7 +107,10 @@ export async function loadKeyManagerFromEnvironment(): Promise<KeyManager> {
  * Utility function to export a key for storage
  * Use this to generate the value for your STORED_KEY environment variable
  */
-export async function exportKeyForEnvironment(keyManager: KeyManager, keyId: string): Promise<string> {
+export async function exportKeyForEnvironment(
+  keyManager: KeyManager,
+  keyId: string
+): Promise<string> {
   return keyManager.exportKeyToString(keyId);
 }
 
@@ -116,4 +123,4 @@ const __dirname = dirname(__filename);
 
 if (process.argv[1] === __filename) {
   main().catch(console.error);
-} 
+}

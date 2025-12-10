@@ -7,7 +7,7 @@ The official TypeScript SDK for the Nuwa Protocol, providing a unified interface
 ## ✨ Features
 
 - **🎯 Unified API**: Single entry point for all Nuwa Protocol functionality
-- **🌍 Cross-Platform**: Works seamlessly in browser and Node.js environments  
+- **🌍 Cross-Platform**: Works seamlessly in browser and Node.js environments
 - **🔧 Auto-Configuration**: Smart environment detection with sensible defaults
 - **⚡ Lazy Loading**: Modules load only when needed for optimal performance
 - **🛡️ Type Safe**: Full TypeScript support with environment-aware types
@@ -22,7 +22,7 @@ The official TypeScript SDK for the Nuwa Protocol, providing a unified interface
 npm install @nuwa-ai/kit
 # or
 pnpm add @nuwa-ai/kit
-# or  
+# or
 yarn add @nuwa-ai/kit
 ```
 
@@ -37,8 +37,8 @@ const nuwa = await NuwaKit.initialize({
   network: 'test',
   identity: {
     cadopDomain: 'https://test-id.nuwa.dev',
-    appName: 'My Nuwa App'
-  }
+    appName: 'My Nuwa App',
+  },
 });
 
 // Connect to CADOP for authentication
@@ -47,12 +47,12 @@ await nuwa.identity.connect();
 // Create payment client
 const client = await nuwa.payment.createHttpClient({
   baseUrl: 'https://api.example.com',
-  maxAmount: BigInt('1000000000000') // 1 USD
+  maxAmount: BigInt('1000000000000'), // 1 USD
 });
 
 // Make paid API calls
 const response = await client.post('/api/chat', {
-  message: 'Hello, AI!'
+  message: 'Hello, AI!',
 });
 ```
 
@@ -67,12 +67,12 @@ const nuwa = await NuwaKit.initialize({
   environment: 'server',
   network: 'test',
   identity: {
-    serviceKey: process.env.SERVICE_KEY
+    serviceKey: process.env.SERVICE_KEY,
   },
   express: {
     serviceId: 'my-ai-service',
-    defaultPricePicoUSD: BigInt('1000000000') // 0.001 USD per request
-  }
+    defaultPricePicoUSD: BigInt('1000000000'), // 0.001 USD per request
+  },
 });
 
 // Create Express app with billing
@@ -80,7 +80,8 @@ const app = express();
 const billing = await nuwa.express.createPaymentKit();
 
 // Register paid endpoints
-billing.post('/api/chat', 
+billing.post(
+  '/api/chat',
   { pricing: '10000000000' }, // 0.01 USD per request
   async (req, res) => {
     res.json({ response: 'AI response here' });
@@ -107,20 +108,20 @@ const nuwa = await NuwaKit.initialize({
   network: 'local' | 'dev' | 'test' | 'main',
   rpcUrl?: string,
   debug?: boolean,
-  
+
   identity?: {
     serviceKey?: string,        // Server-side
     cadopDomain?: string,       // Client-side
     storage?: 'local' | 'indexeddb' | 'memory',
     appName?: string
   },
-  
+
   payment?: {
     defaultAssetId?: string,
     maxAmount?: bigint | string,
     timeoutMs?: number
   },
-  
+
   express?: {                   // Node.js only
     serviceId?: string,
     adminDid?: string | string[],
@@ -133,7 +134,7 @@ const nuwa = await NuwaKit.initialize({
 #### Instance Properties
 
 - `nuwa.identity` - Identity management module
-- `nuwa.payment` - Payment channel operations  
+- `nuwa.payment` - Payment channel operations
 - `nuwa.express` - Express.js integration (Node.js only)
 
 #### Instance Methods
@@ -215,7 +216,7 @@ const result = await mcpClient.callTool('tool-name', { params });
 
 ```typescript
 const adminClient = await nuwa.payment.createAdminClient({
-  baseUrl: 'https://payment-hub.example.com'
+  baseUrl: 'https://payment-hub.example.com',
 });
 
 // Manage payment channels
@@ -268,7 +269,7 @@ The SDK automatically loads configuration from environment variables:
 ROOCH_NETWORK=test
 ROOCH_NODE_URL=https://test-seed.rooch.network
 
-# Identity configuration  
+# Identity configuration
 SERVICE_KEY=your-service-key-here
 CADOP_DOMAIN=https://test-id.nuwa.dev
 
@@ -280,7 +281,7 @@ ADMIN_DID=did:rooch:1234567890abcdef
 ### Configuration Priority
 
 1. **User-provided config** (highest priority)
-2. **Environment variables** 
+2. **Environment variables**
 3. **Default values** (lowest priority)
 
 ### Network Defaults
@@ -289,7 +290,7 @@ Each network has sensible defaults:
 
 - **local**: `http://localhost:6767`, `http://localhost:3000`
 - **dev**: Development endpoints
-- **test**: Test network endpoints  
+- **test**: Test network endpoints
 - **main**: Production endpoints
 
 ## 🌍 Environment Support
@@ -302,12 +303,12 @@ Each network has sensible defaults:
 - ✅ MCP payment clients
 - ❌ Express integration (Node.js only)
 
-### Node.js Environment  
+### Node.js Environment
 
 - ✅ Service key authentication
 - ✅ File-based key storage
 - ✅ HTTP payment clients
-- ✅ MCP payment clients  
+- ✅ MCP payment clients
 - ✅ Express integration
 - ✅ Admin operations
 
@@ -328,7 +329,7 @@ const nuwa = await NuwaKit.initialize({ environment: 'server' });
 The SDK provides comprehensive error handling with intelligent error wrapping:
 
 ```typescript
-import { 
+import {
   NuwaKitError,
   NuwaKitConfigError,
   NuwaKitEnvironmentError,
@@ -337,7 +338,7 @@ import {
   NuwaKitModuleUnavailableError,
   isNuwaKitError,
   createErrorSummary,
-  formatErrorForConsole
+  formatErrorForConsole,
 } from '@nuwa-ai/kit';
 
 try {
@@ -346,11 +347,11 @@ try {
   if (isNuwaKitError(error)) {
     // Get user-friendly error message
     console.error(error.getUserMessage());
-    
+
     // Get detailed error summary
     const summary = createErrorSummary(error);
     console.log('Error details:', summary);
-    
+
     // Format for console with colors and suggestions
     console.log(formatErrorForConsole(error));
   }
@@ -360,7 +361,7 @@ try {
 ### Error Types
 
 - **NuwaKitConfigError**: Configuration validation errors
-- **NuwaKitEnvironmentError**: Environment detection/compatibility issues  
+- **NuwaKitEnvironmentError**: Environment detection/compatibility issues
 - **NuwaKitInitializationError**: SDK initialization failures
 - **NuwaKitRuntimeError**: Runtime operation errors
 - **NuwaKitModuleUnavailableError**: Module not available in current environment
@@ -390,7 +391,7 @@ import { IdentityKitWeb } from '@nuwa-ai/identity-kit-web';
 const identity = await IdentityKitWeb.init();
 await identity.connect();
 
-// After  
+// After
 import { NuwaKit } from '@nuwa-ai/kit';
 const nuwa = await NuwaKit.initialize();
 await nuwa.identity.connect();

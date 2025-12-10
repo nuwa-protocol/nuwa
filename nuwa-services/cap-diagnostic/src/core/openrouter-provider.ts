@@ -15,20 +15,17 @@ export type { OpenRouterCompletionSettings };
 export interface OpenRouterProvider {
   (
     modelId: OpenRouterChatModelId,
-    settings?: OpenRouterCompletionSettings,
+    settings?: OpenRouterCompletionSettings
   ): OpenRouterCompletionLanguageModel;
-  (
-    modelId: OpenRouterChatModelId,
-    settings?: OpenRouterChatSettings,
-  ): OpenRouterChatLanguageModel;
+  (modelId: OpenRouterChatModelId, settings?: OpenRouterChatSettings): OpenRouterChatLanguageModel;
 
   languageModel(
     modelId: OpenRouterChatModelId,
-    settings?: OpenRouterCompletionSettings,
+    settings?: OpenRouterCompletionSettings
   ): OpenRouterCompletionLanguageModel;
   languageModel(
     modelId: OpenRouterChatModelId,
-    settings?: OpenRouterChatSettings,
+    settings?: OpenRouterChatSettings
   ): OpenRouterChatLanguageModel;
 
   /**
@@ -36,7 +33,7 @@ export interface OpenRouterProvider {
    */
   chat(
     modelId: OpenRouterChatModelId,
-    settings?: OpenRouterChatSettings,
+    settings?: OpenRouterChatSettings
   ): OpenRouterChatLanguageModel;
 
   /**
@@ -44,7 +41,7 @@ export interface OpenRouterProvider {
    */
   completion(
     modelId: OpenRouterCompletionModelId,
-    settings?: OpenRouterCompletionSettings,
+    settings?: OpenRouterCompletionSettings
   ): OpenRouterCompletionLanguageModel;
 }
 
@@ -91,12 +88,9 @@ export interface OpenRouterProviderSettings {
 /**
  * Create an OpenRouter provider instance.
  */
-export function createOpenRouter(
-  options: OpenRouterProviderSettings = {},
-): OpenRouterProvider {
+export function createOpenRouter(options: OpenRouterProviderSettings = {}): OpenRouterProvider {
   const baseURL =
-    withoutTrailingSlash(options.baseURL ?? options.baseUrl) ??
-    'https://openrouter.ai/api/v1';
+    withoutTrailingSlash(options.baseURL ?? options.baseUrl) ?? 'https://openrouter.ai/api/v1';
 
   // we default to compatible, because strict breaks providers like Groq:
   const compatibility = options.compatibility ?? 'compatible';
@@ -110,10 +104,7 @@ export function createOpenRouter(
     ...options.headers,
   });
 
-  const createChatModel = (
-    modelId: OpenRouterChatModelId,
-    settings: OpenRouterChatSettings = {},
-  ) =>
+  const createChatModel = (modelId: OpenRouterChatModelId, settings: OpenRouterChatSettings = {}) =>
     new OpenRouterChatLanguageModel(modelId, settings, {
       provider: 'openrouter.chat',
       url: (path: string) => `${baseURL}${path}`,
@@ -125,7 +116,7 @@ export function createOpenRouter(
 
   const createCompletionModel = (
     modelId: OpenRouterCompletionModelId,
-    settings: OpenRouterCompletionSettings = {},
+    settings: OpenRouterCompletionSettings = {}
   ) =>
     new OpenRouterCompletionLanguageModel(modelId, settings, {
       provider: 'openrouter.completion',
@@ -138,19 +129,14 @@ export function createOpenRouter(
 
   const createLanguageModel = (
     modelId: OpenRouterChatModelId | OpenRouterCompletionModelId,
-    settings?: OpenRouterChatSettings | OpenRouterCompletionSettings,
+    settings?: OpenRouterChatSettings | OpenRouterCompletionSettings
   ) => {
     if (new.target) {
-      throw new Error(
-        'The OpenRouter model function cannot be called with the new keyword.',
-      );
+      throw new Error('The OpenRouter model function cannot be called with the new keyword.');
     }
 
     if (modelId === 'openai/gpt-3.5-turbo-instruct') {
-      return createCompletionModel(
-        modelId,
-        settings as OpenRouterCompletionSettings,
-      );
+      return createCompletionModel(modelId, settings as OpenRouterCompletionSettings);
     }
 
     return createChatModel(modelId, settings as OpenRouterChatSettings);
@@ -158,7 +144,7 @@ export function createOpenRouter(
 
   const provider = (
     modelId: OpenRouterChatModelId | OpenRouterCompletionModelId,
-    settings?: OpenRouterChatSettings | OpenRouterCompletionSettings,
+    settings?: OpenRouterChatSettings | OpenRouterCompletionSettings
   ) => createLanguageModel(modelId, settings);
 
   provider.languageModel = createLanguageModel;

@@ -1,12 +1,12 @@
 import { streamText } from 'ai';
 import type { Message } from 'ai';
 import type { Cap } from '../types/cap.js';
-import type { 
-  DiagnosticConfig, 
-  DiagnosticResult, 
-  TestResult, 
+import type {
+  DiagnosticConfig,
+  DiagnosticResult,
+  TestResult,
   DiagnosticSummary,
-  CapTestContext 
+  CapTestContext,
 } from '../types/diagnostic.js';
 import { CapResolver } from './cap-resolver.js';
 import { CapValidator } from '../utils/validation.js';
@@ -37,9 +37,9 @@ export class DiagnosticEngine {
       // Test 1: CAP Validation
       const validationTest = await this.runValidationTest(cap);
       tests.push(validationTest);
-      
+
       if (!validationTest.success) {
-        criticalIssues.push(...validationTest.details?.errors || []);
+        criticalIssues.push(...(validationTest.details?.errors || []));
       }
       if (validationTest.details?.warnings) {
         warnings.push(...validationTest.details.warnings);
@@ -48,9 +48,9 @@ export class DiagnosticEngine {
       // Test 2: Configuration Test
       const configTest = await this.runConfigurationTest(cap);
       tests.push(configTest);
-      
+
       if (!configTest.success) {
-        criticalIssues.push(...configTest.details?.errors || []);
+        criticalIssues.push(...(configTest.details?.errors || []));
       }
       if (configTest.details?.warnings) {
         warnings.push(...configTest.details.warnings);
@@ -59,7 +59,7 @@ export class DiagnosticEngine {
       // Test 3: LLM Integration Test
       const llmTest = await this.runLLMTest(cap);
       tests.push(llmTest);
-      
+
       if (!llmTest.success) {
         criticalIssues.push(`LLM integration failed: ${llmTest.error}`);
       }
@@ -67,7 +67,7 @@ export class DiagnosticEngine {
       // Test 4: MCP Integration Test
       const mcpTest = await this.runMCPTest(cap);
       tests.push(mcpTest);
-      
+
       if (!mcpTest.success) {
         criticalIssues.push(`MCP integration failed: ${mcpTest.error}`);
       }
@@ -75,25 +75,24 @@ export class DiagnosticEngine {
       // Test 5: End-to-End Test
       const e2eTest = await this.runEndToEndTest(cap);
       tests.push(e2eTest);
-      
+
       if (!e2eTest.success) {
         criticalIssues.push(`End-to-end test failed: ${e2eTest.error}`);
       }
 
       // Generate recommendations
       recommendations.push(...this.generateRecommendations(tests, cap));
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       capLogger.error('Diagnosis failed with unexpected error', { error: errorMessage });
-      
+
       tests.push({
         name: 'Unexpected Error',
         success: false,
         duration: Date.now() - startTime,
         error: errorMessage,
       });
-      
+
       criticalIssues.push(`Unexpected error during diagnosis: ${errorMessage}`);
     }
 
@@ -110,12 +109,12 @@ export class DiagnosticEngine {
       summary,
     };
 
-    capLogger.info('CAP diagnosis completed', { 
-      success: result.success, 
+    capLogger.info('CAP diagnosis completed', {
+      success: result.success,
       duration,
       totalTests: tests.length,
       passedTests: summary.passedTests,
-      failedTests: summary.failedTests
+      failedTests: summary.failedTests,
     });
 
     return result;
@@ -126,7 +125,7 @@ export class DiagnosticEngine {
    */
   private async runValidationTest(cap: Cap): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const validation = CapValidator.validate(cap);
       const promptValidation = CapValidator.validatePrompt(cap.core.prompt.value);
@@ -141,7 +140,7 @@ export class DiagnosticEngine {
       const allWarnings = [
         ...validation.warnings,
         ...promptValidation.errors, // Treat prompt validation errors as warnings for now
-        ...modelValidation.errors,  // Treat model validation errors as warnings for now
+        ...modelValidation.errors, // Treat model validation errors as warnings for now
       ];
 
       return {
@@ -169,7 +168,7 @@ export class DiagnosticEngine {
    */
   private async runConfigurationTest(cap: Cap): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const resolver = new CapResolver(cap, this.config);
       const testResult = await resolver.testConfiguration();
@@ -200,11 +199,11 @@ export class DiagnosticEngine {
    */
   private async runLLMTest(cap: Cap): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const resolver = new CapResolver(cap, this.config);
       const model = resolver.getResolvedModel();
-      
+
       // Test with a simple message
       const testMessage: Message = {
         id: 'test-message',
@@ -252,7 +251,7 @@ export class DiagnosticEngine {
    */
   private async runMCPTest(cap: Cap): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const resolver = new CapResolver(cap, this.config);
       const tools = await resolver.getResolvedTools();
@@ -287,14 +286,14 @@ export class DiagnosticEngine {
    */
   private async runEndToEndTest(cap: Cap): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const resolver = new CapResolver(cap, this.config);
       const { prompt, model, tools } = await resolver.getResolvedConfig();
 
       // Test with one of the configured test messages
       const testMessage = this.config.diagnostic.testMessages[0] || 'Hello, can you help me?';
-      
+
       const testMessages: Message[] = [
         {
           id: 'test-user-message',

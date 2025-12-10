@@ -117,7 +117,10 @@ export class GeminiUsageExtractor extends BaseUsageExtractor {
     } catch (parseError) {
       // Streaming chunks may be incomplete - this is expected behavior
       // Only log if it's not a common streaming truncation error
-      if (parseError instanceof SyntaxError && !parseError.message.includes('Unterminated string')) {
+      if (
+        parseError instanceof SyntaxError &&
+        !parseError.message.includes('Unterminated string')
+      ) {
         console.error('[GeminiUsageExtractor] Unexpected JSON parse error:', parseError);
       }
       return null;

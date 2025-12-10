@@ -20,7 +20,7 @@
    - JSON ↔ **Multibase**（固定使用 `base58btc` 编码，即 `z` 前缀）
    - 调用方**暂不自定义** codec，后续再行扩展
 2. 在 `KeyManager` 中增加三个 API：
-   - `exportKeyToString(keyId, format?)`   → 导出 `StoredKey` 字符串
+   - `exportKeyToString(keyId, format?)` → 导出 `StoredKey` 字符串
    - `importKeyFromString(serialized, format?)` → 将字符串解析并注入当前 `KeyManager`
    - `KeyManager.fromSerializedKey(serialized, format?, store?)` → 工厂方法，直接用字符串创建 `KeyManager`
 3. 字符串格式采用前缀标记，方便解析：
@@ -31,6 +31,7 @@
    ```
 
    无前缀时默认按 `base64` 处理。
+
 4. **导出流程**：
    1. 读取指定 `StoredKey`。
    2. `StoredKeyCodec.encode()` 转成字符串。
@@ -106,6 +107,7 @@ export class KeyManager {
 ## 4. 使用示例
 
 ### 4.1 导出并写入环境变量
+
 ```ts
 const { keyManager, keyId } = await KeyManager.createWithDidKey();
 const envString = await keyManager.exportKeyToString(keyId); // 默认 base64
@@ -113,11 +115,13 @@ console.log('STORED_KEY=', envString);
 ```
 
 ### 4.2 .env 示例
+
 ```env
 STORED_KEY=zeyJrZXlJZCI6ICJkaWQ6a2V5Ono2VE...
 ```
 
 ### 4.3 应用启动时导入
+
 ```ts
 import { KeyManager } from '@nuwa/identity-kit';
 
@@ -133,14 +137,14 @@ export async function loadKeyManager(): Promise<KeyManager> {
 ## 5. 扩展与兼容性
 
 1. **多把钥匙**：可让 `StoredKeyCodec` 支持 `StoredKey[]`，字符串使用 `;` 分隔或整体 JSON 数组。
-2. **更安全的实现**：未来接入云端 KMS，可让 `exportKeyToString` 在检测到不允许导出私钥的 `KeyStore` 时抛错或返回受限内容。 
+2. **更安全的实现**：未来接入云端 KMS，可让 `exportKeyToString` 在检测到不允许导出私钥的 `KeyStore` 时抛错或返回受限内容。
 3. **向下兼容**：新增方法均为可选使用，不影响现有 API。
 
 ---
 
 ## 6. 小结
 
-该方案在保持 `KeyStore`/`KeyManager` 原有设计的前提下，引入 `StoredKeyCodec` 与若干便捷方法，实现了 *StoredKey ↔ 字符串* 的双向转换，满足了通过环境变量快速注入私钥的场景需求，同时为多钥匙与安全增强预留扩展空间。
+该方案在保持 `KeyStore`/`KeyManager` 原有设计的前提下，引入 `StoredKeyCodec` 与若干便捷方法，实现了 _StoredKey ↔ 字符串_ 的双向转换，满足了通过环境变量快速注入私钥的场景需求，同时为多钥匙与安全增强预留扩展空间。
 
 ---
 
@@ -151,6 +155,7 @@ export async function loadKeyManager(): Promise<KeyManager> {
 当前导入 `StoredKey` 时，其中可能同时包含 `privateKeyMultibase` 和 `publicKeyMultibase`。为确保数据完整性，需要校验这两个密钥的一致性（即 private key 能否推导出对应的 public key）。
 
 **当前 crypto 库的局限性**：
+
 1. `CryptoProvider` 接口缺少 `derivePublicKey` 方法
 2. 只有 `Secp256k1Provider` 内部使用了 `secp256k1.getPublicKey()` 进行公钥推导
 3. `Ed25519Provider` 和 `EcdsaR1Provider` 没有提供从私钥推导公钥的功能
@@ -163,7 +168,7 @@ export async function loadKeyManager(): Promise<KeyManager> {
 // crypto/providers.ts
 export interface CryptoProvider {
   // ... existing methods ...
-  
+
   /**
    * Derive public key from private key
    * @param privateKey The private key bytes
@@ -179,16 +184,16 @@ export interface CryptoProvider {
 // crypto/providers/secp256k1.ts
 export class Secp256k1Provider implements CryptoProvider {
   // ... existing methods ...
-  
+
   async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
     return secp256k1.getPublicKey(privateKey, true); // compressed format
   }
 }
 
-// crypto/providers/ed25519.ts  
+// crypto/providers/ed25519.ts
 export class Ed25519Provider implements CryptoProvider {
   // ... existing methods ...
-  
+
   async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
     // Import private key and derive public key using Web Crypto API
     const cryptoKey = await this.crypto.subtle.importKey(
@@ -198,11 +203,11 @@ export class Ed25519Provider implements CryptoProvider {
       true,
       ['sign']
     );
-    
+
     // Export as JWK to get public key coordinates
     const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
     if (!jwk.x) throw new Error('Failed to derive public key from private key');
-    
+
     // Convert base64url to raw bytes
     return MultibaseCodec.decodeBase64url(`u${jwk.x}`);
   }
@@ -211,7 +216,7 @@ export class Ed25519Provider implements CryptoProvider {
 // crypto/providers/ecdsa_r1.ts
 export class EcdsaR1Provider implements CryptoProvider {
   // ... existing methods ...
-  
+
   async derivePublicKey(privateKey: Uint8Array): Promise<Uint8Array> {
     // Import private key
     const cryptoKey = await this.crypto.subtle.importKey(
@@ -221,20 +226,20 @@ export class EcdsaR1Provider implements CryptoProvider {
       true,
       ['sign']
     );
-    
+
     // Export as JWK and reconstruct public key
     const jwk = await this.crypto.subtle.exportKey('jwk', cryptoKey);
     if (!jwk.x || !jwk.y) throw new Error('Failed to derive public key from private key');
-    
+
     // Reconstruct uncompressed public key and compress it
     const x = MultibaseCodec.decodeBase64url(`u${jwk.x}`);
     const y = MultibaseCodec.decodeBase64url(`u${jwk.y}`);
-    
+
     const uncompressed = new Uint8Array(65);
     uncompressed[0] = 0x04;
     uncompressed.set(x, 1);
     uncompressed.set(y, 33);
-    
+
     return this.compressPublicKey(uncompressed);
   }
 }
@@ -246,7 +251,7 @@ export class EcdsaR1Provider implements CryptoProvider {
 // crypto/utils.ts
 export class CryptoUtils {
   // ... existing methods ...
-  
+
   /**
    * Derive public key from private key
    * @param privateKey The private key bytes
@@ -267,7 +272,7 @@ export class CryptoUtils {
 // StoredKeyCodec.ts
 export class StoredKeyCodec {
   // ... existing methods ...
-  
+
   /**
    * 校验 StoredKey 中私钥和公钥的一致性
    */
@@ -276,15 +281,15 @@ export class StoredKeyCodec {
       // 如果缺少任一密钥，跳过校验
       return true;
     }
-    
+
     try {
       // 解码私钥和公钥
       const privateKeyBytes = MultibaseCodec.decodeBase58btc(key.privateKeyMultibase);
       const publicKeyBytes = MultibaseCodec.decodeBase58btc(key.publicKeyMultibase);
-      
+
       // 从私钥推导公钥
       const derivedPublicKey = await CryptoUtils.derivePublicKey(privateKeyBytes, key.keyType);
-      
+
       // 比较公钥是否一致
       return this.areUint8ArraysEqual(derivedPublicKey, publicKeyBytes);
     } catch (error) {
@@ -292,7 +297,7 @@ export class StoredKeyCodec {
       return false;
     }
   }
-  
+
   private static areUint8ArraysEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
@@ -300,18 +305,18 @@ export class StoredKeyCodec {
     }
     return true;
   }
-  
+
   /**
    * 解码并校验 StoredKey
    */
   static async decodeAndValidate(serialized: string): Promise<StoredKey> {
     const key = this.decode(serialized);
     const isValid = await this.validateKeyConsistency(key);
-    
+
     if (!isValid) {
       throw new Error('StoredKey validation failed: private and public keys are inconsistent');
     }
-    
+
     return key;
   }
 }
@@ -323,14 +328,14 @@ export class StoredKeyCodec {
 // KeyManager.ts (新增方法)
 export class KeyManager {
   // ... existing methods ...
-  
+
   /** 通过字符串导入 StoredKey（带校验） */
   async importKeyFromStringWithValidation(serialized: string): Promise<StoredKey> {
     const key = await StoredKeyCodec.decodeAndValidate(serialized);
     await this.importKey(key);
     return key;
   }
-  
+
   /** 根据序列化字符串快速创建 KeyManager（带校验） */
   static async fromSerializedKeyWithValidation(
     serialized: string,
@@ -369,4 +374,4 @@ if (!isValid) {
 3. **低优先级**：实现 `EcdsaR1Provider.derivePublicKey()`（技术复杂度较高）
 4. **补充**：增加 `StoredKeyCodec` 校验功能和相关工具方法
 
-通过以上改进，可确保导入的私钥与公钥数据一致性，提升系统安全性和数据完整性。 
+通过以上改进，可确保导入的私钥与公钥数据一致性，提升系统安全性和数据完整性。

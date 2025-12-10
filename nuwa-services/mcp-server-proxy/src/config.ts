@@ -1,15 +1,15 @@
 /**
  * Configuration loading and parsing module
  */
-import fs from "node:fs";
-import path from "node:path";
-import yaml from "js-yaml";
-import { parseArgs } from "node:util";
-import { fileURLToPath } from "node:url";
-import type { UpstreamConfig } from "./types.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import yaml from 'js-yaml';
+import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
+import type { UpstreamConfig } from './types.js';
 
 // Get directory name in ESM
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Tool configuration interface - only for pricing configuration
 export interface MinimalToolConfig {
@@ -24,7 +24,7 @@ export interface MinimalConfig {
   // Payment configuration (optional)
   serviceId?: string;
   serviceKey?: string;
-  network?: "local" | "dev" | "test" | "main";
+  network?: 'local' | 'dev' | 'test' | 'main';
   rpcUrl?: string;
   defaultAssetId?: string;
   defaultPricePicoUSD?: string;
@@ -58,16 +58,16 @@ function parseCliArgs(): CliArgs {
     const { values } = parseArgs({
       args: process.argv.slice(2),
       options: {
-        port: { type: "string", short: "p" },
-        endpoint: { type: "string", short: "e" },
-        config: { type: "string", short: "c" },
-        "service-id": { type: "string" },
-        network: { type: "string", short: "n" },
-        "rpc-url": { type: "string" },
-        "default-asset-id": { type: "string" },
-        "default-price-pico-usd": { type: "string" },
-        debug: { type: "boolean", short: "d" },
-        help: { type: "boolean", short: "h" },
+        port: { type: 'string', short: 'p' },
+        endpoint: { type: 'string', short: 'e' },
+        config: { type: 'string', short: 'c' },
+        'service-id': { type: 'string' },
+        network: { type: 'string', short: 'n' },
+        'rpc-url': { type: 'string' },
+        'default-asset-id': { type: 'string' },
+        'default-price-pico-usd': { type: 'string' },
+        debug: { type: 'boolean', short: 'd' },
+        help: { type: 'boolean', short: 'h' },
       },
       allowPositional: false,
     });
@@ -76,16 +76,16 @@ function parseCliArgs(): CliArgs {
       port: values.port ? Number(values.port) : undefined,
       endpoint: values.endpoint,
       config: values.config,
-      serviceId: values["service-id"],
+      serviceId: values['service-id'],
       network: values.network,
-      rpcUrl: values["rpc-url"],
-      defaultAssetId: values["default-asset-id"],
-      defaultPricePicoUSD: values["default-price-pico-usd"],
+      rpcUrl: values['rpc-url'],
+      defaultAssetId: values['default-asset-id'],
+      defaultPricePicoUSD: values['default-price-pico-usd'],
       debug: values.debug,
       help: values.help,
     };
   } catch (error) {
-    console.error("Error parsing command line arguments:", error);
+    console.error('Error parsing command line arguments:', error);
     process.exit(1);
   }
 }
@@ -142,11 +142,11 @@ async function fetchRemoteConfig(url: string): Promise<string> {
   try {
     console.log(`📡 Fetching remote configuration from: ${url}`);
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const configContent = await response.text();
     console.log(`✅ Successfully fetched remote configuration (${configContent.length} bytes)`);
     return configContent;
@@ -175,7 +175,7 @@ async function loadConfigFile(configPath: string): Promise<any> {
     }
 
     try {
-      configYaml = fs.readFileSync(configPath, "utf8");
+      configYaml = fs.readFileSync(configPath, 'utf8');
     } catch (error) {
       console.error(`Error reading local config file ${configPath}:`, error);
       process.exit(1);
@@ -185,28 +185,23 @@ async function loadConfigFile(configPath: string): Promise<any> {
   try {
     const missingVars: string[] = [];
 
-    const configWithEnvVars = configYaml.replace(
-      /\${([^}]+)}/g,
-      (match, varName) => {
-        const value = process.env[varName];
-        if (value === undefined || value === "") {
-          missingVars.push(varName);
-          return ""; // Keep empty string for now, but track missing vars
-        }
-        return value;
-      },
-    );
+    const configWithEnvVars = configYaml.replace(/\${([^}]+)}/g, (match, varName) => {
+      const value = process.env[varName];
+      if (value === undefined || value === '') {
+        missingVars.push(varName);
+        return ''; // Keep empty string for now, but track missing vars
+      }
+      return value;
+    });
 
     // Warn about missing environment variables
     if (missingVars.length > 0) {
-      console.warn(
-        `⚠️  Warning: Missing environment variables in config file ${configPath}:`,
-      );
-      missingVars.forEach((varName) => {
+      console.warn(`⚠️  Warning: Missing environment variables in config file ${configPath}:`);
+      missingVars.forEach(varName => {
         console.warn(`   - ${varName} (referenced as \${${varName}})`);
       });
       console.warn(
-        "   These variables will be treated as empty strings, which may cause runtime errors.",
+        '   These variables will be treated as empty strings, which may cause runtime errors.'
       );
     }
 
@@ -229,9 +224,7 @@ export async function loadConfig(): Promise<MinimalConfig> {
 
   // Determine config file path (CLI > env > default)
   const configPath =
-    cliArgs.config ||
-    process.env.CONFIG_PATH ||
-    path.join(__dirname, "../config.yaml");
+    cliArgs.config || process.env.CONFIG_PATH || path.join(__dirname, '../config.yaml');
 
   // Load config file if it exists
   const fileConfig = await loadConfigFile(configPath);
@@ -251,29 +244,22 @@ export async function loadConfig(): Promise<MinimalConfig> {
       fileConfig.port ??
       8088,
 
-    endpoint:
-      cliArgs.endpoint ?? process.env.ENDPOINT ?? fileConfig.endpoint ?? "/mcp",
+    endpoint: cliArgs.endpoint ?? process.env.ENDPOINT ?? fileConfig.endpoint ?? '/mcp',
 
     // Upstream settings
     upstream: fileConfig.upstream,
 
     // Payment settings
-    serviceId:
-      cliArgs.serviceId ?? process.env.SERVICE_ID ?? fileConfig.serviceId,
+    serviceId: cliArgs.serviceId ?? process.env.SERVICE_ID ?? fileConfig.serviceId,
 
     serviceKey: process.env.SERVICE_KEY ?? fileConfig.serviceKey,
 
-    network: (cliArgs.network ??
-      process.env.ROOCH_NETWORK ??
-      fileConfig.network ??
-      "test") as any,
+    network: (cliArgs.network ?? process.env.ROOCH_NETWORK ?? fileConfig.network ?? 'test') as any,
 
     rpcUrl: cliArgs.rpcUrl ?? process.env.ROOCH_RPC_URL ?? fileConfig.rpcUrl,
 
     defaultAssetId:
-      cliArgs.defaultAssetId ??
-      process.env.DEFAULT_ASSET_ID ??
-      fileConfig.defaultAssetId,
+      cliArgs.defaultAssetId ?? process.env.DEFAULT_ASSET_ID ?? fileConfig.defaultAssetId,
 
     defaultPricePicoUSD:
       cliArgs.defaultPricePicoUSD ??
@@ -284,9 +270,7 @@ export async function loadConfig(): Promise<MinimalConfig> {
 
     debug:
       cliArgs.debug ??
-      (process.env.DEBUG === "1" || process.env.DEBUG === "true"
-        ? true
-        : undefined) ??
+      (process.env.DEBUG === '1' || process.env.DEBUG === 'true' ? true : undefined) ??
       fileConfig.debug ??
       false,
 

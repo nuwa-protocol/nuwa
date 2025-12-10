@@ -27,6 +27,7 @@ payment-kit-integration/
 ### 1. Prerequisites
 
 Make sure you have:
+
 - Node.js 18+ installed
 - A running Rooch network (local or testnet)
 - IdentityKit configured with private keys
@@ -68,6 +69,7 @@ pnpm start:server
 ```
 
 The server will start on `http://localhost:3000` and show:
+
 - 🔑 Identity Kit initialization
 - 💳 Payment Kit setup
 - 📋 Available endpoints
@@ -93,7 +95,7 @@ pnpm dev:client channel                 # Show channel info
 ### Public Endpoints (No Payment Required)
 
 - `GET /payment/info` - Service information and configuration
-- `GET /payment/price?assetId=<id>` - Asset price information  
+- `GET /payment/price?assetId=<id>` - Asset price information
 - `GET /health` - Health check
 
 ### Payment-Enabled Endpoints
@@ -121,16 +123,16 @@ pnpm dev:client channel                 # Show channel info
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CUSTODIAN_PRIVATE_KEY` | Client identity private key | Required |
-| `SERVICE_PRIVATE_KEY` | Server identity private key | Required |
-| `ROOCH_NETWORK` | Rooch network | `local` |
-| `ROOCH_NODE_URL` | Rooch RPC endpoint | `http://localhost:50051` |
-| `PORT` | Server port | `3000` |
-| `SERVICE_ID` | Service identifier | `payment-example` |
-| `DEFAULT_ASSET_ID` | Payment asset | `0x3::gas_coin::RGas` |
-| `DEBUG` | Enable debug logging | `true` |
+| Variable                | Description                 | Default                  |
+| ----------------------- | --------------------------- | ------------------------ |
+| `CUSTODIAN_PRIVATE_KEY` | Client identity private key | Required                 |
+| `SERVICE_PRIVATE_KEY`   | Server identity private key | Required                 |
+| `ROOCH_NETWORK`         | Rooch network               | `local`                  |
+| `ROOCH_NODE_URL`        | Rooch RPC endpoint          | `http://localhost:50051` |
+| `PORT`                  | Server port                 | `3000`                   |
+| `SERVICE_ID`            | Service identifier          | `payment-example`        |
+| `DEFAULT_ASSET_ID`      | Payment asset               | `0x3::gas_coin::RGas`    |
+| `DEBUG`                 | Enable debug logging        | `true`                   |
 
 ### CLI Options
 
@@ -151,6 +153,7 @@ pnpm dev:client channel                 # Show channel info
 ## 📊 Example Usage
 
 ### 1. Service Information
+
 ```bash
 $ pnpm dev:client info
 
@@ -166,6 +169,7 @@ $ pnpm dev:client info
 Note: Service info is accessed via `/payment/info` endpoint provided by ExpressPaymentKit.
 
 ### 2. Echo Request
+
 ```bash
 $ pnpm dev:client echo "Hello, Payment Kit!"
 
@@ -178,6 +182,7 @@ $ pnpm dev:client echo "Hello, Payment Kit!"
 ```
 
 ### 3. Text Processing
+
 ```bash
 $ pnpm dev:client process "hello world"
 
@@ -191,6 +196,7 @@ $ pnpm dev:client process "hello world"
 ```
 
 ### 4. Chat Completion (Post-billing)
+
 ```bash
 $ pnpm dev:client chat "What is blockchain?"
 
@@ -205,14 +211,18 @@ $ pnpm dev:client chat "What is blockchain?"
 ## 🔍 Monitoring and Debugging
 
 ### Server Logs
+
 The server provides detailed logging for:
+
 - Payment verification
 - Billing calculations
 - Channel state changes
 - Error conditions
 
 ### Client State
+
 Check current payment channel state:
+
 ```bash
 $ pnpm dev:client channel
 
@@ -223,7 +233,9 @@ $ pnpm dev:client channel
 ```
 
 ### Admin Interface
+
 Monitor claims and channel health:
+
 ```bash
 curl http://localhost:3000/admin/claims \
   -H "Authorization: DID-JWT eyJ..."
@@ -232,17 +244,20 @@ curl http://localhost:3000/admin/claims \
 ## 🛠️ Development
 
 ### Building
+
 ```bash
 pnpm build
 ```
 
 ### Testing Different Scenarios
+
 1. **First-time user**: Start with a fresh identity
 2. **Existing user**: Use an identity with existing channels
 3. **Insufficient funds**: Test payment failures
 4. **Network issues**: Test reconnection and recovery
 
 ### Extending the Example
+
 - Add new API endpoints with different pricing models
 - Implement rate limiting
 - Add request/response validation
@@ -251,6 +266,7 @@ pnpm build
 ## 📚 Key Concepts
 
 ### ExpressPaymentKit (Server)
+
 - Automatic billing middleware integration
 - Multiple pricing strategies:
   - **Pre-billing**: Fixed price strategies (PerRequest) - calculated before request execution
@@ -259,12 +275,14 @@ pnpm build
 - DID-based authentication
 
 ### PaymentChannelHttpClient (Client)
+
 - Automatic payment channel management
 - Transparent HTTP request wrapper
 - Built-in retry and error handling
 - State persistence and recovery
 
 ### Payment Flow
+
 1. **Channel Discovery**: Client discovers service DID and pricing
 2. **Channel Creation**: First request creates payment channel
 3. **Payment Loop**: Subsequent requests use deferred payment model

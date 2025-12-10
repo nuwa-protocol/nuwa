@@ -14,27 +14,24 @@ const server = new McpServer({
 });
 
 // Tool that outputs to both stdout (via MCP) and stderr
-server.tool(
-  'test_stderr',
-  'Test stderr output',
-  { message: z.string() },
-  async ({ message }) => {
-    console.error(`[stderr-test-mcp] Processing tool call with message: ${message}`);
-    
-    if (message === 'trigger_error') {
-      console.error(`[stderr-test-mcp] ERROR: Simulated error condition!`);
-      throw new Error('Simulated error for testing');
-    }
-    
-    console.error(`[stderr-test-mcp] Tool execution completed successfully`);
-    return { 
-      content: [{ 
-        type: 'text', 
-        text: `Processed: ${message}` 
-      }] 
-    };
+server.tool('test_stderr', 'Test stderr output', { message: z.string() }, async ({ message }) => {
+  console.error(`[stderr-test-mcp] Processing tool call with message: ${message}`);
+
+  if (message === 'trigger_error') {
+    console.error(`[stderr-test-mcp] ERROR: Simulated error condition!`);
+    throw new Error('Simulated error for testing');
   }
-);
+
+  console.error(`[stderr-test-mcp] Tool execution completed successfully`);
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Processed: ${message}`,
+      },
+    ],
+  };
+});
 
 const transport = new StdioServerTransport();
 

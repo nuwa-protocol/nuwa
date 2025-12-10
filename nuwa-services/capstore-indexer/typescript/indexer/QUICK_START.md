@@ -3,6 +3,7 @@
 ## 🎉 功能完成
 
 Capstore Indexer 现在同时支持：
+
 - ✅ MCP 协议: `http://localhost:3000/mcp`
 - ✅ RESTful API: `http://localhost:3000/api`
 
@@ -41,13 +42,13 @@ curl "http://localhost:3000/api/caps?sortBy=average_rating&sortOrder=desc"
 
 ## 📚 可用端点
 
-| 方法 | 端点 | 描述 |
-|------|------|------|
-| GET | `/api/caps` | 搜索和列表查询 Caps |
-| GET | `/api/caps/:id` | 根据 ID 查询 Cap |
-| GET | `/api/caps/cid/:cid` | 根据 CID 查询 Cap |
-| GET | `/api/caps/:id/stats` | 查询 Cap 统计信息 |
-| GET | `/api/caps/download/:cid` | 下载 Cap 文件 |
+| 方法 | 端点                      | 描述                |
+| ---- | ------------------------- | ------------------- |
+| GET  | `/api/caps`               | 搜索和列表查询 Caps |
+| GET  | `/api/caps/:id`           | 根据 ID 查询 Cap    |
+| GET  | `/api/caps/cid/:cid`      | 根据 CID 查询 Cap   |
+| GET  | `/api/caps/:id/stats`     | 查询 Cap 统计信息   |
+| GET  | `/api/caps/download/:cid` | 下载 Cap 文件       |
 
 ## 🔍 查询参数
 
@@ -88,7 +89,9 @@ const statsData = await statsResponse.json();
 console.log(statsData);
 
 // 下载 Cap 文件
-const downloadResponse = await fetch('http://localhost:3000/api/caps/download/YOUR_CID?dataFormat=utf8');
+const downloadResponse = await fetch(
+  'http://localhost:3000/api/caps/download/YOUR_CID?dataFormat=utf8'
+);
 const downloadData = await downloadResponse.json();
 console.log(downloadData);
 ```
@@ -130,4 +133,3 @@ print(search_data)
 3. 无需身份验证即可访问只读接口
 4. 所有响应均为 JSON 格式
 5. 默认启用 CORS，允许跨域访问
-

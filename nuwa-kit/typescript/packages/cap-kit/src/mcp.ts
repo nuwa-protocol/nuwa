@@ -1,12 +1,12 @@
 // import { DidAccountSigner, type SignerInterface } from "@nuwa-ai/identity-kit";
-import { Args, RoochClient, Transaction } from "@roochnetwork/rooch-sdk";
-import * as yaml from "js-yaml";
-import { buildClient } from "./client";
-import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from "./type";
-import { IdentityEnv } from "@nuwa-ai/identity-kit";
-import { UniversalMcpClient } from "@nuwa-ai/payment-kit";
+import { Args, RoochClient, Transaction } from '@roochnetwork/rooch-sdk';
+import * as yaml from 'js-yaml';
+import { buildClient } from './client';
+import type { Cap, CapStats, Page, Result, ResultCap, RatingDistribution } from './type';
+import { IdentityEnv } from '@nuwa-ai/identity-kit';
+import { UniversalMcpClient } from '@nuwa-ai/payment-kit';
 
-export * from "./type";
+export * from './type';
 
 export class CapKitMcp {
   protected roochClient: RoochClient;
@@ -35,7 +35,7 @@ export class CapKitMcp {
       // Ensure the client is fully initialized by calling tools()
       this.mcpTools = await client.tools();
     }
-    return this.mcpTools
+    return this.mcpTools;
   }
 
   async getMcpClient(): Promise<UniversalMcpClient> {
@@ -71,40 +71,35 @@ export class CapKitMcp {
     this.mcpClient?.close();
   }
 
-  async queryByID(id: {
-    id?: string;
-    cid?: string;
-  }): Promise<Result<ResultCap>> {
+  async queryByID(id: { id?: string; cid?: string }): Promise<Result<ResultCap>> {
     try {
       // Get tools from MCP server
       const tools = await this.getTools();
       const queryCapByID = tools.queryCapByID;
 
       if (!queryCapByID) {
-        throw new Error("Query Cap by id tool not available on MCP server");
+        throw new Error('Query Cap by id tool not available on MCP server');
       }
 
       // Upload file to IPFS
       const result = await queryCapByID.execute(id, {
-        toolCallId: "queryCapByID",
+        toolCallId: 'queryCapByID',
         messages: [],
       });
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const queryResult = JSON.parse((result.content as any)[0].text);
 
       if (queryResult.code !== 200 && queryResult.code !== 404) {
-        throw new Error(
-          `Query with id failed: ${queryResult.error || "Unknown error"}`,
-        );
+        throw new Error(`Query with id failed: ${queryResult.error || 'Unknown error'}`);
       }
 
       return queryResult;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
@@ -114,22 +109,17 @@ export class CapKitMcp {
       tags?: string[];
       page?: number;
       size?: number;
-      sortBy?:
-      | "average_rating"
-      | "downloads"
-      | "favorites"
-      | "rating_count"
-      | "updated_at";
-      sortOrder?: "asc" | "desc";
-    },
+      sortBy?: 'average_rating' | 'downloads' | 'favorites' | 'rating_count' | 'updated_at';
+      sortOrder?: 'asc' | 'desc';
+    }
   ): Promise<Result<Page<ResultCap>>> {
     try {
       // Get tools from MCP server
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const queryCapByName = tools.queryCapByName;
 
       if (!queryCapByName) {
-        throw new Error("query tool not available on MCP server");
+        throw new Error('query tool not available on MCP server');
       }
 
       // Upload file to IPFS
@@ -143,13 +133,13 @@ export class CapKitMcp {
           sortOrder: opt?.sortOrder,
         },
         {
-          toolCallId: "query-cap-by-name",
+          toolCallId: 'query-cap-by-name',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const queryResult = JSON.parse((result.content as any)[0].text);
@@ -165,9 +155,7 @@ export class CapKitMcp {
         } as Result<Page<ResultCap>>;
       }
       if (queryResult.code !== 200) {
-        throw new Error(
-          `query failed: ${queryResult.error || "Unknown error"}`,
-        );
+        throw new Error(`query failed: ${queryResult.error || 'Unknown error'}`);
       }
       // Transform the raw response data to ResultCap format
       // const transformedItems = queryResult.data.items.map((item: any) => {
@@ -186,22 +174,17 @@ export class CapKitMcp {
         },
       } as Result<Page<ResultCap>>;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
-  async queryMyFavorite(
-    page?: number,
-    size?: number,
-  ): Promise<Result<Page<ResultCap>>> {
-
-
+  async queryMyFavorite(page?: number, size?: number): Promise<Result<Page<ResultCap>>> {
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const queryMyFavoriteCaps = tools.queryMyFavoriteCap;
 
       if (!queryMyFavoriteCaps) {
-        throw new Error("queryMyFavoriteCaps tool not available on MCP server");
+        throw new Error('queryMyFavoriteCaps tool not available on MCP server');
       }
 
       const result = await queryMyFavoriteCaps.execute(
@@ -210,21 +193,19 @@ export class CapKitMcp {
           pageSize: size,
         },
         {
-          toolCallId: "queryMyFavoriteCaps",
+          toolCallId: 'queryMyFavoriteCaps',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const queryResult = JSON.parse((result.content as any)[0].text);
 
       if (queryResult.code !== 200) {
-        throw new Error(
-          `queryMyFavoriteCaps failed: ${queryResult.error || "Unknown error"}`,
-        );
+        throw new Error(`queryMyFavoriteCaps failed: ${queryResult.error || 'Unknown error'}`);
       }
 
       return {
@@ -237,18 +218,17 @@ export class CapKitMcp {
         },
       } as Result<Page<ResultCap>>;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
   async queryCapStats(capId: string): Promise<Result<CapStats>> {
-
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const queryCapStats = tools.queryCapStats;
 
       if (!queryCapStats) {
-        throw new Error("queryCapStats tool not available on MCP server");
+        throw new Error('queryCapStats tool not available on MCP server');
       }
 
       const result = await queryCapStats.execute(
@@ -256,41 +236,39 @@ export class CapKitMcp {
           capId: capId,
         },
         {
-          toolCallId: "queryCapStats",
+          toolCallId: 'queryCapStats',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const queryResult = JSON.parse((result.content as any)[0].text);
 
       if (queryResult.code !== 200) {
-        throw new Error(
-          `query cap stats failed: ${queryResult.error || "Unknown error"}`,
-        );
+        throw new Error(`query cap stats failed: ${queryResult.error || 'Unknown error'}`);
       }
 
       return queryResult as Result<CapStats>;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
   async rateCap(capId: string, rating: number): Promise<Result<boolean>> {
     // Validate rating is between 1 and 5
     if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
-      throw new Error("Rating must be an integer between 1 and 5");
+      throw new Error('Rating must be an integer between 1 and 5');
     }
 
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const rateCap = tools.rateCap;
 
       if (!rateCap) {
-        throw new Error("rateCap tool not available on MCP server");
+        throw new Error('rateCap tool not available on MCP server');
       }
 
       const result = await rateCap.execute(
@@ -299,13 +277,13 @@ export class CapKitMcp {
           rating: rating,
         },
         {
-          toolCallId: "rateCap",
+          toolCallId: 'rateCap',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       return {
@@ -313,19 +291,17 @@ export class CapKitMcp {
         data: true,
       } as Result<boolean>;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
   async queryCapRatingDistribution(capId: string): Promise<Result<RatingDistribution[]>> {
-
-
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const queryCapRatingDistribution = tools.queryCapRatingDistribution;
 
       if (!queryCapRatingDistribution) {
-        throw new Error("queryCapRatingDistribution tool not available on MCP server");
+        throw new Error('queryCapRatingDistribution tool not available on MCP server');
       }
 
       const result = await queryCapRatingDistribution.execute(
@@ -333,13 +309,13 @@ export class CapKitMcp {
           capId: capId,
         },
         {
-          toolCallId: "queryCapRatingDistribution",
+          toolCallId: 'queryCapRatingDistribution',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const content = (result.content as any)?.[0]?.text;
@@ -351,27 +327,23 @@ export class CapKitMcp {
             data: resut.data.distribution,
           } as Result<RatingDistribution[]>;
         } catch (parseError) {
-          throw new Error("Failed to parse rating distribution response");
+          throw new Error('Failed to parse rating distribution response');
         }
       }
 
-      throw new Error("No data received");
+      throw new Error('No data received');
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
-  async install(
-    capId: string,
-    action: "add" | "remove" | "isInstall",
-  ): Promise<Result<boolean>> {
-
+  async install(capId: string, action: 'add' | 'remove' | 'isInstall'): Promise<Result<boolean>> {
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const favoriteCap = tools.favoriteCap;
 
       if (!favoriteCap) {
-        throw new Error("favoriteCap tool not available on MCP server");
+        throw new Error('favoriteCap tool not available on MCP server');
       }
 
       const result = await favoriteCap.execute(
@@ -380,16 +352,16 @@ export class CapKitMcp {
           action: action === 'isInstall' ? 'isFavorite' : action,
         },
         {
-          toolCallId: "favoriteCap",
+          toolCallId: 'favoriteCap',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
-      if (action === "isInstall") {
+      if (action === 'isInstall') {
         const data = JSON.parse(result.content[0].text);
         return {
           code: 200,
@@ -402,21 +374,17 @@ export class CapKitMcp {
         } as Result<boolean>;
       }
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
-  async updateEnableCap(
-    capId: string,
-    action: "enable" | "disable",
-  ): Promise<Result<boolean>> {
-
+  async updateEnableCap(capId: string, action: 'enable' | 'disable'): Promise<Result<boolean>> {
     try {
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const updateEnableCap = tools.updateEnableCap;
 
       if (!updateEnableCap) {
-        throw new Error("updateEnableCap tool not available on MCP server");
+        throw new Error('updateEnableCap tool not available on MCP server');
       }
 
       const result = await updateEnableCap.execute(
@@ -425,13 +393,13 @@ export class CapKitMcp {
           action: action,
         },
         {
-          toolCallId: "updateEnableCap",
+          toolCallId: 'updateEnableCap',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       return {
@@ -439,7 +407,7 @@ export class CapKitMcp {
         data: true,
       } as Result<boolean>;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
@@ -456,11 +424,11 @@ export class CapKitMcp {
   async downloadByID(id: string): Promise<Cap> {
     try {
       // Get tools from MCP server
-      const tools = await this.getTools()
+      const tools = await this.getTools();
       const downloadCap = tools.downloadCap;
 
       if (!downloadCap) {
-        throw new Error("downloadCap tool not available on MCP server");
+        throw new Error('downloadCap tool not available on MCP server');
       }
 
       // Download file from IPFS
@@ -469,28 +437,26 @@ export class CapKitMcp {
           id: id,
         },
         {
-          toolCallId: "download-cap",
+          toolCallId: 'download-cap',
           messages: [],
-        },
+        }
       );
 
       if (result.isError) {
-        throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+        throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
       }
 
       const downloadResult = JSON.parse((result.content as any)[0].text);
 
       if (downloadResult.code !== 200) {
-        throw new Error(
-          `Download failed: ${downloadResult.error || "Unknown error"}`,
-        );
+        throw new Error(`Download failed: ${downloadResult.error || 'Unknown error'}`);
       }
-      const data = downloadResult.data.rawData
-      const utf8 = new TextDecoder().decode(Uint8Array.from(atob(data), c => c.charCodeAt(0)))
+      const data = downloadResult.data.rawData;
+      const utf8 = new TextDecoder().decode(Uint8Array.from(atob(data), c => c.charCodeAt(0)));
 
       return yaml.load(utf8) as Cap;
     } catch (e) {
-      throw e
+      throw e;
     }
   }
 
@@ -521,9 +487,7 @@ export class CapKitMcp {
   async registerCap(cap: Cap) {
     // len > 6 && len < 20, only contain a-z, A-Z, 0-9, _
     if (!/^[a-zA-Z0-9_]{6,20}$/.test(cap.idName)) {
-      throw new Error(
-        "Name must be between 6 and 20 characters and only contain a-z, A-Z, 0-9, _",
-      );
+      throw new Error('Name must be between 6 and 20 characters and only contain a-z, A-Z, 0-9, _');
     }
 
     // 1. Create ACP (Agent Capability Package) file
@@ -533,7 +497,7 @@ export class CapKitMcp {
     const bytes = encoder.encode(acpContent);
     const rawData = btoa(String.fromCharCode(...bytes));
 
-    const tools = await this.getTools()
+    const tools = await this.getTools();
     const uploadCap = tools.uploadCap;
 
     const result = await uploadCap.execute(
@@ -541,25 +505,23 @@ export class CapKitMcp {
         cap: rawData,
       },
       {
-        toolCallId: "upload-cap",
+        toolCallId: 'upload-cap',
         messages: [],
-      },
+      }
     );
 
     if (result.isError) {
-      throw new Error((result.content as any)?.[0]?.text || "Unknown error");
+      throw new Error((result.content as any)?.[0]?.text || 'Unknown error');
     }
 
     const uploadResult = JSON.parse((result.content as any)[0].text);
     const uploadData = uploadResult.data;
 
     if (uploadResult.code !== 200) {
-      throw new Error(
-        `Upload cap failed: ${uploadResult.error || "Unknown error"}`,
-      );
+      throw new Error(`Upload cap failed: ${uploadResult.error || 'Unknown error'}`);
     }
 
-    return cap.id
+    return cap.id;
   }
 
   // private async uploadToIPFS(

@@ -39,6 +39,7 @@ Payment Kit 支持流式端点（SSE、NDJSON）的“带内支付帧（In-band 
   - 恢复：若本次流未收到支付帧，下次请求会按正常恢复流程获取最新 SubRAV。
 
 说明
+
 - 应用代码按常规读取响应体，不会看到支付帧，只会看到业务数据。
 - 非流式端点行为不变（仍使用响应头）。
 
@@ -86,9 +87,9 @@ import { PaymentChannelHttpClient } from '@nuwa-ai/payment-kit';
 const client = new PaymentChannelHttpClient({
   baseUrl: 'http://localhost:3003',
   chainConfig: { chain: 'rooch', network: 'test', rpcUrl: 'https://test-seed.rooch.network' },
-  signer,       // 兼容 IdentityKit 的 SignerInterface
-  keyId,        // 建议显式指定
-  payerDid,     // 可选，默认从 signer.getDid() 推导
+  signer, // 兼容 IdentityKit 的 SignerInterface
+  keyId, // 建议显式指定
+  payerDid, // 可选，默认从 signer.getDid() 推导
   defaultAssetId: '0x3::gas_coin::RGas',
   maxAmount: BigInt('10000000000'),
   debug: true,
@@ -138,7 +139,10 @@ billing.post(
     const completion_tokens = Math.min(max_tokens, 50);
     const total_tokens = prompt_tokens + completion_tokens;
     (res as any).locals.usage = total_tokens; // 供策略计算
-    res.json({ choices: [{ message: { role: 'assistant', content: 'mock response' } }], usage: { prompt_tokens, completion_tokens, total_tokens } });
+    res.json({
+      choices: [{ message: { role: 'assistant', content: 'mock response' } }],
+      usage: { prompt_tokens, completion_tokens, total_tokens },
+    });
   }
 );
 
@@ -209,11 +213,11 @@ await admin.triggerClaim({ channelId: '0x...' });
 
 ```typescript
 interface SubRAV {
-  version: number;          // Protocol version (default: 1)
+  version: number; // Protocol version (default: 1)
   chainId: bigint;
-  channelId: string;        // 32-byte hex string
+  channelId: string; // 32-byte hex string
   channelEpoch: bigint;
-  vmIdFragment: string;     // DID verification method fragment
+  vmIdFragment: string; // DID verification method fragment
   accumulatedAmount: bigint;
   nonce: bigint;
 }
@@ -234,16 +238,9 @@ interface SignedSubRAV {
 
 ```typescript
 class SubRAVSigner {
-  static async sign(
-    subRav: SubRAV,
-    signer: SignerInterface,
-    keyId: string
-  ): Promise<SignedSubRAV>;
+  static async sign(subRav: SubRAV, signer: SignerInterface, keyId: string): Promise<SignedSubRAV>;
 
-  static async verify(
-    signedSubRAV: SignedSubRAV,
-    resolver: DIDResolver
-  ): Promise<boolean>;
+  static async verify(signedSubRAV: SignedSubRAV, resolver: DIDResolver): Promise<boolean>;
 }
 ```
 

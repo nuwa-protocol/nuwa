@@ -1,7 +1,16 @@
-import type { LanguageModelV1, LanguageModelV1CallOptions, LanguageModelV1CallWarning, LanguageModelV1FinishReason, LanguageModelV1StreamPart } from '@ai-sdk/provider';
+import type {
+  LanguageModelV1,
+  LanguageModelV1CallOptions,
+  LanguageModelV1CallWarning,
+  LanguageModelV1FinishReason,
+  LanguageModelV1StreamPart,
+} from '@ai-sdk/provider';
 import { convertToOpenRouterChatMessages } from './convert-to-openrouter-chat-messages.js';
 import { mapOpenRouterFinishReason } from './map-openrouter-finish-reason.js';
-import type { OpenRouterChatModelId, OpenRouterChatSettings } from './types/openrouter-chat-settings.js';
+import type {
+  OpenRouterChatModelId,
+  OpenRouterChatSettings,
+} from './types/openrouter-chat-settings.js';
 
 export class OpenRouterChatLanguageModel implements LanguageModelV1 {
   readonly specificationVersion = 'v1';
@@ -65,7 +74,7 @@ export class OpenRouterChatLanguageModel implements LanguageModelV1 {
     stream: ReadableStream<LanguageModelV1StreamPart>;
   }> {
     const response = await this.fetch(options, { stream: true });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(`OpenRouter API error: ${error.error?.message || 'Unknown error'}`);
@@ -76,9 +85,12 @@ export class OpenRouterChatLanguageModel implements LanguageModelV1 {
     };
   }
 
-  private async fetch(options: LanguageModelV1CallOptions, requestOptions: { stream?: boolean } = {}): Promise<Response> {
+  private async fetch(
+    options: LanguageModelV1CallOptions,
+    requestOptions: { stream?: boolean } = {}
+  ): Promise<Response> {
     const messages = convertToOpenRouterChatMessages(options.prompt);
-    
+
     const body = {
       model: this.modelId,
       messages,
@@ -108,7 +120,9 @@ export class OpenRouterChatLanguageModel implements LanguageModelV1 {
     });
   }
 
-  private createStream(body: ReadableStream<Uint8Array>): ReadableStream<LanguageModelV1StreamPart> {
+  private createStream(
+    body: ReadableStream<Uint8Array>
+  ): ReadableStream<LanguageModelV1StreamPart> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
 

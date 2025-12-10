@@ -11,7 +11,7 @@ export const OPENAI_PATHS = {
 // Add Google Gemini path constants
 export const GEMINI_PATHS = {
   CHAT_COMPLETIONS: '/v1/models/{model}:generateContent',
-  STREAM_CHAT_COMPLETIONS: '/v1/models/{model}:streamGenerateContent'
+  STREAM_CHAT_COMPLETIONS: '/v1/models/{model}:streamGenerateContent',
 } as const;
 
 export const OPENROUTER_PATHS = {

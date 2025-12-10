@@ -27,16 +27,16 @@ program
     try {
       // Load configuration
       const config = await loadConfig(options.config);
-      
+
       // Set log level
       if (options.verbose) {
         logger.winston.level = 'debug';
       }
 
-      logger.info('Starting CAP diagnosis', { 
-        files: files.length, 
+      logger.info('Starting CAP diagnosis', {
+        files: files.length,
         config: options.config,
-        output: options.output 
+        output: options.output,
       });
 
       // Initialize diagnostic engine
@@ -44,38 +44,39 @@ program
 
       // Process each file
       const results: DiagnosticResult[] = [];
-      
+
       for (const file of files) {
         try {
           const cap = await loadCapFile(file);
-          logger.info('Diagnosing CAP', { 
-            file, 
-            capId: cap.id, 
-            capName: cap.metadata?.displayName 
+          logger.info('Diagnosing CAP', {
+            file,
+            capId: cap.id,
+            capName: cap.metadata?.displayName,
           });
-          
+
           const result = await engine.diagnoseCap(cap);
           results.push(result);
-          
+
           // Display individual result
           displayResult(result, options.format);
-          
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error('Failed to diagnose CAP', { file, error: errorMessage });
-          
+
           const errorResult: DiagnosticResult = {
             capId: 'unknown',
             capName: file,
             success: false,
             timestamp: Date.now(),
             duration: 0,
-            tests: [{
-              name: 'File Loading',
-              success: false,
-              duration: 0,
-              error: errorMessage,
-            }],
+            tests: [
+              {
+                name: 'File Loading',
+                success: false,
+                duration: 0,
+                error: errorMessage,
+              },
+            ],
             summary: {
               totalTests: 1,
               passedTests: 0,
@@ -85,7 +86,7 @@ program
               recommendations: ['Check file format and accessibility'],
             },
           };
-          
+
           results.push(errorResult);
           displayResult(errorResult, options.format);
         }
@@ -99,7 +100,7 @@ program
           results,
           summary: generateOverallSummary(results),
         };
-        
+
         writeFileSync(options.output, JSON.stringify(outputData, null, 2));
         logger.info('Results saved to file', { output: options.output });
       }
@@ -110,7 +111,6 @@ program
       // Exit with appropriate code
       const hasFailures = results.some(r => !r.success);
       process.exit(hasFailures ? 1 : 0);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Diagnosis failed', { error: errorMessage });
@@ -138,7 +138,7 @@ program
         try {
           const cap = await loadCapFile(file);
           const validation = CapSchema.safeParse(cap);
-          
+
           if (validation.success) {
             console.log(`✅ ${file}: Valid`);
           } else {
@@ -154,7 +154,6 @@ program
       }
 
       process.exit(allValid ? 0 : 1);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Validation failed', { error: errorMessage });
@@ -169,16 +168,19 @@ program
   .option('-p, --provider <provider>', 'Filter by provider (openai, anthropic, google, etc.)', '')
   .option('-f, --format <format>', 'Output format (table|json|list)', 'table')
   .option('-v, --verbose', 'Show detailed model information')
-  .action(async (options) => {
+  .action(async options => {
     try {
       if (options.verbose) {
         logger.winston.level = 'debug';
       }
 
-      logger.info('Listing available models', { provider: options.provider, format: options.format });
+      logger.info('Listing available models', {
+        provider: options.provider,
+        format: options.format,
+      });
 
       const models = await getAvailableModels();
-      const filteredModels = options.provider 
+      const filteredModels = options.provider
         ? models.filter(model => model.id.toLowerCase().includes(options.provider.toLowerCase()))
         : models;
 
@@ -192,7 +194,6 @@ program
         // Table format
         displayModelsTable(filteredModels, options.verbose);
       }
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Failed to list models', { error: errorMessage });
@@ -216,11 +217,7 @@ async function loadConfig(configPath?: string): Promise<DiagnosticConfig> {
       retries: 3,
     },
     diagnostic: {
-      testMessages: [
-        'Hello, can you help me?',
-        'What can you do?',
-        'Test your capabilities',
-      ],
+      testMessages: ['Hello, can you help me?', 'What can you do?', 'Test your capabilities'],
       maxSteps: 3,
       maxRetries: 2,
     },
@@ -244,7 +241,7 @@ async function loadConfig(configPath?: string): Promise<DiagnosticConfig> {
 
 async function loadCapFile(filePath: string) {
   const resolvedPath = resolve(filePath);
-  
+
   if (!existsSync(resolvedPath)) {
     throw new Error(`File not found: ${resolvedPath}`);
   }
@@ -257,11 +254,13 @@ async function loadCapFile(filePath: string) {
   try {
     const fileContent = readFileSync(resolvedPath, 'utf-8');
     const capData = JSON.parse(fileContent);
-    
+
     // Validate against schema
     const validation = CapSchema.safeParse(capData);
     if (!validation.success) {
-      throw new Error(`Invalid CAP format: ${validation.error.errors.map(e => e.message).join(', ')}`);
+      throw new Error(
+        `Invalid CAP format: ${validation.error.errors.map(e => e.message).join(', ')}`
+      );
     }
 
     return validation.data;
@@ -284,21 +283,21 @@ function displayResult(result: DiagnosticResult, format: string) {
   console.log(`\n${status} ${result.capName} (${result.capId})`);
   console.log(`Duration: ${result.duration}ms`);
   console.log(`Tests: ${result.summary.passedTests}/${result.summary.totalTests} passed`);
-  
+
   if (result.summary.criticalIssues.length > 0) {
     console.log('Critical Issues:');
     result.summary.criticalIssues.forEach(issue => {
       console.log(`  - ${issue}`);
     });
   }
-  
+
   if (result.summary.warnings.length > 0) {
     console.log('Warnings:');
     result.summary.warnings.forEach(warning => {
       console.log(`  - ${warning}`);
     });
   }
-  
+
   if (result.summary.recommendations.length > 0) {
     console.log('Recommendations:');
     result.summary.recommendations.forEach(rec => {
@@ -311,18 +310,20 @@ function displayOverallSummary(results: DiagnosticResult[]) {
   const total = results.length;
   const passed = results.filter(r => r.success).length;
   const failed = total - passed;
-  
+
   console.log(`\n=== Overall Summary ===`);
   console.log(`Total CAPs: ${total}`);
   console.log(`Passed: ${passed}`);
   console.log(`Failed: ${failed}`);
   console.log(`Success Rate: ${((passed / total) * 100).toFixed(1)}%`);
-  
+
   if (failed > 0) {
     console.log(`\nFailed CAPs:`);
-    results.filter(r => !r.success).forEach(result => {
-      console.log(`  - ${result.capName} (${result.capId})`);
-    });
+    results
+      .filter(r => !r.success)
+      .forEach(result => {
+        console.log(`  - ${result.capName} (${result.capId})`);
+      });
   }
 }
 
@@ -330,7 +331,7 @@ function generateOverallSummary(results: DiagnosticResult[]) {
   const total = results.length;
   const passed = results.filter(r => r.success).length;
   const failed = total - passed;
-  
+
   return {
     total,
     passed,
@@ -354,7 +355,7 @@ interface ModelInfo {
 
 async function getAvailableModels(): Promise<ModelInfo[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  
+
   if (!apiKey) {
     logger.warn('No OpenRouter API key found. Using fallback model list.');
     return getFallbackModels();
@@ -362,10 +363,10 @@ async function getAvailableModels(): Promise<ModelInfo[]> {
 
   try {
     logger.info('Fetching models from OpenRouter API');
-    
+
     const response = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -375,7 +376,7 @@ async function getAvailableModels(): Promise<ModelInfo[]> {
     }
 
     const data = await response.json();
-    
+
     if (!data.data || !Array.isArray(data.data)) {
       throw new Error('Invalid response format from OpenRouter API');
     }
@@ -385,17 +386,21 @@ async function getAvailableModels(): Promise<ModelInfo[]> {
       id: model.id,
       name: model.name || model.id.split('/').pop() || model.id,
       provider: model.id.split('/')[0] || 'Unknown',
-      description: model.description || model.context_length ? `Context: ${model.context_length} tokens` : undefined,
+      description:
+        model.description || model.context_length
+          ? `Context: ${model.context_length} tokens`
+          : undefined,
       contextLength: model.context_length,
-      pricing: model.pricing ? {
-        input: model.pricing.prompt ? `$${model.pricing.prompt}/1M tokens` : 'N/A',
-        output: model.pricing.completion ? `$${model.pricing.completion}/1M tokens` : 'N/A'
-      } : undefined
+      pricing: model.pricing
+        ? {
+            input: model.pricing.prompt ? `$${model.pricing.prompt}/1M tokens` : 'N/A',
+            output: model.pricing.completion ? `$${model.pricing.completion}/1M tokens` : 'N/A',
+          }
+        : undefined,
     }));
 
     logger.info(`Successfully fetched ${models.length} models from OpenRouter`);
     return models;
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to fetch models from OpenRouter API', { error: errorMessage });
@@ -413,7 +418,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'OpenAI',
       description: 'Most advanced GPT-4 model with vision capabilities',
       contextLength: 128000,
-      pricing: { input: '$5.00/1M tokens', output: '$15.00/1M tokens' }
+      pricing: { input: '$5.00/1M tokens', output: '$15.00/1M tokens' },
     },
     {
       id: 'openai/gpt-4o-mini',
@@ -421,7 +426,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'OpenAI',
       description: 'Faster, cheaper GPT-4o model',
       contextLength: 128000,
-      pricing: { input: '$0.15/1M tokens', output: '$0.60/1M tokens' }
+      pricing: { input: '$0.15/1M tokens', output: '$0.60/1M tokens' },
     },
     {
       id: 'openai/gpt-4-turbo',
@@ -429,7 +434,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'OpenAI',
       description: 'Previous generation GPT-4 with large context',
       contextLength: 128000,
-      pricing: { input: '$10.00/1M tokens', output: '$30.00/1M tokens' }
+      pricing: { input: '$10.00/1M tokens', output: '$30.00/1M tokens' },
     },
     {
       id: 'openai/gpt-3.5-turbo',
@@ -437,7 +442,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'OpenAI',
       description: 'Fast and cost-effective model',
       contextLength: 16385,
-      pricing: { input: '$0.50/1M tokens', output: '$1.50/1M tokens' }
+      pricing: { input: '$0.50/1M tokens', output: '$1.50/1M tokens' },
     },
     {
       id: 'anthropic/claude-3.5-sonnet',
@@ -445,7 +450,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'Anthropic',
       description: 'Most capable Claude model with excellent reasoning',
       contextLength: 200000,
-      pricing: { input: '$3.00/1M tokens', output: '$15.00/1M tokens' }
+      pricing: { input: '$3.00/1M tokens', output: '$15.00/1M tokens' },
     },
     {
       id: 'anthropic/claude-3-haiku',
@@ -453,15 +458,15 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'Anthropic',
       description: 'Fast and lightweight Claude model',
       contextLength: 200000,
-      pricing: { input: '$0.25/1M tokens', output: '$1.25/1M tokens' }
+      pricing: { input: '$0.25/1M tokens', output: '$1.25/1M tokens' },
     },
     {
       id: 'google/gemini-pro-1.5',
       name: 'Gemini Pro 1.5',
       provider: 'Google',
-      description: 'Google\'s advanced multimodal model',
+      description: "Google's advanced multimodal model",
       contextLength: 2000000,
-      pricing: { input: '$1.25/1M tokens', output: '$5.00/1M tokens' }
+      pricing: { input: '$1.25/1M tokens', output: '$5.00/1M tokens' },
     },
     {
       id: 'meta-llama/llama-3.1-8b-instruct',
@@ -469,7 +474,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'Meta',
       description: 'Open-source model with good performance',
       contextLength: 131072,
-      pricing: { input: '$0.20/1M tokens', output: '$0.20/1M tokens' }
+      pricing: { input: '$0.20/1M tokens', output: '$0.20/1M tokens' },
     },
     {
       id: 'meta-llama/llama-3.1-70b-instruct',
@@ -477,7 +482,7 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'Meta',
       description: 'Large open-source model with excellent capabilities',
       contextLength: 131072,
-      pricing: { input: '$0.90/1M tokens', output: '$0.90/1M tokens' }
+      pricing: { input: '$0.90/1M tokens', output: '$0.90/1M tokens' },
     },
     {
       id: 'mistralai/mistral-7b-instruct',
@@ -485,30 +490,39 @@ function getFallbackModels(): ModelInfo[] {
       provider: 'Mistral AI',
       description: 'Efficient European model with good performance',
       contextLength: 32768,
-      pricing: { input: '$0.20/1M tokens', output: '$0.20/1M tokens' }
-    }
+      pricing: { input: '$0.20/1M tokens', output: '$0.20/1M tokens' },
+    },
   ];
 }
 
 function displayModelsTable(models: ModelInfo[], verbose: boolean) {
   console.log('\n=== Available LLM Models ===\n');
-  
+
   if (verbose) {
     // Detailed table format
-    console.log('ID'.padEnd(35) + 'Name'.padEnd(25) + 'Provider'.padEnd(12) + 'Context'.padEnd(10) + 'Input Price'.padEnd(15) + 'Output Price');
+    console.log(
+      'ID'.padEnd(35) +
+        'Name'.padEnd(25) +
+        'Provider'.padEnd(12) +
+        'Context'.padEnd(10) +
+        'Input Price'.padEnd(15) +
+        'Output Price'
+    );
     console.log('-'.repeat(120));
-    
+
     models.forEach(model => {
       const id = model.id.padEnd(35);
       const name = model.name.padEnd(25);
       const provider = model.provider.padEnd(12);
-      const context = (model.contextLength ? `${(model.contextLength / 1000).toFixed(0)}K` : 'N/A').padEnd(10);
+      const context = (
+        model.contextLength ? `${(model.contextLength / 1000).toFixed(0)}K` : 'N/A'
+      ).padEnd(10);
       const inputPrice = (model.pricing?.input || 'N/A').padEnd(15);
       const outputPrice = model.pricing?.output || 'N/A';
-      
+
       console.log(`${id}${name}${provider}${context}${inputPrice}${outputPrice}`);
     });
-    
+
     console.log('\n=== Model Descriptions ===\n');
     models.forEach(model => {
       console.log(`${model.id}:`);
@@ -519,16 +533,16 @@ function displayModelsTable(models: ModelInfo[], verbose: boolean) {
     // Simple table format
     console.log('ID'.padEnd(40) + 'Name'.padEnd(25) + 'Provider');
     console.log('-'.repeat(75));
-    
+
     models.forEach(model => {
       const id = model.id.padEnd(40);
       const name = model.name.padEnd(25);
       const provider = model.provider;
-      
+
       console.log(`${id}${name}${provider}`);
     });
   }
-  
+
   console.log(`\nTotal models: ${models.length}`);
   console.log('\nUse --verbose for detailed information including pricing and context lengths.');
   console.log('Use --provider <name> to filter by provider (e.g., --provider openai).');

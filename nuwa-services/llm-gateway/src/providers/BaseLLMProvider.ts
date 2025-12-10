@@ -199,7 +199,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         // If failed to parse as JSON, return the original string
         return data;
       }
-}
+    }
 
     // Already normalized (Object)
     return data;
@@ -310,14 +310,14 @@ export abstract class BaseLLMProvider implements LLMProvider {
           statusText,
           requestId,
         };
-}
+      }
     } else if (error.request) {
       // Network error - no response received
       message = 'Network error - Unable to reach provider';
       statusCode = 503;
       details = {
         type: 'network_error',
-};
+      };
     } else {
       // Other error (request setup, etc.)
       message = error.message || 'Unknown error occurred';
@@ -615,12 +615,16 @@ export abstract class BaseLLMProvider implements LLMProvider {
 export class DefaultModelExtractor implements ModelExtractor {
   extractModel(req: Request, path: string): ModelExtractionResult | undefined {
     // Only extract model from request body for POST/PUT/PATCH requests
-    if (['POST', 'PUT', 'PATCH'].includes(req.method?.toUpperCase() || '') &&
-        req.body && typeof req.body === 'object' && req.body.model) {
+    if (
+      ['POST', 'PUT', 'PATCH'].includes(req.method?.toUpperCase() || '') &&
+      req.body &&
+      typeof req.body === 'object' &&
+      req.body.model
+    ) {
       return {
         model: req.body.model,
         source: 'body',
-        extractedData: { ...req.body }
+        extractedData: { ...req.body },
       };
     }
 
@@ -638,7 +642,7 @@ export class DefaultStreamExtractor implements StreamExtractor {
 
     return {
       isStream,
-      source: isStream ? 'body' : 'default'
+      source: isStream ? 'body' : 'default',
     };
   }
 

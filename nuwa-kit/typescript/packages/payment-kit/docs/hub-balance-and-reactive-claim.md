@@ -27,22 +27,18 @@
 ## 3. 组件与职责
 
 - **HubBalanceService（新）**
-
   - `getBalance(ownerDid, assetId)`: 读缓存（短 TTL/SWR），必要时回链刷新
   - `refresh(ownerDid, assetId)`: 强制刷新
   - 不提供 adjust 接口（避免本地真值漂移）
 
 - **ChannelRepository（既有）**
-
   - 作为 SubChannelInfo 的唯一缓存载体（memory/indexeddb/sql 实现）
   - claim 成功后推进 `lastClaimedAmount` / `lastConfirmedNonce` / `lastUpdated`
 
 - **PendingSubRAVRepository / RAVRepository（既有）**
-
   - 最新 pending/signed SubRAV 的权威来源（无 TTL）
 
 - **ClaimTriggerService（新或重构）**
-
   - `maybeQueue(channelId, vmIdFragment, delta)`
   - 并发控制（`activeClaims`）+ 重试退避
 
@@ -55,7 +51,6 @@
 ## 4. 分源缓存策略（Key）
 
 - **链上余额（payer Hub）**
-
   - 缓存层：HubBalanceService
   - TTL：2–5s；负缓存 TTL：1–2s；SWR：过期可用，后台刷新
   - 触发强刷：
@@ -64,7 +59,6 @@
     - 即将触发 claim 且余额临界
 
 - **SubChannelInfo（lastClaimedAmount/lastConfirmedNonce）**
-
   - 缓存层：仅 `ChannelRepository` 内置缓存，不再单独引入新缓存服务
   - 推进方式：claim 成功后服务端主动更新本地缓存，避免长时间滞后
 

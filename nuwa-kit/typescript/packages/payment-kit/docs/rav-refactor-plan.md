@@ -33,16 +33,13 @@
 ## 2 现状梳理（问题列表）
 
 - `SubRavValidator.ts`
-
   - 仅提供 `assertRavProgression` / `assertSubRavProgression`，没有 `validate` 导出。
   - 与 `PaymentUtils.validateSubRAV()` 存在职责重叠；缺少“允许 `amount` 持平”的可配置校验入口。
 
 - `SubRAVManager`（见 `src/core/SubRav.ts`）
-
   - 封装签名/验证（对外依赖 Signer/DID Resolver），但 `validate()` 当前调用了不存在的 `SubRAVValidator.validate`，与实现不符。
 
 - `PaymentChannelPayeeClient`
-
   - `verifySubRAV()` 完成签名验证与进度校验，但与 `PaymentProcessor.confirmDeferredPayment()` 的“pending 对齐检查”重复；
   - 针对“首次/握手/相同 SubRAV”的容忍策略存在历史兼容分支，未来需要与 `rav-handling.md` Phase 2 对齐；
   - 存在与链/本地仓库的状态游标同步逻辑，易与 `PaymentProcessor` 中的 baseline 查找重复。
@@ -60,7 +57,6 @@
 在不改变外部对 `PaymentProcessor` 的使用前提下，将“RAV 领域能力”模块化，形成单一入口但多模块互相解耦：
 
 - 核心模块（新建 `src/core/rav/` 目录）：
-
   - `RavProgressionValidator`：进度校验（nonce/amount 单调），提供 `allowSameAccumulated` 选项；
   - `RavVerificationService`：签名验证 + pending 匹配校验的统一入口；
   - `RavBaselineResolver`：解析 `(channelId, vmIdFragment)` 与 baseline（latestSigned / subChannel cursor / chainId）；
@@ -287,7 +283,6 @@ export function decideRoutePolicy(input: RoutePolicyInput): RoutePolicyDecision;
 ## 7 测试与回归清单
 
 - 单元测试：
-
   - `RavProgressionValidator`：递增/持平/回退（含边界）
   - `RavVerificationService`：pending 不匹配、签名错误、成功路径
   - `RavBaselineResolver`：有/无 SignedSubRAV、有/无 DIDAuth、多种仓库/链游标
@@ -295,7 +290,6 @@ export function decideRoutePolicy(input: RoutePolicyInput): RoutePolicyDecision;
   - `RavProposalBuilder`：从 signed/cursor 两种 baseline 产出一致的 next unsigned 与 header
 
 - 集成测试（服务端）：
-
   - FREE 路由：有/无 RAV、存在 pending 但缺签名 → 402；
   - PAID 路由：首次（无 baseline）报错、带 SignedSubRAV 流程、`cost=0` 仍返回 unsigned；
   - pending 优先级：存在 pending 时必须匹配签名；

@@ -15,8 +15,8 @@ Context7 是一个提供最新库文档的 MCP 服务器，支持获取各种编
 
 ```yaml
 upstream:
-  type: "stdio"
-  command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+  type: 'stdio'
+  command: ['npx', '-y', '@upstash/context7-mcp@latest']
 ```
 
 Context7 MCP 服务器通过 stdio 方式运行，使用 npx 直接运行最新版本。
@@ -29,25 +29,28 @@ Context7 MCP 服务器通过 stdio 方式运行，使用 npx 直接运行最新�
 ## 部署步骤
 
 1. **部署到 Railway**
+
    ```bash
    ./deployments/scripts/manage.sh deploy context7-proxy
    ```
 
 2. **设置环境变量**
+
    ```bash
    # 基础配置
    railway variables set SERVICE_KEY=your_service_key_here
    railway variables set ROOCH_RPC_URL=https://test-seed.rooch.network
-   
+
    # 如果 Context7 需要 API 密钥
    # railway variables set CONTEXT7_API_KEY=your_api_key_here
    ```
 
 3. **验证部署**
+
    ```bash
    # 检查状态
    ./deployments/scripts/manage.sh status context7-proxy
-   
+
    # 健康检查
    ./deployments/scripts/manage.sh health context7-proxy
    ```
@@ -111,11 +114,12 @@ railway logs --filter error
 ### 故障排除
 
 1. **服务无法启动**
+
    ```bash
    # 检查 npx 是否可用
    railway shell
    npx --version
-   
+
    # 测试 Context7 包
    npx -y @upstash/context7-mcp@latest --help
    ```

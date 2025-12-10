@@ -5,6 +5,7 @@
 ### 前置条件
 
 1. **安装 Railway CLI**
+
    ```bash
    npm install -g @railway/cli
    railway login
@@ -30,6 +31,7 @@
 #### 2. 配置实例
 
 编辑生成的配置文件：
+
 ```bash
 # 编辑配置
 vim deployments/instances/my-proxy/config.yaml
@@ -45,6 +47,7 @@ cat deployments/instances/my-proxy/env.example
 ```
 
 部署过程中会提示设置环境变量，例如：
+
 ```bash
 railway variables set SERVICE_KEY=your_service_key_here
 railway variables set UPSTREAM_API_TOKEN=your_api_token_here
@@ -116,6 +119,7 @@ railway variables set AMAP_API_KEY=your_amap_key_here
 ```
 
 **支持的工具**：
+
 - `amap.geo` - 地理编码 (0.0001 USD)
 - `amap.regeocode` - 逆地理编码 (0.0001 USD)
 - `amap.direction.*` - 路径规划 (0.0003-0.0005 USD)
@@ -132,6 +136,7 @@ railway variables set GITHUB_TOKEN=your_github_token_here
 ```
 
 **支持的工具**：
+
 - `github_search_repositories` - 搜索仓库 (免费)
 - `github_get_file_contents` - 获取文件 (0.0001 USD)
 - `github_create_issue` - 创建 Issue (0.002 USD)
@@ -148,6 +153,7 @@ railway variables set SERVICE_KEY=your_service_key_here
 ```
 
 **支持的工具**：
+
 - `mcp_context7_resolve-library-id` - 库名称解析 (免费)
 - `mcp_context7_get-library-docs` - 获取库文档 (0.0001 USD)
 
@@ -157,63 +163,65 @@ railway variables set SERVICE_KEY=your_service_key_here
 
 ```yaml
 upstream:
-  type: "httpStream"
-  url: "https://api.example.com/mcp"
+  type: 'httpStream'
+  url: 'https://api.example.com/mcp'
   auth:
-    scheme: "bearer"
-    token: "${API_TOKEN}"
+    scheme: 'bearer'
+    token: '${API_TOKEN}'
 
 register:
   tools:
-    - name: "example.search"
-      pricePicoUSD: "100000000"  # 0.0001 USD
-    - name: "example.create"
-      pricePicoUSD: "1000000000" # 0.001 USD
+    - name: 'example.search'
+      pricePicoUSD: '100000000' # 0.0001 USD
+    - name: 'example.create'
+      pricePicoUSD: '1000000000' # 0.001 USD
 ```
 
 ### Stdio Upstream 示例
 
 **Node.js MCP 服务器：**
+
 ```yaml
 upstream:
-  type: "stdio"
-  command: ["npx", "-y", "@example/mcp-server"]
+  type: 'stdio'
+  command: ['npx', '-y', '@example/mcp-server']
   env:
-    API_KEY: "${UPSTREAM_API_KEY}"
-    DEBUG: "true"
+    API_KEY: '${UPSTREAM_API_KEY}'
+    DEBUG: 'true'
 
 register:
   tools:
-    - name: "local.tool"
-      pricePicoUSD: "500000000"  # 0.0005 USD
+    - name: 'local.tool'
+      pricePicoUSD: '500000000' # 0.0005 USD
 ```
 
 **Python MCP 服务器：**
+
 ```yaml
 upstream:
-  type: "stdio"
-  command: ["uvx", "my-python-mcp-server"]
+  type: 'stdio'
+  command: ['uvx', 'my-python-mcp-server']
   env:
-    PYTHON_API_KEY: "${PYTHON_API_KEY}"
-    DEBUG: "true"
+    PYTHON_API_KEY: '${PYTHON_API_KEY}'
+    DEBUG: 'true'
 
 register:
   tools:
-    - name: "python.tool"
-      pricePicoUSD: "500000000"  # 0.0005 USD
+    - name: 'python.tool'
+      pricePicoUSD: '500000000' # 0.0005 USD
 ```
 
 ## 💰 定价策略
 
 ### 推荐定价 (picoUSD)
 
-| 操作类型 | 价格 (USD) | picoUSD 值 |
-|----------|------------|------------|
-| 简单查询 | $0.0001 | `100000000` |
-| 数据检索 | $0.0005 | `500000000` |
-| 数据创建 | $0.001 | `1000000000` |
-| 复杂操作 | $0.005 | `5000000000` |
-| 高级功能 | $0.01 | `10000000000` |
+| 操作类型 | 价格 (USD) | picoUSD 值    |
+| -------- | ---------- | ------------- |
+| 简单查询 | $0.0001    | `100000000`   |
+| 数据检索 | $0.0005    | `500000000`   |
+| 数据创建 | $0.001     | `1000000000`  |
+| 复杂操作 | $0.005     | `5000000000`  |
+| 高级功能 | $0.01      | `10000000000` |
 
 ### 免费工具
 
@@ -247,6 +255,7 @@ railway logs --filter error
 ### 性能监控
 
 Railway 提供内置的性能监控：
+
 - CPU 使用率
 - 内存使用率
 - 网络流量
@@ -257,28 +266,31 @@ Railway 提供内置的性能监控：
 ### 常见问题
 
 1. **部署失败**
+
    ```bash
    # 检查配置文件语法
    cat deployments/instances/my-proxy/config.yaml | yaml-lint
-   
+
    # 检查环境变量
    railway variables
    ```
 
 2. **Stdio upstream 无法启动**
+
    ```bash
    # 检查命令路径
    which npx
-   
+
    # 测试本地执行
    npx @example/mcp-server
    ```
 
 3. **支付功能异常**
+
    ```bash
    # 验证服务密钥
    echo $SERVICE_KEY | base64 -d
-   
+
    # 检查网络连接
    curl -I $ROOCH_RPC_URL
    ```

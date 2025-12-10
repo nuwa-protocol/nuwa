@@ -7,20 +7,20 @@ export interface Result {
 }
 
 export interface CapMetadata {
-  id: string,
-  cid: string,
-  name: string,
-  displayName: string,
-  description: string,
-  tags: string[],
-  homepage: string,
-  timestamp: string,
-  repository: string,
-  thumbnail: string,
-  introduction: string,
-  enable: boolean,
-  version?: number,
-  stats: CapStats
+  id: string;
+  cid: string;
+  name: string;
+  displayName: string;
+  description: string;
+  tags: string[];
+  homepage: string;
+  timestamp: string;
+  repository: string;
+  thumbnail: string;
+  introduction: string;
+  enable: boolean;
+  version?: number;
+  stats: CapStats;
 }
 
 export interface RatingDistribution {

@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ESNext",        
+    "target": "ESNext",
     "module": "ESNext",
     "outDir": "./dist",
     "moduleResolution": "node",
-    "esModuleInterop": false,  
-    "strict": false,           
-    "skipLibCheck": true,      
-    "resolveJsonModule": true, 
+    "esModuleInterop": false,
+    "strict": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
     "types": ["node"],
     "typeRoots": ["./node_modules/@types", "./types"]
   },

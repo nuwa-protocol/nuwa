@@ -1,16 +1,9 @@
 {
   "preset": "ts-jest/presets/default-esm",
   "testEnvironment": "node",
-  "setupFilesAfterEnv": [
-    "<rootDir>/jest.setup.js"
-  ],
-  "extensionsToTreatAsEsm": [
-    ".ts"
-  ],
-  "roots": [
-    "<rootDir>/src",
-    "<rootDir>/test"
-  ],
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
+  "extensionsToTreatAsEsm": [".ts"],
+  "roots": ["<rootDir>/src", "<rootDir>/test"],
   "transform": {
     "^.+\\.tsx?$": [
       "ts-jest",
@@ -20,30 +13,14 @@
       }
     ]
   },
-  "testMatch": [
-    "**/__tests__/**/*.ts",
-    "**/?(*.)+(spec|test).ts"
-  ],
-  "moduleFileExtensions": [
-    "ts",
-    "tsx",
-    "js",
-    "jsx",
-    "json",
-    "node"
-  ],
+  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
   "testTimeout": 30000,
   "verbose": true,
   "collectCoverage": true,
   "coverageDirectory": "coverage",
-  "coverageReporters": [
-    "text-summary"
-  ],
-  "collectCoverageFrom": [
-    "src/**/*.ts",
-    "!src/**/types.ts",
-    "!src/**/index.ts"
-  ],
+  "coverageReporters": ["text-summary"],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/types.ts", "!src/**/index.ts"],
   "coverageThreshold": {
     "global": {
       "branches": 0,

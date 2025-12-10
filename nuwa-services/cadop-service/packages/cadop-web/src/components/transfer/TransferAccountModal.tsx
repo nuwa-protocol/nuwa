@@ -27,7 +27,10 @@ export function TransferAccountModal({
   const { toast } = useToast();
   const { transfer, isLoading } = useAccountTransfer(agentDid);
 
-  const handleTransfer = async (recipient: string, amount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
+  const handleTransfer = async (
+    recipient: string,
+    amount: bigint
+  ): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
       const normalizedRecipient = normalizeAddress(recipient);
       const result = await transfer(normalizedRecipient, amount, DEFAULT_ASSET_ID);
@@ -36,7 +39,10 @@ export function TransferAccountModal({
         toast({
           variant: 'success',
           title: t('transfer.success', 'Transfer Successful'),
-          description: t('transfer.successDescription', 'Successfully transferred RGAS to the recipient'),
+          description: t(
+            'transfer.successDescription',
+            'Successfully transferred RGAS to the recipient'
+          ),
         });
         onSuccess?.();
         return { txHash: result.txHash, success: true };
@@ -62,7 +68,10 @@ export function TransferAccountModal({
     const trimmed = recipient.trim();
 
     if (!trimmed) {
-      return { valid: false, error: t('transfer.recipientRequired', 'Recipient address is required') };
+      return {
+        valid: false,
+        error: t('transfer.recipientRequired', 'Recipient address is required'),
+      };
     }
 
     try {
@@ -71,7 +80,10 @@ export function TransferAccountModal({
     } catch {
       return {
         valid: false,
-        error: t('transfer.invalidAddressFormat', 'Invalid address format. Please enter a valid Rooch address or DID')
+        error: t(
+          'transfer.invalidAddressFormat',
+          'Invalid address format. Please enter a valid Rooch address or DID'
+        ),
       };
     }
   };
@@ -81,7 +93,10 @@ export function TransferAccountModal({
       open={open}
       onClose={onClose}
       title={t('transfer.accountTransfer', 'Transfer Account Balance')}
-      description={t('transfer.accountTransferDescription', 'Transfer RGAS from your account balance to another address')}
+      description={t(
+        'transfer.accountTransferDescription',
+        'Transfer RGAS from your account balance to another address'
+      )}
       agentDid={agentDid}
       currentBalance={currentBalance}
       balanceLabel={t('transfer.accountBalance', 'Account Balance')}
@@ -90,7 +105,10 @@ export function TransferAccountModal({
       maxAmount={currentBalance}
       showRecipientInput={true}
       recipientLabel={t('transfer.recipientAddress', 'Recipient Address')}
-      recipientPlaceholder={t('transfer.recipientPlaceholder', 'Enter Rooch address (0x...) or DID (did:rooch:0x...)')}
+      recipientPlaceholder={t(
+        'transfer.recipientPlaceholder',
+        'Enter Rooch address (0x...) or DID (did:rooch:0x...)'
+      )}
       showAmountInput={true}
       amountLabel={t('transfer.amount', 'Amount')}
       amountPlaceholder="0.00"

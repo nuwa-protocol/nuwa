@@ -15,30 +15,29 @@ server.tool(
   { varName: z.string() },
   async ({ varName }) => {
     const value = process.env[varName];
-    return { 
-      content: [{ 
-        type: 'text', 
-        text: value ? `${varName}=${value}` : `${varName} not found` 
-      }] 
+    return {
+      content: [
+        {
+          type: 'text',
+          text: value ? `${varName}=${value}` : `${varName} not found`,
+        },
+      ],
     };
   }
 );
 
 // Tool to list all environment variables (for debugging)
-server.tool(
-  'list_env',
-  'List all environment variables',
-  {},
-  async () => {
-    const envVars = Object.keys(process.env).sort();
-    return { 
-      content: [{ 
-        type: 'text', 
-        text: `Found ${envVars.length} environment variables: ${envVars.slice(0, 10).join(', ')}${envVars.length > 10 ? '...' : ''}` 
-      }] 
-    };
-  }
-);
+server.tool('list_env', 'List all environment variables', {}, async () => {
+  const envVars = Object.keys(process.env).sort();
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Found ${envVars.length} environment variables: ${envVars.slice(0, 10).join(', ')}${envVars.length > 10 ? '...' : ''}`,
+      },
+    ],
+  };
+});
 
 const transport = new StdioServerTransport();
 

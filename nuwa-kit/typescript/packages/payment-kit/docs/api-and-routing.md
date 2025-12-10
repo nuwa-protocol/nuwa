@@ -11,7 +11,6 @@ Payment Kit 的服务端设计遵循以下原则，以实现高度的灵活性�
 1.  **框架无关 (Framework-Agnostic)**：核心业务逻辑（如计费、状态管理）与具体的 Web 框架（如 Express）解耦。通过适配器模式，可以轻松扩展至 Koa、Fastify 或其他框架。
 
 2.  **分层架构**：代码库结构清晰，职责分离：
-
     - `core/`：业务核心，包含 `BillingEngine`、`PayeeClient` 等。
     - `api/`：内置接口的纯业务实现 (Handlers)，不依赖任何框架。
     - `transport/`：框架适配层，负责将业务 Handlers “嫁接”到具体的框架上，如 `transport/express/`。

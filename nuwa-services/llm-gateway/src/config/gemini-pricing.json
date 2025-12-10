@@ -4,73 +4,73 @@
   "lastUpdated": "2025-11-22",
   "models": {
     "gemini-3-pro-preview": {
-      "promptPerMTokUsd": 4.00,
-      "completionPerMTokUsd": 18.00,
+      "promptPerMTokUsd": 4.0,
+      "completionPerMTokUsd": 18.0,
       "description": "Gemini 3 Pro Preview - Most advanced multimodal model (prices for prompts > 200K tokens)"
     },
     "gemini-2.5-pro": {
-      "promptPerMTokUsd": 2.50,
-      "completionPerMTokUsd": 15.00,
+      "promptPerMTokUsd": 2.5,
+      "completionPerMTokUsd": 15.0,
       "description": "Gemini 2.5 Pro - Advanced multi-purpose model for coding and complex reasoning (prices for prompts > 200K tokens)"
     },
     "gemini-2.5-flash": {
-      "promptPerMTokUsd": 1.00,
-      "completionPerMTokUsd": 2.50,
+      "promptPerMTokUsd": 1.0,
+      "completionPerMTokUsd": 2.5,
       "description": "Gemini 2.5 Flash - Mixed reasoning model with 1M context and thinking budget (audio input pricing)"
     },
     "gemini-2.5-flash-preview": {
-      "promptPerMTokUsd": 1.00,
-      "completionPerMTokUsd": 2.50,
+      "promptPerMTokUsd": 1.0,
+      "completionPerMTokUsd": 2.5,
       "description": "Gemini 2.5 Flash Preview - Latest preview of 2.5 Flash model"
     },
     "gemini-2.5-flash-preview-09-2025": {
-      "promptPerMTokUsd": 1.00,
-      "completionPerMTokUsd": 2.50,
+      "promptPerMTokUsd": 1.0,
+      "completionPerMTokUsd": 2.5,
       "description": "Gemini 2.5 Flash Preview (Sept 2025) - Best for high-volume tasks with thinking"
     },
     "gemini-2.5-flash-lite": {
-      "promptPerMTokUsd": 0.30,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.3,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.5 Flash-Lite - Smallest and most cost-effective model for scale (audio input pricing)"
     },
     "gemini-2.5-flash-lite-preview": {
-      "promptPerMTokUsd": 0.30,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.3,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.5 Flash-Lite Preview - Latest preview version"
     },
     "gemini-2.5-flash-lite-preview-09-2025": {
-      "promptPerMTokUsd": 0.30,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.3,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.5 Flash-Lite Preview (Sept 2025) - Optimized for cost-efficiency and throughput"
     },
     "gemini-2.5-computer-use-preview-10-2025": {
-      "promptPerMTokUsd": 2.50,
-      "completionPerMTokUsd": 15.00,
+      "promptPerMTokUsd": 2.5,
+      "completionPerMTokUsd": 15.0,
       "description": "Gemini 2.5 Computer Use - Optimized for browser automation agents (prices for prompts > 200K tokens)"
     },
     "gemini-2.0-flash": {
-      "promptPerMTokUsd": 0.70,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.7,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.0 Flash - Balanced multimodal model with 1M context, built for agentic era (audio input pricing)"
     },
     "gemini-2.0-flash-exp": {
-      "promptPerMTokUsd": 0.70,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.7,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.0 Flash Experimental - Latest experimental variant"
     },
     "gemini-2.0-flash-thinking-exp": {
-      "promptPerMTokUsd": 0.70,
-      "completionPerMTokUsd": 0.40,
+      "promptPerMTokUsd": 0.7,
+      "completionPerMTokUsd": 0.4,
       "description": "Gemini 2.0 Flash Thinking Experimental - Extended reasoning capabilities"
     },
     "gemini-2.0-flash-lite": {
       "promptPerMTokUsd": 0.075,
-      "completionPerMTokUsd": 0.30,
+      "completionPerMTokUsd": 0.3,
       "description": "Gemini 2.0 Flash-Lite - Smallest and most cost-effective model for scale"
     },
     "gemini-robotics-er-1.5-preview": {
-      "promptPerMTokUsd": 1.00,
-      "completionPerMTokUsd": 2.50,
+      "promptPerMTokUsd": 1.0,
+      "completionPerMTokUsd": 2.5,
       "description": "Gemini Robotics-ER 1.5 - Embodied reasoning for robotics (audio input pricing)"
     },
     "gemma-3": {

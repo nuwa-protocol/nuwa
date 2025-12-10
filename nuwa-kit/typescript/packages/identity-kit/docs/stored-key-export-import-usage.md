@@ -5,8 +5,9 @@ This guide demonstrates how to use the new StoredKey export/import functionality
 ## Overview
 
 The StoredKey export/import feature allows you to:
+
 - Export any `StoredKey` to a single base58btc-encoded string
-- Import keys from serialized strings into new `KeyManager` instances  
+- Import keys from serialized strings into new `KeyManager` instances
 - Easily pass private keys through environment variables or CI/CD secrets
 - Maintain full key functionality after export/import cycles
 
@@ -81,6 +82,7 @@ console.log('Decoded:', decoded);
 Exports a stored key to a base58btc-encoded string.
 
 **Parameters:**
+
 - `keyId`: The ID of the key to export
 
 **Returns:** A base58btc-encoded string representation of the StoredKey
@@ -92,6 +94,7 @@ Exports a stored key to a base58btc-encoded string.
 Imports a StoredKey from a serialized string into the current KeyManager.
 
 **Parameters:**
+
 - `serialized`: Base58btc-encoded string representation of a StoredKey
 
 **Returns:** The imported StoredKey
@@ -101,6 +104,7 @@ Imports a StoredKey from a serialized string into the current KeyManager.
 Static factory method to create a new KeyManager from a serialized key.
 
 **Parameters:**
+
 - `serialized`: Base58btc-encoded string representation of a StoredKey
 - `store`: Optional KeyStore instance (defaults to MemoryKeyStore)
 
@@ -113,6 +117,7 @@ Static factory method to create a new KeyManager from a serialized key.
 Encodes a StoredKey to a base58btc string.
 
 **Parameters:**
+
 - `key`: The StoredKey to encode
 
 **Returns:** Base58btc-encoded string with 'z' prefix
@@ -122,6 +127,7 @@ Encodes a StoredKey to a base58btc string.
 Decodes a base58btc string to a StoredKey.
 
 **Parameters:**
+
 - `serialized`: Base58btc-encoded string
 
 **Returns:** The decoded StoredKey
@@ -216,22 +222,26 @@ try {
 ## Examples
 
 For complete working examples, see:
+
 - `examples/stored-key-export-import.ts` - Comprehensive usage demonstration
 - Test files in `test/keys/` for additional usage patterns
 
 ## Format Details
 
 Exported keys use the following format:
+
 - **Encoding**: Base58btc with 'z' prefix (multibase format)
 - **Content**: JSON representation of the StoredKey object
 - **Size**: Approximately 300-400 characters for typical keys
 
 Example exported key:
+
 ```
 z3HpaPDy2WN8TPNiyYwfcN5QW47DAQxij2JEpYGi7j4Li1Uqes...
 ```
 
 This encodes a JSON object like:
+
 ```json
 {
   "keyId": "did:key:z6MkjaCy4DaU3krCimuG11B6VipLDgx3HYKtfxhbAggSEuEA#account-key",
@@ -239,4 +249,4 @@ This encodes a JSON object like:
   "publicKeyMultibase": "z6MkjaCy4DaU3krCimuG11B6VipLDgx3HYKtfxhbAggSEuEA",
   "privateKeyMultibase": "z3u2HNqP6b5gqBCT7vdPkxX4rY8QRJl1KcSMZ9p7b6vRsA8W"
 }
-``` 
+```

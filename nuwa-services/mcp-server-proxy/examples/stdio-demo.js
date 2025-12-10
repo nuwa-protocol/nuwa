@@ -22,13 +22,15 @@ server.tool(
   async ({ message }) => {
     // 调试信息输出到 stderr（推荐）
     console.error(`[demo-mcp] Processing: ${message}`);
-    
+
     // MCP 响应通过 SDK 发送到 stdout（自动处理）
-    return { 
-      content: [{ 
-        type: 'text', 
-        text: `Demo response: ${message}` 
-      }] 
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Demo response: ${message}`,
+        },
+      ],
     };
   }
 );

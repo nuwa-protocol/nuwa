@@ -94,13 +94,13 @@ Then edit `config.yaml` to match your needs. Here are some examples:
 ```yaml
 # Server settings
 port: 8088
-endpoint: "/mcp"
+endpoint: '/mcp'
 
 # Payment configuration
-serviceId: "my-mcp-service"
-network: "test"
-rpcUrl: "https://test-seed.rooch.network:443"
-defaultPricePicoUSD: "100000000"  # 0.0001 USD - Default price for all tools
+serviceId: 'my-mcp-service'
+network: 'test'
+rpcUrl: 'https://test-seed.rooch.network:443'
+defaultPricePicoUSD: '100000000' # 0.0001 USD - Default price for all tools
 ```
 
 #### Example 2: With HTTP Upstream
@@ -108,72 +108,73 @@ defaultPricePicoUSD: "100000000"  # 0.0001 USD - Default price for all tools
 ```yaml
 # Server settings
 port: 8088
-endpoint: "/mcp"
+endpoint: '/mcp'
 
 # Upstream MCP server
 upstream:
-  type: "httpStream"
-  url: "https://api.example.com/mcp?key=${API_KEY}"
+  type: 'httpStream'
+  url: 'https://api.example.com/mcp?key=${API_KEY}'
 
 # Payment configuration
-serviceId: "my-mcp-service"
-network: "test"
-rpcUrl: "${ROOCH_RPC_URL}"
-defaultPricePicoUSD: "100000000"  # 0.0001 USD - Default price for all tools
+serviceId: 'my-mcp-service'
+network: 'test'
+rpcUrl: '${ROOCH_RPC_URL}'
+defaultPricePicoUSD: '100000000' # 0.0001 USD - Default price for all tools
 
 # Tool pricing configuration (optional)
 register:
   tools:
-    - name: "example.tool"
-      pricePicoUSD: "200000000"  # 0.0002 USD - Explicit price, overrides default
-    - name: "free.tool"
-      pricePicoUSD: "0"  # Free tool
+    - name: 'example.tool'
+      pricePicoUSD: '200000000' # 0.0002 USD - Explicit price, overrides default
+    - name: 'free.tool'
+      pricePicoUSD: '0' # Free tool
 ```
 
 #### Example 3: With Stdio Upstream
 
 ```yaml
-# Server settings  
+# Server settings
 port: 8088
-endpoint: "/mcp"
+endpoint: '/mcp'
 
 # Stdio upstream MCP server (Node.js)
 upstream:
-  type: "stdio"
-  command: ["npx", "-y", "@example/mcp-server"]
+  type: 'stdio'
+  command: ['npx', '-y', '@example/mcp-server']
   env:
-    API_KEY: "${API_KEY}"
+    API_KEY: '${API_KEY}'
   # stderr: "inherit"  # Default: child process errors are visible (recommended for debugging)
   # stderr: "ignore"   # Suppress child process error output
   # stderr: "pipe"     # Capture stderr (advanced usage)
 
 # Payment configuration
-serviceId: "my-mcp-service"
-network: "test"
-defaultPricePicoUSD: "100000000"
+serviceId: 'my-mcp-service'
+network: 'test'
+defaultPricePicoUSD: '100000000'
 ```
 
 #### Example 4: With Python Stdio Upstream
 
 ```yaml
-# Server settings  
+# Server settings
 port: 8088
-endpoint: "/mcp"
+endpoint: '/mcp'
 
 # Stdio upstream MCP server (Python)
 upstream:
-  type: "stdio"
-  command: ["uvx", "my-python-mcp-server"]
+  type: 'stdio'
+  command: ['uvx', 'my-python-mcp-server']
   env:
-    PYTHON_API_KEY: "${PYTHON_API_KEY}"
+    PYTHON_API_KEY: '${PYTHON_API_KEY}'
 
 # Payment configuration
-serviceId: "my-python-mcp-service"
-network: "test"
-defaultPricePicoUSD: "100000000"
+serviceId: 'my-python-mcp-service'
+network: 'test'
+defaultPricePicoUSD: '100000000'
 ```
 
-**Note**: 
+**Note**:
+
 - Stdio upstream automatically inherits all environment variables from the parent process, then merges any custom environment variables specified in the `env` section. This ensures that child processes have access to system variables like `PATH`, `HOME`, etc., as well as any custom variables you specify.
 - The `stderr` option controls how child process error output is handled:
   - `inherit` (default): Error messages from the child process are displayed in the proxy's console, making debugging easier
@@ -181,12 +182,14 @@ defaultPricePicoUSD: "100000000"
   - `pipe`: Captures stderr for advanced processing (not commonly needed)
 
 **Important**: In stdio mode, the child process uses:
+
 - **stdin/stdout**: For MCP JSON-RPC protocol communication (handled automatically by the SDK)
 - **stderr**: For debug output, error messages, and logging (visible in proxy console with `stderr: inherit`)
 
 Never write non-MCP content to stdout in your MCP server, as this will break protocol communication. Use `console.error()` for debug output instead of `console.log()`.
 
 Set any required environment variables:
+
 ```bash
 export API_KEY=your_secret_key
 export ROOCH_RPC_URL=https://test-seed.rooch.network:443
@@ -223,11 +226,13 @@ npx @nuwa-ai/mcp-server-proxy --config ./my-config.yaml
 If you're building from source:
 
 - **Development mode** (with hot-reloading):
+
   ```bash
   pnpm dev
   ```
 
 - **Production mode**:
+
   ```bash
   # 1. Build the project
   pnpm build
@@ -237,16 +242,17 @@ If you're building from source:
   ```
 
 - **With command line arguments**:
+
   ```bash
   # Show help and available options
   pnpm run help
-  
+
   # Start with custom port and debug
   node dist/index.js --port 3000 --debug
-  
+
   # Start with custom config file
   node dist/index.js --config ./custom-config.yaml
-  
+
   # Start with payment configuration
   node dist/index.js --service-id my-service --network test --default-price-pico-usd 100000000
   ```
@@ -327,6 +333,7 @@ docker run -d -p 8088:8088 \
 #### Configuration Server Requirements
 
 Your configuration server should:
+
 - Serve YAML files with proper `Content-Type: text/yaml` or `text/plain` headers
 - Support HTTPS for production deployments
 - Have appropriate CORS headers if accessed from browsers
@@ -351,7 +358,7 @@ mcp-server-proxy --config https://raw.githubusercontent.com/nuwa-protocol/nuwa/m
 ```
 
 ```bash
-# Run Context7 proxy locally  
+# Run Context7 proxy locally
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8089
 
@@ -372,7 +379,7 @@ node dist/index.js --config ./deployments/instances/amap-proxy/config.yaml
 ```
 
 ```bash
-# Run Context7 proxy locally  
+# Run Context7 proxy locally
 export SERVICE_KEY=your_service_key_here  # Required for ServiceDID and payment channels
 export PORT=8089
 
@@ -420,6 +427,7 @@ ROOCH_NODE_URL=https://test-seed.rooch.network:443 pnpm test:e2e
 ```
 
 **Note**: E2E tests require:
+
 - A running Rooch node (local or remote)
 - The `PAYMENT_E2E=1` environment variable
 - Sufficient test tokens for payment channel operations
@@ -481,13 +489,15 @@ docker run -d -p 8088:8088 \
 The Docker image includes common tools needed for stdio upstream commands:
 
 - **Node.js & npm/npx**: For running Node.js-based MCP servers
+
   ```yaml
-  command: ["npx", "-y", "@upstash/context7-mcp@latest"]
+  command: ['npx', '-y', '@upstash/context7-mcp@latest']
   ```
 
 - **Python & uv/uvx**: For running Python-based MCP servers
+
   ```yaml
-  command: ["uvx", "my-python-mcp-server"]
+  command: ['uvx', 'my-python-mcp-server']
   ```
 
 - **System tools**: git, curl, bash for additional functionality
@@ -500,14 +510,14 @@ The Docker image includes common tools needed for stdio upstream commands:
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SERVICE_KEY` | Service private key for DID signing | ✅ |
-| `CONFIG_PATH` | Path to configuration file | ❌ |
-| `PORT` | Server port (default: 8088) | ❌ |
-| `ENDPOINT` | MCP endpoint path (default: /mcp) | ❌ |
-| `DEBUG` | Enable debug logging | ❌ |
-| `UPSTREAM_API_KEY` | API key for upstream services | ⚠️ |
+| Variable           | Description                         | Required |
+| ------------------ | ----------------------------------- | -------- |
+| `SERVICE_KEY`      | Service private key for DID signing | ✅       |
+| `CONFIG_PATH`      | Path to configuration file          | ❌       |
+| `PORT`             | Server port (default: 8088)         | ❌       |
+| `ENDPOINT`         | MCP endpoint path (default: /mcp)   | ❌       |
+| `DEBUG`            | Enable debug logging                | ❌       |
+| `UPSTREAM_API_KEY` | API key for upstream services       | ⚠️       |
 
 ### Docker Compose
 
@@ -527,6 +537,7 @@ docker-compose up -d
 ```
 
 The `docker-compose.yml` file includes:
+
 - ✅ **Complete configuration** with all environment variables
 - ✅ **Health checks** for service monitoring
 - ✅ **Multiple proxy instances examples** (Amap, Context7)
@@ -551,4 +562,4 @@ docker run -d -p 8088:8088 \
   -e SERVICE_KEY="your_service_key" \
   --name mcp-server-proxy \
   mcp-server-proxy
-``` 
+```

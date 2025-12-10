@@ -24,12 +24,12 @@ export function DepositToHubModal({
 }: DepositToHubModalProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const {
-    depositToHub,
-    isLoading,
-  } = useHubDepositWithdraw(agentDid);
+  const { depositToHub, isLoading } = useHubDepositWithdraw(agentDid);
 
-  const handleDeposit = async (_recipient: string, depositAmount: bigint): Promise<{ txHash?: string; success: boolean; error?: string }> => {
+  const handleDeposit = async (
+    _recipient: string,
+    depositAmount: bigint
+  ): Promise<{ txHash?: string; success: boolean; error?: string }> => {
     try {
       const result = await depositToHub(depositAmount, DEFAULT_ASSET_ID);
 
@@ -37,7 +37,10 @@ export function DepositToHubModal({
         toast({
           variant: 'success',
           title: t('transfer.depositSuccess', 'Deposit Successful'),
-          description: t('transfer.depositSuccessDescription', 'Successfully deposited RGAS to your Payment Hub'),
+          description: t(
+            'transfer.depositSuccessDescription',
+            'Successfully deposited RGAS to your Payment Hub'
+          ),
         });
         onSuccess?.();
         return { txHash: result.txHash, success: true };
@@ -64,7 +67,10 @@ export function DepositToHubModal({
       open={open}
       onClose={onClose}
       title={t('transfer.depositToHub', 'Deposit to Payment Hub')}
-      description={t('transfer.depositToHubDescription', 'Transfer RGAS from your account balance to Payment Hub')}
+      description={t(
+        'transfer.depositToHubDescription',
+        'Transfer RGAS from your account balance to Payment Hub'
+      )}
       agentDid={agentDid}
       currentBalance={currentAccountBalance}
       balanceLabel={t('transfer.availableAccountBalance', 'Available Account Balance')}

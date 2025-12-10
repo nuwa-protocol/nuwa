@@ -4,18 +4,18 @@ This package provides the official TypeScript/JavaScript SDK for the Nuwa Protoc
 
 ## Features
 
-*   Identity Management (NIP-1, NIP-2, NIP-3)
-*   Capability Handling (NIP-5)
-*   Payment Channel Interaction (NIP-4)
-*   Service Gateway Communication (NIP-6, NIP-7)
-*   Core utilities and type definitions.
+- Identity Management (NIP-1, NIP-2, NIP-3)
+- Capability Handling (NIP-5)
+- Payment Channel Interaction (NIP-4)
+- Service Gateway Communication (NIP-6, NIP-7)
+- Core utilities and type definitions.
 
 ## Structure (Monorepo - pnpm)
 
 This SDK is structured as a monorepo using pnpm workspaces. Key packages include:
 
-*   `packages/identity-kit`: Identity creation, authentication, and management.
-*   `packages/identity-kit-web`: Identity creation, authentication, and management for web.
+- `packages/identity-kit`: Identity creation, authentication, and management.
+- `packages/identity-kit-web`: Identity creation, authentication, and management for web.
 
 ## Installation
 
@@ -31,10 +31,12 @@ pnpm add @nuwa-ai/identity-kit
 (Instructions for setting up the development environment, building, and testing)
 
 ### Prerequisites
-*   Node.js (e.g., v18+)
-*   pnpm
+
+- Node.js (e.g., v18+)
+- pnpm
 
 ### Setup
+
 ```bash
 git clone <repository-url>
 cd nuwa-kit/typescript
@@ -43,6 +45,7 @@ pnpm run build
 ```
 
 ### Running Tests
+
 ```bash
 pnpm test
 ```
