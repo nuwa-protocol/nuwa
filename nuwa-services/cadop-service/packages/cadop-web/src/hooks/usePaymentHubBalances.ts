@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DEFAULT_ASSET_ID } from '@/config/env';
 import { usePaymentHubClient } from './usePaymentHubClient';
 
 export function usePaymentHubBalances(agentDid?: string | null) {
@@ -14,10 +15,10 @@ export function usePaymentHubBalances(agentDid?: string | null) {
     try {
       const [b, c] = await Promise.all([
         hubClient.getAllBalances(agentDid),
-        hubClient.getActiveChannelsCounts(agentDid),
+        hubClient.getActiveChannelCount(DEFAULT_ASSET_ID, agentDid),
       ]);
       setBalances(b);
-      setActiveCounts(c);
+      setActiveCounts({ [DEFAULT_ASSET_ID]: c });
       setError(null);
     } catch (e: any) {
       setError(e?.message || String(e));

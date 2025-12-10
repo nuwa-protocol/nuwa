@@ -13,6 +13,7 @@ import type {
   DepositParams,
   WithdrawParams,
 } from '../contracts/IPaymentChannelContract';
+import type { TransferToHubParams } from '../contracts/IPaymentChannelContract';
 import type { RateProvider } from '../billing/rate/types';
 import { ContractRateProvider } from '../billing/rate/contract';
 
@@ -137,13 +138,14 @@ export class PaymentHubClient {
   }
 
   /**
-   * Get active channels counts for all assets
+   * Get active channel count for an asset (defaults to client's default asset)
    */
-  async getActiveChannelsCounts(ownerDid?: string): Promise<Record<string, number>> {
+  async getActiveChannelCount(assetId?: string, ownerDid?: string): Promise<number> {
     if (!ownerDid) {
       ownerDid = await this.signer.getDid();
     }
-    return this.contract.getActiveChannelsCounts(ownerDid);
+    const targetAssetId = assetId || this.defaultAssetId;
+    return this.contract.getActiveChannelCount(ownerDid, targetAssetId);
   }
 
   /**
@@ -153,5 +155,42 @@ export class PaymentHubClient {
     const { requiredAmount = BigInt(0), ...balanceOptions } = options;
     const balance = await this.getBalance(balanceOptions);
     return balance >= requiredAmount;
+  }
+
+  /**
+   * Transfer funds from this hub to another address's payment hub
+   * @param recipientDid DID of the recipient
+   * @param assetId Asset to transfer
+   * @param amount Amount to transfer
+   * @returns Transaction hash
+   */
+  async transfer(
+    recipientDid: string,
+    assetId: string,
+    amount: bigint
+  ): Promise<{ txHash: string }> {
+    const senderDid = await this.signer.getDid();
+
+    const params: TransferToHubParams = {
+      senderDid,
+      receiverDid: recipientDid,
+      assetId,
+      amount,
+      signer: this.signer,
+    };
+
+    const result = await this.contract.transferToHub(params);
+    return { txHash: result.txHash };
+  }
+
+  /**
+   * Get unlocked balance (available for transfer) from this hub
+   * @param options Optional balance options
+   * @returns Unlocked balance amount
+   */
+  async getUnlockedBalance(options: BalanceOptions = {}): Promise<bigint> {
+    const ownerDid = options.ownerDid || (await this.signer.getDid());
+    const assetId = options.assetId || this.defaultAssetId;
+    return this.contract.getUnlockedBalance(ownerDid, assetId);
   }
 }

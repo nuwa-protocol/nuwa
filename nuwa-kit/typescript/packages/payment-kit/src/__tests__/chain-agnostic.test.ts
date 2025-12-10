@@ -12,6 +12,7 @@ import type {
   SubChannelInfo,
   SubChannelParams,
   OpenChannelWithSubChannelParams,
+  TransferToHubParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo } from '../core/types';
 import { PaymentChannelPayerClient } from '../client/PaymentChannelPayerClient';
@@ -128,12 +129,25 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     };
   }
 
-  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
-    // Mock active channels counts
+  async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
+    if (assetId === '0x3::gas_coin::RGas') return 3;
+    if (assetId === '0x3::stable_coin::USDC') return 1;
+    return 0;
+  }
+
+  async transferToHub(params: TransferToHubParams): Promise<any> {
+    // Mock transfer to hub - return success
     return {
-      '0x3::gas_coin::RGas': 3,
-      '0x3::stable_coin::USDC': 1,
+      txHash: '0xmock_transfer_hash',
+      blockHeight: BigInt(300),
+      events: [],
     };
+  }
+
+  async getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    // Mock unlocked balance - return 80% of total balance
+    const totalBalance = await this.getHubBalance(ownerDid, assetId);
+    return (totalBalance * 8n) / 10n; // 80% unlocked
   }
 }
 

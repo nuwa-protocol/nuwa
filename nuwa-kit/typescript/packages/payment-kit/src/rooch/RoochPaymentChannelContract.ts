@@ -32,9 +32,11 @@ import type {
   SubChannelInfo,
   DepositParams,
   WithdrawParams,
+  TransferToHubParams,
 } from '../contracts/IPaymentChannelContract';
 import type { AssetInfo, SignedSubRAV, SubRAV, ChannelInfo } from '../core/types';
 import { SubRAVCodec } from '../core/SubRav';
+import { parseDid } from '@nuwa-ai/identity-kit';
 import {
   calcChannelObjectId,
   normalizeAssetId,
@@ -47,19 +49,13 @@ import {
   parseDynamicFieldCoinStore,
   parseDynamicFieldU64,
   safeBalanceToBigint,
+  parseU256FromBCS,
   PaymentChannelData,
   PaymentHub,
   SubChannel,
   DynamicField,
   CoinStoreFieldData,
 } from './ChannelUtils';
-import {
-  DebugLogger,
-  SignerInterface,
-  DidAccountSigner,
-  parseDid,
-  isSignerInterface,
-} from '@nuwa-ai/identity-kit';
 import {
   badRequest,
   notFound,
@@ -99,7 +95,13 @@ const RGAS_CANONICAL_TAG: string =
 /**
  * Default contract address for Rooch payment channels
  */
-const DEFAULT_PAYMENT_CHANNEL_MODULE = '0x3::payment_channel';
+const PAYMENT_CHANNEL_MODULE = 'payment_channel';
+const DEFAULT_PAYMENT_CHANNEL_ADDRESS = '0x3';
+
+/**
+ * Default lock amount per channel (asset units, e.g. 1 RGAS)
+ */
+const DEFAULT_LOCK_AMOUNT_PER_CHANNEL = 1_000_000n;
 
 /**
  * Rooch implementation of the Payment Channel Contract
@@ -112,7 +114,12 @@ export class RoochPaymentChannelContract
   implements IPaymentChannelContract
 {
   constructor(options: RoochContractOptions = {}) {
-    super(options, DEFAULT_PAYMENT_CHANNEL_MODULE, 'RoochPaymentChannelContract');
+    // contractAddress here is address only; module appended per call
+    super(
+      { ...options, contractAddress: options.contractAddress || DEFAULT_PAYMENT_CHANNEL_ADDRESS },
+      DEFAULT_PAYMENT_CHANNEL_ADDRESS,
+      'RoochPaymentChannelContract'
+    );
   }
 
   async openChannel(params: OpenChannelParams): Promise<OpenChannelResult> {
@@ -135,7 +142,7 @@ export class RoochPaymentChannelContract
       // Create transaction to open channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::open_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::open_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier)],
         maxGas: 100000000,
@@ -195,7 +202,7 @@ export class RoochPaymentChannelContract
       // Create transaction to open channel with sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::open_channel_with_sub_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::open_channel_with_sub_channel_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(payeeParsed.identifier), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
@@ -242,7 +249,7 @@ export class RoochPaymentChannelContract
       // Create transaction to authorize sub-channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::authorize_sub_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::authorize_sub_channel_entry`,
         args: [Args.objectId(params.channelId), Args.string(params.vmIdFragment)],
         maxGas: 100000000,
       });
@@ -281,7 +288,7 @@ export class RoochPaymentChannelContract
       // Create transaction to claim from channel
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::claim_from_channel_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::claim_from_channel_entry`,
         args: [
           Args.objectId(subRav.channelId),
           Args.string(subRav.vmIdFragment),
@@ -333,14 +340,14 @@ export class RoochPaymentChannelContract
         const serializedProofs = CloseProofsSchema.serialize(params.closeProofs).toBytes();
 
         transaction.callFunction({
-          target: `${this.getContractAddress()}::close_channel_entry`,
+          target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::close_channel_entry`,
           args: [Args.objectId(params.channelId), Args.vec('u8', serializedProofs)],
           maxGas: 100000000,
         });
       } else {
         // Force close (initiate cancellation)
         transaction.callFunction({
-          target: `${this.getContractAddress()}::initiate_cancellation_entry`,
+          target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::initiate_cancellation_entry`,
           args: [Args.objectId(params.channelId)],
           maxGas: 100000000,
         });
@@ -518,7 +525,7 @@ export class RoochPaymentChannelContract
       // Create transaction to deposit to hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::deposit_to_hub_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::deposit_to_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.address(ownerParsed.identifier), Args.u256(params.amount)],
         maxGas: 100000000,
@@ -563,7 +570,7 @@ export class RoochPaymentChannelContract
       // Create transaction to withdraw from hub
       const transaction = this.createTransaction();
       transaction.callFunction({
-        target: `${this.getContractAddress()}::withdraw_from_hub_entry`,
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::withdraw_from_hub_entry`,
         typeArgs: [params.assetId], // CoinType as type argument
         args: [Args.u256(params.amount)],
         maxGas: 100000000,
@@ -741,76 +748,202 @@ export class RoochPaymentChannelContract
     }
   }
 
-  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
+  async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
     try {
-      this.getLogger().debug('Getting active channels counts for DID:', ownerDid);
+      this.getLogger().debug('Getting active channel count for DID:', ownerDid, 'asset:', assetId);
 
-      // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
         this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
-        return {};
+        return 0;
       }
 
-      this.getLogger().debug('Active channels table ID:', paymentHub.active_channels);
+      return await this.getActiveChannelCountFromHub(paymentHub, assetId);
+    } catch (error) {
+      this.getLogger().error('Error getting active channel count:', error);
+      return 0;
+    }
+  }
 
-      // List all field states in active_channels table to get all coin types and their counts
-      const channelCounts: Record<string, number> = {};
-      let cursor = null;
-      const pageSize = 100;
-
-      const fieldStates = await this.getClient().listFieldStates({
+  private async getActiveChannelCountFromHub(
+    paymentHub: PaymentHub,
+    assetId: string
+  ): Promise<number> {
+    try {
+      const fieldKey = deriveCoinTypeFieldKey(assetId);
+      const fieldStates = await this.getClient().getFieldStates({
         objectId: paymentHub.active_channels,
-        cursor,
-        limit: pageSize.toString(),
+        fieldKey: [fieldKey],
       });
 
-      if (!fieldStates || !fieldStates.data) {
-        return channelCounts;
+      if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
+        return 0;
       }
 
-      for (const state of fieldStates.data) {
-        try {
-          // Parse DynamicField<String, u64> for active channels counts
-          const fieldValue = state.state.value;
+      const fieldValue = fieldStates[0].value;
 
-          // Parse BCS bytes using DynamicFieldU64Schema
-          try {
-            //this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
-            const parsed = parseDynamicFieldU64(fieldValue);
-
-            //this.logger.debug('Parsed DynamicField:', parsed);
-
-            // Extract coin type and count from the parsed data
-            const coinType = parsed.name;
-            const count = parsed.value;
-
-            if (coinType && count > 0) {
-              channelCounts[coinType] = count;
-            }
-          } catch (parseError) {
-            this.getLogger().warn('Failed to parse u64 BCS data:', parseError);
-            continue;
-          }
-        } catch (parseError) {
-          this.getLogger().warn(
-            'Failed to parse field state for active channels count:',
-            parseError
-          );
-          continue;
+      try {
+        if (typeof fieldValue === 'string') {
+          const parsed = parseDynamicFieldU64(fieldValue);
+          return parsed.value;
         }
+
+        if (fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue) {
+          const parsedValue = (fieldValue as any).value;
+          if (typeof parsedValue === 'number') {
+            return parsedValue;
+          }
+          if (typeof parsedValue === 'bigint') {
+            return Number(parsedValue);
+          }
+          if (typeof parsedValue === 'string') {
+            return Number(parsedValue);
+          }
+        }
+      } catch (parseError) {
+        this.getLogger().warn('Failed to parse active channel count field:', parseError);
+        return 0;
       }
 
-      // if (!fieldStates.has_next_page) {
-      //   break;
-      // }
-      // cursor = fieldStates.next_cursor;
-
-      return channelCounts;
+      return 0;
     } catch (error) {
-      this.getLogger().error('Error getting active channels counts:', error);
-      // Return empty object instead of throwing
-      return {};
+      this.getLogger().error('Error querying active channel count from hub:', error);
+      return 0;
+    }
+  }
+
+  private async getLockedUnit(assetId: string): Promise<bigint> {
+    try {
+      const normalizedAssetId = normalizeAssetId(assetId);
+      const result = await this.getClient().executeViewFunction({
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::get_locked_unit`,
+        args: [Args.string(normalizedAssetId)],
+      });
+
+      const rv = (result as any)?.return_values?.[0];
+      const decoded = rv?.decoded_value ?? rv?.value;
+
+      if (typeof decoded === 'bigint') {
+        return decoded;
+      }
+      if (typeof decoded === 'number') {
+        return BigInt(decoded);
+      }
+      if (typeof decoded === 'string') {
+        if (decoded.startsWith('0x')) {
+          return parseU256FromBCS(decoded);
+        }
+        return BigInt(decoded);
+      }
+
+      return DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
+    } catch (error) {
+      this.getLogger().warn('Failed to fetch locked unit from view, using default', error);
+      return DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
+    }
+  }
+
+  /**
+   * Transfer funds from sender's payment hub to receiver's payment hub
+   * Calls the payment_channel::transfer_to_hub_entry function
+   */
+  async transferToHub(params: TransferToHubParams): Promise<TxResult> {
+    try {
+      this.getLogger().debug('Transferring from hub to hub:', {
+        senderDid: params.senderDid,
+        receiverDid: params.receiverDid,
+        assetId: params.assetId,
+        amount: params.amount.toString(),
+      });
+
+      // Validate parameters
+      const { senderDid, receiverDid, assetId, amount, signer } = params;
+
+      // Parse sender DID for method validation
+      const senderParsed = parseDid(senderDid);
+      if (senderParsed.method !== 'rooch') {
+        throw badRequest(
+          `Invalid sender DID method: expected 'rooch', got '${senderParsed.method}'`
+        );
+      }
+
+      // Parse receiver DID and convert to address
+      const receiverParsed = parseDid(receiverDid);
+      if (receiverParsed.method !== 'rooch') {
+        throw badRequest(
+          `Invalid receiver DID method: expected 'rooch', got '${receiverParsed.method}'`
+        );
+      }
+      const receiverAddress = receiverParsed.identifier;
+
+      // Convert signer to Rooch signer
+      const roochSigner = await this.convertSigner(signer);
+
+      // Create transaction
+      const tx = this.createTransaction();
+
+      // Call the payment_channel::transfer_to_hub_entry function
+      tx.callFunction({
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::transfer_to_hub_entry`,
+        typeArgs: [assetId],
+        args: [Args.address(receiverAddress), Args.u256(amount)],
+        maxGas: 100000000,
+      });
+
+      // Execute the transaction
+      const result = await this.getClient().signAndExecuteTransaction({
+        transaction: tx,
+        signer: roochSigner,
+      });
+
+      // Check if the transaction was successful
+      if (result.execution_info.status.type !== 'executed') {
+        throw mapTxFailureToPaymentKitError('transferToHub', result.execution_info);
+      }
+
+      const txHash = result.execution_info.tx_hash || '';
+      this.getLogger().debug('Hub transfer completed:', { txHash });
+
+      return { txHash };
+    } catch (error) {
+      this.getLogger().error('Error transferring from hub to hub:', error);
+      throw wrapUnknownError('transferToHub', error);
+    }
+  }
+
+  /**
+   * Get unlocked balance in payment hub (excluding locked amounts for active channels)
+   * This calculates the available balance by subtracting locked amounts from total balance
+   */
+  async getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint> {
+    try {
+      this.getLogger().debug('Getting unlocked balance:', { ownerDid, assetId });
+
+      // Get total balance
+      const totalBalance = await this.getHubBalance(ownerDid, assetId);
+
+      // Get active channels count for this asset
+      const activeChannelsCount = await this.getActiveChannelCount(ownerDid, assetId);
+
+      // Fetch per-coin locked unit from Move view; fallback to default if unavailable
+      const lockAmountPerChannel = await this.getLockedUnit(assetId);
+
+      const lockedBalance = BigInt(activeChannelsCount) * lockAmountPerChannel;
+      const unlockedBalance =
+        totalBalance > lockedBalance ? totalBalance - lockedBalance : BigInt(0);
+
+      this.getLogger().debug('Unlocked balance calculated:', {
+        totalBalance: totalBalance.toString(),
+        activeChannelsCount,
+        lockedBalance: lockedBalance.toString(),
+        unlockedBalance: unlockedBalance.toString(),
+      });
+
+      return unlockedBalance;
+    } catch (error) {
+      this.getLogger().error('Error getting unlocked balance:', error);
+      // Return 0 instead of throwing to be more graceful
+      return BigInt(0);
     }
   }
 

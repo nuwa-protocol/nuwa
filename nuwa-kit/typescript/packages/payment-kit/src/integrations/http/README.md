@@ -182,12 +182,10 @@ getChannelId(): string | undefined
 ### 2. 请求流程
 
 1. **准备 Header**：
-
    - 添加 DIDAuth 认证头（如果配置了 `payerDid` 和 `keyManager`）
    - 添加支付通道数据头
 
 2. **生成支付数据**：
-
    - 首次请求：创建握手 SubRAV（nonce=0, amount=0）
    - 后续请求：签名服务器提供的 unsigned SubRAV
 

@@ -217,11 +217,27 @@ export interface IPaymentChannelContract {
   getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>>;
 
   /**
-   * Get active channels count in payment hub for all assets
+   * Get active channel count for a specific asset in payment hub
    * @param ownerDid Owner DID of the hub
-   * @returns Record mapping asset IDs to active channel counts
+   * @param assetId Asset identifier
+   * @returns Active channel count for the asset
    */
-  getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>>;
+  getActiveChannelCount(ownerDid: string, assetId: string): Promise<number>;
+
+  /**
+   * Transfer funds from sender's payment hub to receiver's payment hub
+   * @param params Transfer parameters including sender DID, receiver DID, asset, amount, and signer
+   * @returns Transaction result
+   */
+  transferToHub(params: TransferToHubParams): Promise<TxResult>;
+
+  /**
+   * Get unlocked balance in payment hub (excluding locked amounts for active channels)
+   * @param ownerDid Owner DID of the hub
+   * @param assetId Asset identifier
+   * @returns Unlocked balance amount
+   */
+  getUnlockedBalance(ownerDid: string, assetId: string): Promise<bigint>;
 }
 
 // -------- PaymentHub Type Alias --------
@@ -236,7 +252,7 @@ export type IPaymentHubContract = Pick<
   | 'withdrawFromHub'
   | 'getHubBalance'
   | 'getAllHubBalances'
-  | 'getActiveChannelsCounts'
+  | 'getActiveChannelCount'
 >;
 
 // -------- PaymentHub Parameters --------
@@ -267,6 +283,22 @@ export interface WithdrawParams {
   amount: bigint;
   /** Optional recipient address/DID (defaults to owner's account) */
   recipient?: string;
+  /** Signer for the transaction */
+  signer: SignerInterface;
+}
+
+/**
+ * Parameters for transferring funds from one payment hub to another
+ */
+export interface TransferToHubParams {
+  /** Sender DID (source hub owner) */
+  senderDid: string;
+  /** Receiver DID (destination hub owner) */
+  receiverDid: string;
+  /** Asset information */
+  assetId: string;
+  /** Amount to transfer */
+  amount: bigint;
   /** Signer for the transaction */
   signer: SignerInterface;
 }

@@ -196,13 +196,11 @@ SELECT * FROM test_ravs LIMIT 5;
 ### Common Issues
 
 1. **Database connection timeout**:
-
    - Ensure PostgreSQL is running
    - Check firewall and network settings
    - Verify connection parameters
 
 2. **Permission errors**:
-
    - Ensure database user has CREATE/DROP privileges
    - Check password authentication
 

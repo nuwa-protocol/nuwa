@@ -69,25 +69,21 @@ npm run test:e2e
 ### Test Scenarios
 
 1. **Complete HTTP deferred payment flow**
-
    - First request (no payment, receives SubRAV proposal)
    - Subsequent requests (pays for previous, receives new proposal)
    - Multiple requests to trigger auto-claim
 
 2. **Mixed request types with different pricing**
-
    - Echo requests (cheaper: 0.001 RGas)
    - Process requests (expensive: 0.01 RGas)
    - Pricing consistency validation
 
 3. **Auto-claim threshold behavior**
-
    - Amount-based auto-claim (0.5 RGas threshold)
    - Nonce-based auto-claim (5 requests threshold)
    - Blockchain state verification
 
 4. **Error handling**
-
    - Invalid payment data
    - Server health checks
    - Admin endpoint access
@@ -133,13 +129,11 @@ This model provides:
 ### Common Issues
 
 1. **Tests skip/timeout**:
-
    - Ensure `PAYMENT_E2E=1` is set
    - Verify Rooch node is running and accessible
    - Check network connectivity
 
 2. **Payment channel errors**:
-
    - Ensure test accounts have sufficient balance
    - Check if previous test runs left channels in inconsistent state
    - Verify DID creation and key management

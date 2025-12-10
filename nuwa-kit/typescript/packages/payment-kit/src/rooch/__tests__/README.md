@@ -19,7 +19,6 @@ This file contains end-to-end integration tests that verify the complete payment
 **Test Coverage:**
 
 1. **Asset Information Tests:**
-
    - `should get asset info for RGas` - Verifies asset metadata retrieval
    - `should get asset price for RGas` - Validates asset pricing in pUSD
    - **`should get chain ID`** - NEW: Tests chain ID retrieval from the blockchain
@@ -34,12 +33,10 @@ This file contains end-to-end integration tests that verify the complete payment
 This test verifies the complete claim process:
 
 1. **Setup Phase:**
-
    - Opens a payment channel between payer and payee
    - Authorizes a sub-channel for the payer
 
 2. **SubRAV Creation:**
-
    - Creates a SubRAV (Sub-channel Receipt And Voucher) with:
      - Version: 1 (current protocol version)
      - Chain ID: dynamically retrieved from `contract.getChainId()` (improved from hardcoded value)
@@ -50,12 +47,10 @@ This test verifies the complete claim process:
      - Nonce: 1
 
 3. **Signing Process:**
-
    - Gets the payer's key ID from the key manager
    - Signs the SubRAV using `SubRAVSigner.sign()`
 
 4. **Claim Execution:**
-
    - Creates claim parameters with the signed SubRAV
    - Uses the payee's signer for the claim transaction (correct workflow)
    - Calls `contract.claimFromChannel()`

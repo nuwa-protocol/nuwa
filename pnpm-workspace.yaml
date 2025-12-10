@@ -5,6 +5,8 @@ packages:
   - 'nuwa-kit/typescript/examples/*'
   # nuwa-services
   - 'nuwa-services/*'
+  # cadop-service sub-packages (web/shared/api)
+  - 'nuwa-services/cadop-service/packages/*'
   # Exclusions
   - '!nuwa-kit/typescript/packages/nuwa-client'
   - '!nuwa-kit/typescript/packages/indexer'
