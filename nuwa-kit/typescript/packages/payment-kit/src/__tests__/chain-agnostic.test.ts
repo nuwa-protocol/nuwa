@@ -129,17 +129,10 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     };
   }
 
-  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
-    // Mock active channels counts
-    return {
-      '0x3::gas_coin::RGas': 3,
-      '0x3::stable_coin::USDC': 1,
-    };
-  }
-
   async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
-    const counts = await this.getActiveChannelsCounts(ownerDid);
-    return counts[assetId] ?? 0;
+    if (assetId === '0x3::gas_coin::RGas') return 3;
+    if (assetId === '0x3::stable_coin::USDC') return 1;
+    return 0;
   }
 
   async transferToHub(params: TransferToHubParams): Promise<any> {

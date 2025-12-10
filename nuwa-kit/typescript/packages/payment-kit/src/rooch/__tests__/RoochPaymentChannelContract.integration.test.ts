@@ -176,34 +176,6 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       );
     });
 
-    it('should get active channels counts', async () => {
-      if (!shouldRunIntegrationTests()) return;
-
-      // First fund the hub and open some channels
-      await fundPayerHub();
-      await openTestChannel();
-
-      // Get active channels counts
-      const channelCounts = await contract.getActiveChannelsCounts(payer.did);
-
-      expect(channelCounts).toBeDefined();
-      expect(typeof channelCounts).toBe('object');
-
-      // Should have at least one active channel for RGas
-      const normalizedAssetId = normalizeAssetId(testAsset.assetId);
-      if (channelCounts[normalizedAssetId]) {
-        expect(channelCounts[normalizedAssetId]).toBeGreaterThan(0);
-        expect(typeof channelCounts[normalizedAssetId]).toBe('number');
-      }
-
-      console.log(
-        `Active channels counts retrieved:
-        Owner DID: ${payer.did}
-        Channel Counts:`,
-        channelCounts
-      );
-    });
-
     it('should get active channel count by asset id', async () => {
       if (!shouldRunIntegrationTests()) return;
 
@@ -276,8 +248,8 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const allBalances = await contract.getAllHubBalances(payer.did);
       expect(Object.keys(allBalances).length).toBeGreaterThan(0);
 
-      // Test getActiveChannelsCounts - this will exercise DynamicField<String, u64> parsing
-      const channelCounts = await contract.getActiveChannelsCounts(payer.did);
+      // Test getActiveChannelCount - this will exercise DynamicField<String, u64> parsing
+      const channelCount = await contract.getActiveChannelCount(payer.did, testAsset.assetId);
 
       // Log detailed parsing results for verification
       console.log(`PaymentHub BCS parsing verification:
@@ -287,7 +259,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
           (key, value) => (typeof value === 'bigint' ? value.toString() : value),
           2
         )}
-        Channel counts: ${JSON.stringify(channelCounts, null, 2)}`);
+        Active channel count: ${channelCount}`);
 
       // Verify consistency between single and batch balance queries
       const normalizedAssetId = normalizeAssetId(testAsset.assetId);
@@ -312,13 +284,13 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const allBalances = await contract.getAllHubBalances(emptyPayer.did);
       expect(allBalances).toEqual({});
 
-      const channelCounts = await contract.getActiveChannelsCounts(emptyPayer.did);
-      expect(channelCounts).toEqual({});
+      const activeCount = await contract.getActiveChannelCount(emptyPayer.did, testAsset.assetId);
+      expect(activeCount).toBe(0);
 
       console.log(`Empty hub handling verified:
         Balance: ${balance}
         All balances: ${JSON.stringify(allBalances)}
-        Channel counts: ${JSON.stringify(channelCounts)}`);
+        Active channel count: ${activeCount}`);
     });
 
     it('should test PaymentHubClient integration', async () => {
@@ -352,9 +324,9 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       }); // 100 RGas
       expect(hasInsufficientBalance).toBe(false);
 
-      // Open a channel to test getActiveChannelsCounts
+      // Open a channel to test getActiveChannelCount
       await openTestChannel();
-      const channelCounts = await hubClient.getActiveChannelsCounts();
+      const channelCount = await hubClient.getActiveChannelCount();
 
       console.log(`PaymentHubClient integration test results:
         Deposit Amount: ${depositAmount}
@@ -366,7 +338,7 @@ describe('RoochPaymentChannelContract Integration Test', () => {
         )}
         Has Enough Balance (1 RGas): ${hasEnoughBalance}
         Has Insufficient Balance (100 RGas): ${hasInsufficientBalance}
-        Active Channels Counts: ${JSON.stringify(channelCounts, null, 2)}`);
+        Active Channel Count: ${channelCount}`);
     });
   });
 

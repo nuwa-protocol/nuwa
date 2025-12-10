@@ -120,23 +120,17 @@ describe('PaymentHubClient', () => {
     });
   });
 
-  describe('getActiveChannelsCounts', () => {
-    it('should get active channels counts for all assets', async () => {
-      const counts = await hubClient.getActiveChannelsCounts();
+  describe('getActiveChannelCount', () => {
+    it('should get active channel count for default asset', async () => {
+      const count = await hubClient.getActiveChannelCount();
 
-      expect(counts).toEqual({
-        '0x3::gas_coin::RGas': 2,
-        '0x3::stable_coin::USDC': 1,
-      });
+      expect(count).toBe(2);
     });
 
     it('should support different owner DID', async () => {
-      const counts = await hubClient.getActiveChannelsCounts('did:rooch:0x456');
+      const count = await hubClient.getActiveChannelCount(assetId, 'did:rooch:0x456');
 
-      expect(counts).toEqual({
-        '0x3::gas_coin::RGas': 2,
-        '0x3::stable_coin::USDC': 1,
-      });
+      expect(count).toBe(2);
     });
   });
 

@@ -908,7 +908,7 @@ const hubBalance = await paymentHubClient.getBalance({
 const unlockedBalance = await contract.getUnlockedBalance(ownerDid, assetId);
 
 // Active Channels
-const activeCounts = await contract.getActiveChannelsCounts(ownerDid);
+const activeCount = await contract.getActiveChannelCount(ownerDid, assetId);
 ```
 
 ### 6.3 DID 和地址转换

@@ -149,17 +149,6 @@ export class PaymentHubClient {
   }
 
   /**
-   * Get active channels counts for all assets
-   * Note: for single-asset usage, prefer getActiveChannelCount to avoid extra aggregation.
-   */
-  async getActiveChannelsCounts(ownerDid?: string): Promise<Record<string, number>> {
-    if (!ownerDid) {
-      ownerDid = await this.signer.getDid();
-    }
-    return this.contract.getActiveChannelsCounts(ownerDid);
-  }
-
-  /**
    * Check if hub has sufficient balance for a payment
    */
   async hasBalance(options: HasBalanceOptions = {}): Promise<boolean> {

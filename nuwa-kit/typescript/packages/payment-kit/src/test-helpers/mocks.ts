@@ -143,17 +143,11 @@ export class MockContract implements IPaymentChannelContract {
     return balances;
   }
 
-  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
-    // Mock implementation - return some test data
-    return {
-      '0x3::gas_coin::RGas': 2,
-      '0x3::stable_coin::USDC': 1,
-    };
-  }
-
   async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
-    const counts = await this.getActiveChannelsCounts(ownerDid);
-    return counts[assetId] ?? 0;
+    // Mock implementation - simple deterministic count
+    if (assetId === '0x3::gas_coin::RGas') return 2;
+    if (assetId === '0x3::stable_coin::USDC') return 1;
+    return 0;
   }
 
   async getChannelStatus(params: { channelId: string }): Promise<ChannelInfo> {

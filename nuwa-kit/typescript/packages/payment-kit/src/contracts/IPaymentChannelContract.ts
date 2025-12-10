@@ -217,13 +217,6 @@ export interface IPaymentChannelContract {
   getAllHubBalances(ownerDid: string): Promise<Record<string, bigint>>;
 
   /**
-   * Get active channels count in payment hub for all assets
-   * @param ownerDid Owner DID of the hub
-   * @returns Record mapping asset IDs to active channel counts
-   */
-  getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>>;
-
-  /**
    * Get active channel count for a specific asset in payment hub
    * @param ownerDid Owner DID of the hub
    * @param assetId Asset identifier
@@ -260,7 +253,6 @@ export type IPaymentHubContract = Pick<
   | 'getHubBalance'
   | 'getAllHubBalances'
   | 'getActiveChannelCount'
-  | 'getActiveChannelsCounts'
 >;
 
 // -------- PaymentHub Parameters --------

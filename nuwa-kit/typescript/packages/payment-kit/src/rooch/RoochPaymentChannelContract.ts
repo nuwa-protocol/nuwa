@@ -748,57 +748,6 @@ export class RoochPaymentChannelContract
     }
   }
 
-  async getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>> {
-    try {
-      this.getLogger().debug('Getting active channels counts for DID:', ownerDid);
-
-      const paymentHub = await this.getPaymentHub(ownerDid);
-      if (!paymentHub) {
-        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
-        return {};
-      }
-
-      // Primary path: list the active_channels table directly so we don't depend on multi_coin_store entries.
-      const countsFromTable = await this.listActiveChannelCounts(paymentHub.active_channels);
-      if (Object.keys(countsFromTable).length > 0) {
-        return countsFromTable;
-      }
-
-      // Fallback: derive coin types from balances and query per-asset
-      const coinTypes = await this.listHubCoinTypes(paymentHub);
-      if (coinTypes.length === 0) {
-        return {};
-      }
-
-      const results = await Promise.allSettled(
-        coinTypes.map(async coinType => ({
-          coinType,
-          count: await this.getActiveChannelCountFromHub(paymentHub, coinType),
-        }))
-      );
-
-      const channelCounts: Record<string, number> = {};
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          const { coinType, count } = result.value;
-          if (count > 0) {
-            channelCounts[coinType] = count;
-          }
-        } else {
-          this.getLogger().warn(
-            'Failed to fetch active channel count for coin type',
-            result.reason
-          );
-        }
-      }
-
-      return channelCounts;
-    } catch (error) {
-      this.getLogger().error('Error getting active channels counts:', error);
-      return {};
-    }
-  }
-
   async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
     try {
       this.getLogger().debug('Getting active channel count for DID:', ownerDid, 'asset:', assetId);
@@ -863,77 +812,6 @@ export class RoochPaymentChannelContract
     }
   }
 
-  private async listActiveChannelCounts(tableId: string): Promise<Record<string, number>> {
-    const channelCounts: Record<string, number> = {};
-    let cursor: string | null = null;
-    const pageSize = 100;
-
-    while (true) {
-      const fieldStates = await this.getClient().listFieldStates({
-        objectId: tableId,
-        cursor,
-        limit: pageSize.toString(),
-      });
-
-      if (!fieldStates || !fieldStates.data || fieldStates.data.length === 0) {
-        break;
-      }
-
-      for (const state of fieldStates.data) {
-        try {
-          const fieldValue = state.state.value;
-          const parsed = this.parseActiveChannelFieldValue(fieldValue);
-          if (parsed && parsed.coinType && parsed.count > 0) {
-            channelCounts[parsed.coinType] = parsed.count;
-          }
-        } catch (parseError) {
-          this.getLogger().warn('Failed to parse active channel field state:', parseError);
-          continue;
-        }
-      }
-
-      if (!fieldStates.has_next_page) {
-        break;
-      }
-      cursor = fieldStates.next_cursor ?? null;
-    }
-
-    return channelCounts;
-  }
-
-  private parseActiveChannelFieldValue(
-    fieldValue: unknown
-  ): { coinType: string; count: number } | null {
-    // BCS hex string path
-    if (typeof fieldValue === 'string') {
-      const parsed = parseDynamicFieldU64(fieldValue);
-      return { coinType: parsed.name, count: parsed.value };
-    }
-
-    // Decoded object path (when decode=true)
-    if (fieldValue && typeof fieldValue === 'object') {
-      const valueObj = (fieldValue as any).value ?? (fieldValue as any);
-      const name = valueObj.name;
-      const val = valueObj.value;
-      if (typeof name === 'string' && val !== undefined) {
-        if (typeof val === 'number') {
-          return { coinType: name, count: val };
-        }
-        if (typeof val === 'bigint') {
-          return { coinType: name, count: Number(val) };
-        }
-        if (typeof val === 'string') {
-          const num = Number(val);
-          if (!Number.isNaN(num)) {
-            return { coinType: name, count: num };
-          }
-        }
-      }
-    }
-
-    return null;
-  }
-
   private async getLockedUnit(assetId: string): Promise<bigint> {
     try {
       const normalizedAssetId = normalizeAssetId(assetId);
@@ -963,43 +841,6 @@ export class RoochPaymentChannelContract
       this.getLogger().warn('Failed to fetch locked unit from view, using default', error);
       return DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
     }
-  }
-
-  private async listHubCoinTypes(paymentHub: PaymentHub): Promise<string[]> {
-    const coinTypes = new Set<string>();
-    let cursor: string | null = null;
-    const pageSize = 100;
-
-    while (true) {
-      const fieldStates = await this.getClient().listFieldStates({
-        objectId: paymentHub.multi_coin_store,
-        cursor,
-        limit: pageSize.toString(),
-      });
-
-      if (!fieldStates || !fieldStates.data || fieldStates.data.length === 0) {
-        break;
-      }
-
-      for (const state of fieldStates.data) {
-        try {
-          const parsed = parseDynamicFieldCoinStore(state.state.value);
-          if (parsed.name) {
-            coinTypes.add(parsed.name);
-          }
-        } catch (parseError) {
-          this.getLogger().warn('Failed to parse coin type from multi_coin_store:', parseError);
-          continue;
-        }
-      }
-
-      if (!fieldStates.has_next_page) {
-        break;
-      }
-      cursor = fieldStates.next_cursor ?? null;
-    }
-
-    return Array.from(coinTypes);
   }
 
   /**
