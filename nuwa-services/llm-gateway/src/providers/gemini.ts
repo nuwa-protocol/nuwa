@@ -1,7 +1,13 @@
 import axios, { AxiosResponse } from 'axios';
 import { Request } from 'express';
 import { BaseLLMProvider } from './BaseLLMProvider.js';
-import { TestableLLMProvider, StreamExtractor, StreamExtractionResult, ModelExtractor, ModelExtractionResult } from './LLMProvider.js';
+import {
+  TestableLLMProvider,
+  StreamExtractor,
+  StreamExtractionResult,
+  ModelExtractor,
+  ModelExtractionResult,
+} from './LLMProvider.js';
 import { UsageExtractor } from '../billing/usage/interfaces/UsageExtractor.js';
 import { StreamProcessor } from '../billing/usage/interfaces/StreamProcessor.js';
 import { GeminiUsageExtractor } from '../billing/usage/providers/GeminiUsageExtractor.js';
@@ -387,7 +393,9 @@ class GeminiModelExtractor implements ModelExtractor {
     // Pattern to match: /v1/models/{model}:generateContent or :streamGenerateContent
     // Matches both /v1/ and /v1beta/ prefixes
     // Note: streamGenerateContent has uppercase 'G', while generateContent has lowercase 'g'
-    const modelMatch = path.match(/\/v1(?:beta)?\/models\/([^:]+):(streamGenerateContent|generateContent)/);
+    const modelMatch = path.match(
+      /\/v1(?:beta)?\/models\/([^:]+):(streamGenerateContent|generateContent)/
+    );
 
     if (modelMatch && modelMatch[1]) {
       return {

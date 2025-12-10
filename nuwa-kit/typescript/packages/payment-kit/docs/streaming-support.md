@@ -7,7 +7,6 @@
 ### 背景与现状分析
 
 - 服务端（`transport/express/ExpressPaymentKit.ts`）
-
   - 当前通过 `on-headers` 在响应头写出前同步写入支付协议头（`X-Payment-Channel-Data`）。
   - 计费单元 `units` 由 `res.locals.usage` 提供，并在 `on-headers` 钩子中调用 `middleware.settleBillingSync(billingContext, units, resAdapter)` 完成结算头写入；响应结束后（`res.on('finish')`）若存在待持久化的 Proposal 则落库。
   - 对于流式输出，使用量在首包时尚未知，导致“必须在写 headers 前得出费用”的假设不成立。
@@ -251,7 +250,6 @@ export function stripPaymentFrames(resp: Response, mode: 'sse' | 'ndjson'): Resp
 ### 路由与配置变更建议
 
 - `RouteOptions` 新增：
-
   - `streaming?: boolean`（标识路由是流式输出；用于服务端禁用 `on-headers` 写入策略）
 
 - `ExpressPaymentKitOptions` 新增：
@@ -327,14 +325,12 @@ const { payment } = await handle.done; // data: Response, payment: PaymentInfo |
 ### 实施清单（按优先级）
 
 1. 服务端：
-
    - 在 `ExpressPaymentKit.ts` 增加 `streaming` 分支：禁用 `on-headers` 写头，改为 `finish/close` 时结算并持久化。
    - 新增 `SettlementRepository` 接口与实现（Memory + SQL）。
    - 增加内置路由 `GET {basePath}/payments/:clientTxRef`。
    - 提供 `createStreamBillingHelpers(res)` 的最小实现，封装使用量累加与 finalize。
 
 2. 客户端：
-
    - `PaymentChannelHttpClient.ts` 在 `handleResponse()` 无协议头且判断为流式时，启动对 `/payments/:clientTxRef` 的后台轮询（指数退避，受 `timeoutMs` 约束）。
    - 成功后按现有成功分支处理，失败/超时按现有 onError 处理。
    - 可选：支持解析“流内支付帧”。

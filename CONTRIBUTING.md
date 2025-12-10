@@ -28,6 +28,7 @@ If you're unable to find an open issue addressing the problem, [open a new one](
 ### Suggesting Enhancements
 
 If you have an idea for an enhancement or a new feature, please outline your proposal in a GitHub issue.
+
 - Provide a clear and detailed explanation of the feature.
 - Explain why this enhancement would be useful to Nuwa users and is consistent with the project's goals.
 - If possible, provide examples of how the feature might be used.
@@ -37,6 +38,7 @@ For significant protocol changes or new features, please refer to the [Nuwa Impr
 ### Your First Code Contribution
 
 Unsure where to begin contributing to Nuwa? You can start by looking through these `good first issue` and `help wanted` issues:
+
 - [Good first issues](https://github.com/nuwa-protocol/nuwa/labels/good%20first%20issue) - issues which should only require a few lines of code, and a test or two.
 - [Help wanted issues](https://github.com/nuwa-protocol/nuwa/labels/help%20wanted) - issues which should be a bit more involved than `good first issues`.
 
@@ -58,19 +60,20 @@ Unsure where to begin contributing to Nuwa? You can start by looking through the
 The Nuwa project is a monorepo containing multiple components (smart contracts, SDKs, services) written in different languages (Move, TypeScript, Python, Rust, etc.).
 
 Please refer to the `README.md` file within the specific subdirectory you are working on for detailed setup instructions. For example:
--   For Move smart contracts, see `contracts/move/README.md`.
--   For TypeScript SDKs/services, see `nuwa-kit/typescript/README.md`.
--   For Python components, see `nuwa-kit/python/README.md`.
+
+- For Move smart contracts, see `contracts/move/README.md`.
+- For TypeScript SDKs/services, see `nuwa-kit/typescript/README.md`.
+- For Python components, see `nuwa-kit/python/README.md`.
 
 Generally, you will need the relevant toolchains for the language you are working with.
 
 ## Coding Guidelines
 
--   **Consistency:** Try to maintain consistency with the existing codebase.
--   **Clarity:** Write clear, understandable, and maintainable code. Add comments where necessary to explain complex logic.
--   **Testing:** All contributions should include tests.
--   **Linting & Formatting:** Ensure your code adheres to the project's linting and formatting standards. We use tools like ESLint/Prettier for TypeScript, Black/Flake8 for Python, and `cargo fmt` for Rust. Configuration files for these tools are typically found in the respective subdirectories.
--   **Commit Messages:** Follow the [Conventional Commits](https://www.conventionalcommits.org/) style.
+- **Consistency:** Try to maintain consistency with the existing codebase.
+- **Clarity:** Write clear, understandable, and maintainable code. Add comments where necessary to explain complex logic.
+- **Testing:** All contributions should include tests.
+- **Linting & Formatting:** Ensure your code adheres to the project's linting and formatting standards. We use tools like ESLint/Prettier for TypeScript, Black/Flake8 for Python, and `cargo fmt` for Rust. Configuration files for these tools are typically found in the respective subdirectories.
+- **Commit Messages:** Follow the [Conventional Commits](https://www.conventionalcommits.org/) style.
 
 ## Nuwa Improvement Proposals (NIPs)
 

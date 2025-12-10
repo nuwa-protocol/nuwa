@@ -293,12 +293,10 @@ class MockContract implements IPaymentChannelContract {
 ### 常见问题
 
 1. **汇率获取失败**
-
    - 检查合约 `getAssetPrice()` 实现
    - 确认链上 oracle 正常工作
 
 2. **价格计算异常**
-
    - 验证资产精度配置
    - 检查 picoUSD 单位使用
 

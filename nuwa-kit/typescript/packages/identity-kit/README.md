@@ -8,12 +8,12 @@
 
 ## ✨ Features
 
-* **Easy bootstrap** – A single `IdentityKit.bootstrap()` call bootstraps the KeyStore, VDR, and other building blocks.
-* **NIP-1 compliant** – Full coverage of DID Document lifecycle: master key, operational keys, service declarations, etc.
-* **Pluggable architecture** – VDR plugins for `did:key`, `did:rooch`, and custom methods.
-* **Browser friendly** – Built-in `LocalStorage` / `IndexedDB` KeyStores while still compatible with Node.js / Deno.
-* **Type-safe** – 100 % TypeScript with rich type definitions.
-* **Test helpers** – Integrated testing utilities for Rooch DID integration tests.
+- **Easy bootstrap** – A single `IdentityKit.bootstrap()` call bootstraps the KeyStore, VDR, and other building blocks.
+- **NIP-1 compliant** – Full coverage of DID Document lifecycle: master key, operational keys, service declarations, etc.
+- **Pluggable architecture** – VDR plugins for `did:key`, `did:rooch`, and custom methods.
+- **Browser friendly** – Built-in `LocalStorage` / `IndexedDB` KeyStores while still compatible with Node.js / Deno.
+- **Type-safe** – 100 % TypeScript with rich type definitions.
+- **Test helpers** – Integrated testing utilities for Rooch DID integration tests.
 
 ## 📦 Installation
 
@@ -74,11 +74,11 @@ function MyComponent() {
   const { state, connect, sign } = useIdentityKit({
     appName: 'My App'
   });
-  
+
   if (!state.isConnected) {
     return <button onClick={connect}>Connect</button>;
   }
-  
+
   return <div>Connected as: {state.agentDid}</div>;
 }
 ```
@@ -92,18 +92,15 @@ function MyComponent() {
 const doc = kit.getDIDDocument();
 
 // Add a new device key
-await kit.addVerificationMethod(
-  { keyType: KeyType.ECDSA_SECP256K1 },
-  ['authentication'],
-);
+await kit.addVerificationMethod({ keyType: KeyType.ECDSA_SECP256K1 }, ['authentication']);
 
 // Sign data using DIDAuth v1 (NIP-2)
 import { DIDAuth } from '@nuwa-ai/identity-kit';
 
 const sig = await DIDAuth.v1.createSignature(
   { operation: 'example', params: { message: 'hello' } },
-  env.keyManager,                  // SignerInterface (reuse env KeyManager)
-  doc.verificationMethod![0].id    // keyId
+  env.keyManager, // SignerInterface (reuse env KeyManager)
+  doc.verificationMethod![0].id // keyId
 );
 ```
 
@@ -120,15 +117,15 @@ describe('My Integration Test', () => {
   beforeEach(async () => {
     // Skip if no Rooch node available (CI-friendly)
     if (TestEnv.skipIfNoNode()) return;
-    
+
     // Bootstrap test environment
     const env = await TestEnv.bootstrap();
-    
+
     // Create real on-chain DIDs
     const payer = await createSelfDid(env, {
-      keyType: 'EcdsaSecp256k1VerificationKey2019'
+      keyType: 'EcdsaSecp256k1VerificationKey2019',
     });
-    
+
     // DIDs are ready for use in tests
     console.log('Created DID:', payer.did);
   });
@@ -136,6 +133,7 @@ describe('My Integration Test', () => {
 ```
 
 The test helpers ensure:
+
 - DIDs are actually created on-chain (not just local key generation)
 - Proper relationship between private keys and DID accounts
 - CI/CD friendly environment detection
@@ -147,14 +145,14 @@ The test helpers ensure:
 
 ## 🛠️ Quick Reference
 
-| Concept | Description |
-|---------|-------------|
+| Concept       | Description                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `IdentityEnv` | Runtime built by `IdentityKit.bootstrap()` / `IdentityEnvBuilder`, holding the global `VDRRegistry` & `KeyManager`. |
-| `VDRRegistry` | Singleton managing VDR instances and providing unified DID resolve / create APIs. |
-| `KeyManager` | Built-in key lifecycle manager implementing `SignerInterface`; can sign directly. |
-| `KeyStore` | Key persistence backend. Browsers use `LocalStorageKeyStore` / `IndexedDBKeyStore` by default. |
-| `IdentityKit` | High-level object bound to **one DID**, exposing key / service / signing / resolving APIs. |
-| `TestEnv` | Test environment for integration testing with real on-chain DIDs. |
+| `VDRRegistry` | Singleton managing VDR instances and providing unified DID resolve / create APIs.                                   |
+| `KeyManager`  | Built-in key lifecycle manager implementing `SignerInterface`; can sign directly.                                   |
+| `KeyStore`    | Key persistence backend. Browsers use `LocalStorageKeyStore` / `IndexedDBKeyStore` by default.                      |
+| `IdentityKit` | High-level object bound to **one DID**, exposing key / service / signing / resolving APIs.                          |
+| `TestEnv`     | Test environment for integration testing with real on-chain DIDs.                                                   |
 
 ---
 
@@ -179,4 +177,4 @@ Implement `VDRInterface` / `KeyStore` and inject via `builder.useVDR()` / `build
 
 ## 📄 License
 
-Apache-2.0 
+Apache-2.0

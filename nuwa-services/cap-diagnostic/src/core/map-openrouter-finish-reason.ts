@@ -1,6 +1,8 @@
 import type { LanguageModelV1FinishReason } from '@ai-sdk/provider';
 
-export function mapOpenRouterFinishReason(finishReason: string | null | undefined): LanguageModelV1FinishReason {
+export function mapOpenRouterFinishReason(
+  finishReason: string | null | undefined
+): LanguageModelV1FinishReason {
   switch (finishReason) {
     case 'stop':
       return 'stop';

@@ -4,46 +4,52 @@ services:
   mcp-server-proxy:
     image: ghcr.io/nuwa-protocol/mcp-server-proxy:latest
     ports:
-      - "8088:8088"
+      - '8088:8088'
     environment:
       # Required: Service key for DID authentication and payment
       - SERVICE_KEY=${SERVICE_KEY}
-      
+
       # Optional: Configuration file path or URL
       # - CONFIG_PATH=/app/config/config.yaml
       # - CONFIG_PATH=https://your-config-server.com/configs/my-proxy.yaml
-      
+
       # Optional: Server configuration
       - PORT=8088
       - ENDPOINT=/mcp
       - DEBUG=false
-      
+
       # Optional: Payment configuration
       - ROOCH_NETWORK=test
       # - ROOCH_RPC_URL=https://test-seed.rooch.network:443
       # - DEFAULT_PRICE_PICO_USD=100000000
-      
+
       # Upstream service configuration (depends on your upstream)
       # For HTTP/HTTPS upstream:
       # - UPSTREAM_API_KEY=${UPSTREAM_API_KEY}
-      
+
       # For Amap upstream:
       # - AMAP_API_KEY=${AMAP_API_KEY}
-      
+
       # For Context7 upstream:
       # - CONTEXT7_API_KEY=${CONTEXT7_API_KEY}
-      
+
     volumes:
       # Optional: Mount configuration file
       # - ./config.yaml:/app/config/config.yaml:ro
-      
+
       # Optional: Mount logs directory
       # - ./logs:/app/logs
-      
+
     restart: unless-stopped
-    
+
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8088/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:8088/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -10,11 +10,11 @@ config({ path: '.env' });
 
 // Mock crypto if not available in test environment
 if (typeof globalThis.crypto === 'undefined') {
-  globalThis.crypto = webcrypto as any;
+  globalThis.crypto = webcrypto;
 }
 
 // Mock TextEncoder/TextDecoder if not available
 if (typeof globalThis.TextEncoder === 'undefined') {
   globalThis.TextEncoder = TextEncoder;
   globalThis.TextDecoder = TextDecoder;
-} 
+}

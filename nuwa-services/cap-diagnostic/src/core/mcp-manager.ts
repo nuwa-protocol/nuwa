@@ -44,29 +44,26 @@ export class MCPManager {
     const clients = new Map<string, NuwaMCPClient>();
     const mcpServers = cap.core.mcpServers || {};
 
-    logger.info('Initializing MCP servers', { 
-      capId: cap.id, 
-      serverCount: Object.keys(mcpServers).length 
+    logger.info('Initializing MCP servers', {
+      capId: cap.id,
+      serverCount: Object.keys(mcpServers).length,
     });
 
     // Initialize all MCP clients
     for (const [serverName, serverConfig] of Object.entries(mcpServers)) {
       try {
-        const client = await this.createNuwaMCPClient(
-          serverConfig.url,
-          serverConfig.transport,
-        );
+        const client = await this.createNuwaMCPClient(serverConfig.url, serverConfig.transport);
         clients.set(serverName, client);
         logger.info('MCP server connected', { serverName, url: serverConfig.url });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error('Failed to connect to MCP server', { 
-          serverName, 
-          url: serverConfig.url, 
-          error: errorMessage 
+        logger.error('Failed to connect to MCP server', {
+          serverName,
+          url: serverConfig.url,
+          error: errorMessage,
         });
         throw new Error(
-          `Failed to connect to MCP server ${serverName} at ${serverConfig.url}: ${errorMessage}`,
+          `Failed to connect to MCP server ${serverName} at ${serverConfig.url}: ${errorMessage}`
         );
       }
     }
@@ -84,9 +81,9 @@ export class MCPManager {
             _originalName: toolName,
           };
         }
-        logger.info('MCP tools loaded', { 
-          serverName, 
-          toolCount: Object.keys(serverTools).length 
+        logger.info('MCP tools loaded', {
+          serverName,
+          toolCount: Object.keys(serverTools).length,
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -104,9 +101,9 @@ export class MCPManager {
     };
     this.currentCapId = cap.id;
 
-    logger.info('MCP initialization complete', { 
+    logger.info('MCP initialization complete', {
       capId: cap.id,
-      totalTools: Object.keys(allTools).length 
+      totalTools: Object.keys(allTools).length,
     });
 
     return allTools;
@@ -123,9 +120,7 @@ export class MCPManager {
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error('Failed to close MCP client', { serverName, error: errorMessage });
-            throw new Error(
-              `Failed to close MCP client ${serverName}: ${errorMessage}`,
-            );
+            throw new Error(`Failed to close MCP client ${serverName}: ${errorMessage}`);
           }
         }
       } catch (error) {
@@ -150,22 +145,29 @@ export class MCPManager {
   /**
    * Test MCP server connectivity
    */
-  async testMCPServer(url: string, transportType?: McpTransportType): Promise<{
+  async testMCPServer(
+    url: string,
+    transportType?: McpTransportType
+  ): Promise<{
     success: boolean;
     error?: string;
     duration: number;
     toolsCount?: number;
   }> {
     const startTime = Date.now();
-    
+
     try {
       const client = await this.createNuwaMCPClient(url, transportType);
       const tools = await client.tools();
       await client.close();
-      
+
       const duration = Date.now() - startTime;
-      logger.info('MCP server test successful', { url, duration, toolsCount: Object.keys(tools).length });
-      
+      logger.info('MCP server test successful', {
+        url,
+        duration,
+        toolsCount: Object.keys(tools).length,
+      });
+
       return {
         success: true,
         duration,
@@ -174,9 +176,9 @@ export class MCPManager {
     } catch (error) {
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       logger.error('MCP server test failed', { url, error: errorMessage, duration });
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -187,7 +189,7 @@ export class MCPManager {
 
   private async createNuwaMCPClient(
     url: string,
-    transportType?: McpTransportType,
+    transportType?: McpTransportType
   ): Promise<NuwaMCPClient> {
     const buildTransport = async (): Promise<any> => {
       if (transportType === 'httpStream') {
@@ -200,7 +202,7 @@ export class MCPManager {
           requestInit: { headers: {} },
         });
       }
-      
+
       // auto-detect
       try {
         await fetch(url, {
@@ -341,7 +343,7 @@ export class MCPManager {
 
       async readResourceTemplate<T = unknown>(
         uriTemplate: string,
-        args: Record<string, unknown>,
+        args: Record<string, unknown>
       ): Promise<T> {
         const passThroughSchema = { parse: (v: any) => v } as const;
         try {

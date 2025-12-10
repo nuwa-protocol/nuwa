@@ -5,11 +5,13 @@ A comprehensive showcase of the `@nuwa-ai/ui-kit` SDK featuring three different 
 ## 🌟 Three Example Types
 
 ### 1. 🌤️ **Weather App** - Pure UI Illustration
+
 **File:** [`src/pages/WeatherPage.tsx`](./src/pages/WeatherPage.tsx)  
 **Type:** Inline UI  
 **Communication:** None (pure display)
 
 A simple weather display component that demonstrates basic Cap UI styling and layout patterns. This example shows:
+
 - Basic iframe UI structure
 - Responsive design patterns
 - Static content display
@@ -20,11 +22,13 @@ A simple weather display component that demonstrates basic Cap UI styling and la
 ---
 
 ### 2. 💬 **Demo App** - Single Direction Communication
+
 **File:** [`src/pages/NuwaClientDemoPage.tsx`](./src/pages/NuwaClientDemoPage.tsx)  
 **Type:** Inline UI  
 **Communication:** Cap UI → Nuwa Client (one-way)
 
 An interactive demo that calls Nuwa Client functions from the UI. This example demonstrates:
+
 - ✅ Send prompts to AI
 - ✅ Add selections to chat
 - ✅ Save/retrieve state data
@@ -32,6 +36,7 @@ An interactive demo that calls Nuwa Client functions from the UI. This example d
 - ✅ Auto height adjustment
 
 **Features:**
+
 - Tab-based interface (Prompt, Selection, State)
 - Connection status indicator
 - Error handling and user feedback
@@ -51,18 +56,21 @@ This is the easiest way to explore all three examples and see how they work in a
 ### 💻 Local Development
 
 ### Prerequisites
+
 - Node.js >= 16
 - npm/yarn/pnpm
 
 ### Installation & Setup
 
 1. **Install dependencies:**
+
    ```bash
    cd examples/cap-ui
    npm install
    ```
 
 2. **Run development server:**
+
    ```bash
    npm run dev
    ```
@@ -75,11 +83,13 @@ This is the easiest way to explore all three examples and see how they work in a
 ### Testing the Examples
 
 #### Weather App
+
 - Navigate to `/weather`
 - View the static weather display
 - Observe responsive design and styling
 
-#### Demo App  
+#### Demo App
+
 - Navigate to `/demo`
 - Test the three tabs: Prompt, Selection, State
 - Watch connection status indicator
@@ -92,7 +102,7 @@ examples/cap-ui/
 ├── src/
 │   ├── pages/
 │   │   ├── WeatherPage.tsx     # Pure UI example
-│   │   ├── NuwaClientDemoPage.tsx  # Single direction example  
+│   │   ├── NuwaClientDemoPage.tsx  # Single direction example
 │   │   ├── NotePage.tsx        # Bidirectional example
 │   │   └── Home.tsx           # Navigation page
 │   ├── components/            # Shared components
@@ -101,9 +111,10 @@ examples/cap-ui/
 └── package.json             # Dependencies
 ```
 
-##  Common Patterns
+## Common Patterns
 
 All examples demonstrate these best practices:
+
 - ✅ Proper `containerRef` usage for height adjustment
 - ✅ Connection state management
 - ✅ Error handling

@@ -22,7 +22,7 @@ describe('Config Module', () => {
     // Restore original state
     process.argv = originalArgv;
     process.env = originalEnv;
-    
+
     // Clean up test config file
     if (fs.existsSync(testConfigPath)) {
       fs.unlinkSync(testConfigPath);
@@ -39,9 +39,9 @@ describe('Config Module', () => {
     delete process.env.CONFIG_PATH;
     // Use a non-existent config path to ensure defaults are used
     process.env.CONFIG_PATH = '/non/existent/config.yaml';
-    
+
     const config = loadConfig();
-    
+
     expect(config.port).toBe(8088);
     expect(config.endpoint).toBe('/mcp');
     expect(config.network).toBe('test');
@@ -52,16 +52,16 @@ describe('Config Module', () => {
     process.argv = ['node', 'server.js'];
     process.env.PORT = '9000';
     process.env.DEBUG = 'true';
-    
+
     const config = loadConfig();
-    
+
     expect(config.port).toBe(9000);
     expect(config.debug).toBe(true);
   });
 
   it('should prioritize config file over defaults', () => {
     process.argv = ['node', 'server.js'];
-    
+
     // Create test config file
     const testConfig = `
 port: 7000
@@ -75,9 +75,9 @@ network: "dev"
 `;
     fs.writeFileSync(testConfigPath, testConfig);
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.port).toBe(7000);
     expect(config.endpoint).toBe('/test-mcp');
     expect(config.debug).toBe(true);
@@ -90,7 +90,7 @@ network: "dev"
   it('should prioritize CLI args over everything else', () => {
     process.argv = ['node', 'server.js', '--port', '6000', '--debug'];
     process.env.PORT = '9000';
-    
+
     // Create test config file
     const testConfig = `
 port: 7000
@@ -100,9 +100,9 @@ upstream:
 `;
     fs.writeFileSync(testConfigPath, testConfig);
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.port).toBe(6000);
     expect(config.debug).toBe(true);
     expect(config.upstream?.type).toBe('httpStream');
@@ -113,7 +113,7 @@ upstream:
     process.argv = ['node', 'server.js'];
     process.env.TEST_API_KEY = 'secret123';
     process.env.TEST_RPC_URL = 'https://test-rpc.example.com';
-    
+
     // Create test config file with env vars
     const testConfig = `
 port: 8000
@@ -125,9 +125,9 @@ serviceId: "test-service"
 `;
     fs.writeFileSync(testConfigPath, testConfig);
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.upstream?.type).toBe('httpStream');
     expect((config.upstream as any)?.url).toBe('https://api.example.com/mcp?key=secret123');
     expect(config.rpcUrl).toBe('https://test-rpc.example.com');
@@ -135,7 +135,7 @@ serviceId: "test-service"
 
   it('should handle custom tools from config file', () => {
     process.argv = ['node', 'server.js'];
-    
+
     // Create test config file with custom tools
     const testConfig = `
 port: 8000
@@ -155,9 +155,9 @@ register:
 `;
     fs.writeFileSync(testConfigPath, testConfig);
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.register?.tools).toHaveLength(2);
     expect(config.register?.tools[0].name).toBe('custom.tool');
     expect(config.register?.tools[0].pricePicoUSD).toBe('1000000000000');
@@ -167,19 +167,22 @@ register:
 
   it('should handle stdio upstream configuration', () => {
     process.argv = ['node', 'server.js'];
-    
-    fs.writeFileSync(testConfigPath, `port: 8088
+
+    fs.writeFileSync(
+      testConfigPath,
+      `port: 8088
 upstream:
   type: "stdio"
   command: ["python", "-m", "my_mcp_server"]
   cwd: "/path/to/server"
   env:
-    API_KEY: "test-key"`);
-    
+    API_KEY: "test-key"`
+    );
+
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.upstream).toBeDefined();
     expect(config.upstream?.type).toBe('stdio');
     expect((config.upstream as any)?.command).toEqual(['python', '-m', 'my_mcp_server']);
@@ -189,19 +192,22 @@ upstream:
 
   it('should handle httpStream upstream configuration', () => {
     process.argv = ['node', 'server.js'];
-    
-    fs.writeFileSync(testConfigPath, `port: 8088
+
+    fs.writeFileSync(
+      testConfigPath,
+      `port: 8088
 upstream:
   type: "httpStream"
   url: "https://api.example.com/mcp"
   auth:
     scheme: "bearer"
-    token: "test-token"`);
-    
+    token: "test-token"`
+    );
+
     process.env.CONFIG_PATH = testConfigPath;
-    
+
     const config = loadConfig();
-    
+
     expect(config.upstream).toBeDefined();
     expect(config.upstream?.type).toBe('httpStream');
     expect((config.upstream as any)?.url).toBe('https://api.example.com/mcp');

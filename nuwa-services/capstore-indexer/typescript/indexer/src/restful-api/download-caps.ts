@@ -9,10 +9,7 @@ import { sendJson } from './utils.js';
  * Request body: { ids: string[] }
  * Response: { code: 200, data: { [id: string]: any } }
  */
-export async function handleDownloadCaps(
-  req: IncomingMessage,
-  res: ServerResponse
-): Promise<void> {
+export async function handleDownloadCaps(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     // Parse request body to get IDs array
     let body = '';
@@ -20,7 +17,7 @@ export async function handleDownloadCaps(
       body += chunk.toString();
     });
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       req.on('end', () => resolve());
     });
 
@@ -52,7 +49,7 @@ export async function handleDownloadCaps(
     }
 
     // Download all caps in parallel
-    const downloadPromises = ids.map(async (id) => {
+    const downloadPromises = ids.map(async id => {
       try {
         const result = await downloadFromSupabase(id);
         return {
@@ -77,7 +74,7 @@ export async function handleDownloadCaps(
     const successfulDownloads: { [id: string]: any } = {};
     const failedDownloads: { [id: string]: string } = {};
 
-    results.forEach((result) => {
+    results.forEach(result => {
       if (result.success && result.data) {
         successfulDownloads[result.id] = result.data.raw_data;
       } else {

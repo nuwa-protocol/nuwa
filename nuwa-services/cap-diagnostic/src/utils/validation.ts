@@ -61,7 +61,7 @@ export class CapValidator {
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -83,7 +83,7 @@ export class CapValidator {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -101,7 +101,7 @@ export class CapValidator {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 }

@@ -9,56 +9,35 @@ const server = new McpServer({
   version: '0.1.0',
 });
 
-server.tool(
-  'echo',
-  'Echo',
-  { text: z.string() },
-  async ({ text }) => ({ content: [{ type: 'text', text }] })
-);
-
-server.tool(
-  'custom.free',
-  'A free custom tool',
-  { message: z.string() },
-  async ({ message }) => ({ content: [{ type: 'text', text: `Custom free tool executed with message: ${message}` }] })
-);
-
-server.tool(
-  'custom.paid',
-  'A paid custom tool',
-  { data: z.string() },
-  async ({ data }) => ({ content: [{ type: 'text', text: `Custom paid tool executed with data: ${data}` }] })
-);
-
-server.prompt('hello', async () => ({
-  messages: [
-    { role: 'user', content: { type: 'text', text: 'Hello, world!' } }
-  ]
+server.tool('echo', 'Echo', { text: z.string() }, async ({ text }) => ({
+  content: [{ type: 'text', text }],
 }));
 
-server.resource(
-  'test.txt',
-  'file:///test.txt',
-  async (uri) => ({
-    contents: [{ type: 'text', text: 'file content', uri: 'file:///test.txt' }]
-  })
-);
+server.tool('custom.free', 'A free custom tool', { message: z.string() }, async ({ message }) => ({
+  content: [{ type: 'text', text: `Custom free tool executed with message: ${message}` }],
+}));
+
+server.tool('custom.paid', 'A paid custom tool', { data: z.string() }, async ({ data }) => ({
+  content: [{ type: 'text', text: `Custom paid tool executed with data: ${data}` }],
+}));
+
+server.prompt('hello', async () => ({
+  messages: [{ role: 'user', content: { type: 'text', text: 'Hello, world!' } }],
+}));
+
+server.resource('test.txt', 'file:///test.txt', async uri => ({
+  contents: [{ type: 'text', text: 'file content', uri: 'file:///test.txt' }],
+}));
 
 const template = new ResourceTemplate('file:///{name}.txt', {
   list: async () => ({
-    resources: [
-      { name: 'template1', uri: 'file:///template1.txt', mimeType: 'text/plain' }
-    ]
-  })
+    resources: [{ name: 'template1', uri: 'file:///template1.txt', mimeType: 'text/plain' }],
+  }),
 });
 
-server.resource(
-  'template1',
-  template,
-  async (uri, variables) => ({
-    contents: [{ type: 'text', text: `file content for ${variables.name}`, uri: uri.toString() }]
-  })
-);
+server.resource('template1', template, async (uri, variables) => ({
+  contents: [{ type: 'text', text: `file content for ${variables.name}`, uri: uri.toString() }],
+}));
 
 const app = fastify();
 const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -92,4 +71,4 @@ app.listen({ port }, (err, address) => {
     process.exit(1);
   }
   console.log(`[mock-mcp] Standard MCP HTTP server (SDK, Fastify) running on ${address}`);
-}); 
+});

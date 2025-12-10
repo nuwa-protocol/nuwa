@@ -37,9 +37,9 @@ graph TD
     end
 
     subgraph "Core Modules"
-        SM1[SubRAVSigner] 
+        SM1[SubRAVSigner]
         SM2[SubRAVGenerator]
-        CM1[ChannelManager] 
+        CM1[ChannelManager]
         CM2[ClaimManager]
         Contract["IPaymentChannelContract"]
     end
@@ -90,12 +90,12 @@ graph TD
 const channelMeta = await payerClient.openChannel({
   payeeDid: 'did:rooch:0xdef...',
   asset: { assetId: '0x3::gas_coin::RGas', symbol: 'RGAS' },
-  collateral: BigInt('1000000000000000000')
+  collateral: BigInt('1000000000000000000'),
 });
 
 // 2. 授权子通道（多设备支持）
 await payerClient.authorizeSubChannel({
-  vmIdFragment: 'laptop-key'  // 对应 DID 验证方法片段
+  vmIdFragment: 'laptop-key', // 对应 DID 验证方法片段
 });
 
 // 3. API Gateway 支付流程
@@ -104,13 +104,13 @@ const subRAV = await payeeClient.generateSubRAV({
   channelId: 'channel-123',
   payerKeyId: 'did:example:payer#key1',
   amount: BigInt('5000000000000000'),
-  description: 'LLM API call - GPT-4'
+  description: 'LLM API call - GPT-4',
 });
 
 // Client 端签名验证
 const signedSubRAV = await payerClient.signSubRAV(subRAV, {
   validateBeforeSigning: true,
-  maxAmount: BigInt('10000000000000000')
+  maxAmount: BigInt('10000000000000000'),
 });
 
 // Gateway 处理签名后的支付凭证
@@ -151,6 +151,7 @@ sequenceDiagram
 ```
 
 **关键优势**：
+
 - ✅ **成本后计算**：Gateway 根据实际 token 消费量动态生成 RAV
 - ✅ **客户端保护**：支持 `maxAmount` 限制，防止恶意收费
 - ✅ **批量优化**：降低链上交易频率和成本
@@ -159,12 +160,14 @@ sequenceDiagram
 ### 3.3 SubRAV 生成与验证流程（更新）
 
 **生成流程（Payee 端 - API Gateway）**
+
 1. `PayeeClient.generateSubRAV()` 基于实际消费量构造 SubRAV
 2. 从缓存获取当前 `nonce` 和 `accumulatedAmount`
 3. 增加消费金额，递增 `nonce`
 4. 返回未签名的 `SubRAV` 给客户端
 
 **签名流程（Payer 端 - API Client）**
+
 1. `PayerClient.signSubRAV()` 接收 Gateway 生成的 SubRAV
 2. 执行业务逻辑验证（金额上限、nonce 单调性等）
 3. 通过 `SubRAVCodec.encode()` 进行 BCS 序列化
@@ -172,6 +175,7 @@ sequenceDiagram
 5. 返回 `SignedSubRAV`
 
 **验证流程（Payee 端）**
+
 1. `PayeeClient.processSignedSubRAV()` 接收客户端签名的 RAV
 2. 使用 `SubRAVCodec.encode()` 重新序列化 payload
 3. 通过 `SubRAVSigner.verify()` 验证签名
@@ -194,14 +198,14 @@ app.post('/v1/chat/completions', async (req, res) => {
     channelId: prevRAV?.channelId || req.headers['x-channel-id'],
     payerKeyId: req.headers['x-payer-key-id'],
     request: req.body,
-    previousSignedRAV: prevRAV?.signedSubRav
+    previousSignedRAV: prevRAV?.signedSubRav,
   });
 
   // 3. 构建响应头
   const responseHeader = HttpHeaderCodec.buildResponseHeader({
     signedSubRav: result.subRAV, // 未签名，等待客户端签名
     amountDebited: result.totalCost,
-    serviceTxRef: `srv-${Date.now()}`
+    serviceTxRef: `srv-${Date.now()}`,
   });
 
   res.set('X-Payment-Required', responseHeader);
@@ -212,7 +216,7 @@ app.post('/v1/chat/completions', async (req, res) => {
 const response = await apiClient.callAPI({
   prompt: 'Explain quantum computing',
   model: 'gpt-4',
-  maxCost: BigInt('100000') // 最大接受成本
+  maxCost: BigInt('100000'), // 最大接受成本
 });
 ```
 
@@ -224,13 +228,13 @@ const response = await apiClient.callAPI({
 
 ```ts
 export interface SubRAV {
-  version: number;          // Protocol version, default 1
-  chainId: bigint;          // 区块链标识符
-  channelId: string;        // 通道 ID (32-byte hex)
-  channelEpoch: bigint;     // 通道纪元，防止重放攻击
-  vmIdFragment: string;     // 验证方法片段
+  version: number; // Protocol version, default 1
+  chainId: bigint; // 区块链标识符
+  channelId: string; // 通道 ID (32-byte hex)
+  channelEpoch: bigint; // 通道纪元，防止重放攻击
+  vmIdFragment: string; // 验证方法片段
   accumulatedAmount: bigint; // 累积金额
-  nonce: bigint;           // 单调递增的随机数
+  nonce: bigint; // 单调递增的随机数
 }
 
 export interface SignedSubRAV {
@@ -249,8 +253,8 @@ export interface ChannelMetadata {
 }
 
 export interface AssetInfo {
-  assetId: string;     // e.g., '0x3::gas_coin::RGas' or ObjectID
-  symbol?: string;     // e.g., 'RGAS' (optional, for display)
+  assetId: string; // e.g., '0x3::gas_coin::RGas' or ObjectID
+  symbol?: string; // e.g., 'RGAS' (optional, for display)
 }
 ```
 
@@ -318,7 +322,7 @@ return CloseProofsSchema.serialize({ proofs }).toBytes();
 ```ts
 export interface RoochContractOptions {
   rpcUrl: string;
-  contractAddress?: string;  // 默认使用已知的支付通道合约地址
+  contractAddress?: string; // 默认使用已知的支付通道合约地址
   debug?: boolean;
 }
 
@@ -331,27 +335,27 @@ export class RoochPaymentChannelContract {
     this.contractAddress = options.contractAddress || DEFAULT_CONTRACT_ADDRESS;
   }
 
-      async openChannel(params: {
-      payerDid: string;
-      payeeDid: string;
-      asset: AssetInfo;
-      collateral: bigint;
-      signer: Signer;
-    }): Promise<{ channelId: string; txHash: string }> {
-      const tx = new Transaction();
-      tx.callFunction({
-        target: `${this.contractAddress}::payment_channel::open_channel`,
-        args: [
-          Args.string(params.payerDid),
-          Args.string(params.payeeDid),
-          Args.string(params.asset.assetId),
-          Args.u256(params.collateral.toString())
-      ]
+  async openChannel(params: {
+    payerDid: string;
+    payeeDid: string;
+    asset: AssetInfo;
+    collateral: bigint;
+    signer: Signer;
+  }): Promise<{ channelId: string; txHash: string }> {
+    const tx = new Transaction();
+    tx.callFunction({
+      target: `${this.contractAddress}::payment_channel::open_channel`,
+      args: [
+        Args.string(params.payerDid),
+        Args.string(params.payeeDid),
+        Args.string(params.asset.assetId),
+        Args.u256(params.collateral.toString()),
+      ],
     });
 
     const result = await this.client.signAndExecuteTransaction({
       transaction: tx,
-      signer: params.signer
+      signer: params.signer,
     });
 
     // 解析事件获取 channelId
@@ -384,7 +388,7 @@ export class RoochPaymentChannelContract {
 export interface PaymentChannelPayerClientOptions {
   rpcUrl: string;
   signer: SignerInterface;
-  keyId?: string;                    // 默认签名 key
+  keyId?: string; // 默认签名 key
   contractAddress?: string;
   storageOptions?: StorageOptions;
 }
@@ -419,13 +423,13 @@ export class PaymentChannelPayerClient {
     collateral: bigint;
   }): Promise<ChannelMetadata> {
     const payerDid = await this.signer.getDid();
-    
+
     const result = await this.contract.openChannel({
       payerDid,
       payeeDid: params.payeeDid,
       asset: params.asset,
       collateral: params.collateral,
-      signer: this.signer
+      signer: this.signer,
     });
 
     const metadata: ChannelMetadata = {
@@ -435,16 +439,16 @@ export class PaymentChannelPayerClient {
       asset: params.asset,
       totalCollateral: params.collateral,
       epoch: BigInt(0),
-      status: 'active'
+      status: 'active',
     };
 
     await this.stateStorage.setChannelMetadata(result.channelId, metadata);
-    
+
     // 设为活跃通道
     if (!this.activeChannelId) {
       this.activeChannelId = result.channelId;
     }
-    
+
     return metadata;
   }
 
@@ -460,7 +464,7 @@ export class PaymentChannelPayerClient {
     const payerDid = await this.signer.getDid();
     const expectedKeyId = `${payerDid}#${subRAV.vmIdFragment}`;
     const useKeyId = this.keyId || expectedKeyId;
-    
+
     // 验证密钥匹配
     const ourFragment = this.extractFragment(useKeyId);
     if (ourFragment !== subRAV.vmIdFragment) {
@@ -492,22 +496,28 @@ export class PaymentChannelPayerClient {
 
     // 验证金额限制
     if (maxAmount && subRAV.accumulatedAmount > maxAmount) {
-      throw new Error(`SubRAV amount ${subRAV.accumulatedAmount} exceeds maximum allowed ${maxAmount}`);
+      throw new Error(
+        `SubRAV amount ${subRAV.accumulatedAmount} exceeds maximum allowed ${maxAmount}`
+      );
     }
 
     // 验证 nonce 单调性
     const payerDid = await this.signer.getDid();
     const keyId = `${payerDid}#${subRAV.vmIdFragment}`;
-    
+
     try {
       const prevState = await this.stateStorage.getSubChannelState(subRAV.channelId, keyId);
-      
+
       if (subRAV.nonce !== prevState.nonce + BigInt(1)) {
-        throw new Error(`Invalid nonce: expected ${prevState.nonce + BigInt(1)}, got ${subRAV.nonce}`);
+        throw new Error(
+          `Invalid nonce: expected ${prevState.nonce + BigInt(1)}, got ${subRAV.nonce}`
+        );
       }
 
       if (subRAV.accumulatedAmount <= prevState.accumulatedAmount) {
-        throw new Error(`Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`);
+        throw new Error(
+          `Amount must increase: previous ${prevState.accumulatedAmount}, new ${subRAV.accumulatedAmount}`
+        );
       }
     } catch (error) {
       // 首次 SubRAV
@@ -537,7 +547,7 @@ export class PaymentChannelPayeeClient {
 
     // 获取通道信息
     const channelInfo = await this.contract.getChannelStatus({ channelId });
-    
+
     // 获取或初始化子通道状态
     let subChannelState;
     try {
@@ -552,7 +562,7 @@ export class PaymentChannelPayeeClient {
         lastConfirmedNonce: BigInt(0),
         lastUpdated: Date.now(),
       } as any;
-      
+
       await this.stateStorage.updateSubChannelState(channelId, payerKeyId, subChannelState);
     }
 
@@ -597,12 +607,14 @@ export class PaymentChannelPayeeClient {
     }
 
     // 状态已在 generateSubRAV 时更新，这里仅作确认
-    console.log(`Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`);
+    console.log(
+      `Successfully processed signed SubRAV for channel ${signedSubRAV.subRav.channelId}, nonce ${signedSubRAV.subRav.nonce}`
+    );
   }
 
   async batchClaimFromChannels(signedSubRAVs: SignedSubRAV[]): Promise<ClaimResult[]> {
     const results: ClaimResult[] = [];
-    
+
     for (const signedSubRAV of signedSubRAVs) {
       try {
         const result = await this.contract.claimFromChannel({
@@ -628,7 +640,9 @@ export class PaymentChannelPayeeClient {
   private extractVmIdFragment(keyId: string): string {
     const parts = keyId.split('#');
     if (parts.length !== 2) {
-      throw new Error(`Invalid keyId format: ${keyId}. Expected format: "did:example:payer#fragment"`);
+      throw new Error(
+        `Invalid keyId format: ${keyId}. Expected format: "did:example:payer#fragment"`
+      );
     }
     return parts[1];
   }
@@ -641,13 +655,14 @@ export class PaymentChannelPayeeClient {
 
 #### 核心组件
 
-| 组件 | 说明 |
-| ---- | ---- |
-| `RAVStore` | 统一的 RAV 持久化接口，负责保存、检索、去重 `SignedSubRAV`。支持多种后端（内存 / IndexedDB / SQLite / Postgres）。 |
-| `ClaimScheduler` | 周期性检查待结算的 RAV，按策略批量调用 `claim_from_channel`，减少链上交易次数。 |
-| `PayeeClient` | 封装验证 → 存储 → 定时 claim 全流程，对 `PaymentChannelClient` 做按需裁剪，仅保留收款相关 API。 |
+| 组件             | 说明                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `RAVStore`       | 统一的 RAV 持久化接口，负责保存、检索、去重 `SignedSubRAV`。支持多种后端（内存 / IndexedDB / SQLite / Postgres）。 |
+| `ClaimScheduler` | 周期性检查待结算的 RAV，按策略批量调用 `claim_from_channel`，减少链上交易次数。                                    |
+| `PayeeClient`    | 封装验证 → 存储 → 定时 claim 全流程，对 `PaymentChannelClient` 做按需裁剪，仅保留收款相关 API。                    |
 
 #### RAVStore 接口
+
 ```ts
 export interface RAVStore {
   /** 保存一个新的 RAV（幂等） */
@@ -660,6 +675,7 @@ export interface RAVStore {
   list(channelId: string): AsyncIterable<SignedSubRAV>;
 }
 ```
+
 > 默认实现：`MemoryRAVStore`（测试） + `IndexedDBRAVStore`（浏览器） + `SqlRAVStore`（Node.js / 服务端）。
 
 #### SqlRAVStore（PostgreSQL / Supabase 实现）
@@ -683,7 +699,7 @@ export class SqlRAVStore implements RAVStore {
         rav.subRav.nonce.toString(),
         rav.subRav.accumulatedAmount.toString(),
         Buffer.from(MultibaseCodec.encodeBase64url(JSON.stringify(rav))),
-      ],
+      ]
     );
   }
 
@@ -692,7 +708,7 @@ export class SqlRAVStore implements RAVStore {
       `SELECT rav_data FROM ravs
        WHERE channel_id = $1 AND vm_id_fragment = $2
        ORDER BY nonce DESC LIMIT 1`,
-      [channelId, vmIdFragment],
+      [channelId, vmIdFragment]
     );
     return rows[0] ? JSON.parse(MultibaseCodec.decodeBase64url(rows[0].rav_data)) : null;
   }
@@ -700,7 +716,7 @@ export class SqlRAVStore implements RAVStore {
   async *list(channelId: string) {
     const cursor = await this.pool.query(
       `SELECT rav_data FROM ravs WHERE channel_id = $1 ORDER BY nonce`,
-      [channelId],
+      [channelId]
     );
     for (const row of cursor.rows) {
       yield JSON.parse(MultibaseCodec.decodeBase64url(row.rav_data));
@@ -710,6 +726,7 @@ export class SqlRAVStore implements RAVStore {
 ```
 
 **表结构（DDL）**
+
 ```sql
 CREATE TABLE IF NOT EXISTS ravs (
   id                SERIAL PRIMARY KEY,
@@ -732,6 +749,7 @@ CREATE INDEX IF NOT EXISTS idx_ravs_channel ON ravs(channel_id);
 ---
 
 #### ClaimScheduler 流程
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -757,6 +775,7 @@ sequenceDiagram
 - **并发控制**：同一通道同一时间只允许一个 claim 任务在跑，避免 nonce 冲突。
 
 #### PayeeClient 快速示例
+
 ```ts
 const payee = await createPayeeClient({
   rpcUrl: 'https://test-seed.rooch.network',
@@ -764,8 +783,8 @@ const payee = await createPayeeClient({
   store: new SqlRAVStore(db),
   claimOptions: {
     minClaimAmount: BigInt('10000000000000000'), // 0.01 RGAS
-    maxIntervalMs: 5 * 60_000,                  // 5 分钟
-  }
+    maxIntervalMs: 5 * 60_000, // 5 分钟
+  },
 });
 
 // 当收到 HTTP 请求头中的 RAV 时：
@@ -809,10 +828,14 @@ export interface ChannelStateCache {
 }
 
 // 默认内存实现
-export class MemoryChannelStateCache implements ChannelStateCache { /* ... */ }
+export class MemoryChannelStateCache implements ChannelStateCache {
+  /* ... */
+}
 
 // 可选的持久化实现
-export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */ }
+export class IndexedDBChannelStateCache implements ChannelStateCache {
+  /* ... */
+}
 ```
 
 ---
@@ -842,17 +865,20 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 ## 7. 渐进式开发里程碑（更新）
 
 ### M1 - 核心协议层 (✅ 已完成)
+
 - [x] `core/types.ts` - 核心数据结构
 - [x] `core/subrav.ts` - SubRAV 编解码 & 签名验证
 - [x] BCS 序列化集成（直接使用 `@roochnetwork/rooch-sdk` 提供的 `bcs`）
 - [x] 单元测试覆盖关键路径（SubRAV & CloseProofs）
 
 ### M2 - Rooch 合约封装（✅ 已完成）
+
 - [x] `rooch/contract.ts` - 基础通道操作（open / claim / close）
 - [x] CloseProofs BCS 序列化实现
 - [x] 与 Rooch testnet 的集成测试 & 事件解析
 
 ### M3 - 角色分离客户端 (✅ 已完成)
+
 - [x] **PaymentChannelPayerClient** - 通道管理和签名验证
 - [x] **PaymentChannelPayeeClient** - RAV 生成和批量索赔
 - [x] **API Gateway 工作流程** - 完整的 LLM Gateway 示例
@@ -860,18 +886,21 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 - [x] **向后兼容性** - 保留原有 API，渐进式迁移
 
 ### M4 - HTTP Gateway & 示例 (🚧 进行中)
+
 - [x] `core/http-header.ts` - HTTP Profile 实现
 - [x] `examples/llm-gateway-workflow.ts` - 完整工作流程示例
 - [ ] 示例 HTTP 服务器和客户端集成测试
 - [ ] MCP (Model Context Protocol) 支付集成示例
 
 ### M5 - 高级功能 (🔄 规划中)
+
 - [ ] **RAVStore** - 持久化 RAV 存储（PostgreSQL / Supabase 支持）
 - [ ] **ClaimScheduler** - 自动批量索赔调度器
 - [ ] **流式支付** - 长会话渐进式微支付
 - [ ] **多链扩展** - EVM / Solana 支付通道支持
 
 ### M6 - 文档和发布 (📝 待完成)
+
 - [x] README / 设计文档更新
 - [ ] API 文档生成和完善
 - [ ] 示例应用和最佳实践指南
@@ -882,6 +911,7 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 ### 关键里程碑成果
 
 #### ✅ M3 重点成果：API Gateway 支付模式
+
 1. **职责清晰分离**：
    - Payer Client：专注通道管理、签名验证、客户端保护
    - Payee Client：专注 RAV 生成、成本计算、批量索赔
@@ -892,6 +922,7 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
    - 批量优化：降低链上交易频率和成本
 
 3. **完整工作流程**：
+
    ```
    Client API Request → Gateway Process → Generate SubRAV →
    Client Sign → Gateway Verify → Batch Claim (定期)
@@ -904,24 +935,27 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 ## 8. 依赖和工具链
 
 ### 外部依赖
+
 - `@nuwa-ai/identity-kit` - DID 和签名
 - `@roochnetwork/rooch-sdk` - Rooch 区块链交互
 - `@roochnetwork/bcs` - 序列化支持
 
 ### 开发工具
+
 - **TypeScript 5.x** - 类型安全
 - **Jest** - 单元和集成测试
 - **tsup** - 构建工具 (ESM + CJS)
 - **changesets** - 版本管理
 
 ### 测试基础设施
+
 - **本地 Rooch 节点** - 集成测试
 - **Docker Compose** - 测试环境隔离
 - **GitHub Actions** - CI/CD 流水线
 
 ---
 
-这个设计方案提供了完整的架构指导，涵盖了从核心协议实现到高级 API 封装的所有层面。每个模块都有明确的职责边界和接口定义，确保代码的可维护性和可扩展性。 
+这个设计方案提供了完整的架构指导，涵盖了从核心协议实现到高级 API 封装的所有层面。每个模块都有明确的职责边界和接口定义，确保代码的可维护性和可扩展性。
 
 ## 9. Chain-Agnostic Refactor (✅ COMPLETED)
 
@@ -929,28 +963,28 @@ export class IndexedDBChannelStateCache implements ChannelStateCache { /* ... */
 
 ### 已实现的改进
 
-1. **✅ 链无关抽象 – `IPaymentChannelContract`**  
+1. **✅ 链无关抽象 – `IPaymentChannelContract`**
    - ✅ 创建了统一的 `IPaymentChannelContract` 接口，包含所有通道操作
    - ✅ 实现了 `getAssetInfo` 和 `getAssetPrice` 方法，价格统一返回 pUSD (微美元)
    - ✅ `RoochPaymentChannelContract` 实现了新接口
    - ✅ 为未来扩展做好准备 (`EVMPaymentChannelContract`, `SolanaPaymentChannelContract` 等)
 
-2. **✅ 客户端重构 – `PaymentChannelClient`**  
+2. **✅ 客户端重构 – `PaymentChannelClient`**
    - ✅ 创建了链无关的 `PaymentChannelClient`，构造函数接收 `IPaymentChannelContract` 实例
    - ✅ 移除了 Rooch 特定的依赖，实现真正的链抽象
    - ✅ 保持了相同的高级 API，向下兼容
 
-3. **✅ Factory Pattern – `PaymentChannelFactory`**  
+3. **✅ Factory Pattern – `PaymentChannelFactory`**
    - ✅ 实现了工厂模式，支持根据配置动态创建不同链的合约实例
    - ✅ 提供便捷的 `createRoochPaymentChannelClient` 函数
    - ✅ 支持链配置的类型安全
 
-4. **✅ 缓存抽象 – `ChannelStateCache`**  
+4. **✅ 缓存抽象 – `ChannelStateCache`**
    - ✅ 定义了统一的缓存接口，支持多种存储后端
    - ✅ 实现了 `MemoryChannelStateCache` 作为默认实现
    - ✅ 为未来的 IndexedDB、SQL 等实现做好准备
 
-5. **✅ 统一定价 – pUSD 标准**  
+5. **✅ 统一定价 – pUSD 标准**
    - ✅ 所有价格 API 统一返回 pUSD (1 USD = 1,000,000 pUSD)
    - ✅ 便于跨链计费和价格比较
    - ✅ 为链下计费系统提供统一的价格单位
@@ -979,7 +1013,7 @@ const price = await client.getAssetPrice('0x3::gas_coin::RGas');
 const evmClient = createEVMPaymentChannelClient({ ... }); // 未来实现
 ```
 
-详细的 API 使用说明请参考 [EXAMPLE.md](./EXAMPLE.md)。 
+详细的 API 使用说明请参考 [EXAMPLE.md](./EXAMPLE.md)。
 
 ---
 
@@ -994,26 +1028,26 @@ graph TD
     subgraph "Application Layer"
         App[PaymentChannelClient]
     end
-    
+
     subgraph "Cache Layer (临时缓存)"
         MC[MemoryCache]
-        RC[RedisCache] 
+        RC[RedisCache]
     end
-    
+
     subgraph "Storage Layer (持久化存储)"
         IDB[IndexedDBStorage]
         SQL[SQLStorage]
         Memory[MemoryStorage]
     end
-    
+
     App --> MC
     MC --> IDB
     MC --> SQL
     App --> IDB
     App --> SQL
-    
+
     style MC fill:#e1f5fe,stroke:#0277bd
-    style RC fill:#e1f5fe,stroke:#0277bd  
+    style RC fill:#e1f5fe,stroke:#0277bd
     style IDB fill:#f3e5f5,stroke:#7b1fa2
     style SQL fill:#f3e5f5,stroke:#7b1fa2
     style Memory fill:#f3e5f5,stroke:#7b1fa2
@@ -1022,6 +1056,7 @@ graph TD
 ### 4.6.2 明确职责分工
 
 #### Cache 层 (缓存层)
+
 - **目的**：提升性能，减少 I/O 操作
 - **特性**：临时性、可丢失、有 TTL
 - **实现**：内存、Redis、LRU Cache
@@ -1041,6 +1076,7 @@ interface Cache<K, V> {
 ```
 
 #### Storage 层 (存储层)
+
 - **目的**：持久化数据，提供可靠存储
 - **特性**：持久性、事务性、查询能力
 - **实现**：IndexedDB、SQLite、PostgreSQL、内存（测试用）
@@ -1063,13 +1099,14 @@ interface Storage<T> {
 ### 4.6.3 重构建议
 
 #### 方案 A：重命名现有实现
+
 ```ts
-// 原来的 ChannelStateCache -> ChannelStateStorage  
+// 原来的 ChannelStateCache -> ChannelStateStorage
 export interface ChannelStateStorage {
   getChannelMetadata(channelId: string): Promise<ChannelMetadata | null>;
   setChannelMetadata(channelId: string, metadata: ChannelMetadata): Promise<void>;
-  listChannelMetadata(): Promise<ChannelMetadata[]>;        // 管理 API
-  removeChannelMetadata(channelId: string): Promise<void>;  // 管理 API
+  listChannelMetadata(): Promise<ChannelMetadata[]>; // 管理 API
+  removeChannelMetadata(channelId: string): Promise<void>; // 管理 API
   // ... 其他 CRUD 操作
 }
 
@@ -1082,31 +1119,32 @@ export interface ChannelStateCache {
 ```
 
 #### 方案 B：组合模式
+
 ```ts
 export class PaymentChannelClient {
-  private storage: ChannelStateStorage;    // 持久化存储
-  private cache: ChannelStateCache;        // 临时缓存
-  
+  private storage: ChannelStateStorage; // 持久化存储
+  private cache: ChannelStateCache; // 临时缓存
+
   constructor(options: {
     storage: ChannelStateStorage;
-    cache?: ChannelStateCache;  // 可选缓存层
+    cache?: ChannelStateCache; // 可选缓存层
   }) {
     this.storage = options.storage;
     this.cache = options.cache || new NoOpCache();
   }
-  
+
   async getChannelMetadata(channelId: string): Promise<ChannelMetadata | null> {
     // 1. 先查缓存
     let metadata = await this.cache.get(`channel:${channelId}`);
     if (metadata) return metadata;
-    
+
     // 2. 缓存未命中，查存储
     metadata = await this.storage.getChannelMetadata(channelId);
     if (metadata) {
       // 3. 写入缓存
       await this.cache.set(`channel:${channelId}`, metadata, 5 * 60 * 1000); // 5分钟TTL
     }
-    
+
     return metadata;
   }
 }
@@ -1115,26 +1153,29 @@ export class PaymentChannelClient {
 ### 4.6.4 现实应用场景
 
 #### Browser 端
+
 ```ts
 const client = new PaymentChannelClient({
-  storage: new IndexedDBChannelStateStorage(),  // 持久化到 IndexedDB
-  cache: new MemoryChannelStateCache()          // 内存缓存提升性能
+  storage: new IndexedDBChannelStateStorage(), // 持久化到 IndexedDB
+  cache: new MemoryChannelStateCache(), // 内存缓存提升性能
 });
 ```
 
 #### Node.js 服务端
+
 ```ts
 const client = new PaymentChannelClient({
-  storage: new SQLChannelStateStorage(dbPool),   // 持久化到 PostgreSQL
-  cache: new RedisChannelStateCache(redisClient) // Redis 缓存
+  storage: new SQLChannelStateStorage(dbPool), // 持久化到 PostgreSQL
+  cache: new RedisChannelStateCache(redisClient), // Redis 缓存
 });
 ```
 
 #### 测试环境
+
 ```ts
 const client = new PaymentChannelClient({
-  storage: new MemoryChannelStateStorage(),    // 内存存储，便于测试
-  cache: new NoOpCache()                       // 禁用缓存，便于调试
+  storage: new MemoryChannelStateStorage(), // 内存存储，便于测试
+  cache: new NoOpCache(), // 禁用缓存，便于调试
 });
 ```
 
@@ -1145,4 +1186,4 @@ const client = new PaymentChannelClient({
 3. **Phase 3**: 更新 `PaymentChannelClient` 支持 Storage + Cache 组合
 4. **Phase 4**: 提供向后兼容的适配器
 
-这样的设计更符合软件架构的分层原则，职责清晰，便于扩展和测试。 
+这样的设计更符合软件架构的分层原则，职责清晰，便于扩展和测试。

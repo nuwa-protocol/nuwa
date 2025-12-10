@@ -44,7 +44,7 @@
 | `NuwaStore` / `AuthStore` / `UserStore` & `StorageAdapter` | identity-kit-web          | 通用身份本地存储，无框架耦合。                          |
 | `lib/agent/AgentService.ts`                                | 新包 `@nuwa-ai/cadop-sdk` | Custodian mint & status 轮询可供多前端复用。            |
 | DeepLink / Add-Key 流程（现已在 identity-kit-web 存在）    | 保留单实现                | 删除 cadop-web 重复逻辑，直接 import。                  |
-| DID ↔ Rooch Address helper                                | identity-kit              | 放入 `didUtil.getRoochAddressFromDid()`，统一解析方式。 |
+| DID ↔ Rooch Address helper                                 | identity-kit              | 放入 `didUtil.getRoochAddressFromDid()`，统一解析方式。 |
 
 ---
 

@@ -8,7 +8,11 @@ import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Info, AlertCircle, CheckCircle, Wallet } from 'lucide-react';
-import { formatAddressDisplay, PercentageHelpers, normalizeAddress } from '@/utils/addressValidation';
+import {
+  formatAddressDisplay,
+  PercentageHelpers,
+  normalizeAddress,
+} from '@/utils/addressValidation';
 
 export interface TransferModalProps {
   open: boolean;
@@ -34,7 +38,10 @@ export interface TransferModalProps {
   // Custom content
   extraContent?: ReactNode;
   // Actions
-  onTransfer: (recipient: string, amount: bigint) => Promise<{ txHash?: string; success: boolean; error?: string }>;
+  onTransfer: (
+    recipient: string,
+    amount: bigint
+  ) => Promise<{ txHash?: string; success: boolean; error?: string }>;
   onSuccess?: (txHash: string) => void;
   // Loading state
   isLoading?: boolean;
@@ -206,7 +213,7 @@ export function TransferModalBase({
     const balanceNumber = Number(balance) / Math.pow(10, decimals);
     return balanceNumber.toLocaleString(undefined, {
       minimumFractionDigits: 0,
-      maximumFractionDigits: decimals
+      maximumFractionDigits: decimals,
     });
   };
 
@@ -241,9 +248,7 @@ export function TransferModalBase({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">{title}</DialogTitle>
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </DialogHeader>
 
         <div className="space-y-6">
@@ -275,14 +280,12 @@ export function TransferModalBase({
                 type="text"
                 placeholder={recipientPlaceholder}
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={e => setRecipient(e.target.value)}
                 disabled={status === 'transferring'}
                 className="font-mono"
               />
               {recipient && validateRecipientInput(recipient).valid && (
-                <p className="text-xs text-muted-foreground">
-                  {formatAddressDisplay(recipient)}
-                </p>
+                <p className="text-xs text-muted-foreground">{formatAddressDisplay(recipient)}</p>
               )}
             </div>
           )}
@@ -296,7 +299,7 @@ export function TransferModalBase({
                 type="text"
                 placeholder={amountPlaceholder}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={e => setAmount(e.target.value)}
                 disabled={status === 'transferring'}
                 className="font-mono"
               />
@@ -304,7 +307,7 @@ export function TransferModalBase({
               {/* Percentage Buttons */}
               {showPercentageButtons && (
                 <div className="flex space-x-2">
-                  {PercentageHelpers.getPercentageOptions().map((option) => (
+                  {PercentageHelpers.getPercentageOptions().map(option => (
                     <Button
                       key={option.value}
                       variant="outline"
@@ -363,9 +366,7 @@ export function TransferModalBase({
             )}
 
             {status === 'success' ? (
-              <Button onClick={onClose}>
-                Done
-              </Button>
+              <Button onClick={onClose}>Done</Button>
             ) : (
               <Button
                 onClick={handleTransfer}

@@ -105,23 +105,19 @@ export class PaymentChannelHttpClient {
 ### 4.1 请求流程
 
 0. **确保通道可用**
-
    1. 提取 `host`，查询 `mappingStore` 是否已有 `channelId`。
    2. 若无记录或通道已关闭，则使用内部 `PaymentChannelPayerClient` 自动调用 `openChannelWithSubChannel()` 创建新通道，并写回 `mappingStore`。
 
 1. **准备 Header**
-
    - `Authorization`（可选）：调用 `DidAuthHelper` 基于 `payerDid` 生成 DIDAuthV1 头。
    - `X-Payment-Channel-Data`：
      - 若缓存的 `pendingSubRAV` 存在，则由内部 `payerClient.signSubRAV()` 签名并封装。
      - 若是第一次向该 host 发送请求（Handshake 场景）：构造 nonce=0、amount=0 的 SubRAV 并签名封装。
 
 2. **发送请求**
-
    - 底层使用可注入的 `fetch`（默认全局 fetch）发起 HTTP 请求。
 
 3. **处理响应**
-
    - 读取响应 Header 中的 `X-Payment-Channel-Data`（如果有）。
    - 若包含新的 unsigned `SubRAV`：
      - 保存到 `pendingSubRAV` 缓存，供下一次请求签名使用。

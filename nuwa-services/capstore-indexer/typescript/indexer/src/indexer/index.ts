@@ -1,11 +1,14 @@
-import axios from "axios";
-import yaml from "js-yaml";
+import axios from 'axios';
+import yaml from 'js-yaml';
 import {
   queryLastRegisterEventCursor,
-  queryLastUpdateCursor, saveCapToSupabase, saveRegisterEventCursor, saveUpdateEventCursor
+  queryLastUpdateCursor,
+  saveCapToSupabase,
+  saveRegisterEventCursor,
+  saveUpdateEventCursor,
 } from '../supabase.js';
 import { RoochClient } from '@roochnetwork/rooch-sdk';
-import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from "../constant.js";
+import { IPFS_GATEWAY, PACKAGE_ID, ROOCH_NODE_URL } from '../constant.js';
 
 /**
  * Fetches and parses YAML content from IPFS using the provided CID
@@ -21,7 +24,7 @@ export async function fetchAndParseYaml(cid: string): Promise<any> {
     const response = await axios.post(url, null, {
       timeout: 10000,
       responseType: 'text',
-      responseEncoding: 'utf8'
+      responseEncoding: 'utf8',
     });
 
     if (response.status !== 200) {
@@ -71,8 +74,8 @@ export async function processRoochRegisterEvent() {
       queryOption: {
         decode: true,
         showDisplay: true,
-        descending: false
-      }
+        descending: false,
+      },
     });
 
     // Process all events, only update cursor if all succeed
@@ -92,7 +95,7 @@ export async function processRoochRegisterEvent() {
         await saveCapToSupabase(yamlData, cid, 0);
       } catch (e) {
         processedEvents.push(cid);
-        console.log(`dirty data ${cid} `, e.message)
+        console.log(`dirty data ${cid} `, e.message);
       }
 
       processedEvents.push(cid);
@@ -102,7 +105,9 @@ export async function processRoochRegisterEvent() {
     // Only update cursor if all events were processed successfully
     if (events.data.length > 0 && events.next_cursor) {
       await saveRegisterEventCursor(events.next_cursor);
-      console.log(`Updated cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`);
+      console.log(
+        `Updated cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`
+      );
     } else if (events.data.length > 0) {
       console.log(`Processed ${processedEvents.length} events but no new cursor to save`);
     } else {
@@ -115,7 +120,6 @@ export async function processRoochRegisterEvent() {
     throw new Error(`Rooch event query failed: ${(error as Error).message}`);
   }
 }
-
 
 /**
  * Processes Rooch UpdateEvent events from the blockchain
@@ -137,8 +141,8 @@ export async function processRoochUpdateEvent() {
       queryOption: {
         decode: true,
         showDisplay: true,
-        descending: false
-      }
+        descending: false,
+      },
     });
 
     // Process all events, only update cursor if all succeed
@@ -151,14 +155,16 @@ export async function processRoochUpdateEvent() {
       const cid = data.cid;
       const version = data.version as number;
 
-      console.log(`Processing update event with CID: ${cid}, CAP ID: ${data.cap_uri}, Version: ${version}`);
+      console.log(
+        `Processing update event with CID: ${cid}, CAP ID: ${data.cap_uri}, Version: ${version}`
+      );
 
       try {
         const yamlData = await fetchAndParseYaml(cid);
         await saveCapToSupabase(yamlData, cid, version);
       } catch (e) {
         processedEvents.push(cid);
-        console.log(`dirty data ${cid} `, e.message)
+        console.log(`dirty data ${cid} `, e.message);
       }
 
       processedEvents.push(cid);
@@ -167,9 +173,11 @@ export async function processRoochUpdateEvent() {
 
     // Only update cursor if all events were processed successfully
     if (events.data.length > 0 && events.next_cursor) {
-      console.log('update-next', events.next_cursor)
+      console.log('update-next', events.next_cursor);
       await saveUpdateEventCursor(events.next_cursor);
-      console.log(`Updated update cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`);
+      console.log(
+        `Updated update cursor after processing ${processedEvents.length} events: ${processedEvents.join(', ')}`
+      );
     } else if (events.data.length > 0) {
       console.log(`Processed ${processedEvents.length} update events but no new cursor to save`);
     } else {
@@ -191,7 +199,7 @@ export async function processRoochUpdateEvent() {
 export function setupRoochEventListener(interval = 5000) {
   setInterval(async () => {
     try {
-      console.log("Checking Rooch for new Events...");
+      console.log('Checking Rooch for new Events...');
       await processRoochRegisterEvent();
       await processRoochUpdateEvent();
     } catch (error) {

@@ -147,11 +147,7 @@ export function validateAmount(
  * @param precision - Maximum decimal places to display (default: all)
  * @returns formatted amount string
  */
-export function formatAmount(
-  amount: bigint,
-  decimals: number,
-  precision?: number
-): string {
+export function formatAmount(amount: bigint, decimals: number, precision?: number): string {
   const amountStr = amount.toString().padStart(decimals + 1, '0');
   const integerPart = amountStr.slice(0, -decimals) || '0';
   let fractionalPart = amountStr.slice(-decimals);

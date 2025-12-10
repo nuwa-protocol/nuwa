@@ -8,40 +8,25 @@ const server = new McpServer({
   version: '0.1.0',
 });
 
-server.tool(
-  'echo',
-  'Echo',
-  { text: z.string() },
-  async ({ text }) => ({ content: [{ type: 'text', text }] })
-);
-
-server.tool(
-  'stdio.free',
-  'A free stdio tool',
-  { message: z.string() },
-  async ({ message }) => ({ content: [{ type: 'text', text: `Stdio free tool executed with message: ${message}` }] })
-);
-
-server.tool(
-  'stdio.paid',
-  'A paid stdio tool',
-  { data: z.string() },
-  async ({ data }) => ({ content: [{ type: 'text', text: `Stdio paid tool executed with data: ${data}` }] })
-);
-
-server.prompt('hello', async () => ({
-  messages: [
-    { role: 'user', content: { type: 'text', text: 'Hello from stdio!' } }
-  ]
+server.tool('echo', 'Echo', { text: z.string() }, async ({ text }) => ({
+  content: [{ type: 'text', text }],
 }));
 
-server.resource(
-  'stdio-test.txt',
-  'file:///stdio-test.txt',
-  async (uri) => ({
-    contents: [{ type: 'text', text: 'stdio file content', uri: 'file:///stdio-test.txt' }]
-  })
-);
+server.tool('stdio.free', 'A free stdio tool', { message: z.string() }, async ({ message }) => ({
+  content: [{ type: 'text', text: `Stdio free tool executed with message: ${message}` }],
+}));
+
+server.tool('stdio.paid', 'A paid stdio tool', { data: z.string() }, async ({ data }) => ({
+  content: [{ type: 'text', text: `Stdio paid tool executed with data: ${data}` }],
+}));
+
+server.prompt('hello', async () => ({
+  messages: [{ role: 'user', content: { type: 'text', text: 'Hello from stdio!' } }],
+}));
+
+server.resource('stdio-test.txt', 'file:///stdio-test.txt', async uri => ({
+  contents: [{ type: 'text', text: 'stdio file content', uri: 'file:///stdio-test.txt' }],
+}));
 
 const transport = new StdioServerTransport();
 

@@ -74,6 +74,7 @@ The tool provides a comprehensive CLI interface with two main commands:
 ### Configuration
 
 Supports flexible configuration through:
+
 - Environment variables
 - Configuration files
 - Command-line options
@@ -121,6 +122,7 @@ npm install
 ### Configuration
 
 Set environment variables:
+
 ```bash
 export OPENROUTER_API_KEY="your-api-key"
 export USER_LOCATION="UTC"  # Optional: for {{user_geo}} variable
@@ -149,6 +151,7 @@ The diagnostic tool replicates the client-side environment by:
 ## Error Handling
 
 Comprehensive error handling includes:
+
 - Network connectivity issues
 - API authentication failures
 - MCP server unavailability
@@ -158,6 +161,7 @@ Comprehensive error handling includes:
 ## Reporting
 
 Generates detailed reports including:
+
 - Test results and timing
 - Error messages and warnings
 - Recommendations for fixes
@@ -166,6 +170,7 @@ Generates detailed reports including:
 ## Future Enhancements
 
 Potential improvements:
+
 - Support for additional LLM providers
 - Batch processing capabilities
 - Integration with CI/CD pipelines
@@ -175,6 +180,7 @@ Potential improvements:
 ## Dependencies
 
 Key dependencies:
+
 - `@ai-sdk/provider`: AI SDK integration
 - `@modelcontextprotocol/sdk`: MCP protocol support
 - `@nuwa-ai/cap-kit`: CAP type definitions

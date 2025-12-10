@@ -2,7 +2,7 @@ import type { LanguageModelV1Message } from '@ai-sdk/provider';
 
 export function convertToOpenRouterCompletionPrompt(messages: LanguageModelV1Message[]): string {
   return messages
-    .map((message) => {
+    .map(message => {
       switch (message.role) {
         case 'system':
           return `System: ${typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}`;

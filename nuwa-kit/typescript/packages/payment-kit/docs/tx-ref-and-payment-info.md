@@ -58,12 +58,10 @@ Payment Kit 的 HTTP 协议目前仅在 _请求头_ 携带 `clientTxRef`，而 _
 采用「**默认 SDK 自动生成，可选让调用方传入**」的方案：
 
 1. **默认行为：SDK 生成**
-
    - `PaymentChannelHttpClient.request()` 在每次发起请求前自动生成 `clientTxRef`（UUID / nanoid）
    - 调用方零配置即可获得幂等能力，避免不同调用方忘记生成、格式不统一的问题
 
 2. **可选自定义：调用方提供**
-
    - 在幂等写服务、重放保护、事务批次等场景，业务可能已经有自己的请求 ID
    - SDK API 允许通过 headers 显式传入：
      ```typescript

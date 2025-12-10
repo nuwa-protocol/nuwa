@@ -49,10 +49,7 @@ export class CapResolver {
     // Resolve {{user_geo}} variable
     if (resolvedPrompt.includes('{{user_geo}}')) {
       const userLocation = await this.getUserLocation();
-      resolvedPrompt = resolvedPrompt.replace(
-        /\{\{user_geo\}\}/g,
-        userLocation,
-      );
+      resolvedPrompt = resolvedPrompt.replace(/\{\{user_geo\}\}/g, userLocation);
       logger.debug('Resolved user_geo variable', { userLocation });
     }
 
@@ -87,16 +84,16 @@ export class CapResolver {
       try {
         logger.debug('Resolving MCP tools', { capId: this.cap.id });
         const tools = await this.mcpManager.initializeForCap(this.cap);
-        logger.info('MCP tools resolved', { 
-          capId: this.cap.id, 
-          toolCount: Object.keys(tools).length 
+        logger.info('MCP tools resolved', {
+          capId: this.cap.id,
+          toolCount: Object.keys(tools).length,
         });
         return tools;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error('Failed to resolve MCP tools', { 
-          capId: this.cap.id, 
-          error: errorMessage 
+        logger.error('Failed to resolve MCP tools', {
+          capId: this.cap.id,
+          error: errorMessage,
         });
         throw new Error(`Failed to resolve MCP tools: ${errorMessage}`);
       }
@@ -115,19 +112,16 @@ export class CapResolver {
     tools: Record<string, any>;
   }> {
     logger.info('Resolving CAP configuration', { capId: this.cap.id });
-    
-    const [prompt, tools] = await Promise.all([
-      this.getResolvedPrompt(),
-      this.getResolvedTools(),
-    ]);
+
+    const [prompt, tools] = await Promise.all([this.getResolvedPrompt(), this.getResolvedTools()]);
 
     const model = this.getResolvedModel();
 
-    logger.info('CAP configuration resolved', { 
+    logger.info('CAP configuration resolved', {
       capId: this.cap.id,
       promptLength: prompt.length,
       toolCount: Object.keys(tools).length,
-      modelId: this.cap.core.model.id
+      modelId: this.cap.core.model.id,
     });
 
     return {
@@ -189,7 +183,7 @@ export class CapResolver {
           const tools = await this.getResolvedTools();
           details.toolsAvailable = Object.keys(tools).length;
           details.mcpServersConnected = true;
-          
+
           if (details.toolsAvailable === 0) {
             warnings.push('MCP servers connected but no tools available');
           }
@@ -200,7 +194,6 @@ export class CapResolver {
       } else {
         details.mcpServersConnected = true; // No MCP servers to test
       }
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       errors.push(`Configuration test failed: ${errorMessage}`);
@@ -223,9 +216,9 @@ export class CapResolver {
       logger.debug('CAP resolver cleanup completed', { capId: this.cap.id });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('CAP resolver cleanup failed', { 
-        capId: this.cap.id, 
-        error: errorMessage 
+      logger.error('CAP resolver cleanup failed', {
+        capId: this.cap.id,
+        error: errorMessage,
       });
     }
   }

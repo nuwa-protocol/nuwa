@@ -26,7 +26,7 @@ export async function parseJsonBody(req: IncomingMessage): Promise<any> {
 export function parseQueryParams(url: string): Record<string, string | string[]> {
   const urlObj = new URL(url, 'http://localhost');
   const params: Record<string, string | string[]> = {};
-  
+
   for (const [key, value] of urlObj.searchParams.entries()) {
     if (params[key]) {
       if (Array.isArray(params[key])) {
@@ -38,7 +38,7 @@ export function parseQueryParams(url: string): Record<string, string | string[]>
       params[key] = value;
     }
   }
-  
+
   return params;
 }
 
@@ -76,11 +76,11 @@ export function sendCorsResponse(res: ServerResponse): void {
 export function extractPathParam(pathname: string, pattern: string): string | null {
   const parts = pathname.split('/');
   const patternParts = pattern.split('/');
-  
+
   if (parts.length !== patternParts.length) {
     return null;
   }
-  
+
   for (let i = 0; i < patternParts.length; i++) {
     if (patternParts[i].startsWith(':')) {
       return parts[i];
@@ -88,7 +88,7 @@ export function extractPathParam(pathname: string, pattern: string): string | nu
       return null;
     }
   }
-  
+
   return null;
 }
 
@@ -98,4 +98,3 @@ export function extractPathParam(pathname: string, pattern: string): string | nu
 export function matchesPattern(pathname: string, pattern: RegExp): boolean {
   return pattern.test(pathname);
 }
-

@@ -79,6 +79,7 @@ restful-api/
 ```
 
 **数据流**:
+
 ```
 HTTP Request
     ↓
@@ -118,6 +119,7 @@ services/
 ```
 
 **数据流**:
+
 ```
 MCP Client Request
     ↓
@@ -139,6 +141,7 @@ Tool Execution
 **Supabase 数据库操作封装**
 
 主要函数：
+
 - `queryFromSupabase()` - 查询 Caps（支持各种过滤和排序）
 - `queryCapStats()` - 查询 Cap 统计信息
 - `queryUserFavoriteCaps()` - 查询用户收藏
@@ -214,27 +217,29 @@ Tool Execution
 ## 🛠️ 技术栈
 
 ### 核心依赖
+
 - **@nuwa-ai/identity-kit** (^0.6.0) - 身份认证
 - **@nuwa-ai/payment-kit** (link) - 支付和 MCP 服务器
 - **@supabase/supabase-js** (^2.50.5) - 数据库
 - **zod** (^3.25.0) - 数据验证
 
 ### 开发依赖
+
 - **TypeScript** (~5.4.0)
 - **tsx** (^4.7.0) - TypeScript 执行器
 - **vitest** (^1.6.0) - 测试框架
 
 ## 📝 文档索引
 
-| 文档 | 描述 | 目标读者 |
-|------|------|----------|
-| [API.md](./API.md) | API 接口文档 | API 使用者 |
-| [QUICK_START.md](./QUICK_START.md) | 快速入门指南 | 新手 |
-| [CURL_EXAMPLES.md](./CURL_EXAMPLES.md) | Curl 测试示例 | 测试人员 |
-| [src/restful-api/README.md](./src/restful-api/README.md) | RESTful API 开发文档 | 开发者 |
-| [CHANGES.md](./CHANGES.md) | 变更说明 | 所有人 |
-| [REFACTORING.md](./REFACTORING.md) | 重构总结 | 开发者 |
-| [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | 项目结构（本文档） | 所有人 |
+| 文档                                                     | 描述                 | 目标读者   |
+| -------------------------------------------------------- | -------------------- | ---------- |
+| [API.md](./API.md)                                       | API 接口文档         | API 使用者 |
+| [QUICK_START.md](./QUICK_START.md)                       | 快速入门指南         | 新手       |
+| [CURL_EXAMPLES.md](./CURL_EXAMPLES.md)                   | Curl 测试示例        | 测试人员   |
+| [src/restful-api/README.md](./src/restful-api/README.md) | RESTful API 开发文档 | 开发者     |
+| [CHANGES.md](./CHANGES.md)                               | 变更说明             | 所有人     |
+| [REFACTORING.md](./REFACTORING.md)                       | 重构总结             | 开发者     |
+| [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)           | 项目结构（本文档）   | 所有人     |
 
 ## 🚀 快速导航
 
@@ -250,21 +255,25 @@ Tool Execution
 ## 🔧 开发指南
 
 ### 启动开发服务器
+
 ```bash
 npm run dev
 ```
 
 ### 编译项目
+
 ```bash
 npm run build
 ```
 
 ### 运行测试
+
 ```bash
 npm test
 ```
 
 ### 运行 API 测试
+
 ```bash
 ./examples/test-api.sh
 # 或
@@ -275,13 +284,13 @@ node examples/test-api.js
 
 ### 默认端口: 3000
 
-| 端点 | 协议 | 描述 |
-|------|------|------|
-| `/health` | HTTP | 健康检查 |
-| `/ready` | HTTP | 就绪检查 |
-| `/mcp` | MCP | MCP 协议端点 |
-| `/api/*` | REST | RESTful API 端点 |
-| `/.well-known/nuwa-payment/info` | HTTP | 服务发现 |
+| 端点                             | 协议 | 描述             |
+| -------------------------------- | ---- | ---------------- |
+| `/health`                        | HTTP | 健康检查         |
+| `/ready`                         | HTTP | 就绪检查         |
+| `/mcp`                           | MCP  | MCP 协议端点     |
+| `/api/*`                         | REST | RESTful API 端点 |
+| `/.well-known/nuwa-payment/info` | HTTP | 服务发现         |
 
 ## 📈 性能考虑
 
@@ -300,4 +309,3 @@ node examples/test-api.js
 ## 📅 更新日期
 
 2025-10-28
-

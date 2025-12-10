@@ -1,4 +1,4 @@
-import { DebugLogger} from '@nuwa-ai/identity-kit';
+import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { IdentityKitWeb } from '@nuwa-ai/identity-kit/web';
 import { createHttpClient, type PaymentChannelHttpClient } from '@nuwa-ai/payment-kit/http';
 import { type TransactionStore, UniversalMcpClient, createMcpClient } from '@nuwa-ai/payment-kit';
@@ -15,7 +15,10 @@ function getHostKey(baseUrl: string): string {
   }
 }
 
-export async function getPaymentClient(sdk: IdentityKitWeb, baseUrl: string): Promise<PaymentChannelHttpClient> {
+export async function getPaymentClient(
+  sdk: IdentityKitWeb,
+  baseUrl: string
+): Promise<PaymentChannelHttpClient> {
   const key = getHostKey(baseUrl);
   const existing = clientsByHost.get(key);
   if (existing) return existing;
@@ -116,5 +119,3 @@ export function resetPaymentClient(baseUrl?: string): void {
   clientsByHost.delete(key);
   mcpClientsByHost.delete(key);
 }
-
-

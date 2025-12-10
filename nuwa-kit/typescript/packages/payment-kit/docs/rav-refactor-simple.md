@@ -67,7 +67,6 @@ export async function verify(
 ## 3 与现有代码的衔接
 
 - `PaymentProcessor.preProcess()`：
-
   - 直接调用 `RavVerifier.verify(ctx, deps)`；
   - 按 `result.decision` 设置 `ctx.state`：
     - `ALLOW`：继续；
@@ -76,15 +75,12 @@ export async function verify(
   - 将 `result.signedVerified` 赋给 `ctx.state.signedSubRavVerified`；
 
 - `PaymentProcessor.settle()`：
-
   - 行为保持原样；使用 `ctx.state` 中的 baseline（由 `RavVerifier` 已填充）。
 
 - `PaymentProcessor.confirmDeferredPayment()` 与 `checkPendingProposalPriority()`：
-
   - 精简为内部转调 `RavVerifier.verify()`，或保留为兼容薄封装；
 
 - `PaymentChannelPayeeClient`：
-
   - 不变；`RavVerifier` 复用其 `verifySubRAV()`、`getSubChannelState()`、`getChannelInfo()` 等能力。
 
 - `SubRavValidator.ts` / `SubRAVManager`：
@@ -95,7 +91,6 @@ export async function verify(
 ## 4 行为对齐（Phase 1 与 Phase 2）
 
 - Phase 1（不改行为）：
-
   - `verify()` 的判定逻辑按现有 `PaymentProcessor` 与 `PaymentChannelPayeeClient` 的已实施逻辑实现；
   - 错误码与 Header 形态不变；
 

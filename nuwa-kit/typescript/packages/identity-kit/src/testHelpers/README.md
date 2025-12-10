@@ -11,23 +11,23 @@ describe('My Integration Test', () => {
   beforeEach(async () => {
     // Skip tests if no Rooch node is available
     if (TestEnv.skipIfNoNode()) return;
-    
+
     // Bootstrap test environment
     const env = await TestEnv.bootstrap({
       rpcUrl: process.env.ROOCH_NODE_URL || 'http://localhost:6767',
       network: 'test',
-      debug: true
+      debug: true,
     });
-    
+
     // Create DIDs with real on-chain transactions
     const payer = await createSelfDid(env, {
-      keyType: 'EcdsaSecp256k1VerificationKey2019'
+      keyType: 'EcdsaSecp256k1VerificationKey2019',
     });
-    
+
     const payee = await createSelfDid(env, {
-      keyType: 'Ed25519VerificationKey2020'
+      keyType: 'Ed25519VerificationKey2020',
     });
-    
+
     // Use the DIDs in your tests
     console.log('Payer DID:', payer.did);
     console.log('Payee DID:', payee.did);
@@ -40,6 +40,7 @@ describe('My Integration Test', () => {
 ### TestEnv
 
 The `TestEnv` class manages the test environment setup, including:
+
 - Rooch client initialization
 - VDR registry setup
 - Network connectivity checking
@@ -48,6 +49,7 @@ The `TestEnv` class manages the test environment setup, including:
 ### createSelfDid()
 
 Creates a DID by calling the on-chain `create_did_object_for_self` function. This ensures that:
+
 - The DID actually exists on the blockchain
 - The private key corresponds to the DID's account address
 - The DID document has proper verification methods and relationships
@@ -55,9 +57,11 @@ Creates a DID by calling the on-chain `create_did_object_for_self` function. Thi
 ### CADOP Methods
 
 #### createCadopCustodian()
+
 Creates a custodian DID with CADOP service.
 
 #### createDidViaCadop()
+
 Creates a user DID via CADOP protocol using an existing custodian.
 
 ## Payment Kit Integration
@@ -71,23 +75,23 @@ import { createHttpClient } from '@nuwa-ai/payment-kit';
 describe('Payment Integration Test', () => {
   test('should work with simplified API', async () => {
     if (TestEnv.skipIfNoNode()) return;
-    
+
     // Bootstrap test environment
     const env = await TestEnv.bootstrap({
       rpcUrl: 'http://localhost:6767',
-      network: 'local'
+      network: 'local',
     });
-    
+
     // Create a test DID (now includes its own IdentityEnv)
     const payer = await createSelfDid(env);
-    
+
     // Create HTTP client with automatic service discovery
     const client = await createHttpClient({
       baseUrl: 'https://api.example.com',
-      env: payer.identityEnv,  // Use the DID's dedicated IdentityEnv
-      maxAmount: BigInt('1000000000')
+      env: payer.identityEnv, // Use the DID's dedicated IdentityEnv
+      maxAmount: BigInt('1000000000'),
     });
-    
+
     // Make paid API calls
     const result = await client.get('/v1/echo?q=hello');
   });
@@ -102,26 +106,26 @@ Each DID created with `createSelfDid` gets its own `IdentityEnv`, making it perf
 describe('Multi-Party Payment Test', () => {
   test('should work with separate identities', async () => {
     if (TestEnv.skipIfNoNode()) return;
-    
+
     const env = await TestEnv.bootstrap({
       rpcUrl: 'http://localhost:6767',
-      network: 'local'
+      network: 'local',
     });
-    
+
     // Create separate identities for payer and payee
     const payer = await createSelfDid(env);
     const payee = await createSelfDid(env);
-    
+
     // Each has their own IdentityEnv - no conflicts!
     const payerClient = await createHttpClient({
       baseUrl: 'https://api.example.com',
-      env: payer.identityEnv,  // Payer's IdentityEnv
-      maxAmount: BigInt('1000000000')
+      env: payer.identityEnv, // Payer's IdentityEnv
+      maxAmount: BigInt('1000000000'),
     });
-    
+
     // You could also create a payee service using payee.identityEnv
     // without any interference between the two
-    
+
     const result = await payerClient.get('/v1/echo?q=hello');
   });
 });
@@ -136,6 +140,7 @@ describe('Multi-Party Payment Test', () => {
 ## Error Handling
 
 The test helpers will automatically:
+
 - Skip tests in CI environments when no Rooch node is available
 - Provide clear error messages for setup failures
 - Wait for transaction confirmations
@@ -149,7 +154,7 @@ The test helpers will automatically:
 const didResult = await createSelfDid(env, {
   keyType: 'EcdsaSecp256k1VerificationKey2019',
   keyFragment: 'my-custom-key',
-  skipFunding: false
+  skipFunding: false,
 });
 ```
 
@@ -158,10 +163,10 @@ const didResult = await createSelfDid(env, {
 #### 分步创建（推荐方式）
 
 ```ts
-import { 
-  TestEnv, 
-  createCadopCustodian, 
-  createDidViaCadop 
+import {
+  TestEnv,
+  createCadopCustodian,
+  createDidViaCadop,
 } from '@nuwa-ai/identity-kit/testHelpers';
 
 const env = await TestEnv.bootstrap();
@@ -169,18 +174,18 @@ const env = await TestEnv.bootstrap();
 // 1. 先创建托管方（带 CADOP 服务）
 const custodian = await createCadopCustodian(env, {
   custodianKeyType: 'EcdsaSecp256k1VerificationKey2019',
-  skipFunding: false
+  skipFunding: false,
 });
 
 console.log('Custodian created with CADOP service:', custodian.did);
 
 // 2. 使用同一个托管方为多个用户创建 DID
 const user1 = await createDidViaCadop(env, custodian, {
-  userKeyType: 'Ed25519VerificationKey2020'
+  userKeyType: 'Ed25519VerificationKey2020',
 });
 
 const user2 = await createDidViaCadop(env, custodian, {
-  userKeyType: 'EcdsaSecp256k1VerificationKey2019'
+  userKeyType: 'EcdsaSecp256k1VerificationKey2019',
 });
 
 console.log('User 1 DID:', user1.did);
@@ -190,10 +195,10 @@ console.log('User 2 DID:', user2.did);
 #### 在测试用例中的使用
 
 ```ts
-import { 
-  TestEnv, 
-  createCadopCustodian, 
-  createDidViaCadop 
+import {
+  TestEnv,
+  createCadopCustodian,
+  createDidViaCadop,
 } from '@nuwa-ai/identity-kit/testHelpers';
 
 describe('Payment Channel Tests', () => {
@@ -202,9 +207,9 @@ describe('Payment Channel Tests', () => {
 
   beforeEach(async () => {
     if (TestEnv.skipIfNoNode()) return;
-    
+
     env = await TestEnv.bootstrap();
-    
+
     // 为整个测试套件创建一个托管方
     custodian = await createCadopCustodian(env);
   });
@@ -214,11 +219,11 @@ describe('Payment Channel Tests', () => {
 
     // 为每个测试用例创建不同的用户
     const payer = await createDidViaCadop(env, custodian, {
-      userKeyType: 'EcdsaSecp256k1VerificationKey2019'
+      userKeyType: 'EcdsaSecp256k1VerificationKey2019',
     });
 
     const payee = await createDidViaCadop(env, custodian, {
-      userKeyType: 'Ed25519VerificationKey2020'
+      userKeyType: 'Ed25519VerificationKey2020',
     });
 
     // 测试支付通道逻辑...
@@ -263,6 +268,7 @@ console.log('Connected to:', env.rpcUrl);
 ## Migration from Manual Setup
 
 Before (manual setup):
+
 ```ts
 const keyPair = Secp256k1Keypair.generate();
 const address = keyPair.getRoochAddress().toBech32Address();
@@ -270,7 +276,8 @@ const did = `did:rooch:${address}`; // ❌ DID doesn't exist on-chain!
 ```
 
 After (using test helpers):
+
 ```ts
 const { did, keyManager, signer } = await createSelfDid(env);
 // ✅ DID is created on-chain and ready to use
-``` 
+```

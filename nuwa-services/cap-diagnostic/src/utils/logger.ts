@@ -15,25 +15,26 @@ export class Logger {
     const format = config.format || 'simple';
     const silent = config.silent || false;
 
-    const logFormat = format === 'json' 
-      ? winston.format.json()
-      : winston.format.combine(
-          winston.format.timestamp(),
-          winston.format.colorize(),
-          winston.format.printf(({ timestamp, level, message, ...meta }) => {
-            const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
-            return `${timestamp} [${level}]: ${message} ${metaStr}`;
-          })
-        );
+    const logFormat =
+      format === 'json'
+        ? winston.format.json()
+        : winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.colorize(),
+            winston.format.printf(({ timestamp, level, message, ...meta }) => {
+              const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
+              return `${timestamp} [${level}]: ${message} ${metaStr}`;
+            })
+          );
 
     this.winston = winston.createLogger({
       level,
       format: logFormat,
       transports: [
         new winston.transports.Console({
-          silent
-        })
-      ]
+          silent,
+        }),
+      ],
     });
   }
 

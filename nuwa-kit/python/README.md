@@ -4,7 +4,7 @@ This package provides the official Python SDK for the Nuwa Protocol.
 
 ## Features
 
-*   (Similar to TypeScript SDK features)
+- (Similar to TypeScript SDK features)
 
 ## Installation
 
@@ -17,7 +17,6 @@ pip install nuwa-kit
 ## Usage
 
 (Basic usage examples)
-
 
 ## Development
 

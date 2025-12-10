@@ -1,20 +1,20 @@
-import { Cap, CapKitMcp } from "../src";
+import { Cap, CapKitMcp } from '../src';
 import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
-import { setupEnv } from "./env";
-import { IdentityEnv } from "@nuwa-ai/identity-kit";
+import { setupEnv } from './env';
+import { IdentityEnv } from '@nuwa-ai/identity-kit';
 
-describe("CapKit", () => {
+describe('CapKit', () => {
   let capKit: CapKitMcp;
   let identityEnv: IdentityEnv;
   beforeAll(async () => {
     const { capKit: a, identityEnv: s } = await setupEnv();
     capKit = a;
     identityEnv = s;
-  }, 60000)
+  }, 60000);
 
   afterAll(async () => {
-    await capKit?.mcpClose()
-  })
+    await capKit?.mcpClose();
+  });
 
   const buildCap = (did: string, name: string, disName?: string) => {
     return {
@@ -25,29 +25,28 @@ describe("CapKit", () => {
         mcpServers: {},
         prompt: {
           suggestions: ['hello', name],
-          value: 'nuwa test cap'
+          value: 'nuwa test cap',
         },
         model: {
-          providerId: "anthropic",
+          providerId: 'anthropic',
           modelId: 'openai/gpt-4o-mini',
           supportedInputs: ['text', 'image', 'file'],
           modelType: 'Language Model',
           contextLength: 100,
-        }
+        },
       },
       metadata: {
-        displayName: disName ?? "nuwa_test",
-        description: "nuwa test cap nuwa test cap nuwa test cap",
-        introduction: "nuwa test",
-        tags: [
-          "Coding"
-        ],
-        thumbnail: "https://nuwa.dev/_next/image?url=%2Flogos%2Fbasic-logo_brandcolor.png&w=256&q=75"
-      }
-    } as Cap
-  }
+        displayName: disName ?? 'nuwa_test',
+        description: 'nuwa test cap nuwa test cap nuwa test cap',
+        introduction: 'nuwa test',
+        tags: ['Coding'],
+        thumbnail:
+          'https://nuwa.dev/_next/image?url=%2Flogos%2Fbasic-logo_brandcolor.png&w=256&q=75',
+      },
+    } as Cap;
+  };
 
-  it("should register a cap v2", async () => {
+  it('should register a cap v2', async () => {
     const did = await identityEnv.keyManager.getDid();
 
     const result = await capKit.registerCap(buildCap(did, 'test_cap123'));
@@ -66,6 +65,5 @@ describe("CapKit", () => {
 
     const result3 = await capKit.queryByName('test_cap');
     expect(result3.code).toBe(200);
-
   }, 1000000); // 30 second timeout for blockchain operations
 });

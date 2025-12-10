@@ -63,10 +63,10 @@ export const config = {
   trustProxy: (env.TRUST_PROXY === 'true'
     ? true
     : env.TRUST_PROXY === 'false'
-    ? false
-    : !isNaN(Number(env.TRUST_PROXY))
-    ? Number(env.TRUST_PROXY)
-    : env.TRUST_PROXY) as boolean | number | string | string[],
+      ? false
+      : !isNaN(Number(env.TRUST_PROXY))
+        ? Number(env.TRUST_PROXY)
+        : env.TRUST_PROXY) as boolean | number | string | string[],
   // Bitcoin configuration removed - using standard Bitcoin message signing
   logging: {
     level: env.LOG_LEVEL,

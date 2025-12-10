@@ -61,7 +61,7 @@ export const PromptSchema = {
       throw new Error('Invalid prompt: missing or invalid name');
     }
     return data as PromptDefinition;
-  }
+  },
 };
 
 export const ResourceSchema = {
@@ -70,7 +70,7 @@ export const ResourceSchema = {
       throw new Error('Invalid resource: missing or invalid uri');
     }
     return data as ResourceDefinition;
-  }
+  },
 };
 
 export const ResourceTemplateSchema = {
@@ -79,7 +79,7 @@ export const ResourceTemplateSchema = {
       throw new Error('Invalid resource template: missing or invalid uriTemplate');
     }
     return data as ResourceTemplateDefinition;
-  }
+  },
 };
 
 export const PromptMessagesResultSchema = {
@@ -88,5 +88,5 @@ export const PromptMessagesResultSchema = {
       throw new Error('Invalid prompt messages result: missing or invalid messages array');
     }
     return data as PromptMessagesResult;
-  }
+  },
 };

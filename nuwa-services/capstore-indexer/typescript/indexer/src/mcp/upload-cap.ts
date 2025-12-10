@@ -1,10 +1,13 @@
-import z from "zod";
+import z from 'zod';
 import { Readable } from 'node:stream';
-import { ipfsClient } from "../service.js";
+import { ipfsClient } from '../service.js';
 import { CID } from 'multiformats/cid';
-import { Result } from "../type.js";
+import { Result } from '../type.js';
 
-async function uploadCap({ fileName, fileData, pin }: { fileName: string, fileData: string, pin: boolean }, context: any) {
+async function uploadCap(
+  { fileName, fileData, pin }: { fileName: string; fileData: string; pin: boolean },
+  context: any
+) {
   try {
     const uploaderDid = context.didInfo.did;
     console.log(`📤 Upload request from DID: ${uploaderDid}, File: ${fileName}`);
@@ -16,7 +19,7 @@ async function uploadCap({ fileName, fileData, pin }: { fileName: string, fileDa
     // Upload to IPFS
     const ipfsResult = await ipfsClient.add({
       path: fileName,
-      content: Readable.from([data])
+      content: Readable.from([data]),
     });
 
     const ipfsCid = CID.parse(ipfsResult.cid.toString());
@@ -30,42 +33,46 @@ async function uploadCap({ fileName, fileData, pin }: { fileName: string, fileDa
 
     // MCP standard response format
     return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          code: 200,
-          data: {
-            fileName,
-            ipfsCid: ipfsCid.toString(),
-            uploaderDid,
-            timestamp: new Date().toISOString(),
-            ipfsUrl: `ipfs://${ipfsCid.toString()}`,
-            gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`
-          }
-        } as Result)
-      }]
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            code: 200,
+            data: {
+              fileName,
+              ipfsCid: ipfsCid.toString(),
+              uploaderDid,
+              timestamp: new Date().toISOString(),
+              ipfsUrl: `ipfs://${ipfsCid.toString()}`,
+              gatewayUrl: `https://ipfs.io/ipfs/${ipfsCid.toString()}`,
+            },
+          } as Result),
+        },
+      ],
     };
   } catch (error) {
     return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          code: 500,
-          error: error instanceof Error ? error.message : String(error)
-        } as Result)
-      }]
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            code: 500,
+            error: error instanceof Error ? error.message : String(error),
+          } as Result),
+        },
+      ],
     };
   }
 }
 
 export const uploadCapTool = {
-  name: "uploadCap",
-  description: "Upload a cap to IPFS & rooch blockchain",
+  name: 'uploadCap',
+  description: 'Upload a cap to IPFS & rooch blockchain',
   parameters: z.object({
-    fileName: z.string().describe("Name of the file"),
-    fileData: z.string().describe("Base64 encoded file data"),
-    pin: z.boolean().optional().default(true).describe("Pin the file on IPFS")
+    fileName: z.string().describe('Name of the file'),
+    fileData: z.string().describe('Base64 encoded file data'),
+    pin: z.boolean().optional().default(true).describe('Pin the file on IPFS'),
   }),
   pricePicoUSD: BigInt(1000000000), // 0.001 USD
-  execute: uploadCap
+  execute: uploadCap,
 };

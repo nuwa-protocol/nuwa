@@ -4,10 +4,13 @@
   "extensionsToTreatAsEsm": [".ts"],
   "roots": ["<rootDir>/src", "<rootDir>/__tests__", "<rootDir>/test"],
   "transform": {
-    "^.+\\.tsx?$": ["ts-jest", {
-      "tsconfig": "tsconfig.json",
-      "useESM": true
-    }]
+    "^.+\\.tsx?$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.json",
+        "useESM": true
+      }
+    ]
   },
   "testMatch": ["**/__tests__/**/*.ts", "**/test/**/*.test.ts", "**/?(*.)+(spec|test).ts"],
   "moduleFileExtensions": ["ts", "js", "json"],
@@ -15,11 +18,7 @@
   "collectCoverage": false,
   "coverageDirectory": "coverage",
   "coverageReporters": ["text-summary"],
-  "collectCoverageFrom": [
-    "src/**/*.ts",
-    "!src/**/types.ts",
-    "!src/**/index.ts"
-  ],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/types.ts", "!src/**/index.ts"],
   "coverageThreshold": {
     "global": {
       "branches": 0,
@@ -30,10 +29,13 @@
   },
   "setupFiles": ["<rootDir>/__tests__/setup.cjs"],
   "reporters": [
-    ["default", {
-      "summaryThreshold": 1,
-      "verbose": false
-    }]
+    [
+      "default",
+      {
+        "summaryThreshold": 1,
+        "verbose": false
+      }
+    ]
   ],
   "maxConcurrency": 1,
   "maxWorkers": 1,
@@ -41,10 +43,6 @@
   "moduleNameMapper": {
     "^@nuwa-ai/identity-kit/testHelpers$": "<rootDir>/../identity-kit/src/testHelpers/index.ts"
   },
-  "testPathIgnorePatterns": [
-    "<rootDir>/test/e2e/"
-  ],
-  "transformIgnorePatterns": [
-    "node_modules/(?!(fastmcp|@modelcontextprotocol|mcp-proxy)/)"
-  ]
-} 
+  "testPathIgnorePatterns": ["<rootDir>/test/e2e/"],
+  "transformIgnorePatterns": ["node_modules/(?!(fastmcp|@modelcontextprotocol|mcp-proxy)/)"]
+}

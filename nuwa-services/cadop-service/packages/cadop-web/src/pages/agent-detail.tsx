@@ -24,7 +24,21 @@ import { ConditionalRevenueCard } from '@/components/revenue/ConditionalRevenueC
 import { ServiceManagement } from '@/components/service/ServiceManagement';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useDIDService } from '../hooks/useDIDService';
-import { ArrowLeft, Key, History, Users, FileText, RotateCcw, Gift, Trash2, Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Info } from 'lucide-react';
+import {
+  ArrowLeft,
+  Key,
+  History,
+  Users,
+  FileText,
+  RotateCcw,
+  Gift,
+  Trash2,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  Info,
+} from 'lucide-react';
 import type { DIDDocument, VerificationMethod } from '@nuwa-ai/identity-kit';
 import { useAgentBalances } from '../hooks/useAgentBalances';
 import { usePaymentHubBalances } from '../hooks/usePaymentHubBalances';
@@ -323,7 +337,10 @@ export function AgentDetailPage() {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="max-w-xs">
-                              {t('agent.accountBalanceTooltip', 'This is your on-chain account balance, available for regular transfers, gas fees, and other on-chain operations.')}
+                              {t(
+                                'agent.accountBalanceTooltip',
+                                'This is your on-chain account balance, available for regular transfers, gas fees, and other on-chain operations.'
+                              )}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -341,7 +358,10 @@ export function AgentDetailPage() {
                   <CardContent>
                     <div className="space-y-4">
                       <p className="text-sm text-muted-foreground">
-                        {t('agent.accountBalanceDesc', 'Available balance for transfers and transactions')}
+                        {t(
+                          'agent.accountBalanceDesc',
+                          'Available balance for transfers and transactions'
+                        )}
                       </p>
 
                       {agentAccountLoading ? (
@@ -411,7 +431,10 @@ export function AgentDetailPage() {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="max-w-xs">
-                              {t('agent.paymentChannelBalanceTooltip', 'This is the balance dedicated to payment channels. Payment channels enable fast, low-cost micro-payments without submitting on-chain transactions each time. When channels are active, a portion of the balance is locked as collateral.')}
+                              {t(
+                                'agent.paymentChannelBalanceTooltip',
+                                'This is the balance dedicated to payment channels. Payment channels enable fast, low-cost micro-payments without submitting on-chain transactions each time. When channels are active, a portion of the balance is locked as collateral.'
+                              )}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -432,7 +455,10 @@ export function AgentDetailPage() {
                   <CardContent>
                     <div className="space-y-4">
                       <p className="text-sm text-muted-foreground">
-                        {t('agent.paymentChannelBalanceDesc', 'Reserved balance for fast payment channels')}
+                        {t(
+                          'agent.paymentChannelBalanceDesc',
+                          'Reserved balance for fast payment channels'
+                        )}
                       </p>
 
                       {paymentHubStateLoading || paymentHubRgasLoading ? (
@@ -463,13 +489,17 @@ export function AgentDetailPage() {
 
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="flex flex-col space-y-1 p-2 rounded border border-muted">
-                              <span className="text-muted-foreground">{t('agent.lockedBalance', 'Locked')}</span>
+                              <span className="text-muted-foreground">
+                                {t('agent.lockedBalance', 'Locked')}
+                              </span>
                               <span className="font-mono font-semibold text-orange-600">
                                 {paymentHubLocked} RGAS
                               </span>
                             </div>
                             <div className="flex flex-col space-y-1 p-2 rounded border border-muted">
-                              <span className="text-muted-foreground">{t('agent.unlockedBalance', 'Unlocked')}</span>
+                              <span className="text-muted-foreground">
+                                {t('agent.unlockedBalance', 'Unlocked')}
+                              </span>
                               <span className="font-mono font-semibold text-green-600">
                                 {paymentHubUnlocked} RGAS
                               </span>
@@ -481,28 +511,31 @@ export function AgentDetailPage() {
                       )}
 
                       {/* Action buttons */}
-                      {(!paymentHubStateLoading && !paymentHubRgasLoading && !paymentHubStateError && !paymentHubRgasError) && (
-                        <div className="flex space-x-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setTransferHubOpen(true)}
-                            className="flex-1"
-                          >
-                            <ArrowUpRight className="h-4 w-4 mr-2" />
-                            {t('agent.transfer', 'Transfer')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setWithdrawOpen(true)}
-                            className="flex-1"
-                          >
-                            <ArrowDownRight className="h-4 w-4 mr-2" />
-                            {t('agent.withdraw', 'Withdraw')}
-                          </Button>
-                        </div>
-                      )}
+                      {!paymentHubStateLoading &&
+                        !paymentHubRgasLoading &&
+                        !paymentHubStateError &&
+                        !paymentHubRgasError && (
+                          <div className="flex space-x-2 pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setTransferHubOpen(true)}
+                              className="flex-1"
+                            >
+                              <ArrowUpRight className="h-4 w-4 mr-2" />
+                              {t('agent.transfer', 'Transfer')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setWithdrawOpen(true)}
+                              className="flex-1"
+                            >
+                              <ArrowDownRight className="h-4 w-4 mr-2" />
+                              {t('agent.withdraw', 'Withdraw')}
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   </CardContent>
                 </Card>
@@ -692,7 +725,9 @@ export function AgentDetailPage() {
             open={transferAccountOpen}
             onClose={() => setTransferAccountOpen(false)}
             agentDid={did}
-            currentBalance={BigInt(agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance ?? 0)}
+            currentBalance={BigInt(
+              agentAccountBalances.find(b => b.symbol === 'RGAS')?.balance ?? 0
+            )}
             onSuccess={handleTransferSuccess}
           />
 

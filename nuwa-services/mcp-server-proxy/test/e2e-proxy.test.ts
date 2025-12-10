@@ -14,7 +14,7 @@ import { createMcpClient } from '@nuwa-ai/payment-kit';
 async function startMockUpstream(): Promise<ChildProcess> {
   const proc = fork('./test/fixtures/http-mock-mcp.js', [], { stdio: 'ignore' });
   await new Promise<void>((resolve, reject) => {
-    waitOn({ resources: ['tcp:4000'], timeout: 10000 }, (err) => {
+    waitOn({ resources: ['tcp:4000'], timeout: 10000 }, err => {
       if (err) reject(err);
       else resolve();
     });
@@ -23,18 +23,20 @@ async function startMockUpstream(): Promise<ChildProcess> {
 }
 
 // Start the actual proxy server directly using the exported startServer function
-async function startProxyServer(payee: CreateSelfDidResult): Promise<{ close: () => Promise<void> }> {
+async function startProxyServer(
+  payee: CreateSelfDidResult
+): Promise<{ close: () => Promise<void> }> {
   // Export payee's key for the proxy server
   const keyIds = await payee.keyManager.listKeyIds();
   const serviceKey = await payee.keyManager.exportKeyToString(keyIds[0]);
-  
+
   // Create test configuration
   const config: MinimalConfig = {
     port: 5100,
     endpoint: '/mcp',
     upstream: {
       type: 'httpStream',
-      url: 'http://127.0.0.1:4000/mcp'
+      url: 'http://127.0.0.1:4000/mcp',
     },
     serviceId: 'test-service',
     serviceKey: serviceKey, // Use exported key string
@@ -45,14 +47,14 @@ async function startProxyServer(payee: CreateSelfDidResult): Promise<{ close: ()
       tools: [
         {
           name: 'custom.free',
-          pricePicoUSD: '0'
+          pricePicoUSD: '0',
         },
         {
           name: 'custom.paid',
-          pricePicoUSD: '200000000' // 0.0002 USD
-        }
-      ]
-    }
+          pricePicoUSD: '200000000', // 0.0002 USD
+        },
+      ],
+    },
   };
 
   // Use the exported startServer function
@@ -112,10 +114,10 @@ describe('Proxy MCP e2e', () => {
 
     // Start mock upstream first
     upstreamProc = await startMockUpstream();
-    
+
     // Start the actual proxy server directly
     proxyServer = await startProxyServer(payee);
-    
+
     // Create MCP client with payment capabilities
     mcpClient = await createMcpClient({
       baseUrl: 'http://127.0.0.1:5100/mcp',
@@ -136,8 +138,12 @@ describe('Proxy MCP e2e', () => {
   afterAll(async () => {
     if (!shouldRunE2ETests()) return;
 
-    try { await proxyServer?.close?.(); } catch {}
-    try { upstreamProc?.kill('SIGTERM'); } catch {}
+    try {
+      await proxyServer?.close?.();
+    } catch {}
+    try {
+      upstreamProc?.kill('SIGTERM');
+    } catch {}
   });
 
   it('tools/list returns upstream forwarded tools', async () => {
@@ -151,11 +157,11 @@ describe('Proxy MCP e2e', () => {
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('Available tools:', names);
-    
+
     // Should contain payment kit built-in tools
     expect(names).toContain('nuwa.health');
     expect(names).toContain('nuwa.discovery');
-    
+
     // Should contain upstream 'echo' tool
     expect(names).toContain('echo');
 
@@ -207,11 +213,11 @@ describe('Proxy MCP e2e', () => {
 
     // Call upstream echo tool (should be paid due to defaultPricePicoUSD)
     const result = await mcpClient.call('echo', { text: 'paid upstream test' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
     expect(result.payment!.cost).toBe(BigInt('1000000')); // 100,000,000 picoUSD ÷ 100 picoUSD/unit = 1,000,000 RGas base units
-    
+
     console.log('✅ Paid upstream tool response:', result.data);
     console.log('💰 Payment info:', {
       cost: result.payment!.cost.toString(),
@@ -230,12 +236,12 @@ describe('Proxy MCP e2e', () => {
 
     // Call custom free tool
     const result = await mcpClient.call('custom.free', { message: 'test message' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeUndefined(); // Should be free
     expect(typeof result.data).toBe('string');
     expect(result.data).toContain('Custom free tool executed with message: test message');
-    
+
     console.log('✅ Custom FREE tool response:', result.data);
     console.log('✅ Payment info:', result.payment || 'None (FREE)');
 
@@ -246,16 +252,16 @@ describe('Proxy MCP e2e', () => {
     if (!shouldRunE2ETests()) return;
 
     console.log('💎 Testing custom paid tools');
-    
+
     // Call custom paid tool
     const result = await mcpClient.call('custom.paid', { data: 'test data' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
     expect(result.payment!.cost).toBe(BigInt('2000000')); // 200,000,000 picoUSD ÷ 100 picoUSD/unit = 2,000,000 RGas base units
     expect(typeof result.data).toBe('string');
     expect(result.data).toContain('Custom paid tool executed with data: test data');
-    
+
     console.log('✅ Custom paid tool response:', result.data);
     console.log('💰 Payment info:', {
       cost: result.payment!.cost.toString(),
@@ -278,11 +284,11 @@ describe('Proxy MCP e2e', () => {
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('All available tools:', names);
-    
+
     // Should contain payment kit built-in tools
     expect(names).toContain('nuwa.health');
     expect(names).toContain('nuwa.discovery');
-    
+
     // Should contain upstream 'echo' tool
     expect(names).toContain('echo');
 
@@ -295,11 +301,13 @@ describe('Proxy MCP e2e', () => {
 });
 
 // Start stdio mock MCP server
-async function startStdioProxyServer(payee: CreateSelfDidResult): Promise<{ close: () => Promise<void> }> {
+async function startStdioProxyServer(
+  payee: CreateSelfDidResult
+): Promise<{ close: () => Promise<void> }> {
   // Export payee's key for the proxy server
   const keyIds = await payee.keyManager.listKeyIds();
   const serviceKey = await payee.keyManager.exportKeyToString(keyIds[0]);
-  
+
   // Create test configuration with stdio upstream
   const config: MinimalConfig = {
     port: 5200, // Different port to avoid conflicts
@@ -307,7 +315,7 @@ async function startStdioProxyServer(payee: CreateSelfDidResult): Promise<{ clos
     upstream: {
       type: 'stdio',
       command: ['node', './test/fixtures/stdio-mock-mcp.js'],
-      cwd: process.cwd()
+      cwd: process.cwd(),
     },
     serviceId: 'test-stdio-service',
     serviceKey: serviceKey,
@@ -318,14 +326,14 @@ async function startStdioProxyServer(payee: CreateSelfDidResult): Promise<{ clos
       tools: [
         {
           name: 'stdio.free',
-          pricePicoUSD: '0'
+          pricePicoUSD: '0',
         },
         {
           name: 'stdio.paid',
-          pricePicoUSD: '200000000' // 0.0002 USD
-        }
-      ]
-    }
+          pricePicoUSD: '200000000', // 0.0002 USD
+        },
+      ],
+    },
   };
 
   return await startServer(config);
@@ -378,7 +386,7 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
 
     // Start the stdio proxy server
     proxyServer = await startStdioProxyServer(payee);
-    
+
     // Create MCP client with payment capabilities
     mcpClient = await createMcpClient({
       baseUrl: 'http://127.0.0.1:5200/mcp',
@@ -399,7 +407,9 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
   afterAll(async () => {
     if (!shouldRunE2ETests()) return;
 
-    try { await proxyServer?.close?.(); } catch {}
+    try {
+      await proxyServer?.close?.();
+    } catch {}
   });
 
   it('stdio upstream tools/list returns forwarded tools', async () => {
@@ -413,11 +423,11 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
     const list = Array.isArray((tools as any).tools) ? (tools as any).tools : (tools as any);
     const names = list.map((t: any) => t.name);
     console.log('Available stdio tools:', names);
-    
+
     // Should contain payment kit built-in tools
     expect(names).toContain('nuwa.health');
     expect(names).toContain('nuwa.discovery');
-    
+
     // Should contain stdio upstream tools
     expect(names).toContain('echo');
     expect(names).toContain('stdio.free');
@@ -447,12 +457,12 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
 
     // Call stdio free tool
     const result = await mcpClient.call('stdio.free', { message: 'test stdio message' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeUndefined(); // Should be free
     expect(typeof result.data).toBe('string');
     expect(result.data).toContain('Stdio free tool executed with message: test stdio message');
-    
+
     console.log('✅ Stdio FREE tool response:', result.data);
     console.log('✅ Payment info:', result.payment || 'None (FREE)');
 
@@ -463,16 +473,16 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
     if (!shouldRunE2ETests()) return;
 
     console.log('💎 Testing stdio paid tools');
-    
+
     // Call stdio paid tool
     const result = await mcpClient.call('stdio.paid', { data: 'test stdio data' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
     expect(result.payment!.cost).toBe(BigInt('2000000')); // 200,000,000 picoUSD ÷ 100 picoUSD/unit = 2,000,000 RGas base units
     expect(typeof result.data).toBe('string');
     expect(result.data).toContain('Stdio paid tool executed with data: test stdio data');
-    
+
     console.log('✅ Stdio paid tool response:', result.data);
     console.log('💰 Payment info:', {
       cost: result.payment!.cost.toString(),
@@ -491,11 +501,11 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
 
     // Call upstream echo tool (should be paid due to defaultPricePicoUSD)
     const result = await mcpClient.call('echo', { text: 'paid stdio upstream test' });
-    
+
     expect(result.data).toBeTruthy();
     expect(result.payment).toBeTruthy(); // Should have payment info
     expect(result.payment!.cost).toBe(BigInt('1000000')); // 100,000,000 picoUSD ÷ 100 picoUSD/unit = 1,000,000 RGas base units
-    
+
     console.log('✅ Paid stdio upstream tool response:', result.data);
     console.log('💰 Payment info:', {
       cost: result.payment!.cost.toString(),

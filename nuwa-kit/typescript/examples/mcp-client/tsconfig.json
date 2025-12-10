@@ -11,4 +11,4 @@
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]
-} 
+}

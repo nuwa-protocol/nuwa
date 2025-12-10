@@ -1,18 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { PACKAGE_ID, SUPABASE_KEY, SUPABASE_URL } from './constant.js';
-import { IndexerEventIDView } from "@roochnetwork/rooch-sdk";
+import { IndexerEventIDView } from '@roochnetwork/rooch-sdk';
 import { CapMetadata, CapStats, RatingDistribution } from './type.js';
 import { Cap } from '@nuwa-ai/cap-kit';
-import yaml from "js-yaml";
+import yaml from 'js-yaml';
 config();
 
-const CAP_SYNC_TABLE_NAME = "cap_sync_state";
-const CAP_TABLE_NAME = "cap_data"
-const CAP_STATS_TABLE_NAME = "cap_stats";
-const USER_FAVORITE_CAPS_TABLE_NAME = "user_favorite_caps";
-const USER_CAP_RATINGS_TABLE_NAME = "user_cap_ratings";
-const CAP_RAW_DATA_TABLE_NAME = "cap_raw_data";
+const CAP_SYNC_TABLE_NAME = 'cap_sync_state';
+const CAP_TABLE_NAME = 'cap_data';
+const CAP_STATS_TABLE_NAME = 'cap_stats';
+const USER_FAVORITE_CAPS_TABLE_NAME = 'user_favorite_caps';
+const USER_CAP_RATINGS_TABLE_NAME = 'user_cap_ratings';
+const CAP_RAW_DATA_TABLE_NAME = 'cap_raw_data';
 
 /**
  * Serializes an IndexerEventIDView cursor to a JSON string
@@ -73,16 +73,14 @@ export async function queryLastRegisterEventCursor(): Promise<IndexerEventIDView
 export async function saveRegisterEventCursor(cursor: IndexerEventIDView | null) {
   try {
     const cursorStr = serializeCursor(cursor);
-    const { error } = await supabase
-      .from(CAP_SYNC_TABLE_NAME)
-      .upsert(
-        {
-          event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,
-          cursor: cursorStr,
-          last_updated: new Date()
-        },
-        { onConflict: 'event_type' }
-      );
+    const { error } = await supabase.from(CAP_SYNC_TABLE_NAME).upsert(
+      {
+        event_type: `${PACKAGE_ID}::acp_registry::RegisterEvent`,
+        cursor: cursorStr,
+        last_updated: new Date(),
+      },
+      { onConflict: 'event_type' }
+    );
 
     if (error) throw error;
     console.log(`Cursor saved: ${cursorStr}`);
@@ -121,16 +119,14 @@ export async function queryLastUpdateCursor(): Promise<IndexerEventIDView | null
 export async function saveUpdateEventCursor(cursor: IndexerEventIDView | null) {
   try {
     const cursorStr = serializeCursor(cursor);
-    const { error } = await supabase
-      .from(CAP_SYNC_TABLE_NAME)
-      .upsert(
-        {
-          event_type: `${PACKAGE_ID}::acp_registry::UpdateEvent`,
-          cursor: cursorStr,
-          last_updated: new Date()
-        },
-        { onConflict: 'event_type' }
-      );
+    const { error } = await supabase.from(CAP_SYNC_TABLE_NAME).upsert(
+      {
+        event_type: `${PACKAGE_ID}::acp_registry::UpdateEvent`,
+        cursor: cursorStr,
+        last_updated: new Date(),
+      },
+      { onConflict: 'event_type' }
+    );
 
     if (error) throw error;
     console.log(`Update Cursor saved: ${cursorStr}`);
@@ -149,18 +145,14 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
  * @param version - Version number of the CAP
  * @throws Error if database operations fail
  */
-export async function saveCapToSupabase(
-  data: any,
-  cid: string,
-  version: number,
-): Promise<void> {
+export async function saveCapToSupabase(data: any, cid: string, version: number): Promise<void> {
   try {
-    const id = data.id
+    const id = data.id;
     // Query existing record
     const { data: existingData, error: queryError } = await supabase
       .from(CAP_TABLE_NAME)
-      .select("version, cid")
-      .eq("id", id)
+      .select('version, cid')
+      .eq('id', id)
       .maybeSingle();
 
     if (queryError) {
@@ -171,8 +163,8 @@ export async function saveCapToSupabase(
     if (existingData && version <= existingData.version) {
       console.log(
         `✅ Skipping update for ${id}. ` +
-        `Current version ${existingData.version} >= provided version ${version}, ` +
-        `CID: ${existingData.cid}`
+          `Current version ${existingData.version} >= provided version ${version}, ` +
+          `CID: ${existingData.cid}`
       );
       return;
     }
@@ -193,7 +185,7 @@ export async function saveCapToSupabase(
         version: version,
         timestamp: new Date().toISOString(),
       },
-      { onConflict: "id" }
+      { onConflict: 'id' }
     );
 
     if (error) {
@@ -201,7 +193,9 @@ export async function saveCapToSupabase(
     }
 
     if (existingData) {
-      console.log(`✅ Updated ${id} from version ${existingData.version} to ${version}, CID: ${cid}`);
+      console.log(
+        `✅ Updated ${id} from version ${existingData.version} to ${version}, CID: ${cid}`
+      );
     } else {
       console.log(`✅ Inserted new record for ${id}, version ${version}, CID: ${cid}`);
       // Initialize stats for new cap
@@ -221,27 +215,25 @@ export async function saveCapToSupabase(
  * @param rawData - The raw data string to store (optional)
  * @throws Error if database operations fail
  */
-export async function saveCapToSupabaseV2(
-  capBase64: string
-): Promise<void> {
+export async function saveCapToSupabaseV2(capBase64: string): Promise<void> {
   try {
     const capYaml = Buffer.from(capBase64, 'base64').toString('utf-8');
     const cap = yaml.load(capYaml);
 
-    const id = cap.id
+    const id = cap.id;
 
     // Query existing record
     const { data: existingData, error: queryError } = await supabase
       .from(CAP_TABLE_NAME)
-      .select("version, id")
-      .eq("id", id)
+      .select('version, id')
+      .eq('id', id)
       .maybeSingle();
 
     if (queryError) {
       throw new Error(`Supabase query failed: ${queryError.message}`);
     }
 
-    let version = 1
+    let version = 1;
     // If record exists and version doesn't need updating
     if (existingData) {
       version += 1;
@@ -262,22 +254,20 @@ export async function saveCapToSupabaseV2(
         version: version,
         timestamp: new Date().toISOString(),
       },
-      { onConflict: "id" }
+      { onConflict: 'id' }
     );
 
     if (error) {
       throw new Error(`Supabase operation failed: ${error.message}`);
     }
 
-    const { error: rawDataError } = await supabase
-      .from(CAP_RAW_DATA_TABLE_NAME)
-      .upsert(
-        {
-          id: id,
-          raw_data: capBase64
-        },
-        { onConflict: "id" }
-      );
+    const { error: rawDataError } = await supabase.from(CAP_RAW_DATA_TABLE_NAME).upsert(
+      {
+        id: id,
+        raw_data: capBase64,
+      },
+      { onConflict: 'id' }
+    );
 
     if (!existingData) {
       // Initialize stats for new cap
@@ -303,14 +293,17 @@ export async function downloadFromSupabase(id: string): Promise<{
     const cap = caps.items[0];
     await incrementCapDownloads(cap.id);
 
-    const { data, error } = await supabase.from(CAP_RAW_DATA_TABLE_NAME).select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase
+      .from(CAP_RAW_DATA_TABLE_NAME)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: error.message };
     }
 
     return { success: true, data };
-
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
@@ -322,7 +315,11 @@ export async function downloadsFromSupabaseRawData(id: string): Promise<{
   error?: string;
 }> {
   try {
-    const { data, error } = await supabase.from(CAP_RAW_DATA_TABLE_NAME).select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase
+      .from(CAP_RAW_DATA_TABLE_NAME)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: error.message };
@@ -381,7 +378,7 @@ export async function queryFromSupabase(
       p_sort_by: sortBy || 'downloads',
       p_sort_order: sortOrder,
       p_offset: offset,
-      p_limit: validatedPageSize
+      p_limit: validatedPageSize,
     });
 
     if (error) {
@@ -396,7 +393,7 @@ export async function queryFromSupabase(
         page,
         pageSize: validatedPageSize,
         totalItems: 0,
-        totalPages: 0
+        totalPages: 0,
       };
     }
 
@@ -426,7 +423,7 @@ export async function queryFromSupabase(
           ratingCount: item.rating_count || 0,
           averageRating: item.average_rating || 0,
           favorites: item.favorites || 0,
-        }
+        },
       };
     });
 
@@ -436,12 +433,12 @@ export async function queryFromSupabase(
       totalItems,
       page,
       pageSize: validatedPageSize,
-      totalPages
+      totalPages,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown query error'
+      error: error instanceof Error ? error.message : 'Unknown query error',
     };
   }
 }
@@ -456,16 +453,14 @@ export async function queryAllTags(): Promise<{
   error?: string;
 }> {
   try {
-    const { data, error } = await supabase
-      .from(CAP_TABLE_NAME)
-      .select('tags');
+    const { data, error } = await supabase.from(CAP_TABLE_NAME).select('tags');
 
     if (error) throw error;
 
     if (!data || data.length === 0) {
       return {
         success: true,
-        tags: []
+        tags: [],
       };
     }
 
@@ -479,12 +474,12 @@ export async function queryAllTags(): Promise<{
 
     return {
       success: true,
-      tags: Array.from(allTags).sort()
+      tags: Array.from(allTags).sort(),
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get tags'
+      error: error instanceof Error ? error.message : 'Failed to get tags',
     };
   }
 }
@@ -502,7 +497,14 @@ export async function queryByExactTags(
   pageSize: number = 50
 ): Promise<{
   success: boolean;
-  items?: Array<{ cid: string; name: string; id: string, version: number, displayName: string, tags: string[] }>;
+  items?: Array<{
+    cid: string;
+    name: string;
+    id: string;
+    version: number;
+    displayName: string;
+    tags: string[];
+  }>;
   totalItems?: number;
   page?: number;
   pageSize?: number;
@@ -529,7 +531,7 @@ export async function queryByExactTags(
         page,
         pageSize: validatedPageSize,
         totalItems: 0,
-        totalPages: 0
+        totalPages: 0,
       };
     }
 
@@ -544,22 +546,25 @@ export async function queryByExactTags(
         id: item.id,
         version: item.version,
         displayName: item.display_name,
-        tags: item.tags || []
+        tags: item.tags || [],
       })),
       totalItems,
       page,
       pageSize: validatedPageSize,
-      totalPages
+      totalPages,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to query by exact tags'
+      error: error instanceof Error ? error.message : 'Failed to query by exact tags',
     };
   }
 }
 
-export async function queryCapStats(capId: string, userDID?: string): Promise<{
+export async function queryCapStats(
+  capId: string,
+  userDID?: string
+): Promise<{
   success: boolean;
   stats?: CapStats;
   error?: string;
@@ -602,12 +607,16 @@ export async function queryCapStats(capId: string, userDID?: string): Promise<{
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get cap stats'
+      error: error instanceof Error ? error.message : 'Failed to get cap stats',
     };
   }
 }
 
-export async function rateCap(userDID: string, capId: string, rating: number): Promise<{
+export async function rateCap(
+  userDID: string,
+  capId: string,
+  rating: number
+): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -622,7 +631,7 @@ export async function rateCap(userDID: string, capId: string, rating: number): P
     const { error } = await supabase.rpc('rate_cap', {
       p_user_did: userDID,
       p_cap_id: capId,
-      p_rating: rating
+      p_rating: rating,
     });
 
     if (error) {
@@ -633,7 +642,7 @@ export async function rateCap(userDID: string, capId: string, rating: number): P
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to rate cap'
+      error: error instanceof Error ? error.message : 'Failed to rate cap',
     };
   }
 }
@@ -644,7 +653,7 @@ export async function incrementCapDownloads(capId: string): Promise<{
 }> {
   try {
     const { error } = await supabase.rpc('increment_cap_downloads', {
-      p_cap_id: capId
+      p_cap_id: capId,
     });
 
     if (error) {
@@ -655,12 +664,16 @@ export async function incrementCapDownloads(capId: string): Promise<{
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to increment cap downloads'
+      error: error instanceof Error ? error.message : 'Failed to increment cap downloads',
     };
   }
 }
 
-export async function queryUserFavoriteCaps(did: string, page: number = 0, pageSize: number = 50): Promise<{
+export async function queryUserFavoriteCaps(
+  did: string,
+  page: number = 0,
+  pageSize: number = 50
+): Promise<{
   success: boolean;
   items?: any[];
   totalItems?: number;
@@ -675,12 +688,15 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
 
     const { data, count, error } = await supabase
       .from(USER_FAVORITE_CAPS_TABLE_NAME)
-      .select(`
+      .select(
+        `
                 cap_data (
                     *,
                     cap_stats (*)
                 )
-            `, { count: 'exact' })
+            `,
+        { count: 'exact' }
+      )
       .eq('user_did', did)
       .range(offset, offset + validatedPageSize - 1);
 
@@ -691,8 +707,8 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
     const totalPages = Math.ceil(totalItems / validatedPageSize);
 
     const transformedItems = data.map((item: any) => {
-      const cap = item.cap_data
-      const stats = cap.cap_stats
+      const cap = item.cap_data;
+      const stats = cap.cap_stats;
       return {
         id: cap.id,
         cid: cap.cid,
@@ -714,9 +730,9 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
           averageRating: stats.average_rating || 0,
           favorites: stats.favorites || 0,
           userRating: stats.user_rating || null,
-        }
+        },
       };
-    })
+    });
     return {
       success: true,
       items: transformedItems,
@@ -728,12 +744,15 @@ export async function queryUserFavoriteCaps(did: string, page: number = 0, pageS
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get user favorite caps'
+      error: error instanceof Error ? error.message : 'Failed to get user favorite caps',
     };
   }
 }
 
-export async function addToUserFavoriteCaps(did: string, capId: string): Promise<{
+export async function addToUserFavoriteCaps(
+  did: string,
+  capId: string
+): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -746,8 +765,9 @@ export async function addToUserFavoriteCaps(did: string, capId: string): Promise
     if (insertError) throw insertError;
 
     // Update the favorites count in cap_stats using the database function
-    const { error: updateError } = await supabase
-      .rpc('increment_cap_favorites', { p_cap_id: capId });
+    const { error: updateError } = await supabase.rpc('increment_cap_favorites', {
+      p_cap_id: capId,
+    });
 
     if (updateError) {
       console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
@@ -758,12 +778,15 @@ export async function addToUserFavoriteCaps(did: string, capId: string): Promise
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to add to user favorite caps'
+      error: error instanceof Error ? error.message : 'Failed to add to user favorite caps',
     };
   }
 }
 
-export async function removeFromUserFavoriteCaps(did: string, capId: string): Promise<{
+export async function removeFromUserFavoriteCaps(
+  did: string,
+  capId: string
+): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -778,8 +801,9 @@ export async function removeFromUserFavoriteCaps(did: string, capId: string): Pr
     if (deleteError) throw deleteError;
 
     // Update the favorites count in cap_stats using the database function
-    const { error: updateError } = await supabase
-      .rpc('decrement_cap_favorites', { p_cap_id: capId });
+    const { error: updateError } = await supabase.rpc('decrement_cap_favorites', {
+      p_cap_id: capId,
+    });
 
     if (updateError) {
       console.warn(`Warning: Failed to update favorites count for cap ${capId}:`, updateError);
@@ -790,12 +814,15 @@ export async function removeFromUserFavoriteCaps(did: string, capId: string): Pr
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to remove from user favorite caps'
+      error: error instanceof Error ? error.message : 'Failed to remove from user favorite caps',
     };
   }
 }
 
-export async function isUserFavoriteCap(did: string, capId: string): Promise<{
+export async function isUserFavoriteCap(
+  did: string,
+  capId: string
+): Promise<{
   success: boolean;
   isFavorite?: boolean;
   error?: string;
@@ -812,28 +839,34 @@ export async function isUserFavoriteCap(did: string, capId: string): Promise<{
 
     return {
       success: true,
-      isFavorite: !!data
+      isFavorite: !!data,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to check if cap is favorite'
+      error: error instanceof Error ? error.message : 'Failed to check if cap is favorite',
     };
   }
 }
 
-export async function updateCapEnable(capId: string, enable: boolean): Promise<{
+export async function updateCapEnable(
+  capId: string,
+  enable: boolean
+): Promise<{
   success: boolean;
   error?: string;
 }> {
   try {
-    const { error } = await supabase.from(CAP_TABLE_NAME).update({ enable: enable }).eq('id', capId);
+    const { error } = await supabase
+      .from(CAP_TABLE_NAME)
+      .update({ enable: enable })
+      .eq('id', capId);
     if (error) throw error;
     return { success: true };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update cap enable'
+      error: error instanceof Error ? error.message : 'Failed to update cap enable',
     };
   }
 }
@@ -845,23 +878,24 @@ export async function getCapRatingDistribution(capId: string): Promise<{
 }> {
   try {
     const { data, error } = await supabase.rpc('get_cap_rating_distribution_complete', {
-      p_cap_id: capId
+      p_cap_id: capId,
     });
 
     if (error) {
       throw error;
     }
 
-    const distribution: RatingDistribution[] = data?.map((item: any) => ({
-      rating: item.rating,
-      count: Number(item.count)
-    })) ?? [];
+    const distribution: RatingDistribution[] =
+      data?.map((item: any) => ({
+        rating: item.rating,
+        count: Number(item.count),
+      })) ?? [];
 
     return { success: true, distribution };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get rating distribution'
+      error: error instanceof Error ? error.message : 'Failed to get rating distribution',
     };
   }
 }

@@ -32,7 +32,9 @@ import { createDefaultVDRs } from './index';
 import { DIDDocument } from '../types'; // Assuming DIDDocument is needed for agent construction
 
 // Example: Initialize with a placeholder or existing DID document for the agent's identity
-const didDocument: DIDDocument = { /* ... your agent's initial DID Document ... */ };
+const didDocument: DIDDocument = {
+  /* ... your agent's initial DID Document ... */
+};
 
 // Create default VDRs for 'key' and 'rooch' methods
 const vdrs = createDefaultVDRs();
@@ -41,7 +43,9 @@ const vdrs = createDefaultVDRs();
 const kit = new IdentityKit(didDocument, { vdrs });
 
 // Resolve a DID using the registered VDRs
-const resolvedDoc = await kit.resolveDID('did:rooch:rooch1z0en78drsglz5wkw9ze85zd4sfu2d0kyg6y5rph7z4k5fn9lzw8qkccsg3');
+const resolvedDoc = await kit.resolveDID(
+  'did:rooch:rooch1z0en78drsglz5wkw9ze85zd4sfu2d0kyg6y5rph7z4k5fn9lzw8qkccsg3'
+);
 
 // Example of creating a DID with RoochVDR (requires a signer)
 // import { Ed25519Keypair, SignatureScheme } from '@roochnetwork/rooch-sdk'; // Example imports
@@ -67,6 +71,7 @@ To create a custom VDR implementation:
 For detailed implementation guidance, **refer to the `AbstractVDR.ts` class and existing implementations like `RoochVDR.ts` and `KeyVDR.ts`**. These files provide concrete examples of method implementations, option handling, and error management.
 
 **High-Level Structure Example:**
+
 ```typescript
 import { AbstractVDR } from './abstractVDR';
 import { DIDDocument, DIDCreationRequest, DIDCreationResult } from '../types';
@@ -92,7 +97,7 @@ export class CustomVDR extends AbstractVDR {
     // For details, see KeyVDR.ts or RoochVDR.ts
     throw new Error('Method not implemented.');
   }
-  
+
   // ... implement other VDRInterface methods as needed ...
   // (exists, addVerificationMethod, removeVerificationMethod, addService, etc.)
   // Refer to AbstractVDR.ts for method signatures.
@@ -104,28 +109,45 @@ export class CustomVDR extends AbstractVDR {
 Each VDR implementation should conform to the `VDRInterface`. `AbstractVDR` provides a base class with some default implementations and helper methods.
 
 ```typescript
-import { DIDDocument, ServiceEndpoint, VerificationMethod, VerificationRelationship, DIDCreationRequest, DIDCreationResult, CADOPCreationRequest } from '../types';
+import {
+  DIDDocument,
+  ServiceEndpoint,
+  VerificationMethod,
+  VerificationRelationship,
+  DIDCreationRequest,
+  DIDCreationResult,
+  CADOPCreationRequest,
+} from '../types';
 
 interface VDRInterface {
   // DID Document Creation
   create?(request: DIDCreationRequest, options?: any): Promise<DIDCreationResult>;
   createViaCADOP?(request: CADOPCreationRequest, options?: any): Promise<DIDCreationResult>;
-  
+
   // Core operations
   resolve(did: string): Promise<DIDDocument | null>;
   exists(did: string): Promise<boolean>;
   getMethod(): string;
-  
+
   // Fine-grained update operations
   // Concrete VDRs must implement these if they support updates.
   // See AbstractVDR.ts for signatures and default "not implemented" errors.
-  addVerificationMethod(did: string, verificationMethod: VerificationMethod, 
-    relationships?: VerificationRelationship[], options?: any): Promise<boolean>;
+  addVerificationMethod(
+    did: string,
+    verificationMethod: VerificationMethod,
+    relationships?: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean>;
   removeVerificationMethod(did: string, id: string, options?: any): Promise<boolean>;
   addService(did: string, service: ServiceEndpoint, options?: any): Promise<boolean>;
   removeService(did: string, id: string, options?: any): Promise<boolean>;
-  updateRelationships(did: string, id: string, add: VerificationRelationship[], 
-    remove: VerificationRelationship[], options?: any): Promise<boolean>;
+  updateRelationships(
+    did: string,
+    id: string,
+    add: VerificationRelationship[],
+    remove: VerificationRelationship[],
+    options?: any
+  ): Promise<boolean>;
   updateController(did: string, controller: string | string[], options?: any): Promise<boolean>;
 }
 ```
@@ -134,6 +156,7 @@ interface VDRInterface {
 
 **Initial Creation using `create`:**
 The `create` method is used when the DID and its document are generated/registered by the VDR system (e.g., on-chain VDRs).
+
 ```typescript
 // const vdr = agent.getVDR('rooch'); // Or your custom VDR
 // const creationRequest: DIDCreationRequest = { /* ... */ };
@@ -144,6 +167,7 @@ The `create` method is used when the DID and its document are generated/register
 
 **Checking Existence and Updates:**
 Before updates, check if a DID exists.
+
 ```typescript
 // const did = 'did:example:123';
 // const vdr = agent.getVDR('example');
@@ -156,11 +180,13 @@ Before updates, check if a DID exists.
 //   // Refer to specific VDR implementation and AbstractVDR.ts for details on options.
 // }
 ```
+
 Update methods include: `addVerificationMethod`, `removeVerificationMethod`, `addService`, etc.
 
 ### Permission Model
 
 VDRs enforce permissions, often guided by `AbstractVDR`'s `validateKeyPermission` helper.
+
 - **Key Management** (e.g., `addVerificationMethod`) typically needs `capabilityDelegation`.
 - **Service Management** (e.g., `addService`) typically needs `capabilityInvocation`.
 - **Controller Updates** require current controller authorization.
@@ -175,17 +201,18 @@ For building a new VDR:
 
 1.  **Extend `AbstractVDR`**: This provides structure and helper utilities.
 2.  **Implement Core Methods**:
-    *   `create(request: DIDCreationRequest, options?: any)`: For DID generation.
-    *   `resolve(did: string)`: To fetch the DID document.
+    - `create(request: DIDCreationRequest, options?: any)`: For DID generation.
+    - `resolve(did: string)`: To fetch the DID document.
 3.  **Implement Update Methods (if applicable)**: Such as `addVerificationMethod`, `addService`, etc. These involve:
-    *   Resolving the current document.
-    *   Validating permissions (see `validateUpdateOperation` in `AbstractVDR`).
-    *   Copying the document (`this.copyDocument`).
-    *   Applying changes and persisting them.
+    - Resolving the current document.
+    - Validating permissions (see `validateUpdateOperation` in `AbstractVDR`).
+    - Copying the document (`this.copyDocument`).
+    - Applying changes and persisting them.
 4.  **Error Handling & Validation**: Use helpers from `AbstractVDR` (e.g., `validateDIDMethod`, `validateDocument`) and implement robust error reporting.
 
 **The best resources for understanding implementation details are:**
--   `nuwa-kit/typescript/packages/nuwa-identity-kit/src/vdr/abstractVDR.ts`
--   Existing VDR implementations like `KeyVDR.ts` and `RoochVDR.ts`.
+
+- `nuwa-kit/typescript/packages/nuwa-identity-kit/src/vdr/abstractVDR.ts`
+- Existing VDR implementations like `KeyVDR.ts` and `RoochVDR.ts`.
 
 These files showcase how to structure your VDR, handle parameters, manage state, and interact with the underlying DID method's specifics.

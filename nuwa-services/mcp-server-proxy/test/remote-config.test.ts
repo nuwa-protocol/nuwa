@@ -43,7 +43,7 @@ upstream:
       }
     });
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       mockServer.listen(0, () => {
         const port = mockServer.address().port;
         serverUrl = `http://localhost:${port}`;
@@ -54,7 +54,7 @@ upstream:
 
   afterAll(async () => {
     if (mockServer) {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         mockServer.close(() => resolve());
       });
     }
@@ -63,9 +63,9 @@ upstream:
   it('should load configuration from remote URL', async () => {
     // Clear argv to avoid interference
     process.argv = ['node', 'server.js', '--config', `${serverUrl}/config.yaml`];
-    
+
     const config = await loadConfig();
-    
+
     expect(config.port).toBe(9999);
     expect(config.endpoint).toBe('/remote-mcp');
     expect(config.serviceId).toBe('remote-test-service');
@@ -83,16 +83,16 @@ upstream:
     // Set test environment variables
     process.env.TEST_PORT = '7777';
     process.env.TEST_API_KEY = 'remote-secret-key';
-    
+
     process.argv = ['node', 'server.js', '--config', `${serverUrl}/config-with-env.yaml`];
-    
+
     const config = await loadConfig();
-    
+
     expect(config.port).toBe(7777);
     expect(config.serviceId).toBe('env-test-service');
     expect(config.upstream?.type).toBe('httpStream');
     expect((config.upstream as any)?.url).toBe('https://api.example.com/mcp?key=remote-secret-key');
-    
+
     // Clean up
     delete process.env.TEST_PORT;
     delete process.env.TEST_API_KEY;
@@ -100,7 +100,7 @@ upstream:
 
   it('should handle remote config loading errors gracefully', async () => {
     process.argv = ['node', 'server.js', '--config', `${serverUrl}/nonexistent.yaml`];
-    
+
     // Mock process.exit to prevent actual exit during test
     const originalExit = process.exit;
     let exitCode: number | undefined;
@@ -108,7 +108,7 @@ upstream:
       exitCode = code;
       throw new Error('Process exit called');
     }) as any;
-    
+
     try {
       await expect(loadConfig()).rejects.toThrow('Process exit called');
       expect(exitCode).toBe(1);
@@ -121,12 +121,12 @@ upstream:
   it('should prioritize environment CONFIG_PATH over default', async () => {
     process.argv = ['node', 'server.js'];
     process.env.CONFIG_PATH = `${serverUrl}/config.yaml`;
-    
+
     const config = await loadConfig();
-    
+
     expect(config.port).toBe(9999);
     expect(config.serviceId).toBe('remote-test-service');
-    
+
     // Clean up
     delete process.env.CONFIG_PATH;
   });

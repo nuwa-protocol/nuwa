@@ -9,4 +9,4 @@
     "types": ["node"]
   },
   "include": ["src/**/*"]
-} 
+}

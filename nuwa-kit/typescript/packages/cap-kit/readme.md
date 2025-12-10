@@ -41,7 +41,7 @@ const env = await TestEnv.bootstrap({
 
 // Create a DID signer
 const { signer } = await createSelfDid(env, {
-  customScopes: ['0xcontract::*::*']
+  customScopes: ['0xcontract::*::*'],
 });
 
 // Initialize CapKit
@@ -53,14 +53,10 @@ const capKit = new CapKit({
 });
 
 // Register a new capability
-const cid = await capKit.registerCap(
-  'my_awesome_cap',
-  'Description of my capability',
-  {
-    version: '1.0.0',
-    capabilities: ['text-generation', 'summarization']
-  }
-);
+const cid = await capKit.registerCap('my_awesome_cap', 'Description of my capability', {
+  version: '1.0.0',
+  capabilities: ['text-generation', 'summarization'],
+});
 
 console.log(`Capability registered with CID: ${cid}`);
 ```
@@ -98,6 +94,7 @@ async registerCap(
 ```
 
 **Parameters:**
+
 - `name`: Unique capability name (6-20 characters, alphanumeric and underscore only)
 - `description`: Human-readable description of the capability
 - `options`: Additional metadata and configuration
@@ -105,6 +102,7 @@ async registerCap(
 **Returns:** IPFS CID of the registered capability package
 
 **Example:**
+
 ```typescript
 const cid = await capKit.registerCap(
   'web_scraper',
@@ -114,8 +112,8 @@ const cid = await capKit.registerCap(
     capabilities: ['web-scraping', 'data-extraction'],
     requirements: {
       memory: '512MB',
-      permissions: ['network-access']
-    }
+      permissions: ['network-access'],
+    },
   }
 );
 ```
@@ -129,11 +127,13 @@ async queryCapWithCID(cid: string): Promise<any>
 ```
 
 **Parameters:**
+
 - `cid`: IPFS Content Identifier
 
 **Returns:** Capability metadata object
 
 **Example:**
+
 ```typescript
 const capability = await capKit.queryCapWithCID('QmcG8y4tGQacqSMJdWUQuJvf4921psvoasfQrasMRRTC3q');
 console.log(capability.name, capability.description);
@@ -152,6 +152,7 @@ async queryWithName(
 ```
 
 **Parameters:**
+
 - `name`: Optional name filter for search
 - `page`: Page number for pagination (default: 1)
 - `size`: Number of results per page (default: 10)
@@ -159,6 +160,7 @@ async queryWithName(
 **Returns:** Paginated list of capability packages
 
 **Example:**
+
 ```typescript
 // Search all capabilities
 const allCaps = await capKit.queryWithName();
@@ -174,23 +176,22 @@ Downloads the content of a capability package.
 
 ```typescript
 async downloadCap(
-  cid: string, 
+  cid: string,
   format?: 'base64' | 'utf8'
 ): Promise<any>
 ```
 
 **Parameters:**
+
 - `cid`: IPFS Content Identifier
 - `format`: Data format for download (default: 'utf8')
 
 **Returns:** Downloaded capability package content
 
 **Example:**
+
 ```typescript
-const content = await capKit.downloadCap(
-  'QmcG8y4tGQacqSMJdWUQuJvf4921psvoasfQrasMRRTC3q',
-  'utf8'
-);
+const content = await capKit.downloadCap('QmcG8y4tGQacqSMJdWUQuJvf4921psvoasfQrasMRRTC3q', 'utf8');
 
 // Parse YAML content
 import * as yaml from 'js-yaml';
@@ -226,22 +227,22 @@ const capKit = new CapKit({
 Capability packages are stored as YAML files with the following structure:
 
 ```yaml
-id: "did:nuwa:user123:my_capability"
-name: "my_capability"
-description: "Description of the capability"
-version: "1.0.0"
+id: 'did:nuwa:user123:my_capability'
+name: 'my_capability'
+description: 'Description of the capability'
+version: '1.0.0'
 capabilities:
-  - "text-generation"
-  - "data-analysis"
+  - 'text-generation'
+  - 'data-analysis'
 requirements:
-  memory: "256MB"
+  memory: '256MB'
   permissions:
-    - "network-access"
-    - "file-system-read"
+    - 'network-access'
+    - 'file-system-read'
 metadata:
-  author: "User Name"
-  license: "MIT"
-  tags: ["ai", "nlp", "utility"]
+  author: 'User Name'
+  license: 'MIT'
+  tags: ['ai', 'nlp', 'utility']
 ```
 
 ## Error Handling

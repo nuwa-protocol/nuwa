@@ -16,10 +16,7 @@
         "groups": [
           {
             "group": "Introduction",
-            "pages": [
-              "introduction/nuwa-ai",
-              "introduction/why-nuwa"
-            ]
+            "pages": ["introduction/nuwa-ai", "introduction/why-nuwa"]
           },
           {
             "group": "Core Concepts",
@@ -44,11 +41,7 @@
               "build-caps/models",
               {
                 "group": "MCP",
-                "pages": [
-                  "build-caps/mcp",
-                  "build-caps/mcp-proxy",
-                  "build-caps/mcp-server"
-                ]
+                "pages": ["build-caps/mcp", "build-caps/mcp-proxy", "build-caps/mcp-server"]
               },
               "build-caps/llm-gateway",
               "build-caps/prompt",
@@ -75,16 +68,11 @@
           },
           {
             "group": "Examples",
-            "pages": [
-              "guides/llm-gateway-knowledge-service"
-            ]
+            "pages": ["guides/llm-gateway-knowledge-service"]
           },
           {
             "group": "Deployment",
-            "pages": [
-              "guides/deploy-llm-gateway-railway",
-              "guides/deploy-mcp-proxy-railway"
-            ]
+            "pages": ["guides/deploy-llm-gateway-railway", "guides/deploy-mcp-proxy-railway"]
           }
         ]
       },
@@ -94,23 +82,15 @@
         "groups": [
           {
             "group": "Introduction",
-            "pages": [
-              "xnuwa/overview",
-              "xnuwa/x402",
-              "xnuwa/erc8004"
-            ]
+            "pages": ["xnuwa/overview", "xnuwa/x402", "xnuwa/erc8004"]
           },
           {
             "group": "Build",
-            "pages": [
-              "xnuwa/x402-mcp"
-            ]
+            "pages": ["xnuwa/x402-mcp"]
           },
           {
             "group": "SDK",
-            "pages": [
-              "xnuwa/sdk"
-            ],
+            "pages": ["xnuwa/sdk"],
             "anchors": [
               {
                 "anchor": "Nuwa-8004",
@@ -136,16 +116,7 @@
     }
   },
   "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
+    "options": ["copy", "view", "chatgpt", "claude", "perplexity", "mcp", "cursor", "vscode"]
   },
   "footer": {
     "socials": {

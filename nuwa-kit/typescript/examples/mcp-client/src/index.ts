@@ -1,11 +1,20 @@
-import { CryptoUtils, MultibaseCodec, KeyType, IdentityEnvBuilder, IdentityEnv, IdentityKit, KeyStore, MemoryKeyStore } from "@nuwa-ai/identity-kit";
-import { createMcpClient } from "@nuwa-ai/payment-kit";
-import { randomUUID } from "crypto";
-import fs from "fs/promises";
-import os, { networkInterfaces } from "os";
-import path from "path";
-import http from "http";
-import { URL } from "url";
+import {
+  CryptoUtils,
+  MultibaseCodec,
+  KeyType,
+  IdentityEnvBuilder,
+  IdentityEnv,
+  IdentityKit,
+  KeyStore,
+  MemoryKeyStore,
+} from '@nuwa-ai/identity-kit';
+import { createMcpClient } from '@nuwa-ai/payment-kit';
+import { randomUUID } from 'crypto';
+import fs from 'fs/promises';
+import os, { networkInterfaces } from 'os';
+import path from 'path';
+import http from 'http';
+import { URL } from 'url';
 
 /************************************************************
  * Configuration persistence helpers
@@ -19,12 +28,12 @@ interface StoredConfig {
   publicKeyMultibase: string;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), ".nuwa");
-const CONFIG_PATH = path.join(CONFIG_DIR, "mcp-cli.json");
+const CONFIG_DIR = path.join(os.homedir(), '.nuwa');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'mcp-cli.json');
 
 async function loadConfig(): Promise<StoredConfig | null> {
   try {
-    const json = await fs.readFile(CONFIG_PATH, "utf8");
+    const json = await fs.readFile(CONFIG_PATH, 'utf8');
     return JSON.parse(json) as StoredConfig;
   } catch (_) {
     return null;
@@ -33,19 +42,19 @@ async function loadConfig(): Promise<StoredConfig | null> {
 
 async function saveConfig(config: StoredConfig): Promise<void> {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
 }
 
 /************************************************************
  * Deep-link connect flow (one-time run)
  ************************************************************/
 
-const DEFAULT_CADOP_DOMAIN = "https://test-id.nuwa.dev"; // can be overridden via env
+const DEFAULT_CADOP_DOMAIN = 'https://test-id.nuwa.dev'; // can be overridden via env
 const REDIRECT_PORT = 4378; // local HTTP port for callback
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
 
 async function connectToCadop(cadopDomain = DEFAULT_CADOP_DOMAIN): Promise<StoredConfig> {
-  console.log("No existing key found – starting connect flow…\n");
+  console.log('No existing key found – starting connect flow…\n');
 
   // 1. Generate an Ed25519 key pair
   const { publicKey, privateKey } = await CryptoUtils.generateKeyPair(KeyType.ED25519);
@@ -62,27 +71,27 @@ async function connectToCadop(cadopDomain = DEFAULT_CADOP_DOMAIN): Promise<Store
       publicKeyMultibase,
       idFragment,
     },
-    verificationRelationships: ["authentication"],
+    verificationRelationships: ['authentication'],
     redirectUri: REDIRECT_URI,
     state,
   } as const;
 
   const encodedPayload = MultibaseCodec.encodeBase64url(JSON.stringify(payload));
-  const cadopBase = cadopDomain.replace(/\/+$/, "");
+  const cadopBase = cadopDomain.replace(/\/+$/, '');
   const deepLinkUrl = `${cadopBase}/add-key?payload=${encodedPayload}`;
 
-  console.log("Please open the following URL in your browser to authorise the key:\n");
-  console.log(deepLinkUrl + "\n");
+  console.log('Please open the following URL in your browser to authorise the key:\n');
+  console.log(deepLinkUrl + '\n');
   console.log(
     `Once you confirm the operation in CADOP Web, it will redirect to ${REDIRECT_URI}.\n` +
-      "Leave this terminal open; the CLI is now waiting for the callback…\n"
+      'Leave this terminal open; the CLI is now waiting for the callback…\n'
   );
 
   // 3. Wait for browser redirect on a local HTTP server
   const result = await waitForCallback(state);
 
   if (!result.success) {
-    throw new Error(result.error || "Authorization failed");
+    throw new Error(result.error || 'Authorization failed');
   }
 
   const { agentDid, keyId } = result;
@@ -115,29 +124,29 @@ interface CallbackResult {
 function waitForCallback(expectedState: string): Promise<CallbackResult> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      const reqUrl = new URL(req.url || "", `http://localhost:${REDIRECT_PORT}`);
-      if (reqUrl.pathname !== "/callback") {
-        res.writeHead(404, { "Content-Type": "text/plain" });
-        res.end("Not Found");
+      const reqUrl = new URL(req.url || '', `http://localhost:${REDIRECT_PORT}`);
+      if (reqUrl.pathname !== '/callback') {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
         return; // ignore unrelated paths
       }
       try {
         const params = reqUrl.searchParams;
-        const state = params.get("state") || undefined;
-        const success = params.get("success") === "1";
-        const error = params.get("error") || undefined;
-        const agentDid = params.get("agent") || params.get("agentDid") || undefined;
-        const keyId = params.get("key_id") || params.get("keyId") || undefined;
+        const state = params.get('state') || undefined;
+        const success = params.get('success') === '1';
+        const error = params.get('error') || undefined;
+        const agentDid = params.get('agent') || params.get('agentDid') || undefined;
+        const keyId = params.get('key_id') || params.get('keyId') || undefined;
 
         const htmlResponse = success
           ? `<html><body><h2>Key authorised successfully.</h2>You may now return to the CLI.</body></html>`
-          : `<html><body><h2>Authorisation failed.</h2><pre>${error ?? "Unknown error"}</pre></body></html>`;
-        res.writeHead(success ? 200 : 400, { "Content-Type": "text/html" });
+          : `<html><body><h2>Authorisation failed.</h2><pre>${error ?? 'Unknown error'}</pre></body></html>`;
+        res.writeHead(success ? 200 : 400, { 'Content-Type': 'text/html' });
         res.end(htmlResponse);
 
         // Validate state to prevent CSRF
         if (state !== expectedState) {
-          resolve({ success: false, error: "State mismatch" });
+          resolve({ success: false, error: 'State mismatch' });
         } else {
           resolve({ success, error, agentDid, keyId, state });
         }
@@ -151,13 +160,16 @@ function waitForCallback(expectedState: string): Promise<CallbackResult> {
 
     server.listen(REDIRECT_PORT, () => {
       // Add simple 5-minute timeout
-      setTimeout(() => {
-        server.close();
-        resolve({ success: false, error: "Timeout waiting for callback" });
-      }, 5 * 60 * 1000);
+      setTimeout(
+        () => {
+          server.close();
+          resolve({ success: false, error: 'Timeout waiting for callback' });
+        },
+        5 * 60 * 1000
+      );
     });
 
-    server.on("error", err => {
+    server.on('error', err => {
       reject(err);
     });
   });
@@ -170,7 +182,7 @@ function waitForCallback(expectedState: string): Promise<CallbackResult> {
 function createLocalKeyStore(cfg: StoredConfig): KeyStore {
   const privateKeyBytes = MultibaseCodec.decodeBase58btc(cfg.privateKeyMultibase);
   const publicKeyBytes = MultibaseCodec.decodeBase58btc(cfg.publicKeyMultibase);
-  const fullId = cfg.keyId.includes("#") ? cfg.keyId : `${cfg.agentDid}#${cfg.keyId}`;
+  const fullId = cfg.keyId.includes('#') ? cfg.keyId : `${cfg.agentDid}#${cfg.keyId}`;
 
   return {
     async listKeyIds(): Promise<string[]> {
@@ -183,7 +195,7 @@ function createLocalKeyStore(cfg: StoredConfig): KeyStore {
           keyType: cfg.keyType,
           publicKeyMultibase: cfg.publicKeyMultibase,
           privateKeyMultibase: cfg.privateKeyMultibase,
-          meta: { source: "local-config" },
+          meta: { source: 'local-config' },
         } as any;
       }
       return null;
@@ -205,7 +217,6 @@ function createLocalKeyStore(cfg: StoredConfig): KeyStore {
   };
 }
 
-
 /************************************************************
  * Main
  ************************************************************/
@@ -220,14 +231,14 @@ async function main() {
   const keyStore = createLocalKeyStore(config);
   // Build IdentityEnv and preload KeyManager state
   const env = await IdentityKit.bootstrap({
-    method: "rooch",
+    method: 'rooch',
     keyStore: keyStore,
     vdrOptions: {
-      network: "test",
+      network: 'test',
     },
   });
   // Note: for demo purposes we only need env.keyManager as signer; DID/key import not required here
-  const baseUrl = process.env.MCP_URL || "http://localhost:8080/mcp";
+  const baseUrl = process.env.MCP_URL || 'http://localhost:8080/mcp';
   console.log(`Using MCP baseUrl: ${baseUrl}`);
   const payer = await createMcpClient({
     baseUrl,
@@ -236,35 +247,39 @@ async function main() {
     debug: true,
   });
 
-  console.log("Calling nuwa.health via PaymentChannelMcpClient…");
+  console.log('Calling nuwa.health via PaymentChannelMcpClient…');
   const health = await payer.healthCheck();
-  console.log("Health:", health);
+  console.log('Health:', health);
 
-  console.log("Calling nuwa.discovery…");
-  const { content } = await payer.callTool("nuwa.discovery");
-  const discoveryText = content.find((c: any) => c?.type === "text");
-  console.log("Discovery:", discoveryText?.text || content);
+  console.log('Calling nuwa.discovery…');
+  const { content } = await payer.callTool('nuwa.discovery');
+  const discoveryText = content.find((c: any) => c?.type === 'text');
+  console.log('Discovery:', discoveryText?.text || content);
 
-  console.log("Calling echo…");
-  const echo = await payer.callTool("echo", { text: "Hello, world!" });
-  console.log("Echo:", echo);
+  console.log('Calling echo…');
+  const echo = await payer.callTool('echo', { text: 'Hello, world!' });
+  console.log('Echo:', echo);
 
   //loop calling echo for testing the payment flow
   let payments = [];
   const loopCount = 10;
   for (let i = 0; i < loopCount; i++) {
-    const { content:_, payment } = await payer.callToolWithPayment("echo", { text: "Hello, world!" });
+    const { content: _, payment } = await payer.callToolWithPayment('echo', {
+      text: 'Hello, world!',
+    });
     payments.push(payment);
   }
   let firstPayment = payments[0];
   let lastPayment = payments[payments.length - 1];
-  console.log("loop calling echo results", { firstPayment, lastPayment });
+  console.log('loop calling echo results', { firstPayment, lastPayment });
   if (payments.length !== loopCount) {
-    throw new Error(`Payment length is not equal to loop count: ${payments.length} !== ${loopCount}`);
+    throw new Error(
+      `Payment length is not equal to loop count: ${payments.length} !== ${loopCount}`
+    );
   }
 }
 
 main().catch(err => {
   console.error(err);
   process.exit(1);
-}); 
+});

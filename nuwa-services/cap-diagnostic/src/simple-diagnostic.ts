@@ -2,7 +2,7 @@
 
 /**
  * Simplified CAP Diagnostic Tool
- * 
+ *
  * This is a simplified version that focuses on core diagnostic functionality
  * without complex OpenRouter provider implementations.
  */
@@ -52,7 +52,7 @@ export class SimpleDiagnosticEngine {
       // Test 1: CAP Validation
       const validationTest = await this.runValidationTest(cap);
       tests.push(validationTest);
-      
+
       if (!validationTest.success) {
         criticalIssues.push(...(validationTest.details?.errors || []));
       }
@@ -63,7 +63,7 @@ export class SimpleDiagnosticEngine {
       // Test 2: Configuration Test
       const configTest = await this.runConfigurationTest(cap);
       tests.push(configTest);
-      
+
       if (!configTest.success) {
         criticalIssues.push(...(configTest.details?.errors || []));
       }
@@ -74,25 +74,24 @@ export class SimpleDiagnosticEngine {
       // Test 3: Basic Connectivity Test
       const connectivityTest = await this.runConnectivityTest(cap);
       tests.push(connectivityTest);
-      
+
       if (!connectivityTest.success) {
         criticalIssues.push(`Connectivity test failed: ${connectivityTest.error}`);
       }
 
       // Generate recommendations
       recommendations.push(...this.generateRecommendations(tests, cap));
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       capLogger.error('Diagnosis failed with unexpected error', { error: errorMessage });
-      
+
       tests.push({
         name: 'Unexpected Error',
         success: false,
         duration: Date.now() - startTime,
         error: errorMessage,
       });
-      
+
       criticalIssues.push(`Unexpected error during diagnosis: ${errorMessage}`);
     }
 
@@ -109,12 +108,12 @@ export class SimpleDiagnosticEngine {
       summary,
     };
 
-    capLogger.info('Simple CAP diagnosis completed', { 
-      success: result.success, 
+    capLogger.info('Simple CAP diagnosis completed', {
+      success: result.success,
       duration,
       totalTests: tests.length,
       passedTests: summary.passedTests,
-      failedTests: summary.failedTests
+      failedTests: summary.failedTests,
     });
 
     return result;
@@ -122,7 +121,7 @@ export class SimpleDiagnosticEngine {
 
   private async runValidationTest(cap: Cap): Promise<SimpleDiagnosticResult['tests'][0]> {
     const startTime = Date.now();
-    
+
     try {
       const validation = CapValidator.validate(cap);
       const promptValidation = CapValidator.validatePrompt(cap.core.prompt.value);
@@ -137,7 +136,7 @@ export class SimpleDiagnosticEngine {
       const allWarnings = [
         ...validation.warnings,
         ...promptValidation.errors, // Treat prompt validation errors as warnings for now
-        ...modelValidation.errors,  // Treat model validation errors as warnings for now
+        ...modelValidation.errors, // Treat model validation errors as warnings for now
       ];
 
       return {
@@ -162,7 +161,7 @@ export class SimpleDiagnosticEngine {
 
   private async runConfigurationTest(cap: Cap): Promise<SimpleDiagnosticResult['tests'][0]> {
     const startTime = Date.now();
-    
+
     try {
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -219,7 +218,7 @@ export class SimpleDiagnosticEngine {
 
   private async runConnectivityTest(cap: Cap): Promise<SimpleDiagnosticResult['tests'][0]> {
     const startTime = Date.now();
-    
+
     try {
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -231,11 +230,11 @@ export class SimpleDiagnosticEngine {
           if (config.url) {
             try {
               // Simple HEAD request to check if server is reachable
-              const response = await fetch(config.url, { 
+              const response = await fetch(config.url, {
                 method: 'HEAD',
-                signal: AbortSignal.timeout(5000)
+                signal: AbortSignal.timeout(5000),
               });
-              
+
               if (!response.ok) {
                 warnings.push(`MCP server ${serverName} returned status ${response.status}`);
               }
@@ -337,34 +336,35 @@ export async function runSimpleDiagnostic(files: string[]): Promise<void> {
   for (const file of files) {
     try {
       const cap = await loadCapFile(file);
-      logger.info('Diagnosing CAP', { 
-        file, 
-        capId: cap.id, 
-        capName: cap.metadata?.displayName 
+      logger.info('Diagnosing CAP', {
+        file,
+        capId: cap.id,
+        capName: cap.metadata?.displayName,
       });
-      
+
       const result = await engine.diagnoseCap(cap);
       results.push(result);
-      
+
       // Display individual result
       displayResult(result);
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Failed to diagnose CAP', { file, error: errorMessage });
-      
+
       const errorResult: SimpleDiagnosticResult = {
         capId: 'unknown',
         capName: file,
         success: false,
         timestamp: Date.now(),
         duration: 0,
-        tests: [{
-          name: 'File Loading',
-          success: false,
-          duration: 0,
-          error: errorMessage,
-        }],
+        tests: [
+          {
+            name: 'File Loading',
+            success: false,
+            duration: 0,
+            error: errorMessage,
+          },
+        ],
         summary: {
           totalTests: 1,
           passedTests: 0,
@@ -374,7 +374,7 @@ export async function runSimpleDiagnostic(files: string[]): Promise<void> {
           recommendations: ['Check file format and accessibility'],
         },
       };
-      
+
       results.push(errorResult);
       displayResult(errorResult);
     }
@@ -390,7 +390,7 @@ export async function runSimpleDiagnostic(files: string[]): Promise<void> {
 
 async function loadCapFile(filePath: string): Promise<Cap> {
   const resolvedPath = resolve(filePath);
-  
+
   if (!existsSync(resolvedPath)) {
     throw new Error(`File not found: ${resolvedPath}`);
   }
@@ -398,7 +398,7 @@ async function loadCapFile(filePath: string): Promise<Cap> {
   try {
     const fileContent = readFileSync(resolvedPath, 'utf-8');
     const capData = JSON.parse(fileContent);
-    
+
     // Basic validation
     if (!capData.id || !capData.core) {
       throw new Error('Invalid CAP format: missing required fields');
@@ -418,21 +418,21 @@ function displayResult(result: SimpleDiagnosticResult) {
   console.log(`\n${status} ${result.capName} (${result.capId})`);
   console.log(`Duration: ${result.duration}ms`);
   console.log(`Tests: ${result.summary.passedTests}/${result.summary.totalTests} passed`);
-  
+
   if (result.summary.criticalIssues.length > 0) {
     console.log('Critical Issues:');
     result.summary.criticalIssues.forEach(issue => {
       console.log(`  - ${issue}`);
     });
   }
-  
+
   if (result.summary.warnings.length > 0) {
     console.log('Warnings:');
     result.summary.warnings.forEach(warning => {
       console.log(`  - ${warning}`);
     });
   }
-  
+
   if (result.summary.recommendations.length > 0) {
     console.log('Recommendations:');
     result.summary.recommendations.forEach(rec => {
@@ -445,18 +445,20 @@ function displayOverallSummary(results: SimpleDiagnosticResult[]) {
   const total = results.length;
   const passed = results.filter(r => r.success).length;
   const failed = total - passed;
-  
+
   console.log(`\n=== Overall Summary ===`);
   console.log(`Total CAPs: ${total}`);
   console.log(`Passed: ${passed}`);
   console.log(`Failed: ${failed}`);
   console.log(`Success Rate: ${((passed / total) * 100).toFixed(1)}%`);
-  
+
   if (failed > 0) {
     console.log(`\nFailed CAPs:`);
-    results.filter(r => !r.success).forEach(result => {
-      console.log(`  - ${result.capName} (${result.capId})`);
-    });
+    results
+      .filter(r => !r.success)
+      .forEach(result => {
+        console.log(`  - ${result.capName} (${result.capId})`);
+      });
   }
 }
 
@@ -467,6 +469,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error('Usage: tsx simple-diagnostic.ts <cap-files...>');
     process.exit(1);
   }
-  
+
   runSimpleDiagnostic(files).catch(console.error);
 }
