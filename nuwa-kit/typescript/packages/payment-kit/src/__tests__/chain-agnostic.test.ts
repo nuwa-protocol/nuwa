@@ -137,6 +137,11 @@ class MockPaymentChannelContract implements IPaymentChannelContract {
     };
   }
 
+  async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
+    const counts = await this.getActiveChannelsCounts(ownerDid);
+    return counts[assetId] ?? 0;
+  }
+
   async transferToHub(params: TransferToHubParams): Promise<any> {
     // Mock transfer to hub - return success
     return {

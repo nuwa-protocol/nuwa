@@ -751,73 +751,145 @@ export class RoochPaymentChannelContract
     try {
       this.getLogger().debug('Getting active channels counts for DID:', ownerDid);
 
-      // Get PaymentHub object
       const paymentHub = await this.getPaymentHub(ownerDid);
       if (!paymentHub) {
         this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
         return {};
       }
 
-      this.getLogger().debug('Active channels table ID:', paymentHub.active_channels);
-
-      // List all field states in active_channels table to get all coin types and their counts
-      const channelCounts: Record<string, number> = {};
-      let cursor = null;
-      const pageSize = 100;
-
-      const fieldStates = await this.getClient().listFieldStates({
-        objectId: paymentHub.active_channels,
-        cursor,
-        limit: pageSize.toString(),
-      });
-
-      if (!fieldStates || !fieldStates.data) {
-        return channelCounts;
+      const coinTypes = await this.listHubCoinTypes(paymentHub);
+      if (coinTypes.length === 0) {
+        return {};
       }
 
-      for (const state of fieldStates.data) {
-        try {
-          // Parse DynamicField<String, u64> for active channels counts
-          const fieldValue = state.state.value;
+      const results = await Promise.allSettled(
+        coinTypes.map(async coinType => ({
+          coinType,
+          count: await this.getActiveChannelCountFromHub(paymentHub, coinType),
+        }))
+      );
 
-          // Parse BCS bytes using DynamicFieldU64Schema
-          try {
-            //this.logger.debug('Parsing DynamicField<String, u64> from BCS hex:', fieldValue);
-            const parsed = parseDynamicFieldU64(fieldValue);
-
-            //this.logger.debug('Parsed DynamicField:', parsed);
-
-            // Extract coin type and count from the parsed data
-            const coinType = parsed.name;
-            const count = parsed.value;
-
-            if (coinType && count > 0) {
-              channelCounts[coinType] = count;
-            }
-          } catch (parseError) {
-            this.getLogger().warn('Failed to parse u64 BCS data:', parseError);
-            continue;
+      const channelCounts: Record<string, number> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          const { coinType, count } = result.value;
+          if (count > 0) {
+            channelCounts[coinType] = count;
           }
-        } catch (parseError) {
+        } else {
           this.getLogger().warn(
-            'Failed to parse field state for active channels count:',
-            parseError
+            'Failed to fetch active channel count for coin type',
+            result.reason
           );
-          continue;
         }
       }
-
-      // if (!fieldStates.has_next_page) {
-      //   break;
-      // }
-      // cursor = fieldStates.next_cursor;
 
       return channelCounts;
     } catch (error) {
       this.getLogger().error('Error getting active channels counts:', error);
-      // Return empty object instead of throwing
       return {};
     }
+  }
+
+  async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
+    try {
+      this.getLogger().debug('Getting active channel count for DID:', ownerDid, 'asset:', assetId);
+
+      const paymentHub = await this.getPaymentHub(ownerDid);
+      if (!paymentHub) {
+        this.getLogger().debug('PaymentHub not found for owner:', ownerDid);
+        return 0;
+      }
+
+      return await this.getActiveChannelCountFromHub(paymentHub, assetId);
+    } catch (error) {
+      this.getLogger().error('Error getting active channel count:', error);
+      return 0;
+    }
+  }
+
+  private async getActiveChannelCountFromHub(
+    paymentHub: PaymentHub,
+    assetId: string
+  ): Promise<number> {
+    try {
+      const fieldKey = deriveCoinTypeFieldKey(assetId);
+      const fieldStates = await this.getClient().getFieldStates({
+        objectId: paymentHub.active_channels,
+        fieldKey: [fieldKey],
+      });
+
+      if (!fieldStates || fieldStates.length === 0 || !fieldStates[0]) {
+        return 0;
+      }
+
+      const fieldValue = fieldStates[0].value;
+
+      try {
+        if (typeof fieldValue === 'string') {
+          const parsed = parseDynamicFieldU64(fieldValue);
+          return parsed.value;
+        }
+
+        if (fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue) {
+          const parsedValue = (fieldValue as any).value;
+          if (typeof parsedValue === 'number') {
+            return parsedValue;
+          }
+          if (typeof parsedValue === 'bigint') {
+            return Number(parsedValue);
+          }
+          if (typeof parsedValue === 'string') {
+            return Number(parsedValue);
+          }
+        }
+      } catch (parseError) {
+        this.getLogger().warn('Failed to parse active channel count field:', parseError);
+        return 0;
+      }
+
+      return 0;
+    } catch (error) {
+      this.getLogger().error('Error querying active channel count from hub:', error);
+      return 0;
+    }
+  }
+
+  private async listHubCoinTypes(paymentHub: PaymentHub): Promise<string[]> {
+    const coinTypes = new Set<string>();
+    let cursor: string | null = null;
+    const pageSize = 100;
+
+    while (true) {
+      const fieldStates = await this.getClient().listFieldStates({
+        objectId: paymentHub.multi_coin_store,
+        cursor,
+        limit: pageSize.toString(),
+      });
+
+      if (!fieldStates || !fieldStates.data || fieldStates.data.length === 0) {
+        break;
+      }
+
+      for (const state of fieldStates.data) {
+        try {
+          const parsed = parseDynamicFieldCoinStore(state.state.value);
+          if (parsed.name) {
+            coinTypes.add(parsed.name);
+          }
+        } catch (parseError) {
+          this.getLogger().warn('Failed to parse coin type from multi_coin_store:', parseError);
+          continue;
+        }
+      }
+
+      if (!fieldStates.has_next_page) {
+        break;
+      }
+      cursor = fieldStates.next_cursor ?? null;
+    }
+
+    return Array.from(coinTypes);
   }
 
   /**

@@ -224,6 +224,14 @@ export interface IPaymentChannelContract {
   getActiveChannelsCounts(ownerDid: string): Promise<Record<string, number>>;
 
   /**
+   * Get active channel count for a specific asset in payment hub
+   * @param ownerDid Owner DID of the hub
+   * @param assetId Asset identifier
+   * @returns Active channel count for the asset
+   */
+  getActiveChannelCount(ownerDid: string, assetId: string): Promise<number>;
+
+  /**
    * Transfer funds from sender's payment hub to receiver's payment hub
    * @param params Transfer parameters including sender DID, receiver DID, asset, amount, and signer
    * @returns Transaction result
@@ -251,6 +259,7 @@ export type IPaymentHubContract = Pick<
   | 'withdrawFromHub'
   | 'getHubBalance'
   | 'getAllHubBalances'
+  | 'getActiveChannelCount'
   | 'getActiveChannelsCounts'
 >;
 

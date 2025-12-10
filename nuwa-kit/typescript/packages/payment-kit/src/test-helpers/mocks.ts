@@ -151,6 +151,11 @@ export class MockContract implements IPaymentChannelContract {
     };
   }
 
+  async getActiveChannelCount(ownerDid: string, assetId: string): Promise<number> {
+    const counts = await this.getActiveChannelsCounts(ownerDid);
+    return counts[assetId] ?? 0;
+  }
+
   async getChannelStatus(params: { channelId: string }): Promise<ChannelInfo> {
     const channel = this.channels.get(params.channelId);
     if (!channel) {

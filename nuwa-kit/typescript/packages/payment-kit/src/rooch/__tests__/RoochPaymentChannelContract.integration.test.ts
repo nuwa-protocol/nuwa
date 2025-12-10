@@ -204,6 +204,30 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       );
     });
 
+    it('should get active channel count by asset id', async () => {
+      if (!shouldRunIntegrationTests()) return;
+
+      await fundPayerHub();
+      await openTestChannel();
+
+      const normalizedAssetId = normalizeAssetId(testAsset.assetId);
+      const count = await contract.getActiveChannelCount(payer.did, normalizedAssetId);
+      expect(typeof count).toBe('number');
+      expect(count).toBeGreaterThan(0);
+
+      // Query a coin type without active channels should return 0
+      const missingAssetId = '0x3::gas_coin::NonExist';
+      const missingCount = await contract.getActiveChannelCount(payer.did, missingAssetId);
+      expect(missingCount).toBe(0);
+
+      console.log(
+        `Active channel count check:
+        Asset: ${normalizedAssetId}
+        Count: ${count}
+        Missing Asset Count: ${missingCount}`
+      );
+    });
+
     it('should verify PaymentHub BCS parsing with real data', async () => {
       if (!shouldRunIntegrationTests()) return;
 
@@ -599,12 +623,38 @@ describe('RoochPaymentChannelContract Integration Test', () => {
       const depositAmount = BigInt(50000000); // 0.5 RGas
       await hubClient.deposit(testAsset.assetId, depositAmount);
 
-      const balance = await hubClient.getBalance();
+      let balance = await hubClient.getBalance();
       expect(balance).toBeGreaterThanOrEqual(depositAmount);
 
+      // Ensure there is enough unlocked balance for the withdrawal even if locked_unit_per_coin is set
+      const desiredWithdraw = BigInt(10000000); // 0.1 RGas
+      let unlocked = await hubClient.getUnlockedBalance();
+      if (unlocked < desiredWithdraw) {
+        const topUp = desiredWithdraw - unlocked + BigInt(5_000_000); // add small buffer
+        await hubClient.deposit(testAsset.assetId, topUp);
+        unlocked = await hubClient.getUnlockedBalance();
+      }
+      expect(unlocked).toBeGreaterThanOrEqual(desiredWithdraw);
+
+      // Refresh balance after potential top-up
+      balance = await hubClient.getBalance();
+
       // Test withdrawal
-      const withdrawAmount = BigInt(10000000); // 0.1 RGas
-      await hubClient.withdraw(testAsset.assetId, withdrawAmount);
+      const withdrawAmount = desiredWithdraw;
+      try {
+        await hubClient.withdraw(testAsset.assetId, withdrawAmount);
+      } catch (err: any) {
+        const message = err?.message ?? '';
+        // Move abort 25 => insufficient unlocked balance on chain; retry after an extra deposit buffer
+        if (typeof message === 'string' && message.includes('Move abort 25')) {
+          const extraBuffer = BigInt(200_000_000); // 2 RGas
+          await hubClient.deposit(testAsset.assetId, extraBuffer);
+          balance = await hubClient.getBalance();
+          await hubClient.withdraw(testAsset.assetId, withdrawAmount);
+        } else {
+          throw err;
+        }
+      }
 
       const balanceAfterWithdraw = await hubClient.getBalance();
       expect(balanceAfterWithdraw).toBeLessThan(balance);
