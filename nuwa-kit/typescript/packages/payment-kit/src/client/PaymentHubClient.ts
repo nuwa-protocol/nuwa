@@ -138,7 +138,19 @@ export class PaymentHubClient {
   }
 
   /**
+   * Get active channel count for an asset (defaults to client's default asset)
+   */
+  async getActiveChannelCount(assetId?: string, ownerDid?: string): Promise<number> {
+    if (!ownerDid) {
+      ownerDid = await this.signer.getDid();
+    }
+    const targetAssetId = assetId || this.defaultAssetId;
+    return this.contract.getActiveChannelCount(ownerDid, targetAssetId);
+  }
+
+  /**
    * Get active channels counts for all assets
+   * Note: for single-asset usage, prefer getActiveChannelCount to avoid extra aggregation.
    */
   async getActiveChannelsCounts(ownerDid?: string): Promise<Record<string, number>> {
     if (!ownerDid) {

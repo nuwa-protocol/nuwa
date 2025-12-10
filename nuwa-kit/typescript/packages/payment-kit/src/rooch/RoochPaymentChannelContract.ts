@@ -49,6 +49,7 @@ import {
   parseDynamicFieldCoinStore,
   parseDynamicFieldU64,
   safeBalanceToBigint,
+  parseU256FromBCS,
   PaymentChannelData,
   PaymentHub,
   SubChannel,
@@ -757,6 +758,13 @@ export class RoochPaymentChannelContract
         return {};
       }
 
+      // Primary path: list the active_channels table directly so we don't depend on multi_coin_store entries.
+      const countsFromTable = await this.listActiveChannelCounts(paymentHub.active_channels);
+      if (Object.keys(countsFromTable).length > 0) {
+        return countsFromTable;
+      }
+
+      // Fallback: derive coin types from balances and query per-asset
       const coinTypes = await this.listHubCoinTypes(paymentHub);
       if (coinTypes.length === 0) {
         return {};
@@ -852,6 +860,108 @@ export class RoochPaymentChannelContract
     } catch (error) {
       this.getLogger().error('Error querying active channel count from hub:', error);
       return 0;
+    }
+  }
+
+  private async listActiveChannelCounts(tableId: string): Promise<Record<string, number>> {
+    const channelCounts: Record<string, number> = {};
+    let cursor: string | null = null;
+    const pageSize = 100;
+
+    while (true) {
+      const fieldStates = await this.getClient().listFieldStates({
+        objectId: tableId,
+        cursor,
+        limit: pageSize.toString(),
+      });
+
+      if (!fieldStates || !fieldStates.data || fieldStates.data.length === 0) {
+        break;
+      }
+
+      for (const state of fieldStates.data) {
+        try {
+          const fieldValue = state.state.value;
+          const parsed = this.parseActiveChannelFieldValue(fieldValue);
+          if (parsed && parsed.coinType && parsed.count > 0) {
+            channelCounts[parsed.coinType] = parsed.count;
+          }
+        } catch (parseError) {
+          this.getLogger().warn('Failed to parse active channel field state:', parseError);
+          continue;
+        }
+      }
+
+      if (!fieldStates.has_next_page) {
+        break;
+      }
+      cursor = fieldStates.next_cursor ?? null;
+    }
+
+    return channelCounts;
+  }
+
+  private parseActiveChannelFieldValue(
+    fieldValue: unknown
+  ): { coinType: string; count: number } | null {
+    // BCS hex string path
+    if (typeof fieldValue === 'string') {
+      const parsed = parseDynamicFieldU64(fieldValue);
+      return { coinType: parsed.name, count: parsed.value };
+    }
+
+    // Decoded object path (when decode=true)
+    if (fieldValue && typeof fieldValue === 'object') {
+      const valueObj = (fieldValue as any).value ?? (fieldValue as any);
+      const name = valueObj.name;
+      const val = valueObj.value;
+      if (typeof name === 'string' && val !== undefined) {
+        if (typeof val === 'number') {
+          return { coinType: name, count: val };
+        }
+        if (typeof val === 'bigint') {
+          return { coinType: name, count: Number(val) };
+        }
+        if (typeof val === 'string') {
+          const num = Number(val);
+          if (!Number.isNaN(num)) {
+            return { coinType: name, count: num };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private async getLockedUnit(assetId: string): Promise<bigint> {
+    try {
+      const normalizedAssetId = normalizeAssetId(assetId);
+      const result = await this.getClient().executeViewFunction({
+        target: `${this.getContractAddress()}::${PAYMENT_CHANNEL_MODULE}::get_locked_unit`,
+        args: [Args.string(normalizedAssetId)],
+      });
+
+      const rv = (result as any)?.return_values?.[0];
+      const decoded = rv?.decoded_value ?? rv?.value;
+
+      if (typeof decoded === 'bigint') {
+        return decoded;
+      }
+      if (typeof decoded === 'number') {
+        return BigInt(decoded);
+      }
+      if (typeof decoded === 'string') {
+        if (decoded.startsWith('0x')) {
+          return parseU256FromBCS(decoded);
+        }
+        return BigInt(decoded);
+      }
+
+      return DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
+    } catch (error) {
+      this.getLogger().warn('Failed to fetch locked unit from view, using default', error);
+      return DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
     }
   }
 
@@ -972,12 +1082,10 @@ export class RoochPaymentChannelContract
       const totalBalance = await this.getHubBalance(ownerDid, assetId);
 
       // Get active channels count for this asset
-      const activeChannelsCounts = await this.getActiveChannelsCounts(ownerDid);
-      const activeChannelsCount = activeChannelsCounts[assetId] || 0;
+      const activeChannelsCount = await this.getActiveChannelCount(ownerDid, assetId);
 
-      // Default lock amount per channel (in asset units)
-      // This should be configurable or fetched from contract in future
-      const lockAmountPerChannel = DEFAULT_LOCK_AMOUNT_PER_CHANNEL;
+      // Fetch per-coin locked unit from Move view; fallback to default if unavailable
+      const lockAmountPerChannel = await this.getLockedUnit(assetId);
 
       const lockedBalance = BigInt(activeChannelsCount) * lockAmountPerChannel;
       const unlockedBalance =
