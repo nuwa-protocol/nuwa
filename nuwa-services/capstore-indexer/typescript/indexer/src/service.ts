@@ -68,7 +68,14 @@ export async function getService() {
       method: 'rooch',
       keyStore: keyManager.getStore(),
       vdrOptions: {
-        network: TARGET === 'local' ? 'local' : 'test',
+        network:
+          TARGET === 'local'
+            ? 'local'
+            : TARGET === 'main'
+            ? 'main'
+            : TARGET === 'dev'
+            ? 'dev'
+            : 'test',
       },
     });
 
