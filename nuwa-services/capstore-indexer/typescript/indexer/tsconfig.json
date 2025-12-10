@@ -4,7 +4,7 @@
     "module": "ESNext",
     "outDir": "./dist",
     "moduleResolution": "node",
-    "esModuleInterop": false,
+    "esModuleInterop": true,
     "strict": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,

@@ -4,9 +4,11 @@ packages:
   # nuwa-kit examples (excluding certain packages)
   - 'nuwa-kit/typescript/examples/*'
   # nuwa-services
-  - 'nuwa-services/*'
+  - 'nuwa-services/cadop-service'
   # cadop-service sub-packages (web/shared/api)
   - 'nuwa-services/cadop-service/packages/*'
+  - 'nuwa-services/llm-gateway'
+  - 'nuwa-services/mcp-server-proxy'
   # Exclusions
-  - '!nuwa-kit/typescript/packages/nuwa-client'
-  - '!nuwa-kit/typescript/packages/indexer'
+  - '!nuwa-services/capstore-indexer/**'
+  

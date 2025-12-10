@@ -218,7 +218,8 @@ export async function saveCapToSupabase(data: any, cid: string, version: number)
 export async function saveCapToSupabaseV2(capBase64: string): Promise<void> {
   try {
     const capYaml = Buffer.from(capBase64, 'base64').toString('utf-8');
-    const cap = yaml.load(capYaml);
+    // js-yaml typings return unknown; cast to relaxed shape for runtime access
+    const cap = yaml.load(capYaml) as any;
 
     const id = cap.id;
 
