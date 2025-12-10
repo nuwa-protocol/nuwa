@@ -33,9 +33,11 @@ export const SUPABASE_URL =
     throw new Error('SUPABASE_URL is required');
   })();
 export const SUPABASE_KEY =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
   (() => {
-    throw new Error('SUPABASE_ANON_KEY is required');
+    throw new Error('SUPABASE_SECRET_KEY is required');
   })();
 export const IPFS_GATEWAY =
   process.env.IPFS_GATEWAY ||
