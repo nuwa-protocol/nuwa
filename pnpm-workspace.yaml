@@ -11,5 +11,7 @@ packages:
   - 'nuwa-services/mcp-server-proxy'
   # Exclusions
   - '!nuwa-services/capstore-indexer/**'
+  - '!nuwa-services/cap-diagnostic/**'
+  - '!nuwa-services/discord-interactions/**'
   - '!nuwa-client/**'
   
