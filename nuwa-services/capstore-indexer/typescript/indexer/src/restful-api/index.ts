@@ -22,6 +22,12 @@ export async function handleApiRoutes(req: IncomingMessage, res: ServerResponse)
     return false;
   }
 
+  console.log('[API] Incoming request:', {
+    method: req.method,
+    pathname,
+    timestamp: new Date().toISOString(),
+  });
+
   // Handle OPTIONS for CORS preflight
   if (req.method === 'OPTIONS') {
     sendCorsResponse(res);
@@ -85,12 +91,26 @@ export async function handleApiRoutes(req: IncomingMessage, res: ServerResponse)
     }
 
     // No matching route found
+    console.warn('[API] Route not found:', {
+      method: req.method,
+      pathname,
+      timestamp: new Date().toISOString(),
+    });
+    
     sendJson(res, 404, {
       code: 404,
       error: 'API route not found',
     });
     return true;
   } catch (error) {
+    console.error('[API] Unhandled error in route handler:', {
+      method: req.method,
+      pathname,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+    
     sendJson(res, 500, {
       code: 500,
       error: (error as Error).message || 'Unknown error occurred',
