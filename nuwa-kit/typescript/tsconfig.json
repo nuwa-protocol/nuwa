@@ -8,6 +8,9 @@
   "files": [],
   "references": [
     { "path": "./packages/identity-kit" },
-    { "path": "./packages/payment-kit" }
+    { "path": "./packages/payment-kit" },
+    { "path": "./packages/cap-kit" },
+    { "path": "./packages/kit" },
+    { "path": "./packages/ui-kit" }
   ]
 }
