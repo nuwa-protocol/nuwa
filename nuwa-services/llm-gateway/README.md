@@ -420,7 +420,7 @@ docker run -d -p 8080:8080 \
 - ✅ **Workspace dependencies**: The build includes `@nuwa-ai/identity-kit` and `@nuwa-ai/payment-kit` from the monorepo
 - 🔧 **Scripts provided**: Use `build-docker.sh` and `test-docker.sh` for convenience
 
-For details on the Docker build process and troubleshooting, see [DOCKER_FIX.md](./DOCKER_FIX.md).
+For details on the Docker build process and troubleshooting, see the comments in the provided scripts and Dockerfile.
 
 ### Production Deployment
 
