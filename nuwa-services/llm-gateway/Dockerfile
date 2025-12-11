@@ -1,4 +1,5 @@
 # Workspace-based build for LLM Gateway
+# Note: Build must be run from workspace root with: docker build -f nuwa-services/llm-gateway/Dockerfile .
 FROM node:20-alpine AS base
 
 # Install pnpm globally
@@ -9,7 +10,7 @@ WORKDIR /app
 
 # Build stage - build from workspace root
 FROM base AS builder
-# Copy entire workspace (including built packages)
+# Copy entire workspace source code (dist folders excluded by .dockerignore at workspace root)
 COPY . .
 
 # Install workspace dependencies
@@ -31,10 +32,27 @@ RUN adduser --system --uid 1001 llmgateway
 # Set working directory
 WORKDIR /app
 
-# Copy built workspace dependencies and application
+# Copy workspace configuration files for proper module resolution
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+# Copy root node_modules (contains shared dependencies)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/nuwa-services/llm-gateway/dist ./dist
-COPY --from=builder /app/nuwa-services/llm-gateway/package.json ./package.json
+
+# Copy workspace dependencies with their built artifacts
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/dist ./nuwa-kit/typescript/packages/identity-kit/dist
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/package.json ./nuwa-kit/typescript/packages/identity-kit/package.json
+
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/dist ./nuwa-kit/typescript/packages/payment-kit/dist
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/package.json ./nuwa-kit/typescript/packages/payment-kit/package.json
+
+# Copy the llm-gateway service
+COPY --from=builder /app/nuwa-services/llm-gateway/dist ./nuwa-services/llm-gateway/dist
+COPY --from=builder /app/nuwa-services/llm-gateway/package.json ./nuwa-services/llm-gateway/package.json
+COPY --from=builder /app/nuwa-services/llm-gateway/node_modules ./nuwa-services/llm-gateway/node_modules
+
+# Set working directory to the service directory
+WORKDIR /app/nuwa-services/llm-gateway
 
 # Create config directory for mounted configs
 RUN mkdir -p /app/config && chown llmgateway:nodejs /app/config
