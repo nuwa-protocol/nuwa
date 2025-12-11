@@ -42,9 +42,11 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy workspace dependencies with their built artifacts
 COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/dist ./nuwa-kit/typescript/packages/identity-kit/dist
 COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/package.json ./nuwa-kit/typescript/packages/identity-kit/package.json
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/node_modules ./nuwa-kit/typescript/packages/identity-kit/node_modules
 
 COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/dist ./nuwa-kit/typescript/packages/payment-kit/dist
 COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/package.json ./nuwa-kit/typescript/packages/payment-kit/package.json
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/node_modules ./nuwa-kit/typescript/packages/payment-kit/node_modules
 
 # Copy the llm-gateway service
 COPY --from=builder /app/nuwa-services/llm-gateway/dist ./nuwa-services/llm-gateway/dist

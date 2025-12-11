@@ -403,9 +403,6 @@ docker build -f nuwa-services/llm-gateway/Dockerfile -t llm-gateway .
 cd nuwa-services/llm-gateway
 ./build-docker.sh
 
-# Test the image
-./test-docker.sh
-
 # Run the container
 docker run -d -p 8080:8080 \
   -e SERVICE_KEY="your_service_key" \
