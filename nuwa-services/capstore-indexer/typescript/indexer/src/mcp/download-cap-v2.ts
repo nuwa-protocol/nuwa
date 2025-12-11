@@ -4,9 +4,17 @@ import { downloadFromSupabase } from '../supabase.js';
 
 async function downloadCap({ id }: { id: string }, context: any) {
   try {
+    console.log('[downloadCap] Starting download for cap:', { id, timestamp: new Date().toISOString() });
+    
     const capRaw = await downloadFromSupabase(id);
 
     if (capRaw.error) {
+      console.error('[downloadCap] Failed to download cap:', {
+        id,
+        error: capRaw.error,
+        timestamp: new Date().toISOString(),
+      });
+      
       return {
         content: [
           {
@@ -19,6 +27,8 @@ async function downloadCap({ id }: { id: string }, context: any) {
         ],
       };
     }
+
+    console.log('[downloadCap] Successfully downloaded cap:', { id, timestamp: new Date().toISOString() });
 
     // MCP standard response format
     return {
@@ -37,6 +47,13 @@ async function downloadCap({ id }: { id: string }, context: any) {
       ],
     };
   } catch (error) {
+    console.error('[downloadCap] Unexpected error:', {
+      id,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+    
     return {
       content: [
         {

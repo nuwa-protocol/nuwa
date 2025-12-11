@@ -54,53 +54,68 @@ let _mcpInstance: Awaited<ReturnType<typeof createFastMcpServerFromEnv>> | null 
 
 export async function getService() {
   if (!_mcpInstance) {
-    // Initialize service key and identity environment
-    const serviceKey = process.env.SERVICE_KEY;
-    if (!serviceKey) {
-      throw new Error('SERVICE_KEY environment variable is required');
+    try {
+      console.log('🚀 Initializing Capstore Indexer Service...');
+      
+      // Initialize service key and identity environment
+      const serviceKey = process.env.SERVICE_KEY;
+      if (!serviceKey) {
+        throw new Error('SERVICE_KEY environment variable is required');
+      }
+
+      const keyManager = await KeyManager.fromSerializedKey(serviceKey);
+      const serviceDid = await keyManager.getDid();
+      console.log('🔑 Service DID:', serviceDid);
+
+      const env = await IdentityKit.bootstrap({
+        method: 'rooch',
+        keyStore: keyManager.getStore(),
+        vdrOptions: {
+          network:
+            TARGET === 'local'
+              ? 'local'
+              : TARGET === 'main'
+              ? 'main'
+              : TARGET === 'dev'
+              ? 'dev'
+              : 'test',
+        },
+      });
+
+      console.log('📡 Creating MCP server instance...');
+      _mcpInstance = await createFastMcpServerFromEnv(env, {
+        serviceId: 'nuwa-capstore-indexer',
+        adminDid: serviceDid,
+        debug: process.env.DEBUG === 'true',
+        port: parseInt(process.env.PORT || '3000'),
+        endpoint: '/mcp',
+        customRouteHandler: handleApiRoutes,
+      });
+
+      console.log('🔧 Registering MCP tools...');
+      // Register FREE tools
+      _mcpInstance.freeTool(downloadCapTool);
+      _mcpInstance.freeTool(queryCapByIDTool);
+      _mcpInstance.freeTool(queryCapByNameTool);
+      _mcpInstance.freeTool(queryCapStatsTool);
+      _mcpInstance.freeTool(queryMyFavoriteCapTool);
+      _mcpInstance.freeTool(queryCapRatingDistributionTool);
+
+      _mcpInstance.paidTool(rateCapTool);
+      // _mcpInstance.paidTool(uploadCapTool);
+      _mcpInstance.paidTool(uploadCapTool);
+      _mcpInstance.paidTool(favoriteCapTool);
+      _mcpInstance.paidTool(updateEnableCapTool);
+      
+      console.log('✅ Service initialization completed');
+    } catch (error) {
+      console.error('❌ Failed to initialize service:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
     }
-
-    const keyManager = await KeyManager.fromSerializedKey(serviceKey);
-    const serviceDid = await keyManager.getDid();
-    console.log('🔑 Service DID:', serviceDid);
-
-    const env = await IdentityKit.bootstrap({
-      method: 'rooch',
-      keyStore: keyManager.getStore(),
-      vdrOptions: {
-        network:
-          TARGET === 'local'
-            ? 'local'
-            : TARGET === 'main'
-            ? 'main'
-            : TARGET === 'dev'
-            ? 'dev'
-            : 'test',
-      },
-    });
-
-    _mcpInstance = await createFastMcpServerFromEnv(env, {
-      serviceId: 'nuwa-capstore-indexer',
-      adminDid: serviceDid,
-      debug: process.env.DEBUG === 'true',
-      port: parseInt(process.env.PORT || '3000'),
-      endpoint: '/mcp',
-      customRouteHandler: handleApiRoutes,
-    });
-
-    // Register FREE tools
-    _mcpInstance.freeTool(downloadCapTool);
-    _mcpInstance.freeTool(queryCapByIDTool);
-    _mcpInstance.freeTool(queryCapByNameTool);
-    _mcpInstance.freeTool(queryCapStatsTool);
-    _mcpInstance.freeTool(queryMyFavoriteCapTool);
-    _mcpInstance.freeTool(queryCapRatingDistributionTool);
-
-    _mcpInstance.paidTool(rateCapTool);
-    // _mcpInstance.paidTool(uploadCapTool);
-    _mcpInstance.paidTool(uploadCapTool);
-    _mcpInstance.paidTool(favoriteCapTool);
-    _mcpInstance.paidTool(updateEnableCapTool);
   }
   return _mcpInstance;
 }
