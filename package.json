@@ -6,13 +6,15 @@
   "workspaces": [
     "nuwa-kit/typescript/packages/*",
     "nuwa-kit/typescript/examples/*",
-    "nuwa-services/*",
-    "nuwa-services/cadop-service/packages/*"
+    "nuwa-services/cadop-service",
+    "nuwa-services/cadop-service/packages/*",
+    "nuwa-services/llm-gateway",
+    "nuwa-services/mcp-server-proxy"
   ],
   "scripts": {
     "build": "pnpm -r --filter './nuwa-kit/typescript/packages/*' run build",
     "build:examples": "pnpm -r --filter './nuwa-kit/typescript/examples/*' run build",
-    "build:services": "pnpm -r --filter './nuwa-services/*' run build",
+    "build:services": "pnpm -r --filter './nuwa-services/cadop-service' --filter './nuwa-services/llm-gateway' --filter './nuwa-services/mcp-server-proxy' run build",
     "build:cadop-web": "pnpm -r --filter @cadop/web... build",
     "dev": "pnpm -r --parallel --filter './nuwa-kit/typescript/packages/*' run dev",
     "test": "pnpm -r run test",

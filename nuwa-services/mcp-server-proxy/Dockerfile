@@ -44,10 +44,29 @@ RUN adduser --system --uid 1001 mcpproxy
 # Set working directory
 WORKDIR /app
 
-# Copy built workspace dependencies and application
+# Copy workspace configuration files for proper module resolution
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+# Copy root node_modules (contains shared dependencies)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/nuwa-services/mcp-server-proxy/dist ./dist
-COPY --from=builder /app/nuwa-services/mcp-server-proxy/package.json ./package.json
+
+# Copy workspace dependencies with their built artifacts
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/dist ./nuwa-kit/typescript/packages/identity-kit/dist
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/package.json ./nuwa-kit/typescript/packages/identity-kit/package.json
+COPY --from=builder /app/nuwa-kit/typescript/packages/identity-kit/node_modules ./nuwa-kit/typescript/packages/identity-kit/node_modules
+
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/dist ./nuwa-kit/typescript/packages/payment-kit/dist
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/package.json ./nuwa-kit/typescript/packages/payment-kit/package.json
+COPY --from=builder /app/nuwa-kit/typescript/packages/payment-kit/node_modules ./nuwa-kit/typescript/packages/payment-kit/node_modules
+
+# Copy the mcp-server-proxy service
+COPY --from=builder /app/nuwa-services/mcp-server-proxy/dist ./nuwa-services/mcp-server-proxy/dist
+COPY --from=builder /app/nuwa-services/mcp-server-proxy/package.json ./nuwa-services/mcp-server-proxy/package.json
+COPY --from=builder /app/nuwa-services/mcp-server-proxy/node_modules ./nuwa-services/mcp-server-proxy/node_modules
+
+# Set working directory to the service directory
+WORKDIR /app/nuwa-services/mcp-server-proxy
 
 # Create config directory for mounted configs
 RUN mkdir -p /app/config && chown mcpproxy:nodejs /app/config

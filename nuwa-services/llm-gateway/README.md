@@ -394,10 +394,14 @@ If you need to build the image locally:
 ```bash
 # Clone the repository
 git clone https://github.com/nuwa-protocol/nuwa.git
-cd nuwa/nuwa-services/llm-gateway
+cd nuwa
 
-# Build the image
-docker build -t llm-gateway .
+# Build the image (must build from workspace root!)
+docker build -f nuwa-services/llm-gateway/Dockerfile -t llm-gateway .
+
+# Or use the convenience script
+cd nuwa-services/llm-gateway
+./build-docker.sh
 
 # Run the container
 docker run -d -p 8080:8080 \
@@ -406,6 +410,14 @@ docker run -d -p 8080:8080 \
   --name llm-gateway \
   llm-gateway
 ```
+
+**Important Notes:**
+
+- ⚠️ **Build from workspace root**: The Docker image must be built from the repository root (`nuwa/`), not from the service directory
+- ✅ **Workspace dependencies**: The build includes `@nuwa-ai/identity-kit` and `@nuwa-ai/payment-kit` from the monorepo
+- 🔧 **Scripts provided**: Use `build-docker.sh` and `test-docker.sh` for convenience
+
+For details on the Docker build process and troubleshooting, see the comments in the provided scripts and Dockerfile.
 
 ### Production Deployment
 

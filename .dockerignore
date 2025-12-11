@@ -63,10 +63,14 @@ deps/
 !nuwa-kit/typescript/packages/*/package.json
 !nuwa-kit/typescript/packages/*/dist/**
 !nuwa-kit/typescript/packages/*/src/**
+!nuwa-kit/typescript/packages/*/tsconfig.json
 !nuwa-kit/typescript/pnpm-workspace.yaml
 !nuwa-kit/typescript/tsconfig.json
+!nuwa-kit/typescript/package.json
 !nuwa-services/*/package.json
 !nuwa-services/*/src/**
+!nuwa-services/*/tsconfig.json
 !pnpm-workspace.yaml
 !pnpm-lock.yaml
 !package.json
+!tsconfig.json
