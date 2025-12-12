@@ -9,12 +9,14 @@
     "nuwa-services/cadop-service",
     "nuwa-services/cadop-service/packages/*",
     "nuwa-services/llm-gateway",
-    "nuwa-services/mcp-server-proxy"
+    "nuwa-services/mcp-server-proxy",
+    "nuwa-services/capstore-indexer/typescript/indexer"
   ],
   "scripts": {
     "build": "pnpm -r --filter './nuwa-kit/typescript/packages/*' run build",
     "build:examples": "pnpm -r --filter './nuwa-kit/typescript/examples/*' run build",
-    "build:services": "pnpm -r --filter './nuwa-services/cadop-service' --filter './nuwa-services/llm-gateway' --filter './nuwa-services/mcp-server-proxy' run build",
+    "build:services": "pnpm -r --filter './nuwa-services/cadop-service' --filter './nuwa-services/llm-gateway' --filter './nuwa-services/mcp-server-proxy' --filter './nuwa-services/capstore-indexer/typescript/indexer' run build",
+    "dev:indexer": "pnpm --filter @nuwa-service/indexer dev",
     "build:cadop-web": "pnpm -r --filter @cadop/web... build",
     "dev": "pnpm -r --parallel --filter './nuwa-kit/typescript/packages/*' run dev",
     "test": "pnpm -r run test",
@@ -39,7 +41,8 @@
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0",
   "pnpm": {
     "overrides": {
-      "rimraf": "^5.0.10"
+      "rimraf": "^5.0.10",
+      "@modelcontextprotocol/sdk": "1.20.2"
     }
   }
 }

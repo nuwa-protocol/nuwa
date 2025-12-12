@@ -9,8 +9,9 @@ packages:
   - 'nuwa-services/cadop-service/packages/*'
   - 'nuwa-services/llm-gateway'
   - 'nuwa-services/mcp-server-proxy'
+  # capstore-indexer (now included in workspace)
+  - 'nuwa-services/capstore-indexer/typescript/indexer'
   # Exclusions
-  - '!nuwa-services/capstore-indexer/**'
   - '!nuwa-services/cap-diagnostic/**'
   - '!nuwa-services/discord-interactions/**'
   - '!nuwa-client/**'

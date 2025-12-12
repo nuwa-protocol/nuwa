@@ -473,7 +473,10 @@ export class UniversalMcpClient {
     if (this.options.customTransport) {
       transport = this.options.customTransport;
     } else {
-      transport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+      const httpTransport = new StreamableHTTPClientTransport(new URL(this.options.baseUrl));
+      // Set protocol version to 2025-06-18 for compatibility with FastMCP 3.5.0
+      httpTransport.setProtocolVersion('2025-06-18');
+      transport = httpTransport;
     }
 
     const client = new McpClient({
