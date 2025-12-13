@@ -63,9 +63,6 @@ USER capindexer
 # Expose port
 EXPOSE 4001
 
-# Health check (note: health endpoint might not exist, adjust if needed)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 # Default environment variables
 ENV NODE_ENV=production
