@@ -1,18 +1,19 @@
 /**
- * MCP Server v2 - Start via FastMcpStarter (handles MCP over HTTP/SSE)
+ * MCP Server v2 - Start via McpServerFactory (handles MCP over HTTP/SSE)
+ * Supports both fastmcp (default) and official SDK engines via MCP_ENGINE env var
  */
 import { KeyManager } from '@nuwa-ai/identity-kit';
-import { createFastMcpServer } from '@nuwa-ai/payment-kit';
+import { createMcpServer } from '@nuwa-ai/payment-kit';
 import { initUpstream } from './upstream.js';
 import type { Upstream } from './types.js';
 import { loadConfig, type MinimalConfig, type MinimalToolConfig } from './config.js';
 import { z } from 'zod';
 
-// Local registry removed; FastMcpStarter manages tools
+// Local registry removed; McpServerFactory manages tools
 
-// No Fastify server; FastMcpStarter provides HTTP server
+// No Fastify server; McpServerFactory provides HTTP server
 
-// (FastMcpStarter handles HTTP/SSE/MCP parsing)
+// (McpServerFactory handles HTTP/SSE/MCP parsing via selected engine)
 
 // Exported function to start the server (for testing and direct use)
 async function startServer(
@@ -126,17 +127,17 @@ async function startServer(
             });
             console.log(`Upstream response for ${upstreamTool.name}:`, res);
             if (res && Array.isArray(res.content)) {
-              // Return the content array directly so FastMcpStarter can handle it properly
+              // Return the content array directly so the MCP engine can handle it properly
               return { content: res.content };
             }
             return res;
           };
 
-          // Use FastMcpStarter's tool registration mechanism which handles schema conversion
+          // Use McpServerFactory's tool registration mechanism which handles schema conversion
           const upstreamToolDef = {
             name: upstreamTool.name,
             description: upstreamTool.description || `Forwarded tool: ${upstreamTool.name}`,
-            // Pass the original inputSchema - FastMcpStarter will handle the conversion
+            // Pass the original inputSchema - the MCP engine will handle the conversion
             parameters: upstreamTool.inputSchema,
             execute: forwardExecute,
           };
