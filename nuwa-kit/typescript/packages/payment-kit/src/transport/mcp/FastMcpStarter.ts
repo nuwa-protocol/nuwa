@@ -275,22 +275,48 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       port,
       streamEndpoint: endpoint,
       createServer: async (req: any) => {
-        const session = new FastMCPSession({
-          name: opts.serviceId || 'nuwa-mcp-server',
-          version: '1.0.0',
-          ping: undefined,
-          prompts: registrar.getPrompts(),
-          resources: registrar.getResources(),
-          resourcesTemplates: registrar.getResourceTemplates(),
-          roots: { enabled: true },
-          tools: registrar.getTools(),
-          transportType: 'httpStream',
+        logger.debug('Creating new MCP session', {
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
         } as any);
-        (session as any).__sessionId = ++sessionCounter;
-        return session;
+        
+        try {
+          const session = new FastMCPSession({
+            name: opts.serviceId || 'nuwa-mcp-server',
+            version: '1.0.0',
+            ping: undefined,
+            prompts: registrar.getPrompts(),
+            resources: registrar.getResources(),
+            resourcesTemplates: registrar.getResourceTemplates(),
+            roots: { enabled: true },
+            tools: registrar.getTools(),
+            transportType: 'httpStream',
+          } as any);
+          (session as any).__sessionId = ++sessionCounter;
+          
+          logger.debug('MCP session created', {
+            sessionId: (session as any).__sessionId,
+            toolCount: registrar.getTools().length,
+          } as any);
+          
+          return session;
+        } catch (e) {
+          logger.error('Failed to create MCP session', {
+            error: e instanceof Error ? e.message : String(e),
+            stack: e instanceof Error ? e.stack : undefined,
+            method: req.method,
+            url: req.url,
+          } as any);
+          throw e;
+        }
       },
       onConnect: async (session: any) => {
         sessions.push(session);
+        logger.info('MCP session connected', {
+          sessionId: (session as any).__sessionId,
+          totalSessions: sessions.length,
+        } as any);
         // Register all tools to the new session via FastMCP internal handlers
         // We rely on FastMCP having already had tools added via registrar
         // Emit-like behavior is not exposed; sessions will receive handlers on creation
@@ -298,6 +324,10 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
       onClose: async (session: any) => {
         const idx = sessions.indexOf(session as any);
         if (idx >= 0) sessions.splice(idx, 1);
+        logger.info('MCP session closed', {
+          sessionId: (session as any).__sessionId,
+          totalSessions: sessions.length,
+        } as any);
       },
       onUnhandledRequest: async (req: any, res: any) => {
         // Handle preflight requests
@@ -309,6 +339,13 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
 
         try {
           const url = new URL(req.url || '', 'http://localhost');
+          
+          logger.debug('Unhandled request', {
+            method: req.method,
+            pathname: url.pathname,
+            headers: req.headers,
+          } as any);
+          
           // Health endpoint (parity with FastMCP default)
           if (req.method === 'GET' && url.pathname === '/health') {
             res.writeHead(200, { 'Content-Type': 'text/plain' }).end('✓ Ok');
@@ -345,6 +382,11 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
               };
               res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
             } catch (e: any) {
+              logger.error('Failed to generate service discovery info', {
+                error: e?.message,
+                stack: e?.stack,
+              } as any);
+              
               res
                 .writeHead(500, { 'Content-Type': 'application/json' })
                 .end(JSON.stringify({ error: e?.message || 'internal error' }));
@@ -360,11 +402,32 @@ export async function createFastMcpServer(opts: FastMcpServerOptions): Promise<{
             }
           }
 
+          logger.warn('No handler found for request', {
+            method: req.method,
+            pathname: url.pathname,
+          } as any);
+          
           res.writeHead(404).end();
         } catch (e) {
+          logger.error('Error in onUnhandledRequest', {
+            error: e instanceof Error ? e.message : String(e),
+            stack: e instanceof Error ? e.stack : undefined,
+            method: req?.method,
+            url: req?.url,
+          } as any);
+          
           try {
-            res.writeHead(500).end();
-          } catch {}
+            res.writeHead(500, { 'Content-Type': 'application/json' }).end(
+              JSON.stringify({
+                error: e instanceof Error ? e.message : 'Internal server error',
+                timestamp: new Date().toISOString(),
+              })
+            );
+          } catch (writeError) {
+            logger.error('Failed to write error response', {
+              error: writeError instanceof Error ? writeError.message : String(writeError),
+            } as any);
+          }
         }
       },
     });

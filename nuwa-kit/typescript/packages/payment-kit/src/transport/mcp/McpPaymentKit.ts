@@ -126,10 +126,26 @@ export class McpPaymentKit {
           content.push({ type: 'text', text: serializeJson(result) });
         }
       } catch (e) {
-        this.logger.warn('Failed to invoke tool', {
+        // Log error with full stack trace
+        this.logger.error('Failed to invoke tool', {
           cause: e,
           name,
           params,
+          stack: e instanceof Error ? e.stack : undefined,
+          message: e instanceof Error ? e.message : String(e),
+        });
+        
+        // Return error to client
+        content.push({
+          type: 'text',
+          text: JSON.stringify({
+            code: 500,
+            error: e instanceof Error ? e.message : String(e),
+            details: {
+              tool: name,
+              timestamp: new Date().toISOString(),
+            }
+          })
         });
       }
 
@@ -157,7 +173,36 @@ export class McpPaymentKit {
     const contextWithDid = ctx?.meta?.didInfo
       ? { ...(context || {}), didInfo: ctx.meta.didInfo }
       : context;
-    const result = await entry.handler(safeParams, contextWithDid);
+    
+    let result;
+    try {
+      result = await entry.handler(safeParams, contextWithDid);
+    } catch (e) {
+      // Log error with full stack trace
+      this.logger.error('Tool handler execution failed', {
+        cause: e,
+        name,
+        params,
+        stack: e instanceof Error ? e.stack : undefined,
+        message: e instanceof Error ? e.message : String(e),
+        context: contextWithDid,
+      });
+      
+      // Return error in MCP format
+      const errorContent = {
+        type: 'text',
+        text: JSON.stringify({
+          code: 500,
+          error: e instanceof Error ? e.message : String(e),
+          details: {
+            tool: name,
+            timestamp: new Date().toISOString(),
+          }
+        })
+      };
+      
+      return { content: [errorContent] } as any;
+    }
 
     // Step C/D: settle + persist
     // If middleware flagged to skip billing (e.g., nuwa.recovery), return plain result

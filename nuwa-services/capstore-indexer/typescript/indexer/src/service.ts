@@ -83,10 +83,28 @@ export async function getService() {
       });
 
       console.log('📡 Creating MCP server instance...');
+      
+      // Enable debug logging only if DEBUG is explicitly set
+      const isDebugEnabled = process.env.DEBUG === 'true';
+      if (isDebugEnabled) {
+        console.log('🐛 Debug logging enabled');
+        // Set log level for payment-kit logger
+        try {
+          const { DebugLogger } = await import('@nuwa-ai/identity-kit');
+          if (DebugLogger && typeof DebugLogger.setGlobalLevel === 'function') {
+            DebugLogger.setGlobalLevel('debug');
+          } else {
+            console.warn('DebugLogger.setGlobalLevel is not available in @nuwa-ai/identity-kit');
+          }
+        } catch (e) {
+          console.warn('Failed to enable debug logging via DebugLogger.setGlobalLevel:', e);
+        }
+      }
+      
       _mcpInstance = await createFastMcpServerFromEnv(env, {
         serviceId: 'nuwa-capstore-indexer',
         adminDid: serviceDid,
-        debug: process.env.DEBUG === 'true',
+        debug: isDebugEnabled,
         port: parseInt(process.env.PORT || '3000'),
         endpoint: '/mcp',
         customRouteHandler: handleApiRoutes,

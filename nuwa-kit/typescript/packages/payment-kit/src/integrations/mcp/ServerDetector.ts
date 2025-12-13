@@ -167,6 +167,10 @@ export class ServerDetector {
 
     try {
       const transport = new StreamableHTTPClientTransport(new URL(baseUrl));
+      // Set protocol version to 2025-06-18 for compatibility with FastMCP 3.5.0, if supported by SDK
+      if (typeof (transport as any).setProtocolVersion === 'function') {
+        transport.setProtocolVersion('2025-06-18');
+      }
       mcpClient = new McpClient({
         name: 'nuwa-detector-client',
         version: '1.0.0',
