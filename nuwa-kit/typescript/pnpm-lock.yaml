@@ -74,7 +74,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.13.1
-        version: 1.24.3(zod@3.25.76)
+        version: 1.24.3(zod@4.1.13)
       '@nuwa-ai/identity-kit':
         specifier: workspace:*
         version: link:../../packages/identity-kit
@@ -83,7 +83,7 @@ importers:
         version: link:../../packages/payment-kit
       ai:
         specifier: ^5.0.41
-        version: 5.0.108(zod@3.25.76)
+        version: 5.0.108(zod@4.1.13)
       fastmcp:
         specifier: ^3.5.0
         version: 3.5.0
@@ -370,7 +370,7 @@ importers:
   packages/payment-kit:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ~1.20.2
+        specifier: 1.20.2
         version: 1.20.2
       '@nuwa-ai/identity-kit':
         specifier: workspace:*
@@ -388,8 +388,8 @@ importers:
         specifier: ^5.0.60
         version: 5.0.108(zod@3.25.76)
       fastmcp:
-        specifier: ^3.25.4
-        version: 3.25.4
+        specifier: 3.5.0
+        version: 3.5.0
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
@@ -485,7 +485,7 @@ importers:
   packages/ui-kit:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ~1.20.2
+        specifier: 1.20.2
         version: 1.20.2
       penpal:
         specifier: ^7.0.4
@@ -2583,15 +2583,6 @@ packages:
   fast-uri@3.1.0:
     resolution: {integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==}
 
-  fastmcp@3.25.4:
-    resolution: {integrity: sha512-0HuS5LdNhxsG7C3F0L2JVnagavH626XSoMfjZqkoYMLZhFs9PJSteU3xaLFkFq0Ri+Lj2VHR0wpIsSNYlDe+ug==}
-    hasBin: true
-    peerDependencies:
-      jose: ^5.0.0
-    peerDependenciesMeta:
-      jose:
-        optional: true
-
   fastmcp@3.5.0:
     resolution: {integrity: sha512-80OeYVFCqusrOFPNxm8uJ5G/ZaKMasygZTLvZReZ5o6iCvDBwFR/S485Is3jY0128aAaIyYx9eAgWjBUQUwoYg==}
     hasBin: true
@@ -3329,10 +3320,6 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
-
-  mcp-proxy@5.12.5:
-    resolution: {integrity: sha512-Vawdc8vi36fXxKCaDpluRvbGcmrUXJdvXcDhkh30HYsws8XqX2rWPBflZpavzeS+6SwijRFV7g+9ypQRJZlrEQ==}
-    hasBin: true
 
   mcp-proxy@5.5.6:
     resolution: {integrity: sha512-6c4JrjBIo6Jc3KPANgF6KX1NeWGHiyPxSeZuBMOz69/ChDChxVUErTZIlj835MWc6jn6pIjTCDfly7EYqkU6ww==}
@@ -4535,29 +4522,6 @@ packages:
       zod-to-json-schema:
         optional: true
 
-  xsschema@0.4.0-beta.5:
-    resolution: {integrity: sha512-73pYwf1hMy++7SnOkghJdgdPaGi+Y5I0SaO6rIlxb1ouV6tEyDbEcXP82kyr32KQVTlUbFj6qewi9eUVEiXm+g==}
-    peerDependencies:
-      '@valibot/to-json-schema': ^1.0.0
-      arktype: ^2.1.20
-      effect: ^3.16.0
-      sury: ^10.0.0
-      zod: ^3.25.0 || ^4.0.0
-      zod-to-json-schema: ^3.24.5
-    peerDependenciesMeta:
-      '@valibot/to-json-schema':
-        optional: true
-      arktype:
-        optional: true
-      effect:
-        optional: true
-      sury:
-        optional: true
-      zod:
-        optional: true
-      zod-to-json-schema:
-        optional: true
-
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -4621,12 +4585,26 @@ snapshots:
       '@vercel/oidc': 3.0.5
       zod: 3.25.76
 
+  '@ai-sdk/gateway@2.0.18(zod@4.1.13)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.1.13)
+      '@vercel/oidc': 3.0.5
+      zod: 4.1.13
+
   '@ai-sdk/provider-utils@3.0.18(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.0.0
       eventsource-parser: 3.0.6
       zod: 3.25.76
+
+  '@ai-sdk/provider-utils@3.0.18(zod@4.1.13)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 4.1.13
 
   '@ai-sdk/provider@2.0.0':
     dependencies:
@@ -5536,25 +5514,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.24.3(zod@3.25.76)':
-    dependencies:
-      ajv: 8.17.1
-      ajv-formats: 3.0.1(ajv@8.17.1)
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.2.1
-      express-rate-limit: 7.5.1(express@5.2.1)
-      jose: 6.1.3
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.0(zod@3.25.76)
-    transitivePeerDependencies:
-      - supports-color
-
   '@modelcontextprotocol/sdk@1.24.3(zod@4.1.13)':
     dependencies:
       ajv: 8.17.1
@@ -6136,6 +6095,14 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.18(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
       zod: 3.25.76
+
+  ai@5.0.108(zod@4.1.13):
+    dependencies:
+      '@ai-sdk/gateway': 2.0.18(zod@4.1.13)
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.1.13)
+      '@opentelemetry/api': 1.9.0
+      zod: 4.1.13
 
   ajv-formats@3.0.1(ajv@8.17.1):
     optionalDependencies:
@@ -6920,32 +6887,9 @@ snapshots:
 
   fast-uri@3.1.0: {}
 
-  fastmcp@3.25.4:
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.24.3(zod@4.1.13)
-      '@standard-schema/spec': 1.0.0
-      execa: 9.6.1
-      file-type: 21.1.1
-      fuse.js: 7.1.0
-      mcp-proxy: 5.12.5
-      strict-event-emitter-types: 2.0.0
-      undici: 7.16.0
-      uri-templates: 0.2.0
-      xsschema: 0.4.0-beta.5(zod-to-json-schema@3.25.0(zod@3.25.76))(zod@4.1.13)
-      yargs: 18.0.0
-      zod: 4.1.13
-      zod-to-json-schema: 3.25.0(zod@4.1.13)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - '@valibot/to-json-schema'
-      - arktype
-      - effect
-      - supports-color
-      - sury
-
   fastmcp@3.5.0:
     dependencies:
-      '@modelcontextprotocol/sdk': 1.24.3(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.20.2
       '@standard-schema/spec': 1.0.0
       execa: 9.6.1
       file-type: 21.1.1
@@ -6959,7 +6903,6 @@ snapshots:
       zod: 3.25.76
       zod-to-json-schema: 3.25.0(zod@3.25.76)
     transitivePeerDependencies:
-      - '@cfworker/json-schema'
       - '@valibot/to-json-schema'
       - arktype
       - effect
@@ -7906,8 +7849,6 @@ snapshots:
       tmpl: 1.0.5
 
   math-intrinsics@1.1.0: {}
-
-  mcp-proxy@5.12.5: {}
 
   mcp-proxy@5.5.6: {}
 
@@ -9008,11 +8949,6 @@ snapshots:
   xsschema@0.3.0-beta.3(zod-to-json-schema@3.25.0(zod@3.25.76))(zod@3.25.76):
     optionalDependencies:
       zod: 3.25.76
-      zod-to-json-schema: 3.25.0(zod@3.25.76)
-
-  xsschema@0.4.0-beta.5(zod-to-json-schema@3.25.0(zod@3.25.76))(zod@4.1.13):
-    optionalDependencies:
-      zod: 4.1.13
       zod-to-json-schema: 3.25.0(zod@3.25.76)
 
   xtend@4.0.2: {}
