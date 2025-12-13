@@ -84,13 +84,21 @@ export async function getService() {
 
       console.log('📡 Creating MCP server instance...');
       
-      // Enable debug logging in production
-      const isDebugEnabled = process.env.DEBUG === 'true' || process.env.NODE_ENV === 'production';
+      // Enable debug logging only if DEBUG is explicitly set
+      const isDebugEnabled = process.env.DEBUG === 'true';
       if (isDebugEnabled) {
         console.log('🐛 Debug logging enabled');
         // Set log level for payment-kit logger
-        const { DebugLogger } = await import('@nuwa-ai/identity-kit');
-        DebugLogger.setGlobalLevel('debug');
+        try {
+          const { DebugLogger } = await import('@nuwa-ai/identity-kit');
+          if (DebugLogger && typeof DebugLogger.setGlobalLevel === 'function') {
+            DebugLogger.setGlobalLevel('debug');
+          } else {
+            console.warn('DebugLogger.setGlobalLevel is not available in @nuwa-ai/identity-kit');
+          }
+        } catch (e) {
+          console.warn('Failed to enable debug logging via DebugLogger.setGlobalLevel:', e);
+        }
       }
       
       _mcpInstance = await createFastMcpServerFromEnv(env, {
