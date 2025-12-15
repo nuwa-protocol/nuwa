@@ -5,8 +5,28 @@ import { FastMcpServerOptions, createFastMcpServer } from './FastMcpStarter';
 import { SdkMcpServerOptions, createSdkMcpServer } from './SdkMcpStarter';
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 
-export interface McpServerOptions extends FastMcpServerOptions, SdkMcpServerOptions {
-  engine?: 'fastmcp' | 'sdk';
+// Common options that work for both engines
+export interface McpServerCommonOptions {
+  serviceId?: string;
+  signer?: any;
+  rpcUrl?: string;
+  network?: 'main' | 'test';
+  debug?: boolean;
+  port?: number;
+  endpoint?: `/${string}`;
+  wellKnown?: {
+    enabled?: boolean;
+    path?: `/${string}`;
+  };
+  customRouteHandler?: (req: any, res: any) => Promise<boolean> | boolean;
+  defaultAssetId?: string;
+  defaultPricePicoUSD?: bigint;
+}
+
+export interface McpServerOptions extends McpServerCommonOptions {
+  engine?: 'fastmcp' | 'sdk' | 'legacy' | 'official';
+  // Allow any additional engine-specific properties
+  [key: string]: any;
 }
 
 export interface McpServerFactory {
@@ -57,12 +77,19 @@ export interface McpServerFactory {
 
 class DefaultMcpServerFactory implements McpServerFactory {
   async createServer(opts: McpServerOptions) {
-    const engine = opts.engine || this.getEngineFromEnv() || 'fastmcp';
+    // Check explicit engine option first
+    if (opts.engine === 'sdk' || opts.engine === 'official') {
+      return createSdkMcpServer(opts as SdkMcpServerOptions);
+    } else if (opts.engine === 'fastmcp' || opts.engine === 'legacy') {
+      return createFastMcpServer(opts as FastMcpServerOptions);
+    }
 
-    if (engine === 'sdk') {
-      return createSdkMcpServer(opts);
+    // Fall back to environment variable or default
+    const envEngine = this.getEngineFromEnv();
+    if (envEngine === 'sdk') {
+      return createSdkMcpServer(opts as SdkMcpServerOptions);
     } else {
-      return createFastMcpServer(opts);
+      return createFastMcpServer(opts as FastMcpServerOptions);
     }
   }
 
@@ -100,19 +127,28 @@ export async function createMcpServerFromEnv(
   env: IdentityEnv,
   opts: Omit<McpServerOptions, 'signer' | 'rpcUrl' | 'network'>
 ) {
-  const engine = opts.engine || process.env.MCP_ENGINE?.toLowerCase() || 'fastmcp';
-
-  if (engine === 'sdk' || engine === 'official') {
+  // Check explicit engine option first
+  if (opts.engine === 'sdk' || opts.engine === 'official') {
     const { createSdkMcpServerFromEnv } = await import('./SdkMcpStarter');
-    return createSdkMcpServerFromEnv(env, opts);
+    return createSdkMcpServerFromEnv(env, opts as Omit<SdkMcpServerOptions, 'signer' | 'rpcUrl' | 'network'>);
+  } else if (opts.engine === 'fastmcp' || opts.engine === 'legacy') {
+    const { createFastMcpServerFromEnv } = await import('./FastMcpStarter');
+    return createFastMcpServerFromEnv(env, opts as Omit<FastMcpServerOptions, 'signer' | 'rpcUrl' | 'network'>);
+  }
+
+  // Fall back to environment variable or default
+  const envEngine = process.env.MCP_ENGINE?.toLowerCase();
+  if (envEngine === 'sdk' || envEngine === 'official') {
+    const { createSdkMcpServerFromEnv } = await import('./SdkMcpStarter');
+    return createSdkMcpServerFromEnv(env, opts as Omit<SdkMcpServerOptions, 'signer' | 'rpcUrl' | 'network'>);
   } else {
     const { createFastMcpServerFromEnv } = await import('./FastMcpStarter');
-    return createFastMcpServerFromEnv(env, opts);
+    return createFastMcpServerFromEnv(env, opts as Omit<FastMcpServerOptions, 'signer' | 'rpcUrl' | 'network'>);
   }
 }
 
 // Export factory for testing or custom configurations
-export { DefaultMcpServerFactory as McpServerFactoryImpl };
+export { DefaultMcpServerFactory };
 export { factory as mcpServerFactory };
 
 // Re-export types for convenience

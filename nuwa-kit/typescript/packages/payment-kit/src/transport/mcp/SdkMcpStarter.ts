@@ -1,5 +1,5 @@
-// MCP Server using official MCP SDK engine
-// Provides drop-in compatibility with FastMcpStarter but uses @modelcontextprotocol/sdk
+// SdkMcpStarter: MCP Server implementation using the official MCP SDK engine (@modelcontextprotocol/sdk).
+// This server is designed to provide drop-in compatibility with FastMcpStarter, but uses the official SDK rather than the FastMcpStarter engine.
 
 import { McpPaymentKit, createMcpPaymentKit, McpPaymentKitOptions } from './McpPaymentKit';
 import { z } from 'zod';
@@ -7,10 +7,8 @@ import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 import { getChainConfigFromEnv } from '../../helpers/fromIdentityEnv';
 import type { Server } from 'http';
 import {
-  Server as McpServer,
-  createServer as createMcpServer
+  Server as McpServer
 } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
@@ -262,7 +260,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
 }> {
   const logger = DebugLogger.get('SdkMcpStarter');
 
-  const server = createMcpServer(
+  const server = new McpServer(
     {
       name: opts.serviceId || 'nuwa-mcp-server',
       version: '1.0.0',
@@ -311,7 +309,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     const { name, arguments: args } = request.params;
     const tool = registrar.getTools().find(t => t.name === name);
 
@@ -340,7 +338,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     };
   });
 
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
     const { name, arguments: args } = request.params;
     const prompt = registrar.getPrompts().find((p: any) => p.name === name);
 
@@ -369,7 +367,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     };
   });
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
     const { uri } = request.params;
     const resource = registrar.getResources().find((r: any) => r.uri === uri);
 
@@ -402,7 +400,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     const wellKnownPath = (opts.wellKnown?.path ||
       '/.well-known/nuwa-payment/info') as `/${string}`;
 
-    const httpServer = createHttpServer((req: any, res: any) => {
+    const httpServer = createHttpServer(async (req: any, res: any) => {
       const url = parseUrl(req.url || '', true);
 
       // Handle preflight requests
@@ -454,26 +452,50 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
         return;
       }
 
+      // Handle MCP endpoint with SSE transport
+      if (req.method === 'GET' && url.pathname === endpoint) {
+        // Create SSE transport for this specific connection
+        const sseTransport = new SSEServerTransport(endpoint, res);
+
+        // Connect the MCP server to this SSE transport
+        // Note: Each connection gets its own transport instance
+        server.connect(sseTransport).catch((error: any) => {
+          logger.error('Failed to connect SSE transport', {
+            error: error instanceof Error ? error.message : String(error),
+            endpoint,
+          } as any);
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' }).end('SSE connection failed');
+          }
+        });
+        return;
+      }
+
       // Try custom route handler
       if (opts.customRouteHandler) {
-        opts.customRouteHandler(req, res).then((handled) => {
-          if (!handled) {
-            res.writeHead(404).end();
+        try {
+          const result = opts.customRouteHandler(req, res);
+          if (result instanceof Promise) {
+            result.then((handled: any) => {
+              if (!handled) {
+                res.writeHead(404).end();
+              }
+            }).catch(() => {
+              res.writeHead(500).end();
+            });
+          } else {
+            if (!result) {
+              res.writeHead(404).end();
+            }
           }
-        }).catch(() => {
+        } catch {
           res.writeHead(500).end();
-        });
+        }
         return;
       }
 
       res.writeHead(404).end();
     });
-
-    // Set up SSE transport for MCP
-    const sseTransport = new SSEServerTransport('/mcp', res);
-
-    // Connect the MCP server to the SSE transport
-    await server.connect(sseTransport);
 
     registrar.markStarted();
 
@@ -483,6 +505,18 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     } as any);
 
     const srv = httpServer as any as StoppableServer;
+
+    // Start listening for connections
+    await new Promise<void>((resolve, reject) => {
+      srv.listen(port, (err?: Error) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
     logger.info(`SDK MCP HTTP server listening at http://localhost:${port}`);
 
     // Wrap stop/close to ensure kit resources are destroyed
