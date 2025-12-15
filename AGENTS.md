@@ -9,8 +9,8 @@ This repo is a pnpm monorepo for the Nuwa Protocol ecosystem.
 - `nuwa-services/*`: backend services (e.g. `llm-gateway`, `mcp-server-proxy`, `cadop-service`).
 - `contracts/move/rooch/*`: Rooch Move smart contracts (e.g. `acp-registry/`).
 - `nips/`: protocol proposals/spec discussions.
-- `website/` and `docs/`: documentation and site content.
-- `deps/`: vendored dependencies / submodules (see `.gitmodules`).
+- `docs/`: documentation and site content.
+- `deps/`: vendored dependencies / submodules (see `.gitmodules`). This directory appears only after initializing submodules (e.g., with `git submodule update --init --recursive`).
 
 Each major directory has its own `README.md` with component-specific setup.
 
@@ -38,7 +38,7 @@ Move contracts (example):
 ## Coding Style & Naming Conventions
 
 - Formatting: Prettier (`.prettierrc`) with 2-space indentation, single quotes, semicolons, `printWidth: 100`.
-- Linting: ESLint for TypeScript (`.eslintrc.js`); unused args should be prefixed with `_` and avoid `console.log` (prefer `console.warn/error`).
+- Linting: ESLint for TypeScript (`.eslintrc.js`); unused args should be prefixed with `_`; `console.log` will trigger a lint warning (prefer `console.warn` or `console.error`, which are allowed).
 - Keep build artifacts out of PRs (`dist/`, `build/`, `coverage/`).
 
 ## Testing Guidelines
