@@ -1,6 +1,7 @@
 // Parity tests for FastMcpStarter vs SdkMcpStarter engines
 // Ensures both engines provide identical behavior and API compatibility
 
+import { describe, test, expect, jest, afterEach, beforeEach } from '@jest/globals';
 import {
   createFastMcpServer,
   type FastMcpServerOptions,
@@ -73,7 +74,7 @@ describe('MCP Engine Parity Tests', () => {
       fastmcpServer = await createFastMcpServer(baseServerOptions as FastMcpServerOptions);
       sdkServer = await createSdkMcpServer(baseServerOptions as SdkMcpServerOptions);
 
-      const toolDef = {
+      const toolDef: any = {
         name: 'test_tool',
         description: 'Test tool for parity',
         parameters: {
@@ -82,6 +83,7 @@ describe('MCP Engine Parity Tests', () => {
             message: { type: 'string' },
           },
         },
+        // @ts-ignore
         execute: jest.fn().mockResolvedValue({ result: 'success' }),
       };
 
@@ -95,7 +97,7 @@ describe('MCP Engine Parity Tests', () => {
       }).not.toThrow();
 
       // Test free tool registration
-      const freeToolDef = {
+      const freeToolDef: any = {
         name: 'free_tool',
         description: 'Free tool test',
         parameters: {
@@ -104,6 +106,7 @@ describe('MCP Engine Parity Tests', () => {
             data: { type: 'string' },
           },
         },
+        // @ts-ignore
         execute: jest.fn().mockResolvedValue({ free: 'yes' }),
       };
 
@@ -116,7 +119,7 @@ describe('MCP Engine Parity Tests', () => {
       }).not.toThrow();
 
       // Test paid tool registration
-      const paidToolDef = {
+      const paidToolDef: any = {
         name: 'paid_tool',
         description: 'Paid tool test',
         pricePicoUSD: 1000n,
@@ -126,6 +129,7 @@ describe('MCP Engine Parity Tests', () => {
             query: { type: 'string' },
           },
         },
+        // @ts-ignore
         execute: jest.fn().mockResolvedValue({ paid: 'yes' }),
       };
 
@@ -142,7 +146,7 @@ describe('MCP Engine Parity Tests', () => {
       fastmcpServer = await createFastMcpServer(baseServerOptions as FastMcpServerOptions);
       sdkServer = await createSdkMcpServer(baseServerOptions as SdkMcpServerOptions);
 
-      const promptDef = {
+      const promptDef: any = {
         name: 'test_prompt',
         description: 'Test prompt for parity',
         arguments: [
@@ -152,6 +156,7 @@ describe('MCP Engine Parity Tests', () => {
             required: false,
           },
         ],
+        // @ts-ignore
         load: jest.fn().mockResolvedValue('Test prompt content'),
       };
 
@@ -168,10 +173,11 @@ describe('MCP Engine Parity Tests', () => {
       fastmcpServer = await createFastMcpServer(baseServerOptions as FastMcpServerOptions);
       sdkServer = await createSdkMcpServer(baseServerOptions as SdkMcpServerOptions);
 
-      const resourceDef = {
+      const resourceDef: any = {
         uri: 'test://resource',
         name: 'Test Resource',
         mimeType: 'text/plain',
+        // @ts-ignore
         load: jest.fn().mockResolvedValue({ text: 'Test resource content' }),
       };
 
@@ -183,7 +189,7 @@ describe('MCP Engine Parity Tests', () => {
         sdkServer.addResource(resourceDef);
       }).not.toThrow();
 
-      const templateDef = {
+      const templateDef: any = {
         uriTemplate: 'test://template/{param}',
         name: 'Test Template',
         mimeType: 'application/json',
@@ -194,6 +200,7 @@ describe('MCP Engine Parity Tests', () => {
             required: true,
           },
         ],
+        // @ts-ignore
         load: jest.fn().mockResolvedValue({ text: JSON.stringify({ param: 'test' }) }),
       };
 
@@ -227,7 +234,8 @@ describe('MCP Engine Parity Tests', () => {
     });
 
     test('should handle custom route handlers', async () => {
-      const customHandler = jest.fn().mockResolvedValue(true);
+      // @ts-ignore
+      const customHandler: any = jest.fn().mockResolvedValue(true);
 
       const optionsWithHandler = {
         ...baseServerOptions,
@@ -342,7 +350,7 @@ describe('McpServerFactory Integration', () => {
 });
 
 describe('Environment Variable Support', () => {
-  test('should respect MCP_ENGINE environment variable', () => {
+  test('should respect MCP_ENGINE environment variable', async () => {
     // Test that the factory correctly reads the environment variable
     const engineValues = ['fastmcp', 'legacy', 'sdk', 'official'];
 
@@ -351,7 +359,7 @@ describe('Environment Variable Support', () => {
 
       // Dynamic import to get fresh module state
       jest.resetModules();
-      const { DefaultMcpServerFactory } = require('../../../src/transport/mcp/McpServerFactory');
+      const { DefaultMcpServerFactory } = await import('../../../src/transport/mcp/McpServerFactory');
 
       const factory = new DefaultMcpServerFactory();
       const expectedEngine = (engine === 'sdk' || engine === 'official') ? 'sdk' : 'fastmcp';
