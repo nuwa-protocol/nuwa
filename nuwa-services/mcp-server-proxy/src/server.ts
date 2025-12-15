@@ -61,7 +61,7 @@ async function startServer(
     serverOptions.debug = config.debug;
   }
 
-  const app: any = await createFastMcpServer(serverOptions);
+  const app: any = await createMcpServer(serverOptions);
 
   // Prepare upstream via shared helper if configured
   let upstream: Upstream | undefined;
