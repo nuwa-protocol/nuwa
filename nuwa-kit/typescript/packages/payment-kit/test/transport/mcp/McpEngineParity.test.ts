@@ -34,7 +34,25 @@ describe('MCP Engine Parity Tests', () => {
     let sdkServer: any | undefined;
 
     afterEach(async () => {
-      // Servers will be cleaned up automatically by Jest
+      // Explicitly clean up servers to prevent hanging handles
+      if (fastmcpServer) {
+        try {
+          // Call destroy on the kit if it exists
+          const inner = fastmcpServer.getInner();
+          if (inner?.kit?.destroy) {
+            inner.kit.destroy();
+          }
+        } catch {}
+      }
+      if (sdkServer) {
+        try {
+          // Call destroy on the kit if it exists
+          const inner = sdkServer.getInner();
+          if (inner?.kit?.destroy) {
+            inner.kit.destroy();
+          }
+        } catch {}
+      }
       fastmcpServer = undefined;
       sdkServer = undefined;
     });
@@ -215,6 +233,11 @@ describe('MCP Engine Parity Tests', () => {
   });
 
   describe('Configuration Handling', () => {
+    afterEach(async () => {
+      // Clean up any servers created in this test group
+      // Note: Variables are scoped to individual tests, so no cleanup needed here
+    });
+
     test('should handle wellKnown configuration', async () => {
       const optionsWithWellKnown = {
         ...baseServerOptions,
@@ -230,7 +253,19 @@ describe('MCP Engine Parity Tests', () => {
       expect(fastmcpServer).toBeDefined();
       expect(sdkServer).toBeDefined();
 
-      // Variables will be reset in afterEach
+      // Clean up explicitly by destroying kits
+      try {
+        const fastmcpInner = fastmcpServer.getInner();
+        if (fastmcpInner?.kit?.destroy) {
+          fastmcpInner.kit.destroy();
+        }
+      } catch {}
+      try {
+        const sdkInner = sdkServer.getInner();
+        if (sdkInner?.kit?.destroy) {
+          sdkInner.kit.destroy();
+        }
+      } catch {}
     });
 
     test('should handle custom route handlers', async () => {
@@ -248,7 +283,19 @@ describe('MCP Engine Parity Tests', () => {
       expect(fastmcpServer).toBeDefined();
       expect(sdkServer).toBeDefined();
 
-      // Variables will be reset in afterEach
+      // Clean up explicitly by destroying kits
+      try {
+        const fastmcpInner = fastmcpServer.getInner();
+        if (fastmcpInner?.kit?.destroy) {
+          fastmcpInner.kit.destroy();
+        }
+      } catch {}
+      try {
+        const sdkInner = sdkServer.getInner();
+        if (sdkInner?.kit?.destroy) {
+          sdkInner.kit.destroy();
+        }
+      } catch {}
     });
   });
 
@@ -274,7 +321,17 @@ describe('MCP Engine Parity Tests', () => {
       expect(fastmcpTools.length).toBeGreaterThan(0);
       expect(sdkTools.length).toBeGreaterThan(0);
 
-      // Variables will be reset in afterEach
+      // Clean up explicitly by destroying kits
+      try {
+        if (fastmcpInner.kit?.destroy) {
+          fastmcpInner.kit.destroy();
+        }
+      } catch {}
+      try {
+        if (sdkInner.kit?.destroy) {
+          sdkInner.kit.destroy();
+        }
+      } catch {}
     });
   });
 });
@@ -296,7 +353,13 @@ describe('McpServerFactory Integration', () => {
 
     const server = await createMcpServer(baseServerOptions as McpServerOptions);
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 
   test('should use fastmcp engine when MCP_ENGINE=fastmcp', async () => {
@@ -305,7 +368,13 @@ describe('McpServerFactory Integration', () => {
 
     const server = await createMcpServer(baseServerOptions as McpServerOptions);
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 
   test('should use fastmcp engine when MCP_ENGINE=legacy', async () => {
@@ -314,7 +383,13 @@ describe('McpServerFactory Integration', () => {
 
     const server = await createMcpServer(baseServerOptions as McpServerOptions);
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 
   test('should use sdk engine when MCP_ENGINE=sdk', async () => {
@@ -323,7 +398,13 @@ describe('McpServerFactory Integration', () => {
 
     const server = await createMcpServer(baseServerOptions as McpServerOptions);
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 
   test('should use sdk engine when MCP_ENGINE=official', async () => {
@@ -332,7 +413,13 @@ describe('McpServerFactory Integration', () => {
 
     const server = await createMcpServer(baseServerOptions as McpServerOptions);
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 
   test('should override environment variable with explicit engine option', async () => {
@@ -345,7 +432,13 @@ describe('McpServerFactory Integration', () => {
     } as McpServerOptions);
 
     expect(server).toBeDefined();
-    // Server cleanup handled by test framework
+    // Clean up explicitly by destroying kit
+    try {
+      const inner = server.getInner();
+      if (inner?.kit?.destroy) {
+        inner.kit.destroy();
+      }
+    } catch {}
   });
 });
 
