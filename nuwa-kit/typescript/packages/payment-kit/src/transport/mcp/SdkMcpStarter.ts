@@ -9,7 +9,7 @@ import type { Server } from 'http';
 import {
   Server as McpServer
 } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
@@ -24,6 +24,7 @@ import { DebugLogger } from '@nuwa-ai/identity-kit';
 import { RouteOptions } from '../express';
 import { createServer as createHttpServer } from 'http';
 import { parse as parseUrl } from 'url';
+import { randomBytes } from 'crypto';
 
 // Server type with explicit stop method used by tests and callers
 export type StoppableServer = Server & { stop: () => Promise<void> };
@@ -260,7 +261,9 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
 }> {
   const logger = DebugLogger.get('SdkMcpStarter');
 
-  const server = new McpServer(
+  // We don't create a global server anymore - each session gets its own server
+  // But we still need a placeholder server for the registrar to work
+  const placeholderServer = new McpServer(
     {
       name: opts.serviceId || 'nuwa-mcp-server',
       version: '1.0.0',
@@ -278,7 +281,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
   const kit = await createMcpPaymentKit(opts);
 
   // Register built-in payment tools via registrar
-  const bootstrapRegistrar = new PaymentMcpToolRegistrar(server, kit);
+  const bootstrapRegistrar = new PaymentMcpToolRegistrar(placeholderServer, kit);
 
   // Register each tool from kit
   for (const name of kit.listTools()) {
@@ -298,100 +301,30 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
 
   const registrar = bootstrapRegistrar;
 
-  // Set up request handlers
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-      tools: registrar.getTools().map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      })),
-    };
-  });
+  // Session management for StreamableHTTPServerTransport
+  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
 
-  server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
-    const { name, arguments: args } = request.params;
-    const tool = registrar.getTools().find(t => t.name === name);
+  // Helper to generate session IDs
+  const generateSessionId = (): string => {
+    return randomBytes(16).toString('hex');
+  };
 
-    if (!tool) {
-      throw new Error(`Tool '${name}' not found`);
+  // Helper to clean up a session
+  const cleanupSession = async (sessionId: string) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+      try {
+        await session.server.close();
+        sessions.delete(sessionId);
+        logger.debug('Cleaned up session', { sessionId } as any);
+      } catch (error) {
+        logger.error('Error cleaning up session', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error)
+        } as any);
+      }
     }
-
-    try {
-      const result = await tool.handler(args);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: typeof result === 'string' ? result : JSON.stringify(result),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(`Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  });
-
-  server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    return {
-      prompts: registrar.getPrompts(),
-    };
-  });
-
-  server.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
-    const { name, arguments: args } = request.params;
-    const prompt = registrar.getPrompts().find((p: any) => p.name === name);
-
-    if (!prompt) {
-      throw new Error(`Prompt '${name}' not found`);
-    }
-
-    const result = await prompt.load(args);
-    return {
-      description: prompt.description,
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: result,
-          },
-        },
-      ],
-    };
-  });
-
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return {
-      resources: registrar.getResources(),
-    };
-  });
-
-  server.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
-    const { uri } = request.params;
-    const resource = registrar.getResources().find((r: any) => r.uri === uri);
-
-    if (!resource) {
-      throw new Error(`Resource '${uri}' not found`);
-    }
-
-    const result = await resource.load();
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: resource.mimeType,
-          ...result,
-        },
-      ],
-    };
-  });
-
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-    return {
-      resourceTemplates: registrar.getResourceTemplates(),
-    };
-  });
+  };
 
   const start = async () => {
     const port = opts.port ?? 8080;
@@ -403,12 +336,46 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     const httpServer = createHttpServer(async (req: any, res: any) => {
       const url = parseUrl(req.url || '', true);
 
+      // Set CORS headers for all responses
+      const setCorsHeaders = (origin?: string) => {
+        if (origin) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+        }
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+      };
+
       // Handle preflight requests
       if (req.method === 'OPTIONS') {
+        const origin = req.headers.origin;
+        setCorsHeaders(origin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
         res.writeHead(204);
         res.end();
         return;
       }
+
+      const origin = req.headers.origin;
+      setCorsHeaders(origin);
+
+      // Helper to read request body
+      const readRequestBody = async (): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          let body = '';
+          req.on('data', (chunk: any) => {
+            body += chunk.toString();
+          });
+          req.on('end', () => {
+            try {
+              resolve(body ? JSON.parse(body) : undefined);
+            } catch {
+              resolve(undefined);
+            }
+          });
+          req.on('error', reject);
+        });
+      };
 
       // Health endpoint
       if (req.method === 'GET' && url.pathname === '/health') {
@@ -452,23 +419,212 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
         return;
       }
 
-      // Handle MCP endpoint with SSE transport
-      if (req.method === 'GET' && url.pathname === endpoint) {
-        // Create SSE transport for this specific connection
-        const sseTransport = new SSEServerTransport(endpoint, res);
+      // Handle MCP endpoint with session routing
+      if (url.pathname === endpoint) {
+        const sessionId = req.headers['mcp-session-id'] as string;
 
-        // Connect the MCP server to this SSE transport
-        // Note: Each connection gets its own transport instance
-        server.connect(sseTransport).catch((error: any) => {
-          logger.error('Failed to connect SSE transport', {
-            error: error instanceof Error ? error.message : String(error),
-            endpoint,
-          } as any);
-          if (!res.headersSent) {
-            res.writeHead(500, { 'Content-Type': 'text/plain' }).end('SSE connection failed');
+        if (req.method === 'POST') {
+          // Initialize new session for POST requests without session ID
+          if (!sessionId) {
+            const newSessionId = generateSessionId();
+            const sessionServer = new McpServer(
+              {
+                name: opts.serviceId || 'nuwa-mcp-server',
+                version: '1.0.0',
+              },
+              {
+                capabilities: {
+                  tools: {},
+                  prompts: {},
+                  resources: {},
+                  resourceTemplates: {},
+                },
+              }
+            );
+
+            // Set up request handlers for this session
+            sessionServer.setRequestHandler(ListToolsRequestSchema, async () => {
+              return {
+                tools: registrar.getTools().map(tool => ({
+                  name: tool.name,
+                  description: tool.description,
+                  inputSchema: tool.inputSchema,
+                })),
+              };
+            });
+
+            sessionServer.setRequestHandler(CallToolRequestSchema, async (request: any) => {
+              const { name, arguments: args } = request.params;
+              const tool = registrar.getTools().find(t => t.name === name);
+
+              if (!tool) {
+                throw new Error(`Tool '${name}' not found`);
+              }
+
+              try {
+                const result = await tool.handler(args);
+                // Return MCP-native format - prefer returning kit.invoke() directly when it returns { content: [...] }
+                if (result && typeof result === 'object' && Array.isArray(result.content)) {
+                  return result;
+                }
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: typeof result === 'string' ? result : JSON.stringify(result),
+                    },
+                  ],
+                };
+              } catch (error) {
+                throw new Error(`Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+            });
+
+            sessionServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+              return {
+                prompts: registrar.getPrompts(),
+              };
+            });
+
+            sessionServer.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
+              const { name, arguments: args } = request.params;
+              const prompt = registrar.getPrompts().find((p: any) => p.name === name);
+
+              if (!prompt) {
+                throw new Error(`Prompt '${name}' not found`);
+              }
+
+              const result = await prompt.load(args);
+              return {
+                description: prompt.description,
+                messages: [
+                  {
+                    role: 'user',
+                    content: {
+                      type: 'text',
+                      text: result,
+                    },
+                  },
+                ],
+              };
+            });
+
+            sessionServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+              return {
+                resources: registrar.getResources(),
+              };
+            });
+
+            sessionServer.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
+              const { uri } = request.params;
+              const resource = registrar.getResources().find((r: any) => r.uri === uri);
+
+              if (!resource) {
+                throw new Error(`Resource '${uri}' not found`);
+              }
+
+              const result = await resource.load();
+              return {
+                contents: [
+                  {
+                    uri,
+                    mimeType: resource.mimeType,
+                    ...result,
+                  },
+                ],
+              };
+            });
+
+            sessionServer.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+              return {
+                resourceTemplates: registrar.getResourceTemplates(),
+              };
+            });
+
+            const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+            await sessionServer.connect(transport);
+
+            // Store the session
+            sessions.set(newSessionId, { transport, server: sessionServer });
+
+            // Set the session ID in response header
+            res.setHeader('mcp-session-id', newSessionId);
+
+            logger.debug('Created new MCP session', { sessionId: newSessionId } as any);
+
+            // Handle the request with proper hijacking
+            try {
+              const body = await readRequestBody();
+              // Simulate reply.hijack() behavior
+              res.setHeader('Content-Type', 'application/json');
+              await transport.handleRequest(req, res, body);
+            } catch (error) {
+              logger.error('Error handling MCP request', {
+                sessionId: newSessionId,
+                error: error instanceof Error ? error.message : String(error),
+              } as any);
+              if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                  .end(JSON.stringify({ error: 'Internal server error' }));
+              }
+            }
+          } else {
+            // Route to existing session
+            const session = sessions.get(sessionId);
+            if (!session) {
+              res.writeHead(404, { 'Content-Type': 'application/json' })
+                .end(JSON.stringify({ error: 'Session not found' }));
+              return;
+            }
+
+            try {
+              const body = await readRequestBody();
+              res.setHeader('Content-Type', 'application/json');
+              await session.transport.handleRequest(req, res, body);
+            } catch (error) {
+              logger.error('Error handling MCP request for existing session', {
+                sessionId,
+                error: error instanceof Error ? error.message : String(error),
+              } as any);
+              if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' })
+                  .end(JSON.stringify({ error: 'Internal server error' }));
+              }
+            }
           }
-        });
-        return;
+          return;
+        } else if (req.method === 'GET' || req.method === 'DELETE') {
+          // Route to existing session for GET/DELETE
+          if (!sessionId) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+              .end(JSON.stringify({ error: 'mcp-session-id header required' }));
+            return;
+          }
+
+          const session = sessions.get(sessionId);
+          if (!session) {
+            res.writeHead(404, { 'Content-Type': 'application/json' })
+              .end(JSON.stringify({ error: 'Session not found' }));
+            return;
+          }
+
+          try {
+            const body = await readRequestBody();
+            res.setHeader('Content-Type', 'application/json');
+            await session.transport.handleRequest(req, res, body);
+          } catch (error) {
+            logger.error('Error handling MCP request for existing session', {
+              sessionId,
+              method: req.method,
+              error: error instanceof Error ? error.message : String(error),
+            } as any);
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+                .end(JSON.stringify({ error: 'Internal server error' }));
+            }
+          }
+          return;
+        }
       }
 
       // Try custom route handler
@@ -519,14 +675,18 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
 
     logger.info(`SDK MCP HTTP server listening at http://localhost:${port}`);
 
-    // Wrap stop/close to ensure kit resources are destroyed
+    // Wrap stop/close to ensure kit resources and sessions are destroyed
     const originalClose = srv.close?.bind(srv);
     (srv as any).stop = async () => {
+      // Clean up all sessions
+      const sessionIds = Array.from(sessions.keys());
+      await Promise.all(sessionIds.map(cleanupSession));
+
       try {
         kit.destroy();
       } catch {}
       try {
-        await server.close();
+        await placeholderServer.close();
       } catch {}
       try {
         await new Promise<void>((resolve) => {
@@ -587,7 +747,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     });
   };
 
-  const getInner = () => ({ server, kit });
+  const getInner = () => ({ server: placeholderServer, kit });
 
   const addPrompt = (def: {
     name: string;
