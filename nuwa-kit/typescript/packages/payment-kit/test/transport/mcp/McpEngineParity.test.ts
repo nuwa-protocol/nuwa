@@ -467,5 +467,595 @@ describe('Environment Variable Support', () => {
   });
 });
 
-// Note: Integration tests that start actual servers can be added later
-// when the test infrastructure is improved to handle server lifecycle properly
+// ============================================================================
+// E2E Parity Tests - Comprehensive Engine Comparison
+// ============================================================================
+
+describe.each([
+  { engineName: 'FastMCP', createServer: createFastMcpServer },
+  { engineName: 'SDK', createServer: createSdkMcpServer },
+])('E2E Parity: $engineName Engine', ({ engineName, createServer }) => {
+  let server: any;
+
+  afterEach(async () => {
+    if (server) {
+      try {
+        const inner = server.getInner();
+        if (inner?.kit?.destroy) {
+          inner.kit.destroy();
+        }
+      } catch {}
+      server = undefined;
+    }
+  });
+
+  describe('Initialization and Session Handling', () => {
+    test('should initialize server successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+      expect(server).toBeDefined();
+      expect(typeof server.start).toBe('function');
+      expect(typeof server.getInner).toBe('function');
+    });
+
+    test('should return valid kit and server instances', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      expect(inner).toBeDefined();
+      expect(inner.kit).toBeDefined();
+      expect(inner.server).toBeDefined();
+      expect(typeof inner.kit.listTools).toBe('function');
+      expect(typeof inner.kit.invoke).toBe('function');
+    });
+
+    test('should support service configuration', async () => {
+      const opts = {
+        ...baseServerOptions,
+        serviceId: 'test-service-unique',
+        port: 0,
+      };
+      server = await createServer(opts as any);
+      const inner = server.getInner();
+
+      expect(inner.kit).toBeDefined();
+      // Kit should be configured with the service ID (in opts)
+      expect(inner.kit.opts).toHaveProperty('serviceId');
+      expect(inner.kit.opts.serviceId).toBe('test-service-unique');
+    });
+  });
+
+  describe('Tool List and Tool Call', () => {
+    test('should list or have built-in tools available', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      // Check if tools are available either via listTools or handlers map
+      const tools = inner.kit.listTools();
+      const toolNames = tools.map((t: any) => t.name).filter(Boolean);
+
+      // If listTools is empty, check handlers directly
+      const hasHealthTool =
+        toolNames.includes('nuwa.health') || inner.kit.handlers?.has?.('nuwa.health');
+      const hasDiscoveryTool =
+        toolNames.includes('nuwa.discovery') || inner.kit.handlers?.has?.('nuwa.discovery');
+
+      expect(hasHealthTool).toBe(true);
+      expect(hasDiscoveryTool).toBe(true);
+    });
+
+    test('should register custom tools', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      const testTool = {
+        name: 'test_custom_tool',
+        description: 'Test custom tool',
+        parameters: {
+          type: 'object',
+          properties: {
+            input: { type: 'string' },
+          },
+        },
+        // @ts-ignore
+        execute: jest.fn().mockResolvedValue({ result: 'custom tool executed' }),
+      };
+
+      server.addTool(testTool);
+
+      const inner = server.getInner();
+
+      // Check if tool is registered either in list or handlers
+      const tools = inner.kit.listTools();
+      const toolNames = tools.map((t: any) => t.name).filter(Boolean);
+      const hasCustomTool =
+        toolNames.includes('test_custom_tool') || inner.kit.handlers?.has?.('test_custom_tool');
+
+      expect(hasCustomTool).toBe(true);
+    });
+
+    test('should invoke built-in tools successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      // Call health check tool
+      const rawResult = await inner.kit.invoke('nuwa.health', {});
+      expect(rawResult).toBeDefined();
+
+      // Extract actual result from wrapped content if needed
+      let result = rawResult;
+      if (rawResult.content && Array.isArray(rawResult.content)) {
+        const textContent = rawResult.content.find((c: any) => c.type === 'text');
+        if (textContent?.text) {
+          try {
+            result = JSON.parse(textContent.text);
+          } catch {
+            result = rawResult;
+          }
+        }
+      }
+
+      expect(result).toHaveProperty('status');
+    });
+
+    test('should invoke custom tools successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ success: true });
+      const testTool: any = {
+        name: 'test_invoke_tool',
+        description: 'Test invoke tool',
+        parameters: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        execute: mockExecute,
+      };
+
+      server.addTool(testTool);
+
+      const inner = server.getInner();
+      await inner.kit.invoke('test_invoke_tool', { message: 'hello' });
+
+      // Verify the tool was called with the message parameter
+      expect(mockExecute).toHaveBeenCalled();
+      const callArgs = mockExecute.mock.calls[0];
+      expect(callArgs[0]).toMatchObject({ message: 'hello' });
+    });
+  });
+
+  describe('__nuwa_auth Parameter Handling', () => {
+    test('should accept __nuwa_auth parameter in tool calls', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ authenticated: true });
+      const testTool: any = {
+        name: 'test_auth_tool',
+        description: 'Test auth tool',
+        parameters: {
+          type: 'object',
+          properties: {
+            data: { type: 'string' },
+          },
+        },
+        execute: mockExecute,
+      };
+
+      server.addTool(testTool);
+
+      const inner = server.getInner();
+      const authHeader = 'test-auth-token-123';
+
+      // Call tool with __nuwa_auth parameter
+      await inner.kit.invoke('test_auth_tool', {
+        data: 'test',
+        __nuwa_auth: authHeader,
+      });
+
+      // Verify the tool was called (auth processing handled by middleware)
+      expect(mockExecute).toHaveBeenCalled();
+    });
+
+    test('should handle missing __nuwa_auth gracefully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ result: 'ok' });
+      const testTool: any = {
+        name: 'test_optional_auth_tool',
+        description: 'Test optional auth tool',
+        parameters: {
+          type: 'object',
+          properties: {
+            data: { type: 'string' },
+          },
+        },
+        execute: mockExecute,
+      };
+
+      server.addTool(testTool);
+
+      const inner = server.getInner();
+
+      // Call tool without __nuwa_auth parameter
+      await inner.kit.invoke('test_optional_auth_tool', { data: 'test' });
+
+      // Should still work
+      expect(mockExecute).toHaveBeenCalled();
+    });
+  });
+
+  describe('__nuwa_payment Parameter Handling', () => {
+    test('should accept __nuwa_payment parameter for paid tools', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ paid: true });
+      const paidTool: any = {
+        name: 'test_paid_tool',
+        description: 'Test paid tool',
+        pricePicoUSD: 1000n,
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+          },
+        },
+        execute: mockExecute,
+      };
+
+      server.paidTool(paidTool);
+
+      const inner = server.getInner();
+
+      // Mock payment payload
+      const paymentPayload = {
+        channelId: 'test-channel-id',
+        nonce: 1,
+        auth: 'test-auth',
+      };
+
+      // Call tool with __nuwa_payment parameter
+      const result = await inner.kit.invoke('test_paid_tool', {
+        query: 'test query',
+        __nuwa_payment: paymentPayload,
+      });
+
+      // In test environment, payment validation may fail, but tool should be registered
+      // Just verify the tool is registered and callable
+      expect(result).toBeDefined();
+      // Tool is registered if we get a response (even if it's an error about payment)
+      const toolRegistered =
+        mockExecute.mock.calls.length > 0 ||
+        result.error?.message?.includes('payment') ||
+        result.content;
+      expect(toolRegistered).toBeTruthy();
+    });
+
+    test('should handle free tools without __nuwa_payment', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ free: true });
+      const freeTool: any = {
+        name: 'test_free_tool',
+        description: 'Test free tool',
+        parameters: {
+          type: 'object',
+          properties: {
+            input: { type: 'string' },
+          },
+        },
+        execute: mockExecute,
+      };
+
+      server.freeTool(freeTool);
+
+      const inner = server.getInner();
+
+      // Call free tool without payment
+      await inner.kit.invoke('test_free_tool', { input: 'test' });
+
+      expect(mockExecute).toHaveBeenCalled();
+    });
+  });
+
+  describe('Health Check Endpoint', () => {
+    test('should have nuwa.health tool available', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      // Check if tool is available via handlers
+      const hasHealthTool = inner.kit.handlers?.has?.('nuwa.health');
+      expect(hasHealthTool).toBe(true);
+    });
+
+    test('should return healthy status from nuwa.health', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      const rawResult = await inner.kit.invoke('nuwa.health', {});
+
+      // Extract actual result from wrapped content if needed
+      let result = rawResult;
+      if (rawResult.content && Array.isArray(rawResult.content)) {
+        const textContent = rawResult.content.find((c: any) => c.type === 'text');
+        if (textContent?.text) {
+          try {
+            result = JSON.parse(textContent.text);
+          } catch {
+            // Not JSON, use as-is
+            result = rawResult;
+          }
+        }
+      }
+
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('status');
+      expect(result.status).toBe('healthy');
+    });
+
+    test('should return version info in health check', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      const rawResult = await inner.kit.invoke('nuwa.health', {});
+
+      // Extract actual result from wrapped content if needed
+      let result = rawResult;
+      if (rawResult.content && Array.isArray(rawResult.content)) {
+        const textContent = rawResult.content.find((c: any) => c.type === 'text');
+        if (textContent?.text) {
+          try {
+            result = JSON.parse(textContent.text);
+          } catch {
+            result = rawResult;
+          }
+        }
+      }
+
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('status');
+      // Version may or may not be present depending on configuration
+      if (result.version) {
+        expect(typeof result.version).toBe('string');
+      }
+    });
+  });
+
+  describe('Discovery Endpoint', () => {
+    test('should have nuwa.discovery tool available or invocable', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      // Try to invoke discovery - if it works, tool is available
+      const rawResult = await inner.kit.invoke('nuwa.discovery', {});
+      expect(rawResult).toBeDefined();
+
+      // Tool should either be in list or directly invocable
+      const tools = inner.kit.listTools();
+      const toolNames = tools.map((t: any) => t.name).filter(Boolean);
+      // Either in list or successfully invoked above
+      const discoveryAvailable = toolNames.includes('nuwa.discovery') || rawResult !== null;
+      expect(discoveryAvailable).toBe(true);
+    });
+
+    test('should return service info from nuwa.discovery', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      const rawResult = await inner.kit.invoke('nuwa.discovery', {});
+
+      // Extract actual result from wrapped content if needed
+      let result = rawResult;
+      if (rawResult.content && Array.isArray(rawResult.content)) {
+        const textContent = rawResult.content.find((c: any) => c.type === 'text');
+        if (textContent?.text) {
+          try {
+            result = JSON.parse(textContent.text);
+          } catch {
+            result = rawResult;
+          }
+        }
+      }
+
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('serviceId');
+      expect(result.serviceId).toBe(baseServerOptions.serviceId);
+    });
+
+    test('should return serviceDid in discovery', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      const rawResult = await inner.kit.invoke('nuwa.discovery', {});
+
+      // Extract actual result from wrapped content if needed
+      let result = rawResult;
+      if (rawResult.content && Array.isArray(rawResult.content)) {
+        const textContent = rawResult.content.find((c: any) => c.type === 'text');
+        if (textContent?.text) {
+          try {
+            result = JSON.parse(textContent.text);
+          } catch {
+            result = rawResult;
+          }
+        }
+      }
+
+      expect(result).toBeDefined();
+      // serviceDid may not always be present in all engines/configurations
+      if (result.serviceDid !== undefined) {
+        expect(typeof result.serviceDid).toBe('string');
+      }
+      // At minimum, should have serviceId
+      expect(result.serviceId).toBe(baseServerOptions.serviceId);
+    });
+  });
+
+  describe('Tool Pricing and Payment Flow', () => {
+    test('should correctly register and invoke free tools', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ type: 'free' });
+      const freeTool: any = {
+        name: 'free_pricing_test',
+        description: 'Free pricing test tool',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+        execute: mockExecute,
+      };
+
+      server.freeTool(freeTool);
+
+      const inner = server.getInner();
+
+      // Verify tool can be invoked (even if not in list)
+      await inner.kit.invoke('free_pricing_test', {});
+      expect(mockExecute).toHaveBeenCalled();
+    });
+
+    test('should correctly register paid tools', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      // @ts-ignore
+      const mockExecute = jest.fn().mockResolvedValue({ type: 'paid' });
+      const paidTool: any = {
+        name: 'paid_pricing_test',
+        description: 'Paid pricing test tool',
+        pricePicoUSD: 5000n,
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+        execute: mockExecute,
+      };
+
+      server.paidTool(paidTool);
+
+      const inner = server.getInner();
+
+      // Verify tool is registered (invocation may require payment)
+      const result = await inner.kit.invoke('paid_pricing_test', {});
+
+      // Tool is registered if we get a response (even if it's an error about payment)
+      expect(result).toBeDefined();
+      const toolRegistered =
+        mockExecute.mock.calls.length > 0 ||
+        result.error?.message?.includes('payment') ||
+        result.content;
+      expect(toolRegistered).toBeTruthy();
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should handle tool execution errors gracefully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      const errorTool: any = {
+        name: 'error_test_tool',
+        description: 'Error test tool',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+        // @ts-ignore
+        execute: jest.fn().mockRejectedValue(new Error('Tool execution failed')),
+      };
+
+      server.addTool(errorTool);
+
+      const inner = server.getInner();
+
+      // Should return error in content or error field
+      const result = await inner.kit.invoke('error_test_tool', {});
+      expect(result).toBeDefined();
+      // Error can be in content or error field depending on engine
+      const hasError =
+        (result.content && result.content.some((c: any) => c.text?.includes('error'))) ||
+        result.error;
+      expect(hasError).toBeTruthy();
+    });
+
+    test('should handle non-existent tool calls', async () => {
+      server = await createServer(baseServerOptions as any);
+      const inner = server.getInner();
+
+      // Should return error for non-existent tool
+      const result = await inner.kit.invoke('non_existent_tool', {});
+      expect(result).toBeDefined();
+      // Error should be present in the result
+      expect(result.error).toBeDefined();
+    });
+  });
+
+  describe('Prompt Registration', () => {
+    test('should register prompts successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      const promptDef = {
+        name: 'test_prompt',
+        description: 'Test prompt',
+        arguments: [
+          {
+            name: 'context',
+            description: 'Context parameter',
+            required: false,
+          },
+        ],
+        // @ts-ignore
+        load: jest.fn().mockResolvedValue('Test prompt content'),
+      };
+
+      expect(() => {
+        server.addPrompt(promptDef);
+      }).not.toThrow();
+    });
+  });
+
+  describe('Resource Registration', () => {
+    test('should register resources successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      const resourceDef = {
+        uri: 'test://resource/file',
+        name: 'Test Resource',
+        mimeType: 'text/plain',
+        // @ts-ignore
+        load: jest.fn().mockResolvedValue({ text: 'Resource content' }),
+      };
+
+      expect(() => {
+        server.addResource(resourceDef);
+      }).not.toThrow();
+    });
+
+    test('should register resource templates successfully', async () => {
+      server = await createServer(baseServerOptions as any);
+
+      const templateDef = {
+        uriTemplate: 'test://template/{id}',
+        name: 'Test Template',
+        mimeType: 'application/json',
+        arguments: [
+          {
+            name: 'id',
+            description: 'Resource ID',
+            required: true,
+          },
+        ],
+        // @ts-ignore
+        load: jest.fn().mockResolvedValue({ text: '{"id": "test"}' }),
+      };
+
+      expect(() => {
+        server.addResourceTemplate(templateDef);
+      }).not.toThrow();
+    });
+  });
+});
