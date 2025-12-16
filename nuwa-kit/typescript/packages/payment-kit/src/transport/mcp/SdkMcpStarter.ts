@@ -451,7 +451,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
         const origin = req.headers.origin;
         setCorsHeaders(origin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
+        res.setHeader('Access-Control-Allow-Headers', '*');
         res.writeHead(204);
         res.end();
         return;
