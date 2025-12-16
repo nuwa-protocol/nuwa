@@ -326,6 +326,107 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     }
   };
 
+  // Helper to set up request handlers for a session server
+  const setupRequestHandlers = (sessionServer: McpServer) => {
+    sessionServer.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: registrar.getTools().map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+        })),
+      };
+    });
+
+    sessionServer.setRequestHandler(CallToolRequestSchema, async (request: any) => {
+      const { name, arguments: args } = request.params;
+      const tool = registrar.getTools().find(t => t.name === name);
+
+      if (!tool) {
+        throw new Error(`Tool '${name}' not found`);
+      }
+
+      try {
+        const result = await tool.handler(args);
+        // Return MCP-native format - prefer returning kit.invoke() directly when it returns { content: [...] }
+        if (result && typeof result === 'object' && Array.isArray(result.content)) {
+          return result;
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: typeof result === 'string' ? result : JSON.stringify(result),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+
+    sessionServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+      return {
+        prompts: registrar.getPrompts(),
+      };
+    });
+
+    sessionServer.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
+      const { name, arguments: args } = request.params;
+      const prompt = registrar.getPrompts().find((p: any) => p.name === name);
+
+      if (!prompt) {
+        throw new Error(`Prompt '${name}' not found`);
+      }
+
+      const result = await prompt.load(args);
+      return {
+        description: prompt.description,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: result,
+            },
+          },
+        ],
+      };
+    });
+
+    sessionServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+      return {
+        resources: registrar.getResources(),
+      };
+    });
+
+    sessionServer.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
+      const { uri } = request.params;
+      const resource = registrar.getResources().find((r: any) => r.uri === uri);
+
+      if (!resource) {
+        throw new Error(`Resource '${uri}' not found`);
+      }
+
+      const result = await resource.load();
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: resource.mimeType,
+            ...result,
+          },
+        ],
+      };
+    });
+
+    sessionServer.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+      return {
+        resourceTemplates: registrar.getResourceTemplates(),
+      };
+    });
+  };
+
   const start = async () => {
     const port = opts.port ?? 8080;
     const endpoint = opts.endpoint || '/mcp';
@@ -350,7 +451,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
         const origin = req.headers.origin;
         setCorsHeaders(origin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', '*');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
         res.writeHead(204);
         res.end();
         return;
@@ -368,9 +469,13 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
           });
           req.on('end', () => {
             try {
-              resolve(body ? JSON.parse(body) : undefined);
-            } catch {
-              resolve(undefined);
+              if (body) {
+                resolve(JSON.parse(body));
+              } else {
+                resolve(undefined);
+              }
+            } catch (error) {
+              reject(new Error('Invalid JSON in request body'));
             }
           });
           req.on('error', reject);
@@ -426,7 +531,12 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
         if (req.method === 'POST') {
           // Initialize new session for POST requests without session ID
           if (!sessionId) {
-            const newSessionId = generateSessionId();
+            let newSessionId = generateSessionId();
+            // Ensure session ID uniqueness
+            while (sessions.has(newSessionId)) {
+              newSessionId = generateSessionId();
+            }
+
             const sessionServer = new McpServer(
               {
                 name: opts.serviceId || 'nuwa-mcp-server',
@@ -442,105 +552,11 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
               }
             );
 
-            // Set up request handlers for this session
-            sessionServer.setRequestHandler(ListToolsRequestSchema, async () => {
-              return {
-                tools: registrar.getTools().map(tool => ({
-                  name: tool.name,
-                  description: tool.description,
-                  inputSchema: tool.inputSchema,
-                })),
-              };
-            });
+            // Set up request handlers for this session using the helper function
+            setupRequestHandlers(sessionServer);
 
-            sessionServer.setRequestHandler(CallToolRequestSchema, async (request: any) => {
-              const { name, arguments: args } = request.params;
-              const tool = registrar.getTools().find(t => t.name === name);
-
-              if (!tool) {
-                throw new Error(`Tool '${name}' not found`);
-              }
-
-              try {
-                const result = await tool.handler(args);
-                // Return MCP-native format - prefer returning kit.invoke() directly when it returns { content: [...] }
-                if (result && typeof result === 'object' && Array.isArray(result.content)) {
-                  return result;
-                }
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: typeof result === 'string' ? result : JSON.stringify(result),
-                    },
-                  ],
-                };
-              } catch (error) {
-                throw new Error(`Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-              }
-            });
-
-            sessionServer.setRequestHandler(ListPromptsRequestSchema, async () => {
-              return {
-                prompts: registrar.getPrompts(),
-              };
-            });
-
-            sessionServer.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
-              const { name, arguments: args } = request.params;
-              const prompt = registrar.getPrompts().find((p: any) => p.name === name);
-
-              if (!prompt) {
-                throw new Error(`Prompt '${name}' not found`);
-              }
-
-              const result = await prompt.load(args);
-              return {
-                description: prompt.description,
-                messages: [
-                  {
-                    role: 'user',
-                    content: {
-                      type: 'text',
-                      text: result,
-                    },
-                  },
-                ],
-              };
-            });
-
-            sessionServer.setRequestHandler(ListResourcesRequestSchema, async () => {
-              return {
-                resources: registrar.getResources(),
-              };
-            });
-
-            sessionServer.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
-              const { uri } = request.params;
-              const resource = registrar.getResources().find((r: any) => r.uri === uri);
-
-              if (!resource) {
-                throw new Error(`Resource '${uri}' not found`);
-              }
-
-              const result = await resource.load();
-              return {
-                contents: [
-                  {
-                    uri,
-                    mimeType: resource.mimeType,
-                    ...result,
-                  },
-                ],
-              };
-            });
-
-            sessionServer.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-              return {
-                resourceTemplates: registrar.getResourceTemplates(),
-              };
-            });
-
+            // We manage session IDs manually via the 'mcp-session-id' header,
+            // so we intentionally disable the built-in session ID generation here.
             const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
             await sessionServer.connect(transport);
 
@@ -609,9 +625,15 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
           }
 
           try {
-            const body = await readRequestBody();
+            // DELETE requests typically don't have a body, so only parse body for GET requests
+            const body = req.method === 'DELETE' ? undefined : await readRequestBody();
             res.setHeader('Content-Type', 'application/json');
             await session.transport.handleRequest(req, res, body);
+
+            // Clean up session after DELETE request
+            if (req.method === 'DELETE') {
+              await cleanupSession(sessionId);
+            }
           } catch (error) {
             logger.error('Error handling MCP request for existing session', {
               sessionId,
