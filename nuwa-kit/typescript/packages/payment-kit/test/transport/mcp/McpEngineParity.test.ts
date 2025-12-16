@@ -1,5 +1,34 @@
-// Parity tests for FastMcpStarter vs SdkMcpStarter engines
-// Ensures both engines provide identical behavior and API compatibility
+// ============================================================================
+// MCP Engine Parity Tests
+// ============================================================================
+//
+// This test suite ensures behavioral parity between two MCP server engines:
+// 1. FastMCP Engine (fastmcp package) - Default, optimized implementation
+// 2. SDK Engine (@modelcontextprotocol/sdk) - Official MCP SDK implementation
+//
+// Goal: Prevent protocol drift and ensure both engines provide identical
+// functionality for tool registration, invocation, payment handling, and
+// protocol-level features like __nuwa_auth and __nuwa_payment parameters.
+//
+// Test Organization:
+// - API Compatibility: Basic interface parity between engines
+// - E2E Parity Tests: Comprehensive behavioral tests parameterized across both engines
+//   - Initialization and session handling
+//   - Tool registration, listing, and invocation
+//   - __nuwa_auth and __nuwa_payment parameter handling
+//   - Health and discovery endpoints
+//   - Error handling
+//   - Prompt and resource registration
+//   - Tool pricing and payment flows
+//
+// Running tests:
+// - All MCP tests: `pnpm test:mcp`
+// - Watch mode: `pnpm test:mcp:watch`
+// - Full suite: `pnpm test`
+//
+// Note: Tests use Jest mocks and don't require a running blockchain node.
+// For E2E tests with real payment flows, see test/e2e/ directory.
+// ============================================================================
 
 import { describe, test, expect, jest, afterEach, beforeEach } from '@jest/globals';
 import {
