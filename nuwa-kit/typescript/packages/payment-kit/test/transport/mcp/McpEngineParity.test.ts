@@ -57,6 +57,23 @@ const baseServerOptions = {
   endpoint: '/mcp' as const,
 };
 
+// Helper function to unwrap MCP response formats
+// SDK engine wraps responses in content arrays, FastMCP returns plain objects
+function unwrapMcpResponse(rawResult: any): any {
+  let result = rawResult;
+  if (rawResult.content && Array.isArray(rawResult.content)) {
+    const textContent = rawResult.content.find((c: any) => c.type === 'text');
+    if (textContent?.text) {
+      try {
+        result = JSON.parse(textContent.text);
+      } catch {
+        result = rawResult;
+      }
+    }
+  }
+  return result;
+}
+
 describe('MCP Engine Parity Tests', () => {
   describe('API Compatibility', () => {
     let fastmcpServer: any | undefined;
@@ -130,7 +147,7 @@ describe('MCP Engine Parity Tests', () => {
             message: { type: 'string' },
           },
         },
-        // @ts-ignore
+        // @ts-expect-error
         execute: jest.fn().mockResolvedValue({ result: 'success' }),
       };
 
@@ -153,7 +170,7 @@ describe('MCP Engine Parity Tests', () => {
             data: { type: 'string' },
           },
         },
-        // @ts-ignore
+        // @ts-expect-error
         execute: jest.fn().mockResolvedValue({ free: 'yes' }),
       };
 
@@ -176,7 +193,7 @@ describe('MCP Engine Parity Tests', () => {
             query: { type: 'string' },
           },
         },
-        // @ts-ignore
+        // @ts-expect-error
         execute: jest.fn().mockResolvedValue({ paid: 'yes' }),
       };
 
@@ -203,7 +220,7 @@ describe('MCP Engine Parity Tests', () => {
             required: false,
           },
         ],
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue('Test prompt content'),
       };
 
@@ -224,7 +241,7 @@ describe('MCP Engine Parity Tests', () => {
         uri: 'test://resource',
         name: 'Test Resource',
         mimeType: 'text/plain',
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue({ text: 'Test resource content' }),
       };
 
@@ -247,7 +264,7 @@ describe('MCP Engine Parity Tests', () => {
             required: true,
           },
         ],
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue({ text: JSON.stringify({ param: 'test' }) }),
       };
 
@@ -298,7 +315,7 @@ describe('MCP Engine Parity Tests', () => {
     });
 
     test('should handle custom route handlers', async () => {
-      // @ts-ignore
+      // @ts-expect-error
       const customHandler: any = jest.fn().mockResolvedValue(true);
 
       const optionsWithHandler = {
@@ -513,7 +530,10 @@ describe.each([
         if (inner?.kit?.destroy) {
           inner.kit.destroy();
         }
-      } catch {}
+      } catch (error) {
+        // Log cleanup errors for debugging, but don't fail the test
+        console.warn('Cleanup error in MCP engine parity tests:', error);
+      }
       server = undefined;
     }
   });
@@ -584,7 +604,7 @@ describe.each([
             input: { type: 'string' },
           },
         },
-        // @ts-ignore
+        // @ts-expect-error
         execute: jest.fn().mockResolvedValue({ result: 'custom tool executed' }),
       };
 
@@ -609,18 +629,8 @@ describe.each([
       const rawResult = await inner.kit.invoke('nuwa.health', {});
       expect(rawResult).toBeDefined();
 
-      // Extract actual result from wrapped content if needed
-      let result = rawResult;
-      if (rawResult.content && Array.isArray(rawResult.content)) {
-        const textContent = rawResult.content.find((c: any) => c.type === 'text');
-        if (textContent?.text) {
-          try {
-            result = JSON.parse(textContent.text);
-          } catch {
-            result = rawResult;
-          }
-        }
-      }
+      // Extract actual result using helper
+      const result = unwrapMcpResponse(rawResult);
 
       expect(result).toHaveProperty('status');
     });
@@ -628,7 +638,7 @@ describe.each([
     test('should invoke custom tools successfully', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error
       const mockExecute = jest.fn().mockResolvedValue({ success: true });
       const testTool: any = {
         name: 'test_invoke_tool',
@@ -658,7 +668,7 @@ describe.each([
     test('should accept __nuwa_auth parameter in tool calls', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error - Testing mock function
       const mockExecute = jest.fn().mockResolvedValue({ authenticated: true });
       const testTool: any = {
         name: 'test_auth_tool',
@@ -683,14 +693,18 @@ describe.each([
         __nuwa_auth: authHeader,
       });
 
-      // Verify the tool was called (auth processing handled by middleware)
+      // Verify the tool was called with auth parameter handling
       expect(mockExecute).toHaveBeenCalled();
+      const callArgs = mockExecute.mock.calls[0];
+      expect(callArgs[0]).toHaveProperty('data', 'test');
+      // Note: __nuwa_auth may or may not be stripped depending on middleware implementation
+      // The important thing is the tool executes successfully with auth present
     });
 
     test('should handle missing __nuwa_auth gracefully', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error
       const mockExecute = jest.fn().mockResolvedValue({ result: 'ok' });
       const testTool: any = {
         name: 'test_optional_auth_tool',
@@ -720,7 +734,7 @@ describe.each([
     test('should accept __nuwa_payment parameter for paid tools', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error - Testing mock function
       const mockExecute = jest.fn().mockResolvedValue({ paid: true });
       const paidTool: any = {
         name: 'test_paid_tool',
@@ -752,21 +766,35 @@ describe.each([
         __nuwa_payment: paymentPayload,
       });
 
-      // In test environment, payment validation may fail, but tool should be registered
-      // Just verify the tool is registered and callable
+      // In test environment, payment validation may fail, but tool should still be registered.
+      // Verify the tool is registered in the handler map and that invocation behavior is as expected.
       expect(result).toBeDefined();
-      // Tool is registered if we get a response (even if it's an error about payment)
-      const toolRegistered =
-        mockExecute.mock.calls.length > 0 ||
-        result.error?.message?.includes('payment') ||
-        result.content;
-      expect(toolRegistered).toBeTruthy();
+
+      // The paid tool should be present in the underlying handler registry.
+      const handlerRegistered = inner.kit.handlers?.has?.('test_paid_tool');
+      expect(handlerRegistered).toBe(true);
+
+      // If payment validation fails, we expect a payment-related error.
+      // Otherwise, the tool's execute function should have been called.
+      if (result.error) {
+        expect(
+          result.error.message?.toLowerCase().includes('payment') ||
+            result.error.message?.toLowerCase().includes('channel'),
+        ).toBe(true);
+      } else if (mockExecute.mock.calls.length > 0) {
+        // If execute was called, verify parameters
+        expect(mockExecute).toHaveBeenCalled();
+      } else {
+        // In some test configurations, payment may prevent execution entirely
+        // which is acceptable behavior - just verify tool is registered
+        expect(handlerRegistered).toBe(true);
+      }
     });
 
     test('should handle free tools without __nuwa_payment', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error
       const mockExecute = jest.fn().mockResolvedValue({ free: true });
       const freeTool: any = {
         name: 'test_free_tool',
@@ -807,19 +835,8 @@ describe.each([
 
       const rawResult = await inner.kit.invoke('nuwa.health', {});
 
-      // Extract actual result from wrapped content if needed
-      let result = rawResult;
-      if (rawResult.content && Array.isArray(rawResult.content)) {
-        const textContent = rawResult.content.find((c: any) => c.type === 'text');
-        if (textContent?.text) {
-          try {
-            result = JSON.parse(textContent.text);
-          } catch {
-            // Not JSON, use as-is
-            result = rawResult;
-          }
-        }
-      }
+      // Extract actual result using helper
+      const result = unwrapMcpResponse(rawResult);
 
       expect(result).toBeDefined();
       expect(result).toHaveProperty('status');
@@ -832,24 +849,18 @@ describe.each([
 
       const rawResult = await inner.kit.invoke('nuwa.health', {});
 
-      // Extract actual result from wrapped content if needed
-      let result = rawResult;
-      if (rawResult.content && Array.isArray(rawResult.content)) {
-        const textContent = rawResult.content.find((c: any) => c.type === 'text');
-        if (textContent?.text) {
-          try {
-            result = JSON.parse(textContent.text);
-          } catch {
-            result = rawResult;
-          }
-        }
-      }
+      // Extract actual result using helper
+      const result = unwrapMcpResponse(rawResult);
 
       expect(result).toBeDefined();
       expect(result).toHaveProperty('status');
-      // Version may or may not be present depending on configuration
-      if (result.version) {
-        expect(typeof result.version).toBe('string');
+      // Version field is optional - when present it must be a string
+      if ('version' in result) {
+        expect(
+          result.version === undefined ||
+            result.version === null ||
+            typeof result.version === 'string',
+        ).toBe(true);
       }
     });
   });
@@ -859,16 +870,14 @@ describe.each([
       server = await createServer(baseServerOptions as any);
       const inner = server.getInner();
 
-      // Try to invoke discovery - if it works, tool is available
+      // Verify tool is registered in handlers (more reliable than listTools)
+      const handlerRegistered = inner.kit.handlers?.has?.('nuwa.discovery');
+      expect(handlerRegistered).toBe(true);
+
+      // Additionally verify it's invocable
       const rawResult = await inner.kit.invoke('nuwa.discovery', {});
       expect(rawResult).toBeDefined();
-
-      // Tool should either be in list or directly invocable
-      const tools = inner.kit.listTools();
-      const toolNames = tools.map((t: any) => t.name).filter(Boolean);
-      // Either in list or successfully invoked above
-      const discoveryAvailable = toolNames.includes('nuwa.discovery') || rawResult !== null;
-      expect(discoveryAvailable).toBe(true);
+      expect(rawResult.error).toBeUndefined();
     });
 
     test('should return service info from nuwa.discovery', async () => {
@@ -877,18 +886,8 @@ describe.each([
 
       const rawResult = await inner.kit.invoke('nuwa.discovery', {});
 
-      // Extract actual result from wrapped content if needed
-      let result = rawResult;
-      if (rawResult.content && Array.isArray(rawResult.content)) {
-        const textContent = rawResult.content.find((c: any) => c.type === 'text');
-        if (textContent?.text) {
-          try {
-            result = JSON.parse(textContent.text);
-          } catch {
-            result = rawResult;
-          }
-        }
-      }
+      // Extract actual result using helper
+      const result = unwrapMcpResponse(rawResult);
 
       expect(result).toBeDefined();
       expect(result).toHaveProperty('serviceId');
@@ -901,24 +900,13 @@ describe.each([
 
       const rawResult = await inner.kit.invoke('nuwa.discovery', {});
 
-      // Extract actual result from wrapped content if needed
-      let result = rawResult;
-      if (rawResult.content && Array.isArray(rawResult.content)) {
-        const textContent = rawResult.content.find((c: any) => c.type === 'text');
-        if (textContent?.text) {
-          try {
-            result = JSON.parse(textContent.text);
-          } catch {
-            result = rawResult;
-          }
-        }
-      }
+      // Extract actual result using helper
+      const result = unwrapMcpResponse(rawResult);
 
       expect(result).toBeDefined();
-      // serviceDid may not always be present in all engines/configurations
-      if (result.serviceDid !== undefined) {
-        expect(typeof result.serviceDid).toBe('string');
-      }
+      // serviceDid may not always be present in all engines/configurations,
+      // but when present it must be a string
+      expect([undefined, expect.any(String)]).toContain(result.serviceDid);
       // At minimum, should have serviceId
       expect(result.serviceId).toBe(baseServerOptions.serviceId);
     });
@@ -928,7 +916,7 @@ describe.each([
     test('should correctly register and invoke free tools', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error - Testing mock function
       const mockExecute = jest.fn().mockResolvedValue({ type: 'free' });
       const freeTool: any = {
         name: 'free_pricing_test',
@@ -952,7 +940,7 @@ describe.each([
     test('should correctly register paid tools', async () => {
       server = await createServer(baseServerOptions as any);
 
-      // @ts-ignore
+      // @ts-expect-error - Testing mock function
       const mockExecute = jest.fn().mockResolvedValue({ type: 'paid' });
       const paidTool: any = {
         name: 'paid_pricing_test',
@@ -972,13 +960,27 @@ describe.each([
       // Verify tool is registered (invocation may require payment)
       const result = await inner.kit.invoke('paid_pricing_test', {});
 
+      // The paid tool should be present in the underlying handler registry.
+      const handlerRegistered = inner.kit.handlers?.has?.('paid_pricing_test');
+      expect(handlerRegistered).toBe(true);
+
       // Tool is registered if we get a response (even if it's an error about payment)
       expect(result).toBeDefined();
-      const toolRegistered =
-        mockExecute.mock.calls.length > 0 ||
-        result.error?.message?.includes('payment') ||
-        result.content;
-      expect(toolRegistered).toBeTruthy();
+      // If payment validation fails, we expect a payment-related error.
+      // Otherwise, the tool's execute function should have been called.
+      if (result.error) {
+        expect(
+          result.error.message?.toLowerCase().includes('payment') ||
+            result.error.message?.toLowerCase().includes('channel'),
+        ).toBe(true);
+      } else if (mockExecute.mock.calls.length > 0) {
+        // If execute was called, verify it happened
+        expect(mockExecute).toHaveBeenCalled();
+      } else {
+        // In some test configurations, payment may prevent execution entirely
+        // which is acceptable behavior - just verify tool is registered
+        expect(handlerRegistered).toBe(true);
+      }
     });
   });
 
@@ -993,7 +995,7 @@ describe.each([
           type: 'object',
           properties: {},
         },
-        // @ts-ignore
+        // @ts-expect-error - Testing mock function
         execute: jest.fn().mockRejectedValue(new Error('Tool execution failed')),
       };
 
@@ -1004,10 +1006,19 @@ describe.each([
       // Should return error in content or error field
       const result = await inner.kit.invoke('error_test_tool', {});
       expect(result).toBeDefined();
+      
       // Error can be in content or error field depending on engine
+      // Check for specific error message to avoid false positives
+      const errorMessage = 'Tool execution failed';
       const hasError =
-        (result.content && result.content.some((c: any) => c.text?.includes('error'))) ||
-        result.error;
+        (result.content &&
+          result.content.some(
+            (c: any) => typeof c.text === 'string' && c.text.includes(errorMessage),
+          )) ||
+        (result.error &&
+          (result.error.message === errorMessage ||
+            String(result.error).includes(errorMessage) ||
+            result.error.message?.includes('error')));
       expect(hasError).toBeTruthy();
     });
 
@@ -1037,7 +1048,7 @@ describe.each([
             required: false,
           },
         ],
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue('Test prompt content'),
       };
 
@@ -1055,7 +1066,7 @@ describe.each([
         uri: 'test://resource/file',
         name: 'Test Resource',
         mimeType: 'text/plain',
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue({ text: 'Resource content' }),
       };
 
@@ -1078,7 +1089,7 @@ describe.each([
             required: true,
           },
         ],
-        // @ts-ignore
+        // @ts-expect-error
         load: jest.fn().mockResolvedValue({ text: '{"id": "test"}' }),
       };
 
