@@ -108,8 +108,8 @@ export class PaymentMcpToolRegistrar {
 
     this.registeredTools.push({
       ...toolDef,
-      handler: async (params: any) => {
-        return await this.kit.invoke(name, params, {});
+      handler: async (params: any, context?: any) => {
+        return await this.kit.invoke(name, params, context);
       },
     });
   }
@@ -288,13 +288,17 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
     const toolDef = {
       name,
       description: `Built-in payment tool: ${name}`,
-      inputSchema: undefined, // Use permissive schema
+      inputSchema: {
+        type: 'object',
+        additionalProperties: true, // Allow reserved fields
+        properties: {},
+      }, // Use permissive schema that supports reserved fields
     };
 
     bootstrapRegistrar.registeredTools.push({
       ...toolDef,
-      handler: async (params: any) => {
-        return await kit.invoke(name, params, {});
+      handler: async (params: any, context?: any) => {
+        return await kit.invoke(name, params, context);
       },
     });
   }
@@ -347,7 +351,7 @@ export async function createSdkMcpServer(opts: SdkMcpServerOptions): Promise<{
       }
 
       try {
-        const result = await tool.handler(args);
+        const result = await tool.handler(args, request.context);
         // Return MCP-native format - prefer returning kit.invoke() directly when it returns { content: [...] }
         if (result && typeof result === 'object' && Array.isArray(result.content)) {
           return result;
