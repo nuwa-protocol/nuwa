@@ -18,6 +18,7 @@
 
 export * from './env';
 export * from './rooch';
+export * from './roochLocalNode';
 export * from './didFactory';
 export * from './types';
 
