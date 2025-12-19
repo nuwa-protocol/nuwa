@@ -24,3 +24,4 @@ export * from './types';
 // Re-export key classes and functions for convenience
 export { TestEnv } from './env';
 export { createSelfDid, createCadopCustodian, createDidViaCadop } from './didFactory';
+export { RoochLocalNode, startLocalRoochNode, ensureRoochReady } from './roochLocalNode';
