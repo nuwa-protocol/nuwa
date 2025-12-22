@@ -1,6 +1,11 @@
 {
-  "preset": "ts-jest/presets/default-esm",
+  "preset": "ts-jest",
   "testEnvironment": "node",
+  "globals": {
+    "ts-jest": {
+      "useESM": true
+    }
+  },
   "extensionsToTreatAsEsm": [".ts"],
   "roots": ["<rootDir>/src", "<rootDir>/__tests__", "<rootDir>/test"],
   "transform": {
