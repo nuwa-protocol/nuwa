@@ -21,6 +21,10 @@ describe('RoochLocalNode Smoke Test', () => {
   // Skip tests if no Rooch binary is available
   if (!hasBinary || !binaryExists) {
     console.log('⚠️  Skipping RoochLocalNode smoke tests - set ROOCH_E2E_BIN to enable');
+
+    test.skip('all tests - ROOCH_E2E_BIN not set or binary not found', () => {
+      // Placeholder test when ROOCH_E2E_BIN is not available
+    });
     return;
   }
 
