@@ -25,9 +25,8 @@ import {
   TestEnv,
   createSelfDid,
   CreateSelfDidResult,
-  DebugLogger,
-  DIDAuth,
-} from '@nuwa-ai/identity-kit';
+} from '@nuwa-ai/identity-kit/testHelpers';
+import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
 import { PaymentHubClient } from '../../src/client/PaymentHubClient';
 import { MemoryChannelRepository } from '../../src/storage';

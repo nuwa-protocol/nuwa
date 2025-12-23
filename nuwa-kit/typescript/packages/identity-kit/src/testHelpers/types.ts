@@ -73,3 +73,43 @@ export interface EnvironmentCheck {
   /** Available RPC URL */
   rpcUrl?: string;
 }
+
+/**
+ * Options for starting a local Rooch node
+ */
+export interface RoochNodeOptions {
+  /** Rooch binary path, defaults to ROOCH_E2E_BIN environment variable */
+  binaryPath?: string;
+  /** Port number, defaults to auto-allocate starting from 6767 */
+  port?: number;
+  /** Data directory, defaults to temp directory */
+  dataDir?: string;
+  /** Logs directory, defaults to temp directory */
+  logsDir?: string;
+  /** Additional server arguments */
+  serverArgs?: string[];
+  /** Network type */
+  network?: 'local' | 'dev' | 'test' | 'main';
+  /** Enable debug logging */
+  debug?: boolean;
+}
+
+/**
+ * Handle representing a running Rooch node
+ */
+export interface RoochNodeHandle {
+  /** RPC URL for connecting to the node */
+  rpcUrl: string;
+  /** Port number the node is listening on */
+  port: number;
+  /** Process ID of the node */
+  pid: number;
+  /** Data directory path */
+  dataDir: string;
+  /** Logs directory path */
+  logsDir: string;
+  /** Stop the node and cleanup resources */
+  stop(): Promise<void>;
+  /** Check if the node is still running */
+  isRunning(): boolean;
+}

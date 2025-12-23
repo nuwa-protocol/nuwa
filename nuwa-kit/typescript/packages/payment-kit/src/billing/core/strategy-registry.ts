@@ -50,3 +50,11 @@ export function clearCache(rule?: BillingRule): void {
     cache = new WeakMap();
   }
 }
+
+/**
+ * Clear the entire strategy registry – useful for testing.
+ * WARNING: This should only be used in test environments.
+ */
+export function clearRegistry(): void {
+  registry.clear();
+}

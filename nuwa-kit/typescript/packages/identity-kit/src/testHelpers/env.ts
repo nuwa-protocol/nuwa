@@ -4,13 +4,17 @@ import { VDRRegistry } from '../vdr/VDRRegistry';
 import { RoochVDR } from '../vdr/roochVDR';
 import { KeyManager } from '../keys/KeyManager';
 import { MemoryKeyStore } from '../keys/KeyStore';
+import { existsSync } from 'fs';
 import {
   TestEnvOptions,
   EnvironmentCheck,
   CreateSelfDidResult,
   CreateSelfDidOptions,
   CreateCadopDidOptions,
+  RoochNodeOptions,
+  RoochNodeHandle,
 } from './types';
+import { RoochLocalNode } from './roochLocalNode';
 
 /**
  * Test environment for Rooch DID integration testing
@@ -66,14 +70,76 @@ export class TestEnv {
    */
   static async bootstrap(options: TestEnvOptions = {}): Promise<TestEnv> {
     const resolvedOptions = await TestEnv.resolveOptions(options);
+    let localNode: RoochNodeHandle | undefined;
 
-    // Check environment
-    const check = await TestEnv.checkEnvironment(resolvedOptions);
-    if (check.shouldSkip) {
-      throw new Error(`Test environment not available: ${check.reason}`);
+    // If autoStartLocalNode is enabled, try to start a local node
+    if (resolvedOptions.autoStartLocalNode) {
+      try {
+        // First, check if existing node is available
+        const check = await TestEnv.checkEnvironment(resolvedOptions);
+        if (!check.shouldSkip) {
+          // Existing node is available, use it
+          return new TestEnv(resolvedOptions);
+        }
+      } catch (error) {
+        // Continue to start local node
+      }
+
+      try {
+        console.log('🚀 Starting local Rooch node for testing...');
+        localNode = await RoochLocalNode.start({
+          binaryPath: process.env.ROOCH_E2E_BIN,
+          network: resolvedOptions.network,
+          debug: resolvedOptions.debug
+        });
+
+        // Update RPC URL to use the local node
+        resolvedOptions.rpcUrl = localNode.rpcUrl;
+        console.log(`✅ Local Rooch node started at ${localNode.rpcUrl}`);
+
+        // Register cleanup handlers
+        const cleanup = async () => {
+          try {
+            if (localNode) {
+              console.log('🛑 Stopping local Rooch node...');
+              await localNode.stop();
+              console.log('✅ Local Rooch node stopped');
+            }
+          } catch (error) {
+            console.error('❌ Error stopping local node:', error);
+          }
+        };
+
+        // Register cleanup for various exit scenarios
+        process.once('exit', cleanup);
+        process.once('SIGINT', cleanup);
+        process.once('SIGTERM', cleanup);
+        process.once('SIGUSR2', cleanup); // nodemon restart
+
+      } catch (error) {
+        throw new Error(`Failed to start local Rooch node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
 
-    return new TestEnv(resolvedOptions);
+    try {
+      // Check environment (will test connectivity to local node if started)
+      const check = await TestEnv.checkEnvironment(resolvedOptions);
+      if (check.shouldSkip) {
+        throw new Error(`Test environment not available: ${check.reason}`);
+      }
+
+      return new TestEnv(resolvedOptions);
+    } catch (error) {
+      // Cleanup local node if TestEnv creation failed
+      if (localNode) {
+        try {
+          await localNode.stop();
+        } catch {
+          // Ignore cleanup errors during failure cleanup
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -150,7 +216,21 @@ export class TestEnv {
       debug: false,
     };
 
-    return { ...defaults, ...options };
+    const resolved = { ...defaults, ...options };
+
+    // If autoStartLocalNode is enabled, validate ROOCH_E2E_BIN
+    if (resolved.autoStartLocalNode) {
+      const binaryPath = process.env.ROOCH_E2E_BIN;
+      if (!binaryPath) {
+        throw new Error('ROOCH_E2E_BIN environment variable is required when autoStartLocalNode is enabled');
+      }
+
+      if (!existsSync(binaryPath)) {
+        throw new Error(`Rooch binary not found at: ${binaryPath}. Set ROOCH_E2E_BIN to a valid Rooch binary path.`);
+      }
+    }
+
+    return resolved;
   }
 
   /**
