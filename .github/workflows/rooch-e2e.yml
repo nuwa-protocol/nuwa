@@ -53,6 +53,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rooch-binary-
 
+      - name: Clean cached Rooch archives
+        run: |
+          # Remove any partially downloaded or cached zip files to prevent extraction errors
+          rm -f ~/.cache/rooch/*.zip
+
       - name: Install dependencies
         run: |
           pnpm install
