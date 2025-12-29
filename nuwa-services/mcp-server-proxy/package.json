@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "PAYMENT_E2E=1 vitest run test/e2e-proxy.test.ts",
-    "test:e2e:local": "PAYMENT_E2E=1 ROOCH_NODE_URL=http://localhost:6767 vitest run test/e2e-proxy.test.ts",
+    "test:e2e:local": "pnpm --filter nuwa-protocol rooch:e2e:with -- pnpm --filter @nuwa-ai/mcp-server-proxy test:e2e:nowait",
+    "test:e2e:nowait": "PAYMENT_E2E=1 vitest run test/e2e-proxy.test.ts",
     "lint": "eslint --ext .ts src/",
     "format": "prettier --write 'src/**/*.ts'",
     "help": "tsx src/server.ts --help"
