@@ -8,8 +8,9 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'test';
 }
 
-// Default Rooch node URL if not specified
-if (!process.env.ROOCH_NODE_URL) {
+// Only set default ROOCH_NODE_URL if PAYMENT_E2E=1 is set
+// This preserves CI skip semantics where tests should be skipped without PAYMENT_E2E=1
+if (process.env.PAYMENT_E2E === '1' && !process.env.ROOCH_NODE_URL) {
   process.env.ROOCH_NODE_URL = 'http://localhost:6767';
 }
 
