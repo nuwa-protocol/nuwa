@@ -25,6 +25,7 @@ import { pipeline } from 'stream/promises';
 import { Transform } from 'stream';
 import path from 'path';
 import { existsSync } from 'fs';
+import { homedir } from 'os';
 
 // Platform mapping based on actual Rooch release naming
 // Note: rooch-macos-latest.zip contains arm64 only (Apple Silicon)
@@ -51,7 +52,7 @@ const VERSION = process.env.ROOCH_E2E_VERSION || '0.12.2';
 const URL_TEMPLATE = process.env.ROOCH_E2E_URL_TEMPLATE ||
   'https://github.com/rooch-network/rooch/releases/download/v${version}/${asset}';
 const CACHE_DIR = process.env.ROOCH_E2E_BIN_DIR ||
-  path.join(process.env.HOME || '.', '.cache', 'rooch');
+  path.join(homedir(), '.cache', 'rooch');
 
 /**
  * Get platform-specific asset name
@@ -104,6 +105,8 @@ async function downloadFile(url, destPath) {
 
   const totalSize = parseInt(response.headers.get('content-length') || '0');
   let downloadedSize = 0;
+  let lastProgressSize = 0;
+  const PROGRESS_INTERVAL = 1024 * 1024; // Report progress every 1MB
 
   const tempPath = destPath + '.tmp';
   const fileStream = createWriteStream(tempPath);
@@ -112,10 +115,11 @@ async function downloadFile(url, destPath) {
   const progressTransform = new Transform({
     transform(chunk, encoding, callback) {
       downloadedSize += chunk.length;
-      if (totalSize > 0 && downloadedSize % (1024 * 1024) === 0) {
+      if (totalSize > 0 && downloadedSize - lastProgressSize >= PROGRESS_INTERVAL) {
         const percent = ((downloadedSize / totalSize) * 100).toFixed(1);
         const mb = (downloadedSize / 1024 / 1024).toFixed(1);
         console.error(`Progress: ${percent}% (${mb} MB)`);
+        lastProgressSize = downloadedSize;
       }
       callback(null, chunk);
     }
@@ -140,6 +144,15 @@ async function downloadWithRetry(url, destPath, maxRetries = 3) {
       return await downloadFile(url, destPath);
     } catch (error) {
       lastError = error;
+
+      // Clean up temporary file if download failed
+      try {
+        const tempPath = destPath + '.tmp';
+        await unlink(tempPath);
+      } catch (cleanupError) {
+        // Ignore cleanup errors
+      }
+
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
         console.error(`Download failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
@@ -169,7 +182,9 @@ async function extractArchive(archivePath, extractDir) {
           execFileSync('powershell', [
             '-NoProfile',
             '-Command',
-            `Expand-Archive -Path "${archivePath}" -DestinationPath "${extractDir}" -Force`
+            '& { param($archivePath, $extractDir) Expand-Archive -Path $archivePath -DestinationPath $extractDir -Force }',
+            archivePath,
+            extractDir
           ], { stdio: 'inherit' });
         } else {
           throw error;
@@ -220,8 +235,9 @@ async function locateExtractedBinary(extractDir) {
 async function verifyBinary(binaryPath, expectedVersion) {
   console.error(`Verifying binary: ${binaryPath}`);
 
-  return new Promise(async (resolve, reject) => {
-    const { spawn } = await import('child_process');
+  const { spawn } = await import('child_process');
+
+  return new Promise((resolve, reject) => {
     const child = spawn(binaryPath, ['--version'], {
       stdio: ['ignore', 'pipe', 'pipe']
     });

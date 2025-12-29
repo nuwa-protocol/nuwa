@@ -56,7 +56,12 @@ function parseArgs() {
   for (let i = 0; i < runnerArgs.length; i++) {
     const arg = runnerArgs[i];
     if (arg === '--port' && runnerArgs[i + 1]) {
-      options.port = parseInt(runnerArgs[i + 1], 10);
+      const parsedPort = parseInt(runnerArgs[i + 1], 10);
+      if (isNaN(parsedPort) || parsedPort < 0 || parsedPort > 65535) {
+        console.error(`Error: Invalid port number: ${runnerArgs[i + 1]}`);
+        process.exit(1);
+      }
+      options.port = parsedPort;
       i++;
     } else if (arg === '--keep') {
       options.keep = true;
@@ -65,7 +70,12 @@ function parseArgs() {
 
   // Allow environment variable overrides
   if (process.env.ROOCH_E2E_PORT) {
-    options.port = parseInt(process.env.ROOCH_E2E_PORT, 10);
+    const parsedPort = parseInt(process.env.ROOCH_E2E_PORT, 10);
+    if (isNaN(parsedPort) || parsedPort < 0 || parsedPort > 65535) {
+      console.error(`Error: Invalid port number in ROOCH_E2E_PORT: ${process.env.ROOCH_E2E_PORT}`);
+      process.exit(1);
+    }
+    options.port = parsedPort;
   }
   if (process.env.ROOCH_E2E_KEEP_TMP === '1') {
     options.keep = true;
@@ -102,11 +112,13 @@ async function getBinaryPath() {
 /**
  * Setup signal handlers for cleanup
  */
-function setupSignalHandlers(nodeHandle, commandProcess) {
+function setupSignalHandlers(nodeHandle, commandProcess, keepOptions) {
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 
   const handler = async (signal) => {
     console.error(`\nReceived ${signal}, shutting down...`);
+
+    let hadErrors = false;
 
     // Kill command process
     if (commandProcess && !commandProcess.killed) {
@@ -114,15 +126,17 @@ function setupSignalHandlers(nodeHandle, commandProcess) {
     }
 
     // Stop Rooch node
-    if (nodeHandle && !nodeHandle.keep) {
+    if (nodeHandle && !keepOptions.keep) {
       try {
         await nodeHandle.stop();
       } catch (error) {
         console.error(`Error stopping node: ${error.message}`);
+        hadErrors = true;
       }
     }
 
-    process.exit(0);
+    // Exit with appropriate code
+    process.exit(hadErrors ? 1 : 0);
   };
 
   signals.forEach(sig => process.on(sig, handler));
@@ -150,17 +164,22 @@ async function main() {
     // 3. Import testHelpers and start local node
     console.error('Starting local Rooch node...');
 
-    // Import from the built dist directory
-    const TEST_HELPERS_PATH = path.join(__dirname, '../../../nuwa-kit/typescript/packages/identity-kit/dist/testHelpers/index.js');
-    const { startLocalRoochNode } = await import(TEST_HELPERS_PATH);
+    // Prefer package resolution for test helpers; fall back to repo-local dist path
+    let startLocalRoochNode;
+    try {
+      const testHelpersModule = await import('@nuwa-ai/identity-kit/testHelpers');
+      startLocalRoochNode = testHelpersModule.startLocalRoochNode;
+    } catch (packageImportError) {
+      console.error('Package import failed, trying local path...');
+      const TEST_HELPERS_PATH = path.join(__dirname, '../../../nuwa-kit/typescript/packages/identity-kit/dist/testHelpers/index.js');
+      const testHelpersModule = await import(TEST_HELPERS_PATH);
+      startLocalRoochNode = testHelpersModule.startLocalRoochNode;
+    }
 
     nodeHandle = await startLocalRoochNode({
       binaryPath,
       port: options.port, // 0 = dynamic port allocation
     });
-
-    // Store keep option for cleanup
-    nodeHandle.keep = options.keep;
 
     console.error(`Node started: ${nodeHandle.rpcUrl}`);
     console.error(`Port: ${nodeHandle.port}`);
@@ -183,7 +202,7 @@ async function main() {
     });
 
     // 6. Setup signal handlers
-    setupSignalHandlers(nodeHandle, commandProcess);
+    setupSignalHandlers(nodeHandle, commandProcess, options);
 
     // 7. Wait for command to complete
     const exitCode = await new Promise((resolve) => {
@@ -196,13 +215,13 @@ async function main() {
       await nodeHandle.stop();
       console.error('Node stopped');
     } else if (options.keep) {
-      console.error(``);
-      console.error(`Node kept running:`);
+      console.error('');
+      console.error('Node kept running:');
       console.error(`  RPC URL: ${nodeHandle.rpcUrl}`);
       console.error(`  Port: ${nodeHandle.port}`);
       console.error(`  PID: ${nodeHandle.pid}`);
       console.error(`  Data dir: ${nodeHandle.dataDir}`);
-      console.error(``);
+      console.error('');
       console.error(`To stop manually: kill ${nodeHandle.pid}`);
     }
 
@@ -212,7 +231,7 @@ async function main() {
     console.error(`Error: ${error.message}`);
 
     // Cleanup on error
-    if (nodeHandle && !nodeHandle.keep) {
+    if (nodeHandle && !options.keep) {
       try {
         console.error('Cleaning up...');
         await nodeHandle.stop();
