@@ -1,0 +1,74 @@
+name: Rooch E2E Tests
+
+on:
+  schedule:
+    # Run nightly at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual triggering from GitHub Actions UI
+  pull_request:
+    paths:
+      - 'nuwa-kit/typescript/packages/payment-kit/**'
+      - 'nuwa-services/mcp-server-proxy/**'
+      - 'scripts/e2e/**'
+      - '.github/workflows/rooch-e2e.yml'
+
+jobs:
+  rooch-e2e:
+    name: Rooch E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache Rooch binary
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/rooch
+          key: ${{ runner.os }}-rooch-binary-${{ hashFiles('scripts/e2e/rooch/ensure-binary.mjs') }}
+          restore-keys: |
+            ${{ runner.os }}-rooch-binary-
+
+      - name: Install dependencies
+        run: |
+          pnpm install
+
+      - name: Build workspace
+        run: |
+          pnpm build
+
+      - name: Run payment-kit E2E tests with Rooch
+        env:
+          NODE_OPTIONS: --experimental-global-webcrypto
+        run: |
+          pnpm rooch:e2e:with -- pnpm --filter @nuwa-ai/payment-kit test:e2e:nowait
+
+      - name: Run mcp-server-proxy E2E tests with Rooch
+        env:
+          NODE_OPTIONS: --experimental-global-webcrypto
+        run: |
+          pnpm rooch:e2e:with -- pnpm --filter @nuwa-ai/mcp-server-proxy test:e2e
