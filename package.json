@@ -25,7 +25,8 @@
     "changeset": "pnpm --filter nuwa-kit changeset",
     "version-packages": "pnpm --filter nuwa-kit changeset version",
     "release": "pnpm --filter nuwa-kit changeset publish",
-    "clean": "pnpm -r run clean && rm -rf node_modules"
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "rooch:e2e:with": "node scripts/e2e/rooch/with-rooch-node.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
