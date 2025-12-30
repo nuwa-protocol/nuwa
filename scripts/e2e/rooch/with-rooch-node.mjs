@@ -88,14 +88,28 @@ function parseArgs() {
  * Get binary path by calling ensure-binary or using existing ROOCH_E2E_BIN
  */
 async function getBinaryPath() {
+  const { existsSync } = await import('fs');
+
   // If ROOCH_E2E_BIN is already set and exists, use it
   if (process.env.ROOCH_E2E_BIN) {
-    const { existsSync } = await import('fs');
     if (existsSync(process.env.ROOCH_E2E_BIN)) {
       console.error(`Using existing binary: ${process.env.ROOCH_E2E_BIN}`);
       return process.env.ROOCH_E2E_BIN;
     }
     console.error(`ROOCH_E2E_BIN set but binary not found, downloading...`);
+  }
+
+  // For local development, check if 'rooch' command exists in PATH
+  // This allows developers to skip binary download if they have rooch installed
+  if (process.env.NODE_ENV !== 'ci' && process.env.CI !== 'true') {
+    try {
+      execSync('which rooch', { stdio: 'ignore' });
+      console.error(`Found 'rooch' command in PATH, using system binary`);
+      return 'rooch';
+    } catch {
+      // rooch not in PATH, continue with download
+      console.error(`'rooch' command not found in PATH, downloading binary...`);
+    }
   }
 
   try {
