@@ -58,6 +58,19 @@ export class RoochLocalNode {
       }
     });
 
+    // Handle stdout and stderr to prevent pipe buffer from filling up
+    if (child.stdout) {
+      child.stdout.on('data', (data) => {
+        console.log(`[Rooch ${port}] ${data.toString()}`);
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on('data', (data) => {
+        console.error(`[Rooch ${port}] ${data.toString()}`);
+      });
+    }
+
     try {
 
       if (!child.pid) {
@@ -65,7 +78,7 @@ export class RoochLocalNode {
       }
 
       // 5. Wait for startup and perform health check
-      await this.ensureReady(`http://127.0.0.1:${port}`);
+      await this.ensureReady(`http://127.0.0.1:${port}`, child);
 
       return {
         rpcUrl: `http://127.0.0.1:${port}`,
@@ -101,13 +114,19 @@ export class RoochLocalNode {
    * Ensure a Rooch node is ready by checking chain ID
    *
    * @param rpcUrl RPC URL of the node
+   * @param child Optional child process to check for exit
    * @param timeout Timeout in milliseconds
    */
-  static async ensureReady(rpcUrl: string, timeout = 30000): Promise<void> {
+  static async ensureReady(rpcUrl: string, child?: ChildProcess, timeout = 30000): Promise<void> {
     const startTime = Date.now();
     const method = 'rooch_getChainID';
 
     while (Date.now() - startTime < timeout) {
+      // Check if process is still running (if provided)
+      if (child && (child.killed || child.exitCode !== null)) {
+        throw new Error(`Rooch node process exited unexpectedly with code ${child.exitCode}`);
+      }
+
       try {
         const response = await fetch(rpcUrl, {
           method: 'POST',
@@ -283,5 +302,5 @@ export async function startLocalRoochNode(opts: RoochNodeOptions = {}): Promise<
  * @param timeout Timeout in milliseconds
  */
 export async function ensureRoochReady(rpcUrl: string, timeout = 30000): Promise<void> {
-  await RoochLocalNode.ensureReady(rpcUrl, timeout);
+  await RoochLocalNode.ensureReady(rpcUrl, undefined, timeout);
 }
