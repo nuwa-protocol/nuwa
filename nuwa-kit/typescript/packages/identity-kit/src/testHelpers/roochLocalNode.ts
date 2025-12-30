@@ -41,12 +41,16 @@ export class RoochLocalNode {
     const dataDir = opts.dataDir || await mkdtemp(join(tmpdir(), 'rooch-data-'));
     const logsDir = opts.logsDir || await mkdtemp(join(tmpdir(), 'rooch-logs-'));
 
-    // 4. Prepare spawn arguments
+    // 4. Initialize Rooch config (required before starting server)
+    await this.initializeConfig(binaryPath, dataDir);
+
+    // 5. Prepare spawn arguments
     const args = [
       'server', 'start',
       '-n', opts.network || 'local',
       '-d', dataDir,
       '--port', port.toString(),
+      '--config-dir', dataDir,
       ...(opts.serverArgs || [])
     ];
 
@@ -153,6 +157,24 @@ export class RoochLocalNode {
     }
 
     throw new Error(`Rooch node not ready after ${timeout}ms at ${rpcUrl}`);
+  }
+
+  /**
+   * Initialize Rooch configuration in a directory
+   *
+   * @param binaryPath Path to rooch binary
+   * @param configDir Directory to initialize config in
+   */
+  private static async initializeConfig(binaryPath: string, configDir: string): Promise<void> {
+    const { execFileSync } = await import('child_process');
+
+    try {
+      execFileSync(binaryPath, ['init', '--config-dir', configDir, '--skip-password'], {
+        stdio: 'pipe'
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to initialize Rooch config: ${error?.message || error}`);
+    }
   }
 
   /**
