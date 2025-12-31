@@ -17,6 +17,13 @@ const config: Config = {
   // Module resolution
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Resolve workspace packages to their dist directories
+    '^@nuwa-ai/payment-kit$': '<rootDir>/dist/node/index.js',
+    '^@nuwa-ai/payment-kit/http$': '<rootDir>/dist/node/integrations/http/index.js',
+    '^@nuwa-ai/payment-kit/express$': '<rootDir>/dist/node/transport/express/index.js',
+    '^@nuwa-ai/payment-kit/storage/sql$': '<rootDir>/dist/node/storage/sql/index.js',
+    '^@nuwa-ai/identity-kit$': '<rootDir>/../../identity-kit/dist/index.js',
+    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../../identity-kit/dist/testHelpers/index.js',
   },
 
   // Transform configuration
@@ -58,9 +65,6 @@ const config: Config = {
 
   // Ignore patterns
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/dist/', '<rootDir>/build/'],
-
-  // Module paths
-  modulePaths: ['<rootDir>/src'],
 
   // Enable experimental ESM support
   extensionsToTreatAsEsm: ['.ts'],
