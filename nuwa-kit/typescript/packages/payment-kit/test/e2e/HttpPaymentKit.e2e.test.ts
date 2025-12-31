@@ -16,8 +16,8 @@ import {
   PaymentChannelAdminClient,
   createAdminClient,
   MemoryHostChannelMappingStore,
-} from '@nuwa-ai/payment-kit/node/integrations/http';
-import type { AssetInfo, PaymentInfo, PaymentResult } from '@nuwa-ai/payment-kit/node';
+} from '@nuwa-ai/payment-kit/http';
+import type { AssetInfo, PaymentInfo, PaymentResult } from '@nuwa-ai/payment-kit';
 import {
   TestEnv,
   createSelfDid,
@@ -25,8 +25,8 @@ import {
 } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
-import { PaymentHubClient } from '@nuwa-ai/payment-kit/node/client';
-import { MemoryChannelRepository } from '@nuwa-ai/payment-kit/node/storage';
+import { PaymentHubClient } from '@nuwa-ai/payment-kit';
+import { MemoryChannelRepository } from '@nuwa-ai/payment-kit/storage/sql';
 
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {

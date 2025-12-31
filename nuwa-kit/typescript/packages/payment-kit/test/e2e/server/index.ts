@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import onHeaders from 'on-headers';
-import { createExpressPaymentKitFromEnv } from '@nuwa-ai/payment-kit/node/transport/express';
-import { HttpPaymentCodec } from '@nuwa-ai/payment-kit/node/middlewares/http';
-import type { HttpRequestPayload, HttpResponsePayload, SubRAV } from '@nuwa-ai/payment-kit/node';
+import { createExpressPaymentKitFromEnv } from '@nuwa-ai/payment-kit/express';
+import { HttpPaymentCodec } from '@nuwa-ai/payment-kit';
+import type { HttpRequestPayload, HttpResponsePayload, SubRAV } from '@nuwa-ai/payment-kit';
 import type { IdentityEnv } from '@nuwa-ai/identity-kit';
 import { DIDAuth } from '@nuwa-ai/identity-kit';
 
