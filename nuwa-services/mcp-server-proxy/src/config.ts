@@ -36,6 +36,9 @@ export interface MinimalConfig {
   register?: {
     tools: MinimalToolConfig[];
   };
+  // MCP engine selection for canary rollout
+  // Options: 'fastmcp' (default) | 'sdk' | 'legacy' | 'official'
+  engine?: 'fastmcp' | 'sdk' | 'legacy' | 'official';
 }
 
 // Command line argument definitions
@@ -48,6 +51,7 @@ interface CliArgs {
   rpcUrl?: string;
   defaultAssetId?: string;
   defaultPricePicoUSD?: string;
+  engine?: string;
   debug?: boolean;
   help?: boolean;
 }
@@ -66,6 +70,7 @@ function parseCliArgs(): CliArgs {
         'rpc-url': { type: 'string' },
         'default-asset-id': { type: 'string' },
         'default-price-pico-usd': { type: 'string' },
+        engine: { type: 'string' },
         debug: { type: 'boolean', short: 'd' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -81,6 +86,7 @@ function parseCliArgs(): CliArgs {
       rpcUrl: values['rpc-url'],
       defaultAssetId: values['default-asset-id'],
       defaultPricePicoUSD: values['default-price-pico-usd'],
+      engine: values.engine,
       debug: values.debug,
       help: values.help,
     };
@@ -106,6 +112,7 @@ Options:
       --rpc-url <url>                 Rooch RPC URL
       --default-asset-id <string>     Default asset ID
       --default-price-pico-usd <num>  Default price in picoUSD
+      --engine <string>               MCP engine (fastmcp|sdk|legacy|official, default: fastmcp)
   -d, --debug                         Enable debug logging
   -h, --help                          Show this help message
 
@@ -117,13 +124,15 @@ Configuration Priority (high to low):
 
 Environment Variables:
   PORT, CONFIG_PATH, SERVICE_ID, SERVICE_KEY,
-  ROOCH_NETWORK, ROOCH_RPC_URL, DEFAULT_ASSET_ID, DEFAULT_PRICE_PICO_USD, DEBUG
+  ROOCH_NETWORK, ROOCH_RPC_URL, DEFAULT_ASSET_ID, DEFAULT_PRICE_PICO_USD,
+  MCP_ENGINE (fastmcp|sdk|legacy|official), DEBUG
 
 Examples:
   node server.js --port 3000 --debug
   node server.js --config ./my-config.yaml
   node server.js --config https://example.com/configs/my-config.yaml
   node server.js --service-id my-service --network test --default-price-pico-usd 1000000000000
+  node server.js --engine sdk  # Use official SDK engine (canary rollout)
 `);
 }
 
@@ -273,6 +282,13 @@ export async function loadConfig(): Promise<MinimalConfig> {
       (process.env.DEBUG === '1' || process.env.DEBUG === 'true' ? true : undefined) ??
       fileConfig.debug ??
       false,
+
+    // Engine selection for canary rollout (CLI > env > file > default to fastmcp)
+    engine:
+      (cliArgs.engine as any) ??
+      (process.env.MCP_ENGINE as any) ??
+      fileConfig.engine ??
+      undefined, // undefined means use payment-kit's default (fastmcp)
 
     // Tools from config file only (not suitable for CLI)
     register: {

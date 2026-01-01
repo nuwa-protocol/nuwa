@@ -278,6 +278,7 @@ Options:
       --rpc-url <url>                 Rooch RPC URL
       --default-asset-id <string>     Default asset ID
       --default-price-pico-usd <num>  Default price in picoUSD
+      --engine <string>               MCP engine (fastmcp|sdk|legacy|official)
   -d, --debug                         Enable debug logging
   -h, --help                          Show help message
 ```
@@ -292,8 +293,23 @@ SERVICE_ID=my-service
 SERVICE_KEY=your-service-key
 ROOCH_NETWORK=test
 DEFAULT_PRICE_PICO_USD=100000000
+MCP_ENGINE=fastmcp  # MCP engine selection (fastmcp|sdk|legacy|official)
 DEBUG=true
 ```
+
+### MCP Engine Configuration
+
+The `mcp-server-proxy` supports two MCP engines for canary rollouts:
+
+- **fastmcp** (default): The FastMCP engine
+- **sdk**: The official MCP SDK engine
+
+Configure via:
+1. **CLI**: `--engine sdk`
+2. **Environment**: `MCP_ENGINE=sdk`
+3. **Config file**: `engine: sdk`
+
+For detailed rollout guidance, see [docs/CANARY_ROLLOUT.md](./docs/CANARY_ROLLOUT.md).
 
 ### 4. Remote Configuration Support
 

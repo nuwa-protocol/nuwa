@@ -47,6 +47,7 @@ async function startServer(
   const serverOptions: any = {
     port: Number(config.port || process.env.PORT || 8088),
     endpoint: (config.endpoint || '/mcp') as any,
+    engine: config.engine, // Pass engine option for canary rollout (fastmcp/sdk/legacy/official)
   };
 
   // Only add payment options if we have a signer
