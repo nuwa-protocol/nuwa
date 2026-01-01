@@ -16,6 +16,7 @@
     "test:e2e": "PAYMENT_E2E=1 vitest run test/e2e-proxy.test.ts",
     "test:e2e:local": "pnpm --filter nuwa-protocol rooch:e2e:with -- pnpm --filter @nuwa-ai/mcp-server-proxy test:e2e:nowait",
     "test:e2e:nowait": "PAYMENT_E2E=1 vitest run test/e2e-proxy.test.ts",
+    "test:unit": "vitest run test/config.test.ts test/remote-config.test.ts",
     "lint": "eslint --ext .ts src/",
     "format": "prettier --write 'src/**/*.ts'",
     "help": "tsx src/server.ts --help"
