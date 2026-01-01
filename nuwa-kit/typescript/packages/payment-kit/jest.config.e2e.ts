@@ -17,9 +17,9 @@ const config: Config = {
   // Module resolution
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    // Only map identity-kit testHelpers since we use relative imports for payment-kit
-    '^@nuwa-ai/identity-kit$': '<rootDir>/../identity-kit/dist/index.js',
-    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../identity-kit/src/testHelpers/index.js',
+    // Map identity-kit to src to avoid type mismatches with testHelpers
+    '^@nuwa-ai/identity-kit$': '<rootDir>/../identity-kit/src/index.ts',
+    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../identity-kit/src/testHelpers/index.ts',
   },
 
   // Transform configuration

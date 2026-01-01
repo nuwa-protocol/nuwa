@@ -28,7 +28,7 @@ import {
 } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
-import { MemoryChannelRepository } from '../../src/storage/sql';
+import { MemoryChannelRepository } from '../../src/storage/memory';
 
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
