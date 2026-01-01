@@ -395,6 +395,9 @@ describe('Proxy MCP e2e (Stdio Upstream)', () => {
       maxAmount: BigInt(100000000000), // 100 RGas - increase to handle higher costs
     });
 
+    // Trigger server type detection by calling health check
+    await mcpClient.healthCheck();
+
     // Fund the payer's hub
     const hubClient = mcpClient.getPayerClient().getHubClient();
     const depositTx = await hubClient.deposit(testAsset.assetId, BigInt('1000000000')); // 10 RGas
