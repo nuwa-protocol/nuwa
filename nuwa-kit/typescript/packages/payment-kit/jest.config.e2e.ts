@@ -17,13 +17,9 @@ const config: Config = {
   // Module resolution
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    // Resolve workspace packages to their dist directories
-    '^@nuwa-ai/payment-kit$': '<rootDir>/dist/node/index.js',
-    '^@nuwa-ai/payment-kit/http$': '<rootDir>/dist/node/integrations/http/index.js',
-    '^@nuwa-ai/payment-kit/express$': '<rootDir>/dist/node/transport/express/index.js',
-    '^@nuwa-ai/payment-kit/storage/sql$': '<rootDir>/dist/node/storage/sql/index.js',
-    '^@nuwa-ai/identity-kit$': '<rootDir>/../../identity-kit/dist/index.js',
-    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../../identity-kit/dist/testHelpers/index.js',
+    // Only map identity-kit testHelpers since we use relative imports for payment-kit
+    '^@nuwa-ai/identity-kit$': '<rootDir>/../identity-kit/dist/index.js',
+    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../identity-kit/src/testHelpers/index.js',
   },
 
   // Transform configuration
@@ -32,12 +28,7 @@ const config: Config = {
       'ts-jest',
       {
         useESM: true,
-        tsconfig: {
-          moduleResolution: 'node',
-          allowSyntheticDefaultImports: true,
-          esModuleInterop: true,
-          module: 'esnext',
-        },
+        tsconfig: './tsconfig.e2e.json',
       },
     ],
     '^.+\\.jsx?$': [
