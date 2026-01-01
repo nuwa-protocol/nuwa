@@ -1069,8 +1069,8 @@ importers:
         specifier: ^0.6.0
         version: 0.6.0(typescript@5.4.5)
       '@nuwa-ai/payment-kit':
-        specifier: ^0.6.8
-        version: 0.6.9(express@5.2.1)(pg@8.16.3)(typescript@5.4.5)
+        specifier: workspace:^
+        version: link:../../nuwa-kit/typescript/packages/payment-kit
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
@@ -9554,33 +9554,6 @@ snapshots:
       zod-to-json-schema: 3.25.0(zod@3.25.76)
     optionalDependencies:
       express: 4.22.1
-      pg: 8.16.3
-    transitivePeerDependencies:
-      - '@valibot/to-json-schema'
-      - arktype
-      - effect
-      - supports-color
-      - sury
-      - typescript
-
-  '@nuwa-ai/payment-kit@0.6.9(express@5.2.1)(pg@8.16.3)(typescript@5.4.5)':
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.20.2
-      '@nuwa-ai/identity-kit': 0.6.0(typescript@5.4.5)
-      '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.4.5)
-      '@types/js-yaml': 4.0.9
-      '@types/pg': 8.15.6
-      ai: 5.0.108(zod@3.25.76)
-      fastmcp: 3.5.0
-      js-yaml: 4.1.1
-      lossless-json: 4.3.0
-      mcp-proxy: 5.5.6
-      on-headers: 1.1.0
-      path-to-regexp: 6.3.0
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.0(zod@3.25.76)
-    optionalDependencies:
-      express: 5.2.1
       pg: 8.16.3
     transitivePeerDependencies:
       - '@valibot/to-json-schema'

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@nuwa-ai/identity-kit": ["../identity-kit/src/index.ts"],
+      "@nuwa-ai/identity-kit/testHelpers": ["../identity-kit/src/testHelpers/index.ts"]
+    }
+  },
+  "include": ["test/e2e/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

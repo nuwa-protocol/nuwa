@@ -17,6 +17,9 @@ const config: Config = {
   // Module resolution
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Map identity-kit to src to avoid type mismatches with testHelpers
+    '^@nuwa-ai/identity-kit$': '<rootDir>/../identity-kit/src/index.ts',
+    '^@nuwa-ai/identity-kit/testHelpers': '<rootDir>/../identity-kit/src/testHelpers/index.ts',
   },
 
   // Transform configuration
@@ -25,12 +28,7 @@ const config: Config = {
       'ts-jest',
       {
         useESM: true,
-        tsconfig: {
-          moduleResolution: 'node',
-          allowSyntheticDefaultImports: true,
-          esModuleInterop: true,
-          module: 'esnext',
-        },
+        tsconfig: './tsconfig.e2e.json',
       },
     ],
     '^.+\\.jsx?$': [
@@ -58,9 +56,6 @@ const config: Config = {
 
   // Ignore patterns
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/dist/', '<rootDir>/build/'],
-
-  // Module paths
-  modulePaths: ['<rootDir>/src'],
 
   // Enable experimental ESM support
   extensionsToTreatAsEsm: ['.ts'],

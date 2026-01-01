@@ -171,24 +171,20 @@ async function extractArchive(archivePath, extractDir) {
 
   try {
     if (archivePath.endsWith('.zip')) {
-      // Try tar first (available on most systems)
-      try {
-        execFileSync('tar', ['-xf', archivePath, '-C', extractDir], {
+      // On Windows, use PowerShell
+      if (process.platform === 'win32') {
+        execFileSync('powershell', [
+          '-NoProfile',
+          '-Command',
+          '& { param($archivePath, $extractDir) Expand-Archive -Path $archivePath -DestinationPath $extractDir -Force }',
+          archivePath,
+          extractDir
+        ], { stdio: 'inherit' });
+      } else {
+        // On Unix-like systems (Linux, macOS), use unzip
+        execFileSync('unzip', ['-q', archivePath, '-d', extractDir], {
           stdio: 'inherit'
         });
-      } catch (error) {
-        // Fallback to PowerShell on Windows
-        if (process.platform === 'win32') {
-          execFileSync('powershell', [
-            '-NoProfile',
-            '-Command',
-            '& { param($archivePath, $extractDir) Expand-Archive -Path $archivePath -DestinationPath $extractDir -Force }',
-            archivePath,
-            extractDir
-          ], { stdio: 'inherit' });
-        } else {
-          throw error;
-        }
       }
     } else {
       throw new Error(`Unsupported archive format: ${archivePath}`);

@@ -17,8 +17,8 @@ import {
   createAdminClient,
   MemoryHostChannelMappingStore,
 } from '../../src/integrations/http';
+import { PaymentHubClient } from '../../src/client/PaymentHubClient';
 import { safeStringify } from '../../src/utils/json';
-import { PaymentChannelFactory } from '../../src/factory/chainFactory';
 import { RoochPaymentChannelContract } from '../../src/rooch/RoochPaymentChannelContract';
 import type { AssetInfo, PaymentInfo, PaymentResult } from '../../src/core/types';
 import {
@@ -28,8 +28,7 @@ import {
 } from '@nuwa-ai/identity-kit/testHelpers';
 import { DebugLogger, DIDAuth } from '@nuwa-ai/identity-kit';
 import { createBillingServer } from './server';
-import { PaymentHubClient } from '../../src/client/PaymentHubClient';
-import { MemoryChannelRepository } from '../../src/storage';
+import { MemoryChannelRepository } from '../../src/storage/memory/channel.memory';
 
 // Helper function to format payment info consistently
 function formatPaymentInfo(payment: PaymentInfo): string {
