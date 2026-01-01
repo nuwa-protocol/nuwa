@@ -26,7 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.3",
     "@nuwa-ai/identity-kit": "^0.6.0",
-    "@nuwa-ai/payment-kit": "^0.6.8",
+    "@nuwa-ai/payment-kit": "workspace:^",
     "js-yaml": "^4.1.0",
     "undici": "^6.6.0",
     "zod": "^3.22.4"
