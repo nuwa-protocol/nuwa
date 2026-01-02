@@ -283,7 +283,7 @@ export async function loadConfig(): Promise<MinimalConfig> {
       fileConfig.debug ??
       false,
 
-    // Engine selection for canary rollout (CLI > env > file > default to fastmcp)
+    // Engine selection for canary rollout (CLI > env > file > payment-kit default)
     engine:
       (cliArgs.engine as any) ??
       (process.env.MCP_ENGINE as any) ??

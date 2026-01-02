@@ -5,7 +5,7 @@ This document describes how to perform canary rollouts and rollbacks for the MCP
 ## Background
 
 The `mcp-server-proxy` service supports two MCP engines:
-- **fastmcp** (default): The legacy FastMCP engine
+- **fastmcp** (default): The FastMCP engine
 - **sdk**: The official MCP SDK engine
 
 The `MCP_ENGINE` configuration allows safe service-level canary deployment of the new SDK engine.
@@ -136,13 +136,13 @@ Error during server shutdown
 
 ### Health Checks
 
-Implement health check endpoints to verify service status:
+If your deployment exposes HTTP health check endpoints, you can verify service status with commands like:
 
 ```bash
-# Basic health check
+# Example basic health check (replace host/port/path with your configuration)
 curl http://localhost:8088/health
 
-# MCP endpoint check
+# Example MCP endpoint check (replace host/port/path with your configuration)
 curl http://localhost:8088/mcp
 ```
 

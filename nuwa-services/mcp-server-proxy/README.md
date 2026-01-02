@@ -299,10 +299,10 @@ DEBUG=true
 
 ### MCP Engine Configuration
 
-The `mcp-server-proxy` supports two MCP engines for canary rollouts:
+The `mcp-server-proxy` supports two MCP engines (with multiple aliases) for canary rollouts:
 
-- **fastmcp** (default): The FastMCP engine
-- **sdk**: The official MCP SDK engine
+- **fastmcp** (default): The FastMCP engine (also known as `legacy`)
+- **sdk**: The official MCP SDK engine (also known as `official`)
 
 Configure via:
 1. **CLI**: `--engine sdk`
