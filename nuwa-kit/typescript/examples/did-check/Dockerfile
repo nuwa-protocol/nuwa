@@ -1,18 +1,18 @@
 # Production Dockerfile for did-check service
-# Build context is repository root, dockerfilePath points to this file
+# Build context is the rootDirectory: /nuwa-kit/typescript/examples/did-check
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files from did-check directory
-COPY nuwa-kit/typescript/examples/did-check/package.json ./
+# Copy package files (relative to rootDirectory)
+COPY package.json ./
 
 # Install all dependencies including @nuwa-ai/identity-kit from npm
 RUN npm install
 
-# Copy source files from did-check directory
-COPY nuwa-kit/typescript/examples/did-check/tsconfig.json ./
-COPY nuwa-kit/typescript/examples/did-check/src ./src
+# Copy source files (relative to rootDirectory)
+COPY tsconfig.json ./
+COPY src ./src
 
 # Build TypeScript
 RUN npx tsc
@@ -27,7 +27,7 @@ ENV NODE_ENV=production
 ENV PORT=3004
 
 # Copy package files and install production dependencies only
-COPY nuwa-kit/typescript/examples/did-check/package.json ./
+COPY package.json ./
 RUN npm install --omit=dev
 
 # Copy built files from builder
