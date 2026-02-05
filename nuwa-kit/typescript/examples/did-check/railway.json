@@ -1,13 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "buildCommand": "cd nuwa-kit/typescript/examples/did-check && npm install && npm run build"
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
-    "restartPolicyType": "ON_FAILURE",
-    "startCommand": "cd nuwa-kit/typescript/examples/did-check && node dist/server.js",
-    "numReplicas": 1
+    "restartPolicyType": "ON_FAILURE"
   }
 }
