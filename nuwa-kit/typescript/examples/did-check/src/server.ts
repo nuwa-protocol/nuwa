@@ -205,8 +205,7 @@ async function main() {
 }
 
 // Start server if run directly
-if (require.main === module) {
-    main().catch(console.error);
-}
+// Using ES module check instead of CommonJS require.main
+main().catch(console.error);
 
 export { createServer, createDIDAuthMiddleware };
