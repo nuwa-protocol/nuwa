@@ -1,7 +1,9 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "dockerfilePath": "Dockerfile"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile",
+    "rootDirectory": "nuwa-kit/typescript/examples/did-check"
   },
   "deploy": {
     "healthcheckPath": "/health",
