@@ -345,7 +345,6 @@ class IdentityCLIClient {
         console.log(chalk.blue('🔍 Fetching service info...'));
         const result = await this.makePublicRequest('GET', '/info');
         console.log(chalk.green('📋 Service Information:'));
-        console.log(chalk.white(`  Service DID: ${result.serviceDid}`));
         console.log(chalk.white(`  Network: ${result.network}`));
         console.log(chalk.white(`  Version: ${result.version}`));
         console.log(chalk.white(`  Public endpoints: ${result.endpoints.public.join(', ')}`));

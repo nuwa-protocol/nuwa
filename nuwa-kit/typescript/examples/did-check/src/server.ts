@@ -139,16 +139,6 @@ async function createServer(config: ServerConfig): Promise<{
         });
     });
 
-    // Minimal protected endpoint for did-check
-    app.get('/whoami', didAuthMiddleware, (req: Request, res: Response) => {
-        res.json({
-            callerDid: req.callerDid,
-            callerKeyId: req.callerKeyId,
-            message: 'You are authenticated!',
-            timestamp: new Date().toISOString(),
-        });
-    });
-
     // Error handling middleware
     app.use((err: any, req: Request, res: Response, next: NextFunction) => {
         console.error('🚨 Server error occurred:');
