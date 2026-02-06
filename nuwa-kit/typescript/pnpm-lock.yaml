@@ -18,11 +18,11 @@ importers:
         specifier: ^29.3.4
         version: 29.4.6(@babel/core@7.28.5)(@jest/transform@29.7.0)(@jest/types@30.2.0)(babel-jest@29.7.0(@babel/core@7.28.5))(jest-util@30.2.0)(jest@29.7.0(@types/node@20.19.26)(ts-node@10.9.2(@types/node@20.19.26)(typescript@5.4.5)))(typescript@5.4.5)
 
-  examples/identity-kit-integration:
+  examples/did-check:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: workspace:*
-        version: link:../../packages/identity-kit
+        specifier: ^0.6.0
+        version: 0.6.0(typescript@5.4.5)
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -1416,6 +1416,9 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@nuwa-ai/identity-kit@0.6.0':
+    resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -5586,6 +5589,16 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
+
+  '@nuwa-ai/identity-kit@0.6.0(typescript@5.4.5)':
+    dependencies:
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.4.5)
+      multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   '@opentelemetry/api@1.9.0': {}
 
