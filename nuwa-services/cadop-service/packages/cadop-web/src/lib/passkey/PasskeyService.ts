@@ -311,6 +311,7 @@ export class PasskeyService {
         allowCredentials: allowCredentialIds.map(id => ({
           id: base64URLToArrayBuffer(id),
           type: 'public-key',
+          transports: ['internal', 'hybrid'],
         })),
       }),
     } as unknown as PublicKeyCredentialRequestOptions;
@@ -385,6 +386,7 @@ export class PasskeyService {
         allowCredentials: allowCredentialIds.map(id => ({
           id: base64URLToArrayBuffer(id),
           type: 'public-key',
+          transports: ['internal', 'hybrid'],
         })),
       } as unknown as PublicKeyCredentialRequestOptions;
 
