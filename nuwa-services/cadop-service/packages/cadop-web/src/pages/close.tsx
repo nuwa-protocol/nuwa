@@ -1,6 +1,6 @@
 import { CheckCircle2, Copy, KeyRound, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FixedCardActionButton,
   FixedCardActions,
@@ -15,6 +15,7 @@ function displaySuccess(success: string | null): boolean | null {
 }
 
 export function ClosePage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [copiedField, setCopiedField] = useState<'agent' | 'key' | null>(null);
 
@@ -31,6 +32,15 @@ export function ClosePage() {
     await navigator.clipboard.writeText(value);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 1500);
+  };
+
+  const handleClose = () => {
+    // `window.close()` only works for windows opened by script in most browsers.
+    window.close();
+
+    setTimeout(() => {
+      navigate('/dashboard', { replace: true });
+    }, 100);
   };
 
   const title =
@@ -61,9 +71,7 @@ export function ClosePage() {
       actions={
         <FixedCardActions>
           <FixedCardActionButton
-            onClick={() => {
-              window.close();
-            }}
+            onClick={handleClose}
             size="lg"
           >
             Close
