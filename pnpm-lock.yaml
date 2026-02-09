@@ -28,6 +28,37 @@ importers:
         specifier: ^5.0.0
         version: 5.4.5
 
+  nuwa-kit/typescript/examples/did-check:
+    dependencies:
+      '@nuwa-ai/identity-kit':
+        specifier: ^0.6.0
+        version: 0.6.0(typescript@5.9.3)
+      dotenv:
+        specifier: ^16.3.1
+        version: 16.6.1
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+    devDependencies:
+      '@types/dotenv':
+        specifier: ^8.2.3
+        version: 8.2.3
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.26
+      prettier:
+        specifier: ^3.2.5
+        version: 3.7.4
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
   nuwa-kit/typescript/examples/login-demo:
     dependencies:
       '@nuwa-ai/identity-kit':
@@ -6223,6 +6254,7 @@ packages:
   next@16.0.8:
     resolution: {integrity: sha512-LmcZzG04JuzNXi48s5P+TnJBsTGPJunViNKV/iE4uM6kstjTQsQhvsAv+xF6MJxU2Pr26tl15eVbp0jQnsv6/g==}
     engines: {node: '>=20.9.0'}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
