@@ -2,9 +2,6 @@
 
 import { stat } from 'fs/promises';
 import path from 'path';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const packageJson = require('../package.json');
 import {
   ensureCliDir,
   getActiveProfile,
@@ -28,6 +25,26 @@ type ParsedArgs = {
   command?: string;
   options: Record<string, string | boolean | string[]>;
 };
+
+function resolveCliVersion(): string {
+  const envVersion = process.env.npm_package_version;
+  if (envVersion) return envVersion;
+
+  try {
+    // Resolve from installed package root when running CJS bin (`dist/cli/index.cjs`).
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('../../package.json') as { version?: string };
+    if (typeof pkg.version === 'string' && pkg.version.length > 0) {
+      return pkg.version;
+    }
+  } catch {
+    // Fallback below.
+  }
+
+  return 'unknown';
+}
+
+const cliVersion = resolveCliVersion();
 
 async function main(): Promise<void> {
   try {
@@ -559,7 +576,7 @@ function printHelp(): void {
 }
 
 function printVersion(): void {
-  console.log(packageJson.version);
+  console.log(cliVersion);
 }
 
 void main();
