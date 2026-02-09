@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/@changesets/config@2.3.1/schema.json",
   "changelog": ["@changesets/changelog-github", { "repo": "nuwa-protocol/nuwa" }],
   "commit": false,
-  "linked": [["@nuwa-ai/identity-kit", "@nuwa-ai/identity-kit-web"]],
+  "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch"
