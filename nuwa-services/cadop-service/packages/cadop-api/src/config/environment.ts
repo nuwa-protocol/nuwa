@@ -21,6 +21,9 @@ const envSchema = z.object({
   CADOP_DID: z.string().default('did:rooch:placeholder'),
   JWT_SIGNING_KEY: z.string().default('signing-key-placeholder'),
   CUSTODIAN_MAX_DAILY_MINTS: z.string().default('10'),
+  DID_SUBSIDY_ENABLED: z.string().default('true'),
+  DID_SUBSIDY_AMOUNT_RAW: z.string().default('5000000000'),
+  DID_SUBSIDY_MAX_GAS: z.string().default('100000000'),
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
@@ -51,6 +54,11 @@ export const config = {
     did: env.CADOP_DID,
     maxDailyMints: parseInt(env.CUSTODIAN_MAX_DAILY_MINTS, 10),
     signingKey: env.JWT_SIGNING_KEY,
+    subsidy: {
+      enabled: env.DID_SUBSIDY_ENABLED === 'true',
+      amountRaw: env.DID_SUBSIDY_AMOUNT_RAW,
+      maxGas: parseInt(env.DID_SUBSIDY_MAX_GAS, 10),
+    },
   },
   webauthn: {
     rpId: env.WEBAUTHN_RP_ID,

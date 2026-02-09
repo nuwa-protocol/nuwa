@@ -6,6 +6,7 @@ import {
 import { VDRRegistry, DIDDocument, CadopIdentityKit } from '@nuwa-ai/identity-kit';
 import { logger } from '../utils/logger.js';
 import crypto from 'crypto';
+import { GasSubsidyService } from './GasSubsidyService.js';
 
 import jwt from 'jsonwebtoken';
 
@@ -21,14 +22,20 @@ export class CustodianService {
   private dailyMintCount: Map<string, number>;
   private lastMintReset: Date;
   private config: CustodianServiceConfig;
+  private gasSubsidyService: GasSubsidyService;
 
-  constructor(config: CustodianServiceConfig, cadopKit: CadopIdentityKit) {
+  constructor(
+    config: CustodianServiceConfig,
+    cadopKit: CadopIdentityKit,
+    gasSubsidyService: GasSubsidyService
+  ) {
     this.config = config;
     this.didCreationRecords = new Map();
     this.userDids = new Map();
     this.dailyMintCount = new Map();
     this.lastMintReset = new Date();
     this.cadopKit = cadopKit;
+    this.gasSubsidyService = gasSubsidyService;
   }
 
   /**
@@ -130,6 +137,7 @@ export class CustodianService {
         status.userDid = tokenPayload.sub;
         status.agentDid = result.didDocument?.id;
         status.transactionHash = result.transactionHash;
+        status.subsidy = await this.gasSubsidyService.subsidizeAgentDid(result.didDocument!.id);
 
         // Update user DIDs mapping
         const userDids = this.userDids.get(tokenPayload.sub) || [];

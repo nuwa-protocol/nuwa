@@ -17,6 +17,7 @@ async function initializeServices() {
       cadopDid: config.service.did,
       custodian: {
         maxDailyMints: config.service.maxDailyMints,
+        subsidy: config.service.subsidy,
       },
       idp: {
         signingKey: config.service.signingKey,
