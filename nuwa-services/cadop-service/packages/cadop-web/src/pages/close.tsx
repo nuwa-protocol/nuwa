@@ -39,10 +39,6 @@ export function ClosePage() {
     window.close();
 
     setTimeout(() => {
-      if (window.history.length > 1) {
-        window.history.back();
-        return;
-      }
       navigate('/dashboard', { replace: true });
     }, 100);
   };
