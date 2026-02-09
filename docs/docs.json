@@ -130,5 +130,10 @@
       "discord": "https://discord.gg/y98PKeJQMY",
       "telegram": "https://t.me/Nuwa_Dev"
     }
+  },
+  "seo": {
+    "metatags": {
+      "canonical": "https://nuwa.dev/docs"
+    }
   }
 }
