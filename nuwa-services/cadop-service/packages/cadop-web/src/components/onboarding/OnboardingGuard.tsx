@@ -1,11 +1,8 @@
-import { RoochClient } from '@roochnetwork/rooch-sdk';
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Spinner } from '@/components/ui';
-import { ROOCH_RPC_URL, IS_TESTNET } from '@/config/env';
 import { AuthStore, UserStore } from '@/lib/storage';
-import { ClaimGasStep } from './steps/ClaimGasStep';
 import { CreateAgentStep } from './steps/CreateAgentStep';
 import { CreatePasskeyStep } from './steps/CreatePasskeyStep';
 
@@ -13,50 +10,12 @@ export interface OnboardingGuardProps {
   children: React.ReactNode;
 }
 
-// Minimum balance threshold (RGAS)
-const MIN_GAS = 0.1;
-
 export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [userDid, setUserDid] = useState<string | null>(null);
-  const [agentDid, setAgentDid] = useState<string | undefined>(undefined);
-  const [step, setStep] = useState<'checking' | 'passkey' | 'agent' | 'gas' | 'done'>('checking');
-  const [loading, setLoading] = useState(false);
-
-  const checkGas = useCallback(async (did: string) => {
-    // Skip gas claim on mainnet
-    if (!IS_TESTNET) {
-      setStep('done');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const address = did.split(':')[2];
-      const client = new RoochClient({ url: ROOCH_RPC_URL });
-      const resp = await client.getBalances({
-        owner: address,
-        cursor: null,
-        limit: '10',
-      });
-      const balances = resp.data || [];
-      console.debug('balances', balances);
-      const gas = balances.find(b => b.coin_type === '0x3::gas_coin::RGas');
-      const amount = gas ? parseFloat(gas.balance) : 0;
-      if (amount < MIN_GAS) {
-        setStep('gas');
-      } else {
-        setStep('done');
-      }
-    } catch (error) {
-      console.error('Failed to check gas:', error);
-      setStep('gas');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [step, setStep] = useState<'checking' | 'passkey' | 'agent' | 'done'>('checking');
 
   useEffect(() => {
     const currentUserDid = AuthStore.getCurrentUserDid();
@@ -71,11 +30,8 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
       setStep('agent');
       return;
     }
-    const firstAgent = agents[0];
-    setAgentDid(firstAgent);
-    // Check existing gas balance before deciding the next step
-    checkGas(firstAgent);
-  }, [checkGas]);
+    setStep('done');
+  }, []);
 
   // Passkey created callback
   const handlePasskeyCreated = (newDid: string) => {
@@ -84,16 +40,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   };
 
   // Agent created callback
-  const handleAgentCreated = (did: string) => {
-    setAgentDid(did);
-    // Show loading spinner while checking gas for the new agent
-    setStep('checking');
-    // After creating a new agent, verify if gas needs to be claimed
-    checkGas(did);
-  };
-
-  const handleGasClaimed = () => {
-    // After user clicked Next from ClaimGasStep, consider flow done.
+  const handleAgentCreated = (_did: string) => {
     setStep('done');
   };
 
@@ -111,7 +58,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
     }
   }, [step, location.search, navigate, children]);
 
-  if (step === 'checking' || loading) {
+  if (step === 'checking') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner size="large" />
@@ -124,10 +71,6 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
   }
   if (step === 'agent' && userDid) {
     return <CreateAgentStep userDid={userDid} onComplete={handleAgentCreated} />;
-  }
-
-  if (step === 'gas' && agentDid) {
-    return <ClaimGasStep agentDid={agentDid} onComplete={handleGasClaimed} />;
   }
 
   // All good

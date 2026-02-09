@@ -11,11 +11,17 @@ import {
   CadopServiceType,
 } from '@nuwa-ai/identity-kit';
 import { cryptoService } from './crypto.js';
+import { GasSubsidyService } from './GasSubsidyService.js';
 
 export interface ServiceConfig {
   cadopDid: string;
   custodian: {
     maxDailyMints: number;
+    subsidy: {
+      enabled: boolean;
+      amountRaw: string;
+      maxGas: number;
+    };
   };
   idp: {
     signingKey: string;
@@ -83,7 +89,12 @@ export class ServiceContainer {
           cadopDid: this.serviceConfig.cadopDid,
           maxDailyMints: this.serviceConfig.custodian.maxDailyMints,
         },
-        cadopKit
+        cadopKit,
+        new GasSubsidyService(
+          this.serviceConfig.custodian.subsidy,
+          keypair,
+          this.serviceConfig.rooch.networkUrl
+        )
       );
       logger.info('Custodian service initialized');
 

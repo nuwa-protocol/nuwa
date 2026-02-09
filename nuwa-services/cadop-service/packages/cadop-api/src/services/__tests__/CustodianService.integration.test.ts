@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
 import { IdpService } from '../IdpService.js';
 import { PublicKeyCredentialJSON } from '@simplewebauthn/types';
+import { GasSubsidyService } from '../GasSubsidyService.js';
 
 // Test configuration
 const DEFAULT_NODE_URL = process.env.ROOCH_NODE_URL || 'http://localhost:6767';
@@ -116,7 +117,16 @@ describe('CustodianService Integration Tests', () => {
           cadopDid: cadopServiceDID,
           maxDailyMints: 10,
         },
-        cadopKit
+        cadopKit,
+        new GasSubsidyService(
+          {
+            enabled: false,
+            amountRaw: '0',
+            maxGas: 100000000,
+          },
+          cadopServiceKeypair,
+          DEFAULT_NODE_URL
+        )
       );
 
       idpService = new IdpService({
