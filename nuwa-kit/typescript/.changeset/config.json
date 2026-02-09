@@ -3,6 +3,14 @@
   "changelog": ["@changesets/changelog-github", { "repo": "nuwa-protocol/nuwa" }],
   "commit": false,
   "linked": [],
+  "fixed": [
+    [
+      "@nuwa-ai/identity-kit",
+      "@nuwa-ai/payment-kit",
+      "@nuwa-ai/cap-kit",
+      "@nuwa-ai/ui-kit"
+    ]
+  ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch"
