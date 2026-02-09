@@ -24,7 +24,7 @@ This example uses the `nuwa-id` CLI from `@nuwa-ai/identity-kit` to run remote D
 nuwa-id init --key-fragment support-agent-main
 
 # 2) Generate deep link and send to user
-nuwa-id link --key-fragment support-agent-main
+nuwa-id link
 ```
 
 User opens the URL, approves adding key `#support-agent-main`, and sends DID text back, for example:
@@ -34,14 +34,17 @@ did:rooch:rooch1...
 ```
 
 ```bash
-# 3) Verify DID contains your key
-nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
+# 3) Save DID into local config
+nuwa-id set-did --did did:rooch:rooch1...
 
-# 4) Create auth header (for manual curl usage)
-nuwa-id auth-header --did did:rooch:rooch1... --key-fragment support-agent-main --method GET --url https://did-check.nuwa.dev/whoami
+# 4) Verify DID contains your key
+nuwa-id verify
 
-# 5) Send signed request directly
-nuwa-id curl --did did:rooch:rooch1... --key-fragment support-agent-main --method GET --url https://did-check.nuwa.dev/whoami
+# 5) Create auth header (for manual curl usage)
+nuwa-id auth-header --method GET --url https://did-check.nuwa.dev/whoami
+
+# 6) Send signed request directly
+nuwa-id curl --method GET --url https://did-check.nuwa.dev/whoami
 ```
 
 ## Storage
@@ -49,8 +52,16 @@ nuwa-id curl --did did:rooch:rooch1... --key-fragment support-agent-main --metho
 All agent-side state is in `~/.config/nuwa-did`:
 
 - `config.json`
-- `agent-key.json`
+- `keys/default.json`
 
-Do not share `agent-key.json`.
+Do not share any files under `keys/`.
+
+## Optional: multi-profile
+
+```bash
+nuwa-id profile create --name support-b --key-fragment support-agent-b
+nuwa-id profile list
+nuwa-id profile use --name support-b
+```
 
 If you omit `--key-fragment` on `nuwa-id init`, the CLI generates a timestamp-based fragment automatically.

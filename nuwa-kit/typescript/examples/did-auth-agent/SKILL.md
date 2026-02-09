@@ -31,7 +31,15 @@ nuwa-id init --key-fragment support-agent-main
 This creates local state under:
 
 - `~/.config/nuwa-did/config.json`
-- `~/.config/nuwa-did/agent-key.json`
+- `~/.config/nuwa-did/keys/default.json`
+
+Optional: create additional profiles and switch active profile:
+
+```bash
+nuwa-id profile create --name support-b --key-fragment support-agent-b
+nuwa-id profile use --name support-b
+nuwa-id profile list
+```
 
 If `--key-fragment` is not provided, `nuwa-id` generates a timestamp-based fragment.
 Use an explicit, human-readable fragment for easier debugging and operations.
@@ -39,7 +47,7 @@ Use an explicit, human-readable fragment for easier debugging and operations.
 ### 2) Create deep link and send it to user
 
 ```bash
-nuwa-id link --key-fragment support-agent-main
+nuwa-id link
 ```
 
 Send the printed URL to the user.  
@@ -53,22 +61,28 @@ User sends DID back, for example:
 did:rooch:rooch1...
 ```
 
-### 4) Verify key binding on DID document
+### 4) Persist DID into local config
+
+Save DID into `~/.config/nuwa-did/config.json`:
 
 ```bash
-nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
+nuwa-id set-did --did did:rooch:rooch1...
+```
+
+### 5) Verify key binding on DID document
+
+```bash
+nuwa-id verify
 ```
 
 Only continue if verification succeeds.
 
-### 5) Send DID-authenticated request
+### 6) Send DID-authenticated request
 
 Option A: generate header only
 
 ```bash
 nuwa-id auth-header \
-  --did did:rooch:rooch1... \
-  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -77,8 +91,6 @@ Option B: send request directly
 
 ```bash
 nuwa-id curl \
-  --did did:rooch:rooch1... \
-  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -87,5 +99,5 @@ nuwa-id curl \
 
 - Default network is `main`.
 - Default CADOP domain is `https://id.nuwa.dev`.
-- If `--key-fragment` is omitted, a timestamp-based value is generated.
-- Private key never leaves `~/.config/nuwa-did`.
+- Key fragment comes from active profile config after `nuwa-id init`.
+- Private key never leaves `~/.config/nuwa-did/keys`.
