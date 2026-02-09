@@ -37,7 +37,17 @@ export function useDIDService(targetDid: string | null | undefined): UseDIDServi
     setError(null); // Clear previous errors
     DIDService.initialize(targetDid, credentialId)
       .then(setDidService)
-      .catch(err => setError(err instanceof Error ? err.message : String(err)))
+      .catch(err => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[useDIDService] Failed to initialize DIDService', {
+          targetDid,
+          userDid,
+          credentialIdPresent: !!credentialId,
+          message,
+          rawError: err,
+        });
+        setError(message);
+      })
       .finally(() => setIsLoading(false));
   }, [targetDid, userDid, authLoading]);
 

@@ -40,6 +40,7 @@ export function AddKeyPage() {
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showKeyDetails, setShowKeyDetails] = useState<boolean>(false);
+  const visibleError = didServiceError || error;
 
   // Refresh agents when returning from onboarding
   useEffect(() => {
@@ -234,11 +235,12 @@ export function AddKeyPage() {
         </FixedCardActions>
       }
     >
-      {(error || didServiceError) && (
+      {visibleError && (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle className="text-md font-semibold">{`Service Unavailable`}</AlertTitle>
           <AlertDescription className="break-words overflow-hidden text-sm">
-            {`Please try again later or try another DID.`}
+            <div>{`Please try again later or try another DID.`}</div>
+            <div className="mt-2 font-mono text-xs opacity-90">{visibleError}</div>
           </AlertDescription>
         </Alert>
       )}

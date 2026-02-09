@@ -31,8 +31,8 @@ importers:
   nuwa-kit/typescript/examples/did-check:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.6.0
-        version: 0.6.0(typescript@5.9.3)
+        specifier: ^0.8.0
+        version: 0.8.0(react@19.2.1)(typescript@5.9.3)
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
@@ -2406,6 +2406,15 @@ packages:
 
   '@nuwa-ai/identity-kit@0.6.0':
     resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
+
+  '@nuwa-ai/identity-kit@0.8.0':
+    resolution: {integrity: sha512-noWGmjXq5yEBqrepcMICJPtDK6r65bVQm9q2fLVkuNpd8oS5JPhL+Bh7PU7ZwynO4BoF4tyxFVQ5pel1u95UsA==}
+    hasBin: true
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@nuwa-ai/payment-kit@0.6.9':
     resolution: {integrity: sha512-eaotyE2WWOa/8xYZduX1C4EqKWOKXUAditodfTphzqpmWVqG84tOZ7Otyx4batqZzsdVWEXK/QQsTNi49uMu5g==}
@@ -9187,6 +9196,18 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.9.3)
       multiformats: 9.9.0
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  '@nuwa-ai/identity-kit@0.8.0(react@19.2.1)(typescript@5.9.3)':
+    dependencies:
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.9.3)
+      multiformats: 9.9.0
+    optionalDependencies:
+      react: 19.2.1
     transitivePeerDependencies:
       - supports-color
       - typescript
