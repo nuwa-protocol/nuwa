@@ -6,6 +6,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nuwa-id": "./dist/cli/index.cjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,7 +28,7 @@
   },
   "scripts": {
     "dev": "tsup --watch",
-    "build": "tsup",
+    "build": "tsup && chmod +x dist/cli/index.cjs dist/cli/index.js",
     "test": "jest --config=jest.config.json",
     "test:coverage": "jest --config=jest.config.json --coverage",
     "test:watch": "jest --config=jest.config.json --watch",
@@ -100,7 +103,8 @@
     "entry": [
       "src/index.ts",
       "src/web/index.ts",
-      "src/testHelpers/index.ts"
+      "src/testHelpers/index.ts",
+      "src/cli/index.ts"
     ],
     "format": [
       "esm",
