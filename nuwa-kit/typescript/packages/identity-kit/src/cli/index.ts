@@ -2,6 +2,7 @@
 
 import {
   ensureCliDir,
+  getCliPaths,
   keyExists,
   loadConfig,
   loadKeyMaterial,
@@ -65,7 +66,7 @@ async function runInit(options: ParsedArgs['options']): Promise<void> {
   }
 
   const idFragment = getString(options['id-fragment']) || DEFAULT_CONFIG.idFragment;
-  const network = (getString(options.network) || DEFAULT_CONFIG.network) as 'main' | 'test';
+  const network = parseNetwork(getString(options.network) || DEFAULT_CONFIG.network);
   const roochRpcUrl = getString(options['rpc-url']) || DEFAULT_CONFIG.roochRpcUrl;
   const cadopDomain = getString(options['cadop-domain']) || DEFAULT_CONFIG.cadopDomain;
 
@@ -80,7 +81,7 @@ async function runInit(options: ParsedArgs['options']): Promise<void> {
 
   console.log('initialized did-auth agent config');
   console.log(`publicKeyMultibase=${key.publicKeyMultibase}`);
-  console.log(`configDir=~/.config/nuwa-did`);
+  console.log(`configDir=${getCliPaths().dir}`);
 }
 
 async function runLink(options: ParsedArgs['options']): Promise<void> {
@@ -119,7 +120,7 @@ async function runVerify(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
   const key = await loadKeyMaterial();
   const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
-  const network = (getString(options.network) || config.network || 'main') as 'main' | 'test';
+  const network = parseNetwork(getString(options.network) || config.network || 'main');
   const rpcUrl = getString(options['rpc-url']) || config.roochRpcUrl;
   const keyId = `${did}#${idFragment}`;
 
@@ -151,11 +152,11 @@ async function runAuthHeader(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
   const key = await loadKeyMaterial();
   const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
-  key.idFragment = idFragment;
+  const effectiveKey = { ...key, idFragment };
 
   const header = await createDidAuthHeader({
     did,
-    key,
+    key: effectiveKey,
     method,
     url,
     body,
@@ -174,12 +175,12 @@ async function runCurl(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
   const key = await loadKeyMaterial();
   const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
-  key.idFragment = idFragment;
+  const effectiveKey = { ...key, idFragment };
   const headers = parseHeaders(getStringArray(options.header));
 
   const response = await sendDidAuthRequest({
     did,
-    key,
+    key: effectiveKey,
     method,
     url,
     body,
@@ -279,6 +280,13 @@ function parseHeaders(entries: string[]): Record<string, string> {
   return headers;
 }
 
+function parseNetwork(input: string): 'main' | 'test' {
+  if (input !== 'main' && input !== 'test') {
+    throw new Error(`invalid network "${input}", allowed values: main | test`);
+  }
+  return input;
+}
+
 function printHelp(): void {
   const lines = [
     'nuwa-id - DIDAuth helper CLI for remote agents',
@@ -294,4 +302,3 @@ function printHelp(): void {
 }
 
 void main();
-

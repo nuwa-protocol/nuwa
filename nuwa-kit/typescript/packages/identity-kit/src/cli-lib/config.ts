@@ -60,8 +60,22 @@ export async function keyExists(): Promise<boolean> {
 
 export async function loadKeyMaterial(): Promise<AgentKeyMaterial> {
   const paths = await ensureCliDir();
-  const raw = await readFile(paths.keyFile, 'utf8');
-  return JSON.parse(raw) as AgentKeyMaterial;
+  let raw: string;
+  try {
+    raw = await readFile(paths.keyFile, 'utf8');
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      throw new Error('agent key not initialized; run `nuwa-id init`');
+    }
+    throw error;
+  }
+
+  try {
+    return JSON.parse(raw) as AgentKeyMaterial;
+  } catch {
+    throw new Error('invalid key file at ~/.config/nuwa-did/agent-key.json');
+  }
 }
 
 export async function saveKeyMaterial(key: AgentKeyMaterial): Promise<void> {
@@ -71,4 +85,3 @@ export async function saveKeyMaterial(key: AgentKeyMaterial): Promise<void> {
     mode: 0o600,
   });
 }
-

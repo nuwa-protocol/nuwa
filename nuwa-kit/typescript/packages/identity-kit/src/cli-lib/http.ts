@@ -19,6 +19,11 @@ export interface SignedHttpResponse {
 }
 
 export async function sendDidAuthRequest(input: SignedHttpRequestInput): Promise<SignedHttpResponse> {
+  const normalizedMethod = input.method.toUpperCase();
+  if ((normalizedMethod === 'GET' || normalizedMethod === 'HEAD') && input.body) {
+    throw new Error(`${normalizedMethod} requests must not include a body`);
+  }
+
   const authorization = await createDidAuthHeader({
     did: input.did,
     key: input.key,
@@ -39,9 +44,9 @@ export async function sendDidAuthRequest(input: SignedHttpRequestInput): Promise
   }
 
   const response = await fetch(input.url, {
-    method: input.method.toUpperCase(),
+    method: normalizedMethod,
     headers,
-    body: input.body,
+    body: normalizedMethod === 'GET' || normalizedMethod === 'HEAD' ? undefined : input.body,
   });
 
   return {
@@ -56,4 +61,3 @@ function hasContentType(headers?: Record<string, string>): boolean {
   if (!headers) return false;
   return Object.keys(headers).some(name => name.toLowerCase() === 'content-type');
 }
-
