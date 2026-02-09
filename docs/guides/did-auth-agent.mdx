@@ -36,14 +36,14 @@ nuwa-id init --key-fragment support-agent-main
 This creates local state under `~/.config/nuwa-did`:
 
 - `config.json`
-- `agent-key.json`
+- `keys/default.json`
 
-`agent-key.json` is private key material. Do not share it.
+Any file under `keys/` is private key material. Do not share it.
 
 ## Step 2: Generate deep link for user authorization
 
 ```bash
-nuwa-id link --key-fragment support-agent-main
+nuwa-id link
 ```
 
 Send the printed URL to the user.  
@@ -57,22 +57,34 @@ After approval, the user sends DID text back to the agent, for example:
 did:rooch:rooch1...
 ```
 
-## Step 4: Verify key binding
+## Step 4: Persist DID and verify key binding
+
+Save DID into active profile:
 
 ```bash
-nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
+nuwa-id set-did --did did:rooch:rooch1...
+```
+
+Verify active profile key binding:
+
+```bash
+nuwa-id verify
 ```
 
 Continue only when verification succeeds.
 
 ## Step 5: Send DID-authenticated request
 
+First, persist DID for later commands:
+
+```bash
+nuwa-id set-did --did did:rooch:rooch1...
+```
+
 Generate header only:
 
 ```bash
 nuwa-id auth-header \
-  --did did:rooch:rooch1... \
-  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -81,8 +93,6 @@ Or send directly:
 
 ```bash
 nuwa-id curl \
-  --did did:rooch:rooch1... \
-  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -100,11 +110,20 @@ Expected response:
 
 - Network: `main`
 - CADOP domain: `https://id.nuwa.dev`
-- Key fragment: set with `--key-fragment` (recommended)
+- Key fragment: loaded from active profile in config
+
+## Optional: manage profiles
+
+```bash
+nuwa-id profile create --name support-b --key-fragment support-agent-b
+nuwa-id profile list
+nuwa-id profile use --name support-b
+```
 
 ## Troubleshooting
 
 - `agent key not initialized`: run `nuwa-id init`
+- `did is not set`: run `nuwa-id set-did --did DID`
 - `verification method not found`: user has not authorized the agent key yet, or sent the wrong DID
 - `401 Unauthorized` from `/whoami`: regenerate auth header and ensure URL/method match exactly
 

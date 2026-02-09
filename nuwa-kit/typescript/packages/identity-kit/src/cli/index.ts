@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 
+import { stat } from 'fs/promises';
+import path from 'path';
 import {
   ensureCliDir,
+  getActiveProfile,
   getCliPaths,
   keyExists,
   loadConfig,
   loadKeyMaterial,
   saveConfig,
   saveKeyMaterial,
+  updateActiveProfile,
 } from '../cli-lib/config';
 import { buildAddKeyDeepLink } from '../cli-lib/deeplink';
 import { createDidAuthHeader } from '../cli-lib/authHeader';
 import { sendDidAuthRequest } from '../cli-lib/http';
 import { createAgentKeyMaterial } from '../cli-lib/keys';
 import { verifyDidKeyBinding } from '../cli-lib/verify';
-import { DEFAULT_CONFIG } from '../cli-lib/types';
+import { makeDefaultConfig } from '../cli-lib/types';
 
 type ParsedArgs = {
   command?: string;
@@ -22,18 +26,30 @@ type ParsedArgs = {
 };
 
 async function main(): Promise<void> {
-  const parsed = parseArgs(process.argv.slice(2));
-  const command = parsed.command;
-
-  if (!command || command === 'help' || getBool(parsed.options.help)) {
-    printHelp();
-    return;
-  }
-
   try {
+    const parsed = parseArgs(process.argv.slice(2));
+    const command = parsed.command;
+
+    if (!command || command === 'help' || getBool(parsed.options.help)) {
+      printHelp();
+      return;
+    }
+
     switch (command) {
       case 'init':
         await runInit(parsed.options);
+        return;
+      case 'set-did':
+        await runSetDid(parsed.options);
+        return;
+      case 'profile:list':
+        await runProfileList(parsed.options);
+        return;
+      case 'profile:use':
+        await runProfileUse(parsed.options);
+        return;
+      case 'profile:create':
+        await runProfileCreate(parsed.options);
         return;
       case 'link':
         await runLink(parsed.options);
@@ -59,6 +75,8 @@ async function main(): Promise<void> {
 
 async function runInit(options: ParsedArgs['options']): Promise<void> {
   await ensureCliDir();
+  const config = await loadConfig();
+  const active = getActiveProfile(config);
   const exists = await keyExists();
   const force = getBool(options.force);
   if (exists && !force) {
@@ -66,35 +84,40 @@ async function runInit(options: ParsedArgs['options']): Promise<void> {
   }
 
   const keyFragment = getString(options['key-fragment']) || makeDefaultKeyFragment();
-  const network = parseNetwork(getString(options.network) || DEFAULT_CONFIG.network);
-  const roochRpcUrl = getString(options['rpc-url']);
-  const cadopDomain = getString(options['cadop-domain']) || DEFAULT_CONFIG.cadopDomain;
+  const network = parseNetwork(getString(options.network) || active.profile.network);
+  const roochRpcUrl = getString(options['rpc-url']) || active.profile.roochRpcUrl;
+  const cadopDomain = getString(options['cadop-domain']) || active.profile.cadopDomain;
 
   const key = await createAgentKeyMaterial(keyFragment);
   await saveKeyMaterial(key);
-  await saveConfig({
-    network,
-    roochRpcUrl,
-    cadopDomain,
-    keyFragment,
-  });
+  await saveConfig(
+    updateActiveProfile(config, profile => ({
+      ...profile,
+      network,
+      roochRpcUrl,
+      cadopDomain,
+      keyFragment,
+    }))
+  );
 
   console.log('initialized did-auth agent config');
   console.log(`publicKeyMultibase=${key.publicKeyMultibase}`);
   console.log(`keyFragment=${keyFragment}`);
+  console.log(`activeProfile=${active.name}`);
   console.log(`configDir=${getCliPaths().dir}`);
 }
 
 async function runLink(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
+  const active = getActiveProfile(config);
   const key = await loadKeyMaterial();
-  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
-  const cadopDomain = getString(options['cadop-domain']) || config.cadopDomain;
+  const cadopDomain = getString(options['cadop-domain']) || active.profile.cadopDomain;
   const redirectUri = getString(options['redirect-uri']);
+  assertKeyFragmentMatch(active.profile.keyFragment, key.keyFragment);
 
   const link = buildAddKeyDeepLink({
     key,
-    keyFragment,
+    keyFragment: active.profile.keyFragment,
     cadopDomain,
     redirectUri,
   });
@@ -116,14 +139,116 @@ async function runLink(options: ParsedArgs['options']): Promise<void> {
   console.log(link.url);
 }
 
-async function runVerify(options: ParsedArgs['options']): Promise<void> {
+async function runSetDid(options: ParsedArgs['options']): Promise<void> {
   const did = requiredString(options.did, '--did is required');
   const config = await loadConfig();
+  await saveConfig(updateActiveProfile(config, profile => ({ ...profile, did })));
+  console.log(`saved did=${did} to ${getCliPaths().configFile}`);
+}
+
+async function runProfileList(options: ParsedArgs['options']): Promise<void> {
+  const config = await loadConfig();
+  const entries = Object.entries(config.profiles).map(([name, profile]) => ({
+    name,
+    active: name === config.activeProfile,
+    did: profile.did || '',
+    network: profile.network,
+    cadopDomain: profile.cadopDomain,
+    keyFragment: profile.keyFragment,
+    keyFile: profile.keyFile,
+  }));
+
+  if (getBool(options.json)) {
+    console.log(JSON.stringify(entries, null, 2));
+    return;
+  }
+
+  for (const entry of entries) {
+    const prefix = entry.active ? '*' : ' ';
+    console.log(
+      `${prefix} ${entry.name} network=${entry.network} keyFragment=${entry.keyFragment} did=${entry.did || '-'}`
+    );
+  }
+}
+
+async function runProfileUse(options: ParsedArgs['options']): Promise<void> {
+  const name = requiredString(options.name, '--name is required');
+  const config = await loadConfig();
+  if (!config.profiles[name]) {
+    throw new Error(`profile not found: ${name}`);
+  }
+
+  await saveConfig({
+    ...config,
+    activeProfile: name,
+  });
+  console.log(`activeProfile=${name}`);
+}
+
+async function runProfileCreate(options: ParsedArgs['options']): Promise<void> {
+  const name = requiredString(options.name, '--name is required');
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    throw new Error('invalid --name, allowed chars: a-z A-Z 0-9 _ -');
+  }
+
+  const config = await loadConfig();
+  if (config.profiles[name]) {
+    throw new Error(`profile already exists: ${name}`);
+  }
+  const profileKeyFile = `keys/${name}.json`;
+  const force = getBool(options.force);
+  try {
+    await stat(path.join(getCliPaths().dir, profileKeyFile));
+    if (!force) {
+      throw new Error(`key already exists for profile "${name}", use --force to overwrite`);
+    }
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code && err.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  const active = getActiveProfile(config);
+  const keyFragment = getString(options['key-fragment']) || makeDefaultKeyFragment();
+  const network = parseNetwork(getString(options.network) || active.profile.network);
+  const roochRpcUrl = getString(options['rpc-url']) || active.profile.roochRpcUrl;
+  const cadopDomain = getString(options['cadop-domain']) || active.profile.cadopDomain;
+  const did = getString(options.did);
+
+  const next = {
+    ...config,
+    profiles: {
+      ...config.profiles,
+      [name]: {
+        did,
+        network,
+        roochRpcUrl,
+        cadopDomain,
+        keyFragment,
+        keyFile: profileKeyFile,
+      },
+    },
+  };
+  await saveConfig(next);
+
+  const key = await createAgentKeyMaterial(keyFragment);
+  await saveKeyMaterial(key, name);
+  console.log(`created profile=${name}`);
+  console.log(`publicKeyMultibase=${key.publicKeyMultibase}`);
+  console.log(`keyFragment=${keyFragment}`);
+}
+
+async function runVerify(options: ParsedArgs['options']): Promise<void> {
+  const config = await loadConfig();
+  const active = getActiveProfile(config);
+  const did = active.profile.did;
+  if (!did) throw new Error('did is not set; run `nuwa-id set-did --did DID`');
   const key = await loadKeyMaterial();
-  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
-  const network = parseNetwork(getString(options.network) || config.network || 'main');
-  const rpcUrl = getString(options['rpc-url']) || config.roochRpcUrl;
-  const keyId = `${did}#${keyFragment}`;
+  assertKeyFragmentMatch(active.profile.keyFragment, key.keyFragment);
+  const network = parseNetwork(getString(options.network) || active.profile.network || 'main');
+  const rpcUrl = getString(options['rpc-url']) || active.profile.roochRpcUrl;
+  const keyId = `${did}#${active.profile.keyFragment}`;
 
   const result = await verifyDidKeyBinding({
     did,
@@ -144,20 +269,21 @@ async function runVerify(options: ParsedArgs['options']): Promise<void> {
 }
 
 async function runAuthHeader(options: ParsedArgs['options']): Promise<void> {
-  const did = requiredString(options.did, '--did is required');
+  const config = await loadConfig();
+  const active = getActiveProfile(config);
+  const did = active.profile.did;
+  if (!did) throw new Error('did is not set; run `nuwa-id set-did --did DID`');
   const method = requiredString(options.method, '--method is required');
   const url = requiredString(options.url, '--url is required');
   const body = getString(options.body) || '';
   const audience = getString(options.audience);
 
-  const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
-  const effectiveKey = { ...key, keyFragment };
+  assertKeyFragmentMatch(active.profile.keyFragment, key.keyFragment);
 
   const header = await createDidAuthHeader({
     did,
-    key: effectiveKey,
+    key,
     method,
     url,
     body,
@@ -167,21 +293,22 @@ async function runAuthHeader(options: ParsedArgs['options']): Promise<void> {
 }
 
 async function runCurl(options: ParsedArgs['options']): Promise<void> {
-  const did = requiredString(options.did, '--did is required');
+  const config = await loadConfig();
+  const active = getActiveProfile(config);
+  const did = active.profile.did;
+  if (!did) throw new Error('did is not set; run `nuwa-id set-did --did DID`');
   const method = requiredString(options.method, '--method is required');
   const url = requiredString(options.url, '--url is required');
   const body = getString(options.body) || '';
   const audience = getString(options.audience);
 
-  const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
-  const effectiveKey = { ...key, keyFragment };
+  assertKeyFragmentMatch(active.profile.keyFragment, key.keyFragment);
   const headers = parseHeaders(getStringArray(options.header));
 
   const response = await sendDidAuthRequest({
     did,
-    key: effectiveKey,
+    key,
     method,
     url,
     body,
@@ -195,7 +322,17 @@ async function runCurl(options: ParsedArgs['options']): Promise<void> {
 
 function parseArgs(argv: string[]): ParsedArgs {
   if (argv.length === 0) return { options: {} };
-  const [command, ...rest] = argv;
+  const [first, ...tail] = argv;
+  let command = first;
+  let rest = tail;
+  if (first === 'profile') {
+    const action = tail[0];
+    if (!action || action.startsWith('--')) {
+      throw new Error('profile command requires subcommand: list | use | create');
+    }
+    command = `profile:${action}`;
+    rest = tail.slice(1);
+  }
   const options: ParsedArgs['options'] = {};
 
   for (let i = 0; i < rest.length; i++) {
@@ -298,16 +435,31 @@ function makeDefaultKeyFragment(now = new Date()): string {
   return `agent-auth-${year}${month}${day}${hour}${minute}${second}`;
 }
 
+function assertKeyFragmentMatch(expected: string, actual: string): void {
+  if (expected === actual) return;
+  throw new Error(
+    `keyFragment mismatch: config has "${expected}" but key file has "${actual}". Run \`nuwa-id init --force --key-fragment ${actual}\` to resync.`
+  );
+}
+
 function printHelp(): void {
+  const defaults = makeDefaultConfig();
+  const active = defaults.profiles[defaults.activeProfile];
   const lines = [
     'nuwa-id - DIDAuth helper CLI for remote agents',
     '',
     'Commands:',
     '  nuwa-id init [--force] [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--key-fragment FRAGMENT]',
-    '  nuwa-id link [--cadop-domain URL] [--key-fragment FRAGMENT] [--redirect-uri URL] [--json]',
-    '  nuwa-id verify --did DID [--network main|test] [--rpc-url URL] [--key-fragment FRAGMENT]',
-    '  nuwa-id auth-header --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--key-fragment FRAGMENT]',
-    '  nuwa-id curl --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--key-fragment FRAGMENT] [--header "K: V"]',
+    '  nuwa-id set-did --did DID',
+    '  nuwa-id profile list [--json]',
+    '  nuwa-id profile use --name NAME',
+    '  nuwa-id profile create --name NAME [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--key-fragment FRAGMENT] [--did DID]',
+    '  nuwa-id link [--cadop-domain URL] [--redirect-uri URL] [--json]',
+    '  nuwa-id verify [--network main|test] [--rpc-url URL]',
+    '  nuwa-id auth-header --method METHOD --url URL [--body RAW] [--audience URL]',
+    '  nuwa-id curl --method METHOD --url URL [--body RAW] [--audience URL] [--header "K: V"]',
+    '',
+    `Defaults: network=${active.network}, cadop-domain=${active.cadopDomain}, profile=${defaults.activeProfile}`,
   ];
   console.log(lines.join('\n'));
 }
