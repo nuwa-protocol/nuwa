@@ -92,8 +92,9 @@ export class ServiceContainer {
         cadopKit,
         new GasSubsidyService(
           this.serviceConfig.custodian.subsidy,
-          keypair,
-          this.serviceConfig.rooch.networkUrl
+          cadopKit.getNuwaIdentityKit().getSigner(),
+          this.serviceConfig.rooch.networkUrl,
+          `${this.serviceConfig.cadopDid}#${fragment}`
         )
       );
       logger.info('Custodian service initialized');
