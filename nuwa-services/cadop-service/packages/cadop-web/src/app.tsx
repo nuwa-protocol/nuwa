@@ -7,6 +7,7 @@ import { CreateAgentDIDPage } from './pages/create-agent-did';
 import { AgentDetailPage } from './pages/agent-detail';
 import { AddAuthMethodPage } from './pages/add-auth-method';
 import { AddKeyPage } from './pages/add-key';
+import { ClosePage } from './pages/close';
 import { OnboardingGuard } from './components/onboarding/OnboardingGuard';
 import { OnboardingPage } from './pages/onboarding';
 import { RevenueHistoryPage } from './pages/revenue-history';
@@ -31,6 +32,7 @@ const App: React.FC = () => {
             </OnboardingGuard>
           }
         />
+        <Route path="/close" element={<ClosePage />} />
         <Route path="/setup" element={<OnboardingPage />} />
 
         {/* Protected routes */}

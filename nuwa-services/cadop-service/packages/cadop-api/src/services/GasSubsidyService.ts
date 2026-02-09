@@ -1,4 +1,4 @@
-import { Args, RoochClient, Transaction } from '@roochnetwork/rooch-sdk';
+import { Args, RoochClient, Signer, Transaction } from '@roochnetwork/rooch-sdk';
 import { logger } from '../utils/logger.js';
 
 export interface GasSubsidyConfig {
@@ -15,15 +15,32 @@ export interface GasSubsidyResult {
   reason?: string;
 }
 
+interface RoochExecutionResult {
+  execution_info: {
+    status: {
+      type: string;
+    };
+    tx_hash?: string;
+  };
+}
+
+interface RoochClientLike {
+  signAndExecuteTransaction(input: {
+    transaction: Transaction;
+    signer: Signer;
+  }): Promise<RoochExecutionResult>;
+}
+
 export class GasSubsidyService {
-  private readonly client: RoochClient;
+  private readonly client: RoochClientLike;
 
   constructor(
     private readonly config: GasSubsidyConfig,
-    private readonly signer: unknown,
-    networkUrl: string
+    private readonly signer: Signer,
+    networkUrl: string,
+    client?: RoochClientLike
   ) {
-    this.client = new RoochClient({ url: networkUrl });
+    this.client = client || new RoochClient({ url: networkUrl });
   }
 
   async subsidizeAgentDid(agentDid: string): Promise<GasSubsidyResult> {
@@ -58,7 +75,7 @@ export class GasSubsidyService {
 
       const result = await this.client.signAndExecuteTransaction({
         transaction: tx,
-        signer: this.signer as never,
+        signer: this.signer,
       });
 
       const executed = result.execution_info.status.type === 'executed';

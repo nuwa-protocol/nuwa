@@ -138,6 +138,14 @@ export class CustodianService {
         status.agentDid = result.didDocument?.id;
         status.transactionHash = result.transactionHash;
         status.subsidy = await this.gasSubsidyService.subsidizeAgentDid(result.didDocument!.id);
+        logger.info('Agent DID subsidy result', {
+          agentDid: result.didDocument?.id,
+          attempted: status.subsidy.attempted,
+          subsidyStatus: status.subsidy.status,
+          amountRaw: status.subsidy.amountRaw,
+          subsidyTxHash: status.subsidy.txHash,
+          reason: status.subsidy.reason,
+        });
 
         // Update user DIDs mapping
         const userDids = this.userDids.get(tokenPayload.sub) || [];

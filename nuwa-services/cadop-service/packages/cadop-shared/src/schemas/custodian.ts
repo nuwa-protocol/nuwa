@@ -33,6 +33,6 @@ export const AgentDIDCreationStatusSchema = z.object({
   transactionHash: z.string().optional(),
   subsidy: AgentDIDSubsidySchema.optional(),
   error: z.string().optional(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
