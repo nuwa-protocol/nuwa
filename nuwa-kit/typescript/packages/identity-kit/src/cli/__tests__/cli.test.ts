@@ -2,7 +2,7 @@
  * CLI tests for nuwa-id
  */
 
-import { parseArgs } from '../cli';
+import { parseArgs } from '../args';
 import { makeDefaultConfig } from '../../cli-lib/types';
 
 describe('CLI Argument Parsing', () => {
