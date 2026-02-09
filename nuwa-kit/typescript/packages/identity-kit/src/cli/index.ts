@@ -2,6 +2,9 @@
 
 import { stat } from 'fs/promises';
 import path from 'path';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
 import {
   ensureCliDir,
   getActiveProfile,
@@ -31,6 +34,13 @@ async function main(): Promise<void> {
     const parsed = parseArgs(process.argv.slice(2));
     const command = parsed.command;
 
+    // Handle version flags: -v, --version
+    if (getBool(parsed.options.version) || command === 'version') {
+      printVersion();
+      return;
+    }
+
+    // Handle help flags: -h, --help, help
     if (!command || command === 'help' || getBool(parsed.options.help)) {
       printHelp();
       return;
@@ -42,6 +52,9 @@ async function main(): Promise<void> {
         return;
       case 'set-did':
         await runSetDid(parsed.options);
+        return;
+      case 'status':
+        await runStatus(parsed.options);
         return;
       case 'profile:list':
         await runProfileList(parsed.options);
@@ -65,7 +78,7 @@ async function main(): Promise<void> {
         await runCurl(parsed.options);
         return;
       default:
-        throw new Error(`Unknown command: ${command}`);
+        throw new Error(`Unknown command: ${command}. Run 'nuwa-id --help' for usage information.`);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -145,6 +158,45 @@ async function runSetDid(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
   await saveConfig(updateActiveProfile(config, profile => ({ ...profile, did })));
   console.log(`saved did=${did} to ${getCliPaths().configFile}`);
+}
+
+async function runStatus(options: ParsedArgs['options']): Promise<void> {
+  const config = await loadConfig();
+  const active = getActiveProfile(config);
+  const cliPaths = getCliPaths();
+  const keyFilePath = path.join(cliPaths.dir, active.profile.keyFile);
+
+  // Check if key file exists
+  let keyFileExists = false;
+  try {
+    await stat(keyFilePath);
+    keyFileExists = true;
+  } catch {
+    keyFileExists = false;
+  }
+
+  const status = {
+    activeProfile: active.name,
+    did: active.profile.did || '',
+    network: active.profile.network,
+    cadopDomain: active.profile.cadopDomain,
+    keyFragment: active.profile.keyFragment,
+    keyFilePath,
+    keyFileExists,
+  };
+
+  if (getBool(options.json)) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+
+  console.log(`Active Profile: ${status.activeProfile}`);
+  console.log(`DID: ${status.did || '(not set)'}`);
+  console.log(`Network: ${status.network}`);
+  console.log(`Cadop Domain: ${status.cadopDomain}`);
+  console.log(`Key Fragment: ${status.keyFragment}`);
+  console.log(`Key File Path: ${status.keyFilePath}`);
+  console.log(`Key File Exists: ${status.keyFileExists ? 'Yes' : 'No'}`);
 }
 
 async function runProfileList(options: ParsedArgs['options']): Promise<void> {
@@ -324,6 +376,15 @@ async function runCurl(options: ParsedArgs['options']): Promise<void> {
 function parseArgs(argv: string[]): ParsedArgs {
   if (argv.length === 0) return { options: {} };
   const [first, ...tail] = argv;
+
+  // Handle short flags (-h, -v)
+  if (first === '-h' || first === '--help') {
+    return { command: 'help', options: {} };
+  }
+  if (first === '-v' || first === '--version') {
+    return { command: 'version', options: {} };
+  }
+
   let command = first;
   let rest = tail;
   if (first === 'profile') {
@@ -338,7 +399,22 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   for (let i = 0; i < rest.length; i++) {
     const token = rest[i];
-    if (!token.startsWith('--')) continue;
+    if (!token.startsWith('-')) continue;
+
+    // Handle short flags
+    if (token.startsWith('-') && !token.startsWith('--')) {
+      const flag = token.slice(1);
+      if (flag === 'h') {
+        addOption(options, 'help', true);
+        continue;
+      }
+      if (flag === 'v') {
+        addOption(options, 'version', true);
+        continue;
+      }
+      // Unknown short flag
+      throw new Error(`Unknown flag: -${flag}`);
+    }
 
     const [rawKey, inlineValue] = token.slice(2).split('=', 2);
     if (inlineValue !== undefined) {
@@ -449,20 +525,45 @@ function printHelp(): void {
   const lines = [
     'nuwa-id - DIDAuth helper CLI for remote agents',
     '',
+    'Usage:',
+    '  nuwa-id [command] [options]',
+    '',
     'Commands:',
-    '  nuwa-id init [--force] [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--key-fragment FRAGMENT]',
-    '  nuwa-id set-did --did DID',
-    '  nuwa-id profile list [--json]',
-    '  nuwa-id profile use --name NAME',
-    '  nuwa-id profile create --name NAME [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--key-fragment FRAGMENT] [--did DID]',
-    '  nuwa-id link [--cadop-domain URL] [--redirect-uri URL] [--json]',
-    '  nuwa-id verify [--network main|test] [--rpc-url URL]',
-    '  nuwa-id auth-header --method METHOD --url URL [--body RAW] [--audience URL]',
-    '  nuwa-id curl --method METHOD --url URL [--body RAW] [--audience URL] [--header "K: V"]',
+    '  init              Initialize DIDAuth agent config',
+    '  set-did           Set DID for active profile',
+    '  status            Show current profile status',
+    '  profile list      List all profiles',
+    '  profile use       Switch active profile',
+    '  profile create    Create a new profile',
+    '  link              Generate deep link for adding key',
+    '  verify            Verify DID key binding',
+    '  auth-header       Generate DID auth header',
+    '  curl              Send signed HTTP request',
+    '  version           Show CLI version',
+    '  help              Show this help message',
+    '',
+    'Options:',
+    '  -h, --help        Show help message',
+    '  -v, --version     Show version',
+    '  --json            Output in JSON format (for list, status)',
+    '',
+    'Examples:',
+    '  nuwa-id init',
+    '  nuwa-id status',
+    '  nuwa-id status --json',
+    '  nuwa-id profile list --json',
     '',
     `Defaults: network=${active.network}, cadop-domain=${active.cadopDomain}, profile=${defaults.activeProfile}`,
   ];
   console.log(lines.join('\n'));
 }
 
+function printVersion(): void {
+  console.log(packageJson.version);
+}
+
 void main();
+
+// Export for testing
+export { parseArgs };
+export type { ParsedArgs };
