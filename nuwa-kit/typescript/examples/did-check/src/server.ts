@@ -116,11 +116,11 @@ async function createServer(config: ServerConfig): Promise<{
     // Service info endpoint - provides public service information
     app.get('/info', (req: Request, res: Response) => {
         res.json({
-            network: process.env.ROOCH_NETWORK || 'test',
+            network: process.env.ROOCH_NETWORK || 'main',
             version: '1.0.0',
             endpoints: {
                 public: ['/health', '/info'],
-                protected: ['/profile', '/echo', '/whoami'],
+                protected: ['/whoami'],
             },
         });
     });
