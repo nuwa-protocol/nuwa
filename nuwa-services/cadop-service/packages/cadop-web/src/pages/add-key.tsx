@@ -40,7 +40,6 @@ export function AddKeyPage() {
   const [selectedAgentDid, setSelectedAgentDid] = useState<string | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showKeyDetails, setShowKeyDetails] = useState<boolean>(false);
-  const visibleError = didServiceError || error;
 
   // Refresh agents when returning from onboarding
   useEffect(() => {
@@ -93,6 +92,7 @@ export function AddKeyPage() {
 
   // Obtain didService via the shared hook once agent DID has been chosen
   const { didService, error: didServiceError } = useDIDService(selectedAgentDid);
+  const visibleError = didServiceError || error;
 
   // Authenticate user if not already authenticated
   useEffect(() => {
@@ -178,8 +178,8 @@ export function AddKeyPage() {
         const redirectUrl = new URL(payload.redirectUri);
         redirectUrl.searchParams.append('success', '0');
         // If there's an error state, include it in the redirect
-        if (error) {
-          redirectUrl.searchParams.append('error', encodeURIComponent(error));
+        if (visibleError) {
+          redirectUrl.searchParams.append('error', encodeURIComponent(visibleError));
         } else {
           redirectUrl.searchParams.append('error', 'User canceled');
         }
