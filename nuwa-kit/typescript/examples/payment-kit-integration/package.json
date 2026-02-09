@@ -1,6 +1,6 @@
 {
   "name": "@nuwa-ai/payment-kit-integration-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Payment Kit integration example with HTTP server and CLI client",
   "scripts": {

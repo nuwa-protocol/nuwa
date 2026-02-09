@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [[`25a7c31`](https://github.com/nuwa-protocol/nuwa/commit/25a7c31d20e4beddc983c0fe134a92edaac1ffe8)]:
+  - @nuwa-ai/identity-kit@0.8.0
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -26,24 +33,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Note
 
-This initial release includes placeholder implementations for Rooch blockchain integration. Actual Move contract integration will be added in future releases when the payment channel contracts are available. 
+This initial release includes placeholder implementations for Rooch blockchain integration. Actual Move contract integration will be added in future releases when the payment channel contracts are available.
 
 ## [Unreleased]
 
 ### Added
+
 - **`getChainId()` method to `RoochPaymentChannelContract`** - Dynamically retrieve chain ID from blockchain instead of hardcoding
 - **`getChainId()` method to `IPaymentChannelContract` interface** - Chain-agnostic interface for getting chain ID
 - **`claimFromChannel` integration test** - Complete end-to-end test for payment channel claiming functionality
 - **Dynamic chain ID usage in tests** - Tests now use `contract.getChainId()` instead of hardcoded values
 
 ### Changed
+
 - **Improved test reliability** - SubRAV creation in tests now uses dynamic chain ID retrieval
 - **Enhanced documentation** - Updated README files with chain ID information and new test descriptions
 
 ### Technical Details
+
 - Chain ID mapping for Rooch networks:
   - 1 = Rooch Mainnet
-  - 2 = Rooch Testnet  
+  - 2 = Rooch Testnet
   - 3 = Rooch Devnet
   - 4 = Rooch Local
 - The `getChainId()` method uses the underlying `RoochClient.getChainId()` RPC call
@@ -51,4 +61,5 @@ This initial release includes placeholder implementations for Rooch blockchain i
 - Mock implementations updated to include `getChainId()` method
 
 ## [Previous versions]
-... 
+
+...

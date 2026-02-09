@@ -1,5 +1,17 @@
 # @nuwa-ai/identity-kit
 
+## 0.8.0
+
+### Minor Changes
+
+- [#524](https://github.com/nuwa-protocol/nuwa/pull/524) [`25a7c31`](https://github.com/nuwa-protocol/nuwa/commit/25a7c31d20e4beddc983c0fe134a92edaac1ffe8) Thanks [@jolestar](https://github.com/jolestar)! - Release `nuwa-id` CLI workflow for remote DIDAuth usage on `id.nuwa.dev`.
+
+  Key updates:
+  - Add profile-based config layout and `set-did` command for smoother agent UX.
+  - Unify key fragment naming and improve generated deep link payload compatibility.
+  - Extract environment-agnostic deeplink/auth helpers shared by CLI and web paths.
+  - Improve DID verification defaults and remove misleading hardcoded RPC fallback.
+
 ## 0.3.1
 
 ### Patch Changes

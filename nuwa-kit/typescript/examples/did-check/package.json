@@ -1,6 +1,6 @@
 {
     "name": "@nuwa-ai/did-check-example",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "private": true,
     "type": "module",
     "description": "Minimal did-check service using identity-kit for DID authentication on Rooch mainnet",
@@ -13,7 +13,7 @@
         "format:check": "prettier --check \"{src,tests}/**/*.{ts,tsx,js,jsx,json,md,mdx,yaml,yml}\""
     },
     "dependencies": {
-        "@nuwa-ai/identity-kit": "^0.6.0",
+        "@nuwa-ai/identity-kit": "^0.8.0",
         "dotenv": "^16.3.1",
         "express": "^4.18.2"
     },

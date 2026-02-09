@@ -1,7 +1,7 @@
 {
   "name": "@nuwa-example/mcp-server",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
