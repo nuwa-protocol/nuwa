@@ -21,8 +21,8 @@ importers:
   examples/did-check:
     dependencies:
       '@nuwa-ai/identity-kit':
-        specifier: ^0.6.0
-        version: 0.6.0(typescript@5.4.5)
+        specifier: ^0.8.0
+        version: 0.8.0(react@19.2.1)(typescript@5.4.5)
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
@@ -1405,8 +1405,14 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nuwa-ai/identity-kit@0.6.0':
-    resolution: {integrity: sha512-AV08WPJBnk826jiZ8af7OCNx8Grns2mByqpT56h2ZM9/3srtnXzlXs4M9YcyJiar3vn7lfJqpDADkMVQdXs9Kg==}
+  '@nuwa-ai/identity-kit@0.8.0':
+    resolution: {integrity: sha512-noWGmjXq5yEBqrepcMICJPtDK6r65bVQm9q2fLVkuNpd8oS5JPhL+Bh7PU7ZwynO4BoF4tyxFVQ5pel1u95UsA==}
+    hasBin: true
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -5578,12 +5584,14 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@nuwa-ai/identity-kit@0.6.0(typescript@5.4.5)':
+  '@nuwa-ai/identity-kit@0.8.0(react@19.2.1)(typescript@5.4.5)':
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
       '@roochnetwork/rooch-sdk': 0.4.0(typescript@5.4.5)
       multiformats: 9.9.0
+    optionalDependencies:
+      react: 19.2.1
     transitivePeerDependencies:
       - supports-color
       - typescript

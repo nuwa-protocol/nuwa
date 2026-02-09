@@ -2,9 +2,7 @@
 
 import { stat } from 'fs/promises';
 import path from 'path';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const packageJson = require('../package.json');
+import { parseArgs, type ParsedArgs } from './args';
 import {
   ensureCliDir,
   getActiveProfile,
@@ -24,10 +22,25 @@ import { createAgentKeyMaterial } from '../cli-lib/keys';
 import { verifyDidKeyBinding } from '../cli-lib/verify';
 import { makeDefaultConfig } from '../cli-lib/types';
 
-type ParsedArgs = {
-  command?: string;
-  options: Record<string, string | boolean | string[]>;
-};
+function resolveCliVersion(): string {
+  const envVersion = process.env.npm_package_version;
+  if (envVersion) return envVersion;
+
+  try {
+    // Resolve from installed package root when running CJS bin (`dist/cli/index.cjs`).
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('../../package.json') as { version?: string };
+    if (typeof pkg.version === 'string' && pkg.version.length > 0) {
+      return pkg.version;
+    }
+  } catch {
+    // Fallback below.
+  }
+
+  return 'unknown';
+}
+
+const cliVersion = resolveCliVersion();
 
 async function main(): Promise<void> {
   try {
@@ -373,86 +386,6 @@ async function runCurl(options: ParsedArgs['options']): Promise<void> {
   console.log(response.body);
 }
 
-function parseArgs(argv: string[]): ParsedArgs {
-  if (argv.length === 0) return { options: {} };
-  const [first, ...tail] = argv;
-
-  // Handle short flags (-h, -v)
-  if (first === '-h' || first === '--help') {
-    return { command: 'help', options: {} };
-  }
-  if (first === '-v' || first === '--version') {
-    return { command: 'version', options: {} };
-  }
-
-  let command = first;
-  let rest = tail;
-  if (first === 'profile') {
-    const action = tail[0];
-    if (!action || action.startsWith('--')) {
-      throw new Error('profile command requires subcommand: list | use | create');
-    }
-    command = `profile:${action}`;
-    rest = tail.slice(1);
-  }
-  const options: ParsedArgs['options'] = {};
-
-  for (let i = 0; i < rest.length; i++) {
-    const token = rest[i];
-    if (!token.startsWith('-')) continue;
-
-    // Handle short flags
-    if (token.startsWith('-') && !token.startsWith('--')) {
-      const flag = token.slice(1);
-      if (flag === 'h') {
-        addOption(options, 'help', true);
-        continue;
-      }
-      if (flag === 'v') {
-        addOption(options, 'version', true);
-        continue;
-      }
-      // Unknown short flag
-      throw new Error(`Unknown flag: -${flag}`);
-    }
-
-    const [rawKey, inlineValue] = token.slice(2).split('=', 2);
-    if (inlineValue !== undefined) {
-      addOption(options, rawKey, inlineValue);
-      continue;
-    }
-
-    const next = rest[i + 1];
-    if (!next || next.startsWith('--')) {
-      addOption(options, rawKey, true);
-      continue;
-    }
-
-    addOption(options, rawKey, next);
-    i += 1;
-  }
-
-  return { command, options };
-}
-
-function addOption(
-  options: ParsedArgs['options'],
-  key: string,
-  value: string | boolean
-): void {
-  const existing = options[key];
-  if (existing === undefined) {
-    options[key] = value;
-    return;
-  }
-  if (Array.isArray(existing)) {
-    existing.push(String(value));
-    options[key] = existing;
-    return;
-  }
-  options[key] = [String(existing), String(value)];
-}
-
 function getBool(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') return value === 'true';
@@ -559,7 +492,7 @@ function printHelp(): void {
 }
 
 function printVersion(): void {
-  console.log(packageJson.version);
+  console.log(cliVersion);
 }
 
 void main();

@@ -56,6 +56,62 @@ function extractRawPublicKey(spkiInput: ArrayBuffer | Uint8Array, alg: number): 
 export class PasskeyService {
   private developmentMode = import.meta.env.DEV;
 
+  private withCredentialTransports(
+    request: PublicKeyCredentialRequestOptions,
+    transports?: AuthenticatorTransport[]
+  ): PublicKeyCredentialRequestOptions {
+    if (!request.allowCredentials || request.allowCredentials.length === 0) {
+      return request;
+    }
+
+    return {
+      ...request,
+      allowCredentials: request.allowCredentials.map(({ id, type }) => ({
+        id,
+        type,
+        ...(transports ? { transports } : {}),
+      })),
+    };
+  }
+
+  private async getCredentialWithTransportFallback(
+    request: PublicKeyCredentialRequestOptions,
+    mediation: CredentialMediationRequirement
+  ): Promise<PublicKeyCredential | null> {
+    const hasAllowCredentials = !!request.allowCredentials && request.allowCredentials.length > 0;
+    if (!hasAllowCredentials) {
+      return (await navigator.credentials.get({
+        publicKey: request,
+        mediation,
+      })) as PublicKeyCredential | null;
+    }
+
+    const transportAttempts: Array<AuthenticatorTransport[] | undefined> = [
+      ['internal', 'hybrid'],
+      ['internal'],
+      undefined,
+    ];
+
+    let lastTypeError: TypeError | null = null;
+    for (const transports of transportAttempts) {
+      try {
+        const requestWithTransports = this.withCredentialTransports(request, transports);
+        return (await navigator.credentials.get({
+          publicKey: requestWithTransports,
+          mediation,
+        })) as PublicKeyCredential | null;
+      } catch (error) {
+        if (error instanceof TypeError && transports) {
+          lastTypeError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastTypeError || new Error('Passkey authentication failed');
+  }
+
   /** Check if browser supports Passkey */
   public async isSupported(): Promise<boolean> {
     return (
@@ -321,10 +377,7 @@ export class PasskeyService {
 
     let cred: PublicKeyCredential | null;
     try {
-      cred = (await navigator.credentials.get({
-        publicKey: publicKeyRequest,
-        mediation,
-      })) as PublicKeyCredential | null;
+      cred = await this.getCredentialWithTransportFallback(publicKeyRequest, mediation);
     } catch (error) {
       // Re-throw the original error to be handled by UI layer with proper internationalization
       throw error;
@@ -382,19 +435,21 @@ export class PasskeyService {
         rpId: rpId,
         userVerification: 'preferred',
         timeout: 60000,
-        allowCredentials: allowCredentialIds.map(id => ({
-          id: base64URLToArrayBuffer(id),
-          type: 'public-key',
-        })),
+        ...(allowCredentialIds.length > 0 && {
+          allowCredentials: allowCredentialIds.map(id => ({
+            id: base64URLToArrayBuffer(id),
+            type: 'public-key',
+          })),
+        }),
       } as unknown as PublicKeyCredentialRequestOptions;
 
       // call WebAuthn API to get assertion
       let cred: PublicKeyCredential | null;
       try {
-        cred = (await navigator.credentials.get({
-          publicKey: publicKeyRequest,
-          mediation: options.mediation || 'silent',
-        })) as PublicKeyCredential | null;
+        cred = await this.getCredentialWithTransportFallback(
+          publicKeyRequest,
+          options.mediation || 'silent'
+        );
       } catch (webauthnError) {
         // Re-throw the original error to be handled by UI layer with proper internationalization
         throw webauthnError;
