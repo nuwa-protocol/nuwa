@@ -1,4 +1,5 @@
 import { Args, RoochClient, Signer, Transaction } from '@roochnetwork/rooch-sdk';
+import { DidAccountSigner, SignerInterface, isSignerInterface } from '@nuwa-ai/identity-kit';
 import { logger } from '../utils/logger.js';
 
 export interface GasSubsidyConfig {
@@ -33,13 +34,18 @@ interface RoochClientLike {
 
 export class GasSubsidyService {
   private readonly client: RoochClientLike;
+  private readonly signerSource: SignerInterface | Signer;
+  private readonly signerKeyId?: string;
 
   constructor(
     private readonly config: GasSubsidyConfig,
-    private readonly signer: Signer,
+    signer: SignerInterface | Signer,
     networkUrl: string,
+    signerKeyId?: string,
     client?: RoochClientLike
   ) {
+    this.signerSource = signer;
+    this.signerKeyId = signerKeyId;
     this.client = client || new RoochClient({ url: networkUrl });
   }
 
@@ -73,9 +79,10 @@ export class GasSubsidyService {
         maxGas: this.config.maxGas,
       });
 
+      const signer = await this.getExecutionSigner();
       const result = await this.client.signAndExecuteTransaction({
         transaction: tx,
-        signer: this.signer,
+        signer,
       });
 
       const executed = result.execution_info.status.type === 'executed';
@@ -115,5 +122,12 @@ export class GasSubsidyService {
       throw new Error(`invalid DID identifier: ${agentDid}`);
     }
     return identifier;
+  }
+
+  private async getExecutionSigner(): Promise<Signer> {
+    if (isSignerInterface(this.signerSource)) {
+      return DidAccountSigner.create(this.signerSource, this.signerKeyId);
+    }
+    return this.signerSource;
   }
 }

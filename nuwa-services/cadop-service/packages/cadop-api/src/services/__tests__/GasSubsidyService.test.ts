@@ -34,6 +34,7 @@ function makeService(options: {
     },
     signer,
     'https://main-seed.rooch.network',
+    undefined,
     client
   );
 
