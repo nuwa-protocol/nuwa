@@ -19,7 +19,7 @@ export async function createDidAuthHeader(input: CreateDidAuthHeaderInput): Prom
   const target = new URL(input.url);
   const path = `${target.pathname}${target.search}`;
   const audience = input.audience || `${target.protocol}//${target.host}`;
-  const keyId = `${input.did}#${input.key.idFragment}`;
+  const keyId = `${input.did}#${input.key.keyFragment}`;
   const bodyHash = createHash('sha256').update(body).digest('hex');
 
   const privateKey = MultibaseCodec.decode(input.key.privateKeyMultibase);
@@ -57,4 +57,3 @@ export async function createDidAuthHeader(input: CreateDidAuthHeaderInput): Prom
 
   return DIDAuth.v1.toAuthorizationHeader(signed);
 }
-

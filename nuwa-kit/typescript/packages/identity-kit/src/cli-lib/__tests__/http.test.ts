@@ -11,7 +11,7 @@ const key: AgentKeyMaterial = {
   keyType: KeyType.ED25519,
   publicKeyMultibase: 'z6MkgR7YfQjJY8iU8Q8m3w9yJ2Y1YvKq6xFy4V7w2xP3h1vA',
   privateKeyMultibase: 'z3wefakesampleprivatekey',
-  idFragment: 'agent-auth-1',
+  keyFragment: 'agent-auth-1',
   createdAt: new Date().toISOString(),
 };
 
@@ -62,4 +62,3 @@ describe('sendDidAuthRequest', () => {
     ).rejects.toThrow('GET requests must not include a body');
   });
 });
-

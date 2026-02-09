@@ -25,7 +25,7 @@ nuwa-id help
 ### 1) Initialize local key and config
 
 ```bash
-nuwa-id init
+nuwa-id init --key-fragment support-agent-main
 ```
 
 This creates local state under:
@@ -33,10 +33,13 @@ This creates local state under:
 - `~/.config/nuwa-did/config.json`
 - `~/.config/nuwa-did/agent-key.json`
 
+If `--key-fragment` is not provided, `nuwa-id` generates a timestamp-based fragment.
+Use an explicit, human-readable fragment for easier debugging and operations.
+
 ### 2) Create deep link and send it to user
 
 ```bash
-nuwa-id link
+nuwa-id link --key-fragment support-agent-main
 ```
 
 Send the printed URL to the user.  
@@ -53,7 +56,7 @@ did:rooch:rooch1...
 ### 4) Verify key binding on DID document
 
 ```bash
-nuwa-id verify --did did:rooch:rooch1...
+nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
 ```
 
 Only continue if verification succeeds.
@@ -65,6 +68,7 @@ Option A: generate header only
 ```bash
 nuwa-id auth-header \
   --did did:rooch:rooch1... \
+  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -74,6 +78,7 @@ Option B: send request directly
 ```bash
 nuwa-id curl \
   --did did:rooch:rooch1... \
+  --key-fragment support-agent-main \
   --method GET \
   --url https://did-check.nuwa.dev/whoami
 ```
@@ -82,5 +87,5 @@ nuwa-id curl \
 
 - Default network is `main`.
 - Default CADOP domain is `https://id.nuwa.dev`.
-- Default key fragment is `agent-auth-1`.
+- If `--key-fragment` is omitted, a timestamp-based value is generated.
 - Private key never leaves `~/.config/nuwa-did`.

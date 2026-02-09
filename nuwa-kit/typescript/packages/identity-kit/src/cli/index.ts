@@ -65,35 +65,36 @@ async function runInit(options: ParsedArgs['options']): Promise<void> {
     throw new Error('key already exists, use --force to overwrite');
   }
 
-  const idFragment = getString(options['id-fragment']) || DEFAULT_CONFIG.idFragment;
+  const keyFragment = getString(options['key-fragment']) || makeDefaultKeyFragment();
   const network = parseNetwork(getString(options.network) || DEFAULT_CONFIG.network);
-  const roochRpcUrl = getString(options['rpc-url']) || DEFAULT_CONFIG.roochRpcUrl;
+  const roochRpcUrl = getString(options['rpc-url']);
   const cadopDomain = getString(options['cadop-domain']) || DEFAULT_CONFIG.cadopDomain;
 
-  const key = await createAgentKeyMaterial(idFragment);
+  const key = await createAgentKeyMaterial(keyFragment);
   await saveKeyMaterial(key);
   await saveConfig({
     network,
     roochRpcUrl,
     cadopDomain,
-    idFragment,
+    keyFragment,
   });
 
   console.log('initialized did-auth agent config');
   console.log(`publicKeyMultibase=${key.publicKeyMultibase}`);
+  console.log(`keyFragment=${keyFragment}`);
   console.log(`configDir=${getCliPaths().dir}`);
 }
 
 async function runLink(options: ParsedArgs['options']): Promise<void> {
   const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
+  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
   const cadopDomain = getString(options['cadop-domain']) || config.cadopDomain;
   const redirectUri = getString(options['redirect-uri']);
 
   const link = buildAddKeyDeepLink({
     key,
-    idFragment,
+    keyFragment,
     cadopDomain,
     redirectUri,
   });
@@ -119,10 +120,10 @@ async function runVerify(options: ParsedArgs['options']): Promise<void> {
   const did = requiredString(options.did, '--did is required');
   const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
+  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
   const network = parseNetwork(getString(options.network) || config.network || 'main');
   const rpcUrl = getString(options['rpc-url']) || config.roochRpcUrl;
-  const keyId = `${did}#${idFragment}`;
+  const keyId = `${did}#${keyFragment}`;
 
   const result = await verifyDidKeyBinding({
     did,
@@ -151,8 +152,8 @@ async function runAuthHeader(options: ParsedArgs['options']): Promise<void> {
 
   const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
-  const effectiveKey = { ...key, idFragment };
+  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
+  const effectiveKey = { ...key, keyFragment };
 
   const header = await createDidAuthHeader({
     did,
@@ -174,8 +175,8 @@ async function runCurl(options: ParsedArgs['options']): Promise<void> {
 
   const config = await loadConfig();
   const key = await loadKeyMaterial();
-  const idFragment = getString(options['id-fragment']) || config.idFragment || key.idFragment;
-  const effectiveKey = { ...key, idFragment };
+  const keyFragment = getString(options['key-fragment']) || config.keyFragment || key.keyFragment;
+  const effectiveKey = { ...key, keyFragment };
   const headers = parseHeaders(getStringArray(options.header));
 
   const response = await sendDidAuthRequest({
@@ -287,16 +288,26 @@ function parseNetwork(input: string): 'main' | 'test' {
   return input;
 }
 
+function makeDefaultKeyFragment(now = new Date()): string {
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const hour = String(now.getUTCHours()).padStart(2, '0');
+  const minute = String(now.getUTCMinutes()).padStart(2, '0');
+  const second = String(now.getUTCSeconds()).padStart(2, '0');
+  return `agent-auth-${year}${month}${day}${hour}${minute}${second}`;
+}
+
 function printHelp(): void {
   const lines = [
     'nuwa-id - DIDAuth helper CLI for remote agents',
     '',
     'Commands:',
-    '  nuwa-id init [--force] [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--id-fragment FRAGMENT]',
-    '  nuwa-id link [--cadop-domain URL] [--id-fragment FRAGMENT] [--redirect-uri URL] [--json]',
-    '  nuwa-id verify --did DID [--network main|test] [--rpc-url URL] [--id-fragment FRAGMENT]',
-    '  nuwa-id auth-header --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--id-fragment FRAGMENT]',
-    '  nuwa-id curl --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--id-fragment FRAGMENT] [--header "K: V"]',
+    '  nuwa-id init [--force] [--network main|test] [--rpc-url URL] [--cadop-domain URL] [--key-fragment FRAGMENT]',
+    '  nuwa-id link [--cadop-domain URL] [--key-fragment FRAGMENT] [--redirect-uri URL] [--json]',
+    '  nuwa-id verify --did DID [--network main|test] [--rpc-url URL] [--key-fragment FRAGMENT]',
+    '  nuwa-id auth-header --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--key-fragment FRAGMENT]',
+    '  nuwa-id curl --did DID --method METHOD --url URL [--body RAW] [--audience URL] [--key-fragment FRAGMENT] [--header "K: V"]',
   ];
   console.log(lines.join('\n'));
 }

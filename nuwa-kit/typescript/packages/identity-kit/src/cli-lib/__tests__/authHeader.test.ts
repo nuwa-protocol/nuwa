@@ -14,7 +14,7 @@ describe('createDidAuthHeader', () => {
       keyType: KeyType.ED25519,
       publicKeyMultibase: MultibaseCodec.encodeBase58btc(publicKey),
       privateKeyMultibase: MultibaseCodec.encodeBase58btc(privateKey),
-      idFragment: 'agent-auth-1',
+      keyFragment: 'agent-auth-1',
       createdAt: new Date().toISOString(),
     };
     const keyId = `${did}#agent-auth-1`;
@@ -50,4 +50,3 @@ describe('createDidAuthHeader', () => {
     }
   });
 });
-
