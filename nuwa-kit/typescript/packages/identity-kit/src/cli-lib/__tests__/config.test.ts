@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { mkdtemp, readFile, rm } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { loadConfig, saveConfig } from '../config';
+import { loadConfig, saveConfig, saveKeyMaterialWithRelativePath } from '../config';
+import { KeyType } from '../../types/crypto';
 
 describe('cli config', () => {
   let tempHome: string;
@@ -50,5 +51,37 @@ describe('cli config', () => {
     expect(parsed.activeProfile).toBe('default');
     expect(parsed.profiles?.default?.did).toBe('did:rooch:rooch1example');
     expect(parsed.profiles?.default?.keyFile).toBe('keys/default.json');
+  });
+
+  it('throws actionable error for invalid legacy config format', async () => {
+    const configPath = path.join(tempHome, '.config', 'nuwa-did', 'config.json');
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        network: 'main',
+        keyFragment: 'legacy-fragment',
+      }),
+      'utf8'
+    );
+
+    await expect(loadConfig()).rejects.toThrow(
+      /invalid nuwa-id config.*Delete the file and run `nuwa-id init`/
+    );
+  });
+
+  it('rejects unsafe key file paths', async () => {
+    await expect(
+      saveKeyMaterialWithRelativePath(
+        {
+          keyType: KeyType.ED25519,
+          publicKeyMultibase: 'zPublic',
+          privateKeyMultibase: 'zPrivate',
+          keyFragment: 'support-agent-main',
+          createdAt: new Date().toISOString(),
+        },
+        '../escape.json'
+      )
+    ).rejects.toThrow(/invalid keyFile path/);
   });
 });

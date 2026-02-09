@@ -39,7 +39,14 @@ export async function loadConfig(): Promise<DidCliConfig> {
   const paths = await ensureCliDir();
   try {
     const raw = await readFile(paths.configFile, 'utf8');
-    return normalizeConfig(JSON.parse(raw) as Partial<DidCliConfig>);
+    try {
+      return normalizeConfig(JSON.parse(raw) as Partial<DidCliConfig>);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `invalid nuwa-id config at ${paths.configFile}: ${message}. Delete the file and run \`nuwa-id init\` to recreate it.`
+      );
+    }
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (!err?.code || err.code !== 'ENOENT') {
@@ -92,6 +99,18 @@ export async function loadKeyMaterial(profileName?: string): Promise<AgentKeyMat
 export async function saveKeyMaterial(key: AgentKeyMaterial, profileName?: string): Promise<void> {
   const config = await loadConfig();
   const keyFile = resolveProfileKeyFile(config, profileName || config.activeProfile);
+  await saveKeyMaterialToPath(key, keyFile);
+}
+
+export async function saveKeyMaterialWithRelativePath(
+  key: AgentKeyMaterial,
+  keyFileRelativePath: string
+): Promise<void> {
+  const keyFile = resolveSafeKeyPath(keyFileRelativePath);
+  await saveKeyMaterialToPath(key, keyFile);
+}
+
+async function saveKeyMaterialToPath(key: AgentKeyMaterial, keyFile: string): Promise<void> {
   const paths = await ensureCliDir();
   await mkdir(path.dirname(keyFile), { recursive: true, mode: 0o700 });
   await writeFile(keyFile, JSON.stringify(key, null, 2), {
@@ -158,9 +177,15 @@ function resolveProfileKeyFile(config: DidCliConfig, profileName: string): strin
     throw new Error(`profile not found: ${profileName}`);
   }
 
-  const keyFile = profile.keyFile;
+  return resolveSafeKeyPath(profile.keyFile, profileName);
+}
+
+function resolveSafeKeyPath(keyFile: string, profileName?: string): string {
   if (path.isAbsolute(keyFile) || keyFile.includes('..')) {
-    throw new Error(`invalid keyFile in config for profile "${profileName}"`);
+    if (profileName) {
+      throw new Error(`invalid keyFile in config for profile "${profileName}"`);
+    }
+    throw new Error('invalid keyFile path');
   }
 
   return path.join(getCliPaths().dir, keyFile);

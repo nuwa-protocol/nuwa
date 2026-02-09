@@ -11,6 +11,7 @@ import {
   loadKeyMaterial,
   saveConfig,
   saveKeyMaterial,
+  saveKeyMaterialWithRelativePath,
   updateActiveProfile,
 } from '../cli-lib/config';
 import { buildAddKeyDeepLink } from '../cli-lib/deeplink';
@@ -230,10 +231,10 @@ async function runProfileCreate(options: ParsedArgs['options']): Promise<void> {
       },
     },
   };
-  await saveConfig(next);
 
   const key = await createAgentKeyMaterial(keyFragment);
-  await saveKeyMaterial(key, name);
+  await saveKeyMaterialWithRelativePath(key, profileKeyFile);
+  await saveConfig(next);
   console.log(`created profile=${name}`);
   console.log(`publicKeyMultibase=${key.publicKeyMultibase}`);
   console.log(`keyFragment=${keyFragment}`);
@@ -438,7 +439,7 @@ function makeDefaultKeyFragment(now = new Date()): string {
 function assertKeyFragmentMatch(expected: string, actual: string): void {
   if (expected === actual) return;
   throw new Error(
-    `keyFragment mismatch: config has "${expected}" but key file has "${actual}". Run \`nuwa-id init --force --key-fragment ${actual}\` to resync.`
+    `keyFragment mismatch: config has "${expected}" but key file has "${actual}". Update active profile keyFragment to "${actual}" in ~/.config/nuwa-did/config.json, then retry.`
   );
 }
 
