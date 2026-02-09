@@ -4,21 +4,19 @@ export interface DidCliConfig {
   network: 'main' | 'test';
   roochRpcUrl?: string;
   cadopDomain: string;
-  idFragment: string;
+  keyFragment: string;
 }
 
 export interface AgentKeyMaterial {
   keyType: KeyType;
   publicKeyMultibase: string;
   privateKeyMultibase: string;
-  idFragment: string;
+  keyFragment: string;
   createdAt: string;
 }
 
 export const DEFAULT_CONFIG: DidCliConfig = {
   network: 'main',
-  roochRpcUrl: 'https://seed.rooch.network',
   cadopDomain: 'https://id.nuwa.dev',
-  idFragment: 'agent-auth-1',
+  keyFragment: 'agent-auth-1',
 };
-

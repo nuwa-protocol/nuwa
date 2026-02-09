@@ -68,7 +68,7 @@
           },
           {
             "group": "Examples",
-            "pages": ["guides/llm-gateway-knowledge-service"]
+            "pages": ["guides/did-auth-agent", "guides/llm-gateway-knowledge-service"]
           },
           {
             "group": "Deployment",

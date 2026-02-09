@@ -21,13 +21,13 @@ This example uses the `nuwa-id` CLI from `@nuwa-ai/identity-kit` to run remote D
 
 ```bash
 # 1) Initialize local key/config under ~/.config/nuwa-did
-nuwa-id init
+nuwa-id init --key-fragment support-agent-main
 
 # 2) Generate deep link and send to user
-nuwa-id link
+nuwa-id link --key-fragment support-agent-main
 ```
 
-User opens the URL, approves adding key `#agent-auth-1`, and sends DID text back, for example:
+User opens the URL, approves adding key `#support-agent-main`, and sends DID text back, for example:
 
 ```text
 did:rooch:rooch1...
@@ -35,13 +35,13 @@ did:rooch:rooch1...
 
 ```bash
 # 3) Verify DID contains your key
-nuwa-id verify --did did:rooch:rooch1...
+nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
 
 # 4) Create auth header (for manual curl usage)
-nuwa-id auth-header --did did:rooch:rooch1... --method GET --url https://did-check.nuwa.dev/whoami
+nuwa-id auth-header --did did:rooch:rooch1... --key-fragment support-agent-main --method GET --url https://did-check.nuwa.dev/whoami
 
 # 5) Send signed request directly
-nuwa-id curl --did did:rooch:rooch1... --method GET --url https://did-check.nuwa.dev/whoami
+nuwa-id curl --did did:rooch:rooch1... --key-fragment support-agent-main --method GET --url https://did-check.nuwa.dev/whoami
 ```
 
 ## Storage
@@ -53,3 +53,4 @@ All agent-side state is in `~/.config/nuwa-did`:
 
 Do not share `agent-key.json`.
 
+If you omit `--key-fragment` on `nuwa-id init`, the CLI generates a timestamp-based fragment automatically.

@@ -1,0 +1,111 @@
+---
+title: "DIDAuth for Remote Agents"
+description: "Use nuwa-id and did-check to run DIDAuth when user and agent are on different devices."
+---
+
+This guide shows the simplest remote DIDAuth flow for agent environments:
+
+1. Agent generates a local key.
+2. Agent sends a deep link to the user.
+3. User authorizes the key on `id.nuwa.dev` and sends back DID text.
+4. Agent verifies key binding and sends DID-authenticated requests.
+
+The flow uses:
+
+- `nuwa-id` CLI from `@nuwa-ai/identity-kit`
+- `did-check` service at `https://did-check.nuwa.dev`
+
+## Prerequisites
+
+- Node.js 18+
+- Access to Rooch mainnet
+
+## Install CLI
+
+```bash
+npm i -g @nuwa-ai/identity-kit
+nuwa-id help
+```
+
+## Step 1: Initialize local key material
+
+```bash
+nuwa-id init --key-fragment support-agent-main
+```
+
+This creates local state under `~/.config/nuwa-did`:
+
+- `config.json`
+- `agent-key.json`
+
+`agent-key.json` is private key material. Do not share it.
+
+## Step 2: Generate deep link for user authorization
+
+```bash
+nuwa-id link --key-fragment support-agent-main
+```
+
+Send the printed URL to the user.  
+The user opens the link in a browser, logs in on `id.nuwa.dev`, and approves adding the agent key.
+
+## Step 3: Collect DID from user
+
+After approval, the user sends DID text back to the agent, for example:
+
+```text
+did:rooch:rooch1...
+```
+
+## Step 4: Verify key binding
+
+```bash
+nuwa-id verify --did did:rooch:rooch1... --key-fragment support-agent-main
+```
+
+Continue only when verification succeeds.
+
+## Step 5: Send DID-authenticated request
+
+Generate header only:
+
+```bash
+nuwa-id auth-header \
+  --did did:rooch:rooch1... \
+  --key-fragment support-agent-main \
+  --method GET \
+  --url https://did-check.nuwa.dev/whoami
+```
+
+Or send directly:
+
+```bash
+nuwa-id curl \
+  --did did:rooch:rooch1... \
+  --key-fragment support-agent-main \
+  --method GET \
+  --url https://did-check.nuwa.dev/whoami
+```
+
+Expected response:
+
+```json
+{
+  "ok": true,
+  "did": "did:rooch:rooch1..."
+}
+```
+
+## Defaults
+
+- Network: `main`
+- CADOP domain: `https://id.nuwa.dev`
+- Key fragment: set with `--key-fragment` (recommended)
+
+## Troubleshooting
+
+- `agent key not initialized`: run `nuwa-id init`
+- `verification method not found`: user has not authorized the agent key yet, or sent the wrong DID
+- `401 Unauthorized` from `/whoami`: regenerate auth header and ensure URL/method match exactly
+
+If `--key-fragment` is omitted on `nuwa-id init`, the CLI generates a timestamp-based fragment.

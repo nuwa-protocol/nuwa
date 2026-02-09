@@ -1,11 +1,16 @@
 import { randomUUID } from 'crypto';
 import { AddKeyRequestPayloadV1 } from '../types/deeplink';
 import { AgentKeyMaterial } from './types';
+import {
+  buildAddKeyDeepLink as buildAddKeyDeepLinkUrl,
+  buildAddKeyPayload,
+  normalizeCadopDomain,
+} from '../deeplink/shared';
 
 export interface BuildDeepLinkInput {
   key: AgentKeyMaterial;
   cadopDomain: string;
-  idFragment: string;
+  keyFragment: string;
   redirectUri?: string;
 }
 
@@ -16,29 +21,16 @@ export interface BuildDeepLinkOutput {
 
 export function buildAddKeyDeepLink(input: BuildDeepLinkInput): BuildDeepLinkOutput {
   const domain = normalizeCadopDomain(input.cadopDomain);
-  const payload: AddKeyRequestPayloadV1 = {
-    version: 1,
-    verificationMethod: {
-      type: input.key.keyType,
-      publicKeyMultibase: input.key.publicKeyMultibase,
-      idFragment: input.idFragment,
-    },
-    verificationRelationships: ['authentication'],
+  const payload: AddKeyRequestPayloadV1 = buildAddKeyPayload({
+    keyType: input.key.keyType,
+    publicKeyMultibase: input.key.publicKeyMultibase,
+    keyFragment: input.keyFragment,
+    relationships: ['authentication'],
     redirectUri: input.redirectUri || `${domain}/close`,
     state: randomUUID(),
-  };
-  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  });
   return {
-    url: `${domain}/add-key?payload=${encodedPayload}`,
+    url: buildAddKeyDeepLinkUrl({ cadopDomain: domain, payload }),
     payload,
   };
 }
-
-function normalizeCadopDomain(cadopDomain: string): string {
-  const trimmed = cadopDomain.trim().replace(/\/+$/, '');
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
-  }
-  return `https://${trimmed}`;
-}
-

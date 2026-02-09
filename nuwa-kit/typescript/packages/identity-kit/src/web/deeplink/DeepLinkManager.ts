@@ -10,6 +10,7 @@ import {
 } from '../../index';
 import { LocalStorageKeyStore } from '../keystore';
 import { IdentityKitErrorCode, createWebError, createValidationError } from '../../errors';
+import { buildAddKeyDeepLink, buildAddKeyPayload, normalizeCadopDomain } from '../../deeplink/shared';
 
 export interface ConnectOptions {
   cadopDomain?: string;
@@ -78,13 +79,7 @@ export class DeepLinkManager {
     privateKeyMultibase: string;
     publicKeyMultibase: string;
   }> {
-    const cadopDomainRaw = opts.cadopDomain || 'id.nuwa.dev';
-    const cadopDomain =
-      cadopDomainRaw.startsWith('http://') || cadopDomainRaw.startsWith('https://')
-        ? cadopDomainRaw.replace(/\/$/, '') // trim trailing slash
-        : /^(localhost|\d+\.\d+\.\d+\.\d+(:\d+)?)$/.test(cadopDomainRaw)
-          ? `http://${cadopDomainRaw}`
-          : `https://${cadopDomainRaw}`;
+    const cadopDomain = normalizeCadopDomain(opts.cadopDomain || 'id.nuwa.dev');
     const keyType = toKeyType((opts.keyType ?? 'Ed25519VerificationKey2020') as KeyTypeInput);
     const idFragment = opts.idFragment || `key-${Date.now()}`;
     const relationships = opts.relationships || ['authentication'];
@@ -124,30 +119,19 @@ export class DeepLinkManager {
     // Build payload per spec (versioned JSON -> Base64URL)
     const redirectUri = new URL(redirectPath, window.location.origin).toString();
 
-    const payload: AddKeyRequestPayloadV1 = {
-      version: 1,
-      verificationMethod: {
-        type: keyType,
-        publicKeyMultibase: publicKeyMultibase,
-        idFragment,
-      },
-      verificationRelationships: relationships,
+    const payload: AddKeyRequestPayloadV1 = buildAddKeyPayload({
+      keyType,
+      publicKeyMultibase,
+      keyFragment: idFragment,
+      relationships,
       redirectUri,
       state,
-    };
-
-    if (opts.agentDid) {
-      payload.agentDid = opts.agentDid;
-    }
-
-    if (opts.scopes && opts.scopes.length > 0) {
-      payload.scopes = opts.scopes;
-    }
-
-    const encodedPayload = MultibaseCodec.encodeBase64url(JSON.stringify(payload));
+      agentDid: opts.agentDid,
+      scopes: opts.scopes,
+    });
 
     return {
-      url: `${cadopDomain}/add-key?payload=${encodedPayload}`,
+      url: buildAddKeyDeepLink({ cadopDomain, payload }),
       state,
       privateKeyMultibase,
       publicKeyMultibase,
