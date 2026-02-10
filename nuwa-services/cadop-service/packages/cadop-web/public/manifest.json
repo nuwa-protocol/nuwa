@@ -1,11 +1,11 @@
 {
-  "name": "CADOP Service",
-  "short_name": "CADOP",
-  "description": "Custodian-Assisted DID Onboarding Protocol Service - 创建和管理您的 DID，增强您的 Web3 身份",
+  "name": "Nuwa ID",
+  "short_name": "Nuwa ID",
+  "description": "Passkey-based DID onboarding and secure key authorization for agent and app workflows.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/icon-192x192.png",
