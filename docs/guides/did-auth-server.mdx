@@ -1,0 +1,162 @@
+---
+title: "DIDAuth for Backend Services"
+description: "Integrate DIDAuthV1 verification in your backend using @nuwa-ai/identity-kit."
+---
+
+This guide shows a minimal server-side DID authentication integration using:
+
+- `@nuwa-ai/identity-kit`
+- Express middleware
+- Rooch DID resolution (`did:rooch:*`)
+
+Reference implementation: [`nuwa-kit/typescript/examples/did-check`](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/examples/did-check).
+
+## What You Build
+
+- Public endpoints: `/health`, `/info`
+- Protected endpoint: `/whoami`
+- Middleware that verifies `Authorization: DIDAuthV1 ...`
+
+## 1) Install
+
+```bash
+pnpm add @nuwa-ai/identity-kit express
+```
+
+## 2) Bootstrap Identity Environment
+
+Your backend only needs DID resolution to verify signatures. You do not need a service private key for verification-only endpoints.
+
+```ts
+import { IdentityKit } from '@nuwa-ai/identity-kit';
+
+await IdentityKit.bootstrap({
+  method: 'rooch',
+  vdrOptions: {
+    network: process.env.ROOCH_NETWORK || 'main',
+    rpcUrl: process.env.ROOCH_NODE_URL, // optional
+  },
+});
+```
+
+## 3) Add DIDAuth Middleware
+
+```ts
+import type { Request, Response, NextFunction } from 'express';
+import { DIDAuth, VDRRegistry } from '@nuwa-ai/identity-kit';
+
+declare global {
+  namespace Express {
+    interface Request {
+      callerDid?: string;
+      callerKeyId?: string;
+    }
+  }
+}
+
+function createDIDAuthMiddleware() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      res.status(401).json({
+        error: 'Missing authorization header',
+        hint: 'Use Authorization: DIDAuthV1 <base64url-encoded-signed-object>',
+      });
+      return;
+    }
+
+    try {
+      const result = await DIDAuth.v1.verifyAuthHeader(authHeader, VDRRegistry.getInstance());
+      if (!result.ok) {
+        res.status(401).json({ error: result.error, errorCode: result.errorCode });
+        return;
+      }
+
+      req.callerDid = result.signedObject.signature.signer_did;
+      req.callerKeyId = result.signedObject.signature.key_id;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+```
+
+## 4) Protect Routes
+
+```ts
+import express from 'express';
+
+const app = express();
+app.use(express.json());
+const didAuth = createDIDAuthMiddleware();
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.get('/info', (_req, res) => {
+  res.json({
+    network: process.env.ROOCH_NETWORK || 'main',
+    endpoints: {
+      public: ['/health', '/info'],
+      protected: ['/whoami'],
+    },
+  });
+});
+
+app.get('/whoami', didAuth, (req, res) => {
+  res.json({
+    ok: true,
+    did: req.callerDid,
+    keyId: req.callerKeyId,
+  });
+});
+
+app.listen(Number(process.env.PORT || 3004), () => {
+  console.log('did-check server running');
+});
+```
+
+## Request Format
+
+Backend expects this header:
+
+```text
+Authorization: DIDAuthV1 <base64url-encoded-signed-object>
+```
+
+You can generate this on the client side with `DIDAuth.v1.createSignature()` + `DIDAuth.v1.toAuthorizationHeader()`, or with `nuwa-id` CLI (`nuwa-id curl` / `nuwa-id auth-header`).
+
+## Configuration
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `ROOCH_NETWORK` | Rooch network (e.g. `main`, `test`, `dev`, `local`) | `main` |
+| `ROOCH_NODE_URL` | Custom Rooch RPC URL | auto-detected by network |
+| `PORT` | HTTP port | `3004` |
+| `DEBUG` | Enable debug logs | `false` |
+
+## Local Validation
+
+Run the complete example:
+
+```bash
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa
+cd nuwa-kit/typescript/examples/did-check
+pnpm install
+pnpm dev:server
+```
+
+Then send a DID-authenticated request from an agent/client (for example with `nuwa-id`) to:
+
+- `GET http://localhost:3004/whoami`
+
+## Production Notes
+
+- Keep middleware strict: fail closed on missing or invalid auth headers.
+- Log caller DID and key id for auditing.
+- If you front with API Gateway/Proxy, preserve the original `Authorization` header.
+- For public internet deployments, add rate limiting before DIDAuth verification.
+- `verifyAuthHeader()` uses an in-memory nonce store by default. In multi-instance deployments, pass a shared `nonceStore` (for example Redis-backed) to keep replay protection consistent across replicas.
