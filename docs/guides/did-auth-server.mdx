@@ -9,7 +9,7 @@ This guide shows a minimal server-side DID authentication integration using:
 - Express middleware
 - Rooch DID resolution (`did:rooch:*`)
 
-Reference implementation: `nuwa-kit/typescript/examples/did-check`.
+Reference implementation: [`nuwa-kit/typescript/examples/did-check`](https://github.com/nuwa-protocol/nuwa/tree/main/nuwa-kit/typescript/examples/did-check).
 
 ## What You Build
 
@@ -65,15 +65,19 @@ function createDIDAuthMiddleware() {
       return;
     }
 
-    const result = await DIDAuth.v1.verifyAuthHeader(authHeader, VDRRegistry.getInstance());
-    if (!result.ok) {
-      res.status(401).json({ error: result.error, errorCode: result.errorCode });
-      return;
-    }
+    try {
+      const result = await DIDAuth.v1.verifyAuthHeader(authHeader, VDRRegistry.getInstance());
+      if (!result.ok) {
+        res.status(401).json({ error: result.error, errorCode: result.errorCode });
+        return;
+      }
 
-    req.callerDid = result.signedObject.signature.signer_did;
-    req.callerKeyId = result.signedObject.signature.key_id;
-    next();
+      req.callerDid = result.signedObject.signature.signer_did;
+      req.callerKeyId = result.signedObject.signature.key_id;
+      next();
+    } catch (err) {
+      next(err);
+    }
   };
 }
 ```
@@ -84,6 +88,7 @@ function createDIDAuthMiddleware() {
 import express from 'express';
 
 const app = express();
+app.use(express.json());
 const didAuth = createDIDAuthMiddleware();
 
 app.get('/health', (_req, res) => {
@@ -107,6 +112,10 @@ app.get('/whoami', didAuth, (req, res) => {
     keyId: req.callerKeyId,
   });
 });
+
+app.listen(Number(process.env.PORT || 3004), () => {
+  console.log('did-check server running');
+});
 ```
 
 ## Request Format
@@ -123,7 +132,7 @@ You can generate this on the client side with `DIDAuth.v1.createSignature()` + `
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `ROOCH_NETWORK` | Rooch network (`main` or `test`) | `main` |
+| `ROOCH_NETWORK` | Rooch network (e.g. `main`, `test`, `dev`, `local`) | `main` |
 | `ROOCH_NODE_URL` | Custom Rooch RPC URL | auto-detected by network |
 | `PORT` | HTTP port | `3004` |
 | `DEBUG` | Enable debug logs | `false` |
@@ -133,6 +142,8 @@ You can generate this on the client side with `DIDAuth.v1.createSignature()` + `
 Run the complete example:
 
 ```bash
+git clone https://github.com/nuwa-protocol/nuwa.git
+cd nuwa
 cd nuwa-kit/typescript/examples/did-check
 pnpm install
 pnpm dev:server
@@ -148,4 +159,4 @@ Then send a DID-authenticated request from an agent/client (for example with `nu
 - Log caller DID and key id for auditing.
 - If you front with API Gateway/Proxy, preserve the original `Authorization` header.
 - For public internet deployments, add rate limiting before DIDAuth verification.
-
+- `verifyAuthHeader()` uses an in-memory nonce store by default. In multi-instance deployments, pass a shared `nonceStore` (for example Redis-backed) to keep replay protection consistent across replicas.
