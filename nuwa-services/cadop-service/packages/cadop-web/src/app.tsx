@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/auth/login';
 import { DashboardPage } from './pages/dashboard';
@@ -15,9 +15,69 @@ import { Toaster } from './components/ui/toaster';
 import { DebugLogger } from '@nuwa-ai/identity-kit';
 
 const GLOBAL_DEBUG = import.meta.env.DEV;
+const DEFAULT_TITLE = 'Nuwa ID';
+const DEFAULT_DESCRIPTION =
+  'Create and manage your Nuwa DID with passkey authentication, then securely authorize keys for agent and app workflows.';
+
+function getPageMeta(pathname: string): { title: string; description: string } {
+  if (pathname.startsWith('/add-key')) {
+    return {
+      title: 'Authorize Key Request | Nuwa ID',
+      description: 'Review the key request and authorize it to your DID only when you trust the source.',
+    };
+  }
+  if (pathname.startsWith('/setup')) {
+    return {
+      title: 'Create Your DID | Nuwa ID',
+      description: 'Set up your passkey and create your DID in a guided flow.',
+    };
+  }
+  if (pathname.startsWith('/auth/login')) {
+    return {
+      title: 'Sign In | Nuwa ID',
+      description: 'Sign in with passkey or wallet to continue to your DID workspace.',
+    };
+  }
+  if (pathname.startsWith('/dashboard')) {
+    return {
+      title: 'Dashboard | Nuwa ID',
+      description: 'Manage your DID profile, keys, and service authorization status.',
+    };
+  }
+  if (pathname.startsWith('/create-agent-did')) {
+    return {
+      title: 'Create Agent DID | Nuwa ID',
+      description: 'Create a DID for agent workflows and keep ownership under your account.',
+    };
+  }
+  if (pathname.startsWith('/close')) {
+    return {
+      title: 'Completed | Nuwa ID',
+      description: 'This authorization flow is completed. You can close this window safely.',
+    };
+  }
+
+  return {
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+  };
+}
 
 const App: React.FC = () => {
+  const location = useLocation();
+
   DebugLogger.setGlobalLevel(GLOBAL_DEBUG ? 'debug' : 'info');
+
+  React.useEffect(() => {
+    const { title, description } = getPageMeta(location.pathname);
+    document.title = title;
+
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      descriptionMeta.setAttribute('content', description);
+    }
+  }, [location.pathname]);
+
   return (
     <>
       <Routes>

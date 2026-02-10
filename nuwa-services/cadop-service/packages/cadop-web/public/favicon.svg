@@ -1,0 +1,15 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nuwaIdLogoBg" x1="24" y1="20" x2="136" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <linearGradient id="nuwaIdLogoRing" x1="50" y1="50" x2="110" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A5F3FC"/>
+      <stop offset="1" stop-color="#E0E7FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="144" height="144" rx="36" fill="url(#nuwaIdLogoBg)"/>
+  <circle cx="80" cy="74" r="26" stroke="url(#nuwaIdLogoRing)" stroke-width="10"/>
+  <path d="M48 116C54 101 66 94 80 94C94 94 106 101 112 116" stroke="#E0F2FE" stroke-width="10" stroke-linecap="round"/>
+</svg>

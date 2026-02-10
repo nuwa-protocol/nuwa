@@ -26,43 +26,53 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900">Welcome to CADOP</h1>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Choose your preferred sign-in method
-        </p>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl" />
+        <div className="absolute top-1/3 right-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* Error message */}
-          {error && (
-            <div className="mb-6 p-4 rounded-md bg-red-50">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg
-                    className="h-5 w-5 text-red-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
+      <div className="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur">
+            <img src="/favicon.svg" alt="Nuwa ID" className="h-full w-full object-contain" />
+          </div>
+          <p className="text-center text-xs uppercase tracking-[0.24em] text-cyan-200/80">Nuwa ID</p>
+          <h1 className="mt-3 text-center text-3xl font-bold text-white">Secure DID Sign-In</h1>
+          <p className="mt-2 text-center text-sm text-slate-200/80">
+            Continue with passkey or wallet to access your DID workspace.
+          </p>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="rounded-2xl border border-white/15 bg-white/95 px-4 py-8 shadow-2xl shadow-slate-900/30 backdrop-blur sm:px-10">
+            {error && (
+              <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-5 w-5 text-red-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-red-800">{error}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Authentication method selector */}
-          <AuthMethodSelector onSuccess={handleLoginSuccess} onError={handleLoginError} />
+            <AuthMethodSelector onSuccess={handleLoginSuccess} onError={handleLoginError} />
+          </div>
         </div>
       </div>
     </div>

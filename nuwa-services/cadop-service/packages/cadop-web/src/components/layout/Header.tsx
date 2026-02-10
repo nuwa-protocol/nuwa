@@ -43,7 +43,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
               </svg>
             </button>
             <div className="ml-4 text-xl font-semibold text-gray-900 dark:text-white">
-              Nuwa CADOP
+              Nuwa ID
             </div>
           </div>
 

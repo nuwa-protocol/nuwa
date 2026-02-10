@@ -21,20 +21,25 @@ export function FixedCardLayout({
   icon,
 }: FixedCardLayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/25 blur-3xl" />
+        <div className="absolute top-1/3 -right-16 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="absolute -bottom-16 left-1/3 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
+      </div>
       <div
         className={cn(
-          'w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden',
+          'relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-2xl shadow-slate-900/30 backdrop-blur',
           'aspect-[3/4] flex flex-col', // Fixed 3:4 aspect ratio
           className
         )}
       >
         {/* Header area */}
         {(title || subtitle || icon) && (
-          <div className="px-8 pt-8 pb-4 text-center">
+          <div className="px-8 pb-4 pt-8 text-center">
             {icon && <div className="mb-4 flex justify-center">{icon}</div>}
-            {title && <h2 className="text-2xl font-semibold text-gray-900 mb-2">{title}</h2>}
-            {subtitle && <p className="text-gray-600 text-sm">{subtitle}</p>}
+            {title && <h2 className="mb-2 text-2xl font-semibold text-gray-900">{title}</h2>}
+            {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
           </div>
         )}
 
@@ -43,7 +48,7 @@ export function FixedCardLayout({
 
         {/* Bottom action button area */}
         {actions && (
-          <div className="px-8 py-6 border-t border-gray-100 bg-gray-50/50">
+          <div className="border-t border-gray-200/80 bg-gradient-to-b from-white to-slate-50 px-8 py-6">
             <div className="flex flex-col gap-3">{actions}</div>
           </div>
         )}
