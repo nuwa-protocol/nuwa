@@ -69,6 +69,7 @@
           {
             "group": "Examples",
             "pages": [
+              "guides/did-auth",
               "guides/did-auth-agent",
               "guides/did-auth-server",
               "guides/llm-gateway-knowledge-service"

@@ -1,0 +1,38 @@
+---
+title: "DIDAuth Integration Guides"
+description: "A single entry point for DIDAuth integration on agent and backend sides."
+---
+
+Use this page as the DIDAuth entry point, then pick the integration path that matches your role.
+
+## For Agent Integrations
+
+Use the CLI-first remote flow when users and agents are on different devices:
+
+- [DIDAuth for Remote Agents](/guides/did-auth-agent)
+
+This guide covers:
+
+- local key initialization with `nuwa-id`
+- deep link generation on `id.nuwa.dev`
+- user DID handoff and local DID binding
+- verified DID-authenticated requests
+
+## For Backend Integrations
+
+Use this when your service needs to verify `Authorization: DIDAuthV1 ...`:
+
+- [DIDAuth for Backend Services](/guides/did-auth-server)
+
+This guide covers:
+
+- `IdentityKit.bootstrap()` for DID resolution
+- Express middleware with `DIDAuth.v1.verifyAuthHeader()`
+- protected routes (`/whoami`) and production notes
+
+## Recommended Order
+
+1. Start with remote agent flow to understand header generation and key binding.
+2. Add backend middleware verification to protect APIs.
+3. Move to shared nonce store + rate limiting before production rollout.
+
