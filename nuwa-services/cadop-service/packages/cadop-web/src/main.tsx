@@ -11,6 +11,11 @@ import App from './app';
 import i18n from './i18n';
 import './styles/index.css';
 
+// Cadop web is intentionally light-only for now.
+document.documentElement.classList.remove('dark');
+document.body.classList.remove('dark');
+document.documentElement.style.colorScheme = 'light';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
