@@ -82,8 +82,8 @@ export const Text: React.FC<TextProps> = ({
   const typeClasses = {
     default: 'text-foreground',
     secondary: 'text-muted-foreground',
-    success: 'text-green-600 dark:text-green-500',
-    warning: 'text-amber-600 dark:text-amber-500',
+    success: 'text-green-600',
+    warning: 'text-amber-600',
     danger: 'text-destructive',
   };
 

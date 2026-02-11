@@ -21,15 +21,15 @@ export function FixedCardLayout({
   icon,
 }: FixedCardLayoutProps) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 p-4">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/25 blur-3xl" />
-        <div className="absolute top-1/3 -right-16 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
-        <div className="absolute -bottom-16 left-1/3 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/60 blur-3xl" />
+        <div className="absolute top-1/3 -right-16 h-80 w-80 rounded-full bg-cyan-200/55 blur-3xl" />
+        <div className="absolute -bottom-16 left-1/3 h-64 w-64 rounded-full bg-sky-200/55 blur-3xl" />
       </div>
       <div
         className={cn(
-          'relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-2xl shadow-slate-900/30 backdrop-blur',
+          'relative w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 shadow-2xl shadow-slate-300/40 backdrop-blur',
           'aspect-[3/4] flex flex-col', // Fixed 3:4 aspect ratio
           className
         )}

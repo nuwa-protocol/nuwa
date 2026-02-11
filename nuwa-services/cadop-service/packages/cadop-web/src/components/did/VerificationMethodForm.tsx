@@ -163,14 +163,14 @@ export function VerificationMethodForm({
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         {/* Key Generation Section */}
         {did && (
-          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+          <div className="border rounded-lg p-4 bg-blue-50">
             <div className="flex items-center gap-2 mb-3">
               <Key className="h-4 w-4 text-blue-600" />
-              <h4 className="font-medium text-blue-900 dark:text-blue-100">
+              <h4 className="font-medium text-blue-900">
                 Generate New Key Pair
               </h4>
             </div>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+            <p className="text-sm text-blue-700 mb-3">
               Generate a new cryptographic key pair for this DID. The private key will be provided
               as a Service Key for server deployment.
             </p>
@@ -227,13 +227,13 @@ export function VerificationMethodForm({
             )}
 
             {generatedKey && (
-              <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+              <Alert className="border-green-200 bg-green-50">
                 <Shield className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-800 dark:text-green-200">
+                <AlertTitle className="text-green-800">
                   Service Key Generated
                 </AlertTitle>
                 <AlertDescription className="mt-2">
-                  <p className="text-sm text-green-700 dark:text-green-300 mb-3">
+                  <p className="text-sm text-green-700 mb-3">
                     <strong>Important:</strong> Copy and save the Service Key immediately. You
                     won&apos;t be able to view it again.
                   </p>
@@ -258,9 +258,9 @@ export function VerificationMethodForm({
                     </Alert>
                   )}
 
-                  <div className="bg-white dark:bg-gray-800 border rounded p-3 mb-3">
+                  <div className="bg-white border rounded p-3 mb-3">
                     <div className="flex items-center justify-between">
-                      <code className="text-xs font-mono break-all pr-2 text-gray-700 dark:text-gray-300">
+                      <code className="text-xs font-mono break-all pr-2 text-gray-700">
                         {generatedKey.storedKeyString}
                       </code>
                       <CopyButton
@@ -270,7 +270,7 @@ export function VerificationMethodForm({
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-green-600 dark:text-green-400">
+                  <p className="text-xs text-green-600">
                     Add this to your server environment variables:{' '}
                     <code>SERVICE_KEY=&quot;&lt;copied_value&gt;&quot;</code>
                   </p>
@@ -318,7 +318,7 @@ export function VerificationMethodForm({
                   placeholder="z...."
                   {...field}
                   readOnly={!!generatedKey}
-                  className={generatedKey ? 'bg-gray-50 dark:bg-gray-900' : ''}
+                  className={generatedKey ? 'bg-gray-50' : ''}
                 />
               </FormControl>
               {generatedKey && (

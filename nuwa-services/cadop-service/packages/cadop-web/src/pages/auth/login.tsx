@@ -26,27 +26,27 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl" />
-        <div className="absolute top-1/3 right-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/60 blur-3xl" />
+        <div className="absolute top-1/3 right-0 h-80 w-80 rounded-full bg-cyan-200/55 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-sky-200/55 blur-3xl" />
       </div>
 
       <div className="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
             <img src="/favicon.svg" alt="Nuwa ID" className="h-full w-full object-contain" />
           </div>
-          <p className="text-center text-xs uppercase tracking-[0.24em] text-cyan-200/80">Nuwa ID</p>
-          <h1 className="mt-3 text-center text-3xl font-bold text-white">Secure DID Sign-In</h1>
-          <p className="mt-2 text-center text-sm text-slate-200/80">
+          <p className="text-center text-xs uppercase tracking-[0.24em] text-sky-700/80">Nuwa ID</p>
+          <h1 className="mt-3 text-center text-3xl font-bold text-slate-900">Secure DID Sign-In</h1>
+          <p className="mt-2 text-center text-sm text-slate-600">
             Continue with passkey or wallet to access your DID workspace.
           </p>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="rounded-2xl border border-white/15 bg-white/95 px-4 py-8 shadow-2xl shadow-slate-900/30 backdrop-blur sm:px-10">
+          <div className="rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-8 shadow-2xl shadow-slate-300/40 backdrop-blur sm:px-10">
             {error && (
               <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4">
                 <div className="flex">
